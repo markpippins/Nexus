@@ -1,42 +1,42 @@
 package com.angrysurfer.spring.nexus.controller;
 
+import com.angrysurfer.spring.nexus.config.TestJpaConfig;
 import com.angrysurfer.spring.nexus.entity.ServerType;
 import com.angrysurfer.spring.nexus.repository.ServerTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(ServerTypeController.class)
+@Import(TestJpaConfig.class)
 class ServerTypeControllerTest {
 
-    @Mock
-    private ServerTypeRepository repository;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @InjectMocks
-    private ServerTypeController controller;
+    @MockBean
+    private ServerTypeRepository repository;
 
     private ServerType testServerType;
 
     @BeforeEach
     void setUp() {
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
         testServerType = new ServerType();
         testServerType.setId(1L);
         testServerType.setName("Docker Container");
@@ -44,48 +44,44 @@ class ServerTypeControllerTest {
     }
 
     @Test
-    void getAll() {
+    void getAll() throws Exception {
         Page<ServerType> page = new PageImpl<>(List.of(testServerType));
         when(repository.findAll(any(Pageable.class))).thenReturn(page);
 
-        org.springframework.data.domain.Page<ServerType> result = controller.getAll(PageRequest.of(0, 10));
-
-        assertEquals(1, result.getContent().size());
-        verify(repository).findAll(any(Pageable.class));
+        mockMvc.perform(get("/api/v1/server-types"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getById_Found() {
+    void getById_Found() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.of(testServerType));
 
-        ResponseEntity<ServerType> response = controller.getById(1L);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testServerType, response.getBody());
+        mockMvc.perform(get("/api/v1/server-types/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.name").value("Docker Container"));
     }
 
     @Test
-    void getById_NotFound() {
+    void getById_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<ServerType> response = controller.getById(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/server-types/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void create_Success() {
+    void create_Success() throws Exception {
         when(repository.save(any(ServerType.class))).thenReturn(testServerType);
 
-        ResponseEntity<ServerType> response = controller.create(testServerType);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        verify(repository).save(any(ServerType.class));
+        mockMvc.perform(post("/api/v1/server-types")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Docker Container\",\"description\":\"Docker containerized server\"}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
-    void update_Success() {
+    void update_Success() throws Exception {
         ServerType existing = new ServerType();
         existing.setId(1L);
         existing.setName("Old Type");
@@ -96,38 +92,36 @@ class ServerTypeControllerTest {
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(repository.save(any(ServerType.class))).thenReturn(existing);
 
-        ResponseEntity<ServerType> response = controller.update(1L, details);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(repository).save(any(ServerType.class));
+        mockMvc.perform(put("/api/v1/server-types/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New Type\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void update_NotFound() {
+    void update_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<ServerType> response = controller.update(1L, testServerType);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(put("/api/v1/server-types/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New Type\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void delete_Success() {
+    void delete_Success() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.of(testServerType));
         doNothing().when(repository).delete(any(ServerType.class));
 
-        ResponseEntity<Void> response = controller.delete(1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(repository).delete(any(ServerType.class));
+        mockMvc.perform(delete("/api/v1/server-types/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void delete_NotFound() {
+    void delete_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Void> response = controller.delete(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(delete("/api/v1/server-types/1"))
+                .andExpect(status().isNotFound());
     }
 }

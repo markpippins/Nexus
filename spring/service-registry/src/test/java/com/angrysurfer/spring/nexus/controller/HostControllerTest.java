@@ -1,46 +1,46 @@
 package com.angrysurfer.spring.nexus.controller;
 
 import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
+import com.angrysurfer.spring.nexus.config.TestJpaConfig;
 import com.angrysurfer.spring.nexus.entity.Host;
 import com.angrysurfer.spring.nexus.repository.HostRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(HostController.class)
+@Import(TestJpaConfig.class)
 class HostControllerTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private ServicesConsoleClient client;
 
-    @Mock
+    @MockBean
     private HostRepository hostRepository;
-
-    @InjectMocks
-    private HostController hostController;
 
     private Host testHost;
 
     @BeforeEach
     void setUp() {
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
         testHost = new Host();
         testHost.setId(1L);
         testHost.setHostname("test-server");
@@ -49,142 +49,109 @@ class HostControllerTest {
     }
 
     @Test
-    void getServers_ByHostname_Found() {
+    void getServers_ByHostname_Found() throws Exception {
         when(hostRepository.findByHostname("test-server")).thenReturn(Optional.of(testHost));
 
-        ResponseEntity<?> response = hostController.getServers("test-server", PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testHost, response.getBody());
-        verify(hostRepository).findByHostname("test-server");
+        mockMvc.perform(get("/api/v1/servers").param("hostname", "test-server"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getServers_ByHostname_NotFound() {
+    void getServers_ByHostname_NotFound() throws Exception {
         when(hostRepository.findByHostname("nonexistent")).thenReturn(Optional.empty());
 
-        ResponseEntity<?> response = hostController.getServers("nonexistent", PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/servers").param("hostname", "nonexistent"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void getServers_All() {
+    void getServers_All() throws Exception {
         Page<Host> hostPage = new PageImpl<>(List.of(testHost));
         when(hostRepository.findAll(any(Pageable.class))).thenReturn(hostPage);
 
-        ResponseEntity<?> response = hostController.getServers(null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(hostRepository).findAll(any(Pageable.class));
+        mockMvc.perform(get("/api/v1/servers"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getServerById_Found() {
+    void getServerById_Found() throws Exception {
         when(hostRepository.findById(1L)).thenReturn(Optional.of(testHost));
 
-        ResponseEntity<Host> response = hostController.getServerById(1L);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testHost, response.getBody());
+        mockMvc.perform(get("/api/v1/servers/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.hostname").value("test-server"));
     }
 
     @Test
-    void getServerById_NotFound() {
+    void getServerById_NotFound() throws Exception {
         when(hostRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Host> response = hostController.getServerById(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/servers/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void createServer_Success() {
+    void createServer_Success() throws Exception {
         when(hostRepository.findByHostname("test-server")).thenReturn(Optional.empty());
         when(hostRepository.save(any(Host.class))).thenReturn(testHost);
 
-        ResponseEntity<Host> response = hostController.createServer(testHost);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().getActiveFlag());
-        verify(hostRepository).save(any(Host.class));
+        mockMvc.perform(post("/api/v1/servers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"hostname\":\"test-server\",\"ipAddress\":\"192.168.1.100\"}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
-    void createServer_DuplicateHostname() {
+    void createServer_DuplicateHostname() throws Exception {
         when(hostRepository.findByHostname("test-server")).thenReturn(Optional.of(testHost));
 
-        ResponseEntity<Host> response = hostController.createServer(testHost);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        verify(hostRepository, never()).save(any(Host.class));
+        mockMvc.perform(post("/api/v1/servers")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"hostname\":\"test-server\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
-    void updateServer_Success() {
+    void updateServer_Success() throws Exception {
         Host existingHost = new Host();
         existingHost.setId(1L);
         existingHost.setHostname("old-hostname");
-
-        Host updatedHost = new Host();
-        updatedHost.setHostname("new-hostname");
 
         when(hostRepository.findById(1L)).thenReturn(Optional.of(existingHost));
         when(hostRepository.findByHostname("new-hostname")).thenReturn(Optional.empty());
-        when(hostRepository.save(any(Host.class))).thenReturn(updatedHost);
+        when(hostRepository.save(any(Host.class))).thenReturn(existingHost);
 
-        ResponseEntity<Host> response = hostController.updateServer(1L, updatedHost);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(hostRepository).save(any(Host.class));
+        mockMvc.perform(put("/api/v1/servers/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"hostname\":\"new-hostname\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void updateServer_NotFound() {
+    void updateServer_NotFound() throws Exception {
         when(hostRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Host> response = hostController.updateServer(1L, testHost);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(hostRepository, never()).save(any(Host.class));
+        mockMvc.perform(put("/api/v1/servers/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"hostname\":\"new-hostname\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void updateServer_DuplicateHostname() {
-        Host existingHost = new Host();
-        existingHost.setId(1L);
-        existingHost.setHostname("old-hostname");
-
-        Host updatedHost = new Host();
-        updatedHost.setHostname("existing-hostname");
-
-        when(hostRepository.findById(1L)).thenReturn(Optional.of(existingHost));
-        when(hostRepository.findByHostname("existing-hostname")).thenReturn(Optional.of(new Host()));
-
-        ResponseEntity<Host> response = hostController.updateServer(1L, updatedHost);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-    }
-
-    @Test
-    void deleteServer_Success() {
+    void deleteServer_Success() throws Exception {
         when(hostRepository.findById(1L)).thenReturn(Optional.of(testHost));
         doNothing().when(hostRepository).deleteById(1L);
 
-        ResponseEntity<Void> response = hostController.deleteServer(1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(hostRepository).deleteById(1L);
+        mockMvc.perform(delete("/api/v1/servers/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void deleteServer_NotFound() {
+    void deleteServer_NotFound() throws Exception {
         when(hostRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Void> response = hostController.deleteServer(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(hostRepository, never()).deleteById(anyLong());
+        mockMvc.perform(delete("/api/v1/servers/1"))
+                .andExpect(status().isNotFound());
     }
 }

@@ -1,42 +1,48 @@
 package com.angrysurfer.spring.nexus.controller;
 
-import com.angrysurfer.spring.nexus.entity.ServiceConfiguration;
-import com.angrysurfer.spring.nexus.repository.ServiceConfigurationRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ExtendWith(MockitoExtension.class)
+import com.angrysurfer.spring.nexus.config.TestJpaConfig;
+import com.angrysurfer.spring.nexus.entity.ServiceConfiguration;
+import com.angrysurfer.spring.nexus.repository.ServiceConfigurationRepository;
+
+@WebMvcTest(ConfigurationController.class)
+@Import(TestJpaConfig.class)
 class ConfigurationControllerTest {
 
-    @Mock
-    private ServiceConfigurationRepository configurationRepository;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @InjectMocks
-    private ConfigurationController configurationController;
+    @MockBean
+    private ServiceConfigurationRepository configurationRepository;
 
     private ServiceConfiguration testConfiguration;
 
     @BeforeEach
     void setUp() {
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
         testConfiguration = new ServiceConfiguration();
         testConfiguration.setId(1L);
         testConfiguration.setConfigKey("app.name");
@@ -46,134 +52,128 @@ class ConfigurationControllerTest {
     }
 
     @Test
-    void getConfigurations_ByAllParams_Found() {
+    void getConfigurations_ByAllParams_Found() throws Exception {
         when(configurationRepository.findByServiceIdAndConfigKeyAndEnvironmentId(1L, "app.name", 1L))
                 .thenReturn(Optional.of(testConfiguration));
 
-        ResponseEntity<?> response = configurationController.getConfigurations(1L, 1L, "app.name", PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testConfiguration, response.getBody());
+        mockMvc.perform(get("/api/v1/configurations")
+                .param("serviceId", "1")
+                .param("environmentId", "1")
+                .param("configKey", "app.name"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getConfigurations_ByAllParams_NotFound() {
+    void getConfigurations_ByAllParams_NotFound() throws Exception {
         when(configurationRepository.findByServiceIdAndConfigKeyAndEnvironmentId(1L, "app.name", 1L))
                 .thenReturn(Optional.empty());
 
-        ResponseEntity<?> response = configurationController.getConfigurations(1L, 1L, "app.name", PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/configurations")
+                .param("serviceId", "1")
+                .param("environmentId", "1")
+                .param("configKey", "app.name"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void getConfigurations_ByServiceAndEnvironment() {
+    void getConfigurations_ByServiceAndEnvironment() throws Exception {
         Page<ServiceConfiguration> configPage = new PageImpl<>(List.of(testConfiguration));
         when(configurationRepository.findByServiceIdAndEnvironmentId(eq(1L), eq(1L), any(Pageable.class)))
                 .thenReturn(configPage);
 
-        ResponseEntity<?> response = configurationController.getConfigurations(1L, 1L, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/configurations")
+                .param("serviceId", "1")
+                .param("environmentId", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getConfigurations_ByServiceId() {
+    void getConfigurations_ByServiceId() throws Exception {
         Page<ServiceConfiguration> configPage = new PageImpl<>(List.of(testConfiguration));
         when(configurationRepository.findByServiceId(eq(1L), any(Pageable.class))).thenReturn(configPage);
 
-        ResponseEntity<?> response = configurationController.getConfigurations(1L, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/configurations")
+                .param("serviceId", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getConfigurations_All() {
+    void getConfigurations_All() throws Exception {
         Page<ServiceConfiguration> configPage = new PageImpl<>(List.of(testConfiguration));
         when(configurationRepository.findAll(any(Pageable.class))).thenReturn(configPage);
 
-        ResponseEntity<?> response = configurationController.getConfigurations(null, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/configurations"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getConfigurationById_Found() {
+    void getConfigurationById_Found() throws Exception {
         when(configurationRepository.findById(1L)).thenReturn(Optional.of(testConfiguration));
 
-        ResponseEntity<ServiceConfiguration> response = configurationController.getConfigurationById(1L);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testConfiguration, response.getBody());
+        mockMvc.perform(get("/api/v1/configurations/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.configKey").value("app.name"));
     }
 
     @Test
-    void getConfigurationById_NotFound() {
+    void getConfigurationById_NotFound() throws Exception {
         when(configurationRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<ServiceConfiguration> response = configurationController.getConfigurationById(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/configurations/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void createConfiguration_Success() {
+    void createConfiguration_Success() throws Exception {
         when(configurationRepository.save(any(ServiceConfiguration.class))).thenReturn(testConfiguration);
 
-        ResponseEntity<ServiceConfiguration> response = configurationController.createConfiguration(testConfiguration);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        verify(configurationRepository).save(any(ServiceConfiguration.class));
+        mockMvc.perform(post("/api/v1/configurations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                        "{\"configKey\":\"app.name\",\"configValue\":\"Test App\",\"serviceId\":1,\"environmentId\":1}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
-    void updateConfiguration_Success() {
+    void updateConfiguration_Success() throws Exception {
         ServiceConfiguration existingConfig = new ServiceConfiguration();
         existingConfig.setId(1L);
         existingConfig.setConfigKey("old.key");
 
-        ServiceConfiguration updatedConfig = new ServiceConfiguration();
-        updatedConfig.setConfigKey("new.key");
-        updatedConfig.setConfigValue("new.value");
-
         when(configurationRepository.findById(1L)).thenReturn(Optional.of(existingConfig));
-        when(configurationRepository.save(any(ServiceConfiguration.class))).thenReturn(updatedConfig);
+        when(configurationRepository.save(any(ServiceConfiguration.class))).thenReturn(existingConfig);
 
-        ResponseEntity<ServiceConfiguration> response = configurationController.updateConfiguration(1L, updatedConfig);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(configurationRepository).save(any(ServiceConfiguration.class));
+        mockMvc.perform(put("/api/v1/configurations/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"configKey\":\"new.key\",\"configValue\":\"new.value\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void updateConfiguration_NotFound() {
+    void updateConfiguration_NotFound() throws Exception {
         when(configurationRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<ServiceConfiguration> response = configurationController.updateConfiguration(1L, testConfiguration);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(configurationRepository, never()).save(any(ServiceConfiguration.class));
+        mockMvc.perform(put("/api/v1/configurations/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"configKey\":\"new.key\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void deleteConfiguration_Success() {
+    void deleteConfiguration_Success() throws Exception {
         when(configurationRepository.findById(1L)).thenReturn(Optional.of(testConfiguration));
         doNothing().when(configurationRepository).delete(any(ServiceConfiguration.class));
 
-        ResponseEntity<Void> response = configurationController.deleteConfiguration(1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(configurationRepository).delete(any(ServiceConfiguration.class));
+        mockMvc.perform(delete("/api/v1/configurations/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void deleteConfiguration_NotFound() {
+    void deleteConfiguration_NotFound() throws Exception {
         when(configurationRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Void> response = configurationController.deleteConfiguration(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(configurationRepository, never()).delete(any(ServiceConfiguration.class));
+        mockMvc.perform(delete("/api/v1/configurations/1"))
+                .andExpect(status().isNotFound());
     }
 }

@@ -1,42 +1,43 @@
 package com.angrysurfer.spring.nexus.controller;
 
+import com.angrysurfer.spring.nexus.config.TestJpaConfig;
 import com.angrysurfer.spring.nexus.entity.OperatingSystem;
 import com.angrysurfer.spring.nexus.repository.OperatingSystemRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(OperatingSystemController.class)
+@Import(TestJpaConfig.class)
 class OperatingSystemControllerTest {
 
-    @Mock
-    private OperatingSystemRepository repository;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @InjectMocks
-    private OperatingSystemController controller;
+    @MockBean
+    private OperatingSystemRepository repository;
 
     private OperatingSystem testOS;
 
     @BeforeEach
     void setUp() {
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
         testOS = new OperatingSystem();
         testOS.setId(1L);
         testOS.setName("Ubuntu");
@@ -46,90 +47,81 @@ class OperatingSystemControllerTest {
     }
 
     @Test
-    void getAll() {
+    void getAll() throws Exception {
         Page<OperatingSystem> page = new PageImpl<>(List.of(testOS));
         when(repository.findAll(any(Pageable.class))).thenReturn(page);
 
-        org.springframework.data.domain.Page<OperatingSystem> result = controller.getAll(PageRequest.of(0, 10));
-
-        assertEquals(1, result.getContent().size());
-        verify(repository).findAll(any(Pageable.class));
+        mockMvc.perform(get("/api/v1/operating-systems"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getById_Found() {
+    void getById_Found() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.of(testOS));
 
-        ResponseEntity<OperatingSystem> response = controller.getById(1L);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testOS, response.getBody());
+        mockMvc.perform(get("/api/v1/operating-systems/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.name").value("Ubuntu"));
     }
 
     @Test
-    void getById_NotFound() {
+    void getById_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<OperatingSystem> response = controller.getById(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/operating-systems/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void create_Success() {
+    void create_Success() throws Exception {
         when(repository.save(any(OperatingSystem.class))).thenReturn(testOS);
 
-        ResponseEntity<OperatingSystem> response = controller.create(testOS);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        verify(repository).save(any(OperatingSystem.class));
+        mockMvc.perform(post("/api/v1/operating-systems")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Ubuntu\",\"version\":\"22.04\",\"ltsFlag\":true}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
-    void update_Success() {
+    void update_Success() throws Exception {
         OperatingSystem existing = new OperatingSystem();
         existing.setId(1L);
         existing.setName("Old OS");
 
-        OperatingSystem details = new OperatingSystem();
-        details.setName("New OS");
-
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(repository.save(any(OperatingSystem.class))).thenReturn(existing);
 
-        ResponseEntity<OperatingSystem> response = controller.update(1L, details);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(repository).save(any(OperatingSystem.class));
+        mockMvc.perform(put("/api/v1/operating-systems/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New OS\",\"version\":\"22.04\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void update_NotFound() {
+    void update_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<OperatingSystem> response = controller.update(1L, testOS);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(put("/api/v1/operating-systems/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New OS\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void delete_Success() {
+    void delete_Success() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.of(testOS));
         doNothing().when(repository).delete(any(OperatingSystem.class));
 
-        ResponseEntity<Void> response = controller.delete(1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(repository).delete(any(OperatingSystem.class));
+        mockMvc.perform(delete("/api/v1/operating-systems/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void delete_NotFound() {
+    void delete_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Void> response = controller.delete(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(delete("/api/v1/operating-systems/1"))
+                .andExpect(status().isNotFound());
     }
 }

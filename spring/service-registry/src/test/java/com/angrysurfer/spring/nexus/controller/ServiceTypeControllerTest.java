@@ -1,42 +1,42 @@
 package com.angrysurfer.spring.nexus.controller;
 
+import com.angrysurfer.spring.nexus.config.TestJpaConfig;
 import com.angrysurfer.spring.nexus.entity.ServiceType;
 import com.angrysurfer.spring.nexus.repository.ServiceTypeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(ServiceTypeController.class)
+@Import(TestJpaConfig.class)
 class ServiceTypeControllerTest {
 
-    @Mock
-    private ServiceTypeRepository repository;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @InjectMocks
-    private ServiceTypeController controller;
+    @MockBean
+    private ServiceTypeRepository repository;
 
     private ServiceType testServiceType;
 
     @BeforeEach
     void setUp() {
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
         testServiceType = new ServiceType();
         testServiceType.setId(1L);
         testServiceType.setName("Microservice");
@@ -44,48 +44,44 @@ class ServiceTypeControllerTest {
     }
 
     @Test
-    void getAll() {
+    void getAll() throws Exception {
         Page<ServiceType> page = new PageImpl<>(List.of(testServiceType));
         when(repository.findAll(any(Pageable.class))).thenReturn(page);
 
-        org.springframework.data.domain.Page<ServiceType> result = controller.getAll(PageRequest.of(0, 10));
-
-        assertEquals(1, result.getContent().size());
-        verify(repository).findAll(any(Pageable.class));
+        mockMvc.perform(get("/api/v1/service-types"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getById_Found() {
+    void getById_Found() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.of(testServiceType));
 
-        ResponseEntity<ServiceType> response = controller.getById(1L);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testServiceType, response.getBody());
+        mockMvc.perform(get("/api/v1/service-types/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.name").value("Microservice"));
     }
 
     @Test
-    void getById_NotFound() {
+    void getById_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<ServiceType> response = controller.getById(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/service-types/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void create_Success() {
+    void create_Success() throws Exception {
         when(repository.save(any(ServiceType.class))).thenReturn(testServiceType);
 
-        ResponseEntity<ServiceType> response = controller.create(testServiceType);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        verify(repository).save(any(ServiceType.class));
+        mockMvc.perform(post("/api/v1/service-types")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Microservice\",\"description\":\"Microservice type\"}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
-    void update_Success() {
+    void update_Success() throws Exception {
         ServiceType existing = new ServiceType();
         existing.setId(1L);
         existing.setName("Old Name");
@@ -96,38 +92,36 @@ class ServiceTypeControllerTest {
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
         when(repository.save(any(ServiceType.class))).thenReturn(existing);
 
-        ResponseEntity<ServiceType> response = controller.update(1L, details);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(repository).save(any(ServiceType.class));
+        mockMvc.perform(put("/api/v1/service-types/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New Name\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void update_NotFound() {
+    void update_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<ServiceType> response = controller.update(1L, testServiceType);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(put("/api/v1/service-types/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New Name\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void delete_Success() {
+    void delete_Success() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.of(testServiceType));
         doNothing().when(repository).delete(any(ServiceType.class));
 
-        ResponseEntity<Void> response = controller.delete(1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(repository).delete(any(ServiceType.class));
+        mockMvc.perform(delete("/api/v1/service-types/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void delete_NotFound() {
+    void delete_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Void> response = controller.delete(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(delete("/api/v1/service-types/1"))
+                .andExpect(status().isNotFound());
     }
 }

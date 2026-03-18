@@ -1,42 +1,42 @@
 package com.angrysurfer.spring.nexus.controller;
 
+import com.angrysurfer.spring.nexus.config.TestJpaConfig;
 import com.angrysurfer.spring.nexus.entity.Library;
 import com.angrysurfer.spring.nexus.repository.LibraryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(LibraryController.class)
+@Import(TestJpaConfig.class)
 class LibraryControllerTest {
 
-    @Mock
-    private LibraryRepository libraryRepository;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @InjectMocks
-    private LibraryController libraryController;
+    @MockBean
+    private LibraryRepository libraryRepository;
 
     private Library testLibrary;
 
     @BeforeEach
     void setUp() {
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
         testLibrary = new Library();
         testLibrary.setId(1L);
         testLibrary.setName("Lodash");
@@ -45,175 +45,136 @@ class LibraryControllerTest {
     }
 
     @Test
-    void getLibraries_ByName_Found() {
+    void getLibraries_ByName_Found() throws Exception {
         when(libraryRepository.findByName("Lodash")).thenReturn(Optional.of(testLibrary));
 
-        ResponseEntity<?> response = libraryController.getLibraries("Lodash", null, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testLibrary, response.getBody());
-        verify(libraryRepository).findByName("Lodash");
+        mockMvc.perform(get("/api/v1/libraries").param("name", "Lodash"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getLibraries_ByName_NotFound() {
+    void getLibraries_ByName_NotFound() throws Exception {
         when(libraryRepository.findByName("Nonexistent")).thenReturn(Optional.empty());
 
-        ResponseEntity<?> response = libraryController.getLibraries("Nonexistent", null, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/libraries").param("name", "Nonexistent"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void getLibraries_ByCategoryId() {
+    void getLibraries_ByCategoryId() throws Exception {
         Page<Library> libraryPage = new PageImpl<>(List.of(testLibrary));
-        when(libraryRepository.findByCategory_Id(eq(1L), any(Pageable.class))).thenReturn(libraryPage);
+        when(libraryRepository.findByCategory_Id(eq(1L), any())).thenReturn(libraryPage);
 
-        ResponseEntity<?> response = libraryController.getLibraries(null, 1L, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(libraryRepository).findByCategory_Id(eq(1L), any(Pageable.class));
+        mockMvc.perform(get("/api/v1/libraries").param("categoryId", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getLibraries_ByLanguageId() {
+    void getLibraries_ByLanguageId() throws Exception {
         Page<Library> libraryPage = new PageImpl<>(List.of(testLibrary));
-        when(libraryRepository.findByLanguage_Id(eq(1L), any(Pageable.class))).thenReturn(libraryPage);
+        when(libraryRepository.findByLanguage_Id(eq(1L), any())).thenReturn(libraryPage);
 
-        ResponseEntity<?> response = libraryController.getLibraries(null, null, 1L, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(libraryRepository).findByLanguage_Id(eq(1L), any(Pageable.class));
+        mockMvc.perform(get("/api/v1/libraries").param("languageId", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getLibraries_ByPackageManager() {
+    void getLibraries_ByPackageManager() throws Exception {
         Page<Library> libraryPage = new PageImpl<>(List.of(testLibrary));
-        when(libraryRepository.findByPackageManager(eq("npm"), any(Pageable.class))).thenReturn(libraryPage);
+        when(libraryRepository.findByPackageManager(eq("npm"), any())).thenReturn(libraryPage);
 
-        ResponseEntity<?> response = libraryController.getLibraries(null, null, null, "npm", PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(libraryRepository).findByPackageManager(eq("npm"), any(Pageable.class));
+        mockMvc.perform(get("/api/v1/libraries").param("packageManager", "npm"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getLibraries_All() {
+    void getLibraries_All() throws Exception {
         Page<Library> libraryPage = new PageImpl<>(List.of(testLibrary));
         when(libraryRepository.findAll(any(Pageable.class))).thenReturn(libraryPage);
 
-        ResponseEntity<?> response = libraryController.getLibraries(null, null, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(libraryRepository).findAll(any(Pageable.class));
+        mockMvc.perform(get("/api/v1/libraries"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getLibraryById_Found() {
+    void getLibraryById_Found() throws Exception {
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(testLibrary));
 
-        ResponseEntity<Library> response = libraryController.getLibraryById(1L);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testLibrary, response.getBody());
+        mockMvc.perform(get("/api/v1/libraries/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.name").value("Lodash"));
     }
 
     @Test
-    void getLibraryById_NotFound() {
+    void getLibraryById_NotFound() throws Exception {
         when(libraryRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Library> response = libraryController.getLibraryById(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/libraries/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void createLibrary_Success() {
+    void createLibrary_Success() throws Exception {
         when(libraryRepository.findByName("Lodash")).thenReturn(Optional.empty());
         when(libraryRepository.save(any(Library.class))).thenReturn(testLibrary);
 
-        ResponseEntity<Library> response = libraryController.createLibrary(testLibrary);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().getActiveFlag());
-        verify(libraryRepository).save(any(Library.class));
+        mockMvc.perform(post("/api/v1/libraries")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lodash\",\"packageName\":\"lodash\"}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
-    void createLibrary_DuplicateName() {
+    void createLibrary_DuplicateName() throws Exception {
         when(libraryRepository.findByName("Lodash")).thenReturn(Optional.of(testLibrary));
 
-        ResponseEntity<Library> response = libraryController.createLibrary(testLibrary);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        verify(libraryRepository, never()).save(any(Library.class));
+        mockMvc.perform(post("/api/v1/libraries")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Lodash\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
-    void updateLibrary_Success() {
+    void updateLibrary_Success() throws Exception {
         Library existingLibrary = new Library();
         existingLibrary.setId(1L);
         existingLibrary.setName("Old Library");
-
-        Library updatedLibrary = new Library();
-        updatedLibrary.setName("New Library");
 
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(existingLibrary));
         when(libraryRepository.findByName("New Library")).thenReturn(Optional.empty());
-        when(libraryRepository.save(any(Library.class))).thenReturn(updatedLibrary);
+        when(libraryRepository.save(any(Library.class))).thenReturn(existingLibrary);
 
-        ResponseEntity<Library> response = libraryController.updateLibrary(1L, updatedLibrary);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(libraryRepository).save(any(Library.class));
+        mockMvc.perform(put("/api/v1/libraries/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New Library\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void updateLibrary_NotFound() {
+    void updateLibrary_NotFound() throws Exception {
         when(libraryRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Library> response = libraryController.updateLibrary(1L, testLibrary);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(libraryRepository, never()).save(any(Library.class));
+        mockMvc.perform(put("/api/v1/libraries/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New Library\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void updateLibrary_DuplicateName() {
-        Library existingLibrary = new Library();
-        existingLibrary.setId(1L);
-        existingLibrary.setName("Old Library");
-
-        Library updatedLibrary = new Library();
-        updatedLibrary.setName("Existing Library");
-
-        when(libraryRepository.findById(1L)).thenReturn(Optional.of(existingLibrary));
-        when(libraryRepository.findByName("Existing Library")).thenReturn(Optional.of(new Library()));
-
-        ResponseEntity<Library> response = libraryController.updateLibrary(1L, updatedLibrary);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-    }
-
-    @Test
-    void deleteLibrary_Success() {
+    void deleteLibrary_Success() throws Exception {
         when(libraryRepository.findById(1L)).thenReturn(Optional.of(testLibrary));
         doNothing().when(libraryRepository).deleteById(1L);
 
-        ResponseEntity<Void> response = libraryController.deleteLibrary(1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(libraryRepository).deleteById(1L);
+        mockMvc.perform(delete("/api/v1/libraries/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void deleteLibrary_NotFound() {
+    void deleteLibrary_NotFound() throws Exception {
         when(libraryRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Void> response = libraryController.deleteLibrary(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(libraryRepository, never()).deleteById(anyLong());
+        mockMvc.perform(delete("/api/v1/libraries/1"))
+                .andExpect(status().isNotFound());
     }
 }

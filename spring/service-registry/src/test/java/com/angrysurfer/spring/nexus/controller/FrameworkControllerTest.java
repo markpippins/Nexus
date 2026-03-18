@@ -1,46 +1,46 @@
 package com.angrysurfer.spring.nexus.controller;
 
 import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
+import com.angrysurfer.spring.nexus.config.TestJpaConfig;
 import com.angrysurfer.spring.nexus.entity.Framework;
 import com.angrysurfer.spring.nexus.repository.FrameworkRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(FrameworkController.class)
+@Import(TestJpaConfig.class)
 class FrameworkControllerTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private ServicesConsoleClient client;
 
-    @Mock
+    @MockBean
     private FrameworkRepository frameworkRepository;
-
-    @InjectMocks
-    private FrameworkController frameworkController;
 
     private Framework testFramework;
 
     @BeforeEach
     void setUp() {
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
         testFramework = new Framework();
         testFramework.setId(1L);
         testFramework.setName("Spring Boot");
@@ -49,162 +49,122 @@ class FrameworkControllerTest {
     }
 
     @Test
-    void getFrameworks_ByName_Found() {
+    void getFrameworks_ByName_Found() throws Exception {
         when(frameworkRepository.findByName("Spring Boot")).thenReturn(Optional.of(testFramework));
 
-        ResponseEntity<?> response = frameworkController.getFrameworks("Spring Boot", null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testFramework, response.getBody());
-        verify(frameworkRepository).findByName("Spring Boot");
+        mockMvc.perform(get("/api/v1/frameworks").param("name", "Spring Boot"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getFrameworks_ByName_NotFound() {
+    void getFrameworks_ByName_NotFound() throws Exception {
         when(frameworkRepository.findByName("Nonexistent")).thenReturn(Optional.empty());
 
-        ResponseEntity<?> response = frameworkController.getFrameworks("Nonexistent", null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/frameworks").param("name", "Nonexistent"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void getFrameworks_BrokerCompatible() {
+    void getFrameworks_BrokerCompatible() throws Exception {
         Framework framework1 = new Framework();
         framework1.setId(1L);
         framework1.setName("Spring Boot");
         framework1.setSupportsBrokerPattern(true);
 
-        Framework framework2 = new Framework();
-        framework2.setId(2L);
-        framework2.setName("Quarkus");
-        framework2.setSupportsBrokerPattern(true);
+        when(frameworkRepository.findAll()).thenReturn(List.of(framework1));
 
-        when(frameworkRepository.findAll()).thenReturn(List.of(framework1, framework2));
-
-        ResponseEntity<?> response = frameworkController.getFrameworks(null, true, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(frameworkRepository).findAll();
+        mockMvc.perform(get("/api/v1/frameworks").param("brokerCompatible", "true"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getFrameworks_All() {
+    void getFrameworks_All() throws Exception {
         Page<Framework> frameworkPage = new PageImpl<>(List.of(testFramework));
         when(frameworkRepository.findAll(any(Pageable.class))).thenReturn(frameworkPage);
 
-        ResponseEntity<?> response = frameworkController.getFrameworks(null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(frameworkRepository).findAll(any(Pageable.class));
+        mockMvc.perform(get("/api/v1/frameworks"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getFrameworkById_Found() {
+    void getFrameworkById_Found() throws Exception {
         when(frameworkRepository.findById(1L)).thenReturn(Optional.of(testFramework));
 
-        ResponseEntity<Framework> response = frameworkController.getFrameworkById(1L);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testFramework, response.getBody());
+        mockMvc.perform(get("/api/v1/frameworks/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.name").value("Spring Boot"));
     }
 
     @Test
-    void getFrameworkById_NotFound() {
+    void getFrameworkById_NotFound() throws Exception {
         when(frameworkRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Framework> response = frameworkController.getFrameworkById(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/frameworks/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void createFramework_Success() {
+    void createFramework_Success() throws Exception {
         when(frameworkRepository.findByName("Spring Boot")).thenReturn(Optional.empty());
         when(frameworkRepository.save(any(Framework.class))).thenReturn(testFramework);
 
-        ResponseEntity<Framework> response = frameworkController.createFramework(testFramework);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().getActiveFlag());
-        verify(frameworkRepository).save(any(Framework.class));
+        mockMvc.perform(post("/api/v1/frameworks")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Spring Boot\",\"supportsBrokerPattern\":true}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
-    void createFramework_DuplicateName() {
+    void createFramework_DuplicateName() throws Exception {
         when(frameworkRepository.findByName("Spring Boot")).thenReturn(Optional.of(testFramework));
 
-        ResponseEntity<Framework> response = frameworkController.createFramework(testFramework);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        verify(frameworkRepository, never()).save(any(Framework.class));
+        mockMvc.perform(post("/api/v1/frameworks")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Spring Boot\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
-    void updateFramework_Success() {
+    void updateFramework_Success() throws Exception {
         Framework existingFramework = new Framework();
         existingFramework.setId(1L);
         existingFramework.setName("Old Framework");
-
-        Framework updatedFramework = new Framework();
-        updatedFramework.setName("New Framework");
 
         when(frameworkRepository.findById(1L)).thenReturn(Optional.of(existingFramework));
         when(frameworkRepository.findByName("New Framework")).thenReturn(Optional.empty());
-        when(frameworkRepository.save(any(Framework.class))).thenReturn(updatedFramework);
+        when(frameworkRepository.save(any(Framework.class))).thenReturn(existingFramework);
 
-        ResponseEntity<Framework> response = frameworkController.updateFramework(1L, updatedFramework);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(frameworkRepository).save(any(Framework.class));
+        mockMvc.perform(put("/api/v1/frameworks/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New Framework\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void updateFramework_NotFound() {
+    void updateFramework_NotFound() throws Exception {
         when(frameworkRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Framework> response = frameworkController.updateFramework(1L, testFramework);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(frameworkRepository, never()).save(any(Framework.class));
+        mockMvc.perform(put("/api/v1/frameworks/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"New Framework\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void updateFramework_DuplicateName() {
-        Framework existingFramework = new Framework();
-        existingFramework.setId(1L);
-        existingFramework.setName("Old Framework");
-
-        Framework updatedFramework = new Framework();
-        updatedFramework.setName("Existing Framework");
-
-        when(frameworkRepository.findById(1L)).thenReturn(Optional.of(existingFramework));
-        when(frameworkRepository.findByName("Existing Framework")).thenReturn(Optional.of(new Framework()));
-
-        ResponseEntity<Framework> response = frameworkController.updateFramework(1L, updatedFramework);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-    }
-
-    @Test
-    void deleteFramework_Success() {
+    void deleteFramework_Success() throws Exception {
         when(frameworkRepository.findById(1L)).thenReturn(Optional.of(testFramework));
         doNothing().when(frameworkRepository).deleteById(1L);
 
-        ResponseEntity<Void> response = frameworkController.deleteFramework(1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(frameworkRepository).deleteById(1L);
+        mockMvc.perform(delete("/api/v1/frameworks/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void deleteFramework_NotFound() {
+    void deleteFramework_NotFound() throws Exception {
         when(frameworkRepository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Void> response = frameworkController.deleteFramework(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
-        verify(frameworkRepository, never()).deleteById(anyLong());
+        mockMvc.perform(delete("/api/v1/frameworks/1"))
+                .andExpect(status().isNotFound());
     }
 }

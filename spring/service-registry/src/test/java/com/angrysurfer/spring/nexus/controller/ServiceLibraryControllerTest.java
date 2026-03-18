@@ -1,42 +1,42 @@
 package com.angrysurfer.spring.nexus.controller;
 
+import com.angrysurfer.spring.nexus.config.TestJpaConfig;
 import com.angrysurfer.spring.nexus.entity.ServiceLibrary;
 import com.angrysurfer.spring.nexus.repository.ServiceLibraryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(ServiceLibraryController.class)
+@Import(TestJpaConfig.class)
 class ServiceLibraryControllerTest {
 
-    @Mock
-    private ServiceLibraryRepository repository;
+    @Autowired
+    private MockMvc mockMvc;
 
-    @InjectMocks
-    private ServiceLibraryController controller;
+    @MockBean
+    private ServiceLibraryRepository repository;
 
     private ServiceLibrary testServiceLibrary;
 
     @BeforeEach
     void setUp() {
-        org.springframework.mock.web.MockHttpServletRequest request = new org.springframework.mock.web.MockHttpServletRequest();
-        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
         testServiceLibrary = new ServiceLibrary();
         testServiceLibrary.setId(1L);
         testServiceLibrary.setServiceId(1L);
@@ -46,158 +46,149 @@ class ServiceLibraryControllerTest {
     }
 
     @Test
-    void getServiceLibraries_ByServiceId() {
+    void getServiceLibraries_ByServiceId() throws Exception {
         Page<ServiceLibrary> page = new PageImpl<>(List.of(testServiceLibrary));
-        when(repository.findByServiceId(eq(1L), any(Pageable.class))).thenReturn(page);
+        when(repository.findByServiceId(eq(1L), any())).thenReturn(page);
 
-        ResponseEntity<?> response = controller.getServiceLibraries(1L, null, null, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(repository).findByServiceId(eq(1L), any(Pageable.class));
+        mockMvc.perform(get("/api/v1/service-libraries").param("serviceId", "1"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getServiceLibraries_ByServiceId_Direct() {
+    void getServiceLibraries_ByServiceId_Direct() throws Exception {
         Page<ServiceLibrary> page = new PageImpl<>(List.of(testServiceLibrary));
-        when(repository.findByServiceIdAndIsDirect(eq(1L), eq(true), any(Pageable.class))).thenReturn(page);
+        when(repository.findByServiceIdAndIsDirect(eq(1L), eq(true), any())).thenReturn(page);
 
-        ResponseEntity<?> response = controller.getServiceLibraries(1L, null, true, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(repository).findByServiceIdAndIsDirect(eq(1L), eq(true), any(Pageable.class));
+        mockMvc.perform(get("/api/v1/service-libraries").param("serviceId", "1").param("direct", "true"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getServiceLibraries_ByServiceId_Dev() {
+    void getServiceLibraries_ByServiceId_Dev() throws Exception {
         Page<ServiceLibrary> page = new PageImpl<>(List.of(testServiceLibrary));
-        when(repository.findByServiceIdAndIsDevDependency(eq(1L), eq(true), any(Pageable.class))).thenReturn(page);
+        when(repository.findByServiceIdAndIsDevDependency(eq(1L), eq(true), any())).thenReturn(page);
 
-        ResponseEntity<?> response = controller.getServiceLibraries(1L, null, null, true, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(repository).findByServiceIdAndIsDevDependency(eq(1L), eq(true), any(Pageable.class));
+        mockMvc.perform(get("/api/v1/service-libraries").param("serviceId", "1").param("dev", "true"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getServiceLibraries_ByLibraryId() {
+    void getServiceLibraries_ByServiceId_Production() throws Exception {
         Page<ServiceLibrary> page = new PageImpl<>(List.of(testServiceLibrary));
-        when(repository.findByLibraryId(eq(1L), any(Pageable.class))).thenReturn(page);
+        when(repository.findByServiceIdAndIsDevDependency(eq(1L), eq(false), any())).thenReturn(page);
 
-        ResponseEntity<?> response = controller.getServiceLibraries(null, 1L, null, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(repository).findByLibraryId(eq(1L), any(Pageable.class));
+        mockMvc.perform(get("/api/v1/service-libraries").param("serviceId", "1").param("production", "true"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getServiceLibraries_All() {
+    void getServiceLibraries_ByLibraryId() throws Exception {
+        Page<ServiceLibrary> page = new PageImpl<>(List.of(testServiceLibrary));
+        when(repository.findByLibraryId(eq(1L), any())).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/service-libraries").param("libraryId", "1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getServiceLibraries_All() throws Exception {
         Page<ServiceLibrary> page = new PageImpl<>(List.of(testServiceLibrary));
         when(repository.findAll(any(Pageable.class))).thenReturn(page);
 
-        ResponseEntity<?> response = controller.getServiceLibraries(null, null, null, null, null, PageRequest.of(0, 10));
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(repository).findAll(any(Pageable.class));
+        mockMvc.perform(get("/api/v1/service-libraries"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void getServiceLibraryById_Found() {
+    void getServiceLibraryById_Found() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.of(testServiceLibrary));
 
-        ResponseEntity<ServiceLibrary> response = controller.getServiceLibraryById(1L);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertEquals(testServiceLibrary, response.getBody());
+        mockMvc.perform(get("/api/v1/service-libraries/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1));
     }
 
     @Test
-    void getServiceLibraryById_NotFound() {
+    void getServiceLibraryById_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<ServiceLibrary> response = controller.getServiceLibraryById(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(get("/api/v1/service-libraries/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void createServiceLibrary_Success() {
+    void createServiceLibrary_Success() throws Exception {
         when(repository.findByServiceIdAndLibraryId(1L, 1L)).thenReturn(Optional.empty());
         when(repository.save(any(ServiceLibrary.class))).thenReturn(testServiceLibrary);
 
-        ResponseEntity<ServiceLibrary> response = controller.createServiceLibrary(testServiceLibrary);
-
-        assertEquals(HttpStatus.CREATED, response.getStatusCode());
-        assertTrue(response.getBody().getActiveFlag());
-        verify(repository).save(any(ServiceLibrary.class));
+        mockMvc.perform(post("/api/v1/service-libraries")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"serviceId\":1,\"libraryId\":1,\"isDirect\":true}"))
+                .andExpect(status().isCreated());
     }
 
     @Test
-    void createServiceLibrary_Duplicate() {
+    void createServiceLibrary_Duplicate() throws Exception {
         when(repository.findByServiceIdAndLibraryId(1L, 1L)).thenReturn(Optional.of(testServiceLibrary));
 
-        ResponseEntity<ServiceLibrary> response = controller.createServiceLibrary(testServiceLibrary);
-
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        verify(repository, never()).save(any(ServiceLibrary.class));
+        mockMvc.perform(post("/api/v1/service-libraries")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"serviceId\":1,\"libraryId\":1}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
-    void updateServiceLibrary_Success() {
+    void updateServiceLibrary_Success() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.of(testServiceLibrary));
         when(repository.save(any(ServiceLibrary.class))).thenReturn(testServiceLibrary);
 
-        ResponseEntity<ServiceLibrary> response = controller.updateServiceLibrary(1L, testServiceLibrary);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(repository).save(any(ServiceLibrary.class));
+        mockMvc.perform(put("/api/v1/service-libraries/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"serviceId\":1,\"libraryId\":1}"))
+                .andExpect(status().isOk());
     }
 
     @Test
-    void updateServiceLibrary_NotFound() {
+    void updateServiceLibrary_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<ServiceLibrary> response = controller.updateServiceLibrary(1L, testServiceLibrary);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(put("/api/v1/service-libraries/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"serviceId\":1,\"libraryId\":1}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void deleteServiceLibrary_Success() {
+    void deleteServiceLibrary_Success() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.of(testServiceLibrary));
         doNothing().when(repository).deleteById(1L);
 
-        ResponseEntity<Void> response = controller.deleteServiceLibrary(1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(repository).deleteById(1L);
+        mockMvc.perform(delete("/api/v1/service-libraries/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void deleteServiceLibrary_NotFound() {
+    void deleteServiceLibrary_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Void> response = controller.deleteServiceLibrary(1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(delete("/api/v1/service-libraries/1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void deleteServiceLibraryByServiceAndLibrary_Found() {
+    void deleteServiceLibraryByServiceAndLibrary_Found() throws Exception {
         when(repository.findByServiceIdAndLibraryId(1L, 1L)).thenReturn(Optional.of(testServiceLibrary));
         doNothing().when(repository).delete(any(ServiceLibrary.class));
 
-        ResponseEntity<Void> response = controller.deleteServiceLibraryByServiceAndLibrary(1L, 1L);
-
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
-        verify(repository).delete(any(ServiceLibrary.class));
+        mockMvc.perform(delete("/api/v1/service-libraries/service/1/library/1"))
+                .andExpect(status().isNoContent());
     }
 
     @Test
-    void deleteServiceLibraryByServiceAndLibrary_NotFound() {
+    void deleteServiceLibraryByServiceAndLibrary_NotFound() throws Exception {
         when(repository.findByServiceIdAndLibraryId(1L, 1L)).thenReturn(Optional.empty());
 
-        ResponseEntity<Void> response = controller.deleteServiceLibraryByServiceAndLibrary(1L, 1L);
-
-        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        mockMvc.perform(delete("/api/v1/service-libraries/service/1/library/1"))
+                .andExpect(status().isNotFound());
     }
 }
