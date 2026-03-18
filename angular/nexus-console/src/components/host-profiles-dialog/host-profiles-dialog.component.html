@@ -1,0 +1,478 @@
+@if (isOpen()) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backbone-dialog-overlay"
+    (click)="onClose()"
+  >
+    <div
+      class="bg-[rgb(var(--color-surface-dialog))] text-[rgb(var(--color-text-base))] rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden border border-[rgb(var(--color-border-base))] transform transition-all"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Header -->
+      <div
+        class="flex items-center justify-between px-6 py-4 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface))]"
+      >
+        <h2 class="text-xl font-semibold text-[rgb(var(--color-text-prominent))]">
+          Manage Host Servers
+        </h2>
+        <button
+          (click)="onClose()"
+          class="text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] transition-colors p-1 rounded-md hover:bg-[rgb(var(--color-surface-hover))]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-6 w-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar List -->
+        <div
+          class="w-1/3 border-r border-[rgb(var(--color-border-base))] flex flex-col bg-[rgb(var(--color-surface-muted))]"
+        >
+          <div class="p-4 border-b border-[rgb(var(--color-border-base))]">
+            <button
+              (click)="startAddNew()"
+              class="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[rgb(var(--color-primary-600))] hover:bg-[rgb(var(--color-primary-700))] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgb(var(--color-primary-500))] transition-colors"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5 mr-2"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              Add Host Server
+            </button>
+          </div>
+          <div class="flex-1 overflow-y-auto p-2 space-y-1">
+            @for (profile of profileService.profiles(); track profile.id) {
+              <div
+                (click)="startEdit(profile)"
+                class="flex items-center justify-between p-3 rounded-md cursor-pointer transition-colors group"
+                [class.bg-[rgb(var(--color-surface-selected))]]="selectedProfileId() === profile.id"
+                [class.hover:bg-[rgb(var(--color-surface-hover))]]="
+                  selectedProfileId() !== profile.id
+                "
+                [class.ring-2]="profile.isActive"
+                [class.ring-green-500]="profile.isActive"
+              >
+                <div class="flex items-center space-x-3 overflow-hidden">
+                  <div
+                    class="flex-shrink-0 h-8 w-8 rounded flex items-center justify-center"
+                    [class.bg-green-500]="profile.isActive"
+                    [class.text-white]="profile.isActive"
+                    [class.bg-[rgb(var(--color-surface-hover))]]="!profile.isActive"
+                    [class.text-[rgb(var(--color-text-muted))]]="!profile.isActive"
+                  >
+                    @if (profile.imageUrl) {
+                      <img
+                        [src]="profile.imageUrl + '/ui/favicon.ico'"
+                        (error)="$event.target.style.display = 'none'"
+                        class="h-5 w-5 object-contain"
+                        alt=""
+                      />
+                    } @else {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                    }
+                  </div>
+                  <div class="truncate flex-1">
+                    <div class="flex items-center space-x-2">
+                      <p class="text-sm font-medium text-[rgb(var(--color-text-base))] truncate">
+                        {{ profile.name }}
+                      </p>
+                      @if (profile.isActive) {
+                        <span
+                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                        >
+                          Active
+                        </span>
+                      }
+                    </div>
+                    <p class="text-xs text-[rgb(var(--color-text-muted))] truncate">
+                      {{ profile.hostServerUrl }}
+                    </p>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-1">
+                  @if (!profile.isActive) {
+                    <button
+                      (click)="$event.stopPropagation(); setActive(profile.id)"
+                      class="p-1.5 rounded text-[rgb(var(--color-text-muted))] hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Set as Active"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                  }
+                  <button
+                    (click)="$event.stopPropagation(); deleteProfile(profile.id)"
+                    class="p-1.5 rounded text-[rgb(var(--color-text-muted))] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-4 w-4"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 p-6 overflow-y-auto bg-[rgb(var(--color-surface))]">
+          @if (isEditing()) {
+            <div class="space-y-6 max-w-2xl mx-auto">
+              <div>
+                <h3 class="text-lg font-medium leading-6 text-[rgb(var(--color-text-prominent))]">
+                  {{ selectedProfileId() ? 'Edit Host Server' : 'New Host Server' }}
+                </h3>
+                <p class="mt-1 text-sm text-[rgb(var(--color-text-muted))]">
+                  Configure the connection details for the host server.
+                </p>
+              </div>
+
+              <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
+                <div class="sm:col-span-4">
+                  <label
+                    for="name"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Name</label
+                  >
+                  <div class="mt-1">
+                    <input
+                      type="text"
+                      name="name"
+                      id="name"
+                      required
+                      [ngModel]="formState().name"
+                      (ngModelChange)="updateField('name', $event)"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div class="sm:col-span-6">
+                  <label
+                    for="hostServerUrl"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Host Server URL</label
+                  >
+                  <div class="mt-1">
+                    <input
+                      type="url"
+                      name="hostServerUrl"
+                      id="hostServerUrl"
+                      required
+                      [ngModel]="formState().hostServerUrl"
+                      (ngModelChange)="updateField('hostServerUrl', $event)"
+                      placeholder="http://hostname:8085"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    />
+                    <p class="mt-1 text-xs text-[rgb(var(--color-text-muted))]">
+                      The base URL where the host server API is accessible.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="sm:col-span-6">
+                  <label
+                    for="imageUrl"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Image/Icon URL</label
+                  >
+                  <div class="mt-1">
+                    <input
+                      type="url"
+                      name="imageUrl"
+                      id="imageUrl"
+                      [ngModel]="formState().imageUrl"
+                      (ngModelChange)="updateField('imageUrl', $event)"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <!-- Infrastructure Details -->
+                <div class="sm:col-span-3">
+                  <label
+                    for="hostname"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Hostname</label
+                  >
+                  <div class="mt-1">
+                    <input
+                      type="text"
+                      name="hostname"
+                      id="hostname"
+                      [ngModel]="formState().hostname"
+                      (ngModelChange)="updateField('hostname', $event)"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div class="sm:col-span-3">
+                  <label
+                    for="ipAddress"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >IP Address</label
+                  >
+                  <div class="mt-1">
+                    <input
+                      type="text"
+                      name="ipAddress"
+                      id="ipAddress"
+                      [ngModel]="formState().ipAddress"
+                      (ngModelChange)="updateField('ipAddress', $event)"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div class="sm:col-span-3">
+                  <label
+                    for="environment"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Environment</label
+                  >
+                  <div class="mt-1">
+                    <select
+                      id="environment"
+                      name="environment"
+                      [ngModel]="formState().environment"
+                      (ngModelChange)="updateField('environment', $any($event))"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    >
+                      @for (env of environments; track env) {
+                        <option [value]="env">{{ env }}</option>
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                <div class="sm:col-span-3">
+                  <label
+                    for="cloudProvider"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Cloud Provider</label
+                  >
+                  <div class="mt-1">
+                    <select
+                      id="cloudProvider"
+                      name="cloudProvider"
+                      [ngModel]="formState().cloudProvider"
+                      (ngModelChange)="updateField('cloudProvider', $any($event))"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    >
+                      @for (cp of cloudProviders; track cp) {
+                        <option [value]="cp">{{ cp }}</option>
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                <div class="sm:col-span-3">
+                  <label
+                    for="status"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Status</label
+                  >
+                  <div class="mt-1">
+                    <select
+                      id="status"
+                      name="status"
+                      [ngModel]="formState().status"
+                      (ngModelChange)="updateField('status', $any($event))"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    >
+                      @for (st of statuses; track st) {
+                        <option [value]="st">{{ st }}</option>
+                      }
+                    </select>
+                  </div>
+                </div>
+
+                <div class="sm:col-span-3">
+                  <label
+                    for="operatingSystem"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Operating System</label
+                  >
+                  <div class="mt-1">
+                    <input
+                      type="text"
+                      name="operatingSystem"
+                      id="operatingSystem"
+                      [ngModel]="formState().operatingSystem"
+                      (ngModelChange)="updateField('operatingSystem', $event)"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div class="sm:col-span-2">
+                  <label
+                    for="cpuCores"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >CPU Cores</label
+                  >
+                  <div class="mt-1">
+                    <input
+                      type="number"
+                      name="cpuCores"
+                      id="cpuCores"
+                      [ngModel]="formState().cpuCores"
+                      (ngModelChange)="updateField('cpuCores', $event)"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div class="sm:col-span-2">
+                  <label
+                    for="memoryMb"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Memory (MB)</label
+                  >
+                  <div class="mt-1">
+                    <input
+                      type="number"
+                      name="memoryMb"
+                      id="memoryMb"
+                      [ngModel]="formState().memoryMb"
+                      (ngModelChange)="updateField('memoryMb', $event)"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div class="sm:col-span-2">
+                  <label
+                    for="diskGb"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Disk (GB)</label
+                  >
+                  <div class="mt-1">
+                    <input
+                      type="number"
+                      name="diskGb"
+                      id="diskGb"
+                      [ngModel]="formState().diskGb"
+                      (ngModelChange)="updateField('diskGb', $event)"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    />
+                  </div>
+                </div>
+
+                <div class="sm:col-span-6">
+                  <label
+                    for="description"
+                    class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
+                    >Description</label
+                  >
+                  <div class="mt-1">
+                    <textarea
+                      id="description"
+                      name="description"
+                      rows="3"
+                      [ngModel]="formState().description"
+                      (ngModelChange)="updateField('description', $event)"
+                      class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
+                    ></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div
+                class="pt-5 border-t border-[rgb(var(--color-border-base))] flex justify-end space-x-3"
+              >
+                <button
+                  type="button"
+                  (click)="cancelEdit()"
+                  class="px-4 py-2 border border-[rgb(var(--color-border-base))] rounded-md shadow-sm text-sm font-medium text-[rgb(var(--color-text-base))] bg-[rgb(var(--color-surface))] hover:bg-[rgb(var(--color-surface-hover))] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgb(var(--color-primary-500))] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  (click)="saveProfile()"
+                  class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[rgb(var(--color-primary-600))] hover:bg-[rgb(var(--color-primary-700))] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[rgb(var(--color-primary-500))] transition-colors"
+                >
+                  Save Profile
+                </button>
+              </div>
+            </div>
+          } @else {
+            <div
+              class="h-full flex flex-col items-center justify-center text-[rgb(var(--color-text-muted))] opacity-60"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-24 w-24 mb-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1"
+                  d="M5 12h14M12 5l7 7-7 7"
+                />
+              </svg>
+              <p class="text-lg font-medium">Select a host server to edit</p>
+              <p class="text-sm">or create a new one to get started.</p>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+}

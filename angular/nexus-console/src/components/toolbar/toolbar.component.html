@@ -1,0 +1,1154 @@
+<div
+  class="flex items-center px-4 h-12 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]"
+>
+  @if ((!isHomeContext() && showAllControls()) || isPlatformManagementContext()) {
+    @if (viewMode() === 'service-mesh' && meshViewMode() === 'graph') {
+      <!-- Service Mesh Graph Controls -->
+      <div class="flex items-center space-x-2">
+        <!-- Mode Toggle: Camera / Edit -->
+        <div
+          class="flex items-center bg-[rgb(var(--color-background))] rounded-md p-0.5 border border-[rgb(var(--color-border-muted))]"
+        >
+          <button
+            (click)="graphModeChange.emit('camera')"
+            title="Camera Mode - Orbit around the scene"
+            class="flex items-center gap-1 px-2 py-1 rounded text-xs transition-all"
+            [class.bg-[rgb(var(--color-accent-solid-bg))]]="graphInteractionMode() === 'camera'"
+            [class.text-white]="graphInteractionMode() === 'camera'"
+            [class.text-[rgb(var(--color-text-muted))]]="graphInteractionMode() !== 'camera'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z"
+              />
+            </svg>
+            Camera
+          </button>
+          <button
+            (click)="graphModeChange.emit('edit')"
+            title="Edit Mode - Move and edit nodes"
+            class="flex items-center gap-1 px-2 py-1 rounded text-xs transition-all"
+            [class.bg-[rgb(var(--color-accent-solid-bg))]]="graphInteractionMode() === 'edit'"
+            [class.text-white]="graphInteractionMode() === 'edit'"
+            [class.text-[rgb(var(--color-text-muted))]]="graphInteractionMode() !== 'edit'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"
+              />
+            </svg>
+            Edit
+          </button>
+        </div>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Sub-View Toggle: Canvas / Creator -->
+        <div
+          class="flex items-center bg-[rgb(var(--color-background))] rounded-md p-0.5 border border-[rgb(var(--color-border-muted))]"
+        >
+          <button
+            (click)="graphSubViewChange.emit('canvas')"
+            title="Architecture Canvas - 3D visualization"
+            class="flex items-center gap-1 px-2 py-1 rounded text-xs transition-all"
+            [class.bg-[rgb(var(--color-accent-solid-bg))]]="graphSubView() === 'canvas'"
+            [class.text-white]="graphSubView() === 'canvas'"
+            [class.text-[rgb(var(--color-text-muted))]]="graphSubView() !== 'canvas'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z"
+              />
+            </svg>
+            Canvas
+          </button>
+          <button
+            (click)="graphSubViewChange.emit('creator')"
+            title="Component Creator - Create custom component types"
+            class="flex items-center gap-1 px-2 py-1 rounded text-xs transition-all"
+            [class.bg-[rgb(var(--color-accent-solid-bg))]]="graphSubView() === 'creator'"
+            [class.text-white]="graphSubView() === 'creator'"
+            [class.text-[rgb(var(--color-text-muted))]]="graphSubView() !== 'creator'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            Creator
+          </button>
+        </div>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Simulate -->
+        <button
+          (click)="toggleSimulation.emit()"
+          title="Toggle Simulation"
+          class="p-2 rounded-md transition-all"
+          [class.bg-[rgb(var(--color-success-bg))]]="isSimulationActive()"
+          [class.text-[rgb(var(--color-success-text))]]="isSimulationActive()"
+          [class.hover:bg-[rgb(var(--color-surface-hover))]]="!isSimulationActive()"
+          [class.text-[rgb(var(--color-text-muted))]]="!isSimulationActive()"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Save & Load -->
+        <button
+          (click)="saveGraph.emit()"
+          title="Save Graph"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path d="M17 3H7c-1.1 0-2 .9-2 2v14l6-3 6 3V5c0-1.1-.9-2-2-2z" />
+          </svg>
+        </button>
+        <button
+          (click)="loadGraph.emit()"
+          title="Load Graph"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Background Color -->
+        <div class="relative">
+          <button
+            (click)="openColorPicker()"
+            title="Background Color"
+            class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] flex items-center gap-1"
+          >
+            <div
+              class="w-4 h-4 rounded border border-[rgb(var(--color-border-base))]"
+              [style.background-color]="backgroundColor()"
+            ></div>
+          </button>
+          <input
+            #colorInput
+            type="color"
+            [value]="backgroundColor()"
+            (input)="onColorChange($event)"
+            class="absolute opacity-0 w-0 h-0"
+          />
+        </div>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Zoom Controls -->
+        <button
+          (click)="zoomIn.emit()"
+          title="Zoom In"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+              clip-rule="evenodd"
+            />
+            <path
+              fill-rule="evenodd"
+              d="M8 6a1 1 0 011 1v.5h.5a1 1 0 010 2H9V10a1 1 0 11-2 0V9.5H6.5a1 1 0 010-2H7V7a1 1 0 011-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+        <button
+          (click)="zoomOut.emit()"
+          title="Zoom Out"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+              clip-rule="evenodd"
+            />
+            <path
+              fill-rule="evenodd"
+              d="M5 8a1 1 0 011-1h4a1 1 0 010 2H6a1 1 0 01-1-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Rotate Controls -->
+        <button
+          (click)="rotateLeft.emit()"
+          title="Rotate Left"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+        <button
+          (click)="rotateRight.emit()"
+          title="Rotate Right"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M12.293 3.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 9H9a5 5 0 00-5 5v2a1 1 0 11-2 0v-2a7 7 0 017-7h5.586l-2.293-2.293a1 1 0 010-1.414z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Reset & Clear -->
+        <button
+          (click)="resetCamera.emit()"
+          title="Reset Camera"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+        <button
+          (click)="clearGraph.emit()"
+          title="Clear All Nodes"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-danger-bg-hover))] text-[rgb(var(--color-danger-text))]/80"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+      </div>
+    } @else {
+      <!-- File Explorer Controls -->
+      <div class="flex items-center space-x-2">
+        <!-- New Item Button (Direct Action) -->
+        <button
+          [disabled]="!canCreate()"
+          (click)="onNewFolderItemClick()"
+          type="button"
+          [title]="
+            isGatewayContext()
+              ? 'Add New Gateway'
+              : isServiceRegistryContext()
+                ? 'Add New Service Registry'
+                : managementType()
+                  ? 'Add ' + (managementType() | slice: 0 : -1 | titlecase)
+                  : 'New Item'
+          "
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </button>
+
+        @if (isGatewaySelected() || isServiceRegistrySelected()) {
+          <!-- Gateway/Host Editor Save/Reset Buttons -->
+          <button
+            (click)="saveClick.emit()"
+            [disabled]="!canSave()"
+            title="Save Changes"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[rgb(var(--color-success-bg))] text-[rgb(var(--color-success-text))] hover:bg-[rgb(var(--color-success-bg-hover))] transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            Save
+          </button>
+          <button
+            (click)="resetClick.emit()"
+            title="Reset Changes"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover-subtle))] transition-colors text-xs font-medium border border-[rgb(var(--color-border-muted))]"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10.899 12.101A7.002 7.002 0 012.399 8.567a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            Reset
+          </button>
+        }
+
+        @if (!isGatewayContext() && !isServiceRegistryContext() && !isPlatformManagementContext()) {
+          <!-- Divider -->
+          <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+          <!-- Action Buttons -->
+          <button
+            (click)="cutClick.emit()"
+            [disabled]="!canCut()"
+            title="Cut (Ctrl+X)"
+            class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M8 7v8a2 2 0 002 2h4M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M8 7h8m-5 5h2m-5 3h6"
+              />
+            </svg>
+          </button>
+          <button
+            (click)="copyClick.emit()"
+            [disabled]="!canCopy()"
+            title="Copy (Ctrl+C)"
+            class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+              />
+            </svg>
+          </button>
+          <button
+            (click)="pasteClick.emit()"
+            [disabled]="!canPaste()"
+            title="Paste (Ctrl+V)"
+            class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
+            </svg>
+          </button>
+        }
+
+        <button
+          (click)="renameClick.emit()"
+          [disabled]="
+            isGatewayContext()
+              ? !isGatewaySelected()
+              : isServiceRegistryContext()
+                ? !isServiceRegistrySelected()
+                : !canRename()
+          "
+          [title]="isGatewayContext() || isServiceRegistryContext() ? 'Edit' : 'Rename (F2)'"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+            />
+          </svg>
+        </button>
+
+        @if (!isGatewayContext() && !isServiceRegistryContext() && !isPlatformManagementContext()) {
+          <button
+            (click)="shareClick.emit()"
+            [disabled]="!canShare()"
+            title="Share"
+            class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"
+              />
+            </svg>
+          </button>
+        }
+
+        <button
+          (click)="importClick.emit()"
+          [disabled]="!canImport()"
+          title="Import JSON"
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+            />
+          </svg>
+        </button>
+
+        <button
+          (click)="deleteClick.emit()"
+          [disabled]="
+            isGatewayContext()
+              ? !isGatewaySelected()
+              : isServiceRegistryContext()
+                ? !isServiceRegistrySelected()
+                : !canDelete()
+          "
+          [title]="
+            isGatewayContext()
+              ? 'Delete Gateway'
+              : isServiceRegistryContext()
+                ? 'Delete Service Registry'
+                : 'Delete (Del)'
+          "
+          class="p-2 rounded-md hover:bg-[rgb(var(--color-danger-bg-hover))] disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5 text-[rgb(var(--color-danger-text))]/80"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        </button>
+
+        @if (!isGatewayContext() && !isServiceRegistryContext() && !isPlatformManagementContext()) {
+          <button
+            (click)="magnetizeClick.emit()"
+            [disabled]="!canMagnetize()"
+            title="Magnetize"
+            class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path d="M4 3h3v4a3 3 0 1 0 6 0V3h3v4a6 6 0 1 1-12 0V3z" />
+            </svg>
+          </button>
+        }
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        @if (!isGatewayContext() && !isServiceRegistryContext() && !isPlatformManagementContext()) {
+          <!-- Copy to / Move to -->
+          <div class="relative inline-block text-left">
+            <button
+              (click)="toggleCopyToDropdown($event)"
+              [disabled]="!canCopyToMoveTo()"
+              type="button"
+              title="Copy to..."
+              class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M8 7v4m0 0l-3-3m3 3l3-3m-6 3h6l-3-3m6 10v4m0 0l-3-3m3 3l3-3m-6 3h6l-3-3M9 7h6a2 2 0 012 2v10a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2z"
+                />
+              </svg>
+            </button>
+            @if (isCopyToOpen()) {
+              <div
+                class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-[rgb(var(--color-surface-dialog))] shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+              >
+                <div class="py-1">
+                  @if (folderTree(); as tree) {
+                    @for (child of tree.children; track child.name) {
+                      @if (child.type === 'folder') {
+                        <app-destination-node
+                          [node]="child"
+                          [path]="[child.name]"
+                          [currentSourcePath]="currentPath()"
+                          (destinationSelected)="onDestinationSelectedForCopy($event)"
+                        ></app-destination-node>
+                      }
+                    }
+                  }
+                </div>
+              </div>
+            }
+          </div>
+          <div class="relative inline-block text-left">
+            <button
+              (click)="toggleMoveToDropdown($event)"
+              [disabled]="!canCopyToMoveTo()"
+              type="button"
+              title="Move to..."
+              class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
+                />
+              </svg>
+            </button>
+            @if (isMoveToOpen()) {
+              <div
+                class="absolute left-0 z-10 mt-2 w-48 origin-top-left rounded-md bg-[rgb(var(--color-surface-dialog))] shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+              >
+                <div class="py-1">
+                  @if (folderTree(); as tree) {
+                    @for (child of tree.children; track child.name) {
+                      @if (child.type === 'folder') {
+                        <app-destination-node
+                          [node]="child"
+                          [path]="[child.name]"
+                          [currentSourcePath]="currentPath()"
+                          (destinationSelected)="onDestinationSelectedForMove($event)"
+                        ></app-destination-node>
+                      }
+                    }
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+  }
+
+  <div class="flex-grow"></div>
+
+  <!-- View Controls -->
+  <div class="flex items-center space-x-2">
+    @if (!isHomeContext() && showAllControls()) {
+      @if (showExtendedControls()) {
+        <!-- Filter -->
+        <div class="relative">
+          <input
+            type="search"
+            placeholder="Filter"
+            [value]="filterQuery()"
+            (input)="onFilterInputChange($event)"
+            class="w-48 pl-8 pr-2 py-1 rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] focus:ring-1 focus:ring-[rgb(var(--color-accent-ring))] focus:outline-none"
+          />
+          <div class="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4 text-[rgb(var(--color-text-subtle))]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L16 11.414V16a1 1 0 01-1 1l-3-2v-3.586L6.293 6.707A1 1 0 016 6V4z"
+              ></path>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Sort Dropdown -->
+        <div class="relative inline-block text-left">
+          <button
+            (click)="toggleSortDropdown($event)"
+            type="button"
+            title="Sort"
+            class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))]"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3 4h13M3 8h9M3 12h9m-9 4h9m5-4v.01M18 8v.01M18 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </button>
+          @if (isSortDropdownOpen()) {
+            <div
+              class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-[rgb(var(--color-surface-dialog))] shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+              role="menu"
+            >
+              <div class="py-1" role="none">
+                @let current = currentSort();
+                <div
+                  (click)="onSort('name', 'asc')"
+                  class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center px-4 py-2 text-sm cursor-pointer"
+                  role="menuitem"
+                >
+                  <span class="w-5">
+                    @if (current.key === 'name' && current.direction === 'asc') {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                    }
+                  </span>
+                  <span>Name (A-Z)</span>
+                </div>
+                <div
+                  (click)="onSort('name', 'desc')"
+                  class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center px-4 py-2 text-sm cursor-pointer"
+                  role="menuitem"
+                >
+                  <span class="w-5">
+                    @if (current.key === 'name' && current.direction === 'desc') {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                    }
+                  </span>
+                  <span>Name (Z-A)</span>
+                </div>
+                <div
+                  (click)="onSort('modified', 'desc')"
+                  class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center px-4 py-2 text-sm cursor-pointer"
+                  role="menuitem"
+                >
+                  <span class="w-5">
+                    @if (current.key === 'modified' && current.direction === 'desc') {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                    }
+                  </span>
+                  <span>Date Modified (Newest)</span>
+                </div>
+                <div
+                  (click)="onSort('modified', 'asc')"
+                  class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center px-4 py-2 text-sm cursor-pointer"
+                  role="menuitem"
+                >
+                  <span class="w-5">
+                    @if (current.key === 'modified' && current.direction === 'asc') {
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fill-rule="evenodd"
+                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                          clip-rule="evenodd"
+                        />
+                      </svg>
+                    }
+                  </span>
+                  <span>Date Modified (Oldest)</span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Display Mode -->
+        <div
+          class="flex items-center rounded-md bg-[rgb(var(--color-surface))] p-0.5 border border-[rgb(var(--color-border-muted))]"
+        >
+          <button
+            (click)="displayModeChange.emit('grid')"
+            title="Grid View"
+            class="p-1.5 rounded-sm transition-colors"
+            [class.bg-[rgb(var(--color-accent-solid-bg))]]="displayMode() === 'grid'"
+            [class.text-white]="displayMode() === 'grid'"
+            [class.text-[rgb(var(--color-text-muted))]]="displayMode() !== 'grid'"
+            [class.hover:bg-[rgb(var(--color-surface-hover))]]="displayMode() !== 'grid'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2h-2zM11 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2h-2z"
+              />
+            </svg>
+          </button>
+          <button
+            (click)="displayModeChange.emit('list')"
+            title="List View"
+            class="p-1.5 rounded-sm transition-colors"
+            [class.bg-[rgb(var(--color-accent-solid-bg))]]="displayMode() === 'list'"
+            [class.text-white]="displayMode() === 'list'"
+            [class.text-[rgb(var(--color-text-muted))]]="displayMode() !== 'list'"
+            [class.hover:bg-[rgb(var(--color-surface-hover))]]="displayMode() !== 'list'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-5 w-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Layout Toggles -->
+        <button
+          (click)="splitViewClick.emit()"
+          [title]="isSplitViewActive() ? 'Close Split View' : 'Open Split View'"
+          class="p-2 rounded-md transition-colors"
+          [class.bg-[rgb(var(--color-accent-bg))]]="isSplitViewActive()"
+          [class.text-[rgb(var(--color-accent-text))]]="isSplitViewActive()"
+          [class.text-[rgb(var(--color-text-muted))]]="!isSplitViewActive()"
+          [class.hover:bg-[rgb(var(--color-surface-hover))]]="!isSplitViewActive()"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h5a2 2 0 002-2V7a2 2 0 00-2-2h-5a2 2 0 00-2 2m0 10V7m0 10h12"
+            />
+          </svg>
+        </button>
+        <button
+          (click)="detailPaneClick.emit()"
+          [title]="isDetailPaneActive() ? 'Hide Details' : 'Show Details'"
+          class="p-2 rounded-md transition-colors"
+          [class.bg-[rgb(var(--color-accent-bg))]]="isDetailPaneActive()"
+          [class.text-[rgb(var(--color-accent-text))]]="isDetailPaneActive()"
+          [class.text-[rgb(var(--color-text-muted))]]="!isDetailPaneActive()"
+          [class.hover:bg-[rgb(var(--color-surface-hover))]]="!isDetailPaneActive()"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+            />
+          </svg>
+        </button>
+      }
+    }
+    <!-- Hamburger Menu -->
+    <div class="relative inline-block text-left">
+      <button
+        (click)="toggleHamburgerMenu($event)"
+        type="button"
+        title="More options"
+        class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))]"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      @if (isHamburgerMenuOpen()) {
+        <div
+          class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-[rgb(var(--color-surface-dialog))] shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+          role="menu"
+        >
+          <div class="py-1" role="none">
+            <div class="px-4 py-2 text-xs uppercase text-[rgb(var(--color-text-subtle))]">View</div>
+            <div
+              (click)="toggleSidebar.emit()"
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>Main Sidebar</span>
+              @if (isSidebarVisible()) {
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              }
+            </div>
+            <div
+              (click)="toggleTree.emit()"
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>Folder Tree</span>
+              @if (isTreeVisible()) {
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              }
+            </div>
+            <div
+              (click)="toggleChat.emit()"
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>Chat Pane</span>
+              @if (isChatVisible()) {
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              }
+            </div>
+            <div
+              (click)="toggleNotes.emit()"
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>Notes Pane</span>
+              @if (isNotesVisible()) {
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              }
+            </div>
+            <div
+              (click)="toggleSavedItems.emit()"
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>Saved Items Pane</span>
+              @if (isSavedItemsVisible()) {
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              }
+            </div>
+            <div
+              (click)="toggleRssFeed.emit()"
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>RSS Feed Pane</span>
+              @if (isRssFeedVisible()) {
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              }
+            </div>
+            <div
+              (click)="toggleStream.emit()"
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>Idea Stream</span>
+              @if (isStreamVisible()) {
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              }
+            </div>
+
+            <div class="my-1 h-px bg-[rgb(var(--color-border-base))]"></div>
+            <div class="px-4 py-2 text-xs uppercase text-[rgb(var(--color-text-subtle))]">
+              Settings
+            </div>
+            <div
+              #themeMenuButton
+              (click)="onThemeMenuItemClick(themeMenuButton)"
+              data-theme-menu-trigger
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>Theme</span>
+            </div>
+            <div
+              (click)="onRssFeedsMenuItemClick()"
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>Manage RSS Feeds...</span>
+            </div>
+            <div
+              (click)="onPreferencesMenuItemClick()"
+              class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer"
+              role="menuitem"
+            >
+              <span>Preferences...</span>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>

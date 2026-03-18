@@ -1,0 +1,152 @@
+@if (service()) {
+<div class="service-details-container">
+  <div class="service-header">
+    <div class="service-name">{{ service()?.name }}</div>
+    <div class="service-framework">{{ service()?.framework.name }}</div>
+  </div>
+
+  <!-- Health Status Indicator -->
+  <div class="health-status-section">
+    <div class="health-indicator">
+      <div class="health-dot" [style.backgroundColor]="healthStatusColor()"></div>
+      <div class="health-label">{{ healthStatus() }}</div>
+    </div>
+    <div class="service-type">Type: {{ service()?.type.name }}</div>
+  </div>
+
+  <!-- Service Actions -->
+  <div class="service-actions">
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="onStartService()"
+      [disabled]="isAllDeploymentsRunning()"
+    >
+      <mat-icon>play_arrow</mat-icon>
+      Start
+    </button>
+    <button
+      mat-raised-button
+      color="warn"
+      (click)="onStopService()"
+      [disabled]="isAllDeploymentsStopped()"
+    >
+      <mat-icon>stop</mat-icon>
+      Stop
+    </button>
+    <button mat-raised-button color="accent" (click)="onRestartService()">
+      <mat-icon>refresh</mat-icon>
+      Restart
+    </button>
+    <button mat-raised-button (click)="onViewLogs()">
+      <mat-icon>description</mat-icon>
+      Logs
+    </button>
+  </div>
+
+  <!-- Basic Info -->
+  <div class="info-section">
+    <h3>Basic Information</h3>
+    <div class="info-grid">
+      <div class="info-item">
+        <span class="label">Version:</span>
+        <span class="value">{{ service()?.version || 'N/A' }}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Default Port:</span>
+        <span class="value">{{ service()?.defaultPort || 'N/A' }}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Status:</span>
+        <span class="value">{{ service()?.status }}</span>
+      </div>
+      <div class="info-item">
+        <span class="label">Health Check Path:</span>
+        <span class="value">{{ service()?.healthCheckPath || 'N/A' }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Description -->
+  @if (service()?.description) {
+  <div class="description-section">
+    <h3>Description</h3>
+    <p>{{ service()?.description }}</p>
+  </div>
+  }
+
+  <!-- Deployments -->
+  <div class="deployments-section">
+    <h3>Deployments</h3>
+    @if (serviceDeployments().length > 0) {
+    <div class="deployments-list">
+      @for (deployment of serviceDeployments(); track deployment.id) {
+      <div class="deployment-item">
+        <div class="deployment-header">
+          <div class="deployment-server">{{ deployment.server.hostname }}</div>
+          <div class="deployment-env">{{ deployment.environment }}</div>
+        </div>
+        <div class="deployment-details">
+          <div class="detail-item">
+            <span class="label">Port:</span>
+            <span class="value">{{ deployment.port }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Version:</span>
+            <span class="value">{{ deployment.version }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Status:</span>
+            <span
+              class="value status-badge"
+              [class.status-running]="deployment.status === 'RUNNING'"
+              [class.status-stopped]="deployment.status === 'STOPPED'"
+              [class.status-starting]="deployment.status === 'STARTING'"
+              [class.status-stopping]="deployment.status === 'STOPPING'"
+              [class.status-failed]="deployment.status === 'FAILED'"
+              [class.status-unknown]="deployment.status === 'UNKNOWN'"
+            >
+              {{ deployment.status }}
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Health:</span>
+            <span
+              class="value status-badge"
+              [style.backgroundColor]="getHealthStatusColor(deployment.healthStatus)"
+            >
+              {{ deployment.healthStatus }}
+            </span>
+          </div>
+        </div>
+      </div>
+      }
+    </div>
+    } @else {
+    <p class="no-data">No deployments found for this service.</p>
+    }
+  </div>
+
+  <!-- Configurations -->
+  <div class="configurations-section">
+    <h3>Configurations</h3>
+    @if (configurations().length > 0) {
+    <div class="configurations-list">
+      @for (config of configurations(); track config.id) {
+      <div class="configuration-item">
+        <div class="config-key">{{ config.configKey }}</div>
+        <div class="config-value">{{ config.configValue }}</div>
+        <div class="config-env">{{ config.environment }}</div>
+      </div>
+      }
+    </div>
+    } @else {
+    <p class="no-data">No configurations found for this service.</p>
+    }
+  </div>
+</div>
+} @else {
+<div class="empty-state">
+  <p>Select a service to view details</p>
+</div>
+}

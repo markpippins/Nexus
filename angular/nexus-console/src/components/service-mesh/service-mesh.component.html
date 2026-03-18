@@ -1,0 +1,74 @@
+<div class="service-mesh-container">
+  <!-- Header with summary and controls -->
+
+  <!--<div class="title-bar">
+      <h2>Atomic Service Mesh</h2>
+    </div>-->
+
+  <!-- Summary cards (shown in console mode) -->
+  @if (viewMode() === 'console') {
+  <div class="header">
+    <div class="summary-cards">
+      <div class="summary-card">
+        <div class="card-value">{{ summary().totalServices }}</div>
+        <div class="card-label">Total Services</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-value">{{ summary().activeServices }}</div>
+        <div class="card-label">Active Services</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-value">{{ summary().healthyDeployments }}</div>
+        <div class="card-label">Healthy Deployments</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-value">{{ summary().unhealthyDeployments }}</div>
+        <div class="card-label">Unhealthy Deployments</div>
+      </div>
+      <div class="summary-card">
+        <div class="card-value">{{ summary().totalServers }}</div>
+        <div class="card-label">Total Servers</div>
+      </div>
+    </div>
+  </div>
+  }
+  <!-- Main content area -->
+  <div class="content-area">
+    <!-- Console View - Service details and management -->
+    @if (viewMode() === 'console') {
+    <div class="console-container">
+      @if (selectedService(); as service) {
+      <div class="service-details-wrapper">
+        <app-service-details
+          [service]="service"
+          [deployments]="deployments()"
+          [configurations]="selectedServiceConfigurations()"
+        ></app-service-details>
+      </div>
+      } @else {
+      <div class="no-selection">
+        <mat-icon class="large-icon">touch_app</mat-icon>
+        <p>Select a service from the sidebar to view details</p>
+      </div>
+      }
+    </div>
+    }
+
+    <!-- Graph View -->
+    @if (viewMode() === 'graph') { @if (graphSubView() === 'canvas') {
+    <div class="service-graph-container">
+      <app-service-graph
+        [services]="services()"
+        [dependencies]="dependencies()"
+        [deployments]="deployments()"
+        [showInternalPanels]="false"
+        (selectedNode)="onServiceSelected($event)"
+      ></app-service-graph>
+    </div>
+    } @else {
+    <div class="component-creator-container h-full">
+      <app-component-creator></app-component-creator>
+    </div>
+    } }
+  </div>
+</div>

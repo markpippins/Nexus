@@ -1,0 +1,220 @@
+<div class="viz-container" (window:click)="closeContextMenu()">
+  <!-- Header Controls -->
+  <!-- <div class="header-bar">
+    <div class="mode-switcher">
+      <button
+        (click)="setMode('camera')"
+        [class.active]="currentMode() === 'camera' && !isSimulationActive()"
+      >
+        🎥 Camera
+      </button>
+      <button (click)="setMode('edit')" [class.active]="currentMode() === 'edit'">✋ Move</button>
+    </div>
+
+    <button (click)="toggleSimulation()" [class.active]="isSimulationActive()" class="sim-btn">
+      ⚡ {{ isSimulationActive() ? 'Stop' : 'Simulate' }}
+    </button>
+
+    <div class="file-ops">
+      <button (click)="saveJson()">💾 Save</button>
+      <button (click)="triggerLoad()">📂 Load</button>
+    </div>
+
+    <div class="camera-controls">
+      <input
+        type="color"
+        [ngModel]="bgColor"
+        (ngModelChange)="updateBgColor($event)"
+        title="Background Color"
+      />
+      <button (click)="zoomOut()" title="Zoom Out">-</button>
+      <button (click)="zoomIn()" title="Zoom In">+</button>
+      <button (click)="rotateLeft()" title="Rotate Left">↺</button>
+      <button (click)="rotateRight()" title="Rotate Right">↻</button>
+    </div>
+
+    <div class="scene-ops">
+      <button (click)="resetDemo()">Reset</button>
+      <button (click)="clearCanvas()" class="danger">Clear</button>
+    </div>
+  </div> -->
+
+  <!-- Main Content Area -->
+  <div class="content-area" (contextmenu)="onContextMenu($event)">
+    <!-- 3D Canvas -->
+    <div #canvasContainer class="canvas-container"></div>
+
+    <!-- Context Menu -->
+    @if (contextMenu().visible) {
+    <div class="context-menu" [style.left.px]="contextMenu().x" [style.top.px]="contextMenu().y">
+      <div class="menu-item has-submenu">
+        <span>New...</span>
+        <span class="arrow">▶</span>
+
+        <div class="submenu">
+          @for (tool of toolItems(); track tool.type) {
+          <button (click)="$event.stopPropagation(); onContextAction('new', tool.type)">
+            <div
+              class="tool-icon"
+              [style.background-color]="'#' + tool.defaultColor.toString(16).padStart(6, '0')"
+            ></div>
+            {{ tool.label }}
+          </button>
+          }
+        </div>
+      </div>
+
+      <div class="menu-separator"></div>
+      <button disabled>Edit...</button>
+      <button
+        (click)="onContextAction('delete')"
+        [disabled]="!contextMenu().targetNodeId"
+        class="danger"
+      >
+        Delete
+      </button>
+    </div>
+    }
+
+    <!-- Hidden File Input -->
+    <input type="file" #fileInput (change)="onFileSelected($event)" accept=".json" class="hidden" />
+
+    <!-- Left Sidebar: Palette -->
+    @if (showInternalPanels()) {
+    <div class="sidebar left" [class.collapsed]="!isPaletteOpen()">
+      <button (click)="togglePalette()" class="sidebar-toggle">
+        {{ isPaletteOpen() ? '◀' : '▶' }}
+      </button>
+
+      <div class="sidebar-content">
+        <h2>Component Palette</h2>
+
+        <div class="palette-grid">
+          @for (tool of toolItems(); track tool.type) {
+          <button (click)="addNode(tool.type)" class="palette-item">
+            <div
+              class="item-icon"
+              [style.background-color]="'#' + tool.defaultColor.toString(16).padStart(6, '0')"
+            ></div>
+            <div class="item-info">
+              <div class="item-label">{{ tool.label }}</div>
+              <div class="item-category">{{ tool.category || 'Standard' }}</div>
+            </div>
+            <div class="item-add">+</div>
+          </button>
+          }
+        </div>
+      </div>
+    </div>
+    }
+
+    <!-- Right Sidebar: Inspector -->
+    @if (showInternalPanels()) {
+    <div class="sidebar right" [class.collapsed]="!isInspectorOpen()">
+      <button (click)="toggleInspector()" class="sidebar-toggle">
+        {{ isInspectorOpen() ? '▶' : '◀' }}
+      </button>
+
+      <div class="sidebar-content">
+        @if (selectedNodeData(); as node) {
+        <div class="inspector">
+          <div class="inspector-header">
+            <h2>Object Inspector</h2>
+            <button (click)="deleteSelected()" class="delete-btn">Delete</button>
+          </div>
+
+          <div class="field-group">
+            <label>Label</label>
+            <input
+              #labelInput
+              type="text"
+              [ngModel]="formLabel"
+              (ngModelChange)="formLabel = $event; onFormChange()"
+            />
+          </div>
+          <div class="field-group">
+            <label>Description</label>
+            <textarea
+              [ngModel]="formDesc"
+              (ngModelChange)="formDesc = $event; onFormChange()"
+              rows="3"
+            ></textarea>
+          </div>
+          <div class="field-group">
+            <label>Color</label>
+            <div class="color-row">
+              <input
+                type="color"
+                [ngModel]="formColor"
+                (ngModelChange)="formColor = $event; onFormChange()"
+              />
+              <input
+                type="text"
+                [ngModel]="formColor"
+                (ngModelChange)="formColor = $event; onFormChange()"
+              />
+            </div>
+          </div>
+
+          <div class="section-header">TRANSFORM</div>
+          <div class="transform-grid">
+            <div>
+              <label class="axis-x">X</label>
+              <input
+                type="number"
+                [ngModel]="formX"
+                (ngModelChange)="formX = $event; onFormChange()"
+              />
+            </div>
+            <div>
+              <label class="axis-y">Y</label>
+              <input
+                type="number"
+                [ngModel]="formY"
+                (ngModelChange)="formY = $event; onFormChange()"
+              />
+            </div>
+            <div>
+              <label class="axis-z">Z</label>
+              <input
+                type="number"
+                [ngModel]="formZ"
+                (ngModelChange)="formZ = $event; onFormChange()"
+              />
+            </div>
+          </div>
+
+          <div class="section-header">CONNECTIONS</div>
+          <div class="connection-add">
+            <select [(ngModel)]="selectedTargetId">
+              <option value="" disabled selected>Connect to...</option>
+              @for (target of availableTargets(); track target.id) {
+              <option [value]="target.id">{{ target.label }}</option>
+              }
+            </select>
+            <button (click)="addConnection()" [disabled]="!selectedTargetId">+</button>
+          </div>
+
+          <div class="connection-list">
+            @for (conn of currentConnections(); track conn.id) {
+            <div class="connection-item">
+              <span>{{ conn.label }}</span>
+              <button (click)="removeConnection(conn.id)">✕</button>
+            </div>
+            } @if (currentConnections().length === 0) {
+            <div class="empty-connections">No outbound connections</div>
+            }
+          </div>
+        </div>
+        } @else {
+        <div class="no-selection">
+          <div class="icon">⬚</div>
+          <p>No object selected</p>
+          <p class="hint">Click to Select</p>
+        </div>
+        }
+      </div>
+    </div>
+    }
+  </div>
+</div>

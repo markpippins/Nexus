@@ -1,0 +1,25 @@
+<div class="palette-container">
+  <h3 class="palette-header">Component Palette</h3>
+  <div class="palette-grid">
+    @for (tool of toolItems(); track tool.type) {
+      <button
+        (click)="onAddComponent(tool.type)"
+        class="palette-item"
+        [title]="tool.description || tool.name"
+      >
+        <div class="item-icon-wrapper">
+          <div
+            class="item-icon"
+            [class]="'shape-' + (tool.geometry || 'box')"
+            [style.background-color]="getColorHex(tool.defaultColor)"
+          ></div>
+        </div>
+        <div class="item-info">
+          <div class="item-label">{{ tool.name }}</div>
+          <div class="item-category">{{ tool.category || 'Standard' }}</div>
+        </div>
+        <div class="item-add">+</div>
+      </button>
+    }
+  </div>
+</div>

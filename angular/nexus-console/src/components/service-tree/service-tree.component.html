@@ -1,0 +1,169 @@
+<div class="service-tree">
+  <!-- Gateway Services Section (Services with hosted services) -->
+  @if (gateways().length > 0) {
+    <div class="gateways-section">
+      <div class="section-header">
+        <span class="section-icon">🌐</span>
+        <span class="section-title">Service Gateways</span>
+        <span class="section-count">{{ gateways().length }}</span>
+      </div>
+
+      @for (gateway of gateways(); track gateway.name) {
+        <div class="gateway-group">
+          <div class="gateway-header" (click)="toggleGateway(gateway.name)">
+            <div
+              class="gateway-status"
+              [style.backgroundColor]="getHostedServiceStatusColor(gateway.status)"
+              [title]="gateway.status || 'UNKNOWN'"
+            ></div>
+            <div class="gateway-info">
+              <div class="gateway-name">{{ gateway.name }}</div>
+              <div class="gateway-stats">
+                {{ gateway.hostedServices?.length || 0 }} hosted services
+                @if (gateway.framework) {
+                  <span class="gateway-framework">| {{ gateway.framework }}</span>
+                }
+              </div>
+            </div>
+            <mat-icon class="expand-icon">
+              {{ isGatewayExpanded(gateway.name) ? 'expand_more' : 'chevron_right' }}
+            </mat-icon>
+          </div>
+
+          @if (isGatewayExpanded(gateway.name)) {
+            <div class="hosted-services-list">
+              @for (hosted of gateway.hostedServices; track hosted.serviceName) {
+                <div class="hosted-service-item">
+                  <div
+                    class="hosted-service-status"
+                    [style.backgroundColor]="getHostedServiceStatusColor(hosted.status)"
+                    [title]="hosted.status || 'HEALTHY'"
+                  ></div>
+                  <div class="hosted-service-info">
+                    <div class="hosted-service-name">
+                      <span class="hosted-icon">📦</span>
+                      {{ hosted.serviceName }}
+                    </div>
+                    <div class="hosted-service-details">
+                      {{ hosted.operations?.length || 0 }} operations
+                      @if (hosted.type) {
+                        <span class="hosted-type">| {{ hosted.type }}</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="section-divider"></div>
+  }
+
+  <!-- Framework Groups Section -->
+  @for (group of groupedServices(); track group.framework.id) {
+    <div class="framework-group">
+      <div class="framework-header" (click)="toggleFramework(group.framework.id)">
+        @if (getFrameworkImageUrl(group.framework.name); as imageUrl) {
+          <img
+            [src]="imageUrl"
+            class="framework-icon h-6 w-6 object-contain"
+            alt="{{ group.framework.name }}"
+            onerror="
+              this.style.display = 'none';
+              this.nextElementSibling.style.display = 'block';
+            "
+          />
+          <mat-icon class="framework-icon" style="display: none">{{
+            getFrameworkIcon(group.framework.category.name)
+          }}</mat-icon>
+        } @else {
+          <mat-icon class="framework-icon">{{
+            getFrameworkIcon(group.framework.category.name)
+          }}</mat-icon>
+        }
+        <div class="framework-info">
+          <div class="framework-name">{{ group.framework.name }}</div>
+          <div class="framework-stats">
+            {{ group.services.length }} services |
+            <span class="status-count healthy">{{ group.healthySummary.healthy }} healthy</span>,
+            <span class="status-count unhealthy"
+              >{{ group.healthySummary.unhealthy }} unhealthy</span
+            >,
+            <span class="status-count unknown">{{ group.healthySummary.unknown }} unknown</span>
+          </div>
+        </div>
+        <mat-icon class="expand-icon">
+          {{ isFrameworkExpanded(group.framework.id) ? 'expand_more' : 'chevron_right' }}
+        </mat-icon>
+      </div>
+
+      @if (isFrameworkExpanded(group.framework.id)) {
+        <div class="service-list">
+          @for (service of group.services; track service.id) {
+            <div
+              class="service-item"
+              [class.selected]="selectedService()?.id === service.id"
+              [class.opacity-50]="service.status === 'DEPRECATED' || service.status === 'ARCHIVED'"
+              [class.border-dashed]="service.status === 'PLANNED'"
+              [class.border-l-blue-400]="service.status === 'PLANNED'"
+              (click)="selectService(service)"
+            >
+              <div
+                class="service-status"
+                [style.backgroundColor]="getHealthStatusColor(getDeploymentHealthStatus(service))"
+                [title]="getDeploymentHealthStatus(service)"
+              ></div>
+              <div class="service-info">
+                <div class="service-name" [class.line-through]="service.status === 'DEPRECATED'">
+                  {{ service.name }}
+                  @if (service.status !== 'ACTIVE') {
+                    <span
+                      class="status-badge"
+                      [class.planned]="service.status === 'PLANNED'"
+                      [class.deprecated]="service.status === 'DEPRECATED'"
+                      [class.archived]="service.status === 'ARCHIVED'"
+                    >
+                      {{ service.status }}
+                    </span>
+                  }
+                </div>
+                <div class="service-details">
+                  {{ service.framework.language.name }} | {{ service.version }} |
+                  {{ service.type.name }}
+                  @if (service.defaultPort) {
+                    <span class="port">:{{ service.defaultPort }}</span>
+                  }
+                </div>
+              </div>
+              <div class="service-actions">
+                <button
+                  mat-icon-button
+                  (click)="restart(service); $event.stopPropagation()"
+                  [disabled]="!canRestart(service)"
+                  [title]="canRestart(service) ? 'Restart service' : 'Service cannot be restarted'"
+                >
+                  <mat-icon>refresh</mat-icon>
+                </button>
+                <button
+                  mat-icon-button
+                  (click)="viewServiceLogs(service); $event.stopPropagation()"
+                  title="View logs"
+                >
+                  <mat-icon>description</mat-icon>
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+  @if (groupedServices().length === 0 && gateways().length === 0) {
+    <div class="no-services">
+      <p>No services found. Connect to a Host Server to view registered services.</p>
+    </div>
+  }
+</div>

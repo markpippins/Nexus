@@ -1,0 +1,86 @@
+<div class="inspector-container">
+  @if (selectedNodeData(); as node) {
+  <div class="inspector">
+    <div class="inspector-header">
+      <h3>Object Inspector</h3>
+      <button (click)="deleteSelected()" class="delete-btn">Delete</button>
+    </div>
+
+    <div class="field-group">
+      <label>Label</label>
+      <input
+        type="text"
+        [ngModel]="formLabel"
+        (ngModelChange)="formLabel = $event; onFormChange()"
+      />
+    </div>
+    <div class="field-group">
+      <label>Description</label>
+      <textarea
+        [ngModel]="formDesc"
+        (ngModelChange)="formDesc = $event; onFormChange()"
+        rows="3"
+      ></textarea>
+    </div>
+    <div class="field-group">
+      <label>Color</label>
+      <div class="color-row">
+        <input
+          type="color"
+          [ngModel]="formColor"
+          (ngModelChange)="formColor = $event; onFormChange()"
+        />
+        <input
+          type="text"
+          [ngModel]="formColor"
+          (ngModelChange)="formColor = $event; onFormChange()"
+        />
+      </div>
+    </div>
+
+    <div class="section-header">TRANSFORM</div>
+    <div class="transform-grid">
+      <div>
+        <label class="axis-x">X</label>
+        <input type="number" [ngModel]="formX" (ngModelChange)="formX = $event; onFormChange()" />
+      </div>
+      <div>
+        <label class="axis-y">Y</label>
+        <input type="number" [ngModel]="formY" (ngModelChange)="formY = $event; onFormChange()" />
+      </div>
+      <div>
+        <label class="axis-z">Z</label>
+        <input type="number" [ngModel]="formZ" (ngModelChange)="formZ = $event; onFormChange()" />
+      </div>
+    </div>
+
+    <div class="section-header">CONNECTIONS</div>
+    <div class="connection-add">
+      <select [(ngModel)]="selectedTargetId">
+        <option value="" disabled selected>Connect to...</option>
+        @for (target of availableTargets(); track target.id) {
+        <option [value]="target.id">{{ target.label }}</option>
+        }
+      </select>
+      <button (click)="addConnection()" [disabled]="!selectedTargetId">+</button>
+    </div>
+
+    <div class="connection-list">
+      @for (conn of currentConnections(); track conn.id) {
+      <div class="connection-item">
+        <span>{{ conn.label }}</span>
+        <button (click)="removeConnection(conn.id)">✕</button>
+      </div>
+      } @if (currentConnections().length === 0) {
+      <div class="empty-connections">No outbound connections</div>
+      }
+    </div>
+  </div>
+  } @else {
+  <div class="no-selection">
+    <div class="icon">⬚</div>
+    <p>No object selected</p>
+    <p class="hint">Click a node in the graph to select it</p>
+  </div>
+  }
+</div>

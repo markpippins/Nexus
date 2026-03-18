@@ -1,0 +1,122 @@
+/* Enhance form control styling for better visual distinction */
+
+/* Style for all form inputs - overriding default tailwind classes to fix contrast issues */
+app-host-profiles-dialog input[type="text"],
+app-host-profiles-dialog input[type="url"],
+app-host-profiles-dialog input[type="number"],
+app-host-profiles-dialog textarea,
+app-host-profiles-dialog select {
+  background-color: rgb(var(--color-surface));  /* Use surface color instead of undefined input color */
+  color: rgb(var(--color-text-base));
+  border: 1px solid rgb(var(--color-border-base));
+  border-radius: 0.375rem; /* equivalent to rounded-md */
+  padding: 0.5rem; /* equivalent to py-2 px-3 */
+  transition: all 0.15s ease-in-out;
+  box-sizing: border-box;
+}
+
+/* Focus state for better accessibility */
+app-host-profiles-dialog input[type="text"]:focus,
+app-host-profiles-dialog input[type="url"]:focus,
+app-host-profiles-dialog input[type="number"]:focus,
+app-host-profiles-dialog textarea:focus,
+app-host-profiles-dialog select:focus {
+  outline: none;
+  border-color: rgb(var(--color-primary-500));
+  box-shadow: 0 0 0 3px rgba(var(--color-primary-500) 0.1);
+}
+
+/* Hover state for better visual feedback */
+app-host-profiles-dialog input[type="text"]:hover,
+app-host-profiles-dialog input[type="url"]:hover,
+app-host-profiles-dialog input[type="number"]:hover,
+app-host-profiles-dialog textarea:hover,
+app-host-profiles-dialog select:hover {
+  border-color: rgb(var(--color-text-muted)); /* Use muted text for better contrast */
+}
+
+/* Improve visual hierarchy for form groups */
+app-host-profiles-dialog .form-group {
+  margin-bottom: 1.5rem;
+}
+
+app-host-profiles-dialog .form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: rgb(var(--color-text-base));
+  font-weight: 500;
+  font-size: 0.875rem; /* equivalent to text-sm */
+}
+
+/* Special styling for disabled states */
+app-host-profiles-dialog input[disabled],
+app-host-profiles-dialog select[disabled],
+app-host-profiles-dialog textarea[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Better contrast for sidebar selection */
+app-host-profiles-dialog .sidebar-item.selected {
+  background-color: rgb(var(--color-surface-selected));
+}
+
+app-host-profiles-dialog .sidebar-item:hover:not(.selected) {
+  background-color: rgb(var(--color-surface-hover));
+}
+
+/* Visual enhancement for action buttons */
+app-host-profiles-dialog .action-button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem; /* equivalent to rounded-md */
+  font-weight: 500;
+  font-size: 0.875rem; /* equivalent to text-sm */
+  transition: all 0.15s ease-in-out;
+}
+
+/* Ensure form sections have proper separation */
+app-host-profiles-dialog .form-section {
+  padding: 1rem 0;
+  border-bottom: 1px solid rgb(var(--color-border-base));
+}
+
+app-host-profiles-dialog .form-section:last-child {
+  border-bottom: none;
+}
+
+/* Improve contrast for placeholder text */
+app-host-profiles-dialog input::placeholder,
+app-host-profiles-dialog textarea::placeholder {
+  color: rgba(var(--color-text-muted) 0.7);
+}
+
+/* Special treatment for the main content area to enhance depth */
+app-host-profiles-dialog .main-content-area {
+  background-color: rgb(var(--color-surface));
+  min-height: 100%;
+}
+
+/* Enhance the visual appearance of the editing form container */
+app-host-profiles-dialog .edit-form-container {
+  background-color: rgba(var(--color-surface) 0.95);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  margin-top: 1rem;
+}
+
+/* Specific override for the form inputs that were blending with background - now using proper variables */
+app-host-profiles-dialog .shadow-sm {
+  background-color: rgb(var(--color-surface-input));
+  border: 1px solid rgb(var(--color-border-base));
+}
+
+/* Make sure all form controls have proper contrast */
+app-host-profiles-dialog input,
+app-host-profiles-dialog select,
+app-host-profiles-dialog textarea {
+  background-color: rgb(var(--color-surface-input));
+  color: rgb(var(--color-text-base));
+  border: 1px solid rgb(var(--color-border-base));
+  box-shadow: none;
+}
