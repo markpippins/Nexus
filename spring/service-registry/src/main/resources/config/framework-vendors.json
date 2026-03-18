@@ -1,0 +1,14 @@
+[
+    {
+        "name": "Unknown",
+        "description": "Vendor unknown or unspecified"
+    },
+    {
+        "name": "FOSS",
+        "description": "Free and Open Source Software"
+    },
+    {
+        "name": "None",
+        "description": "None / Unspecified"
+    }
+]

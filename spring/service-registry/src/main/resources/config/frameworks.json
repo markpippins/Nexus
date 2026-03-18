@@ -1,0 +1,560 @@
+[
+    {
+        "name": "Spring Boot",
+        "description": "Java Spring Boot microservices framework",
+        "category": "JAVA_SPRING",
+        "language": "Java",
+        "current_version": "3.2.0",
+        "lts_version": "3.1.5",
+        "url": "https://spring.io/projects/spring-boot"
+    },
+    {
+        "name": "Quarkus",
+        "description": "Supersonic Subnexus Java framework",
+        "category": "JAVA_QUARKUS",
+        "language": "Java",
+        "current_version": "3.6.0",
+        "lts_version": "3.2.9",
+        "url": "https://quarkus.io"
+    },
+    {
+        "name": "Micronaut",
+        "description": "Modern JVM-based framework for microservices",
+        "category": "JAVA_MICRONAUT",
+        "language": "Java",
+        "current_version": "4.2.0",
+        "lts_version": "4.0.6",
+        "url": "https://micronaut.io"
+    },
+    {
+        "name": "Helidon",
+        "description": "Oracle Helidon microservices framework",
+        "category": "JAVA_HELIDON",
+        "language": "Java",
+        "current_version": "4.0.0",
+        "lts_version": "3.2.0",
+        "url": "https://helidon.io"
+    },
+    {
+        "name": "NestJS",
+        "description": "Progressive Node.js framework",
+        "category": "NODE_NESTJS",
+        "language": "TypeScript",
+        "current_version": "10.0.0",
+        "lts_version": "9.5.0",
+        "url": "https://nestjs.com"
+    },
+    {
+        "name": "AdonisJS",
+        "description": "Node.js MVC framework",
+        "category": "NODE_ADONISJS",
+        "language": "TypeScript",
+        "current_version": "6.0.0",
+        "lts_version": "5.9.0",
+        "url": "https://adonisjs.com"
+    },
+    {
+        "name": "Moleculer",
+        "description": "Progressive microservices framework for Node.js",
+        "category": "NODE_MOLECULER",
+        "language": "JavaScript",
+        "current_version": "0.14.0",
+        "lts_version": "0.14.0",
+        "url": "https://moleculer.services"
+    },
+    {
+        "name": "Express",
+        "description": "Fast, unopinionated web framework for Node.js",
+        "category": "NODE_EXPRESS",
+        "language": "JavaScript",
+        "current_version": "4.18.0",
+        "lts_version": "4.18.0",
+        "url": "https://expressjs.com"
+    },
+    {
+        "name": "Fastify",
+        "description": "Fast and low overhead web framework for Node.js",
+        "category": "NODE_FASTIFY",
+        "language": "JavaScript",
+        "current_version": "4.26.0",
+        "lts_version": "4.26.0",
+        "url": "https://fastify.dev"
+    },
+    {
+        "name": "Hono",
+        "description": "Ultrafast web framework for the Edges",
+        "category": "NODE_HONO",
+        "language": "TypeScript",
+        "current_version": "4.0.0",
+        "lts_version": "4.0.0",
+        "url": "https://hono.dev"
+    },
+    {
+        "name": "Koa",
+        "description": "Expressive HTTP middleware framework for Node.js",
+        "category": "NODE_KOA",
+        "language": "JavaScript",
+        "current_version": "2.15.0",
+        "lts_version": "2.15.0",
+        "url": "https://koajs.com"
+    },
+    {
+        "name": "Hapi",
+        "description": "Framework for building applications and services",
+        "category": "NODE_HAPI",
+        "language": "JavaScript",
+        "current_version": "21.0.0",
+        "lts_version": "21.0.0",
+        "url": "https://hapi.dev"
+    },
+    {
+        "name": "Feathers",
+        "description": "Framework for real-time applications and REST APIs",
+        "category": "NODE_FEATHERS",
+        "language": "TypeScript",
+        "current_version": "5.0.0",
+        "lts_version": "5.0.0",
+        "url": "https://feathersjs.com"
+    },
+    {
+        "name": "tRPC",
+        "description": "End-to-end typesafe APIs made easy",
+        "category": "NODE_TRPC",
+        "language": "TypeScript",
+        "current_version": "11.0.0",
+        "lts_version": "10.45.0",
+        "url": "https://trpc.io"
+    },
+    {
+        "name": "FastAPI",
+        "description": "Modern Python web framework",
+        "category": "PYTHON_FASTAPI",
+        "language": "Python",
+        "current_version": "0.109.0",
+        "lts_version": "0.109.0",
+        "url": "https://fastapi.tiangolo.com"
+    },
+    {
+        "name": "Django",
+        "description": "High-level Python web framework",
+        "category": "PYTHON_DJANGO",
+        "language": "Python",
+        "current_version": "5.0.0",
+        "lts_version": "4.2.0",
+        "url": "https://www.djangoproject.com"
+    },
+    {
+        "name": "Flask",
+        "description": "Lightweight Python web framework",
+        "category": "PYTHON_FLASK",
+        "language": "Python",
+        "current_version": "3.0.0",
+        "lts_version": "2.3.0",
+        "url": "https://flask.palletsprojects.com"
+    },
+    {
+        "name": "Go",
+        "description": "High-performance HTTP web framework for Go",
+        "category": "GO_GOA",
+        "language": "Go",
+        "current_version": "1.9.0",
+        "lts_version": "1.9.0",
+        "url": "https://gin-gonic.com"
+    },
+    {
+        "name": "Fiber",
+        "description": "Express-inspired web framework for Go",
+        "category": "GO_FIBER",
+        "language": "Go",
+        "current_version": "2.52.0",
+        "lts_version": "2.52.0",
+        "url": "https://gofiber.io"
+    },
+    {
+        "name": "React",
+        "description": "JavaScript library for building user interfaces",
+        "category": "FRONTEND_REACT",
+        "language": "JavaScript",
+        "current_version": "18.2.0",
+        "lts_version": "18.2.0",
+        "url": "https://react.dev"
+    },
+    {
+        "name": "Angular",
+        "description": "Platform for building web applications",
+        "category": "FRONTEND_ANGULAR",
+        "language": "TypeScript",
+        "current_version": "17.0.0",
+        "lts_version": "16.2.0",
+        "url": "https://angular.dev"
+    },
+    {
+        "name": "Vue.js",
+        "description": "Progressive JavaScript framework",
+        "category": "FRONTEND_VUE",
+        "language": "JavaScript",
+        "current_version": "3.4.0",
+        "lts_version": "3.4.0",
+        "url": "https://vuejs.org"
+    },
+    {
+        "name": "Svelte",
+        "description": "Cybernetically enhanced web apps",
+        "category": "FRONTEND_SVELTE",
+        "language": "JavaScript",
+        "current_version": "4.2.0",
+        "lts_version": "4.2.0",
+        "url": "https://svelte.dev"
+    },
+    {
+        "name": "SvelteKit",
+        "description": "Web development, streamlined with Svelte",
+        "category": "FRONTEND_SVELTE",
+        "language": "JavaScript",
+        "current_version": "2.5.0",
+        "lts_version": "2.5.0",
+        "url": "https://kit.svelte.dev"
+    },
+    {
+        "name": "SolidJS",
+        "description": "Simple and performant reactivity",
+        "category": "FRONTEND_SOLID",
+        "language": "TypeScript",
+        "current_version": "1.8.0",
+        "lts_version": "1.8.0",
+        "url": "https://www.solidjs.com"
+    },
+    {
+        "name": "SolidStart",
+        "description": "SolidJS meta-framework",
+        "category": "FRONTEND_SOLID",
+        "language": "TypeScript",
+        "current_version": "1.0.0",
+        "lts_version": "1.0.0",
+        "url": "https://start.solidjs.com"
+    },
+    {
+        "name": "Next.js",
+        "description": "React framework for production",
+        "category": "FRONTEND_NEXTJS",
+        "language": "TypeScript",
+        "current_version": "14.0.0",
+        "lts_version": "13.5.0",
+        "url": "https://nextjs.org"
+    },
+    {
+        "name": "Nuxt",
+        "description": "Vue.js meta-framework",
+        "category": "FRONTEND_NUXT",
+        "language": "TypeScript",
+        "current_version": "3.10.0",
+        "lts_version": "3.10.0",
+        "url": "https://nuxt.com"
+    },
+    {
+        "name": "Remix",
+        "description": "Full stack web framework for React",
+        "category": "FRONTEND_REMIX",
+        "language": "TypeScript",
+        "current_version": "2.6.0",
+        "lts_version": "2.6.0",
+        "url": "https://remix.run"
+    },
+    {
+        "name": "Astro",
+        "description": "The web framework for content-driven websites",
+        "category": "FRONTEND_ASTRO",
+        "language": "TypeScript",
+        "current_version": "4.3.0",
+        "lts_version": "4.3.0",
+        "url": "https://astro.build"
+    },
+    {
+        "name": "Analog",
+        "description": "Fullstack meta-framework for Angular",
+        "category": "FRONTEND_ANALOG",
+        "language": "TypeScript",
+        "current_version": "1.0.0",
+        "lts_version": "0.2.0",
+        "url": "https://analogjs.org"
+    },
+    {
+        "name": "Ember.js",
+        "description": "A framework for ambitious web developers",
+        "category": "FRONTEND_EMBER",
+        "language": "JavaScript",
+        "current_version": "5.6.0",
+        "lts_version": "5.4.0",
+        "url": "https://emberjs.com"
+    },
+    {
+        "name": "Preact",
+        "description": "Fast 3kB alternative to React",
+        "category": "FRONTEND_PREACT",
+        "language": "JavaScript",
+        "current_version": "10.19.0",
+        "lts_version": "10.19.0",
+        "url": "https://preactjs.com"
+    },
+    {
+        "name": "Alpine.js",
+        "description": "Lightweight JavaScript framework",
+        "category": "OTHER",
+        "language": "JavaScript",
+        "current_version": "3.13.0",
+        "lts_version": "3.13.0",
+        "url": "https://alpinejs.dev"
+    },
+    {
+        "name": "HTMX",
+        "description": "High power tools for HTML",
+        "category": "OTHER",
+        "language": "JavaScript",
+        "current_version": "1.9.0",
+        "lts_version": "1.9.0",
+        "url": "https://htmx.org"
+    },
+    {
+        "name": "Electron",
+        "description": "Build cross-platform desktop apps",
+        "category": "DESKTOP_ELECTRON",
+        "language": "JavaScript",
+        "current_version": "28.0.0",
+        "lts_version": "28.0.0",
+        "url": "https://www.electronjs.org"
+    },
+    {
+        "name": "Tauri",
+        "description": "Build smaller, faster, and more secure desktop apps",
+        "category": "DESKTOP_TAURI",
+        "language": "Rust",
+        "current_version": "2.0.0",
+        "lts_version": "1.6.0",
+        "url": "https://tauri.app"
+    },
+    {
+        "name": "React Native",
+        "description": "Build native mobile apps using React",
+        "category": "MOBILE_REACT_NATIVE",
+        "language": "JavaScript",
+        "current_version": "0.73.0",
+        "lts_version": "0.73.0",
+        "url": "https://reactnative.dev"
+    },
+    {
+        "name": "Expo",
+        "description": "Platform for making universal native apps",
+        "category": "MOBILE_EXPO",
+        "language": "JavaScript",
+        "current_version": "50.0.0",
+        "lts_version": "50.0.0",
+        "url": "https://expo.dev"
+    },
+    {
+        "name": "Ionic",
+        "description": "Cross-platform app development",
+        "category": "MOBILE_IONIC",
+        "language": "TypeScript",
+        "current_version": "8.0.0",
+        "lts_version": "7.7.0",
+        "url": "https://ionicframework.com"
+    },
+    {
+        "name": "Capacitor",
+        "description": "Cross-platform native runtime",
+        "category": "MOBILE_CAPACITOR",
+        "language": "TypeScript",
+        "current_version": "5.7.0",
+        "lts_version": "5.7.0",
+        "url": "https://capacitorjs.com"
+    },
+    {
+        "name": "NativeScript",
+        "description": "Native mobile apps with Angular, Vue.js, TypeScript",
+        "category": "MOBILE_NATIVESCRIPT",
+        "language": "TypeScript",
+        "current_version": "8.6.0",
+        "lts_version": "8.6.0",
+        "url": "https://nativescript.org"
+    },
+    {
+        "name": "Phoenix",
+        "description": "Elixir web framework for productive developers",
+        "category": "ELIXIR_PHOENIX",
+        "language": "Elixir",
+        "current_version": "1.7.0",
+        "lts_version": "1.7.0",
+        "url": "https://www.phoenixframework.org"
+    },
+    {
+        "name": "Ruby on Rails",
+        "description": "Full-stack web application framework",
+        "category": "RUBY_RAILS",
+        "language": "Ruby",
+        "current_version": "7.1.0",
+        "lts_version": "7.0.0",
+        "url": "https://rubyonrails.org"
+    },
+    {
+        "name": "Laravel",
+        "description": "The PHP Framework for Web Artisans",
+        "category": "PHP_LARAVEL",
+        "language": "PHP",
+        "current_version": "11.0.0",
+        "lts_version": "10.0.0",
+        "url": "https://laravel.com"
+    },
+    {
+        "name": "Deno",
+        "description": "Secure runtime for JavaScript and TypeScript",
+        "category": "RUNTIME_DENO",
+        "language": "TypeScript",
+        "current_version": "1.40.0",
+        "lts_version": "1.40.0",
+        "url": "https://deno.land"
+    },
+    {
+        "name": "Bun",
+        "description": "Fast all-in-one JavaScript runtime",
+        "category": "RUNTIME_BUN",
+        "language": "JavaScript",
+        "current_version": "1.0.0",
+        "lts_version": "1.0.0",
+        "url": "https://bun.sh"
+    },
+    {
+        "name": "Node.js",
+        "description": "JavaScript runtime built on Chrome V8",
+        "category": "RUNTIME_NODE",
+        "language": "JavaScript",
+        "current_version": "21.0.0",
+        "lts_version": "20.10.0",
+        "url": "https://nodejs.org"
+    },
+    {
+        "name": "Actix Web",
+        "description": "Rust web framework",
+        "category": "RUST_ACTIX",
+        "language": "Rust",
+        "current_version": "4.4.0",
+        "lts_version": "4.4.0",
+        "url": "https://actix.rs"
+    },
+    {
+        "name": "ASP.NET Core",
+        "description": "Cross-platform .NET framework",
+        "category": "DOTNET_ASPNET",
+        "language": ".NET",
+        "current_version": "8.0.0",
+        "lts_version": "6.0.0",
+        "url": "https://dotnet.microsoft.com/apps/aspnet"
+    },
+    {
+        "name": "Strapi",
+        "description": "Open-source headless CMS",
+        "category": "CMS_STRAPI",
+        "language": "JavaScript",
+        "current_version": "4.21.0",
+        "lts_version": "4.21.0",
+        "url": "https://strapi.io"
+    },
+    {
+        "name": "Keystone",
+        "description": "Headless CMS and GraphQL API",
+        "category": "CMS_KEYSTONE",
+        "language": "TypeScript",
+        "current_version": "8.0.0",
+        "lts_version": "8.0.0",
+        "url": "https://keystonejs.com"
+    },
+    {
+        "name": "Meteor",
+        "description": "Full-stack JavaScript platform",
+        "category": "OTHER",
+        "language": "JavaScript",
+        "current_version": "3.0.0",
+        "lts_version": "2.14.0",
+        "url": "https://www.meteor.com"
+    },
+    {
+        "name": "RedwoodJS",
+        "description": "Full-stack React framework with GraphQL",
+        "category": "OTHER",
+        "language": "TypeScript",
+        "current_version": "7.0.0",
+        "lts_version": "7.0.0",
+        "url": "https://redwoodjs.com"
+    },
+    {
+        "name": "Blitz.js",
+        "description": "Fullstack React framework built on Next.js",
+        "category": "FRONTEND_NEXTJS",
+        "language": "TypeScript",
+        "current_version": "2.0.0",
+        "lts_version": "2.0.0",
+        "url": "https://blitzjs.com"
+    },
+    {
+        "name": "T3 Stack",
+        "description": "Full-stack, typesafe Next.js app stack",
+        "category": "FRONTEND_NEXTJS",
+        "language": "TypeScript",
+        "current_version": "7.0.0",
+        "lts_version": "7.0.0",
+        "url": "https://create.t3.gg"
+    },
+    {
+        "name": "Better-T Stack",
+        "description": "Modern TypeScript full-stack starter",
+        "category": "OTHER",
+        "language": "TypeScript",
+        "current_version": "1.0.0",
+        "lts_version": "1.0.0",
+        "url": "https://better-t.dev"
+    },
+    {
+        "name": "Tanstack",
+        "description": "High-quality open-source software for web developers",
+        "category": "OTHER",
+        "language": "TypeScript",
+        "current_version": "5.0.0",
+        "lts_version": "5.0.0",
+        "url": "https://tanstack.com"
+    },
+    {
+        "name": "ElysiaJS",
+        "description": "TypeScript framework for Bun",
+        "category": "NODE_HONO",
+        "language": "TypeScript",
+        "current_version": "1.0.0",
+        "lts_version": "1.0.0",
+        "url": "https://elysiajs.com"
+    },
+    {
+        "name": "ExpressoTS",
+        "description": "TypeScript framework for Express",
+        "category": "NODE_EXPRESS",
+        "language": "TypeScript",
+        "current_version": "3.0.0",
+        "lts_version": "3.0.0",
+        "url": "https://expresso-ts.com"
+    },
+    {
+        "name": "Deepkit",
+        "description": "High-performance TypeScript framework",
+        "category": "OTHER",
+        "language": "TypeScript",
+        "current_version": "1.0.0",
+        "lts_version": "1.0.0",
+        "url": "https://deepkit.io"
+    },
+    {
+        "name": "Inertia.js",
+        "description": "Modern monolith approach to building SPAs",
+        "category": "OTHER",
+        "language": "JavaScript",
+        "current_version": "1.0.0",
+        "lts_version": "1.0.0",
+        "url": "https://inertiajs.com"
+    }
+]

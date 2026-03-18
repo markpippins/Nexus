@@ -1,0 +1,22 @@
+[
+  {
+    "name": "DEVELOPMENT",
+    "description": "Development environment"
+  },
+  {
+    "name": "STAGING",
+    "description": "Staging environment"
+  },
+  {
+    "name": "PRODUCTION",
+    "description": "Production environment"
+  },
+  {
+    "name": "TEST",
+    "description": "Testing environment"
+  },
+  {
+    "name": "None",
+    "description": "None / Unspecified"
+  }
+]

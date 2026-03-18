@@ -1,0 +1,86 @@
+[
+    {
+        "name": "UI_COMPONENTS",
+        "description": "UI Component Libraries (buttons, forms, modals)"
+    },
+    {
+        "name": "DATA_VISUALIZATION",
+        "description": "Charts, graphs, and data visualization libraries"
+    },
+    {
+        "name": "3D_GRAPHICS",
+        "description": "3D rendering and graphics libraries"
+    },
+    {
+        "name": "ANIMATION",
+        "description": "Animation and motion libraries"
+    },
+    {
+        "name": "STATE_MANAGEMENT",
+        "description": "Application state management libraries"
+    },
+    {
+        "name": "FORM_VALIDATION",
+        "description": "Form validation and schema libraries"
+    },
+    {
+        "name": "DATE_TIME",
+        "description": "Date and time manipulation libraries"
+    },
+    {
+        "name": "UTILITY",
+        "description": "General utility and helper libraries"
+    },
+    {
+        "name": "ORM_DATABASE",
+        "description": "Object-Relational Mapping and database access"
+    },
+    {
+        "name": "HTTP_CLIENT",
+        "description": "HTTP client and API communication libraries"
+    },
+    {
+        "name": "TESTING",
+        "description": "Testing frameworks and utilities"
+    },
+    {
+        "name": "CSS_STYLING",
+        "description": "CSS frameworks and styling utilities"
+    },
+    {
+        "name": "REACTIVE",
+        "description": "Reactive programming libraries"
+    },
+    {
+        "name": "GAME_ENGINE",
+        "description": "Game development and engine libraries"
+    },
+    {
+        "name": "BUNDLER_BUILD",
+        "description": "Build tools and bundlers"
+    },
+    {
+        "name": "LOGGING",
+        "description": "Logging and monitoring libraries"
+    },
+    {
+        "name": "SECURITY",
+        "description": "Security and authentication libraries"
+    },
+    {
+        "name": "SERIALIZATION",
+        "description": "Data serialization and transformation"
+    },
+    {
+        "name": "MESSAGING",
+        "description": "Message queues and event libraries"
+    },
+    {
+        "name": "OTHER",
+        "description": "Other libraries"
+    },
+    {
+        "name": "None",
+        "description": "None / Unspecified"
+    }
+]

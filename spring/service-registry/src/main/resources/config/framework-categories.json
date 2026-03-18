@@ -1,0 +1,202 @@
+[
+    {
+        "name": "JAVA_SPRING",
+        "description": "Java Spring Framework"
+    },
+    {
+        "name": "JAVA_QUARKUS",
+        "description": "Java Quarkus Framework"
+    },
+    {
+        "name": "JAVA_MICRONAUT",
+        "description": "Java Micronaut Framework"
+    },
+    {
+        "name": "JAVA_HELIDON",
+        "description": "Java Helidon Framework"
+    },
+    {
+        "name": "NODE_NESTJS",
+        "description": "Node.js NestJS Framework"
+    },
+    {
+        "name": "NODE_ADONISJS",
+        "description": "Node.js AdonisJS Framework"
+    },
+    {
+        "name": "NODE_MOLECULER",
+        "description": "Node.js Moleculer Framework"
+    },
+    {
+        "name": "NODE_EXPRESS",
+        "description": "Node.js Express Framework"
+    },
+    {
+        "name": "NODE_FASTIFY",
+        "description": "Node.js Fastify Framework"
+    },
+    {
+        "name": "NODE_HONO",
+        "description": "Node.js Hono Framework"
+    },
+    {
+        "name": "NODE_KOA",
+        "description": "Node.js Koa Framework"
+    },
+    {
+        "name": "NODE_HAPI",
+        "description": "Node.js Hapi Framework"
+    },
+    {
+        "name": "NODE_FEATHERS",
+        "description": "Node.js Feathers Framework"
+    },
+    {
+        "name": "NODE_TRPC",
+        "description": "Node.js tRPC Framework"
+    },
+    {
+        "name": "PYTHON_FASTAPI",
+        "description": "Python FastAPI Framework"
+    },
+    {
+        "name": "PYTHON_DJANGO",
+        "description": "Python Django Framework"
+    },
+    {
+        "name": "PYTHON_FLASK",
+        "description": "Python Flask Framework"
+    },
+    {
+        "name": "GO_GOA",
+        "description": "Go Gin Framework"
+    },
+    {
+        "name": "GO_FIBER",
+        "description": "Go Fiber Framework"
+    },
+    {
+        "name": "FRONTEND_REACT",
+        "description": "React Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_ANGULAR",
+        "description": "Angular Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_VUE",
+        "description": "Vue.js Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_SVELTE",
+        "description": "Svelte Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_SOLID",
+        "description": "SolidJS Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_NEXTJS",
+        "description": "Next.js Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_NUXT",
+        "description": "Nuxt.js Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_REMIX",
+        "description": "Remix Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_ASTRO",
+        "description": "Astro Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_ANALOG",
+        "description": "Analog Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_EMBER",
+        "description": "Ember.js Frontend Framework"
+    },
+    {
+        "name": "FRONTEND_PREACT",
+        "description": "Preact Frontend Framework"
+    },
+    {
+        "name": "DESKTOP_ELECTRON",
+        "description": "Electron Desktop Framework"
+    },
+    {
+        "name": "DESKTOP_TAURI",
+        "description": "Tauri Desktop Framework"
+    },
+    {
+        "name": "MOBILE_REACT_NATIVE",
+        "description": "React Native Mobile Framework"
+    },
+    {
+        "name": "MOBILE_EXPO",
+        "description": "Expo Mobile Framework"
+    },
+    {
+        "name": "MOBILE_IONIC",
+        "description": "Ionic Mobile Framework"
+    },
+    {
+        "name": "MOBILE_CAPACITOR",
+        "description": "Capacitor Mobile Framework"
+    },
+    {
+        "name": "MOBILE_NATIVESCRIPT",
+        "description": "NativeScript Mobile Framework"
+    },
+    {
+        "name": "ELIXIR_PHOENIX",
+        "description": "Elixir Phoenix Framework"
+    },
+    {
+        "name": "RUBY_RAILS",
+        "description": "Ruby on Rails Framework"
+    },
+    {
+        "name": "PHP_LARAVEL",
+        "description": "PHP Laravel Framework"
+    },
+    {
+        "name": "RUNTIME_DENO",
+        "description": "Deno Runtime"
+    },
+    {
+        "name": "RUNTIME_BUN",
+        "description": "Bun Runtime"
+    },
+    {
+        "name": "RUNTIME_NODE",
+        "description": "Node.js Runtime"
+    },
+    {
+        "name": "RUST_ACTIX",
+        "description": "Rust Actix Framework"
+    },
+    {
+        "name": "DOTNET_ASPNET",
+        "description": ".NET ASP.NET Framework"
+    },
+    {
+        "name": "CMS_STRAPI",
+        "description": "Strapi CMS"
+    },
+    {
+        "name": "CMS_KEYSTONE",
+        "description": "Keystone CMS"
+    },
+    {
+        "name": "OTHER",
+        "description": "Other Framework"
+    },
+    {
+        "name": "None",
+        "description": "None / Unspecified"
+    }
+]

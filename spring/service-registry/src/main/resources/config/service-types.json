@@ -1,0 +1,46 @@
+[
+  {
+    "name": "REST_API",
+    "description": "RESTful API Service"
+  },
+  {
+    "name": "GRAPHQL_API",
+    "description": "GraphQL API Service"
+  },
+  {
+    "name": "GRPC_SERVICE",
+    "description": "gRPC Service"
+  },
+  {
+    "name": "MESSAGE_QUEUE",
+    "description": "Message Queue / Broker"
+  },
+  {
+    "name": "DATABASE",
+    "description": "Database Service"
+  },
+  {
+    "name": "CACHE",
+    "description": "Cache Service"
+  },
+  {
+    "name": "GATEWAY",
+    "description": "API Gateway"
+  },
+  {
+    "name": "PROXY",
+    "description": "Reverse Proxy"
+  },
+  {
+    "name": "WEB_APP",
+    "description": "Web Application"
+  },
+  {
+    "name": "BACKGROUND_JOB",
+    "description": "Background Job / Worker"
+  },
+  {
+    "name": "None",
+    "description": "None / Unspecified"
+  }
+]

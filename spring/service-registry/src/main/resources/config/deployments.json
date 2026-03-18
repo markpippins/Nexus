@@ -1,0 +1,90 @@
+[
+  {
+    "serviceName": "spring-broker-gateway",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8080,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "user-service",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8083,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "login-service",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8084,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "file-service",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8087,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "note-service",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8088,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "quarkus-broker-gateway",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8081,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "moleculer-search",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 4050,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "user-access-service",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8086,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "python-broker-gateway",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8000,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "fs-crawler-adapter",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8001,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  },
+  {
+    "serviceName": "projman-service",
+    "hostname": "iridium",
+    "version": "1.0.0",
+    "port": 8073,
+    "status": "RUNNING",
+    "healthStatus": "HEALTHY"
+  }
+]

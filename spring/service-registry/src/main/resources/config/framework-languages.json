@@ -1,0 +1,66 @@
+[
+    {
+        "name": "Java",
+        "description": "Java Programming Language"
+    },
+    {
+        "name": "JavaScript",
+        "description": "JavaScript Programming Language"
+    },
+    {
+        "name": "TypeScript",
+        "description": "TypeScript Programming Language"
+    },
+    {
+        "name": "Python",
+        "description": "Python Programming Language"
+    },
+    {
+        "name": "Go",
+        "description": "Go Programming Language"
+    },
+    {
+        "name": "Rust",
+        "description": "Rust Programming Language"
+    },
+    {
+        "name": ".NET",
+        "description": ".NET Framework"
+    },
+    {
+        "name": "C#",
+        "description": "C# Programming Language"
+    },
+    {
+        "name": "Clojure",
+        "description": "Clojure Programming Language"
+    },
+    {
+        "name": "Elixir",
+        "description": "Elixir Programming Language"
+    },
+    {
+        "name": "Elm",
+        "description": "Elm Programming Language"
+    },
+    {
+        "name": "PHP",
+        "description": "PHP Programming Language"
+    },
+    {
+        "name": "Ruby",
+        "description": "Ruby Programming Language"
+    },
+    {
+        "name": "Kotlin",
+        "description": "Kotlin Programming Language"
+    },
+    {
+        "name": "Scala",
+        "description": "Scala Programming Language"
+    },
+    {
+        "name": "None",
+        "description": "None / Unspecified"
+    }
+]

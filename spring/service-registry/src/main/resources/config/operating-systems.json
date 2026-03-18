@@ -1,0 +1,38 @@
+[
+    {
+        "name": "LINUX",
+        "description": "Linux Based OS",
+        "version": "Generic",
+        "family": "UNIX"
+    },
+    {
+        "name": "WINDOWS",
+        "description": "Microsoft Windows",
+        "version": "10/11/Server",
+        "family": "WINDOWS"
+    },
+    {
+        "name": "MACOS",
+        "description": "Apple macOS",
+        "version": "Generic",
+        "family": "UNIX"
+    },
+    {
+        "name": "ANDROID",
+        "description": "Android OS",
+        "version": "Generic",
+        "family": "LINUX"
+    },
+    {
+        "name": "IOS",
+        "description": "Apple iOS",
+        "version": "Generic",
+        "family": "UNIX"
+    },
+    {
+        "name": "None",
+        "description": "None / Unspecified",
+        "version": "0.0",
+        "family": "Unknown"
+    }
+]

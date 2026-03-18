@@ -1,0 +1,20 @@
+[
+  {
+    "serviceName": "spring-broker-gateway",
+    "configKey": "spring.data.mongodb.uri",
+    "configValue": "mongodb://localhost:27017/broker",
+    "environment": "DEVELOPMENT",
+    "type": "DATABASE_URL",
+    "isSecret": false,
+    "description": "MongoDB connection string for development"
+  },
+  {
+    "serviceName": "spring-broker-gateway",
+    "configKey": "server.port",
+    "configValue": "8080",
+    "environment": "ALL",
+    "type": "NUMBER",
+    "isSecret": false,
+    "description": "Server port"
+  }
+]
