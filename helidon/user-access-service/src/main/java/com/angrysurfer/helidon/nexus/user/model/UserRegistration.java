@@ -2,7 +2,7 @@ package com.angrysurfer.helidon.nexus.user.model;
 
 import java.io.Serializable;
 
-import com.angrysurfer.helidon.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;

@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.user.service.UserAccessService;
 
 @RestController

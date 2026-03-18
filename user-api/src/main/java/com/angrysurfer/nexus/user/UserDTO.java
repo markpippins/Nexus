@@ -1,20 +1,21 @@
-package com.angrysurfer.helidon.nexus.user;
+package com.angrysurfer.nexus.user;
 
 import java.io.Serializable;
 
-public class UserRegistrationDTO implements Serializable {
+/**
+ * User Data Transfer Object.
+ * Framework-agnostic DTO shared across Spring, Helidon, and Quarkus implementations.
+ */
+public class UserDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     private String id;
-
     private String alias;
-
     private String email;
-
     private boolean admin;
 
-    public UserRegistrationDTO() {
+    public UserDTO() {
     }
 
     public String getId() {

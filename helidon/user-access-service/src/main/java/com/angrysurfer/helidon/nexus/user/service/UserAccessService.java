@@ -1,7 +1,7 @@
 package com.angrysurfer.helidon.nexus.user.service;
 
-import com.angrysurfer.helidon.nexus.user.UserDTO;
-import com.angrysurfer.helidon.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.helidon.nexus.user.model.UserRegistration;
 import com.angrysurfer.helidon.nexus.user.repository.UserRegistrationRepository;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;

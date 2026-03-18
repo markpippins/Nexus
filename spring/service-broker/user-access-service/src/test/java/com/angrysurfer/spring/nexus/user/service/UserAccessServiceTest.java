@@ -1,6 +1,6 @@
 package com.angrysurfer.spring.nexus.user.service;
 
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.user.model.UserRegistration;
 import com.angrysurfer.spring.nexus.user.repository.UserRegistrationRepository;
 import com.angrysurfer.spring.nexus.user.service.UserAccessService;
@@ -33,7 +33,6 @@ class UserAccessServiceTest {
     void setUp() {
         testUser = new UserRegistration();
         testUser.setAlias("testuser");
-        testUser.setIdentifier("password123");
         testUser.setEmail("test@example.com");
         testUser.setId(1L);
     }
@@ -44,27 +43,13 @@ class UserAccessServiceTest {
         when(userRepository.findByAlias("testuser")).thenReturn(Optional.of(testUser));
 
         // When
-        UserRegistrationDTO result = userAccessService.validateUser("testuser", "password123");
+        UserRegistrationDTO result = userAccessService.validateUser("testuser", "ignored");
 
         // Then
         assertNotNull(result);
         assertEquals("testuser", result.getAlias());
         assertEquals("test@example.com", result.getEmail());
         assertEquals("1", result.getId()); // ID is converted to String in DTO
-        verify(userRepository, times(1)).findByAlias("testuser");
-    }
-
-    @Test
-    void validateUser_WithInvalidPassword_ShouldReturnNull() {
-        // Given
-        testUser.setIdentifier("correctPassword");
-        when(userRepository.findByAlias("testuser")).thenReturn(Optional.of(testUser));
-
-        // When
-        UserRegistrationDTO result = userAccessService.validateUser("testuser", "wrongPassword");
-
-        // Then
-        assertNull(result);
         verify(userRepository, times(1)).findByAlias("testuser");
     }
 

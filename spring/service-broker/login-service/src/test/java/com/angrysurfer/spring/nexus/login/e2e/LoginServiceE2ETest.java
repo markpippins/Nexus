@@ -5,7 +5,7 @@ import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
 import com.angrysurfer.spring.nexus.login.LoginResponse;
 import com.angrysurfer.spring.nexus.login.LoginService;
 import com.angrysurfer.spring.nexus.login.client.UserAccessClient;
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,7 +79,6 @@ class LoginServiceE2ETest {
                 if ("user3".equals(alias))
                     user.setId("3");
                 user.setAlias(alias);
-                user.setAvatarUrl("https://example.com/avatar.jpg");
                 user.setAdmin(false);
                 return user;
             } else {
@@ -104,7 +103,6 @@ class LoginServiceE2ETest {
         assertTrue(loginResult.getData().isOk());
         assertNotNull(loginResult.getData().getToken());
         assertEquals("1", loginResult.getData().getUserId());
-        assertEquals("https://example.com/avatar.jpg", loginResult.getData().getAvatarUrl());
         assertFalse(loginResult.getData().isAdmin());
 
         String token = loginResult.getData().getToken();

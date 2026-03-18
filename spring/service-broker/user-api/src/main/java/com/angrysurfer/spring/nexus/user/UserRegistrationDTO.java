@@ -6,7 +6,6 @@ import lombok.NoArgsConstructor;
 
 /**
  * User Registration Data Transfer Object.
- * Simplified version without social media fields (deprecated).
  */
 @Data
 @NoArgsConstructor
@@ -16,13 +15,6 @@ public class UserRegistrationDTO implements Serializable {
 
     private String id;
     private String alias;
-    private String identifier;
     private String email;
-    private String avatarUrl;
     private boolean admin;
-    
-    // REMOVED social media fields (deprecated):
-    // - followers, following, friends
-    // - groups, interests, organizations
-    // - projects, roles, teams, tags
 }

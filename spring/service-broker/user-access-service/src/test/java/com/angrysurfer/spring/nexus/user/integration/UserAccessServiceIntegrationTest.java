@@ -1,6 +1,6 @@
 package com.angrysurfer.spring.nexus.user.integration;
 
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.user.model.UserRegistration;
 import com.angrysurfer.spring.nexus.user.repository.UserRegistrationRepository;
 import com.angrysurfer.spring.nexus.user.service.UserAccessService;
@@ -57,37 +57,18 @@ class UserAccessServiceIntegrationTest {
         // Given
         UserRegistration user = new UserRegistration();
         user.setAlias("testuser");
-        user.setIdentifier("password123");
         user.setEmail("test@example.com");
-        user.setAvatarUrl("https://example.com/avatar.jpg");
         user.setAdmin(true);
         userRepository.save(user);
 
         // When
-        UserRegistrationDTO result = userAccessService.validateUser("testuser", "password123");
+        UserRegistrationDTO result = userAccessService.validateUser("testuser", "ignored");
 
         // Then
         assertNotNull(result);
         assertEquals("testuser", result.getAlias());
         assertEquals("test@example.com", result.getEmail());
-        assertEquals("https://example.com/avatar.jpg", result.getAvatarUrl());
         assertTrue(result.isAdmin());
-    }
-
-    @Test
-    void validateUser_WithWrongPassword_ShouldReturnNull() {
-        // Given
-        UserRegistration user = new UserRegistration();
-        user.setAlias("testuser");
-        user.setIdentifier("correctPassword");
-        user.setEmail("test@example.com");
-        userRepository.save(user);
-
-        // When
-        UserRegistrationDTO result = userAccessService.validateUser("testuser", "wrongPassword");
-
-        // Then
-        assertNull(result);
     }
 
     @Test
@@ -104,20 +85,17 @@ class UserAccessServiceIntegrationTest {
         // Given
         UserRegistration user = new UserRegistration();
         user.setAlias("integrationTestUser");
-        user.setIdentifier("integrationPassword");
         user.setEmail("integration@test.com");
-        user.setAvatarUrl("https://example.com/integration.jpg");
         user.setAdmin(false);
         UserRegistration savedUser = userRepository.save(user);
 
         // When
-        UserRegistrationDTO result = userAccessService.validateUser("integrationTestUser", "integrationPassword");
+        UserRegistrationDTO result = userAccessService.validateUser("integrationTestUser", "ignored");
 
         // Then
         assertNotNull(result);
         assertEquals("integrationTestUser", result.getAlias());
         assertEquals("integration@test.com", result.getEmail());
-        assertEquals("https://example.com/integration.jpg", result.getAvatarUrl());
         assertFalse(result.isAdmin());
         assertNotNull(result.getId()); // ID should be set
     }

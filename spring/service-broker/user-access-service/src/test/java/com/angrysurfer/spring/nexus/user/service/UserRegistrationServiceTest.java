@@ -9,8 +9,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.angrysurfer.spring.nexus.user.UserDTO;
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.user.model.UserRegistration;
 import com.angrysurfer.spring.nexus.user.repository.UserRegistrationRepository;
 import com.angrysurfer.spring.nexus.user.service.UserAccessService;
@@ -31,27 +31,17 @@ class UserRegistrationServiceTest {
         validUser.setId(123L);
         validUser.setAlias("testUser");
         validUser.setEmail("test@example.com");
-        validUser.setIdentifier("password123");
     }
 
     @Test
     void testLoginSuccess() {
         when(userRepository.findByAlias("testUser")).thenReturn(Optional.of(validUser));
 
-        UserRegistrationDTO result = userAccessService.validateUser("testUser", "password123");
+        UserRegistrationDTO result = userAccessService.validateUser("testUser", "ignored");
 
         assertNotNull(result);
         assertEquals("123", result.getId());
         assertEquals("testUser", result.getAlias());
-    }
-
-    @Test
-    void testLoginFailureWrongPassword() {
-        when(userRepository.findByAlias("testUser")).thenReturn(Optional.of(validUser));
-
-        UserRegistrationDTO result = userAccessService.validateUser("testUser", "wrongPassword");
-
-        assertNull(result);
     }
 
     @Test

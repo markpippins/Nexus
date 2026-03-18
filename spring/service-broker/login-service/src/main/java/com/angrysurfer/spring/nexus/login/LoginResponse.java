@@ -9,9 +9,8 @@ import lombok.Data;
 public class LoginResponse {
 
     private String userId;
-    private String avatarUrl;
     private String token;
-    private String status; // Add status field
+    private String status;
     private String message;
     private boolean ok = false;
     private boolean admin = false;
@@ -19,12 +18,11 @@ public class LoginResponse {
 
     public LoginResponse() {
     }
-    
+
     // Constructor for successful login (with token)
-    public LoginResponse(String token, String userId, String avatarUrl, boolean admin) {
+    public LoginResponse(String token, String userId, boolean admin) {
         this.token = token;
         this.userId = userId;
-        this.avatarUrl = avatarUrl;
         this.admin = admin;
         this.ok = true;
         this.status = "SUCCESS";
@@ -36,8 +34,6 @@ public class LoginResponse {
         this.message = message;
         this.ok = false;
     }
-
-    // Removed the problematic constructor `public LoginResponse(String token, String message)`
 
     public void addError(String field, String message) {
         errors.put(field, message);

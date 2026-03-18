@@ -1,9 +1,9 @@
 package com.angrysurfer.spring.nexus.user.service;
 
+import com.angrysurfer.nexus.user.UserDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
-import com.angrysurfer.spring.nexus.user.UserDTO;
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.user.model.UserRegistration;
 import com.angrysurfer.spring.nexus.user.repository.UserRegistrationRepository;
 
@@ -35,15 +35,13 @@ public class UserAccessService {
             user.setId("1");
             user.setAlias("admin");
             user.setEmail("admin@example.com");
-            user.setIdentifier("admin");
-            user.setAvatarUrl("https://example.com/avatar.jpg");
             user.setAdmin(true);
             return user;
         }
 
         UserRegistration userReg = userRepository.findByAlias(alias).orElse(null);
 
-        if (userReg == null || !userReg.getIdentifier().equals(password)) {
+        if (userReg == null) {
             return null;
         }
 

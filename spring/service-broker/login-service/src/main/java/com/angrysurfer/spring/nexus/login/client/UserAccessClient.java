@@ -6,7 +6,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 
 @FeignClient(name = "user-access-service", url = "${user-access-service.url:http://localhost:8083}")
 public interface UserAccessClient {

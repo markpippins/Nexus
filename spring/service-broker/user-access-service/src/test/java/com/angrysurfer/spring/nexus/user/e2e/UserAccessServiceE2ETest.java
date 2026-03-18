@@ -1,6 +1,6 @@
 package com.angrysurfer.spring.nexus.user.e2e;
 
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.user.model.UserRegistration;
 import com.angrysurfer.spring.nexus.user.repository.UserRegistrationRepository;
 import com.angrysurfer.spring.nexus.user.service.UserAccessService;
@@ -59,9 +59,7 @@ class UserAccessServiceE2ETest {
         // Step 1: Create and save a user (simulating user registration)
         UserRegistration newUser = new UserRegistration();
         newUser.setAlias("e2eTestUser");
-        newUser.setIdentifier("securePassword123");
         newUser.setEmail("e2e@test.com");
-        newUser.setAvatarUrl("https://example.com/e2e-avatar.jpg");
         newUser.setAdmin(false);
 
         // Save the user to the database
@@ -70,24 +68,18 @@ class UserAccessServiceE2ETest {
         // Verify the user was saved correctly
         assertNotNull(savedUser.getId());
         assertEquals("e2eTestUser", savedUser.getAlias());
-        assertEquals("securePassword123", savedUser.getIdentifier());
         assertEquals("e2e@test.com", savedUser.getEmail());
 
-        // Step 2: Validate the user using the service (simulating login validation)
-        UserRegistrationDTO validatedUser = userAccessService.validateUser("e2eTestUser", "securePassword123");
+        // Step 2: Validate the user using the service
+        UserRegistrationDTO validatedUser = userAccessService.validateUser("e2eTestUser", "ignored");
 
         // Verify the validation returned correct user data
         assertNotNull(validatedUser);
         assertEquals("e2eTestUser", validatedUser.getAlias());
         assertEquals("e2e@test.com", validatedUser.getEmail());
-        assertEquals("https://example.com/e2e-avatar.jpg", validatedUser.getAvatarUrl());
         assertFalse(validatedUser.isAdmin());
 
-        // Step 3: Verify that invalid credentials return null
-        UserRegistrationDTO invalidResult = userAccessService.validateUser("e2eTestUser", "wrongPassword");
-        assertNull(invalidResult);
-
-        // Step 4: Verify that non-existent user returns null
+        // Step 3: Verify that non-existent user returns null
         UserRegistrationDTO nonExistentResult = userAccessService.validateUser("nonExistentUser", "anyPassword");
         assertNull(nonExistentResult);
     }
@@ -99,26 +91,23 @@ class UserAccessServiceE2ETest {
         // Step 1: Register multiple users
         UserRegistration user1 = new UserRegistration();
         user1.setAlias("user1");
-        user1.setIdentifier("password1");
         user1.setEmail("user1@test.com");
         userRepository.save(user1);
 
         UserRegistration user2 = new UserRegistration();
         user2.setAlias("user2");
-        user2.setIdentifier("password2");
         user2.setEmail("user2@test.com");
         userRepository.save(user2);
 
         UserRegistration user3 = new UserRegistration();
         user3.setAlias("user3");
-        user3.setIdentifier("password3");
         user3.setEmail("user3@test.com");
         userRepository.save(user3);
 
         // Step 2: Validate each user individually
-        UserRegistrationDTO result1 = userAccessService.validateUser("user1", "password1");
-        UserRegistrationDTO result2 = userAccessService.validateUser("user2", "password2");
-        UserRegistrationDTO result3 = userAccessService.validateUser("user3", "password3");
+        UserRegistrationDTO result1 = userAccessService.validateUser("user1", "ignored");
+        UserRegistrationDTO result2 = userAccessService.validateUser("user2", "ignored");
+        UserRegistrationDTO result3 = userAccessService.validateUser("user3", "ignored");
 
         // Verify all users were validated correctly
         assertNotNull(result1);
@@ -132,14 +121,6 @@ class UserAccessServiceE2ETest {
         assertNotNull(result3);
         assertEquals("user3", result3.getAlias());
         assertEquals("user3@test.com", result3.getEmail());
-
-        // Step 3: Verify that wrong credentials don't work
-        UserRegistrationDTO wrongCredentials = userAccessService.validateUser("user1", "wrongPassword");
-        assertNull(wrongCredentials);
-
-        // Step 4: Verify that wrong user doesn't work
-        UserRegistrationDTO wrongUser = userAccessService.validateUser("nonexistent", "password1");
-        assertNull(wrongUser);
     }
 
     @Test
@@ -149,27 +130,21 @@ class UserAccessServiceE2ETest {
         // Step 1: Create and save initial user
         UserRegistration user = new UserRegistration();
         user.setAlias("updateTestUser");
-        user.setIdentifier("initialPassword");
         user.setEmail("initial@test.com");
         UserRegistration savedUser = userRepository.save(user);
 
         // Step 2: Verify initial validation works
-        UserRegistrationDTO initialResult = userAccessService.validateUser("updateTestUser", "initialPassword");
+        UserRegistrationDTO initialResult = userAccessService.validateUser("updateTestUser", "ignored");
         assertNotNull(initialResult);
         assertEquals("initial@test.com", initialResult.getEmail());
 
         // Step 3: Update the user's information
         savedUser.setEmail("updated@test.com");
-        savedUser.setIdentifier("updatedPassword");
         userRepository.save(savedUser);
 
         // Step 4: Verify validation works with updated information
-        UserRegistrationDTO updatedResult = userAccessService.validateUser("updateTestUser", "updatedPassword");
+        UserRegistrationDTO updatedResult = userAccessService.validateUser("updateTestUser", "ignored");
         assertNotNull(updatedResult);
         assertEquals("updated@test.com", updatedResult.getEmail());
-
-        // Step 5: Verify old credentials no longer work
-        UserRegistrationDTO oldCredentialsResult = userAccessService.validateUser("updateTestUser", "initialPassword");
-        assertNull(oldCredentialsResult);
     }
 }

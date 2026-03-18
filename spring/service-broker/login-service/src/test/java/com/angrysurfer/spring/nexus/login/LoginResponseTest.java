@@ -17,7 +17,6 @@ class LoginResponseTest {
 
         // Then
         assertNull(response.getUserId());
-        assertNull(response.getAvatarUrl());
         assertNull(response.getToken());
         assertNull(response.getMessage());
         assertFalse(response.isOk());
@@ -34,7 +33,6 @@ class LoginResponseTest {
 
         // Then
         assertNull(response.getUserId());
-        assertNull(response.getAvatarUrl());
         assertEquals("test-token", response.getToken());
         assertNull(response.getMessage());
         assertFalse(response.isOk()); // Still false because it wasn't set via success constructor
@@ -50,7 +48,6 @@ class LoginResponseTest {
 
         // Then
         assertNull(response.getUserId());
-        assertNull(response.getAvatarUrl());
         assertNull(response.getToken()); // Token is not set with this constructor
         assertEquals("ERROR", response.getStatus()); // Status is set, not token
         assertEquals("test message", response.getMessage());
@@ -67,7 +64,6 @@ class LoginResponseTest {
 
         // When
         response.setUserId("123");
-        response.setAvatarUrl("https://example.com/avatar.jpg");
         response.setToken("test-token");
         response.setMessage("test message");
         response.setOk(true);
@@ -75,7 +71,6 @@ class LoginResponseTest {
 
         // Then
         assertEquals("123", response.getUserId());
-        assertEquals("https://example.com/avatar.jpg", response.getAvatarUrl());
         assertEquals("test-token", response.getToken());
         assertEquals("test message", response.getMessage());
         assertTrue(response.isOk());

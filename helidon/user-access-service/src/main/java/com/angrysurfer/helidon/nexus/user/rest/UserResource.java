@@ -1,6 +1,6 @@
 package com.angrysurfer.helidon.nexus.user.rest;
 
-import com.angrysurfer.helidon.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.helidon.nexus.user.service.UserAccessService;
 
 import jakarta.enterprise.context.RequestScoped;

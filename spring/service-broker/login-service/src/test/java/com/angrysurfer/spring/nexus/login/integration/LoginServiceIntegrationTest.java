@@ -5,7 +5,7 @@ import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
 import com.angrysurfer.spring.nexus.login.LoginResponse;
 import com.angrysurfer.spring.nexus.login.LoginService;
 import com.angrysurfer.spring.nexus.login.client.UserAccessClient;
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +47,6 @@ class LoginServiceIntegrationTest {
         // Given
         UserRegistrationDTO mockUser = new UserRegistrationDTO();
         mockUser.setId("1");
-        mockUser.setAvatarUrl("http://avatar.url");
         mockUser.setAdmin(false);
         when(userAccessClient.validateUser(any())).thenReturn(mockUser);
 

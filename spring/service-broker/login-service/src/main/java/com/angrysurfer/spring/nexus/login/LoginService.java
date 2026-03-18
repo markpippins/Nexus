@@ -16,7 +16,7 @@ import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
 import com.angrysurfer.spring.nexus.login.client.UserAccessClient;
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 
 import feign.FeignException;
 
@@ -60,7 +60,7 @@ public class LoginService {
                 // Generate UUID token for successful login
                 UUID token = UUID.randomUUID();
 
-                LoginResponse response = new LoginResponse(token.toString(), user.getId(), user.getAvatarUrl(),
+                LoginResponse response = new LoginResponse(token.toString(), user.getId(),
                         user.isAdmin());
 
                 // Store user in Redis with TTL (e.g., 24 hours)
