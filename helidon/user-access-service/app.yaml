@@ -1,0 +1,37 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: user-access-service
+  labels:
+    app: user-access-service
+spec:
+  type: ClusterIP
+  selector:
+    app: user-access-service
+  ports:
+    - name: tcp
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: user-access-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-access-service
+  template:
+    metadata:
+      labels:
+        app: user-access-service
+        version: v1
+    spec:
+      containers:
+      - name: user-access-service
+        image: user-access-service
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
