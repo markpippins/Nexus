@@ -22,10 +22,10 @@ public class ServerTypeController {
     private ServerTypeRepository repository;
 
     @GetMapping
-    public List<ServerType> getAll() {
+    public org.springframework.data.domain.Page<ServerType> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all server types");
-        List<ServerType> serverTypes = repository.findAll();
-        log.debug("Fetched {} server types", serverTypes.size());
+        org.springframework.data.domain.Page<ServerType> serverTypes = repository.findAll(pageable);
+        log.debug("Fetched {} server types", serverTypes.getNumberOfElements());
         return serverTypes;
     }
 
@@ -44,11 +44,16 @@ public class ServerTypeController {
     }
 
     @PostMapping
-    public ServerType create(@RequestBody ServerType serverType) {
+    public ResponseEntity<ServerType> create(@RequestBody ServerType serverType) {
         log.info("Creating new server type: {}", serverType.getName());
         ServerType saved = repository.save(serverType);
         log.debug("Created server type with id: {}", saved.getId());
-        return saved;
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(saved.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(saved);
     }
 
     @PutMapping("/{id}")

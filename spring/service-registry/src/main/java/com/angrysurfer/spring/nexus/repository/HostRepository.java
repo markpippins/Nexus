@@ -19,4 +19,11 @@ public interface HostRepository extends JpaRepository<Host, Long> {
     List<Host> findByType(ServerType serverType);
     List<Host> findByType_Id(Long serverTypeId);
     List<Host> findByCloudProvider(String cloudProvider);
+
+    org.springframework.data.domain.Page<Host> findByEnvironmentType(EnvironmentType environmentType, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Host> findByEnvironmentType_Id(Long environmentTypeId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Host> findByStatus(String status, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Host> findByType(ServerType serverType, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Host> findByType_Id(Long serverTypeId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Host> findByCloudProvider(String cloudProvider, org.springframework.data.domain.Pageable pageable);
 }

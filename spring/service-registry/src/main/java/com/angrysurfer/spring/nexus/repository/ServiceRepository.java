@@ -33,4 +33,13 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
     List<Service> findByParentService_Id(Long parentServiceId);
 
     List<Service> findByParentServiceIsNull();
+
+    org.springframework.data.domain.Page<Service> findByFramework(Framework framework, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Service> findByFramework_Id(Long frameworkId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Service> findByType(ServiceType type, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Service> findByType_Id(Long serviceTypeId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Service> findByStatus(String status, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Service> findByParentService(Service parentService, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Service> findByParentService_Id(Long parentServiceId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Service> findByParentServiceIsNull(org.springframework.data.domain.Pageable pageable);
 }

@@ -38,7 +38,8 @@ public class LibraryController {
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long languageId,
-            @RequestParam(required = false) String packageManager) {
+            @RequestParam(required = false) String packageManager,
+            org.springframework.data.domain.Pageable pageable) {
         
         if (name != null) {
             log.info("Fetching library by name: {}", name);
@@ -47,16 +48,16 @@ public class LibraryController {
                     .orElse(ResponseEntity.notFound().build());
         } else if (categoryId != null) {
             log.info("Fetching libraries by category ID: {}", categoryId);
-            return ResponseEntity.ok(libraryRepository.findByCategory_Id(categoryId));
+            return ResponseEntity.ok(libraryRepository.findByCategory_Id(categoryId, pageable));
         } else if (languageId != null) {
             log.info("Fetching libraries by language ID: {}", languageId);
-            return ResponseEntity.ok(libraryRepository.findByLanguage_Id(languageId));
+            return ResponseEntity.ok(libraryRepository.findByLanguage_Id(languageId, pageable));
         } else if (packageManager != null) {
             log.info("Fetching libraries by package manager: {}", packageManager);
-            return ResponseEntity.ok(libraryRepository.findByPackageManager(packageManager));
+            return ResponseEntity.ok(libraryRepository.findByPackageManager(packageManager, pageable));
         } else {
             log.info("Fetching all libraries");
-            return ResponseEntity.ok(libraryRepository.findAll());
+            return ResponseEntity.ok(libraryRepository.findAll(pageable));
         }
     }
 
@@ -80,7 +81,12 @@ public class LibraryController {
         library.setActiveFlag(true);
         Library savedLibrary = libraryRepository.save(library);
         log.info("Successfully created library with ID: {}", savedLibrary.getId());
-        return ResponseEntity.ok(savedLibrary);
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(savedLibrary.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(savedLibrary);
     }
 
     @PutMapping("/{id}")

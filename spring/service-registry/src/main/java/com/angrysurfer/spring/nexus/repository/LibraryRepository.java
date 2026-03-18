@@ -25,4 +25,10 @@ public interface LibraryRepository extends JpaRepository<Library, Long> {
     List<Library> findByLanguage_Id(Long languageId);
 
     List<Library> findByPackageManager(String packageManager);
+
+    org.springframework.data.domain.Page<Library> findByCategory(LibraryCategory category, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Library> findByCategory_Id(Long categoryId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Library> findByLanguage(FrameworkLanguage language, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Library> findByLanguage_Id(Long languageId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Library> findByPackageManager(String packageManager, org.springframework.data.domain.Pageable pageable);
 }

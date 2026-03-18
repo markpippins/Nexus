@@ -1,7 +1,6 @@
 package com.angrysurfer.spring.nexus.controller;
 
 import java.util.List;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,8 +24,13 @@ public class ServiceDependencyController {
     }
 
     @GetMapping
-    public List<com.angrysurfer.spring.nexus.entity.ServiceDependency> getAllDependencies() {
+    public org.springframework.data.domain.Page<com.angrysurfer.spring.nexus.entity.ServiceDependency> getAllDependencies(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all service dependencies from console");
-        return client.getServiceDependencies();
+        List<com.angrysurfer.spring.nexus.entity.ServiceDependency> list = client.getServiceDependencies();
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), list.size());
+        return new org.springframework.data.domain.PageImpl<>(
+                (start <= end) ? list.subList(start, end) : java.util.Collections.emptyList(),
+                pageable, list.size());
     }
 }

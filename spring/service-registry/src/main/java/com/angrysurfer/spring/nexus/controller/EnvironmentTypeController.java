@@ -22,10 +22,10 @@ public class EnvironmentTypeController {
     private EnvironmentTypeRepository repository;
 
     @GetMapping
-    public List<EnvironmentType> getAll() {
+    public org.springframework.data.domain.Page<EnvironmentType> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all environment types");
-        List<EnvironmentType> environmentTypes = repository.findAll();
-        log.debug("Fetched {} environment types", environmentTypes.size());
+        org.springframework.data.domain.Page<EnvironmentType> environmentTypes = repository.findAll(pageable);
+        log.debug("Fetched {} environment types", environmentTypes.getNumberOfElements());
         return environmentTypes;
     }
 
@@ -44,11 +44,16 @@ public class EnvironmentTypeController {
     }
 
     @PostMapping
-    public EnvironmentType create(@RequestBody EnvironmentType environmentType) {
+    public ResponseEntity<EnvironmentType> create(@RequestBody EnvironmentType environmentType) {
         log.info("Creating new environment type: {}", environmentType.getName());
         EnvironmentType saved = repository.save(environmentType);
         log.debug("Created environment type with id: {}", saved.getId());
-        return saved;
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(saved.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(saved);
     }
 
     @PutMapping("/{id}")

@@ -37,7 +37,8 @@ public class HostController {
 
     @GetMapping
     public ResponseEntity<?> getServers(
-            @RequestParam(required = false) String hostname) {
+            @RequestParam(required = false) String hostname,
+            org.springframework.data.domain.Pageable pageable) {
         if (hostname != null) {
             log.info("Fetching server by hostname: {}", hostname);
             return hostRepository.findByHostname(hostname)
@@ -45,7 +46,7 @@ public class HostController {
                     .orElse(ResponseEntity.notFound().build());
         } else {
             log.info("Fetching all hosts/servers from database");
-            return ResponseEntity.ok(hostRepository.findAll());
+            return ResponseEntity.ok(hostRepository.findAll(pageable));
         }
     }
 
@@ -72,7 +73,12 @@ public class HostController {
 
         Host savedHost = hostRepository.save(host);
         log.info("Successfully created server with ID: {}", savedHost.getId());
-        return ResponseEntity.ok(savedHost);
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(savedHost.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(savedHost);
     }
 
     @PutMapping("/{id}")

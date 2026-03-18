@@ -22,10 +22,10 @@ public class OperatingSystemController {
     private OperatingSystemRepository repository;
 
     @GetMapping
-    public List<OperatingSystem> getAll() {
+    public org.springframework.data.domain.Page<OperatingSystem> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all operating systems");
-        List<OperatingSystem> operatingSystems = repository.findAll();
-        log.debug("Fetched {} operating systems", operatingSystems.size());
+        org.springframework.data.domain.Page<OperatingSystem> operatingSystems = repository.findAll(pageable);
+        log.debug("Fetched {} operating systems", operatingSystems.getNumberOfElements());
         return operatingSystems;
     }
 
@@ -44,11 +44,16 @@ public class OperatingSystemController {
     }
 
     @PostMapping
-    public OperatingSystem create(@RequestBody OperatingSystem operatingSystem) {
+    public ResponseEntity<OperatingSystem> create(@RequestBody OperatingSystem operatingSystem) {
         log.info("Creating new operating system: {}", operatingSystem.getName());
         OperatingSystem saved = repository.save(operatingSystem);
         log.debug("Created operating system with id: {}", saved.getId());
-        return saved;
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(saved.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(saved);
     }
 
     @PutMapping("/{id}")

@@ -24,7 +24,9 @@ public class LibraryCategoryController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getLibraryCategories(@RequestParam(required = false) String name) {
+    public ResponseEntity<?> getLibraryCategories(
+            @RequestParam(required = false) String name,
+            org.springframework.data.domain.Pageable pageable) {
         if (name != null) {
             log.info("Fetching library category by name: {}", name);
             return libraryCategoryRepository.findByName(name)
@@ -32,7 +34,7 @@ public class LibraryCategoryController {
                     .orElse(ResponseEntity.notFound().build());
         } else {
             log.info("Fetching all library categories");
-            return ResponseEntity.ok(libraryCategoryRepository.findAll());
+            return ResponseEntity.ok(libraryCategoryRepository.findAll(pageable));
         }
     }
 
@@ -56,7 +58,12 @@ public class LibraryCategoryController {
         category.setActiveFlag(true);
         LibraryCategory savedCategory = libraryCategoryRepository.save(category);
         log.info("Successfully created library category with ID: {}", savedCategory.getId());
-        return ResponseEntity.ok(savedCategory);
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(savedCategory.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(savedCategory);
     }
 
     @PutMapping("/{id}")

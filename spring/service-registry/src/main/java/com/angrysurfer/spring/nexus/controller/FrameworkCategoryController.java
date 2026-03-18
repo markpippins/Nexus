@@ -22,10 +22,10 @@ public class FrameworkCategoryController {
     private FrameworkCategoryRepository repository;
 
     @GetMapping
-    public List<FrameworkCategory> getAll() {
+    public org.springframework.data.domain.Page<FrameworkCategory> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all framework categories");
-        List<FrameworkCategory> categories = repository.findAll();
-        log.debug("Fetched {} framework categories", categories.size());
+        org.springframework.data.domain.Page<FrameworkCategory> categories = repository.findAll(pageable);
+        log.debug("Fetched {} framework categories", categories.getNumberOfElements());
         return categories;
     }
 
@@ -44,11 +44,16 @@ public class FrameworkCategoryController {
     }
 
     @PostMapping
-    public FrameworkCategory create(@RequestBody FrameworkCategory category) {
+    public ResponseEntity<FrameworkCategory> create(@RequestBody FrameworkCategory category) {
         log.info("Creating new framework category: {}", category.getName());
         FrameworkCategory saved = repository.save(category);
         log.debug("Created framework category with id: {}", saved.getId());
-        return saved;
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(saved.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(saved);
     }
 
     @PutMapping("/{id}")

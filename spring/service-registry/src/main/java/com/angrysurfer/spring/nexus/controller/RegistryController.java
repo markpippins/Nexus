@@ -87,9 +87,13 @@ public class RegistryController {
      * Get all registered services (for broker-gateway to query)
      */
     @GetMapping("/services")
-    public ResponseEntity<List<Service>> getAllRegisteredServices() {
+    public ResponseEntity<org.springframework.data.domain.Page<Service>> getAllRegisteredServices(org.springframework.data.domain.Pageable pageable) {
         List<Service> services = registrationService.getAllActiveServices();
-        return ResponseEntity.ok(services);
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), services.size());
+        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+                (start <= end) ? services.subList(start, end) : java.util.Collections.emptyList(),
+                pageable, services.size()));
     }
 
     /**
@@ -97,10 +101,14 @@ public class RegistryController {
      * This is the primary endpoint for the service mesh UI.
      */
     @GetMapping("/services/with-hosted")
-    public ResponseEntity<List<Map<String, Object>>> getAllServicesWithHosted() {
+    public ResponseEntity<org.springframework.data.domain.Page<Map<String, Object>>> getAllServicesWithHosted(org.springframework.data.domain.Pageable pageable) {
         log.debug("Fetching all services with hosted services");
         List<Map<String, Object>> servicesWithHosted = registrationService.getAllServicesWithHosted();
-        return ResponseEntity.ok(servicesWithHosted);
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), servicesWithHosted.size());
+        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+                (start <= end) ? servicesWithHosted.subList(start, end) : java.util.Collections.emptyList(),
+                pageable, servicesWithHosted.size()));
     }
 
     /**

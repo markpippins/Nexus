@@ -15,6 +15,9 @@ public interface ServiceConfigurationRepository extends JpaRepository<ServiceCon
     Optional<ServiceConfiguration> findByServiceIdAndConfigKeyAndEnvironmentId(Long serviceId, String configKey, Long environmentId);
     List<ServiceConfiguration> findByConfigKey(String configKey);
 
+    org.springframework.data.domain.Page<ServiceConfiguration> findByServiceId(Long serviceId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<ServiceConfiguration> findByServiceIdAndEnvironmentId(Long serviceId, Long environmentId, org.springframework.data.domain.Pageable pageable);
+
     // Method needed for backward compatibility with services
     Optional<ServiceConfiguration> findByServiceAndConfigKey(Service service, String configKey);
 }

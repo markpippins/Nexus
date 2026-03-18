@@ -21,6 +21,15 @@ public interface DeploymentRepository extends JpaRepository<Deployment, Long> {
     List<Deployment> findByEnvironment_Id(Long environmentId);
     List<Deployment> findByServiceAndEnvironment(Service service, EnvironmentType environment);
 
+    org.springframework.data.domain.Page<Deployment> findByService(Service service, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByService_Id(Long serviceId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByServer(Host server, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByServer_Id(Long serverId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByStatus(String status, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByEnvironment(EnvironmentType environment, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByEnvironment_Id(Long environmentId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByServiceAndEnvironment(Service service, EnvironmentType environment, org.springframework.data.domain.Pageable pageable);
+
     // Backward-compatible aliases
     default List<Deployment> findByServiceId(Long serviceId) {
         return findByService_Id(serviceId);

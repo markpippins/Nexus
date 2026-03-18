@@ -15,4 +15,6 @@ public interface OperatingSystemRepository extends JpaRepository<OperatingSystem
 
     @Cacheable(value = "operatingSystems", key = "'search:' + #name")
     List<OperatingSystem> findByNameContainingIgnoreCase(String name);
+
+    org.springframework.data.domain.Page<OperatingSystem> findByNameContainingIgnoreCase(String name, org.springframework.data.domain.Pageable pageable);
 }

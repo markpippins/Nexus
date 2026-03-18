@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/service-types")
@@ -23,10 +22,10 @@ public class ServiceTypeController {
     private ServiceTypeRepository repository;
 
     @GetMapping
-    public List<ServiceType> getAll() {
+    public org.springframework.data.domain.Page<ServiceType> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all service types");
-        List<ServiceType> serviceTypes = repository.findAll();
-        log.debug("Fetched {} service types", serviceTypes.size());
+        org.springframework.data.domain.Page<ServiceType> serviceTypes = repository.findAll(pageable);
+        log.debug("Fetched {} service types", serviceTypes.getNumberOfElements());
         return serviceTypes;
     }
 
@@ -45,12 +44,17 @@ public class ServiceTypeController {
     }
 
     @PostMapping
-    public ServiceType create(@RequestBody ServiceType serviceType) {
+    public ResponseEntity<ServiceType> create(@RequestBody ServiceType serviceType) {
         log.info("Creating service type with name: {}", serviceType.getName());
         try {
             ServiceType savedServiceType = repository.save(serviceType);
             log.info("Service type created successfully with ID: {}", savedServiceType.getId());
-            return savedServiceType;
+            java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                    .fromCurrentRequest()
+                    .path("/{id}")
+                    .buildAndExpand(savedServiceType.getId())
+                    .toUri();
+            return ResponseEntity.created(location).body(savedServiceType);
         } catch (Exception e) {
             log.error("Error creating service type: {}", serviceType.getName(), e);
             throw e;

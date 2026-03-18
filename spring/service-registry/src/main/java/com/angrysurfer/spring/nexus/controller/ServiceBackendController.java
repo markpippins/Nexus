@@ -49,11 +49,17 @@ public class ServiceBackendController {
      * Returns: List of backends that deployment 123 uses
      */
     @GetMapping("/deployment/{deploymentId}")
-    public ResponseEntity<List<ServiceBackendDto>> getBackendsForDeployment(@PathVariable Long deploymentId) {
+    public ResponseEntity<org.springframework.data.domain.Page<ServiceBackendDto>> getBackendsForDeployment(
+            @PathVariable Long deploymentId,
+            org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching backends for deployment id: {}", deploymentId);
         List<ServiceBackendDto> backends = serviceBackendService.getBackendsForDeployment(deploymentId);
         log.debug("Found {} backends for deployment {}", backends.size(), deploymentId);
-        return ResponseEntity.ok(backends);
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), backends.size());
+        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+                (start <= end) ? backends.subList(start, end) : java.util.Collections.emptyList(),
+                pageable, backends.size()));
     }
 
     /**
@@ -63,11 +69,17 @@ public class ServiceBackendController {
      * Returns: List of services that use deployment 123 as a backend
      */
     @GetMapping("/consumers/{deploymentId}")
-    public ResponseEntity<List<ServiceBackendDto>> getConsumersForDeployment(@PathVariable Long deploymentId) {
+    public ResponseEntity<org.springframework.data.domain.Page<ServiceBackendDto>> getConsumersForDeployment(
+            @PathVariable Long deploymentId,
+            org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching consumers for deployment id: {}", deploymentId);
         List<ServiceBackendDto> consumers = serviceBackendService.getConsumersForDeployment(deploymentId);
         log.debug("Found {} consumers for deployment {}", consumers.size(), deploymentId);
-        return ResponseEntity.ok(consumers);
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), consumers.size());
+        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+                (start <= end) ? consumers.subList(start, end) : java.util.Collections.emptyList(),
+                pageable, consumers.size()));
     }
 
     /**
@@ -112,7 +124,12 @@ public class ServiceBackendController {
 
         log.debug("Created backend connection with id: {}, service: {}, backend: {}, role: {}",
             backend.getId(), serviceDeploymentId, backendDeploymentId, role);
-        return new ResponseEntity<>(backend, HttpStatus.CREATED);
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(backend.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(backend);
     }
 
     /**

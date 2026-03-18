@@ -40,7 +40,8 @@ public class ServiceController {
     public ResponseEntity<?> getServices(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Long frameworkId,
-            @RequestParam(required = false) Boolean standalone) {
+            @RequestParam(required = false) Boolean standalone,
+            org.springframework.data.domain.Pageable pageable) {
 
         if (name != null) {
             log.info("Fetching service by name: {}", name);
@@ -49,13 +50,13 @@ public class ServiceController {
                     .orElse(ResponseEntity.notFound().build());
         } else if (frameworkId != null) {
             log.info("Fetching services by framework ID: {}", frameworkId);
-            return ResponseEntity.ok(serviceRepository.findByFramework_Id(frameworkId));
+            return ResponseEntity.ok(serviceRepository.findByFramework_Id(frameworkId, pageable));
         } else if (Boolean.TRUE.equals(standalone)) {
             log.info("Fetching standalone/parent services (parentService is null)");
-            return ResponseEntity.ok(serviceRepository.findByParentServiceIsNull());
+            return ResponseEntity.ok(serviceRepository.findByParentServiceIsNull(pageable));
         } else {
             log.info("Fetching all services from database");
-            return ResponseEntity.ok(serviceRepository.findAll());
+            return ResponseEntity.ok(serviceRepository.findAll(pageable));
         }
     }
 
@@ -99,7 +100,12 @@ public class ServiceController {
 
         Service savedService = serviceRepository.save(service);
         log.info("Successfully created service with ID: {}", savedService.getId());
-        return ResponseEntity.ok(savedService);
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(savedService.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(savedService);
     }
 
     @PutMapping("/{id}")

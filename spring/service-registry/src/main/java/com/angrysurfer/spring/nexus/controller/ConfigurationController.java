@@ -1,11 +1,9 @@
 package com.angrysurfer.spring.nexus.controller;
 
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,7 +33,8 @@ public class ConfigurationController {
     public ResponseEntity<?> getConfigurations(
             @RequestParam(required = false) Long serviceId,
             @RequestParam(required = false) Long environmentId,
-            @RequestParam(required = false) String configKey) {
+            @RequestParam(required = false) String configKey,
+            org.springframework.data.domain.Pageable pageable) {
 
         if (serviceId != null && environmentId != null && configKey != null) {
             log.info("Fetching configuration by service ID: {}, key: {}, environment ID: {}", serviceId, configKey, environmentId);
@@ -50,18 +49,18 @@ public class ConfigurationController {
                     });
         } else if (serviceId != null && environmentId != null) {
             log.info("Fetching configurations by service ID: {} and environment ID: {}", serviceId, environmentId);
-            List<ServiceConfiguration> configurations = configurationRepository.findByServiceIdAndEnvironmentId(serviceId, environmentId);
-            log.debug("Fetched {} configurations for service ID: {} and environment ID: {}", configurations.size(), serviceId, environmentId);
+            org.springframework.data.domain.Page<ServiceConfiguration> configurations = configurationRepository.findByServiceIdAndEnvironmentId(serviceId, environmentId, pageable);
+            log.debug("Fetched {} configurations for service ID: {} and environment ID: {}", configurations.getNumberOfElements(), serviceId, environmentId);
             return ResponseEntity.ok(configurations);
         } else if (serviceId != null) {
             log.info("Fetching configurations by service ID: {}", serviceId);
-            List<ServiceConfiguration> configurations = configurationRepository.findByServiceId(serviceId);
-            log.debug("Fetched {} configurations for service ID: {}", configurations.size(), serviceId);
+            org.springframework.data.domain.Page<ServiceConfiguration> configurations = configurationRepository.findByServiceId(serviceId, pageable);
+            log.debug("Fetched {} configurations for service ID: {}", configurations.getNumberOfElements(), serviceId);
             return ResponseEntity.ok(configurations);
         } else {
             log.info("Fetching all configurations");
-            List<ServiceConfiguration> configurations = configurationRepository.findAll();
-            log.debug("Fetched {} configurations", configurations.size());
+            org.springframework.data.domain.Page<ServiceConfiguration> configurations = configurationRepository.findAll(pageable);
+            log.debug("Fetched {} configurations", configurations.getNumberOfElements());
             return ResponseEntity.ok(configurations);
         }
     }
@@ -86,7 +85,12 @@ public class ConfigurationController {
         try {
             ServiceConfiguration savedConfiguration = configurationRepository.save(configuration);
             log.info("Configuration created successfully with ID: {}", savedConfiguration.getId());
-            return new ResponseEntity<>(savedConfiguration, HttpStatus.CREATED);
+            java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                    .fromCurrentRequest()
+                    .path("/{id}")
+                    .buildAndExpand(savedConfiguration.getId())
+                    .toUri();
+            return ResponseEntity.created(location).body(savedConfiguration);
         } catch (Exception e) {
             log.error("Error creating configuration with key: {}", configuration.getConfigKey(), e);
             throw e;

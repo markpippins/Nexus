@@ -24,4 +24,9 @@ public interface FrameworkRepository extends JpaRepository<Framework, Long> {
     List<Framework> findByLanguage(FrameworkLanguage language);
 
     List<Framework> findByLanguage_Id(Long languageId);
+
+    org.springframework.data.domain.Page<Framework> findByCategory(FrameworkCategory category, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Framework> findByCategory_Id(Long categoryId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Framework> findByLanguage(FrameworkLanguage language, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Framework> findByLanguage_Id(Long languageId, org.springframework.data.domain.Pageable pageable);
 }

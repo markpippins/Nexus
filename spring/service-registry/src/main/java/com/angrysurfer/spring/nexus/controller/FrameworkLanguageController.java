@@ -31,10 +31,10 @@ public class FrameworkLanguageController {
     private FrameworkLanguageRepository repository;
 
     @GetMapping
-    public List<FrameworkLanguage> getAll() {
+    public org.springframework.data.domain.Page<FrameworkLanguage> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all framework languages");
-        List<FrameworkLanguage> languages = repository.findAll();
-        log.debug("Fetched {} framework languages", languages.size());
+        org.springframework.data.domain.Page<FrameworkLanguage> languages = repository.findAll(pageable);
+        log.debug("Fetched {} framework languages", languages.getNumberOfElements());
         return languages;
     }
 
@@ -53,12 +53,17 @@ public class FrameworkLanguageController {
     }
 
     @PostMapping
-    public FrameworkLanguage create(@RequestBody FrameworkLanguage language) {
+    public ResponseEntity<FrameworkLanguage> create(@RequestBody FrameworkLanguage language) {
         log.info("Creating framework language: {}", language.getName());
         try {
             FrameworkLanguage saved = repository.save(language);
             log.debug("Framework language created successfully with ID: {}", saved.getId());
-            return saved;
+            java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                    .fromCurrentRequest()
+                    .path("/{id}")
+                    .buildAndExpand(saved.getId())
+                    .toUri();
+            return ResponseEntity.created(location).body(saved);
         } catch (Exception e) {
             log.error("Error creating framework language: {}", language.getName(), e);
             throw e;

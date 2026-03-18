@@ -61,18 +61,26 @@ public class ServiceStatusController {
      * First tries Redis cache, falls back to live health checks.
      */
     @GetMapping
-    public ResponseEntity<List<ServiceStatus>> getAllStatuses() {
+    public ResponseEntity<org.springframework.data.domain.Page<ServiceStatus>> getAllStatuses(org.springframework.data.domain.Pageable pageable) {
         List<ServiceStatus> statuses = cacheService.getAllServiceStatuses();
 
         // If Redis returned data, use it
         if (!statuses.isEmpty()) {
-            return ResponseEntity.ok(statuses);
+            int start = (int) pageable.getOffset();
+            int end = Math.min((start + pageable.getPageSize()), statuses.size());
+            return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+                    (start <= end) ? statuses.subList(start, end) : java.util.Collections.emptyList(),
+                    pageable, statuses.size()));
         }
 
         // Fallback: perform live health checks on deployments
         log.info("Redis unavailable or empty, performing live health checks...");
         statuses = performLiveHealthChecks();
-        return ResponseEntity.ok(statuses);
+        int start = (int) pageable.getOffset();
+        int end = Math.min((start + pageable.getPageSize()), statuses.size());
+        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+                (start <= end) ? statuses.subList(start, end) : java.util.Collections.emptyList(),
+                pageable, statuses.size()));
     }
 
     /**

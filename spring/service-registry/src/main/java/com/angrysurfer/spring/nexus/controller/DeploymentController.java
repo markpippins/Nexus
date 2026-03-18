@@ -42,14 +42,15 @@ public class DeploymentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Deployment>> getDeployments(
-            @RequestParam(required = false) Long serviceId) {
+    public ResponseEntity<org.springframework.data.domain.Page<Deployment>> getDeployments(
+            @RequestParam(required = false) Long serviceId,
+            org.springframework.data.domain.Pageable pageable) {
         if (serviceId != null) {
             log.info("Fetching deployments for service: {}", serviceId);
-            return ResponseEntity.ok(deploymentRepository.findByService_Id(serviceId));
+            return ResponseEntity.ok(deploymentRepository.findByService_Id(serviceId, pageable));
         } else {
             log.info("Fetching all deployments from database");
-            return ResponseEntity.ok(deploymentRepository.findAll());
+            return ResponseEntity.ok(deploymentRepository.findAll(pageable));
         }
     }
 
@@ -97,7 +98,12 @@ public class DeploymentController {
             }
         }
 
-        return ResponseEntity.ok(savedDeployment);
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(savedDeployment.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(savedDeployment);
     }
 
     @PutMapping("/{id}")

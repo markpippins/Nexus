@@ -39,7 +39,8 @@ public class FrameworkController {
     @GetMapping
     public ResponseEntity<?> getFrameworks(
             @RequestParam(required = false) String name,
-            @RequestParam(required = false) Boolean brokerCompatible) {
+            @RequestParam(required = false) Boolean brokerCompatible,
+            org.springframework.data.domain.Pageable pageable) {
         
         if (name != null) {
             log.info("Fetching framework by name: {}", name);
@@ -48,13 +49,19 @@ public class FrameworkController {
                     .orElse(ResponseEntity.notFound().build());
         } else if (Boolean.TRUE.equals(brokerCompatible)) {
             log.info("Fetching broker-compatible frameworks");
-            return ResponseEntity.ok(frameworkRepository.findAll().stream()
+            List<Framework> list = frameworkRepository.findAll().stream()
                     .filter(framework -> framework.getSupportsBrokerPattern() != null
                             && framework.getSupportsBrokerPattern())
-                    .toList());
+                    .toList();
+            int start = (int) pageable.getOffset();
+            int end = Math.min((start + pageable.getPageSize()), list.size());
+            org.springframework.data.domain.Page<Framework> page = new org.springframework.data.domain.PageImpl<>(
+                    (start <= end) ? list.subList(start, end) : java.util.Collections.emptyList(), 
+                    pageable, list.size());
+            return ResponseEntity.ok(page);
         } else {
             log.info("Fetching all frameworks from database");
-            return ResponseEntity.ok(frameworkRepository.findAll());
+            return ResponseEntity.ok(frameworkRepository.findAll(pageable));
         }
     }
 
@@ -81,7 +88,12 @@ public class FrameworkController {
 
         Framework savedFramework = frameworkRepository.save(framework);
         log.info("Successfully created framework with ID: {}", savedFramework.getId());
-        return ResponseEntity.ok(savedFramework);
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(savedFramework.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(savedFramework);
     }
 
     @PutMapping("/{id}")

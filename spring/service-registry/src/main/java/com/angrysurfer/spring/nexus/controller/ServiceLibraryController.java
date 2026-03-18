@@ -38,28 +38,29 @@ public class ServiceLibraryController {
             @RequestParam(required = false) Long libraryId,
             @RequestParam(required = false) Boolean direct,
             @RequestParam(required = false) Boolean dev,
-            @RequestParam(required = false) Boolean production) {
+            @RequestParam(required = false) Boolean production,
+            org.springframework.data.domain.Pageable pageable) {
         
         if (serviceId != null) {
             if (Boolean.TRUE.equals(direct)) {
                 log.info("Fetching direct libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDirect(serviceId, true));
+                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDirect(serviceId, true, pageable));
             } else if (Boolean.TRUE.equals(dev)) {
                 log.info("Fetching dev libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, true));
+                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, true, pageable));
             } else if (Boolean.TRUE.equals(production)) {
                 log.info("Fetching production libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, false));
+                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, false, pageable));
             } else {
                 log.info("Fetching libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceId(serviceId));
+                return ResponseEntity.ok(serviceLibraryRepository.findByServiceId(serviceId, pageable));
             }
         } else if (libraryId != null) {
             log.info("Fetching services using library ID: {}", libraryId);
-            return ResponseEntity.ok(serviceLibraryRepository.findByLibraryId(libraryId));
+            return ResponseEntity.ok(serviceLibraryRepository.findByLibraryId(libraryId, pageable));
         } else {
             log.info("Fetching all service-library relationships");
-            return ResponseEntity.ok(serviceLibraryRepository.findAll());
+            return ResponseEntity.ok(serviceLibraryRepository.findAll(pageable));
         }
     }
 
@@ -87,7 +88,12 @@ public class ServiceLibraryController {
         serviceLibrary.setActiveFlag(true);
         ServiceLibrary saved = serviceLibraryRepository.save(serviceLibrary);
         log.info("Successfully created service-library with ID: {}", saved.getId());
-        return ResponseEntity.ok(saved);
+        java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(saved.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(saved);
     }
 
     @PutMapping("/{id}")
