@@ -22,11 +22,11 @@ import com.angrysurfer.spring.nexus.service.ExternalServiceRegistrationService;
 import com.angrysurfer.spring.nexus.service.ServiceStatusCacheService;
 
 @RestController
-@RequestMapping("/api/v1/registry")
+@RequestMapping("/api/v0/registry")
 @CrossOrigin(origins = "*")
-public class RegistryController {
+public class RegistryControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(RegistryController.class);
+    private static final Logger log = LoggerFactory.getLogger(RegistryControllerV0.class);
 
     @Autowired
     private ExternalServiceRegistrationService registrationService;

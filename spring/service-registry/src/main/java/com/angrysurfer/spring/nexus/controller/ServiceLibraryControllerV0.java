@@ -5,62 +5,28 @@ import com.angrysurfer.spring.nexus.repository.ServiceLibraryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/v1/service-libraries")
+@RequestMapping("/api/v0/service-libraries")
 @CrossOrigin(origins = "*")
-public class ServiceLibraryController {
+public class ServiceLibraryControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(ServiceLibraryController.class);
+    private static final Logger log = LoggerFactory.getLogger(ServiceLibraryControllerV0.class);
 
     private final ServiceLibraryRepository serviceLibraryRepository;
 
-    public ServiceLibraryController(ServiceLibraryRepository serviceLibraryRepository) {
+    public ServiceLibraryControllerV0(ServiceLibraryRepository serviceLibraryRepository) {
         this.serviceLibraryRepository = serviceLibraryRepository;
     }
 
     @GetMapping
-    public ResponseEntity<?> getServiceLibraries(
-            @RequestParam(required = false) Long serviceId,
-            @RequestParam(required = false) Long libraryId,
-            @RequestParam(required = false) Boolean direct,
-            @RequestParam(required = false) Boolean dev,
-            @RequestParam(required = false) Boolean production) {
-        
-        if (serviceId != null) {
-            if (Boolean.TRUE.equals(direct)) {
-                log.info("Fetching direct libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDirect(serviceId, true));
-            } else if (Boolean.TRUE.equals(dev)) {
-                log.info("Fetching dev libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, true));
-            } else if (Boolean.TRUE.equals(production)) {
-                log.info("Fetching production libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, false));
-            } else {
-                log.info("Fetching libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceId(serviceId));
-            }
-        } else if (libraryId != null) {
-            log.info("Fetching services using library ID: {}", libraryId);
-            return ResponseEntity.ok(serviceLibraryRepository.findByLibraryId(libraryId));
-        } else {
-            log.info("Fetching all service-library relationships");
-            return ResponseEntity.ok(serviceLibraryRepository.findAll());
-        }
+    public List<ServiceLibrary> getAllServiceLibraries() {
+        log.info("Fetching all service-library relationships");
+        return serviceLibraryRepository.findAll();
     }
 
     @GetMapping("/{id}")
@@ -69,6 +35,36 @@ public class ServiceLibraryController {
         Optional<ServiceLibrary> serviceLibrary = serviceLibraryRepository.findById(id);
         return serviceLibrary.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/service/{serviceId}")
+    public List<ServiceLibrary> getLibrariesByService(@PathVariable Long serviceId) {
+        log.info("Fetching libraries for service ID: {}", serviceId);
+        return serviceLibraryRepository.findByServiceId(serviceId);
+    }
+
+    @GetMapping("/service/{serviceId}/direct")
+    public List<ServiceLibrary> getDirectLibrariesByService(@PathVariable Long serviceId) {
+        log.info("Fetching direct libraries for service ID: {}", serviceId);
+        return serviceLibraryRepository.findByServiceIdAndIsDirect(serviceId, true);
+    }
+
+    @GetMapping("/service/{serviceId}/dev")
+    public List<ServiceLibrary> getDevLibrariesByService(@PathVariable Long serviceId) {
+        log.info("Fetching dev libraries for service ID: {}", serviceId);
+        return serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, true);
+    }
+
+    @GetMapping("/service/{serviceId}/production")
+    public List<ServiceLibrary> getProductionLibrariesByService(@PathVariable Long serviceId) {
+        log.info("Fetching production libraries for service ID: {}", serviceId);
+        return serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, false);
+    }
+
+    @GetMapping("/library/{libraryId}")
+    public List<ServiceLibrary> getServicesByLibrary(@PathVariable Long libraryId) {
+        log.info("Fetching services using library ID: {}", libraryId);
+        return serviceLibraryRepository.findByLibraryId(libraryId);
     }
 
     @PostMapping

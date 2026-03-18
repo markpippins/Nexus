@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
@@ -22,37 +21,37 @@ import com.angrysurfer.spring.nexus.entity.Host;
 import com.angrysurfer.spring.nexus.repository.HostRepository;
 
 @RestController
-@RequestMapping("/api/v1/servers")
+@RequestMapping("/api/v0/servers")
 @CrossOrigin(origins = "*")
-public class HostController {
+public class HostControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(HostController.class);
+    private static final Logger log = LoggerFactory.getLogger(HostControllerV0.class);
     private final ServicesConsoleClient client;
     private final HostRepository hostRepository;
 
-    public HostController(ServicesConsoleClient client, HostRepository hostRepository) {
+    public HostControllerV0(ServicesConsoleClient client, HostRepository hostRepository) {
         this.client = client;
         this.hostRepository = hostRepository;
     }
 
     @GetMapping
-    public ResponseEntity<?> getServers(
-            @RequestParam(required = false) String hostname) {
-        if (hostname != null) {
-            log.info("Fetching server by hostname: {}", hostname);
-            return hostRepository.findByHostname(hostname)
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } else {
-            log.info("Fetching all hosts/servers from database");
-            return ResponseEntity.ok(hostRepository.findAll());
-        }
+    public List<Host> getAllServers() {
+        log.info("Fetching all hosts/servers from database");
+        return hostRepository.findAll();
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Host> getServerById(@PathVariable Long id) {
         log.info("Fetching server by ID: {}", id);
         return hostRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/hostname/{hostname}")
+    public ResponseEntity<Host> getServerByHostname(@PathVariable String hostname) {
+        log.info("Fetching server by hostname: {}", hostname);
+        return hostRepository.findByHostname(hostname)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

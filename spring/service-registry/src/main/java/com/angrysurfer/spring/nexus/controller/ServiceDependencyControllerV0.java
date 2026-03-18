@@ -13,14 +13,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
 
 @RestController
-@RequestMapping("/api/v1/dependencies")
+@RequestMapping("/api/v0/dependencies")
 @CrossOrigin(origins = "*")
-public class ServiceDependencyController {
+public class ServiceDependencyControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(ServiceDependencyController.class);
+    private static final Logger log = LoggerFactory.getLogger(ServiceDependencyControllerV0.class);
     private final ServicesConsoleClient client;
 
-    public ServiceDependencyController(ServicesConsoleClient client) {
+    public ServiceDependencyControllerV0(ServicesConsoleClient client) {
         this.client = client;
     }
 

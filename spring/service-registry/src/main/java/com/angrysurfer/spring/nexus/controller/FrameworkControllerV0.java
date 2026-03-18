@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
@@ -22,40 +21,30 @@ import com.angrysurfer.spring.nexus.entity.Framework;
 import com.angrysurfer.spring.nexus.repository.FrameworkRepository;
 
 @RestController
-@RequestMapping("/api/v1/frameworks")
+@RequestMapping("/api/v0/frameworks")
 @CrossOrigin(origins = "*")
-public class FrameworkController {
+public class FrameworkControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(FrameworkController.class);
+    private static final Logger log = LoggerFactory.getLogger(FrameworkControllerV0.class);
 
     private final ServicesConsoleClient client;
     private final FrameworkRepository frameworkRepository;
 
-    public FrameworkController(ServicesConsoleClient client, FrameworkRepository frameworkRepository) {
+    public FrameworkControllerV0(ServicesConsoleClient client, FrameworkRepository frameworkRepository) {
         this.client = client;
         this.frameworkRepository = frameworkRepository;
     }
 
     @GetMapping
-    public ResponseEntity<?> getFrameworks(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) Boolean brokerCompatible) {
-        
-        if (name != null) {
-            log.info("Fetching framework by name: {}", name);
-            return frameworkRepository.findByName(name)
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } else if (Boolean.TRUE.equals(brokerCompatible)) {
-            log.info("Fetching broker-compatible frameworks");
-            return ResponseEntity.ok(frameworkRepository.findAll().stream()
-                    .filter(framework -> framework.getSupportsBrokerPattern() != null
-                            && framework.getSupportsBrokerPattern())
-                    .toList());
-        } else {
-            log.info("Fetching all frameworks from database");
-            return ResponseEntity.ok(frameworkRepository.findAll());
-        }
+    public List<Framework> getAllFrameworks() {
+        log.info("Fetching all frameworks from database");
+        return frameworkRepository.findAll();
+    }
+
+    @GetMapping("/all")
+    public List<Framework> getAllFrameworksExplicit() {
+        log.info("Fetching ALL frameworks from database (explicit)");
+        return frameworkRepository.findAll();
     }
 
     @GetMapping("/{id}")
@@ -64,6 +53,23 @@ public class FrameworkController {
         Optional<Framework> framework = frameworkRepository.findById(id);
         return framework.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/name/{name}")
+    public ResponseEntity<Framework> getFrameworkByName(@PathVariable String name) {
+        log.info("Fetching framework by name: {}", name);
+        Optional<Framework> framework = frameworkRepository.findByName(name);
+        return framework.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/broker-compatible")
+    public List<Framework> getBrokerCompatibleFrameworks() {
+        // Filter frameworks that support broker pattern
+        return frameworkRepository.findAll().stream()
+                .filter(framework -> framework.getSupportsBrokerPattern() != null
+                        && framework.getSupportsBrokerPattern())
+                .toList();
     }
 
     @PostMapping

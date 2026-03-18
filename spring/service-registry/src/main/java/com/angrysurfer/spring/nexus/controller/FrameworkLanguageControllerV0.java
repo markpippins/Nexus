@@ -20,12 +20,12 @@ import com.angrysurfer.spring.nexus.entity.FrameworkLanguage;
 import com.angrysurfer.spring.nexus.repository.FrameworkLanguageRepository;
 
 @RestController
-@RequestMapping("/api/v1/framework-languages")
+@RequestMapping("/api/v0/framework-languages")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
-public class FrameworkLanguageController {
+public class FrameworkLanguageControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(FrameworkLanguageController.class);
+    private static final Logger log = LoggerFactory.getLogger(FrameworkLanguageControllerV0.class);
 
     @Autowired
     private FrameworkLanguageRepository repository;

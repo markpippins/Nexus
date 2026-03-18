@@ -25,7 +25,7 @@ import com.angrysurfer.spring.nexus.service.ServiceBackendService;
 
 /**
  * REST API for managing service backend connections
- * 
+ *
  * Endpoints for the Angular admin console to:
  * - View backend connections for a deployment
  * - Add/remove backend connections
@@ -33,19 +33,19 @@ import com.angrysurfer.spring.nexus.service.ServiceBackendService;
  * - View which services consume a backend
  */
 @RestController
-@RequestMapping("/api/v1/backends")
+@RequestMapping("/api/v0/backends")
 @CrossOrigin(origins = "*")
-public class ServiceBackendController {
-    
-    private static final Logger log = LoggerFactory.getLogger(ServiceBackendController.class);
-    
+public class ServiceBackendControllerV0 {
+
+    private static final Logger log = LoggerFactory.getLogger(ServiceBackendControllerV0.class);
+
     @Autowired
     private ServiceBackendService serviceBackendService;
-    
+
     /**
      * Get all backends for a specific deployment
-     * 
-     * Example: GET /api/backends/deployment/123
+     *
+     * Example: GET /api/v0/backends/deployment/123
      * Returns: List of backends that deployment 123 uses
      */
     @GetMapping("/deployment/{deploymentId}")
@@ -59,7 +59,7 @@ public class ServiceBackendController {
     /**
      * Get all consumers (services using this deployment as a backend)
      *
-     * Example: GET /api/backends/consumers/123
+     * Example: GET /api/v0/backends/consumers/123
      * Returns: List of services that use deployment 123 as a backend
      */
     @GetMapping("/consumers/{deploymentId}")
@@ -73,7 +73,7 @@ public class ServiceBackendController {
     /**
      * Get deployment with all backend connections
      *
-     * Example: GET /api/backends/deployment/123/details
+     * Example: GET /api/v0/backends/deployment/123/details
      * Returns: Deployment info + backends + consumers
      */
     @GetMapping("/deployment/{deploymentId}/details")
@@ -87,7 +87,7 @@ public class ServiceBackendController {
     /**
      * Add a backend connection
      *
-     * Example: POST /api/backends
+     * Example: POST /api/v0/backends
      * Body: {
      *   "serviceDeploymentId": 123,
      *   "backendDeploymentId": 456,
@@ -118,7 +118,7 @@ public class ServiceBackendController {
     /**
      * Update backend configuration
      *
-     * Example: PUT /api/backends/789
+     * Example: PUT /api/v0/backends/789
      * Body: {
      *   "role": "BACKUP",
      *   "priority": 2,
@@ -138,7 +138,7 @@ public class ServiceBackendController {
     /**
      * Remove a backend connection
      *
-     * Example: DELETE /api/backends/789
+     * Example: DELETE /api/v0/backends/789
      */
     @DeleteMapping("/{backendId}")
     public ResponseEntity<Void> removeBackend(@PathVariable Long backendId) {

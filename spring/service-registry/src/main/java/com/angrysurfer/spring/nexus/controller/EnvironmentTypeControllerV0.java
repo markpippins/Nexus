@@ -11,12 +11,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/environments")
+@RequestMapping("/api/v0/environments")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
-public class EnvironmentTypeController {
+public class EnvironmentTypeControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(EnvironmentTypeController.class);
+    private static final Logger log = LoggerFactory.getLogger(EnvironmentTypeControllerV0.class);
 
     @Autowired
     private EnvironmentTypeRepository repository;

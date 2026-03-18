@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
@@ -22,41 +21,30 @@ import com.angrysurfer.spring.nexus.entity.Service;
 import com.angrysurfer.spring.nexus.repository.ServiceRepository;
 
 @RestController
-@RequestMapping("/api/v1/services")
+@RequestMapping("/api/v0/services")
 @CrossOrigin(origins = "*")
-public class ServiceController {
+public class ServiceControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(ServiceController.class);
+    private static final Logger log = LoggerFactory.getLogger(ServiceControllerV0.class);
 
     private final ServicesConsoleClient client;
     private final ServiceRepository serviceRepository;
 
-    public ServiceController(ServicesConsoleClient client, ServiceRepository serviceRepository) {
+    public ServiceControllerV0(ServicesConsoleClient client, ServiceRepository serviceRepository) {
         this.client = client;
         this.serviceRepository = serviceRepository;
     }
 
     @GetMapping
-    public ResponseEntity<?> getServices(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) Long frameworkId,
-            @RequestParam(required = false) Boolean standalone) {
+    public List<Service> getAllServices() {
+        log.info("Fetching all services from database");
+        return serviceRepository.findAll();
+    }
 
-        if (name != null) {
-            log.info("Fetching service by name: {}", name);
-            return serviceRepository.findByName(name)
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } else if (frameworkId != null) {
-            log.info("Fetching services by framework ID: {}", frameworkId);
-            return ResponseEntity.ok(serviceRepository.findByFramework_Id(frameworkId));
-        } else if (Boolean.TRUE.equals(standalone)) {
-            log.info("Fetching standalone/parent services (parentService is null)");
-            return ResponseEntity.ok(serviceRepository.findByParentServiceIsNull());
-        } else {
-            log.info("Fetching all services from database");
-            return ResponseEntity.ok(serviceRepository.findAll());
-        }
+    @GetMapping("/all")
+    public List<Service> getAllServicesIncludingInactive() {
+        log.info("Fetching ALL services from database (including inactive)");
+        return serviceRepository.findAll();
     }
 
     @GetMapping("/{id}")
@@ -67,15 +55,33 @@ public class ServiceController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/name/{name}")
+    public ResponseEntity<Service> getServiceByName(@PathVariable String name) {
+        log.info("Fetching service by name: {}", name);
+        Optional<Service> service = serviceRepository.findByName(name);
+        return service.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/framework/{frameworkId}")
+    public List<Service> getServicesByFramework(@PathVariable Long frameworkId) {
+        log.info("Fetching services by framework ID: {}", frameworkId);
+        return serviceRepository.findByFramework_Id(frameworkId);
+    }
+
     @GetMapping("/{id}/dependencies")
     public ResponseEntity<List<Service>> getServiceDependencies(@PathVariable Long id) {
         log.info("Fetching dependencies for service: {}", id);
+        // This would require a custom query or method in the repository
+        // For now, returning empty list
         return ResponseEntity.ok(List.of());
     }
 
     @GetMapping("/{id}/dependents")
     public ResponseEntity<List<Service>> getServiceDependents(@PathVariable String id) {
         log.info("Fetching dependents for service: {}", id);
+        // This would require a custom query or method in the repository
+        // For now, returning empty list
         return ResponseEntity.ok(List.of());
     }
 
@@ -86,15 +92,23 @@ public class ServiceController {
         return ResponseEntity.ok(subModules);
     }
 
+    @GetMapping("/standalone")
+    public List<Service> getStandaloneServices() {
+        log.info("Fetching standalone/parent services (parentService is null)");
+        return serviceRepository.findByParentServiceIsNull();
+    }
+
     @PostMapping
     public ResponseEntity<Service> createService(@RequestBody Service service) {
         log.info("Creating new service: {}", service.getName());
 
+        // Validate that service name is unique
         if (serviceRepository.findByName(service.getName()).isPresent()) {
             log.warn("Service with name {} already exists", service.getName());
             return ResponseEntity.badRequest().build();
         }
 
+        // Set active flag
         service.setActiveFlag(true);
 
         Service savedService = serviceRepository.save(service);
@@ -112,6 +126,7 @@ public class ServiceController {
             return ResponseEntity.notFound().build();
         }
 
+        // Check if name is being changed and if new name already exists
         Service existingService = existingServiceOpt.get();
         if (!existingService.getName().equals(service.getName())) {
             if (serviceRepository.findByName(service.getName()).isPresent()) {
@@ -120,6 +135,7 @@ public class ServiceController {
             }
         }
 
+        // Merge the incoming data with the existing entity
         existingService.setName(service.getName());
         existingService.setDescription(service.getDescription());
         existingService.setDefaultPort(service.getDefaultPort());
@@ -129,6 +145,7 @@ public class ServiceController {
         existingService.setStatus(service.getStatus());
         existingService.setActiveFlag(service.getActiveFlag());
 
+        // Preserve existing relationships if not explicitly provided in the request
         if (service.getFramework() != null) {
             existingService.setFramework(service.getFramework());
         }
@@ -157,6 +174,8 @@ public class ServiceController {
             return ResponseEntity.notFound().build();
         }
 
+        // TODO: Check if service has deployments before deleting
+        // For now, just delete
         serviceRepository.deleteById(id);
         log.info("Successfully deleted service with ID: {}", id);
         return ResponseEntity.noContent().build();

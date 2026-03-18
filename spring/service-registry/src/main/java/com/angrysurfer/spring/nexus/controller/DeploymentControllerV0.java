@@ -25,16 +25,16 @@ import com.angrysurfer.spring.nexus.repository.DeploymentRepository;
 import com.angrysurfer.spring.nexus.repository.ServiceRepository;
 
 @RestController
-@RequestMapping("/api/v1/deployments")
+@RequestMapping("/api/v0/deployments")
 @CrossOrigin(origins = "*")
-public class DeploymentController {
+public class DeploymentControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(DeploymentController.class);
+    private static final Logger log = LoggerFactory.getLogger(DeploymentControllerV0.class);
     private final ServicesConsoleClient client;
     private final DeploymentRepository deploymentRepository;
     private final ServiceRepository serviceRepository;
 
-    public DeploymentController(ServicesConsoleClient client, DeploymentRepository deploymentRepository,
+    public DeploymentControllerV0(ServicesConsoleClient client, DeploymentRepository deploymentRepository,
             ServiceRepository serviceRepository) {
         this.client = client;
         this.deploymentRepository = deploymentRepository;
@@ -42,15 +42,9 @@ public class DeploymentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Deployment>> getDeployments(
-            @RequestParam(required = false) Long serviceId) {
-        if (serviceId != null) {
-            log.info("Fetching deployments for service: {}", serviceId);
-            return ResponseEntity.ok(deploymentRepository.findByService_Id(serviceId));
-        } else {
-            log.info("Fetching all deployments from database");
-            return ResponseEntity.ok(deploymentRepository.findAll());
-        }
+    public List<Deployment> getAllDeployments() {
+        log.info("Fetching all deployments from database");
+        return deploymentRepository.findAll();
     }
 
     @GetMapping("/{id}")
@@ -61,17 +55,21 @@ public class DeploymentController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/service/{serviceId}")
+    public List<Deployment> getDeploymentsByService(@PathVariable Long serviceId) {
+        log.info("Fetching deployments for service: {}", serviceId);
+        return deploymentRepository.findByService_Id(serviceId);
+    }
+
     @PostMapping
     public ResponseEntity<Deployment> createDeployment(@RequestBody Deployment deployment) {
         log.info("Creating new deployment");
 
-        // Set active flag
         deployment.setActiveFlag(true);
 
         Deployment savedDeployment = deploymentRepository.save(deployment);
         log.info("Successfully created deployment with ID: {}", savedDeployment.getId());
 
-        // Check if this service has sub-modules and deploy them automatically
         if (deployment.getService() != null) {
             List<Service> subModules = serviceRepository.findByParentService_Id(deployment.getService().getId());
             if (!subModules.isEmpty()) {
@@ -84,15 +82,15 @@ public class DeploymentController {
                     subDeployment.setEnvironment(deployment.getEnvironment());
                     subDeployment.setVersion(deployment.getVersion());
                     subDeployment.setStatus(deployment.getStatus());
-                    subDeployment.setPort(deployment.getPort()); // Sub-modules share the same port (bundled)
+                    subDeployment.setPort(deployment.getPort());
                     subDeployment.setContextPath(deployment.getContextPath());
                     subDeployment.setHealthCheckUrl(deployment.getHealthCheckUrl());
                     subDeployment.setHealthStatus(deployment.getHealthStatus());
                     subDeployment.setActiveFlag(true);
 
-                    Deployment savedSubDeployment = deploymentRepository.save(subDeployment);
+                    deploymentRepository.save(subDeployment);
                     log.info("Created sub-module deployment for service {} with ID: {}", subModule.getName(),
-                            savedSubDeployment.getId());
+                            subDeployment.getId());
                 }
             }
         }
@@ -110,7 +108,6 @@ public class DeploymentController {
             return ResponseEntity.notFound().build();
         }
 
-        // Update the deployment
         deployment.setId(id);
         Deployment updatedDeployment = deploymentRepository.save(deployment);
         log.info("Successfully updated deployment with ID: {}", id);
@@ -163,7 +160,6 @@ public class DeploymentController {
 
         Deployment deployment = deploymentOpt.get();
 
-        // Check if this service has sub-modules and delete their deployments
         if (deployment.getService() != null) {
             List<Service> subModules = serviceRepository.findByParentService_Id(deployment.getService().getId());
             if (!subModules.isEmpty()) {
@@ -172,7 +168,6 @@ public class DeploymentController {
                 for (Service subModule : subModules) {
                     List<Deployment> subDeployments = deploymentRepository.findByService_Id(subModule.getId());
                     for (Deployment subDeployment : subDeployments) {
-                        // Only delete sub-deployments on the same server
                         if (subDeployment.getServer() != null && subDeployment.getServer().equals(deployment.getServer())) {
                             deploymentRepository.deleteById(subDeployment.getId());
                             log.info("Deleted sub-module deployment for service {} with ID: {}", subModule.getName(),

@@ -38,11 +38,11 @@ import com.angrysurfer.spring.nexus.service.ServiceStatusCacheService;
  * Falls back to live health checks when Redis is unavailable.
  */
 @RestController
-@RequestMapping("/api/v1/status")
+@RequestMapping("/api/v0/status")
 @CrossOrigin(origins = "*")
-public class ServiceStatusController {
+public class ServiceStatusControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(ServiceStatusController.class);
+    private static final Logger log = LoggerFactory.getLogger(ServiceStatusControllerV0.class);
 
     private final ServiceStatusCacheService cacheService;
     private final DeploymentRepository deploymentRepository;
@@ -51,7 +51,7 @@ public class ServiceStatusController {
             .connectTimeout(Duration.ofSeconds(3))
             .build();
 
-    public ServiceStatusController(ServiceStatusCacheService cacheService, DeploymentRepository deploymentRepository) {
+    public ServiceStatusControllerV0(ServiceStatusCacheService cacheService, DeploymentRepository deploymentRepository) {
         this.cacheService = cacheService;
         this.deploymentRepository = deploymentRepository;
     }

@@ -11,35 +11,36 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/v1/library-categories")
+@RequestMapping("/api/v0/library-categories")
 @CrossOrigin(origins = "*")
-public class LibraryCategoryController {
+public class LibraryCategoryControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(LibraryCategoryController.class);
+    private static final Logger log = LoggerFactory.getLogger(LibraryCategoryControllerV0.class);
 
     private final LibraryCategoryRepository libraryCategoryRepository;
 
-    public LibraryCategoryController(LibraryCategoryRepository libraryCategoryRepository) {
+    public LibraryCategoryControllerV0(LibraryCategoryRepository libraryCategoryRepository) {
         this.libraryCategoryRepository = libraryCategoryRepository;
     }
 
     @GetMapping
-    public ResponseEntity<?> getLibraryCategories(@RequestParam(required = false) String name) {
-        if (name != null) {
-            log.info("Fetching library category by name: {}", name);
-            return libraryCategoryRepository.findByName(name)
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } else {
-            log.info("Fetching all library categories");
-            return ResponseEntity.ok(libraryCategoryRepository.findAll());
-        }
+    public List<LibraryCategory> getAllLibraryCategories() {
+        log.info("Fetching all library categories");
+        return libraryCategoryRepository.findAll();
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<LibraryCategory> getLibraryCategoryById(@PathVariable Long id) {
         log.info("Fetching library category by ID: {}", id);
         Optional<LibraryCategory> category = libraryCategoryRepository.findById(id);
+        return category.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/name/{name}")
+    public ResponseEntity<LibraryCategory> getLibraryCategoryByName(@PathVariable String name) {
+        log.info("Fetching library category by name: {}", name);
+        Optional<LibraryCategory> category = libraryCategoryRepository.findByName(name);
         return category.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

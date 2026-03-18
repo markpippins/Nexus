@@ -11,12 +11,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/framework-categories")
+@RequestMapping("/api/v0/framework-categories")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
-public class FrameworkCategoryController {
+public class FrameworkCategoryControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(FrameworkCategoryController.class);
+    private static final Logger log = LoggerFactory.getLogger(FrameworkCategoryControllerV0.class);
 
     @Autowired
     private FrameworkCategoryRepository repository;

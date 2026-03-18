@@ -11,12 +11,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/operating-systems")
+@RequestMapping("/api/v0/operating-systems")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
-public class OperatingSystemController {
+public class OperatingSystemControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(OperatingSystemController.class);
+    private static final Logger log = LoggerFactory.getLogger(OperatingSystemControllerV0.class);
 
     @Autowired
     private OperatingSystemRepository repository;

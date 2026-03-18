@@ -11,12 +11,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/server-types")
+@RequestMapping("/api/v0/server-types")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
-public class ServerTypeController {
+public class ServerTypeControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(ServerTypeController.class);
+    private static final Logger log = LoggerFactory.getLogger(ServerTypeControllerV0.class);
 
     @Autowired
     private ServerTypeRepository repository;

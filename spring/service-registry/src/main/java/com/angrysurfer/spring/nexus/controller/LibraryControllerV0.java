@@ -14,50 +14,28 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.angrysurfer.spring.nexus.entity.Library;
 import com.angrysurfer.spring.nexus.repository.LibraryRepository;
 
 @RestController
-@RequestMapping("/api/v1/libraries")
+@RequestMapping("/api/v0/libraries")
 @CrossOrigin(origins = "*")
-public class LibraryController {
+public class LibraryControllerV0 {
 
-    private static final Logger log = LoggerFactory.getLogger(LibraryController.class);
+    private static final Logger log = LoggerFactory.getLogger(LibraryControllerV0.class);
 
     private final LibraryRepository libraryRepository;
 
-    public LibraryController(LibraryRepository libraryRepository) {
+    public LibraryControllerV0(LibraryRepository libraryRepository) {
         this.libraryRepository = libraryRepository;
     }
 
     @GetMapping
-    public ResponseEntity<?> getLibraries(
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) Long languageId,
-            @RequestParam(required = false) String packageManager) {
-        
-        if (name != null) {
-            log.info("Fetching library by name: {}", name);
-            return libraryRepository.findByName(name)
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
-        } else if (categoryId != null) {
-            log.info("Fetching libraries by category ID: {}", categoryId);
-            return ResponseEntity.ok(libraryRepository.findByCategory_Id(categoryId));
-        } else if (languageId != null) {
-            log.info("Fetching libraries by language ID: {}", languageId);
-            return ResponseEntity.ok(libraryRepository.findByLanguage_Id(languageId));
-        } else if (packageManager != null) {
-            log.info("Fetching libraries by package manager: {}", packageManager);
-            return ResponseEntity.ok(libraryRepository.findByPackageManager(packageManager));
-        } else {
-            log.info("Fetching all libraries");
-            return ResponseEntity.ok(libraryRepository.findAll());
-        }
+    public List<Library> getAllLibraries() {
+        log.info("Fetching all libraries");
+        return libraryRepository.findAll();
     }
 
     @GetMapping("/{id}")
@@ -66,6 +44,32 @@ public class LibraryController {
         Optional<Library> library = libraryRepository.findById(id);
         return library.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/name/{name}")
+    public ResponseEntity<Library> getLibraryByName(@PathVariable String name) {
+        log.info("Fetching library by name: {}", name);
+        Optional<Library> library = libraryRepository.findByName(name);
+        return library.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/category/{categoryId}")
+    public List<Library> getLibrariesByCategory(@PathVariable Long categoryId) {
+        log.info("Fetching libraries by category ID: {}", categoryId);
+        return libraryRepository.findByCategory_Id(categoryId);
+    }
+
+    @GetMapping("/language/{languageId}")
+    public List<Library> getLibrariesByLanguage(@PathVariable Long languageId) {
+        log.info("Fetching libraries by language ID: {}", languageId);
+        return libraryRepository.findByLanguage_Id(languageId);
+    }
+
+    @GetMapping("/package-manager/{packageManager}")
+    public List<Library> getLibrariesByPackageManager(@PathVariable String packageManager) {
+        log.info("Fetching libraries by package manager: {}", packageManager);
+        return libraryRepository.findByPackageManager(packageManager);
     }
 
     @PostMapping

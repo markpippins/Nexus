@@ -8,9 +8,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/visual-components")
+@RequestMapping("/api/v0/visual-components")
 @CrossOrigin(origins = "*")
-public class VisualComponentController {
+public class VisualComponentControllerV0 {
 
     @Autowired
     private VisualComponentRepository repository;
