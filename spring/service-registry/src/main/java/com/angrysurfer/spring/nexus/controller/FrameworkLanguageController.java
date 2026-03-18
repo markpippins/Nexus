@@ -31,11 +31,11 @@ public class FrameworkLanguageController {
     private FrameworkLanguageRepository repository;
 
     @GetMapping
-    public org.springframework.data.domain.Page<FrameworkLanguage> getAll(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<FrameworkLanguage>> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all framework languages");
         org.springframework.data.domain.Page<FrameworkLanguage> languages = repository.findAll(pageable);
         log.debug("Fetched {} framework languages", languages.getNumberOfElements());
-        return languages;
+        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(languages));
     }
 
     @GetMapping("/{id}")

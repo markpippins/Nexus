@@ -51,17 +51,17 @@ public class ConfigurationController {
             log.info("Fetching configurations by service ID: {} and environment ID: {}", serviceId, environmentId);
             org.springframework.data.domain.Page<ServiceConfiguration> configurations = configurationRepository.findByServiceIdAndEnvironmentId(serviceId, environmentId, pageable);
             log.debug("Fetched {} configurations for service ID: {} and environment ID: {}", configurations.getNumberOfElements(), serviceId, environmentId);
-            return ResponseEntity.ok(configurations);
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(configurations));
         } else if (serviceId != null) {
             log.info("Fetching configurations by service ID: {}", serviceId);
             org.springframework.data.domain.Page<ServiceConfiguration> configurations = configurationRepository.findByServiceId(serviceId, pageable);
             log.debug("Fetched {} configurations for service ID: {}", configurations.getNumberOfElements(), serviceId);
-            return ResponseEntity.ok(configurations);
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(configurations));
         } else {
             log.info("Fetching all configurations");
             org.springframework.data.domain.Page<ServiceConfiguration> configurations = configurationRepository.findAll(pageable);
             log.debug("Fetched {} configurations", configurations.getNumberOfElements());
-            return ResponseEntity.ok(configurations);
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(configurations));
         }
     }
 

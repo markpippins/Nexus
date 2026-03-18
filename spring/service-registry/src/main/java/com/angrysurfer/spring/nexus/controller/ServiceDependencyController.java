@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
 
 import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
 
@@ -24,13 +25,14 @@ public class ServiceDependencyController {
     }
 
     @GetMapping
-    public org.springframework.data.domain.Page<com.angrysurfer.spring.nexus.entity.ServiceDependency> getAllDependencies(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<com.angrysurfer.spring.nexus.entity.ServiceDependency>> getAllDependencies(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all service dependencies from console");
         List<com.angrysurfer.spring.nexus.entity.ServiceDependency> list = client.getServiceDependencies();
         int start = (int) pageable.getOffset();
         int end = Math.min((start + pageable.getPageSize()), list.size());
-        return new org.springframework.data.domain.PageImpl<>(
+        org.springframework.data.domain.Page<com.angrysurfer.spring.nexus.entity.ServiceDependency> page = new org.springframework.data.domain.PageImpl<>(
                 (start <= end) ? list.subList(start, end) : java.util.Collections.emptyList(),
                 pageable, list.size());
+        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
     }
 }

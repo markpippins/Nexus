@@ -87,13 +87,14 @@ public class RegistryController {
      * Get all registered services (for broker-gateway to query)
      */
     @GetMapping("/services")
-    public ResponseEntity<org.springframework.data.domain.Page<Service>> getAllRegisteredServices(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<Service>> getAllRegisteredServices(org.springframework.data.domain.Pageable pageable) {
         List<Service> services = registrationService.getAllActiveServices();
         int start = (int) pageable.getOffset();
         int end = Math.min((start + pageable.getPageSize()), services.size());
-        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+        org.springframework.data.domain.Page<Service> page = new org.springframework.data.domain.PageImpl<>(
                 (start <= end) ? services.subList(start, end) : java.util.Collections.emptyList(),
-                pageable, services.size()));
+                pageable, services.size());
+        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
     }
 
     /**
@@ -101,14 +102,15 @@ public class RegistryController {
      * This is the primary endpoint for the service mesh UI.
      */
     @GetMapping("/services/with-hosted")
-    public ResponseEntity<org.springframework.data.domain.Page<Map<String, Object>>> getAllServicesWithHosted(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<Map<String, Object>>> getAllServicesWithHosted(org.springframework.data.domain.Pageable pageable) {
         log.debug("Fetching all services with hosted services");
         List<Map<String, Object>> servicesWithHosted = registrationService.getAllServicesWithHosted();
         int start = (int) pageable.getOffset();
         int end = Math.min((start + pageable.getPageSize()), servicesWithHosted.size());
-        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+        org.springframework.data.domain.Page<Map<String, Object>> page = new org.springframework.data.domain.PageImpl<>(
                 (start <= end) ? servicesWithHosted.subList(start, end) : java.util.Collections.emptyList(),
-                pageable, servicesWithHosted.size()));
+                pageable, servicesWithHosted.size());
+        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
     }
 
     /**

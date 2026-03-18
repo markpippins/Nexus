@@ -22,11 +22,11 @@ public class ServerTypeController {
     private ServerTypeRepository repository;
 
     @GetMapping
-    public org.springframework.data.domain.Page<ServerType> getAll(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServerType>> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all server types");
         org.springframework.data.domain.Page<ServerType> serverTypes = repository.findAll(pageable);
         log.debug("Fetched {} server types", serverTypes.getNumberOfElements());
-        return serverTypes;
+        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serverTypes));
     }
 
     @GetMapping("/{id}")

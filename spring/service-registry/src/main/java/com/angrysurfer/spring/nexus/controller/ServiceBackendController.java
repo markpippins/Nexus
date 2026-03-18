@@ -6,7 +6,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -49,7 +48,7 @@ public class ServiceBackendController {
      * Returns: List of backends that deployment 123 uses
      */
     @GetMapping("/deployment/{deploymentId}")
-    public ResponseEntity<org.springframework.data.domain.Page<ServiceBackendDto>> getBackendsForDeployment(
+    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceBackendDto>> getBackendsForDeployment(
             @PathVariable Long deploymentId,
             org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching backends for deployment id: {}", deploymentId);
@@ -57,9 +56,10 @@ public class ServiceBackendController {
         log.debug("Found {} backends for deployment {}", backends.size(), deploymentId);
         int start = (int) pageable.getOffset();
         int end = Math.min((start + pageable.getPageSize()), backends.size());
-        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+        org.springframework.data.domain.Page<ServiceBackendDto> page = new org.springframework.data.domain.PageImpl<>(
                 (start <= end) ? backends.subList(start, end) : java.util.Collections.emptyList(),
-                pageable, backends.size()));
+                pageable, backends.size());
+        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
     }
 
     /**
@@ -69,7 +69,7 @@ public class ServiceBackendController {
      * Returns: List of services that use deployment 123 as a backend
      */
     @GetMapping("/consumers/{deploymentId}")
-    public ResponseEntity<org.springframework.data.domain.Page<ServiceBackendDto>> getConsumersForDeployment(
+    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceBackendDto>> getConsumersForDeployment(
             @PathVariable Long deploymentId,
             org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching consumers for deployment id: {}", deploymentId);
@@ -77,9 +77,10 @@ public class ServiceBackendController {
         log.debug("Found {} consumers for deployment {}", consumers.size(), deploymentId);
         int start = (int) pageable.getOffset();
         int end = Math.min((start + pageable.getPageSize()), consumers.size());
-        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+        org.springframework.data.domain.Page<ServiceBackendDto> page = new org.springframework.data.domain.PageImpl<>(
                 (start <= end) ? consumers.subList(start, end) : java.util.Collections.emptyList(),
-                pageable, consumers.size()));
+                pageable, consumers.size());
+        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
     }
 
     /**

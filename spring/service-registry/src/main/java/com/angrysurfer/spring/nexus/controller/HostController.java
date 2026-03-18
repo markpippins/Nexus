@@ -46,7 +46,7 @@ public class HostController {
                     .orElse(ResponseEntity.notFound().build());
         } else {
             log.info("Fetching all hosts/servers from database");
-            return ResponseEntity.ok(hostRepository.findAll(pageable));
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(hostRepository.findAll(pageable)));
         }
     }
 

@@ -61,16 +61,17 @@ public class ServiceStatusController {
      * First tries Redis cache, falls back to live health checks.
      */
     @GetMapping
-    public ResponseEntity<org.springframework.data.domain.Page<ServiceStatus>> getAllStatuses(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceStatus>> getAllStatuses(org.springframework.data.domain.Pageable pageable) {
         List<ServiceStatus> statuses = cacheService.getAllServiceStatuses();
 
         // If Redis returned data, use it
         if (!statuses.isEmpty()) {
             int start = (int) pageable.getOffset();
             int end = Math.min((start + pageable.getPageSize()), statuses.size());
-            return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+            org.springframework.data.domain.Page<ServiceStatus> page = new org.springframework.data.domain.PageImpl<>(
                     (start <= end) ? statuses.subList(start, end) : java.util.Collections.emptyList(),
-                    pageable, statuses.size()));
+                    pageable, statuses.size());
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
         }
 
         // Fallback: perform live health checks on deployments
@@ -78,9 +79,10 @@ public class ServiceStatusController {
         statuses = performLiveHealthChecks();
         int start = (int) pageable.getOffset();
         int end = Math.min((start + pageable.getPageSize()), statuses.size());
-        return ResponseEntity.ok(new org.springframework.data.domain.PageImpl<>(
+        org.springframework.data.domain.Page<ServiceStatus> page = new org.springframework.data.domain.PageImpl<>(
                 (start <= end) ? statuses.subList(start, end) : java.util.Collections.emptyList(),
-                pageable, statuses.size()));
+                pageable, statuses.size());
+        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
     }
 
     /**

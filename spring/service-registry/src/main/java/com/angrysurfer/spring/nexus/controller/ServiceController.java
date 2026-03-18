@@ -50,13 +50,13 @@ public class ServiceController {
                     .orElse(ResponseEntity.notFound().build());
         } else if (frameworkId != null) {
             log.info("Fetching services by framework ID: {}", frameworkId);
-            return ResponseEntity.ok(serviceRepository.findByFramework_Id(frameworkId, pageable));
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serviceRepository.findByFramework_Id(frameworkId, pageable)));
         } else if (Boolean.TRUE.equals(standalone)) {
             log.info("Fetching standalone/parent services (parentService is null)");
-            return ResponseEntity.ok(serviceRepository.findByParentServiceIsNull(pageable));
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serviceRepository.findByParentServiceIsNull(pageable)));
         } else {
             log.info("Fetching all services from database");
-            return ResponseEntity.ok(serviceRepository.findAll(pageable));
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serviceRepository.findAll(pageable)));
         }
     }
 

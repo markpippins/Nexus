@@ -44,23 +44,23 @@ public class ServiceLibraryController {
         if (serviceId != null) {
             if (Boolean.TRUE.equals(direct)) {
                 log.info("Fetching direct libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDirect(serviceId, true, pageable));
+                return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serviceLibraryRepository.findByServiceIdAndIsDirect(serviceId, true, pageable)));
             } else if (Boolean.TRUE.equals(dev)) {
                 log.info("Fetching dev libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, true, pageable));
+                return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, true, pageable)));
             } else if (Boolean.TRUE.equals(production)) {
                 log.info("Fetching production libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, false, pageable));
+                return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, false, pageable)));
             } else {
                 log.info("Fetching libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(serviceLibraryRepository.findByServiceId(serviceId, pageable));
+                return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serviceLibraryRepository.findByServiceId(serviceId, pageable)));
             }
         } else if (libraryId != null) {
             log.info("Fetching services using library ID: {}", libraryId);
-            return ResponseEntity.ok(serviceLibraryRepository.findByLibraryId(libraryId, pageable));
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serviceLibraryRepository.findByLibraryId(libraryId, pageable)));
         } else {
             log.info("Fetching all service-library relationships");
-            return ResponseEntity.ok(serviceLibraryRepository.findAll(pageable));
+            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(serviceLibraryRepository.findAll(pageable)));
         }
     }
 
