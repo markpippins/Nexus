@@ -14,6 +14,7 @@ import java.util.List;
 @RequestMapping("/api/v0/server-types")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
+@Deprecated(since = "v1", forRemoval = true)
 public class ServerTypeControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ServerTypeControllerV0.class);
@@ -22,6 +23,7 @@ public class ServerTypeControllerV0 {
     private ServerTypeRepository repository;
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServerType> getAll() {
         log.info("Fetching all server types");
         List<ServerType> serverTypes = repository.findAll();
@@ -30,6 +32,7 @@ public class ServerTypeControllerV0 {
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServerType> getById(@PathVariable Long id) {
         log.info("Fetching server type with id: {}", id);
         return repository.findById(id)
@@ -44,6 +47,7 @@ public class ServerTypeControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ServerType create(@RequestBody ServerType serverType) {
         log.info("Creating new server type: {}", serverType.getName());
         ServerType saved = repository.save(serverType);
@@ -52,6 +56,7 @@ public class ServerTypeControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServerType> update(@PathVariable Long id, @RequestBody ServerType details) {
         log.info("Updating server type with id: {}", id);
         return repository.findById(id)
@@ -69,6 +74,7 @@ public class ServerTypeControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Deleting server type with id: {}", id);
         return repository.findById(id)

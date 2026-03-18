@@ -15,6 +15,7 @@ import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
 @RestController
 @RequestMapping("/api/v0/dependencies")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class ServiceDependencyControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceDependencyControllerV0.class);
@@ -25,6 +26,7 @@ public class ServiceDependencyControllerV0 {
     }
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<com.angrysurfer.spring.nexus.entity.ServiceDependency> getAllDependencies() {
         log.info("Fetching all service dependencies from console");
         return client.getServiceDependencies();

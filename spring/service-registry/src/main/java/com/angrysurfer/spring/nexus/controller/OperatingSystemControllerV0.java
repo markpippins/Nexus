@@ -14,6 +14,7 @@ import java.util.List;
 @RequestMapping("/api/v0/operating-systems")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
+@Deprecated(since = "v1", forRemoval = true)
 public class OperatingSystemControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(OperatingSystemControllerV0.class);
@@ -22,6 +23,7 @@ public class OperatingSystemControllerV0 {
     private OperatingSystemRepository repository;
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<OperatingSystem> getAll() {
         log.info("Fetching all operating systems");
         List<OperatingSystem> operatingSystems = repository.findAll();
@@ -30,6 +32,7 @@ public class OperatingSystemControllerV0 {
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<OperatingSystem> getById(@PathVariable Long id) {
         log.info("Fetching operating system with id: {}", id);
         return repository.findById(id)
@@ -44,6 +47,7 @@ public class OperatingSystemControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public OperatingSystem create(@RequestBody OperatingSystem operatingSystem) {
         log.info("Creating new operating system: {}", operatingSystem.getName());
         OperatingSystem saved = repository.save(operatingSystem);
@@ -52,6 +56,7 @@ public class OperatingSystemControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<OperatingSystem> update(@PathVariable Long id, @RequestBody OperatingSystem details) {
         log.info("Updating operating system with id: {}", id);
         return repository.findById(id)
@@ -71,6 +76,7 @@ public class OperatingSystemControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Deleting operating system with id: {}", id);
         return repository.findById(id)

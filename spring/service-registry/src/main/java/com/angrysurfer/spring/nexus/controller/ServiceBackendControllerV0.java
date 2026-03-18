@@ -35,6 +35,7 @@ import com.angrysurfer.spring.nexus.service.ServiceBackendService;
 @RestController
 @RequestMapping("/api/v0/backends")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class ServiceBackendControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceBackendControllerV0.class);
@@ -49,6 +50,7 @@ public class ServiceBackendControllerV0 {
      * Returns: List of backends that deployment 123 uses
      */
     @GetMapping("/deployment/{deploymentId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<List<ServiceBackendDto>> getBackendsForDeployment(@PathVariable Long deploymentId) {
         log.info("Fetching backends for deployment id: {}", deploymentId);
         List<ServiceBackendDto> backends = serviceBackendService.getBackendsForDeployment(deploymentId);
@@ -63,6 +65,7 @@ public class ServiceBackendControllerV0 {
      * Returns: List of services that use deployment 123 as a backend
      */
     @GetMapping("/consumers/{deploymentId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<List<ServiceBackendDto>> getConsumersForDeployment(@PathVariable Long deploymentId) {
         log.info("Fetching consumers for deployment id: {}", deploymentId);
         List<ServiceBackendDto> consumers = serviceBackendService.getConsumersForDeployment(deploymentId);
@@ -77,6 +80,7 @@ public class ServiceBackendControllerV0 {
      * Returns: Deployment info + backends + consumers
      */
     @GetMapping("/deployment/{deploymentId}/details")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<DeploymentWithBackendsDto> getDeploymentWithBackends(@PathVariable Long deploymentId) {
         log.info("Fetching deployment details with backends for deployment id: {}", deploymentId);
         DeploymentWithBackendsDto dto = serviceBackendService.getDeploymentWithBackends(deploymentId);
@@ -96,6 +100,7 @@ public class ServiceBackendControllerV0 {
      * }
      */
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceBackend> addBackend(@RequestBody Map<String, Object> request) {
         log.info("Adding backend connection from request: {}", request);
         Long serviceDeploymentId = Long.valueOf(request.get("serviceDeploymentId").toString());
@@ -126,6 +131,7 @@ public class ServiceBackendControllerV0 {
      * }
      */
     @PutMapping("/{backendId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceBackend> updateBackend(
             @PathVariable Long backendId,
             @RequestBody ServiceBackendDto dto) {
@@ -141,6 +147,7 @@ public class ServiceBackendControllerV0 {
      * Example: DELETE /api/v0/backends/789
      */
     @DeleteMapping("/{backendId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> removeBackend(@PathVariable Long backendId) {
         log.info("Removing backend id: {}", backendId);
         serviceBackendService.removeBackend(backendId);

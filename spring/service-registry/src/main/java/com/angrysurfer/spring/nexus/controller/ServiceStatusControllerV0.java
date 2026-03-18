@@ -40,6 +40,7 @@ import com.angrysurfer.spring.nexus.service.ServiceStatusCacheService;
 @RestController
 @RequestMapping("/api/v0/status")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class ServiceStatusControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceStatusControllerV0.class);
@@ -61,6 +62,7 @@ public class ServiceStatusControllerV0 {
      * First tries Redis cache, falls back to live health checks.
      */
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<List<ServiceStatus>> getAllStatuses() {
         List<ServiceStatus> statuses = cacheService.getAllServiceStatuses();
 
@@ -184,6 +186,7 @@ public class ServiceStatusControllerV0 {
      * Get status for a specific service
      */
     @GetMapping("/{serviceName}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceStatus> getServiceStatus(@PathVariable String serviceName) {
         return cacheService.getServiceStatus(serviceName)
                 .map(ResponseEntity::ok)
@@ -194,6 +197,7 @@ public class ServiceStatusControllerV0 {
      * Get last heartbeat time for a service
      */
     @GetMapping("/{serviceName}/heartbeat")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Map<String, Object>> getLastHeartbeat(@PathVariable String serviceName) {
         Optional<Instant> lastHeartbeat = cacheService.getLastHeartbeat(serviceName);
 
@@ -211,6 +215,7 @@ public class ServiceStatusControllerV0 {
      * Get metrics for a specific service
      */
     @GetMapping("/{serviceName}/metrics")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Map<String, Object>> getServiceMetrics(@PathVariable String serviceName) {
         return cacheService.getMetrics(serviceName)
                 .map(ResponseEntity::ok)
@@ -221,6 +226,7 @@ public class ServiceStatusControllerV0 {
      * Post metrics from a service
      */
     @PostMapping("/{serviceName}/metrics")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Map<String, String>> postServiceMetrics(
             @PathVariable String serviceName,
             @RequestBody Map<String, Object> metrics) {
@@ -234,6 +240,7 @@ public class ServiceStatusControllerV0 {
      * Get Redis health status
      */
     @GetMapping("/health/redis")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Map<String, Object>> getRedisHealth() {
         boolean healthy = cacheService.isRedisHealthy();
         return ResponseEntity.ok(Map.of(
@@ -246,6 +253,7 @@ public class ServiceStatusControllerV0 {
      * The 3D visualizer can subscribe to this for live updates.
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Deprecated(since = "v1", forRemoval = true)
     public SseEmitter streamStatusUpdates() {
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 

@@ -14,6 +14,7 @@ import java.util.List;
 @RequestMapping("/api/v0/framework-categories")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
+@Deprecated(since = "v1", forRemoval = true)
 public class FrameworkCategoryControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(FrameworkCategoryControllerV0.class);
@@ -22,6 +23,7 @@ public class FrameworkCategoryControllerV0 {
     private FrameworkCategoryRepository repository;
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<FrameworkCategory> getAll() {
         log.info("Fetching all framework categories");
         List<FrameworkCategory> categories = repository.findAll();
@@ -30,6 +32,7 @@ public class FrameworkCategoryControllerV0 {
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<FrameworkCategory> getById(@PathVariable Long id) {
         log.info("Fetching framework category with id: {}", id);
         return repository.findById(id)
@@ -44,6 +47,7 @@ public class FrameworkCategoryControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public FrameworkCategory create(@RequestBody FrameworkCategory category) {
         log.info("Creating new framework category: {}", category.getName());
         FrameworkCategory saved = repository.save(category);
@@ -52,6 +56,7 @@ public class FrameworkCategoryControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<FrameworkCategory> update(@PathVariable Long id, @RequestBody FrameworkCategory details) {
         log.info("Updating framework category with id: {}", id);
         return repository.findById(id)
@@ -69,6 +74,7 @@ public class FrameworkCategoryControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Deleting framework category with id: {}", id);
         return repository.findById(id)

@@ -41,7 +41,7 @@ public class FrameworkController {
             @RequestParam(required = false) String name,
             @RequestParam(required = false) Boolean brokerCompatible,
             org.springframework.data.domain.Pageable pageable) {
-        
+
         if (name != null) {
             log.info("Fetching framework by name: {}", name);
             return frameworkRepository.findByName(name)
@@ -56,7 +56,7 @@ public class FrameworkController {
             int start = (int) pageable.getOffset();
             int end = Math.min((start + pageable.getPageSize()), list.size());
             org.springframework.data.domain.Page<Framework> page = new org.springframework.data.domain.PageImpl<>(
-                    (start <= end) ? list.subList(start, end) : java.util.Collections.emptyList(), 
+                    (start <= end) ? list.subList(start, end) : java.util.Collections.emptyList(),
                     pageable, list.size());
             return ResponseEntity.ok(page);
         } else {

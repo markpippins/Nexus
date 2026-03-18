@@ -24,6 +24,7 @@ import com.angrysurfer.spring.nexus.service.ServiceStatusCacheService;
 @RestController
 @RequestMapping("/api/v0/registry")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class RegistryControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(RegistryControllerV0.class);
@@ -41,6 +42,7 @@ public class RegistryControllerV0 {
      * Register an external service (e.g., Moleculer, Python, Go services)
      */
     @PostMapping("/register")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Map<String, Object>> register(@RequestBody ExternalServiceRegistration registration) {
         log.info("Received registration request for service: {}", registration.getServiceName());
 
@@ -65,6 +67,7 @@ public class RegistryControllerV0 {
      * Updates both database and Redis cache.
      */
     @PostMapping("/heartbeat/{serviceName}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Map<String, String>> heartbeat(@PathVariable String serviceName) {
         log.debug("Received heartbeat from service: {}", serviceName);
 
@@ -87,6 +90,7 @@ public class RegistryControllerV0 {
      * Get all registered services (for broker-gateway to query)
      */
     @GetMapping("/services")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<List<Service>> getAllRegisteredServices() {
         List<Service> services = registrationService.getAllActiveServices();
         return ResponseEntity.ok(services);
@@ -97,6 +101,7 @@ public class RegistryControllerV0 {
      * This is the primary endpoint for the service mesh UI.
      */
     @GetMapping("/services/with-hosted")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<List<Map<String, Object>>> getAllServicesWithHosted() {
         log.debug("Fetching all services with hosted services");
         List<Map<String, Object>> servicesWithHosted = registrationService.getAllServicesWithHosted();
@@ -107,6 +112,7 @@ public class RegistryControllerV0 {
      * Get hosted services for a specific parent service.
      */
     @GetMapping("/services/{serviceName}/hosted")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<List<Map<String, Object>>> getHostedServices(@PathVariable String serviceName) {
         log.debug("Fetching hosted services for: {}", serviceName);
         return registrationService.getHostedServicesForService(serviceName)
@@ -118,6 +124,7 @@ public class RegistryControllerV0 {
      * Find service by operation name (for broker-gateway routing)
      */
     @GetMapping("/services/by-operation/{operation}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Service> findServiceByOperation(@PathVariable String operation) {
         return registrationService.findServiceByOperation(operation)
                 .map(ResponseEntity::ok)
@@ -128,6 +135,7 @@ public class RegistryControllerV0 {
      * Get service details with endpoint URL for direct calls
      */
     @GetMapping("/services/{serviceName}/details")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Map<String, Object>> getServiceDetails(@PathVariable String serviceName) {
         return registrationService.getServiceDetails(serviceName)
                 .map(ResponseEntity::ok)
@@ -138,6 +146,7 @@ public class RegistryControllerV0 {
      * Deregister a service
      */
     @PostMapping("/deregister/{serviceName}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Map<String, String>> deregister(@PathVariable String serviceName) {
         log.info("Deregistering service: {}", serviceName);
 

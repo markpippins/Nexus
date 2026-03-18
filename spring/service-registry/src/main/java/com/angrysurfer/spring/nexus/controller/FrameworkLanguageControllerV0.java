@@ -23,6 +23,7 @@ import com.angrysurfer.spring.nexus.repository.FrameworkLanguageRepository;
 @RequestMapping("/api/v0/framework-languages")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
+@Deprecated(since = "v1", forRemoval = true)
 public class FrameworkLanguageControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(FrameworkLanguageControllerV0.class);
@@ -31,6 +32,7 @@ public class FrameworkLanguageControllerV0 {
     private FrameworkLanguageRepository repository;
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<FrameworkLanguage> getAll() {
         log.info("Fetching all framework languages");
         List<FrameworkLanguage> languages = repository.findAll();
@@ -39,6 +41,7 @@ public class FrameworkLanguageControllerV0 {
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<FrameworkLanguage> getById(@PathVariable Long id) {
         log.info("Fetching framework language by ID: {}", id);
         return repository.findById(id)
@@ -53,6 +56,7 @@ public class FrameworkLanguageControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public FrameworkLanguage create(@RequestBody FrameworkLanguage language) {
         log.info("Creating framework language: {}", language.getName());
         try {
@@ -66,6 +70,7 @@ public class FrameworkLanguageControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<FrameworkLanguage> update(@PathVariable Long id, @RequestBody FrameworkLanguage details) {
         log.info("Updating framework language with ID: {}", id);
         return repository.findById(id)
@@ -83,6 +88,7 @@ public class FrameworkLanguageControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Deleting framework language with ID: {}", id);
         return repository.findById(id)

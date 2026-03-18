@@ -15,6 +15,7 @@ import java.util.List;
 @RequestMapping("/api/v0/service-types")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
+@Deprecated(since = "v1", forRemoval = true)
 public class ServiceTypeControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceTypeControllerV0.class);
@@ -23,6 +24,7 @@ public class ServiceTypeControllerV0 {
     private ServiceTypeRepository repository;
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceType> getAll() {
         log.info("Fetching all service types");
         List<ServiceType> serviceTypes = repository.findAll();
@@ -31,6 +33,7 @@ public class ServiceTypeControllerV0 {
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceType> getById(@PathVariable Long id) {
         log.info("Fetching service type by ID: {}", id);
         return repository.findById(id)
@@ -45,6 +48,7 @@ public class ServiceTypeControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ServiceType create(@RequestBody ServiceType serviceType) {
         log.info("Creating service type with name: {}", serviceType.getName());
         try {
@@ -58,6 +62,7 @@ public class ServiceTypeControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceType> update(@PathVariable Long id, @RequestBody ServiceType details) {
         log.info("Updating service type with ID: {}", id);
         return repository.findById(id)
@@ -75,6 +80,7 @@ public class ServiceTypeControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Deleting service type with ID: {}", id);
         return repository.findById(id)

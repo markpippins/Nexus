@@ -22,6 +22,7 @@ import com.angrysurfer.spring.nexus.repository.LibraryRepository;
 @RestController
 @RequestMapping("/api/v0/libraries")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class LibraryControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(LibraryControllerV0.class);
@@ -33,12 +34,14 @@ public class LibraryControllerV0 {
     }
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Library> getAllLibraries() {
         log.info("Fetching all libraries");
         return libraryRepository.findAll();
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Library> getLibraryById(@PathVariable Long id) {
         log.info("Fetching library by ID: {}", id);
         Optional<Library> library = libraryRepository.findById(id);
@@ -47,6 +50,7 @@ public class LibraryControllerV0 {
     }
 
     @GetMapping("/name/{name}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Library> getLibraryByName(@PathVariable String name) {
         log.info("Fetching library by name: {}", name);
         Optional<Library> library = libraryRepository.findByName(name);
@@ -55,24 +59,28 @@ public class LibraryControllerV0 {
     }
 
     @GetMapping("/category/{categoryId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Library> getLibrariesByCategory(@PathVariable Long categoryId) {
         log.info("Fetching libraries by category ID: {}", categoryId);
         return libraryRepository.findByCategory_Id(categoryId);
     }
 
     @GetMapping("/language/{languageId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Library> getLibrariesByLanguage(@PathVariable Long languageId) {
         log.info("Fetching libraries by language ID: {}", languageId);
         return libraryRepository.findByLanguage_Id(languageId);
     }
 
     @GetMapping("/package-manager/{packageManager}")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Library> getLibrariesByPackageManager(@PathVariable String packageManager) {
         log.info("Fetching libraries by package manager: {}", packageManager);
         return libraryRepository.findByPackageManager(packageManager);
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Library> createLibrary(@RequestBody Library library) {
         log.info("Creating new library: {}", library.getName());
 
@@ -88,6 +96,7 @@ public class LibraryControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Library> updateLibrary(@PathVariable Long id, @RequestBody Library library) {
         log.info("Updating library with ID: {}", id);
 
@@ -112,6 +121,7 @@ public class LibraryControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> deleteLibrary(@PathVariable Long id) {
         log.info("Deleting library with ID: {}", id);
 

@@ -13,6 +13,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/v0/library-categories")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class LibraryCategoryControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(LibraryCategoryControllerV0.class);
@@ -24,12 +25,14 @@ public class LibraryCategoryControllerV0 {
     }
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<LibraryCategory> getAllLibraryCategories() {
         log.info("Fetching all library categories");
         return libraryCategoryRepository.findAll();
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<LibraryCategory> getLibraryCategoryById(@PathVariable Long id) {
         log.info("Fetching library category by ID: {}", id);
         Optional<LibraryCategory> category = libraryCategoryRepository.findById(id);
@@ -38,6 +41,7 @@ public class LibraryCategoryControllerV0 {
     }
 
     @GetMapping("/name/{name}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<LibraryCategory> getLibraryCategoryByName(@PathVariable String name) {
         log.info("Fetching library category by name: {}", name);
         Optional<LibraryCategory> category = libraryCategoryRepository.findByName(name);
@@ -46,6 +50,7 @@ public class LibraryCategoryControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<LibraryCategory> createLibraryCategory(@RequestBody LibraryCategory category) {
         log.info("Creating new library category: {}", category.getName());
 
@@ -61,6 +66,7 @@ public class LibraryCategoryControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<LibraryCategory> updateLibraryCategory(@PathVariable Long id,
             @RequestBody LibraryCategory category) {
         log.info("Updating library category with ID: {}", id);
@@ -86,6 +92,7 @@ public class LibraryCategoryControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> deleteLibraryCategory(@PathVariable Long id) {
         log.info("Deleting library category with ID: {}", id);
 

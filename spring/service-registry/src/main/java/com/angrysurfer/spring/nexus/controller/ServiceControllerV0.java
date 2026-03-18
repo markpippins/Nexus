@@ -23,6 +23,7 @@ import com.angrysurfer.spring.nexus.repository.ServiceRepository;
 @RestController
 @RequestMapping("/api/v0/services")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class ServiceControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceControllerV0.class);
@@ -36,18 +37,21 @@ public class ServiceControllerV0 {
     }
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Service> getAllServices() {
         log.info("Fetching all services from database");
         return serviceRepository.findAll();
     }
 
     @GetMapping("/all")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Service> getAllServicesIncludingInactive() {
         log.info("Fetching ALL services from database (including inactive)");
         return serviceRepository.findAll();
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Service> getServiceById(@PathVariable Long id) {
         log.info("Fetching service by ID: {}", id);
         Optional<Service> service = serviceRepository.findById(id);
@@ -56,6 +60,7 @@ public class ServiceControllerV0 {
     }
 
     @GetMapping("/name/{name}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Service> getServiceByName(@PathVariable String name) {
         log.info("Fetching service by name: {}", name);
         Optional<Service> service = serviceRepository.findByName(name);
@@ -64,12 +69,14 @@ public class ServiceControllerV0 {
     }
 
     @GetMapping("/framework/{frameworkId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Service> getServicesByFramework(@PathVariable Long frameworkId) {
         log.info("Fetching services by framework ID: {}", frameworkId);
         return serviceRepository.findByFramework_Id(frameworkId);
     }
 
     @GetMapping("/{id}/dependencies")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<List<Service>> getServiceDependencies(@PathVariable Long id) {
         log.info("Fetching dependencies for service: {}", id);
         // This would require a custom query or method in the repository
@@ -78,6 +85,7 @@ public class ServiceControllerV0 {
     }
 
     @GetMapping("/{id}/dependents")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<List<Service>> getServiceDependents(@PathVariable String id) {
         log.info("Fetching dependents for service: {}", id);
         // This would require a custom query or method in the repository
@@ -86,6 +94,7 @@ public class ServiceControllerV0 {
     }
 
     @GetMapping("/{id}/sub-modules")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<List<Service>> getSubModules(@PathVariable Long id) {
         log.info("Fetching sub-modules for service: {}", id);
         List<Service> subModules = serviceRepository.findByParentService_Id(id);
@@ -93,12 +102,14 @@ public class ServiceControllerV0 {
     }
 
     @GetMapping("/standalone")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Service> getStandaloneServices() {
         log.info("Fetching standalone/parent services (parentService is null)");
         return serviceRepository.findByParentServiceIsNull();
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Service> createService(@RequestBody Service service) {
         log.info("Creating new service: {}", service.getName());
 
@@ -117,6 +128,7 @@ public class ServiceControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Service> updateService(@PathVariable Long id, @RequestBody Service service) {
         log.info("Updating service with ID: {}", id);
 
@@ -165,6 +177,7 @@ public class ServiceControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> deleteService(@PathVariable Long id) {
         log.info("Deleting service with ID: {}", id);
 

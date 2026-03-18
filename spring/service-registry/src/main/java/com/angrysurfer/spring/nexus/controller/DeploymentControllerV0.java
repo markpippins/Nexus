@@ -27,6 +27,7 @@ import com.angrysurfer.spring.nexus.repository.ServiceRepository;
 @RestController
 @RequestMapping("/api/v0/deployments")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class DeploymentControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(DeploymentControllerV0.class);
@@ -42,12 +43,14 @@ public class DeploymentControllerV0 {
     }
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Deployment> getAllDeployments() {
         log.info("Fetching all deployments from database");
         return deploymentRepository.findAll();
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Deployment> getDeploymentById(@PathVariable Long id) {
         log.info("Fetching deployment by id: {}", id);
         return deploymentRepository.findById(id)
@@ -56,12 +59,14 @@ public class DeploymentControllerV0 {
     }
 
     @GetMapping("/service/{serviceId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Deployment> getDeploymentsByService(@PathVariable Long serviceId) {
         log.info("Fetching deployments for service: {}", serviceId);
         return deploymentRepository.findByService_Id(serviceId);
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Deployment> createDeployment(@RequestBody Deployment deployment) {
         log.info("Creating new deployment");
 
@@ -99,6 +104,7 @@ public class DeploymentControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Deployment> updateDeployment(@PathVariable Long id, @RequestBody Deployment deployment) {
         log.info("Updating deployment with ID: {}", id);
 
@@ -115,6 +121,7 @@ public class DeploymentControllerV0 {
     }
 
     @PatchMapping("/{id}/status")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Deployment> updateDeploymentStatus(@PathVariable Long id, @RequestParam String status) {
         log.info("Updating deployment {} status to: {}", id, status);
 
@@ -132,6 +139,7 @@ public class DeploymentControllerV0 {
     }
 
     @PatchMapping("/{id}/health")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Deployment> updateDeploymentHealth(@PathVariable Long id, @RequestParam String healthStatus) {
         log.info("Updating deployment {} health to: {}", id, healthStatus);
 
@@ -149,6 +157,7 @@ public class DeploymentControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> deleteDeployment(@PathVariable Long id) {
         log.info("Deleting deployment with ID: {}", id);
 

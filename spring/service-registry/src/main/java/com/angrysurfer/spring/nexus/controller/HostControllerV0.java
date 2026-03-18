@@ -23,6 +23,7 @@ import com.angrysurfer.spring.nexus.repository.HostRepository;
 @RestController
 @RequestMapping("/api/v0/servers")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class HostControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(HostControllerV0.class);
@@ -35,12 +36,14 @@ public class HostControllerV0 {
     }
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Host> getAllServers() {
         log.info("Fetching all hosts/servers from database");
         return hostRepository.findAll();
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Host> getServerById(@PathVariable Long id) {
         log.info("Fetching server by ID: {}", id);
         return hostRepository.findById(id)
@@ -49,6 +52,7 @@ public class HostControllerV0 {
     }
 
     @GetMapping("/hostname/{hostname}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Host> getServerByHostname(@PathVariable String hostname) {
         log.info("Fetching server by hostname: {}", hostname);
         return hostRepository.findByHostname(hostname)
@@ -57,6 +61,7 @@ public class HostControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Host> createServer(@RequestBody Host host) {
         log.info("Creating new server: {}", host.getHostname());
 
@@ -75,6 +80,7 @@ public class HostControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Host> updateServer(@PathVariable Long id, @RequestBody Host host) {
         log.info("Updating server with ID: {}", id);
 
@@ -101,6 +107,7 @@ public class HostControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> deleteServer(@PathVariable Long id) {
         log.info("Deleting server with ID: {}", id);
 

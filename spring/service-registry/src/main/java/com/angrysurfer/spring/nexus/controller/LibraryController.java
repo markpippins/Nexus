@@ -1,6 +1,5 @@
 package com.angrysurfer.spring.nexus.controller;
 
-import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -40,7 +39,7 @@ public class LibraryController {
             @RequestParam(required = false) Long languageId,
             @RequestParam(required = false) String packageManager,
             org.springframework.data.domain.Pageable pageable) {
-        
+
         if (name != null) {
             log.info("Fetching library by name: {}", name);
             return libraryRepository.findByName(name)

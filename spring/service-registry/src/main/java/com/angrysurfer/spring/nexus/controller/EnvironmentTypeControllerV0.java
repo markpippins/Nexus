@@ -14,6 +14,7 @@ import java.util.List;
 @RequestMapping("/api/v0/environments")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
+@Deprecated(since = "v1", forRemoval = true)
 public class EnvironmentTypeControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(EnvironmentTypeControllerV0.class);
@@ -22,6 +23,7 @@ public class EnvironmentTypeControllerV0 {
     private EnvironmentTypeRepository repository;
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<EnvironmentType> getAll() {
         log.info("Fetching all environment types");
         List<EnvironmentType> environmentTypes = repository.findAll();
@@ -30,6 +32,7 @@ public class EnvironmentTypeControllerV0 {
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<EnvironmentType> getById(@PathVariable Long id) {
         log.info("Fetching environment type with id: {}", id);
         return repository.findById(id)
@@ -44,6 +47,7 @@ public class EnvironmentTypeControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public EnvironmentType create(@RequestBody EnvironmentType environmentType) {
         log.info("Creating new environment type: {}", environmentType.getName());
         EnvironmentType saved = repository.save(environmentType);
@@ -52,6 +56,7 @@ public class EnvironmentTypeControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<EnvironmentType> update(@PathVariable Long id, @RequestBody EnvironmentType details) {
         log.info("Updating environment type with id: {}", id);
         return repository.findById(id)
@@ -69,6 +74,7 @@ public class EnvironmentTypeControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         log.info("Deleting environment type with id: {}", id);
         return repository.findById(id)

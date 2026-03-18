@@ -13,6 +13,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/v0/service-libraries")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class ServiceLibraryControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceLibraryControllerV0.class);
@@ -24,12 +25,14 @@ public class ServiceLibraryControllerV0 {
     }
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceLibrary> getAllServiceLibraries() {
         log.info("Fetching all service-library relationships");
         return serviceLibraryRepository.findAll();
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceLibrary> getServiceLibraryById(@PathVariable Long id) {
         log.info("Fetching service-library by ID: {}", id);
         Optional<ServiceLibrary> serviceLibrary = serviceLibraryRepository.findById(id);
@@ -38,36 +41,42 @@ public class ServiceLibraryControllerV0 {
     }
 
     @GetMapping("/service/{serviceId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceLibrary> getLibrariesByService(@PathVariable Long serviceId) {
         log.info("Fetching libraries for service ID: {}", serviceId);
         return serviceLibraryRepository.findByServiceId(serviceId);
     }
 
     @GetMapping("/service/{serviceId}/direct")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceLibrary> getDirectLibrariesByService(@PathVariable Long serviceId) {
         log.info("Fetching direct libraries for service ID: {}", serviceId);
         return serviceLibraryRepository.findByServiceIdAndIsDirect(serviceId, true);
     }
 
     @GetMapping("/service/{serviceId}/dev")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceLibrary> getDevLibrariesByService(@PathVariable Long serviceId) {
         log.info("Fetching dev libraries for service ID: {}", serviceId);
         return serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, true);
     }
 
     @GetMapping("/service/{serviceId}/production")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceLibrary> getProductionLibrariesByService(@PathVariable Long serviceId) {
         log.info("Fetching production libraries for service ID: {}", serviceId);
         return serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, false);
     }
 
     @GetMapping("/library/{libraryId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceLibrary> getServicesByLibrary(@PathVariable Long libraryId) {
         log.info("Fetching services using library ID: {}", libraryId);
         return serviceLibraryRepository.findByLibraryId(libraryId);
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceLibrary> createServiceLibrary(@RequestBody ServiceLibrary serviceLibrary) {
         log.info("Creating service-library relationship: service={}, library={}",
                 serviceLibrary.getServiceId(), serviceLibrary.getLibraryId());
@@ -87,6 +96,7 @@ public class ServiceLibraryControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceLibrary> updateServiceLibrary(@PathVariable Long id,
             @RequestBody ServiceLibrary serviceLibrary) {
         log.info("Updating service-library with ID: {}", id);
@@ -104,6 +114,7 @@ public class ServiceLibraryControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> deleteServiceLibrary(@PathVariable Long id) {
         log.info("Deleting service-library with ID: {}", id);
 
@@ -119,6 +130,7 @@ public class ServiceLibraryControllerV0 {
     }
 
     @DeleteMapping("/service/{serviceId}/library/{libraryId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> deleteServiceLibraryByServiceAndLibrary(
             @PathVariable Long serviceId, @PathVariable Long libraryId) {
         log.info("Deleting service-library: service={}, library={}", serviceId, libraryId);

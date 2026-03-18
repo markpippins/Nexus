@@ -10,17 +10,20 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v0/visual-components")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class VisualComponentControllerV0 {
 
     @Autowired
     private VisualComponentRepository repository;
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<VisualComponent> getAll() {
         return repository.findAll();
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<VisualComponent> getById(@PathVariable Long id) {
         return repository.findById(id)
                 .map(ResponseEntity::ok)
@@ -28,11 +31,13 @@ public class VisualComponentControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public VisualComponent create(@RequestBody VisualComponent component) {
         return repository.save(component);
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<VisualComponent> update(@PathVariable Long id, @RequestBody VisualComponent details) {
         return repository.findById(id)
                 .map(existing -> {
@@ -52,6 +57,7 @@ public class VisualComponentControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         return repository.findById(id)
                 .map(existing -> {

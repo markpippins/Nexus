@@ -23,6 +23,7 @@ import com.angrysurfer.spring.nexus.repository.ServiceConfigurationRepository;
 @RestController
 @RequestMapping("/api/configurations")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class ConfigurationControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigurationControllerV0.class);
@@ -31,6 +32,7 @@ public class ConfigurationControllerV0 {
     private ServiceConfigurationRepository configurationRepository;
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceConfiguration> getAllConfigurations() {
         log.info("Fetching all configurations");
         List<ServiceConfiguration> configurations = configurationRepository.findAll();
@@ -39,6 +41,7 @@ public class ConfigurationControllerV0 {
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceConfiguration> getConfigurationById(@PathVariable Long id) {
         log.info("Fetching configuration by ID: {}", id);
         return configurationRepository.findById(id)
@@ -53,6 +56,7 @@ public class ConfigurationControllerV0 {
     }
 
     @GetMapping("/service/{serviceId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceConfiguration> getConfigurationsByService(@PathVariable Long serviceId) {
         log.info("Fetching configurations by service ID: {}", serviceId);
         List<ServiceConfiguration> configurations = configurationRepository.findByServiceId(serviceId);
@@ -61,6 +65,7 @@ public class ConfigurationControllerV0 {
     }
 
     @GetMapping("/service/{serviceId}/environment/{environmentId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<ServiceConfiguration> getConfigurationsByServiceAndEnvironment(
             @PathVariable Long serviceId,
             @PathVariable Long environmentId) {
@@ -73,6 +78,7 @@ public class ConfigurationControllerV0 {
     }
 
     @GetMapping("/service/{serviceId}/key/{configKey}/environment/{environmentId}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceConfiguration> getConfigurationByKey(
             @PathVariable Long serviceId,
             @PathVariable String configKey,
@@ -93,6 +99,7 @@ public class ConfigurationControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceConfiguration> createConfiguration(@RequestBody ServiceConfiguration configuration) {
         log.info("Creating configuration with key: {}", configuration.getConfigKey());
         try {
@@ -106,6 +113,7 @@ public class ConfigurationControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<ServiceConfiguration> updateConfiguration(
             @PathVariable Long id,
             @RequestBody ServiceConfiguration configDetails) {
@@ -129,6 +137,7 @@ public class ConfigurationControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> deleteConfiguration(@PathVariable Long id) {
         log.info("Deleting configuration with ID: {}", id);
         return configurationRepository.findById(id)

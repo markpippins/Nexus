@@ -23,6 +23,7 @@ import com.angrysurfer.spring.nexus.repository.FrameworkRepository;
 @RestController
 @RequestMapping("/api/v0/frameworks")
 @CrossOrigin(origins = "*")
+@Deprecated(since = "v1", forRemoval = true)
 public class FrameworkControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(FrameworkControllerV0.class);
@@ -36,18 +37,21 @@ public class FrameworkControllerV0 {
     }
 
     @GetMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Framework> getAllFrameworks() {
         log.info("Fetching all frameworks from database");
         return frameworkRepository.findAll();
     }
 
     @GetMapping("/all")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Framework> getAllFrameworksExplicit() {
         log.info("Fetching ALL frameworks from database (explicit)");
         return frameworkRepository.findAll();
     }
 
     @GetMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Framework> getFrameworkById(@PathVariable Long id) {
         log.info("Fetching framework by ID: {}", id);
         Optional<Framework> framework = frameworkRepository.findById(id);
@@ -56,6 +60,7 @@ public class FrameworkControllerV0 {
     }
 
     @GetMapping("/name/{name}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Framework> getFrameworkByName(@PathVariable String name) {
         log.info("Fetching framework by name: {}", name);
         Optional<Framework> framework = frameworkRepository.findByName(name);
@@ -64,6 +69,7 @@ public class FrameworkControllerV0 {
     }
 
     @GetMapping("/broker-compatible")
+    @Deprecated(since = "v1", forRemoval = true)
     public List<Framework> getBrokerCompatibleFrameworks() {
         // Filter frameworks that support broker pattern
         return frameworkRepository.findAll().stream()
@@ -73,6 +79,7 @@ public class FrameworkControllerV0 {
     }
 
     @PostMapping
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Framework> createFramework(@RequestBody Framework framework) {
         log.info("Creating new framework: {}", framework.getName());
 
@@ -91,6 +98,7 @@ public class FrameworkControllerV0 {
     }
 
     @PutMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Framework> updateFramework(@PathVariable Long id, @RequestBody Framework framework) {
         log.info("Updating framework with ID: {}", id);
 
@@ -117,6 +125,7 @@ public class FrameworkControllerV0 {
     }
 
     @DeleteMapping("/{id}")
+    @Deprecated(since = "v1", forRemoval = true)
     public ResponseEntity<Void> deleteFramework(@PathVariable Long id) {
         log.info("Deleting framework with ID: {}", id);
 
