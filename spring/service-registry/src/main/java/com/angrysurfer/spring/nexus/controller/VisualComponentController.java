@@ -1,0 +1,66 @@
+package com.angrysurfer.spring.nexus.controller;
+
+import com.angrysurfer.spring.nexus.entity.VisualComponent;
+import com.angrysurfer.spring.nexus.repository.VisualComponentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/visual-components")
+@CrossOrigin(origins = "*")
+public class VisualComponentController {
+
+    @Autowired
+    private VisualComponentRepository repository;
+
+    @GetMapping
+    public List<VisualComponent> getAll() {
+        return repository.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<VisualComponent> getById(@PathVariable Long id) {
+        return repository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping
+    public VisualComponent create(@RequestBody VisualComponent component) {
+        return repository.save(component);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<VisualComponent> update(@PathVariable Long id, @RequestBody VisualComponent details) {
+        return repository.findById(id)
+                .map(existing -> {
+                    if (existing.getIsSystem()) {
+                        return ResponseEntity.status(403).<VisualComponent>build(); // Prevent editing system components
+                    }
+                    existing.setName(details.getName());
+                    existing.setGeometry(details.getGeometry());
+                    existing.setDefaultColor(details.getDefaultColor());
+                    existing.setScale(details.getScale());
+                    existing.setIconClass(details.getIconClass());
+                    existing.setColorClass(details.getColorClass());
+                    existing.setDescription(details.getDescription());
+                    return ResponseEntity.ok(repository.save(existing));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        return repository.findById(id)
+                .map(existing -> {
+                    if (existing.getIsSystem()) {
+                        return ResponseEntity.status(403).<Void>build();
+                    }
+                    repository.delete(existing);
+                    return ResponseEntity.ok().<Void>build();
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+}
