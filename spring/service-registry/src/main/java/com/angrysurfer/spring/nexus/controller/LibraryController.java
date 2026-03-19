@@ -47,16 +47,16 @@ public class LibraryController {
                     .orElse(ResponseEntity.notFound().build());
         } else if (categoryId != null) {
             log.info("Fetching libraries by category ID: {}", categoryId);
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(libraryRepository.findByCategory_Id(categoryId, pageable)));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(libraryRepository.findByCategory_Id(categoryId, pageable)));
         } else if (languageId != null) {
             log.info("Fetching libraries by language ID: {}", languageId);
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(libraryRepository.findByLanguage_Id(languageId, pageable)));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(libraryRepository.findByLanguage_Id(languageId, pageable)));
         } else if (packageManager != null) {
             log.info("Fetching libraries by package manager: {}", packageManager);
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(libraryRepository.findByPackageManager(packageManager, pageable)));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(libraryRepository.findByPackageManager(packageManager, pageable)));
         } else {
             log.info("Fetching all libraries");
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(libraryRepository.findAll(pageable)));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(libraryRepository.findAll(pageable)));
         }
     }
 

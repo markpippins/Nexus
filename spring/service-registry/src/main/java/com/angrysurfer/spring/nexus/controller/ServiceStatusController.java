@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import com.angrysurfer.spring.nexus.dto.ServiceStatus;
-import com.angrysurfer.spring.nexus.dto.ServiceStatus.HealthState;
+import com.angrysurfer.nexus.dto.ServiceStatus;
+import com.angrysurfer.nexus.dto.ServiceStatus.HealthState;
 import com.angrysurfer.spring.nexus.entity.Deployment;
 import com.angrysurfer.spring.nexus.repository.DeploymentRepository;
 import com.angrysurfer.spring.nexus.service.ServiceStatusCacheService;
@@ -61,7 +61,7 @@ public class ServiceStatusController {
      * First tries Redis cache, falls back to live health checks.
      */
     @GetMapping
-    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceStatus>> getAllStatuses(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<ServiceStatus>> getAllStatuses(org.springframework.data.domain.Pageable pageable) {
         List<ServiceStatus> statuses = cacheService.getAllServiceStatuses();
 
         // If Redis returned data, use it
@@ -71,7 +71,7 @@ public class ServiceStatusController {
             org.springframework.data.domain.Page<ServiceStatus> page = new org.springframework.data.domain.PageImpl<>(
                     (start <= end) ? statuses.subList(start, end) : java.util.Collections.emptyList(),
                     pageable, statuses.size());
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(page));
         }
 
         // Fallback: perform live health checks on deployments
@@ -82,7 +82,7 @@ public class ServiceStatusController {
         org.springframework.data.domain.Page<ServiceStatus> page = new org.springframework.data.domain.PageImpl<>(
                 (start <= end) ? statuses.subList(start, end) : java.util.Collections.emptyList(),
                 pageable, statuses.size());
-        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
+        return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(page));
     }
 
     /**

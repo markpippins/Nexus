@@ -18,8 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.angrysurfer.spring.nexus.dto.DeploymentWithBackendsDto;
-import com.angrysurfer.spring.nexus.dto.ServiceBackendDto;
+import com.angrysurfer.nexus.dto.DeploymentWithBackendsDto;
+import com.angrysurfer.nexus.dto.ServiceBackendDto;
 import com.angrysurfer.spring.nexus.entity.ServiceBackend;
 import com.angrysurfer.spring.nexus.service.ServiceBackendService;
 

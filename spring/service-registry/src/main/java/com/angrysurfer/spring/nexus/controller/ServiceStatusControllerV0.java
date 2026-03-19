@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import com.angrysurfer.spring.nexus.dto.ServiceStatus;
-import com.angrysurfer.spring.nexus.dto.ServiceStatus.HealthState;
+import com.angrysurfer.nexus.dto.ServiceStatus;
+import com.angrysurfer.nexus.dto.ServiceStatus.HealthState;
 import com.angrysurfer.spring.nexus.entity.Deployment;
 import com.angrysurfer.spring.nexus.repository.DeploymentRepository;
 import com.angrysurfer.spring.nexus.service.ServiceStatusCacheService;

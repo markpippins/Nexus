@@ -9,8 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.angrysurfer.spring.nexus.dto.DeploymentWithBackendsDto;
-import com.angrysurfer.spring.nexus.dto.ServiceBackendDto;
+import com.angrysurfer.nexus.dto.DeploymentWithBackendsDto;
+import com.angrysurfer.nexus.dto.ServiceBackendDto;
 import com.angrysurfer.spring.nexus.entity.Deployment;
 import com.angrysurfer.spring.nexus.entity.ServiceBackend;
 import com.angrysurfer.spring.nexus.repository.DeploymentRepository;
@@ -82,9 +82,9 @@ public class ServiceBackendService {
     /**
      * Add a backend connection
      */
-@Transactional
+    @Transactional
     public ServiceBackend addBackend(Long serviceDeploymentId, Long backendDeploymentId,
-                                     ServiceBackend.BackendRole role, Integer priority) {
+            ServiceBackend.BackendRole role, Integer priority) {
         // Verify that deployments exist
         deploymentRepository.findById(serviceDeploymentId)
                 .orElseThrow(() -> new RuntimeException("Service deployment not found: " + serviceDeploymentId));
@@ -106,6 +106,17 @@ public class ServiceBackendService {
 
         return saved;
     }
+
+    /**
+     * Add a backend connection with string role
+     */
+    @Transactional
+    public ServiceBackend addBackend(Long serviceDeploymentId, Long backendDeploymentId,
+            String role, Integer priority) {
+        ServiceBackend.BackendRole backendRole = role != null ? ServiceBackend.BackendRole.valueOf(role)
+                : ServiceBackend.BackendRole.PRIMARY;
+        return addBackend(serviceDeploymentId, backendDeploymentId, backendRole, priority);
+    }
     
     /**
      * Remove a backend connection
@@ -126,7 +137,7 @@ public class ServiceBackendService {
                 .orElseThrow(() -> new RuntimeException("Backend not found: " + backendId));
 
         if (dto.getRole() != null) {
-            backend.setRole(dto.getRole());
+            backend.setRole(ServiceBackend.BackendRole.valueOf(dto.getRole()));
         }
         if (dto.getPriority() != null) {
             backend.setPriority(dto.getPriority());
@@ -148,7 +159,7 @@ public class ServiceBackendService {
         log.info("Updated backend: {}", backendId);
         return saved;
     }
-    
+
     /**
      * Convert entity to DTO
      */
@@ -157,7 +168,7 @@ public class ServiceBackendService {
         dto.setId(backend.getId());
         dto.setServiceDeploymentId(backend.getServiceDeploymentId());
         dto.setBackendDeploymentId(backend.getBackendDeploymentId());
-        dto.setRole(backend.getRole());
+        dto.setRole(backend.getRole() != null ? backend.getRole().name() : null);
         dto.setPriority(backend.getPriority());
         dto.setRoutingKey(backend.getRoutingKey());
         dto.setWeight(backend.getWeight());

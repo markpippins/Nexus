@@ -22,11 +22,11 @@ public class OperatingSystemController {
     private OperatingSystemRepository repository;
 
     @GetMapping
-    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<OperatingSystem>> getAll(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<OperatingSystem>> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all operating systems");
         org.springframework.data.domain.Page<OperatingSystem> operatingSystems = repository.findAll(pageable);
         log.debug("Fetched {} operating systems", operatingSystems.getNumberOfElements());
-        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(operatingSystems));
+        return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(operatingSystems));
     }
 
     @GetMapping("/{id}")

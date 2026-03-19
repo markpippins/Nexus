@@ -38,7 +38,7 @@ class ServiceDependencyControllerTest {
         List<ServiceDependency> dependencies = List.of(testDependency);
         when(client.getServiceDependencies()).thenReturn(dependencies);
 
-        org.springframework.http.ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceDependency>> response = controller
+        org.springframework.http.ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<ServiceDependency>> response = controller
                 .getAllDependencies(PageRequest.of(0, 10));
 
         assertNotNull(response);
@@ -50,7 +50,7 @@ class ServiceDependencyControllerTest {
     void getAllDependencies_Empty() {
         when(client.getServiceDependencies()).thenReturn(List.of());
 
-        org.springframework.http.ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceDependency>> response = controller
+        org.springframework.http.ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<ServiceDependency>> response = controller
                 .getAllDependencies(PageRequest.of(0, 10));
 
         assertNotNull(response);

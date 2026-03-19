@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.angrysurfer.spring.nexus.dto.ExternalServiceRegistration;
+import com.angrysurfer.nexus.dto.ExternalServiceRegistration;
 import com.angrysurfer.spring.nexus.entity.Service;
 import com.angrysurfer.spring.nexus.repository.ServiceRepository;
 import com.angrysurfer.spring.nexus.service.ExternalServiceRegistrationService;
@@ -87,14 +87,14 @@ public class RegistryController {
      * Get all registered services (for broker-gateway to query)
      */
     @GetMapping("/services")
-    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<Service>> getAllRegisteredServices(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<Service>> getAllRegisteredServices(org.springframework.data.domain.Pageable pageable) {
         List<Service> services = registrationService.getAllActiveServices();
         int start = (int) pageable.getOffset();
         int end = Math.min((start + pageable.getPageSize()), services.size());
         org.springframework.data.domain.Page<Service> page = new org.springframework.data.domain.PageImpl<>(
                 (start <= end) ? services.subList(start, end) : java.util.Collections.emptyList(),
                 pageable, services.size());
-        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
+        return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(page));
     }
 
     /**
@@ -102,7 +102,7 @@ public class RegistryController {
      * This is the primary endpoint for the service mesh UI.
      */
     @GetMapping("/services/with-hosted")
-    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<Map<String, Object>>> getAllServicesWithHosted(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<Map<String, Object>>> getAllServicesWithHosted(org.springframework.data.domain.Pageable pageable) {
         log.debug("Fetching all services with hosted services");
         List<Map<String, Object>> servicesWithHosted = registrationService.getAllServicesWithHosted();
         int start = (int) pageable.getOffset();
@@ -110,7 +110,7 @@ public class RegistryController {
         org.springframework.data.domain.Page<Map<String, Object>> page = new org.springframework.data.domain.PageImpl<>(
                 (start <= end) ? servicesWithHosted.subList(start, end) : java.util.Collections.emptyList(),
                 pageable, servicesWithHosted.size());
-        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
+        return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(page));
     }
 
     /**

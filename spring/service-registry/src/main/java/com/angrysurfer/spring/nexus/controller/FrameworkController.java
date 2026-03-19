@@ -58,10 +58,10 @@ public class FrameworkController {
             org.springframework.data.domain.Page<Framework> page = new org.springframework.data.domain.PageImpl<>(
                     (start <= end) ? list.subList(start, end) : java.util.Collections.emptyList(),
                     pageable, list.size());
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(page));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(page));
         } else {
             log.info("Fetching all frameworks from database");
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(frameworkRepository.findAll(pageable)));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(frameworkRepository.findAll(pageable)));
         }
     }
 

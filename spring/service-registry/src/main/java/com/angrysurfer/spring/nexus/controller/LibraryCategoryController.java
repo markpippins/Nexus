@@ -34,7 +34,7 @@ public class LibraryCategoryController {
                     .orElse(ResponseEntity.notFound().build());
         } else {
             log.info("Fetching all library categories");
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(libraryCategoryRepository.findAll(pageable)));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(libraryCategoryRepository.findAll(pageable)));
         }
     }
 

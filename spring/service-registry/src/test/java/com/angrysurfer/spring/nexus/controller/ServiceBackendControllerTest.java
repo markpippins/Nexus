@@ -1,8 +1,8 @@
 package com.angrysurfer.spring.nexus.controller;
 
 import com.angrysurfer.spring.nexus.config.TestJpaConfig;
-import com.angrysurfer.spring.nexus.dto.DeploymentWithBackendsDto;
-import com.angrysurfer.spring.nexus.dto.ServiceBackendDto;
+import com.angrysurfer.nexus.dto.DeploymentWithBackendsDto;
+import com.angrysurfer.nexus.dto.ServiceBackendDto;
 import com.angrysurfer.spring.nexus.entity.ServiceBackend;
 import com.angrysurfer.spring.nexus.service.ServiceBackendService;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +43,7 @@ class ServiceBackendControllerTest {
         testBackendDto.setId(1L);
         testBackendDto.setServiceDeploymentId(1L);
         testBackendDto.setBackendDeploymentId(2L);
-        testBackendDto.setRole(ServiceBackend.BackendRole.PRIMARY);
+        testBackendDto.setRole("PRIMARY");
 
         testBackend = new ServiceBackend();
         testBackend.setId(1L);

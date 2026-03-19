@@ -46,6 +46,13 @@
             <artifactId>broker-service-api</artifactId>
         </dependency>
 
+        <!-- Service Registry API (shared DTOs) -->
+        <dependency>
+            <groupId>com.angrysurfer.nexus</groupId>
+            <artifactId>nexus-service-registry-api</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- Spring Data Redis for real-time caching -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

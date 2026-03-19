@@ -22,11 +22,11 @@ public class FrameworkCategoryController {
     private FrameworkCategoryRepository repository;
 
     @GetMapping
-    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<FrameworkCategory>> getAll(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<FrameworkCategory>> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all framework categories");
         org.springframework.data.domain.Page<FrameworkCategory> categories = repository.findAll(pageable);
         log.debug("Fetched {} framework categories", categories.getNumberOfElements());
-        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(categories));
+        return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(categories));
     }
 
     @GetMapping("/{id}")

@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.angrysurfer.spring.nexus.dto.ExternalServiceRegistration;
+import com.angrysurfer.nexus.dto.ExternalServiceRegistration;
 import com.angrysurfer.spring.nexus.entity.Service;
 import com.angrysurfer.spring.nexus.repository.ServiceRepository;
 import com.angrysurfer.spring.nexus.service.ExternalServiceRegistrationService;

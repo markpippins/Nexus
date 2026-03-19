@@ -22,11 +22,11 @@ public class EnvironmentTypeController {
     private EnvironmentTypeRepository repository;
 
     @GetMapping
-    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<EnvironmentType>> getAll(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<EnvironmentType>> getAll(org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all environment types");
         org.springframework.data.domain.Page<EnvironmentType> environmentTypes = repository.findAll(pageable);
         log.debug("Fetched {} environment types", environmentTypes.getNumberOfElements());
-        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(environmentTypes));
+        return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(environmentTypes));
     }
 
     @GetMapping("/{id}")

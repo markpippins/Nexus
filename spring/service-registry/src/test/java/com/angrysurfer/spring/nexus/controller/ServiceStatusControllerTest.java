@@ -1,30 +1,27 @@
 package com.angrysurfer.spring.nexus.controller;
 
-import com.angrysurfer.spring.nexus.dto.ServiceStatus;
-import com.angrysurfer.spring.nexus.dto.ServiceStatus.HealthState;
-import com.angrysurfer.spring.nexus.entity.Deployment;
-import com.angrysurfer.spring.nexus.repository.DeploymentRepository;
-import com.angrysurfer.spring.nexus.service.ServiceStatusCacheService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+
+import com.angrysurfer.nexus.dto.ServiceStatus;
+import com.angrysurfer.nexus.dto.ServiceStatus.HealthState;
+import com.angrysurfer.spring.nexus.repository.DeploymentRepository;
+import com.angrysurfer.spring.nexus.service.ServiceStatusCacheService;
 
 @ExtendWith(MockitoExtension.class)
 class ServiceStatusControllerTest {
@@ -55,7 +52,8 @@ class ServiceStatusControllerTest {
         List<ServiceStatus> statuses = List.of(testStatus);
         when(cacheService.getAllServiceStatuses()).thenReturn(statuses);
 
-        ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceStatus>> response = controller.getAllStatuses(PageRequest.of(0, 10));
+        ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<ServiceStatus>> response = controller
+                .getAllStatuses(PageRequest.of(0, 10));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(cacheService).getAllServiceStatuses();
@@ -66,7 +64,8 @@ class ServiceStatusControllerTest {
         when(cacheService.getAllServiceStatuses()).thenReturn(List.of());
         when(deploymentRepository.findAll()).thenReturn(List.of());
 
-        ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceStatus>> response = controller.getAllStatuses(PageRequest.of(0, 10));
+        ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<ServiceStatus>> response = controller
+                .getAllStatuses(PageRequest.of(0, 10));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(deploymentRepository).findAll();

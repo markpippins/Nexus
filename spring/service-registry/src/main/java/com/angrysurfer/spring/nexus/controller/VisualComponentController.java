@@ -16,8 +16,8 @@ public class VisualComponentController {
     private VisualComponentRepository repository;
 
     @GetMapping
-    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<VisualComponent>> getAll(org.springframework.data.domain.Pageable pageable) {
-        return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(repository.findAll(pageable)));
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<VisualComponent>> getAll(org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(repository.findAll(pageable)));
     }
 
     @GetMapping("/{id}")

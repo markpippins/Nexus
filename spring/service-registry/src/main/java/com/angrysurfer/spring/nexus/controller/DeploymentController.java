@@ -42,15 +42,15 @@ public class DeploymentController {
     }
 
     @GetMapping
-    public ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<Deployment>> getDeployments(
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<Deployment>> getDeployments(
             @RequestParam(required = false) Long serviceId,
             org.springframework.data.domain.Pageable pageable) {
         if (serviceId != null) {
             log.info("Fetching deployments for service: {}", serviceId);
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(deploymentRepository.findByService_Id(serviceId, pageable)));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(deploymentRepository.findByService_Id(serviceId, pageable)));
         } else {
             log.info("Fetching all deployments from database");
-            return ResponseEntity.ok(new com.angrysurfer.spring.nexus.dto.PagedResponse<>(deploymentRepository.findAll(pageable)));
+            return ResponseEntity.ok(com.angrysurfer.spring.nexus.dto.SpringPagedResponse.fromPage(deploymentRepository.findAll(pageable)));
         }
     }
 
