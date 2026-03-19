@@ -63,6 +63,7 @@ class RegistryControllerTest {
         ResponseEntity<Map<String, Object>> response = registryController.register(testRegistration);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertTrue((Boolean) response.getBody().get("success"));
         assertEquals("test-service", response.getBody().get("serviceName"));
         verify(registrationService).registerExternalService(any(ExternalServiceRegistration.class));
@@ -76,6 +77,7 @@ class RegistryControllerTest {
         ResponseEntity<Map<String, Object>> response = registryController.register(testRegistration);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertFalse((Boolean) response.getBody().get("success"));
     }
 
@@ -86,6 +88,7 @@ class RegistryControllerTest {
         ResponseEntity<Map<String, String>> response = registryController.heartbeat("test-service");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals("Heartbeat received", response.getBody().get("message"));
         verify(registrationService).updateHeartbeat("test-service");
     }
@@ -116,7 +119,7 @@ class RegistryControllerTest {
         List<Service> services = List.of(testService);
         when(registrationService.getAllActiveServices()).thenReturn(services);
 
-        ResponseEntity<Page<Service>> response = registryController.getAllRegisteredServices(PageRequest.of(0, 10));
+        ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<Service>> response = registryController.getAllRegisteredServices(PageRequest.of(0, 10));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(registrationService).getAllActiveServices();
@@ -127,7 +130,7 @@ class RegistryControllerTest {
         List<Map<String, Object>> servicesWithHosted = List.of(Map.of("serviceName", "test-service"));
         when(registrationService.getAllServicesWithHosted()).thenReturn(servicesWithHosted);
 
-        ResponseEntity<Page<Map<String, Object>>> response = registryController.getAllServicesWithHosted(PageRequest.of(0, 10));
+        ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<Map<String, Object>>> response = registryController.getAllServicesWithHosted(PageRequest.of(0, 10));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(registrationService).getAllServicesWithHosted();
@@ -142,6 +145,7 @@ class RegistryControllerTest {
         ResponseEntity<List<Map<String, Object>>> response = registryController.getHostedServices("test-service");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals(1, response.getBody().size());
     }
 
@@ -203,6 +207,7 @@ class RegistryControllerTest {
         ResponseEntity<Map<String, String>> response = registryController.deregister("test-service");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals("Service deregistered successfully", response.getBody().get("message"));
     }
 

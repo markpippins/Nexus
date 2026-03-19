@@ -41,12 +41,14 @@ class VisualComponentControllerTest {
 
     @Test
     void getAll() {
-        when(repository.findAll()).thenReturn(List.of(testComponent));
+        org.springframework.data.domain.Page<VisualComponent> page = new org.springframework.data.domain.PageImpl<>(List.of(testComponent));
+        when(repository.findAll(any(org.springframework.data.domain.Pageable.class))).thenReturn(page);
 
-        List<VisualComponent> result = controller.getAll();
+        ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<VisualComponent>> result = controller.getAll(org.springframework.data.domain.PageRequest.of(0, 10));
 
-        assertEquals(1, result.size());
-        verify(repository).findAll();
+        assertNotNull(result.getBody());
+        assertEquals(1, result.getBody().getData().size());
+        verify(repository).findAll(any(org.springframework.data.domain.Pageable.class));
     }
 
     @Test

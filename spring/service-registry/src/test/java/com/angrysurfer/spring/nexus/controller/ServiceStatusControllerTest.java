@@ -55,7 +55,7 @@ class ServiceStatusControllerTest {
         List<ServiceStatus> statuses = List.of(testStatus);
         when(cacheService.getAllServiceStatuses()).thenReturn(statuses);
 
-        ResponseEntity<Page<ServiceStatus>> response = controller.getAllStatuses(PageRequest.of(0, 10));
+        ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceStatus>> response = controller.getAllStatuses(PageRequest.of(0, 10));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(cacheService).getAllServiceStatuses();
@@ -66,7 +66,7 @@ class ServiceStatusControllerTest {
         when(cacheService.getAllServiceStatuses()).thenReturn(List.of());
         when(deploymentRepository.findAll()).thenReturn(List.of());
 
-        ResponseEntity<Page<ServiceStatus>> response = controller.getAllStatuses(PageRequest.of(0, 10));
+        ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceStatus>> response = controller.getAllStatuses(PageRequest.of(0, 10));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(deploymentRepository).findAll();
@@ -100,6 +100,7 @@ class ServiceStatusControllerTest {
         ResponseEntity<Map<String, Object>> response = controller.getLastHeartbeat("test-service");
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertEquals("test-service", response.getBody().get("serviceName"));
     }
 
@@ -150,6 +151,7 @@ class ServiceStatusControllerTest {
         ResponseEntity<Map<String, Object>> response = controller.getRedisHealth();
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertTrue((Boolean) response.getBody().get("redisAvailable"));
     }
 
@@ -160,6 +162,7 @@ class ServiceStatusControllerTest {
         ResponseEntity<Map<String, Object>> response = controller.getRedisHealth();
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         assertFalse((Boolean) response.getBody().get("redisAvailable"));
     }
 

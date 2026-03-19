@@ -1,23 +1,21 @@
 package com.angrysurfer.spring.nexus.controller;
 
-import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
-import com.angrysurfer.spring.nexus.entity.ServiceDependency;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import com.angrysurfer.spring.nexus.client.ServicesConsoleClient;
+import com.angrysurfer.spring.nexus.entity.ServiceDependency;
 
 @ExtendWith(MockitoExtension.class)
 class ServiceDependencyControllerTest {
@@ -40,9 +38,11 @@ class ServiceDependencyControllerTest {
         List<ServiceDependency> dependencies = List.of(testDependency);
         when(client.getServiceDependencies()).thenReturn(dependencies);
 
-        Page<ServiceDependency> result = controller.getAllDependencies(PageRequest.of(0, 10));
+        org.springframework.http.ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceDependency>> response = controller
+                .getAllDependencies(PageRequest.of(0, 10));
 
-        assertNotNull(result);
+        assertNotNull(response);
+        assertNotNull(response.getBody());
         verify(client).getServiceDependencies();
     }
 
@@ -50,9 +50,11 @@ class ServiceDependencyControllerTest {
     void getAllDependencies_Empty() {
         when(client.getServiceDependencies()).thenReturn(List.of());
 
-        Page<ServiceDependency> result = controller.getAllDependencies(PageRequest.of(0, 10));
+        org.springframework.http.ResponseEntity<com.angrysurfer.spring.nexus.dto.PagedResponse<ServiceDependency>> response = controller
+                .getAllDependencies(PageRequest.of(0, 10));
 
-        assertNotNull(result);
-        assertEquals(0, result.getContent().size());
+        assertNotNull(response);
+        assertNotNull(response.getBody());
+        assertEquals(0, response.getBody().getData().size());
     }
 }
