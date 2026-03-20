@@ -170,7 +170,7 @@ heartbeat.interval.seconds=30
 **Verification**:
 ```bash
 # Check registration
-curl http://localhost:8085/api/registry/services
+curl http://localhost:8085/api/v1/registry/services
 
 # Should show quarkus-broker-gateway with status ACTIVE
 ```

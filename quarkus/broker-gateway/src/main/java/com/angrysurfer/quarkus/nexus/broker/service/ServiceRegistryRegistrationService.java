@@ -118,7 +118,7 @@ public class ServiceRegistryRegistrationService {
         try {
             Response response = client
                     .target(hostServerUrl)
-                    .path("/api/registry/register")
+                    .path("/api/v1/registry/register")
                     .request(MediaType.APPLICATION_JSON)
                     .post(Entity.json(registration));
 
@@ -143,7 +143,7 @@ public class ServiceRegistryRegistrationService {
         try {
             Response response = client
                     .target(hostServerUrl)
-                    .path("/api/registry/heartbeat/" + serviceName)
+                    .path("/api/v1/registry/heartbeat/" + serviceName)
                     .request(MediaType.APPLICATION_JSON)
                     .post(Entity.json("{}"));
 
