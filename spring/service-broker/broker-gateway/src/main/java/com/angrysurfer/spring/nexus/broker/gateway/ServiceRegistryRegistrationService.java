@@ -121,7 +121,7 @@ public class ServiceRegistryRegistrationService {
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(registration, headers);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    hostServerUrl + "/api/registry/register",
+                    hostServerUrl + "/api/v1/registry/register",
                     request,
                     Map.class);
 
@@ -167,7 +167,7 @@ public class ServiceRegistryRegistrationService {
             HttpEntity<String> request = new HttpEntity<>("{}", headers);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    hostServerUrl + "/api/registry/heartbeat/" + serviceName,
+                    hostServerUrl + "/api/v1/registry/heartbeat/" + serviceName,
                     request,
                     Map.class);
 

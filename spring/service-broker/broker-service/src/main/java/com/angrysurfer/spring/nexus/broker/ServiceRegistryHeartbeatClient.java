@@ -113,7 +113,7 @@ public class ServiceRegistryHeartbeatClient {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(registration, headers);
 
-            String url = hostServerUrl + "/api/registry/register";
+            String url = hostServerUrl + "/api/v1/registry/register";
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {
@@ -146,7 +146,7 @@ public class ServiceRegistryHeartbeatClient {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> request = new HttpEntity<>("{}", headers);
 
-            String url = hostServerUrl + "/api/registry/heartbeat/" + serviceName;
+            String url = hostServerUrl + "/api/v1/registry/heartbeat/" + serviceName;
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {

@@ -40,7 +40,7 @@ class ServiceDiscoveryClientTest {
                 expectedServiceInfo.setId(1L);
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/registry/services/by-operation/testOperation"),
+                                eq("http://localhost:8085/api/v1/registry/services/by-operation/testOperation"),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class))).thenReturn(expectedServiceInfo);
 
                 // When
@@ -52,7 +52,7 @@ class ServiceDiscoveryClientTest {
                 assertEquals("testService", result.get().getName());
                 assertEquals(Long.valueOf(1L), result.get().getId());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/registry/services/by-operation/testOperation"),
+                                eq("http://localhost:8085/api/v1/registry/services/by-operation/testOperation"),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class));
         }
 
@@ -62,7 +62,7 @@ class ServiceDiscoveryClientTest {
                 String operation = "nonExistentOperation";
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/registry/services/by-operation/nonExistentOperation"),
+                                eq("http://localhost:8085/api/v1/registry/services/by-operation/nonExistentOperation"),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class))).thenReturn(null);
 
                 // When
@@ -72,7 +72,7 @@ class ServiceDiscoveryClientTest {
                 // Then
                 assertFalse(result.isPresent());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/registry/services/by-operation/nonExistentOperation"),
+                                eq("http://localhost:8085/api/v1/registry/services/by-operation/nonExistentOperation"),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class));
         }
 
@@ -82,7 +82,7 @@ class ServiceDiscoveryClientTest {
                 String operation = "errorOperation";
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/registry/services/by-operation/errorOperation"),
+                                eq("http://localhost:8085/api/v1/registry/services/by-operation/errorOperation"),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class)))
                                 .thenThrow(new RuntimeException("Connection failed"));
 
@@ -93,7 +93,7 @@ class ServiceDiscoveryClientTest {
                 // Then
                 assertFalse(result.isPresent());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/registry/services/by-operation/errorOperation"),
+                                eq("http://localhost:8085/api/v1/registry/services/by-operation/errorOperation"),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class));
         }
 
@@ -106,7 +106,7 @@ class ServiceDiscoveryClientTest {
                 expectedServiceDetails.setEndpoint("http://test-service:8080");
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/registry/services/testService/details"),
+                                eq("http://localhost:8085/api/v1/registry/services/testService/details"),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class)))
                                 .thenReturn(expectedServiceDetails);
 
@@ -119,7 +119,7 @@ class ServiceDiscoveryClientTest {
                 assertEquals("testService", result.get().getServiceName());
                 assertEquals("http://test-service:8080", result.get().getEndpoint());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/registry/services/testService/details"),
+                                eq("http://localhost:8085/api/v1/registry/services/testService/details"),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class));
         }
 
@@ -129,7 +129,7 @@ class ServiceDiscoveryClientTest {
                 String serviceName = "nonExistentService";
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/registry/services/nonExistentService/details"),
+                                eq("http://localhost:8085/api/v1/registry/services/nonExistentService/details"),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class))).thenReturn(null);
 
                 // When
@@ -139,7 +139,7 @@ class ServiceDiscoveryClientTest {
                 // Then
                 assertFalse(result.isPresent());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/registry/services/nonExistentService/details"),
+                                eq("http://localhost:8085/api/v1/registry/services/nonExistentService/details"),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class));
         }
 
@@ -149,7 +149,7 @@ class ServiceDiscoveryClientTest {
                 String serviceName = "errorService";
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/registry/services/errorService/details"),
+                                eq("http://localhost:8085/api/v1/registry/services/errorService/details"),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class)))
                                 .thenThrow(new RuntimeException("Connection failed"));
 
@@ -160,7 +160,7 @@ class ServiceDiscoveryClientTest {
                 // Then
                 assertFalse(result.isPresent());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/registry/services/errorService/details"),
+                                eq("http://localhost:8085/api/v1/registry/services/errorService/details"),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class));
         }
 

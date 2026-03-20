@@ -37,7 +37,7 @@ public class ServiceDiscoveryClientImpl implements ServiceDiscoveryClient {
         log.debug("Looking for service to handle operation: {}", operation);
 
         try {
-            String url = hostServerUrl + "/api/registry/services/by-operation/" + operation;
+            String url = hostServerUrl + "/api/v1/registry/services/by-operation/" + operation;
             log.debug("Querying service registry at: {}", url);
 
             ServiceInfoImpl serviceInfo = restTemplate.getForObject(url, ServiceInfoImpl.class);
@@ -58,7 +58,7 @@ public class ServiceDiscoveryClientImpl implements ServiceDiscoveryClient {
         log.debug("Getting details for service: {}", serviceName);
 
         try {
-            String url = hostServerUrl + "/api/registry/services/" + serviceName + "/details";
+            String url = hostServerUrl + "/api/v1/registry/services/" + serviceName + "/details";
             log.debug("Querying service details at: {}", url);
 
             ServiceDetailsImpl details = restTemplate.getForObject(url, ServiceDetailsImpl.class);
