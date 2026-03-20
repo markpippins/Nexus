@@ -66,6 +66,12 @@
             <groupId>com.angrysurfer.nexus</groupId>
             <artifactId>broker-service</artifactId>
         </dependency>
+        <!-- TypeSpec generated client dependencies -->
+        <dependency>
+            <groupId>io.clientcore</groupId>
+            <artifactId>core</artifactId>
+            <version>1.0.0-beta.11</version>
+        </dependency>
 
         <!-- Test dependencies -->
         <dependency>

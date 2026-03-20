@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
+import restfsservice.RestFsServiceClient;
+import restfsservice.RestFsServiceClientBuilder;
 
 @Configuration
 public class RestFsConfig {
@@ -24,5 +26,17 @@ public class RestFsConfig {
         return WebClient.builder()
                 .baseUrl(fsApiUrl)
                 .build();
+    }
+
+    /**
+     * Creates the TypeSpec-generated REST FS Service client.
+     * This replaces the custom RestFsClient implementation.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public RestFsServiceClient restFsServiceClient() {
+        return new RestFsServiceClientBuilder()
+                .endpoint(fsApiUrl)
+                .buildClient();
     }
 }

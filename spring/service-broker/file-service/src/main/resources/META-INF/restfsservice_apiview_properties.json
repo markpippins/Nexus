@@ -1,0 +1,28 @@
+{
+  "flavor": "generic", 
+  "CrossLanguageDefinitionId": {
+    "restfsservice.FsItem": "restFsService.FsItem",
+    "restfsservice.FsItemReference": "restFsService.FsItemReference",
+    "restfsservice.FsItemReferenceType": "restFsService.FsItemReference.type.anonymous",
+    "restfsservice.FsListResponse": "restFsService.FsListResponse",
+    "restfsservice.FsOperationResponse": "restFsService.FsOperationResponse",
+    "restfsservice.FsRequest": "restFsService.FsRequest",
+    "restfsservice.HasFileResponse": "restFsService.hasFile.Response.anonymous",
+    "restfsservice.HasFolderResponse": "restFsService.hasFolder.Response.anonymous",
+    "restfsservice.RestFsServiceClient": "restFsService",
+    "restfsservice.RestFsServiceClientBuilder": "restFsService",
+    "restfsservice.implementation.ChangeDirectoryRequest": "restFsService.changeDirectory.Request.anonymous",
+    "restfsservice.implementation.CopyRequest": "restFsService.copy.Request.anonymous",
+    "restfsservice.implementation.CreateDirectoryRequest": "restFsService.createDirectory.Request.anonymous",
+    "restfsservice.implementation.CreateFileRequest": "restFsService.createFile.Request.anonymous",
+    "restfsservice.implementation.DeleteFileRequest": "restFsService.deleteFile.Request.anonymous",
+    "restfsservice.implementation.HasFileRequest": "restFsService.hasFile.Request.anonymous",
+    "restfsservice.implementation.HasFolderRequest": "restFsService.hasFolder.Request.anonymous",
+    "restfsservice.implementation.ListFilesRequest": "restFsService.listFiles.Request.anonymous",
+    "restfsservice.implementation.MoveItemsRequest": "restFsService.moveItems.Request.anonymous",
+    "restfsservice.implementation.MoveRequest": "restFsService.move.Request.anonymous",
+    "restfsservice.implementation.RemoveDirectoryRequest": "restFsService.removeDirectory.Request.anonymous",
+    "restfsservice.implementation.RenameItemRequest": "restFsService.renameItem.Request.anonymous",
+    "restfsservice.implementation.RenameRequest": "restFsService.rename.Request.anonymous"
+  }
+}

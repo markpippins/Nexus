@@ -6,15 +6,36 @@ import java.util.Map;
 import java.util.Objects;
 
 import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.NoArgsConstructor;
 
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class FsRequest {
 
+    /**
+     * Authentication token (UUID session token)
+     */
+    private String token;
+    
+    /**
+     * User alias for path scoping
+     */
     private String alias;
+    
     private List<String> path;
+    
+    /**
+     * Destination user alias for cross-user copy/move
+     */
     private String toAlias;
+    
+    /**
+     * Destination user token for cross-user copy/move
+     */
+    private String toToken;
+    
     private List<String> toPath;
     private String operation;
     private String filename;
@@ -27,7 +48,7 @@ public class FsRequest {
         userPath.add(alias);
         if (Objects.nonNull(path))
             userPath.addAll(path);
-        return userPath;        
+        return userPath;
     }
 
 
@@ -35,6 +56,14 @@ public class FsRequest {
         this.alias = alias;
         this.path = getUserPath(alias, path);
         this.operation = string;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public String getAlias() {
@@ -83,6 +112,14 @@ public class FsRequest {
 
     public void setToAlias(String toAlias) {
         this.toAlias = toAlias;
+    }
+
+    public String getToToken() {
+        return toToken;
+    }
+
+    public void setToToken(String toToken) {
+        this.toToken = toToken;
     }
 
     public List<String> getToPath() {
