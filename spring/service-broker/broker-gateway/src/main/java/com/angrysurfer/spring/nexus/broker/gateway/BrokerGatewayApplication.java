@@ -3,32 +3,29 @@ package com.angrysurfer.spring.nexus.broker.gateway;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
-
-import com.angrysurfer.spring.nexus.broker.BrokerController;
 
 @SpringBootApplication
 @EnableMongoRepositories(basePackages = {
-        "com.angrysurfer.nexus.broker",
-        "com.angrysurfer.nexus.user",
-        "com.angrysurfer.nexus.fs",
-        "com.angrysurfer.nexus.login",
-        "com.angrysurfer.nexus.note",
-        "com.angrysurfer.nexus.search",
-        "com.angrysurfer.nexus.registry",
-        "com.angrysurfer.nexus.admin.logging"
+        "com.angrysurfer.spring.nexus.broker",
+        "com.angrysurfer.spring.nexus.user",
+        "com.angrysurfer.spring.nexus.fs",
+        "com.angrysurfer.spring.nexus.login",
+        "com.angrysurfer.spring.nexus.note",
+        "com.angrysurfer.spring.nexus.search",
+        "com.angrysurfer.spring.nexus.registry",
+        "com.angrysurfer.spring.nexus.admin.logging"
 })
 @ComponentScan(basePackages = {
-        "com.angrysurfer.nexus.broker",
-        "com.angrysurfer.nexus.user",
-        "com.angrysurfer.nexus.fs",
-        "com.angrysurfer.nexus.login",
-        "com.angrysurfer.nexus.note",
-        "com.angrysurfer.nexus.search",
-        "com.angrysurfer.nexus.registry",
-        "com.angrysurfer.nexus.admin.logging"
-}, excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = BrokerController.class))
+        "com.angrysurfer.spring.nexus.broker",
+        "com.angrysurfer.spring.nexus.user",
+        "com.angrysurfer.spring.nexus.fs",
+        "com.angrysurfer.spring.nexus.login",
+        "com.angrysurfer.spring.nexus.note",
+        "com.angrysurfer.spring.nexus.search",
+        "com.angrysurfer.spring.nexus.registry",
+        "com.angrysurfer.spring.nexus.admin.logging"
+})
 public class BrokerGatewayApplication {
 
     public static void main(String[] args) {

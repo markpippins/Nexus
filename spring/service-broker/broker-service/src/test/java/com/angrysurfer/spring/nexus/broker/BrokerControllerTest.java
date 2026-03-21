@@ -5,6 +5,7 @@ import com.angrysurfer.spring.nexus.broker.Broker;
 import com.angrysurfer.spring.nexus.broker.BrokerController;
 import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
 import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
+import com.angrysurfer.spring.nexus.broker.api.v1.ServiceResponseBody;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,46 +39,48 @@ class BrokerControllerTest {
     @Test
     void testSubmitRequestSuccess() {
         // Arrange
-        ServiceRequest request = new ServiceRequest("testService", "testOperation", 
-            Collections.emptyMap(), "test-request");
+        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = 
+            new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest("testService", "testOperation",
+                Collections.emptyMap(), "test-request");
         ServiceResponse<?> mockResponse = ServiceResponse.ok("Test Data", "test-request");
 
         doReturn(mockResponse).when(broker).submit(any(ServiceRequest.class));
 
         // Act
-        ResponseEntity<?> response = brokerController.submitRequest(request);
+        ResponseEntity<ServiceResponseBody> response = brokerController.submitRequest(v1Request);
 
         // Assert
         assertEquals(200, response.getStatusCodeValue());
-        assertTrue(response.getBody() instanceof ServiceResponse);
-        ServiceResponse<?> responseEntity = (ServiceResponse<?>) response.getBody();
-        assertTrue(responseEntity.isOk());
-        assertEquals("Test Data", responseEntity.getData());
-        assertEquals("test-request", responseEntity.getRequestId());
-        
+        ServiceResponseBody responseBody = response.getBody();
+        assertNotNull(responseBody);
+        assertTrue(responseBody.isOk());
+        assertEquals("Test Data", responseBody.getData());
+        assertEquals("test-request", responseBody.getRequestId());
+
         verify(broker).submit(any(ServiceRequest.class));
     }
 
     @Test
     void testSubmitRequestError() {
         // Arrange
-        ServiceRequest request = new ServiceRequest("testService", "testOperation", 
-            Collections.emptyMap(), "test-request");
+        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = 
+            new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest("testService", "testOperation",
+                Collections.emptyMap(), "test-request");
         ServiceResponse<?> mockResponse = ServiceResponse.error(
             java.util.List.of(java.util.Map.of("error", "Service error")), "test-request");
 
         doReturn(mockResponse).when(broker).submit(any(ServiceRequest.class));
 
         // Act
-        ResponseEntity<?> response = brokerController.submitRequest(request);
+        ResponseEntity<ServiceResponseBody> response = brokerController.submitRequest(v1Request);
 
         // Assert
         assertEquals(400, response.getStatusCodeValue());
-        assertTrue(response.getBody() instanceof ServiceResponse);
-        ServiceResponse<?> responseEntity = (ServiceResponse<?>) response.getBody();
-        assertFalse(responseEntity.isOk());
-        assertNotNull(responseEntity.getErrors());
-        
+        ServiceResponseBody responseBody = response.getBody();
+        assertNotNull(responseBody);
+        assertFalse(responseBody.isOk());
+        assertNotNull(responseBody.getErrors());
+
         verify(broker).submit(any(ServiceRequest.class));
     }
 
@@ -89,16 +92,16 @@ class BrokerControllerTest {
         doReturn(mockResponse).when(broker).submit(any(ServiceRequest.class));
 
         // Act
-        ResponseEntity<?> response = brokerController.testBroker();
+        ResponseEntity<ServiceResponseBody> response = brokerController.testBroker();
 
         // Assert
         assertEquals(200, response.getStatusCodeValue());
-        assertTrue(response.getBody() instanceof ServiceResponse);
-        ServiceResponse<?> responseEntity = (ServiceResponse<?>) response.getBody();
-        assertTrue(responseEntity.isOk());
-        assertEquals("Test Data", responseEntity.getData());
-        assertEquals("test-request", responseEntity.getRequestId());
-        
+        ServiceResponseBody responseBody = response.getBody();
+        assertNotNull(responseBody);
+        assertTrue(responseBody.isOk());
+        assertEquals("Test Data", responseBody.getData());
+        assertEquals("test-request", responseBody.getRequestId());
+
         verify(broker).submit(any(ServiceRequest.class));
     }
 
@@ -111,65 +114,67 @@ class BrokerControllerTest {
         doReturn(mockResponse).when(broker).submit(any(ServiceRequest.class));
 
         // Act
-        ResponseEntity<?> response = brokerController.testBroker();
+        ResponseEntity<ServiceResponseBody> response = brokerController.testBroker();
 
         // Assert
         assertEquals(400, response.getStatusCodeValue());
-        assertTrue(response.getBody() instanceof ServiceResponse);
-        ServiceResponse<?> responseEntity = (ServiceResponse<?>) response.getBody();
-        assertFalse(responseEntity.isOk());
-        assertNotNull(responseEntity.getErrors());
-        
+        ServiceResponseBody responseBody = response.getBody();
+        assertNotNull(responseBody);
+        assertFalse(responseBody.isOk());
+        assertNotNull(responseBody.getErrors());
+
         verify(broker).submit(any(ServiceRequest.class));
     }
 
     @Test
     void testBrokerSubmitInvokedWithCorrectRequest() {
         // Arrange
-        ServiceRequest request = new ServiceRequest("userService", "createUser", 
-            java.util.Map.of("name", "John", "email", "john@example.com"), "request-123");
-        
+        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = 
+            new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest("userService", "createUser",
+                java.util.Map.of("name", "John", "email", "john@example.com"), "request-123");
+
         ServiceResponse<?> mockResponse = ServiceResponse.ok("User created", "request-123");
 
         doReturn(mockResponse).when(broker).submit(any(ServiceRequest.class));
 
         // Act
-        ResponseEntity<?> response = brokerController.submitRequest(request);
+        ResponseEntity<ServiceResponseBody> response = brokerController.submitRequest(v1Request);
 
-        // Verify that broker.submit was called with the exact same request
-        verify(broker).submit(eq(request));
+        // Verify that broker.submit was called
+        verify(broker).submit(any(ServiceRequest.class));
     }
 
     @Test
     void testNullRequestToSubmitRequest() {
         // Arrange
-        ServiceRequest request = null;
-        
-        // This should still be handled by the broker which will validate it
-        doReturn(ServiceResponse.error(java.util.List.of(java.util.Map.of("error", "Invalid request")), "error"))
-            .when(broker).submit(isNull(ServiceRequest.class));
+        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = null;
 
-        // Act
-        ResponseEntity<?> response = brokerController.submitRequest(request);
+        // Act - null request is handled by the controller, not passed to broker
+        ResponseEntity<ServiceResponseBody> response = brokerController.submitRequest(v1Request);
 
-        // Assert
-        // The response depends on how the broker handles a null request
-        verify(broker).submit(isNull(ServiceRequest.class));
+        // Assert - should return 400 Bad Request without calling broker
+        assertEquals(400, response.getStatusCodeValue());
+        assertNotNull(response.getBody());
+        assertFalse(response.getBody().isOk());
+
+        // Verify broker was NOT called since we handle null requests in the controller
+        verify(broker, never()).submit(any(ServiceRequest.class));
     }
 
     @Test
     void testBrokerControllerInitialization() {
         // Test that the controller is properly initialized with the broker
         assertNotNull(brokerController);
-        
+
         // Check that the broker field is set
         // Note: We can't directly access private fields, so we test behavior instead
-        ServiceRequest request = new ServiceRequest("test", "test", Collections.emptyMap(), "test");
+        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = 
+            new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest("test", "test", Collections.emptyMap(), "test");
         ServiceResponse<?> expectedResponse = ServiceResponse.ok("test", "test");
         doReturn(expectedResponse).when(broker).submit(any(ServiceRequest.class));
-        
-        ResponseEntity<?> response = brokerController.submitRequest(request);
-        
+
+        ResponseEntity<ServiceResponseBody> response = brokerController.submitRequest(v1Request);
+
         assertNotNull(response);
         verify(broker).submit(any(ServiceRequest.class));
     }

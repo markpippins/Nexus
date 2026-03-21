@@ -16,10 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.angrysurfer.spring.nexus.admin.logging.service.AdminLoggingService;
 import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
 import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
+import com.angrysurfer.spring.nexus.broker.api.v1.ServiceResponseBody;
 
 @CrossOrigin(originPatterns = "*", allowedHeaders = "*", allowCredentials = "true", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 @RestController
-@RequestMapping("/api/broker")
+@RequestMapping("/api/v1/broker")
 public class BrokerController {
 
     private static final Logger log = LoggerFactory.getLogger(BrokerController.class);
@@ -34,32 +35,50 @@ public class BrokerController {
     }
 
     @PostMapping(value = "/testBroker")
-    public ResponseEntity<?> testBroker() {
-        // log.debug("Received request: {}", request);
-
-        ServiceRequest request = new ServiceRequest("testBroker", "test",
+    public ResponseEntity<ServiceResponseBody> testBroker() {
+        // Create a legacy request for the test
+        ServiceRequest legacyRequest = new ServiceRequest("testBroker", "test",
                 Collections.emptyMap(), "test-request");
 
-        ServiceResponse<?> response = broker.submit(request);
+        ServiceResponse<?> legacyResponse = broker.submit(legacyRequest);
+
+        ServiceResponseBody response = ServiceResponseBody.fromLegacy(legacyResponse);
 
         if (response.isOk()) {
             return ResponseEntity.ok(response);
         } else {
-            // decide on HTTP code: validation errors = 400, not_found = 404, etc.
-            // simplest case: always return 400 for errors
             return ResponseEntity.badRequest().body(response);
         }
     }
 
     @PostMapping(value = "/submitRequest", consumes = {"application/json"})
-    public ResponseEntity<?> submitRequest(@RequestBody ServiceRequest request) {
-        log.debug("Received request: {}", request);
+    public ResponseEntity<ServiceResponseBody> submitRequest(
+            @RequestBody(required = false) com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request) {
+        log.debug("Received request: {}", v1Request);
+
+        // Handle null request
+        if (v1Request == null) {
+            ServiceResponse<?> legacyResponse = ServiceResponse.error(
+                java.util.List.of(java.util.Map.of("code", "invalid_request", "message", "Request body is null")), "null");
+            ServiceResponseBody response = ServiceResponseBody.fromLegacy(legacyResponse);
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Convert v1 request to legacy request for Broker processing
+        ServiceRequest legacyRequest = new ServiceRequest(
+                v1Request.getService(),
+                v1Request.getOperation(),
+                v1Request.getParams(),
+                v1Request.getRequestId());
+        if (v1Request.isEncrypt() != null) {
+            legacyRequest.setEncrypt(v1Request.isEncrypt());
+        }
 
         // Log the request before processing it
         UUID logId = null;
-        String userId = extractUserId(request); // Extract user ID or set to a default
+        String userId = extractUserId(v1Request);
         // try {
-        //     var logEntry = adminLoggingService.logRequest(request, userId);
+        //     var logEntry = adminLoggingService.logRequest(legacyRequest, userId);
         //     if (logEntry != null) {
         //         logId = logEntry.getId();
         //     }
@@ -67,35 +86,35 @@ public class BrokerController {
         //     log.error("Error logging request: {}", e.getMessage(), e);
         // }
 
-        ServiceResponse<?> response = broker.submit(request);
-        
+        ServiceResponse<?> legacyResponse = broker.submit(legacyRequest);
+
+        // Convert legacy response to v1 response
+        ServiceResponseBody response = ServiceResponseBody.fromLegacy(legacyResponse);
+
         // Update the log entry with success/failure status
         // if (logId != null) {
-        //     adminLoggingService.updateLogEntry(logId, response.isOk(), 
+        //     adminLoggingService.updateLogEntry(logId, response.isOk(),
         //         response.isOk() ? null : extractErrorMessage(response));
         // }
 
-        log.debug("returning: {}", response);
+        log.debug("Returning: {}", response);
 
         if (response.isOk()) {
             return ResponseEntity.ok(response);
         } else {
-            // decide on HTTP code: validation errors = 400, not_found = 404, etc.
-            // simplest case: always return 400 for errors
             return ResponseEntity.badRequest().body(response);
         }
     }
 
-    private String extractUserId(ServiceRequest request) {
+    private String extractUserId(com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest request) {
         // Extract userId from request. This could come from a header, or be extracted from security context
         // For now, using a default value, but in a real application, this would come from authentication
-        return "anonymous"; // Replace with actual user extraction logic
+        return "anonymous";
     }
 
-    private String extractErrorMessage(ServiceResponse<?> response) {
-        // Extract error message from response, assuming error details are stored in response
+    private String extractErrorMessage(ServiceResponseBody response) {
+        // Extract error message from response
         if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-            // Extract the first error message or return all errors as JSON
             return response.getErrors().toString();
         }
         return "Unknown error occurred";
