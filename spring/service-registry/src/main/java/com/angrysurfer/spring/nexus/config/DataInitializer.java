@@ -2,11 +2,9 @@ package com.angrysurfer.spring.nexus.config;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,8 +26,6 @@ import com.angrysurfer.spring.nexus.entity.LibraryCategory;
 import com.angrysurfer.spring.nexus.entity.OperatingSystem;
 import com.angrysurfer.spring.nexus.entity.ServerType;
 import com.angrysurfer.spring.nexus.entity.Service;
-import com.angrysurfer.spring.nexus.entity.ServiceConfiguration;
-import com.angrysurfer.spring.nexus.entity.ServiceDependency;
 import com.angrysurfer.spring.nexus.entity.ServiceType;
 import com.angrysurfer.spring.nexus.repository.DeploymentRepository;
 import com.angrysurfer.spring.nexus.repository.EnvironmentTypeRepository;

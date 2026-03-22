@@ -188,7 +188,7 @@ export class CreateUserComponent {
     const userData = { email, alias, identifier };
 
     try {
-      const brokerUrl = targetProfile.brokerUrl || 'http://localhost:8080/api/broker';
+      const brokerUrl = targetProfile.brokerUrl || 'http://localhost:8080/api/v1/broker';
 
       // We don't have snackbar anymore (removed Material), so we might want to emit an event 
       // or use a different toast service. 

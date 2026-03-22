@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,14 +28,17 @@ public class RegistryControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(RegistryControllerV0.class);
 
-    @Autowired
-    private ExternalServiceRegistrationService registrationService;
+    private final ExternalServiceRegistrationService registrationService;
+    private final ServiceStatusCacheService cacheService;
+    private final ServiceRepository serviceRepository;
 
-    @Autowired
-    private ServiceStatusCacheService cacheService;
-
-    @Autowired
-    private ServiceRepository serviceRepository;
+    public RegistryControllerV0(ExternalServiceRegistrationService registrationService,
+                                ServiceStatusCacheService cacheService,
+                                ServiceRepository serviceRepository) {
+        this.registrationService = registrationService;
+        this.cacheService = cacheService;
+        this.serviceRepository = serviceRepository;
+    }
 
     /**
      * Register an external service (e.g., Moleculer, Python, Go services)

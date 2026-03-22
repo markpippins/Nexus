@@ -27,7 +27,7 @@ export class LoginService {
     if (fullUrl.endsWith('/')) {
       fullUrl = fullUrl.slice(0, -1);
     }
-    fullUrl += '/api/broker/submitRequest';
+    fullUrl += '/api/v1/broker/submitRequest';
     return fullUrl;
   }
 

@@ -4,7 +4,6 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -17,19 +16,14 @@ public class ServiceDiscoveryClientImpl implements ServiceDiscoveryClient {
     private static final Logger log = LoggerFactory.getLogger(ServiceDiscoveryClientImpl.class);
 
     @Value("${service.registry.url:http://localhost:8085}")
-    private String hostServerUrl;
+    private final String hostServerUrl;
 
-    @Autowired
-    private RestTemplate restTemplate;
+    private final RestTemplate restTemplate;
 
-    // For testing purposes
-    public void setRestTemplate(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
-
-    // For testing purposes
-    public void setServiceRegistryUrl(String hostServerUrl) {
+    public ServiceDiscoveryClientImpl(@Value("${service.registry.url:http://localhost:8085}") String hostServerUrl,
+                                      RestTemplate restTemplate) {
         this.hostServerUrl = hostServerUrl;
+        this.restTemplate = restTemplate;
     }
 
     @Override

@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,7 +23,7 @@ import com.angrysurfer.spring.nexus.service.ServiceBackendService;
 
 /**
  * REST API for managing service backend connections
- * 
+ *
  * Endpoints for the Angular admin console to:
  * - View backend connections for a deployment
  * - Add/remove backend connections
@@ -35,11 +34,14 @@ import com.angrysurfer.spring.nexus.service.ServiceBackendService;
 @RequestMapping("/api/v1/backends")
 @CrossOrigin(origins = "*")
 public class ServiceBackendController {
-    
+
     private static final Logger log = LoggerFactory.getLogger(ServiceBackendController.class);
-    
-    @Autowired
-    private ServiceBackendService serviceBackendService;
+
+    private final ServiceBackendService serviceBackendService;
+
+    public ServiceBackendController(ServiceBackendService serviceBackendService) {
+        this.serviceBackendService = serviceBackendService;
+    }
     
     /**
      * Get all backends for a specific deployment

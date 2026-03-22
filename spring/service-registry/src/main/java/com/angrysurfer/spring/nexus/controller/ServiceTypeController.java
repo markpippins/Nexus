@@ -5,7 +5,6 @@ import com.angrysurfer.spring.nexus.repository.ServiceTypeRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,8 +17,11 @@ public class ServiceTypeController {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceTypeController.class);
 
-    @Autowired
-    private ServiceTypeRepository repository;
+    private final ServiceTypeRepository repository;
+
+    public ServiceTypeController(ServiceTypeRepository repository) {
+        this.repository = repository;
+    }
 
     @GetMapping
     public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<ServiceType>> getAll(org.springframework.data.domain.Pageable pageable) {

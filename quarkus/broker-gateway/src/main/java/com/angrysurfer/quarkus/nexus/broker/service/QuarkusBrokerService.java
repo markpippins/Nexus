@@ -1,13 +1,13 @@
 package com.angrysurfer.quarkus.nexus.broker.service;
 
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.ws.rs.core.Response;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
 import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.core.Response;
 
 @ApplicationScoped
 public class QuarkusBrokerService implements IBrokerService {

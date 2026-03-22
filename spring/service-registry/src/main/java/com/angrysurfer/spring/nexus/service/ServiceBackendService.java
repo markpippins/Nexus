@@ -5,7 +5,6 @@ import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,14 +17,17 @@ import com.angrysurfer.spring.nexus.repository.ServiceBackendRepository;
 
 @Service
 public class ServiceBackendService {
-    
+
     private static final Logger log = LoggerFactory.getLogger(ServiceBackendService.class);
-    
-    @Autowired
-    private ServiceBackendRepository serviceBackendRepository;
-    
-    @Autowired
-    private DeploymentRepository deploymentRepository;
+
+    private final ServiceBackendRepository serviceBackendRepository;
+    private final DeploymentRepository deploymentRepository;
+
+    public ServiceBackendService(ServiceBackendRepository serviceBackendRepository,
+                                 DeploymentRepository deploymentRepository) {
+        this.serviceBackendRepository = serviceBackendRepository;
+        this.deploymentRepository = deploymentRepository;
+    }
     
     /**
      * Get all backends for a deployment

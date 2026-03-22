@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,8 +27,11 @@ public class FrameworkLanguageControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(FrameworkLanguageControllerV0.class);
 
-    @Autowired
-    private FrameworkLanguageRepository repository;
+    private final FrameworkLanguageRepository repository;
+
+    public FrameworkLanguageControllerV0(FrameworkLanguageRepository repository) {
+        this.repository = repository;
+    }
 
     @GetMapping
     @Deprecated(since = "v1", forRemoval = true)

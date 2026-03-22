@@ -1,11 +1,10 @@
 package com.angrysurfer.spring.nexus.user.model;
 
-import com.angrysurfer.nexus.user.UserRegistrationDTO;
-import com.angrysurfer.spring.nexus.user.model.UserRegistration;
+import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 
 class UserRegistrationModelTest {
 

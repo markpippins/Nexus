@@ -1,0 +1,15 @@
+services:
+  fs-crawler-adapter:
+    build: .
+    ports:
+      - "8001:8001"
+    environment:
+      - FS_CRAWLER_URL=http://localhost:8000 # You'll need to run fs-crawler separately
+      - HOST_SERVER_URL=http://localhost:8085 # You'll need to run service-registry separately
+      - ADAPTER_PORT=8001
+    networks:
+      - atomic-network
+
+networks:
+  atomic-network:
+    driver: bridge

@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -28,8 +27,11 @@ public class ConfigurationControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigurationControllerV0.class);
 
-    @Autowired
-    private ServiceConfigurationRepository configurationRepository;
+    private final ServiceConfigurationRepository configurationRepository;
+
+    public ConfigurationControllerV0(ServiceConfigurationRepository configurationRepository) {
+        this.configurationRepository = configurationRepository;
+    }
 
     @GetMapping
     @Deprecated(since = "v1", forRemoval = true)

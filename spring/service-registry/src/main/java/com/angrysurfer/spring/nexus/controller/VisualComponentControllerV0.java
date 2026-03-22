@@ -2,7 +2,6 @@ package com.angrysurfer.spring.nexus.controller;
 
 import com.angrysurfer.spring.nexus.entity.VisualComponent;
 import com.angrysurfer.spring.nexus.repository.VisualComponentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -13,8 +12,11 @@ import java.util.List;
 @Deprecated(since = "v1", forRemoval = true)
 public class VisualComponentControllerV0 {
 
-    @Autowired
-    private VisualComponentRepository repository;
+    private final VisualComponentRepository repository;
+
+    public VisualComponentControllerV0(VisualComponentRepository repository) {
+        this.repository = repository;
+    }
 
     @GetMapping
     @Deprecated(since = "v1", forRemoval = true)

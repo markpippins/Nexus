@@ -16,7 +16,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -40,12 +39,8 @@ public class Broker {
     private final ApplicationContext ctx;
     private final ObjectMapper objectMapper;
     private final Validator validator;
-
-    @Autowired(required = false)
-    private ServiceDiscoveryClient serviceDiscoveryClient;
-
-    @Autowired(required = false)
-    private ExternalServiceInvoker externalServiceInvoker;
+    private final ServiceDiscoveryClient serviceDiscoveryClient;
+    private final ExternalServiceInvoker externalServiceInvoker;
 
     private record MethodKey(String service, String operation) {
 
@@ -53,10 +48,14 @@ public class Broker {
 
     private final Map<MethodKey, Method> methodCache = new ConcurrentHashMap<>();
 
-    public Broker(ApplicationContext ctx, ObjectMapper objectMapper, Validator validator) {
+    public Broker(ApplicationContext ctx, ObjectMapper objectMapper, Validator validator,
+                  ServiceDiscoveryClient serviceDiscoveryClient,
+                  ExternalServiceInvoker externalServiceInvoker) {
         this.ctx = ctx;
         this.objectMapper = objectMapper;
         this.validator = validator;
+        this.serviceDiscoveryClient = serviceDiscoveryClient;
+        this.externalServiceInvoker = externalServiceInvoker;
         log.info("ServiceBroker initialized");
     }
 

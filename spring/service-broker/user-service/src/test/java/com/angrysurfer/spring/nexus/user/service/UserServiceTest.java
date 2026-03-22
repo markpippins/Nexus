@@ -1,10 +1,13 @@
 package com.angrysurfer.spring.nexus.user.service;
 
-import com.angrysurfer.spring.nexus.user.ResourceNotFoundException;
-import com.angrysurfer.spring.nexus.user.User;
-import com.angrysurfer.spring.nexus.user.UserDTO;
-import com.angrysurfer.spring.nexus.user.UserRepository;
-import com.angrysurfer.spring.nexus.user.UserService;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,16 +16,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import com.angrysurfer.spring.nexus.user.ResourceNotFoundException;
+import com.angrysurfer.spring.nexus.user.User;
+import com.angrysurfer.spring.nexus.user.UserDTO;
+import com.angrysurfer.spring.nexus.user.UserRepository;
+import com.angrysurfer.spring.nexus.user.UserService;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {

@@ -3,7 +3,6 @@ package com.angrysurfer.spring.nexus.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -26,8 +25,11 @@ public class ConfigurationController {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigurationController.class);
 
-    @Autowired
-    private ServiceConfigurationRepository configurationRepository;
+    private final ServiceConfigurationRepository configurationRepository;
+
+    public ConfigurationController(ServiceConfigurationRepository configurationRepository) {
+        this.configurationRepository = configurationRepository;
+    }
 
     @GetMapping
     public ResponseEntity<?> getConfigurations(

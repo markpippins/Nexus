@@ -829,7 +829,7 @@ export class PlatformManagementComponent {
         try {
             switch (actualType) {
                 case 'services':
-                    console.log('[PlatformManagement] Fetching services from', `${url}/api/services`);
+                    console.log('[PlatformManagement] Fetching services from', `${url}/api/v1/services`);
                     const s = await this.platformService.getServices(url);
                     console.log('[PlatformManagement] Services loaded', s.length);
                     this.rawServices.set(s);

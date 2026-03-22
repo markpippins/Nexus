@@ -32,9 +32,7 @@ class ExternalServiceInvokerTest {
 
     @BeforeEach
     void setUp() {
-        serviceInvoker = new ExternalServiceInvokerImpl();
-        serviceInvoker.setDiscoveryClient(discoveryClient);
-        serviceInvoker.setRestTemplate(restTemplate);
+        serviceInvoker = new ExternalServiceInvokerImpl(discoveryClient, restTemplate);
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.angrysurfer.spring.nexus.user.service;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import java.util.Optional;
@@ -9,11 +8,9 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.angrysurfer.nexus.user.UserDTO;
 import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.user.model.UserRegistration;
 import com.angrysurfer.spring.nexus.user.repository.UserRegistrationRepository;
-import com.angrysurfer.spring.nexus.user.service.UserAccessService;
 
 class UserRegistrationServiceTest {
 

@@ -26,9 +26,7 @@ class ServiceDiscoveryClientTest {
 
         @BeforeEach
         void setUp() {
-                discoveryClient = new ServiceDiscoveryClientImpl();
-                discoveryClient.setRestTemplate(restTemplate);
-                discoveryClient.setServiceRegistryUrl("http://localhost:8085");
+                discoveryClient = new ServiceDiscoveryClientImpl("http://localhost:8085", restTemplate);
         }
 
         @Test

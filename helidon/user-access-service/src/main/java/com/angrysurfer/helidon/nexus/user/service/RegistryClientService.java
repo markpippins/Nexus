@@ -126,7 +126,7 @@ public class RegistryClientService {
                 serviceName, endpoint, healthCheckUrl, servicePort);
 
         try {
-            Response response = httpClient.target(hostServerUrl + "/api/registry/register")
+            Response response = httpClient.target(hostServerUrl + "/api/v1/registry/register")
                     .request(MediaType.APPLICATION_JSON)
                     .post(Entity.json(registrationJson));
 
@@ -146,7 +146,7 @@ public class RegistryClientService {
      */
     private void sendHeartbeat() {
         try {
-            Response response = httpClient.target(hostServerUrl + "/api/registry/heartbeat/" + serviceName)
+            Response response = httpClient.target(hostServerUrl + "/api/v1/registry/heartbeat/" + serviceName)
                     .request(MediaType.APPLICATION_JSON)
                     .post(Entity.json("{}"));
 

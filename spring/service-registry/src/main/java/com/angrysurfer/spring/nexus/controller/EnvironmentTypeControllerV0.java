@@ -4,7 +4,6 @@ import com.angrysurfer.spring.nexus.entity.EnvironmentType;
 import com.angrysurfer.spring.nexus.repository.EnvironmentTypeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,8 +18,11 @@ public class EnvironmentTypeControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(EnvironmentTypeControllerV0.class);
 
-    @Autowired
-    private EnvironmentTypeRepository repository;
+    private final EnvironmentTypeRepository repository;
+
+    public EnvironmentTypeControllerV0(EnvironmentTypeRepository repository) {
+        this.repository = repository;
+    }
 
     @GetMapping
     @Deprecated(since = "v1", forRemoval = true)

@@ -1,0 +1,182 @@
+# User Service Implementation Details
+
+## Overview
+The user service is part of the Nexus platform microservices architecture. It provides user management functionality using MongoDB for document-based storage. The service exposes operations through the broker gateway using the `@BrokerOperation` annotation.
+
+## Service Architecture
+- **Service Name**: userService
+- **Technology Stack**: Spring Boot, MongoDB
+- **Communication**: Broker Gateway Interface
+- **Database**: MongoDB with native document approach
+
+## Available Operations through Broker Interface
+
+### User Management Operations
+
+#### 1. createUser
+- **Operation**: `createUser`
+- **Method**: `createUser(email, alias, identifier)`
+- **Description**: Creates a new user with the provided email, alias, and identifier (password).
+- **Parameters**:
+  - `email` (String): User's email address
+  - `alias` (String): User's alias/username 
+  - `identifier` (String): User's password
+- **Returns**: `UserDTO` with user details
+
+#### 2. findAll
+- **Operation**: `findAll`
+- **Method**: `findAll()`
+- **Description**: Retrieves all users in the system
+- **Parameters**: None
+- **Returns**: Set of `UserDTO` objects
+
+#### 3. findById
+- **Operation**: `findById`
+- **Method**: `findById(userId)`
+- **Description**: Retrieves a user by their unique ID
+- **Parameters**:
+  - `userId` (String): The MongoDB ObjectId of the user
+- **Returns**: `UserDTO` with user details
+- **Throws**: ResourceNotFoundException if user not found
+
+#### 4. findByAlias
+- **Operation**: `findByAlias`
+- **Method**: `findByAlias(alias)`
+- **Description**: Retrieves a user by their alias
+- **Parameters**:
+  - `alias` (String): The user's alias/username
+- **Returns**: `UserDTO` with user details
+- **Throws**: ResourceNotFoundException if user not found
+
+#### 5. findByEmail
+- **Operation**: `findByEmail`
+- **Method**: `findByEmail(email)`
+- **Description**: Retrieves a user by their email address
+- **Parameters**:
+  - `email` (String): The user's email
+- **Returns**: `UserDTO` with user details
+- **Throws**: ResourceNotFoundException if user not found
+
+#### 6. addUser
+- **Operation**: `addUser`
+- **Method**: `addUser(user)`
+- **Description**: Adds a new user using a UserDTO object
+- **Parameters**:
+  - `user` (UserDTO): User data transfer object containing user details
+- **Returns**: `UserDTO` with saved user details
+
+#### 7. save
+- **Operation**: `save`
+- **Method**: `save(user)`
+- **Description**: Saves or updates a user using a UserDTO object
+- **Parameters**:
+  - `user` (UserDTO): User data transfer object containing user details
+- **Returns**: `UserDTO` with saved user details
+
+#### 8. update
+- **Operation**: `update`
+- **Method**: `update(user)`
+- **Description**: Updates an existing user
+- **Parameters**:
+  - `user` (User): User entity with updated information
+- **Returns**: `UserDTO` with updated user details
+
+#### 9. getUser
+- **Operation**: `getUser`
+- **Method**: `getUser(id)`
+- **Description**: Retrieves a user by their ID (alias for findById)
+- **Parameters**:
+  - `id` (String): The MongoDB ObjectId of the user
+- **Returns**: `UserDTO` with user details
+- **Throws**: ResourceNotFoundException if user not found
+
+#### 10. saveUser
+- **Operation**: `saveUser`
+- **Method**: `saveUser(user)`
+- **Description**: Saves a user using a UserDTO object (alias for save)
+- **Parameters**:
+  - `user` (UserDTO): User data transfer object containing user details
+- **Returns**: `UserDTO` with saved user details
+
+#### 11. getUsers
+- **Operation**: `getUsers`
+- **Method**: `getUsers()`
+- **Description**: Retrieves all users (alias for findAll)
+- **Parameters**: None
+- **Returns**: Set of `UserDTO` objects
+
+#### 12. delete / deleteUser
+- **Operation**: `delete` or `deleteUser`
+- **Method**: `delete(userId)`
+- **Description**: Deletes a user by their ID
+- **Parameters**:
+  - `id` (String): The MongoDB ObjectId of the user
+- **Returns**: void
+
+## Data Models
+
+### User Entity
+- **Class**: `com.angrysurfer.nexus.user.model.User`
+- **Fields**:
+  - `id` (String): MongoDB ObjectId
+  - `identifier` (String): User identifier (password)
+  - `alias` (String): User alias/username
+  - `email` (String): User email address
+  - `avatarUrl` (String): URL to user's avatar image
+  - `profile` (Profile): User profile reference
+  - `followers` (Set<User>): Users who follow this user
+  - `following` (Set<User>): Users this user follows
+  - `friends` (Set<User>): Users who are friends with this user
+
+### UserDTO
+- **Class**: `com.angrysurfer.nexus.user.UserDTO`
+- **Fields**:
+  - `id` (String): MongoDB ObjectId as String
+  - `alias` (String): User alias/username
+  - `email` (String): User email address
+  - `identifier` (String): User identifier
+  - `avatarUrl` (String): URL to user's avatar image
+  - `followers` (Set<String>): Aliases of users who follow this user
+  - `following` (Set<String>): Aliases of users this user follows
+  - `friends` (Set<String>): Aliases of users who are friends with this user
+
+## Communication Protocol
+
+### ServiceRequest Structure
+- `service` (String): "userService"
+- `operation` (String): Operation name (e.g., "findById", "createUser")
+- `params` (Map<String, Object>): Operation parameters
+- `requestId` (String): Unique request identifier
+
+### ServiceResponse Structure
+- `ok` (boolean): Indicates if the operation was successful
+- `data` (T): Response data (e.g., UserDTO, Set<UserDTO>)
+- `errors` (List<Map<String, Object>>): List of errors if operation failed
+- `requestId` (String): Original request identifier
+- `ts` (Instant): Timestamp of response
+- `service` (String): Service name
+- `operation` (String): Operation name
+
+## Broker Gateway Integration
+
+The service integrates with the broker gateway through:
+1. `BrokerController` at `/api/broker/submitRequest` endpoint
+2. `@BrokerOperation` annotation on exposed methods
+3. `@BrokerParam` annotation for parameter binding
+
+## Example Usage
+
+To call a user service operation through the broker gateway:
+
+```
+POST /api/broker/submitRequest
+
+{
+  "service": "userService",
+  "operation": "findById",
+  "params": {
+    "userId": "507f1f77bcf86cd799439011"
+  },
+  "requestId": "req-12345"
+}
+```

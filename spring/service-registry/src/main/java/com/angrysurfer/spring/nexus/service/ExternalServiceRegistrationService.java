@@ -7,7 +7,6 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,17 +24,20 @@ public class ExternalServiceRegistrationService {
 
     private static final Logger log = LoggerFactory.getLogger(ExternalServiceRegistrationService.class);
 
-    @Autowired
-    private ServiceRepository serviceRepository;
+    private final ServiceRepository serviceRepository;
+    private final FrameworkRepository frameworkRepository;
+    private final ServiceTypeRepository serviceTypeRepository;
+    private final ServiceConfigurationRepository serviceConfigurationRepository;
 
-    @Autowired
-    private FrameworkRepository frameworkRepository;
-
-    @Autowired
-    private ServiceTypeRepository serviceTypeRepository;
-
-    @Autowired
-    private ServiceConfigurationRepository serviceConfigurationRepository;
+    public ExternalServiceRegistrationService(ServiceRepository serviceRepository,
+                                               FrameworkRepository frameworkRepository,
+                                               ServiceTypeRepository serviceTypeRepository,
+                                               ServiceConfigurationRepository serviceConfigurationRepository) {
+        this.serviceRepository = serviceRepository;
+        this.frameworkRepository = frameworkRepository;
+        this.serviceTypeRepository = serviceTypeRepository;
+        this.serviceConfigurationRepository = serviceConfigurationRepository;
+    }
 
     @Transactional
     public com.angrysurfer.spring.nexus.entity.Service registerExternalService(

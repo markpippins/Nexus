@@ -4,7 +4,6 @@ import com.angrysurfer.spring.nexus.entity.ServerType;
 import com.angrysurfer.spring.nexus.repository.ServerTypeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,8 +18,11 @@ public class ServerTypeControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ServerTypeControllerV0.class);
 
-    @Autowired
-    private ServerTypeRepository repository;
+    private final ServerTypeRepository repository;
+
+    public ServerTypeControllerV0(ServerTypeRepository repository) {
+        this.repository = repository;
+    }
 
     @GetMapping
     @Deprecated(since = "v1", forRemoval = true)

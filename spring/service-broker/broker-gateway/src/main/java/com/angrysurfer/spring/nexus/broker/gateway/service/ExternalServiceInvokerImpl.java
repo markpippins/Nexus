@@ -2,7 +2,6 @@ package com.angrysurfer.spring.nexus.broker.gateway.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -19,19 +18,12 @@ public class ExternalServiceInvokerImpl implements ExternalServiceInvoker {
 
     private static final Logger log = LoggerFactory.getLogger(ExternalServiceInvokerImpl.class);
 
-    @Autowired
-    private ServiceDiscoveryClient discoveryClient;
+    private final ServiceDiscoveryClient discoveryClient;
+    private final RestTemplate restTemplate;
 
-    @Autowired
-    private RestTemplate restTemplate;
-
-    // For testing purposes
-    public void setDiscoveryClient(ServiceDiscoveryClient discoveryClient) {
+    public ExternalServiceInvokerImpl(ServiceDiscoveryClient discoveryClient,
+                                      RestTemplate restTemplate) {
         this.discoveryClient = discoveryClient;
-    }
-
-    // For testing purposes
-    public void setRestTemplate(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 

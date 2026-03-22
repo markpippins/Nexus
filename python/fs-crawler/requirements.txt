@@ -1,0 +1,33 @@
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Database Drivers
+motor==3.3.2  # Async MongoDB
+pymongo==4.6.3  # Compatible version for motor 3.3.2
+redis==5.0.1
+sqlalchemy==2.0.23
+aiomysql==0.2.0
+cryptography==42.0.4  # Required for MySQL authentication
+
+# Data Validation & Serialization
+pydantic==2.8.2
+pydantic-settings==2.4.0
+
+# Media Processing Libraries
+mutagen==1.47.0  # Audio metadata
+Pillow==10.4.0   # Image processing
+ExifRead==3.0.0  # EXIF data
+python-magic==0.4.27  # File type detection
+
+# Video Processing (optional, can be heavy)
+# opencv-python-headless==4.8.1.78
+
+# Utilities
+aiofiles==23.2.1  # Async file operations
+python-multipart==0.0.6  # File uploads
+httpx==0.25.2  # HTTP client for testing
+
+# Development & Monitoring
+structlog==23.2.0  # Structured logging
+rich==13.7.0  # Pretty printing/logging

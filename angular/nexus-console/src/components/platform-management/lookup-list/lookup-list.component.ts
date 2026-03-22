@@ -54,7 +54,7 @@ import { LookupItem } from '../../../services/platform-management.service.js';
   `
 })
 export class LookupListComponent {
-  items = input.required<LookupItem[]>();
+  items = input<LookupItem[]>([]);
   type = input.required<string>();
 
   onEdit = output<LookupItem>();
@@ -64,7 +64,7 @@ export class LookupListComponent {
 
   sortedItems = computed(() => {
     const currentSort = this.sortState();
-    const data = this.items();
+    const data = this.items() ?? [];
 
     if (!currentSort.column) return data;
 

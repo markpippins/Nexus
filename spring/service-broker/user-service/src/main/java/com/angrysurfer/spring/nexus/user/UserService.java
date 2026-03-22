@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
-import com.angrysurfer.spring.nexus.user.UserDTO;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

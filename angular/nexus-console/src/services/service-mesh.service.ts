@@ -52,7 +52,7 @@ export class ServiceMeshService {
   private _isPolling = signal(false);
   private _lastUpdated = signal<Date | null>(null);
 
-  // NEW: Track service statuses from /api/status independently
+  // NEW: Track service statuses from /api/v1/status independently
   private _serviceStatuses = signal<Map<string, { healthStatus: HealthStatus; lastHealthCheck?: string }>>(new Map());
 
   // NEW: Track services with their hosted/embedded services
@@ -120,7 +120,7 @@ export class ServiceMeshService {
       healthyDeployments = deployments.filter(d => d.healthStatus === 'HEALTHY').length;
       unhealthyDeployments = deployments.filter(d => d.healthStatus === 'UNHEALTHY').length;
     }
-    // Otherwise, use service statuses from /api/status
+    // Otherwise, use service statuses from /api/v1/status
     else if (serviceStatuses.size > 0) {
       console.log('[ServiceMeshService] Using service statuses instead of deployments');
       const statusArray = Array.from(serviceStatuses.values());
@@ -234,7 +234,7 @@ export class ServiceMeshService {
     const baseUrl = this.getBaseUrl(profile);
 
     try {
-      await firstValueFrom(this.http.get(`${baseUrl}/api/frameworks`));
+      await firstValueFrom(this.http.get(`${baseUrl}/api/v1/frameworks`));
 
       const connection: ServiceMeshConnection = {
         profileId: profile.id,
@@ -409,9 +409,8 @@ export class ServiceMeshService {
 
   private async fetchFrameworks(baseUrl: string): Promise<Framework[]> {
     try {
-      return await firstValueFrom(
-        this.http.get<Framework[]>(`${baseUrl}/api/frameworks`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/frameworks`));
+      return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];
     }
@@ -419,11 +418,10 @@ export class ServiceMeshService {
 
   private async fetchServices(baseUrl: string): Promise<ServiceInstance[]> {
     try {
-      const services = await firstValueFrom(
-        this.http.get<ServiceInstance[]>(`${baseUrl}/api/services`)
-      );
-      console.log('[ServiceMeshService] Fetched services from /api/services:', services.length);
-      console.log('[ServiceMeshService] Service names from /api/services:', services.map(s => s.name));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/services`));
+      const services = Array.isArray(response) ? response : (response.data || []);
+      console.log('[ServiceMeshService] Fetched services from /api/v1/services:', services.length);
+      console.log('[ServiceMeshService] Service names from /api/v1/services:', services.map((s: any) => s.name));
       return services;
     } catch (error) {
       console.error('[ServiceMeshService] Error fetching services:', error);
@@ -437,9 +435,8 @@ export class ServiceMeshService {
    */
   private async fetchServicesWithHosted(baseUrl: string): Promise<ServiceWithHosted[]> {
     try {
-      const services = await firstValueFrom(
-        this.http.get<ServiceWithHosted[]>(`${baseUrl}/api/registry/services/with-hosted`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/registry/services/with-hosted`));
+      const services: ServiceWithHosted[] = Array.isArray(response) ? response : (response.data || []);
       console.log('[ServiceMeshService] Fetched services with hosted:', services.length);
       services.forEach(s => {
         if (s.hostedServices && s.hostedServices.length > 0) {
@@ -456,9 +453,8 @@ export class ServiceMeshService {
 
   private async fetchServers(baseUrl: string): Promise<Server[]> {
     try {
-      return await firstValueFrom(
-        this.http.get<Server[]>(`${baseUrl}/api/servers`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/servers`));
+      return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];
     }
@@ -466,9 +462,8 @@ export class ServiceMeshService {
 
   private async fetchDeployments(baseUrl: string): Promise<Deployment[]> {
     try {
-      const deployments = await firstValueFrom(
-        this.http.get<Deployment[]>(`${baseUrl}/api/deployments`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/deployments`));
+      const deployments: Deployment[] = Array.isArray(response) ? response : (response.data || []);
 
       console.log('[ServiceMeshService] Fetched deployments:', deployments.length);
       console.log('[ServiceMeshService] Sample deployment:', deployments[0]);
@@ -504,7 +499,7 @@ export class ServiceMeshService {
   }
 
   /**
-   * Fetch real-time service statuses from the /api/status endpoint.
+   * Fetch real-time service statuses from the /api/v1/status endpoint.
    * Returns a map of service name to status info.
    */
   private async fetchServiceStatuses(baseUrl: string): Promise<Map<string, { healthStatus: HealthStatus; lastHealthCheck?: string }>> {
@@ -517,12 +512,11 @@ export class ServiceMeshService {
         lastHeartbeat?: string;
       }
 
-      const statuses = await firstValueFrom(
-        this.http.get<ServiceStatusResponse[]>(`${baseUrl}/api/status`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/status`));
+      const statuses: ServiceStatusResponse[] = Array.isArray(response) ? response : (response.data || []);
 
-      console.log('[ServiceMeshService] Raw /api/status response:', statuses);
-      console.log('[ServiceMeshService] Service names from /api/status:', statuses.map(s => s.serviceName));
+      console.log('[ServiceMeshService] Raw /api/v1/status response:', statuses);
+      console.log('[ServiceMeshService] Service names from /api/v1/status:', statuses.map(s => s.serviceName));
 
       const statusMap = new Map<string, { healthStatus: HealthStatus; lastHealthCheck?: string }>();
 
@@ -564,9 +558,8 @@ export class ServiceMeshService {
 
   private async fetchDependencies(baseUrl: string): Promise<ServiceDependency[]> {
     try {
-      return await firstValueFrom(
-        this.http.get<ServiceDependency[]>(`${baseUrl}/api/dependencies`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/dependencies`));
+      return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];
     }
@@ -605,7 +598,7 @@ export class ServiceMeshService {
   async getServiceById(serviceId: string, baseUrl: string): Promise<ServiceInstance | null> {
     try {
       return await firstValueFrom(
-        this.http.get<ServiceInstance>(`${baseUrl}/api/services/${serviceId}`)
+        this.http.get<ServiceInstance>(`${baseUrl}/api/v1/services/${serviceId}`)
       );
     } catch {
       return null;
@@ -614,9 +607,8 @@ export class ServiceMeshService {
 
   async getServiceDependencies(serviceId: string, baseUrl: string): Promise<ServiceInstance[]> {
     try {
-      return await firstValueFrom(
-        this.http.get<ServiceInstance[]>(`${baseUrl}/api/services/${serviceId}/dependencies`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/services/${serviceId}/dependencies`));
+      return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];
     }
@@ -624,9 +616,8 @@ export class ServiceMeshService {
 
   async getServiceDependents(serviceId: string, baseUrl: string): Promise<ServiceInstance[]> {
     try {
-      return await firstValueFrom(
-        this.http.get<ServiceInstance[]>(`${baseUrl}/api/services/${serviceId}/dependents`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/services/${serviceId}/dependents`));
+      return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];
     }
@@ -634,9 +625,8 @@ export class ServiceMeshService {
 
   async getServiceConfigurations(serviceId: string, baseUrl: string): Promise<ServiceConfiguration[]> {
     try {
-      return await firstValueFrom(
-        this.http.get<ServiceConfiguration[]>(`${baseUrl}/api/configurations/service/${serviceId}`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/configurations/service/${serviceId}`));
+      return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];
     }
@@ -644,9 +634,8 @@ export class ServiceMeshService {
 
   async getDeploymentsForService(serviceId: string, baseUrl: string): Promise<Deployment[]> {
     try {
-      return await firstValueFrom(
-        this.http.get<Deployment[]>(`${baseUrl}/api/deployments/service/${serviceId}`)
-      );
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/deployments/service/${serviceId}`));
+      return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];
     }
@@ -665,36 +654,36 @@ export class ServiceMeshService {
       switch (operation) {
         case 'start':
           response = await firstValueFrom(
-            this.http.post(`${baseUrl}/api/deployments/${deploymentId}/start`, params ?? {})
+            this.http.post(`${baseUrl}/api/v1/deployments/${deploymentId}/start`, params ?? {})
           );
           break;
         case 'stop':
           response = await firstValueFrom(
-            this.http.post(`${baseUrl}/api/deployments/${deploymentId}/stop`, params ?? {})
+            this.http.post(`${baseUrl}/api/v1/deployments/${deploymentId}/stop`, params ?? {})
           );
           break;
         case 'restart':
           await firstValueFrom(
-            this.http.post(`${baseUrl}/api/deployments/${deploymentId}/stop`, {})
+            this.http.post(`${baseUrl}/api/v1/deployments/${deploymentId}/stop`, {})
           );
           response = await firstValueFrom(
-            this.http.post(`${baseUrl}/api/deployments/${deploymentId}/start`, {})
+            this.http.post(`${baseUrl}/api/v1/deployments/${deploymentId}/start`, {})
           );
           break;
         case 'health-check':
           response = await firstValueFrom(
-            this.http.get(`${baseUrl}/api/deployments/${deploymentId}`)
+            this.http.get(`${baseUrl}/api/v1/deployments/${deploymentId}`)
           );
           break;
         case 'view-logs':
           // For view-logs, we'll return a placeholder URL or info
           // In a real implementation, this would fetch actual logs
-          response = { logsUrl: `${baseUrl}/api/deployments/${deploymentId}/logs` };
+          response = { logsUrl: `${baseUrl}/api/v1/deployments/${deploymentId}/logs` };
           break;
         case 'view-config':
           // For view-config, fetch configuration
           response = await firstValueFrom(
-            this.http.get(`${baseUrl}/api/configurations/deployment/${deploymentId}`)
+            this.http.get(`${baseUrl}/api/v1/configurations/deployment/${deploymentId}`)
           );
           break;
         default:
@@ -796,7 +785,7 @@ export class ServiceMeshService {
     try {
       await firstValueFrom(
         this.http.post(
-          `${baseUrl}/api/deployments/${deploymentId}/health`,
+          `${baseUrl}/api/v1/deployments/${deploymentId}/health`,
           null,
           { params: { healthStatus } }
         )

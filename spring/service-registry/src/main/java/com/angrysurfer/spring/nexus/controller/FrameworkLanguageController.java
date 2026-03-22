@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,8 +26,11 @@ public class FrameworkLanguageController {
 
     private static final Logger log = LoggerFactory.getLogger(FrameworkLanguageController.class);
 
-    @Autowired
-    private FrameworkLanguageRepository repository;
+    private final FrameworkLanguageRepository repository;
+
+    public FrameworkLanguageController(FrameworkLanguageRepository repository) {
+        this.repository = repository;
+    }
 
     @GetMapping
     public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<FrameworkLanguage>> getAll(org.springframework.data.domain.Pageable pageable) {

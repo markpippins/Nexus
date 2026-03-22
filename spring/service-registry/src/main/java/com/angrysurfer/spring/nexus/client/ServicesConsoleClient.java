@@ -30,7 +30,6 @@ public class ServicesConsoleClient {
     private final FrameworkLanguageRepository languageRepository;
     private final ServiceTypeRepository serviceTypeRepository;
     private final ServerTypeRepository serverTypeRepository;
-    private final EnvironmentTypeRepository environmentTypeRepository;
     private final HostRepository hostRepository;
     private final DeploymentRepository deploymentRepository;
     private final ServiceConfigurationRepository serviceConfigurationRepository;
@@ -43,7 +42,6 @@ public class ServicesConsoleClient {
             FrameworkLanguageRepository languageRepository,
             ServiceTypeRepository serviceTypeRepository,
             ServerTypeRepository serverTypeRepository,
-            EnvironmentTypeRepository environmentTypeRepository,
             HostRepository hostRepository,
             DeploymentRepository deploymentRepository,
             ServiceConfigurationRepository serviceConfigurationRepository,
@@ -54,7 +52,6 @@ public class ServicesConsoleClient {
         this.languageRepository = languageRepository;
         this.serviceTypeRepository = serviceTypeRepository;
         this.serverTypeRepository = serverTypeRepository;
-        this.environmentTypeRepository = environmentTypeRepository;
         this.hostRepository = hostRepository;
         this.deploymentRepository = deploymentRepository;
         this.serviceConfigurationRepository = serviceConfigurationRepository;

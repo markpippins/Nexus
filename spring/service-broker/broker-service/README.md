@@ -1,6 +1,6 @@
 # Broker Service
 
-The core service brokering module that handles the routing and processing of requests to appropriate backend services in the Nucleus system.
+The core service brokering module that handles the routing and processing of requests to appropriate backend services in the Nexus system.
 
 ## Overview
 

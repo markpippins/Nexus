@@ -5,8 +5,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import com.angrysurfer.spring.nexus.user.UserDTO;
-
 /**
  * Tests for simplified UserDTO.
  * Note: Social media fields (followers, following, friends, etc.) removed - deprecated.

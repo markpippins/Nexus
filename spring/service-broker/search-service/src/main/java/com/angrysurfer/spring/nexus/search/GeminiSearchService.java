@@ -34,7 +34,6 @@ public class GeminiSearchService {
 
     private static final long CACHE_TTL_MINUTES = 30; // Cache TTL in minutes
 
-    @Autowired
     public GeminiSearchService(RestTemplate restTemplate, SearchResultsCacheRepository cacheRepository) {
         this.restTemplate = restTemplate;
         this.cacheRepository = cacheRepository;

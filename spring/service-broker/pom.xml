@@ -9,7 +9,7 @@
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>Service Broker</name>
+    <name>Nexus Service Broker</name>
     <description>Nexus Service Broker</description>
 
     <modules>

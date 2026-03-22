@@ -107,7 +107,7 @@ public class ServiceRegistryRegistrationService {
             logger.fine("Registration payload: " + jsonPayload);
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(hostServerUrl + "/api/registry/register"))
+                    .uri(URI.create(hostServerUrl + "/api/v1/registry/register"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .timeout(Duration.ofSeconds(10))
@@ -136,7 +136,7 @@ public class ServiceRegistryRegistrationService {
     private void sendHeartbeat() {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(hostServerUrl + "/api/registry/heartbeat/" + serviceName))
+                    .uri(URI.create(hostServerUrl + "/api/v1/registry/heartbeat/" + serviceName))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("{}"))
                     .timeout(Duration.ofSeconds(10))

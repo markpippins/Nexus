@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ServiceInstance, Framework, Deployment, Library, ServiceLibrary } from '../models/service-mesh.model.js';
 import { ComponentConfig } from '../models/component-config.js';
+import { PagedResponse } from '../models/paged-response.model.js';
 
 export interface Host {
     id: number;
@@ -96,8 +97,9 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/services`;
-            return await firstValueFrom(this.http.get<ServiceInstance[]>(url));
+            const url = `${baseUrl}/api/v1/services`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<ServiceInstance>>(url));
+            return response.data;
         } catch (e) {
             this.error.set('Failed to fetch services');
             throw e;
@@ -110,7 +112,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/services`;
+            const url = `${baseUrl}/api/v1/services`;
             return await firstValueFrom(this.http.post<ServiceInstance>(url, service));
         } catch (e) {
             this.error.set('Failed to create service');
@@ -124,7 +126,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/services/${id}`;
+            const url = `${baseUrl}/api/v1/services/${id}`;
             return await firstValueFrom(this.http.put<ServiceInstance>(url, service));
         } catch (e) {
             this.error.set('Failed to update service');
@@ -138,7 +140,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/services/${id}`;
+            const url = `${baseUrl}/api/v1/services/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
             this.error.set('Failed to delete service');
@@ -152,8 +154,9 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/services/standalone`;
-            return await firstValueFrom(this.http.get<ServiceInstance[]>(url));
+            const url = `${baseUrl}/api/v1/services/standalone`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<ServiceInstance>>(url));
+            return response.data;
         } catch (e) {
             this.error.set('Failed to fetch standalone services');
             throw e;
@@ -167,8 +170,9 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/frameworks`;
-            return await firstValueFrom(this.http.get<Framework[]>(url));
+            const url = `${baseUrl}/api/v1/frameworks`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<Framework>>(url));
+            return response.data;
         } catch (e) {
             this.error.set('Failed to fetch frameworks');
             throw e;
@@ -181,7 +185,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/frameworks`;
+            const url = `${baseUrl}/api/v1/frameworks`;
             return await firstValueFrom(this.http.post<Framework>(url, framework));
         } catch (e) {
             this.error.set('Failed to create framework');
@@ -195,7 +199,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/frameworks/${id}`;
+            const url = `${baseUrl}/api/v1/frameworks/${id}`;
             return await firstValueFrom(this.http.put<Framework>(url, framework));
         } catch (e) {
             this.error.set('Failed to update framework');
@@ -209,7 +213,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/frameworks/${id}`;
+            const url = `${baseUrl}/api/v1/frameworks/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
             this.error.set('Failed to delete framework');
@@ -224,8 +228,9 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/deployments`;
-            return await firstValueFrom(this.http.get<Deployment[]>(url));
+            const url = `${baseUrl}/api/v1/deployments`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<Deployment>>(url));
+            return response.data;
         } catch (e) {
             this.error.set('Failed to fetch deployments');
             throw e;
@@ -238,7 +243,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/deployments`;
+            const url = `${baseUrl}/api/v1/deployments`;
             return await firstValueFrom(this.http.post<Deployment>(url, deployment));
         } catch (e) {
             this.error.set('Failed to create deployment');
@@ -252,7 +257,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/deployments/${id}`;
+            const url = `${baseUrl}/api/v1/deployments/${id}`;
             return await firstValueFrom(this.http.put<Deployment>(url, deployment));
         } catch (e) {
             this.error.set('Failed to update deployment');
@@ -266,7 +271,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/deployments/${id}`;
+            const url = `${baseUrl}/api/v1/deployments/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
             this.error.set('Failed to delete deployment');
@@ -281,8 +286,9 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/servers`;
-            return await firstValueFrom(this.http.get<Host[]>(url));
+            const url = `${baseUrl}/api/v1/servers`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<Host>>(url));
+            return response.data;
         } catch (e) {
             this.error.set('Failed to fetch servers');
             throw e;
@@ -295,7 +301,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/servers`;
+            const url = `${baseUrl}/api/v1/servers`;
             return await firstValueFrom(this.http.post<Host>(url, server));
         } catch (e) {
             this.error.set('Failed to create server');
@@ -309,7 +315,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/servers/${id}`;
+            const url = `${baseUrl}/api/v1/servers/${id}`;
             return await firstValueFrom(this.http.put<Host>(url, server));
         } catch (e) {
             this.error.set('Failed to update server');
@@ -323,7 +329,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/servers/${id}`;
+            const url = `${baseUrl}/api/v1/servers/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
             this.error.set('Failed to delete server');
@@ -346,8 +352,9 @@ export class PlatformManagementService {
         else if (type === 'environments') endpoint = 'environments';
 
         try {
-            const url = `${baseUrl}/api/${endpoint}`;
-            return await firstValueFrom(this.http.get<LookupItem[]>(url));
+            const url = `${baseUrl}/api/v1/${endpoint}`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<LookupItem>>(url));
+            return response.data;
         } catch (e) {
             console.error(`Failed to fetch lookup ${type}`, e);
             throw e;
@@ -360,7 +367,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/${endpoint}`;
+            const url = `${baseUrl}/api/v1/${endpoint}`;
             return await firstValueFrom(this.http.post<LookupItem>(url, item));
         } catch (e) {
             this.error.set(`Failed to create ${type}`);
@@ -375,7 +382,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/${endpoint}/${id}`;
+            const url = `${baseUrl}/api/v1/${endpoint}/${id}`;
             return await firstValueFrom(this.http.put<LookupItem>(url, item));
         } catch (e) {
             this.error.set(`Failed to update ${type}`);
@@ -390,7 +397,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/${endpoint}/${id}`;
+            const url = `${baseUrl}/api/v1/${endpoint}/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
             this.error.set(`Failed to delete ${type}`);
@@ -418,8 +425,9 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/libraries`;
-            return await firstValueFrom(this.http.get<Library[]>(url));
+            const url = `${baseUrl}/api/v1/libraries`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<Library>>(url));
+            return response.data;
         } catch (e) {
             this.error.set('Failed to fetch libraries');
             throw e;
@@ -430,7 +438,7 @@ export class PlatformManagementService {
 
     async getLibraryById(baseUrl: string, id: number): Promise<Library> {
         try {
-            const url = `${baseUrl}/api/libraries/${id}`;
+            const url = `${baseUrl}/api/v1/libraries/${id}`;
             return await firstValueFrom(this.http.get<Library>(url));
         } catch (e) {
             this.error.set('Failed to fetch library');
@@ -442,7 +450,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/libraries`;
+            const url = `${baseUrl}/api/v1/libraries`;
             return await firstValueFrom(this.http.post<Library>(url, library));
         } catch (e) {
             this.error.set('Failed to create library');
@@ -456,7 +464,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/libraries/${id}`;
+            const url = `${baseUrl}/api/v1/libraries/${id}`;
             return await firstValueFrom(this.http.put<Library>(url, library));
         } catch (e) {
             this.error.set('Failed to update library');
@@ -470,7 +478,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/libraries/${id}`;
+            const url = `${baseUrl}/api/v1/libraries/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
             this.error.set('Failed to delete library');
@@ -483,8 +491,9 @@ export class PlatformManagementService {
     // Service Libraries (Dependencies) CRUD
     async getServiceLibraries(baseUrl: string, serviceId: number): Promise<ServiceLibrary[]> {
         try {
-            const url = `${baseUrl}/api/service-libraries/service/${serviceId}`;
-            return await firstValueFrom(this.http.get<ServiceLibrary[]>(url));
+            const url = `${baseUrl}/api/v1/service-libraries/service/${serviceId}`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<ServiceLibrary>>(url));
+            return response.data;
         } catch (e) {
             this.error.set('Failed to fetch service libraries');
             throw e;
@@ -495,7 +504,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/service-libraries`;
+            const url = `${baseUrl}/api/v1/service-libraries`;
             return await firstValueFrom(this.http.post<ServiceLibrary>(url, payload));
         } catch (e) {
             this.error.set('Failed to add library to service');
@@ -509,7 +518,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/service-libraries/${id}`;
+            const url = `${baseUrl}/api/v1/service-libraries/${id}`;
             return await firstValueFrom(this.http.put<ServiceLibrary>(url, payload));
         } catch (e) {
             this.error.set('Failed to update service library');
@@ -523,7 +532,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/service-libraries/${id}`;
+            const url = `${baseUrl}/api/v1/service-libraries/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
             this.error.set('Failed to remove library from service');
@@ -535,8 +544,9 @@ export class PlatformManagementService {
     // Visual Components CRUD
     async getVisualComponents(baseUrl: string): Promise<ComponentConfig[]> {
         try {
-            const url = `${baseUrl}/api/visual-components`;
-            return await firstValueFrom(this.http.get<ComponentConfig[]>(url));
+            const url = `${baseUrl}/api/v1/visual-components`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<ComponentConfig>>(url));
+            return response.data;
         } catch (e) {
             console.error('Failed to fetch visual components', e);
             return [];
@@ -546,7 +556,7 @@ export class PlatformManagementService {
     async createVisualComponent(baseUrl: string, component: Partial<ComponentConfig>): Promise<ComponentConfig> {
         this.loading.set(true);
         try {
-            const url = `${baseUrl}/api/visual-components`;
+            const url = `${baseUrl}/api/v1/visual-components`;
             return await firstValueFrom(this.http.post<ComponentConfig>(url, component));
         } finally {
             this.loading.set(false);
@@ -556,7 +566,7 @@ export class PlatformManagementService {
     async updateVisualComponent(baseUrl: string, id: string, component: Partial<ComponentConfig>): Promise<ComponentConfig> {
         this.loading.set(true);
         try {
-            const url = `${baseUrl}/api/visual-components/${id}`;
+            const url = `${baseUrl}/api/v1/visual-components/${id}`;
             return await firstValueFrom(this.http.put<ComponentConfig>(url, component));
         } finally {
             this.loading.set(false);
@@ -566,7 +576,7 @@ export class PlatformManagementService {
     async deleteVisualComponent(baseUrl: string, id: string): Promise<void> {
         this.loading.set(true);
         try {
-            const url = `${baseUrl}/api/visual-components/${id}`;
+            const url = `${baseUrl}/api/v1/visual-components/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } finally {
             this.loading.set(false);

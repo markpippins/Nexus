@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -40,8 +39,11 @@ public class ServiceBackendControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceBackendControllerV0.class);
 
-    @Autowired
-    private ServiceBackendService serviceBackendService;
+    private final ServiceBackendService serviceBackendService;
+
+    public ServiceBackendControllerV0(ServiceBackendService serviceBackendService) {
+        this.serviceBackendService = serviceBackendService;
+    }
 
     /**
      * Get all backends for a specific deployment

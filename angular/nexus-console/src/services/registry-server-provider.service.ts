@@ -174,7 +174,7 @@ export class RegistryServerProvider implements TreeProvider {
                     icon: 'cloud_upload',
                     hasChildren: false,
                     operations: ['manage-deployments'],
-                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/deployments`, managementType: 'deployments' },
+                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/deployments`, managementType: 'deployments' },
                     lastUpdated: new Date()
                 },
                 {
@@ -184,7 +184,7 @@ export class RegistryServerProvider implements TreeProvider {
                     icon: 'storage',
                     hasChildren: false,
                     operations: ['manage-servers'],
-                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/servers`, managementType: 'servers' },
+                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/servers`, managementType: 'servers' },
                     lastUpdated: new Date()
                 },
                 {
@@ -194,7 +194,7 @@ export class RegistryServerProvider implements TreeProvider {
                     icon: 'dns',
                     hasChildren: false,
                     operations: ['manage-services'],
-                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/services`, managementType: 'services' },
+                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/services`, managementType: 'services' },
                     lastUpdated: new Date()
                 },
                 {
@@ -204,7 +204,7 @@ export class RegistryServerProvider implements TreeProvider {
                     icon: 'monitor_heart',
                     hasChildren: false,
                     operations: ['check-health'],
-                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/platform/health` },
+                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/platform/health` },
                     lastUpdated: new Date()
                 },
                 {
@@ -249,10 +249,11 @@ export class RegistryServerProvider implements TreeProvider {
         try {
             // For now, let's assume an endpoint exists or returns empty
             const baseUrl = this.getBaseUrl(profile);
-            const usersUrl = `${baseUrl}/api/users`;
+            const usersUrl = `${baseUrl}/api/v1/users`;
             // Attempt to fetch, fallback to placeholder if it fails (as it might not exist yet)
             try {
-                const users = await firstValueFrom(this.http.get<any[]>(usersUrl));
+                const response = await firstValueFrom(this.http.get<any>(usersUrl));
+                const users: any[] = Array.isArray(response) ? response : (response.data || []);
                 return users.map(user => ({
                     id: `user-${profile.id}-${user.id || user.alias}`,
                     name: user.alias || user.name,
@@ -313,7 +314,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'cloud_upload',
                 hasChildren: false,
                 operations: ['manage-deployments'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/deployments`, managementType: 'deployments' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/deployments`, managementType: 'deployments' },
                 lastUpdated: new Date()
             },
             {
@@ -323,7 +324,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'storage',
                 hasChildren: false,
                 operations: ['manage-servers'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/servers`, managementType: 'servers' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/servers`, managementType: 'servers' },
                 lastUpdated: new Date()
             },
             {
@@ -333,7 +334,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'dns',
                 hasChildren: false,
                 operations: ['manage-services'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/services`, managementType: 'services' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/services`, managementType: 'services' },
                 lastUpdated: new Date()
             },
             {
@@ -343,7 +344,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'monitor_heart',
                 hasChildren: false,
                 operations: ['check-health'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/platform/health` },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/platform/health` },
                 lastUpdated: new Date()
             },
             {
@@ -369,7 +370,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'category',
                 hasChildren: false,
                 operations: ['manage-frameworks'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/frameworks`, managementType: 'frameworks' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/frameworks`, managementType: 'frameworks' },
                 lastUpdated: new Date()
             },
             {
@@ -379,7 +380,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'local_library',
                 hasChildren: false,
                 operations: ['manage-libraries'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/libraries`, managementType: 'libraries' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/libraries`, managementType: 'libraries' },
                 lastUpdated: new Date()
             },
             {
@@ -389,7 +390,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'dns',
                 hasChildren: false,
                 operations: ['manage-servicetypes'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/service-types`, managementType: 'service-types' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/service-types`, managementType: 'service-types' },
                 lastUpdated: new Date()
             },
             {
@@ -399,7 +400,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'storage',
                 hasChildren: false,
                 operations: ['manage-servertypes'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/server-types`, managementType: 'server-types' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/server-types`, managementType: 'server-types' },
                 lastUpdated: new Date()
             },
             {
@@ -409,7 +410,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'code',
                 hasChildren: false,
                 operations: ['manage-languages'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/framework-languages`, managementType: 'framework-languages' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/framework-languages`, managementType: 'framework-languages' },
                 lastUpdated: new Date()
             },
             {
@@ -419,7 +420,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'class',
                 hasChildren: false,
                 operations: ['manage-categories'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/framework-categories`, managementType: 'framework-categories' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/framework-categories`, managementType: 'framework-categories' },
                 lastUpdated: new Date()
             },
             {
@@ -429,7 +430,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'style',
                 hasChildren: false,
                 operations: ['manage-libcategories'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/library-categories`, managementType: 'library-categories' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/library-categories`, managementType: 'library-categories' },
                 lastUpdated: new Date()
             },
             {
@@ -439,7 +440,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'computer',
                 hasChildren: false,
                 operations: ['manage-operatingsystems'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/operating-systems`, managementType: 'operating-systems' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/operating-systems`, managementType: 'operating-systems' },
                 lastUpdated: new Date()
             },
             {
@@ -449,7 +450,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'cloud',
                 hasChildren: false,
                 operations: ['manage-environments'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/environments`, managementType: 'environments' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/environments`, managementType: 'environments' },
                 lastUpdated: new Date()
             }
         ];
@@ -477,12 +478,14 @@ export class RegistryServerProvider implements TreeProvider {
             }
 
             // Fetch only standalone services (those without a parent) for top-level display
-            const servicesUrl = `${baseUrl}/api/services/standalone`;
-            const servicesResponse: ServiceInstance[] = await firstValueFrom(this.http.get<ServiceInstance[]>(servicesUrl));
+            const servicesUrl = `${baseUrl}/api/v1/services/standalone`;
+            const servicesResponseRaw = await firstValueFrom(this.http.get<any>(servicesUrl));
+            const servicesResponse: ServiceInstance[] = Array.isArray(servicesResponseRaw) ? servicesResponseRaw : (servicesResponseRaw.data || []);
 
             // Fetch deployments to get the health status
-            const deploymentsUrl = `${baseUrl}/api/deployments`;
-            const deploymentsResponse: Deployment[] = await firstValueFrom(this.http.get<Deployment[]>(deploymentsUrl));
+            const deploymentsUrl = `${baseUrl}/api/v1/deployments`;
+            const deploymentsResponseRaw = await firstValueFrom(this.http.get<any>(deploymentsUrl));
+            const deploymentsResponse: Deployment[] = Array.isArray(deploymentsResponseRaw) ? deploymentsResponseRaw : (deploymentsResponseRaw.data || []);
 
             // Map services to tree nodes with proper metadata
             return servicesResponse.map(service => {
@@ -526,8 +529,9 @@ export class RegistryServerProvider implements TreeProvider {
             }
 
             // Fetch deployments for the specific service
-            const deploymentsUrl = `${baseUrl}/api/deployments/service/${serviceId}`;
-            const deploymentsResponse: Deployment[] = await firstValueFrom(this.http.get<Deployment[]>(deploymentsUrl));
+            const deploymentsUrl = `${baseUrl}/api/v1/deployments/service/${serviceId}`;
+            const deploymentsResponseRaw = await firstValueFrom(this.http.get<any>(deploymentsUrl));
+            const deploymentsResponse: Deployment[] = Array.isArray(deploymentsResponseRaw) ? deploymentsResponseRaw : (deploymentsResponseRaw.data || []);
 
             return deploymentsResponse.map(deployment => ({
                 id: `deployment-${profile.id}-${deployment.id}`,
@@ -552,20 +556,20 @@ export class RegistryServerProvider implements TreeProvider {
     private async fetchSubModulesForService(profile: HostProfile, serviceId: string): Promise<TreeNode[]> {
         try {
             const baseUrl = this.getBaseUrl(profile);
-            const subModulesUrl = `${baseUrl}/api/services/${serviceId}/sub-modules`;
-            const subModulesResponse: ServiceInstance[] = await firstValueFrom(
-                this.http.get<ServiceInstance[]>(subModulesUrl)
-            );
+            const subModulesUrl = `${baseUrl}/api/v1/services/${serviceId}/sub-modules`;
+            const subModulesResponseRaw = await firstValueFrom(this.http.get<any>(subModulesUrl));
+            const subModulesResponse: ServiceInstance[] = Array.isArray(subModulesResponseRaw) ? subModulesResponseRaw : (subModulesResponseRaw.data || []);
 
             if (subModulesResponse.length === 0) {
                 return [];
             }
 
             // Fetch deployments to determine health status for each sub-module
-            const deploymentsUrl = `${baseUrl}/api/deployments`;
+            const deploymentsUrl = `${baseUrl}/api/v1/deployments`;
             let deploymentsResponse: Deployment[] = [];
             try {
-                deploymentsResponse = await firstValueFrom(this.http.get<Deployment[]>(deploymentsUrl));
+                const depsRaw = await firstValueFrom(this.http.get<any>(deploymentsUrl));
+                deploymentsResponse = Array.isArray(depsRaw) ? depsRaw : (depsRaw.data || []);
             } catch (e) {
                 console.warn('Failed to fetch deployments for sub-module health status', e);
             }

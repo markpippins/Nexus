@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8004:8004"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - MONGODB_URL=mongodb://mongoUser:somePassword@172.16.30.32:27017/?authSource=admin  # External MongoDB
+      - MYSQL_URL=mysql://media:changeme@mysql:3306/media
+      - PYTHONPATH=/app
+    volumes:
+      - ./app:/app
+      - ./media:/media:ro  # Mount media directories as read-only
+    depends_on:
+      - redis
+      - mysql
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass
+      - MYSQL_DATABASE=media
+      - MYSQL_USER=media
+      - MYSQL_PASSWORD=changeme
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  mysql_data:

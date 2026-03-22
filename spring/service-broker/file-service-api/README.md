@@ -1,10 +1,10 @@
 # File Service API
 
-The API module for the file service, containing interface definitions and shared data structures for file operations in the Nucleus system.
+The API module for the file service, containing interface definitions and shared data structures for file operations in the Nexus system.
 
 ## Overview
 
-This module defines the API contracts for file system operations within the Nucleus system. It provides standardized interfaces and data structures that allow consistent file handling across different components of the system.
+This module defines the API contracts for file system operations within the Nexus system. It provides standardized interfaces and data structures that allow consistent file handling across different components of the system.
 
 ## Key Components
 

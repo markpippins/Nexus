@@ -1,10 +1,10 @@
 # User API
 
-The API module for user services, containing interface definitions and shared data structures for user management operations in the Nucleus system.
+The API module for user services, containing interface definitions and shared data structures for user management operations in the Nexus system.
 
 ## Overview
 
-This module defines the API contracts for user management within the Nucleus system. It provides standardized interfaces and data structures that allow consistent user handling across different components of the system, including authentication, profile management, and user data operations.
+This module defines the API contracts for user management within the Nexus system. It provides standardized interfaces and data structures that allow consistent user handling across different components of the system, including authentication, profile management, and user data operations.
 
 ## Key Components
 

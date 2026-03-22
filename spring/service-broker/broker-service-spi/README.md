@@ -1,10 +1,10 @@
 # Broker Service SPI (Service Provider Interface)
 
-The Service Provider Interface module for the broker service, enabling extensible service implementations in the Nucleus system.
+The Service Provider Interface module for the broker service, enabling extensible service implementations in the Nexus system.
 
 ## Overview
 
-This module defines the SPI (Service Provider Interface) that allows for pluggable and extensible service implementations within the Nucleus broker system. It enables third-party developers and system integrators to add new services without modifying the core broker code.
+This module defines the SPI (Service Provider Interface) that allows for pluggable and extensible service implementations within the Nexus broker system. It enables third-party developers and system integrators to add new services without modifying the core broker code.
 
 ## Key Components
 
@@ -27,7 +27,7 @@ The SPI follows Java's Service Provider Interface pattern, allowing implementati
 To implement a new service using this SPI:
 
 1. Implement the `BrokerServiceProvider` interface
-2. Create a provider configuration file at `META-INF/services/com.angrysurfer.nucleus.broker.BrokerServiceProvider`
+2. Create a provider configuration file at `META-INF/services/com.angrysurfer.Nexus.broker.BrokerServiceProvider`
 3. Register the implementation class in the configuration file
 4. Package as a JAR with the broker service on the classpath
 

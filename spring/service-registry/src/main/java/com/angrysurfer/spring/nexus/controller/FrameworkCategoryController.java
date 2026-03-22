@@ -1,14 +1,20 @@
 package com.angrysurfer.spring.nexus.controller;
 
-import com.angrysurfer.spring.nexus.entity.FrameworkCategory;
-import com.angrysurfer.spring.nexus.repository.FrameworkCategoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import com.angrysurfer.spring.nexus.entity.FrameworkCategory;
+import com.angrysurfer.spring.nexus.repository.FrameworkCategoryRepository;
 
 @RestController
 @RequestMapping("/api/v1/framework-categories")
@@ -18,8 +24,11 @@ public class FrameworkCategoryController {
 
     private static final Logger log = LoggerFactory.getLogger(FrameworkCategoryController.class);
 
-    @Autowired
-    private FrameworkCategoryRepository repository;
+    private final FrameworkCategoryRepository repository;
+
+    public FrameworkCategoryController(FrameworkCategoryRepository repository) {
+        this.repository = repository;
+    }
 
     @GetMapping
     public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<FrameworkCategory>> getAll(org.springframework.data.domain.Pageable pageable) {

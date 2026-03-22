@@ -4,7 +4,6 @@ import com.angrysurfer.spring.nexus.entity.OperatingSystem;
 import com.angrysurfer.spring.nexus.repository.OperatingSystemRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,8 +18,11 @@ public class OperatingSystemControllerV0 {
 
     private static final Logger log = LoggerFactory.getLogger(OperatingSystemControllerV0.class);
 
-    @Autowired
-    private OperatingSystemRepository repository;
+    private final OperatingSystemRepository repository;
+
+    public OperatingSystemControllerV0(OperatingSystemRepository repository) {
+        this.repository = repository;
+    }
 
     @GetMapping
     @Deprecated(since = "v1", forRemoval = true)
