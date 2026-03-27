@@ -21,6 +21,7 @@ typespec/
 ## File Contents
 
 ### `main.tsp`
+
 ```typespec
 import "@typespec/http";
 import "./fs/models.tsp";
