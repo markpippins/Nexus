@@ -11,7 +11,6 @@ The Nexus platform is a production-ready distributed system supporting multiple 
 - **✅ Host-Server Registry**: Persistent service registry with MySQL/H2 storage
 - **✅ Polyglot SDKs**: Production-ready client libraries (Python, Node.js, Go)
 - **✅ Broker Gateway Proxy**: Advanced reverse proxy with rate limiting and logging
-- **✅ User Management**: Dual-architecture user services with MongoDB persistence
 - **✅ External Service Integration**: Seamless integration of services across frameworks
 
 ## Architecture
