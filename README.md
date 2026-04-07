@@ -4,7 +4,7 @@ A comprehensive polyglot microservices platform featuring broker-based service a
 
 ## Overview
 
-The Nexus platform is a production-ready distributed system supporting multiple programming languages and frameworks. Built on **Spring Boot 3.5.0** with Java 21, it provides:
+The Nexus platform is a distributed system supporting multiple programming languages and frameworks. Built on **Spring Boot 3.5.0** with Java 21, it provides:
 
 - **✅ Service Mesh Management**: Real-time service discovery and visualization via Nexus UI
 - **✅ Broker Gateway**: Central hub for request routing and service orchestration  
