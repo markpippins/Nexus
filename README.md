@@ -110,9 +110,9 @@ The Atomic Platform has evolved from a file-explorer-based tool to a **comprehen
 - Clean separation of concerns between service management and search capabilities
 
 #### **Service Discovery System**
-- **ServiceDiscoveryClient**: Host-server integration for service lookup
-- **ExternalServiceInvoker**: Dynamic external service invocation  
-- **BrokerAutoRegistration**: Annotation-based service exposure
+- **Service Discovery Client**: Host-server integration for service lookup
+- **External Service Invoker**: Dynamic external service invocation  
+- **Broker Auto Registration**: Annotation-based service exposure
 - **Fallback Mechanism**: Local → External service resolution
 - **Unified Interface**: Same API for local and external services
 
