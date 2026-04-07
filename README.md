@@ -13,7 +13,7 @@ The Nexus platform is a distributed system supporting multiple programming langu
 - **✅ Broker Gateway Proxy**: Advanced reverse proxy with rate limiting and logging
 - **✅ External Service Integration**: Seamless integration of services across frameworks
 - **✅ 3D Services Mesh View**: Observability layer for real-time monitoring of deployed services.
-- 
+
 ## Architecture
 
 ### **Three-Layer Service Mesh Architecture**
