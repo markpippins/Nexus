@@ -36,6 +36,30 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
                     <textarea formControlName="description" rows="3" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="Description"></textarea>
                  </div>
 
+                 <!-- URL (Vendors, Languages) -->
+                 <div class="flex flex-col gap-1" *ngIf="isVendorOrLanguage()">
+                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">URL</label>
+                    <input type="url" formControlName="url" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="https://...">
+                 </div>
+
+                 <!-- Versioning (Languages) -->
+                 <div class="flex gap-4" *ngIf="isLanguage()">
+                     <div class="flex flex-col gap-1 flex-1">
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Current Version</label>
+                        <input type="text" formControlName="currentVersion" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="e.g. 21">
+                     </div>
+                     <div class="flex flex-col gap-1 flex-1">
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">LTS Version</label>
+                        <input type="text" formControlName="ltsVersion" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="e.g. 21">
+                     </div>
+                 </div>
+
+                 <!-- Active Flag -->
+                 <div class="flex items-center gap-2 mt-2">
+                    <input type="checkbox" formControlName="activeFlag" id="activeFlag" class="rounded border-[rgb(var(--color-border-muted))] text-[rgb(var(--color-accent-ring))] focus:ring-[rgb(var(--color-accent-ring))]">
+                    <label for="activeFlag" class="text-sm font-medium text-[rgb(var(--color-text-base))]">Active</label>
+                 </div>
+
                  <!-- Default Visual Component (Service Types only) -->
                  <div class="flex flex-col gap-1" *ngIf="isServiceType()">
                     <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Default Visual Style</label>
@@ -78,11 +102,17 @@ export class UpsertLookupDialogComponent {
 
     displayType = computed(() => this.type().toLowerCase().replace(/-/g, ' '));
     isServiceType = computed(() => this.type() === 'service-types');
+    isVendorOrLanguage = computed(() => this.type() === 'framework-vendors' || this.type() === 'framework-languages');
+    isLanguage = computed(() => this.type() === 'framework-languages');
 
     constructor() {
         this.form = this.fb.group({
             name: ['', Validators.required],
             description: [''],
+            activeFlag: [true],
+            url: [''],
+            currentVersion: [''],
+            ltsVersion: [''],
             defaultComponentId: [null]
         });
 
@@ -93,10 +123,14 @@ export class UpsertLookupDialogComponent {
                     this.form.patchValue({
                         name: i.name,
                         description: i.description,
+                        activeFlag: i.activeFlag !== false, // default true
+                        url: i.url || '',
+                        currentVersion: i.currentVersion || '',
+                        ltsVersion: i.ltsVersion || '',
                         defaultComponentId: i.defaultComponentId || null
                     });
                 } else {
-                    this.form.reset({ defaultComponentId: null });
+                    this.form.reset({ defaultComponentId: null, activeFlag: true });
                 }
             }
         });

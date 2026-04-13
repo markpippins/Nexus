@@ -450,6 +450,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             (onDelete)="onDelete($event)"
                         ></app-lookup-list>
                     }
+                    @case ('framework-vendors') {
+                         <app-lookup-list
+                            [items]="lookupData()"
+                            [type]="managementType()"
+                            (onEdit)="onEdit($event)"
+                            (onDelete)="onDelete($event)"
+                        ></app-lookup-list>
+                    }
                     @case ('framework-categories') {
                          <app-lookup-list
                             [items]="lookupData()"
@@ -771,6 +779,7 @@ export class PlatformManagementComponent {
                 case 'service-types':
                 case 'server-types':
                 case 'framework-languages':
+                case 'framework-vendors':
                 case 'framework-categories':
                 case 'library-categories':
                 case 'operating-systems':
@@ -849,6 +858,7 @@ export class PlatformManagementComponent {
                 case 'service-types':
                 case 'server-types':
                 case 'framework-languages':
+                case 'framework-vendors':
                 case 'framework-categories':
                 case 'library-categories':
                 case 'operating-systems':
@@ -894,6 +904,7 @@ export class PlatformManagementComponent {
             case 'service-types':
             case 'server-types':
             case 'framework-languages':
+            case 'framework-vendors':
             case 'framework-categories':
             case 'library-categories':
             case 'operating-systems':

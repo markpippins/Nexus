@@ -34,7 +34,8 @@
     "idb": "^8.0.0",
     "rxjs": "~7.8.0",
     "three": "^0.182.0",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "nexus-lookup-client": "file:../../typespec/tsp-output/clients/js"
   },
   "devDependencies": {
     "@angular/build": "^20.3.5",
