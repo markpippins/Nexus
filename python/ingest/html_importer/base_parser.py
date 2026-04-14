@@ -1,11 +1,13 @@
 import os
+import re
 import sys
+import base64
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-from models import NormalizedMessage, TimestampInfo, ConversationMetadata
+from models import NormalizedMessage, TimestampInfo, ImageReference, ConversationMetadata
 
 
 class BaseParser(ABC):
@@ -90,6 +92,169 @@ class BaseParser(ABC):
             raw_value=json_value,
         )
 
+    # ------------------------------------------------------------------
+    # Image extraction utilities
+    # ------------------------------------------------------------------
+
+    # Data URI images smaller than this (bytes) are considered icons/sprites
+    _DATA_URI_SIZE_THRESHOLD = 1024  # 1 KB
+
+    # Known avatar filenames / patterns to skip
+    _AVATAR_PATTERNS = re.compile(r"unnamed|avatar|profile.?photo|user.?icon|photo-thumb", re.IGNORECASE)
+
+    # Known tiny tracking / UI image patterns to skip
+    _TINY_IMAGE_PATTERNS = re.compile(
+        r"("
+        r"1x1|tracking|pixel|spacer|spacer\.gif|"
+        r"icon-?small|sprite|css-?icon|decorative|"
+        r"favicon|logo-?small|badge-?icon|"
+        r"loading-?spinner|throbber"
+        r")",
+        re.IGNORECASE,
+    )
+
+    # 1x1 transparent GIF data URI (very common tracking pixel)
+    _TRANSPARENT_GIF_DATA_URI = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+
+    @staticmethod
+    def _is_avatar(img_tag) -> bool:
+        """Check if an <img> tag looks like an avatar."""
+        src = (img_tag.get("src") or "") + " " + (img_tag.get("alt") or "") + " " + " ".join(img_tag.get("class") or [])
+        return bool(BaseParser._AVATAR_PATTERNS.search(src))
+
+    @staticmethod
+    def _is_tiny_tracking(img_tag) -> bool:
+        """Check if an <img> tag is a tiny tracking pixel or CSS sprite."""
+        src = img_tag.get("src") or ""
+        alt = img_tag.get("alt") or ""
+        classes = " ".join(img_tag.get("class") or [])
+        combined = f"{src} {alt} {classes}"
+
+        # Check 1x1 transparent GIF
+        if src == BaseParser._TRANSPARENT_GIF_DATA_URI:
+            return True
+
+        # Check by alt/class/src name patterns
+        if BaseParser._TINY_IMAGE_PATTERNS.search(combined):
+            return True
+
+        # Check data URI size
+        if src.startswith("data:image"):
+            # Estimate base64-encoded size
+            try:
+                data_part = src.split(",", 1)[1] if "," in src else ""
+                decoded_size = len(base64.b64decode(data_part)) if data_part else 0
+                if decoded_size < BaseParser._DATA_URI_SIZE_THRESHOLD:
+                    return True
+            except Exception:
+                pass
+
+        return False
+
+    @staticmethod
+    def _infer_extension(src: str) -> str:
+        """Guess the file extension from an image src."""
+        if not src:
+            return "png"
+        # Data URI: data:image/jpeg;base64,...
+        if src.startswith("data:image"):
+            mime_match = re.match(r"data:image/(\w+);", src)
+            if mime_match:
+                mime_type = mime_match.group(1)
+                if mime_type in ("jpeg", "jpg"):
+                    return "jpg"
+                if mime_type in ("svg+xml",):
+                    return "svg"
+                return mime_type
+
+        # URL or file path: extract extension
+        url_path = src.split("?")[0]  # strip query params
+        if "." in url_path:
+            ext = url_path.rsplit(".", 1)[-1].lower()
+            # Normalize
+            if ext in ("jpeg",):
+                return "jpg"
+            if ext in ("svg+xml",):
+                return "svg"
+            if ext in ("jpg", "png", "gif", "webp", "svg", "bmp", "ico"):
+                return ext
+
+        return "png"  # default
+
+    @staticmethod
+    def _check_if_saved(src: str, source_path: Path, images_folder: Path) -> bool:
+        """Check if the image src corresponds to a file already in the images folder."""
+        if not src or src.startswith("data:") or src.startswith("blob:"):
+            return False
+
+        # If src is a relative path, check if it exists relative to the source file
+        # (browser "Save Page As" may have saved it in a _files/ directory)
+        if not src.startswith(("http://", "https://", "//")):
+            rel_path = source_path.parent / src.lstrip("./")
+            if rel_path.resolve().exists():
+                return True
+
+        # Check if a file with the expected image-N name already exists
+        if images_folder.exists():
+            # We don't know which number this image is here, but if any
+            # image-N.* file exists it means the folder has been populated
+            return False  # Can't tell at this level; caller decides
+
+        return False
+
+    @staticmethod
+    def extract_images_from_message(
+        msg_tag,
+        source_path: Path,
+        image_counter: dict,
+    ) -> list[ImageReference]:
+        """Extract image references from a message DOM element.
+
+        Args:
+            msg_tag: A BeautifulSoup tag representing the message container.
+            source_path: Path to the source HTML file.
+            image_counter: A mutable dict {"count": int} that tracks the
+                          sequential image number across all messages in the file.
+
+        Returns:
+            A list of ImageReference objects for each content image found.
+        """
+        img_tags = msg_tag.find_all("img")
+        results: list[ImageReference] = []
+
+        for img in img_tags:
+            # Skip avatars
+            if BaseParser._is_avatar(img):
+                continue
+
+            # Skip tiny tracking / sprite / icon images
+            if BaseParser._is_tiny_tracking(img):
+                continue
+
+            src = img.get("src", "")
+            if not src:
+                continue
+
+            # Increment sequential counter
+            image_counter["count"] += 1
+            n = image_counter["count"]
+
+            ext = BaseParser._infer_extension(src)
+            name = f"image-{n}.{ext}"
+
+            # Check if this image is already saveable
+            saved = BaseParser._check_if_saved(src, source_path, Path(""))
+
+            results.append(
+                ImageReference(
+                    name=name,
+                    saved=saved,
+                    original_src=src if not src.startswith("data:") else f"data:{ext};(base64,{len(src)} chars)",
+                )
+            )
+
+        return results
+
 
 # Registry of all available parsers — populated at import time.
 _parser_registry: list[type[BaseParser]] = []
@@ -145,7 +310,7 @@ def detect_and_parse_md(
     try:
         from parsers import chatgpt_parser   # noqa: F401
         from parsers import copilot_parser    # noqa: F401
-        from parsers import gemini_parser     # noqa: F401
+        # from parsers import gemini_parser    # DEPRECATED: commented out - https://linear.app/TODO
         from parsers import markdown_parser   # noqa: F401
     except ImportError:
         pass

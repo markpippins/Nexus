@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-from models import NormalizedMessage, TimestampInfo, ConversationMetadata
+from models import NormalizedMessage, TimestampInfo, ImageReference, ConversationMetadata
 from base_parser import BaseParser, register_parser
 
 
@@ -81,6 +81,7 @@ class ChatGPTParser(BaseParser):
         messages: list[NormalizedMessage] = []
         turn_counter = 0
         last_speaker: str | None = None
+        image_counter: dict = {"count": 0}
 
         # Use conversation-level timestamp for all messages
         ts = TimestampInfo(
@@ -95,6 +96,7 @@ class ChatGPTParser(BaseParser):
             message_id = msg.get("data-message-id", "")
             raw_html_ref = self._build_selector(msg)
             text = self._extract_text(msg, speaker)
+            image_refs = self.extract_images_from_message(msg, source_path, image_counter)
 
             # Turn tracking
             if speaker == "user" and last_speaker in ("assistant", None):
@@ -108,6 +110,7 @@ class ChatGPTParser(BaseParser):
                 text=text.strip(),
                 turn_index=turn_counter,
                 raw_html_ref=raw_html_ref,
+                image_references=image_refs,
             )
             messages.append(normalized)
             last_speaker = speaker

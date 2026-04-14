@@ -45,7 +45,7 @@ from bs4 import BeautifulSoup
 # Import parsers so that @register_parser decorators fire
 from parsers import chatgpt_parser   # noqa: F401
 from parsers import copilot_parser    # noqa: F401
-from parsers import gemini_parser     # noqa: F401
+# from parsers import gemini_parser    # DEPRECATED: commented out - https://linear.app/TODO
 from parsers import markdown_parser   # noqa: F401
 
 from base_parser import detect_and_parse
