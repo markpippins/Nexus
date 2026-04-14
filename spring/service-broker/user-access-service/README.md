@@ -1,10 +1,10 @@
 # User Access Service
 
-The user management service module for the Nucleus system, responsible for handling all user-related operations including registration, authentication, and profile management.
+The user management service module for the Nexus system, responsible for handling all user-related operations including registration, authentication, and profile management.
 
 ## Overview
 
-The user access service provides comprehensive user management capabilities within the Nucleus system. It handles user registration, authentication, profile management, and all other user-related operations. The service integrates with the broker system to process user requests from various clients and uses MongoDB for data persistence.
+The user access service provides comprehensive user management capabilities within the Nexus system. It handles user registration, authentication, profile management, and all other user-related operations. The service integrates with the broker system to process user requests from various clients and uses MongoDB for data persistence.
 
 ## Key Features
 

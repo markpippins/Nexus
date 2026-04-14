@@ -1,10 +1,10 @@
 # Upload Service
 
-The file upload service module for the Nucleus system, responsible for handling file uploads, validation, and storage operations.
+The file upload service module for the Nexus system, responsible for handling file uploads, validation, and storage operations.
 
 ## Overview
 
-The upload service provides comprehensive file upload capabilities within the Nucleus system. It manages the complete file upload lifecycle from initial upload request through validation, processing, and secure storage. The service integrates with the broker system to handle file uploads from various clients.
+The upload service provides comprehensive file upload capabilities within the Nexus system. It manages the complete file upload lifecycle from initial upload request through validation, processing, and secure storage. The service integrates with the broker system to handle file uploads from various clients.
 
 ## Key Features
 
