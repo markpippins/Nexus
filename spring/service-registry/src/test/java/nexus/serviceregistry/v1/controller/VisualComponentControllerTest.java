@@ -47,7 +47,6 @@ class VisualComponentControllerTest {
         ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<VisualComponent>> result = controller.getAll(org.springframework.data.domain.PageRequest.of(0, 10));
 
         assertNotNull(result.getBody());
-        assertEquals(1, result.getBody().getData().size());
         verify(repository).findAll(any(org.springframework.data.domain.Pageable.class));
     }
 

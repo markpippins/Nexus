@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
 
-import com.angrysurfer.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
 
 class UserRegistrationModelTest {
 

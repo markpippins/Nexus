@@ -141,8 +141,13 @@ public class Broker {
         if (serviceDiscoveryClient != null && externalServiceInvoker != null) {
             log.debug("Local bean not found: {}, checking external services", serviceName);
 
-            // For external services, return a proxy that handles calls
-            return new ExternalServiceProxy(serviceName, serviceDiscoveryClient, externalServiceInvoker);
+            // Verify the external service actually exists before creating a proxy
+            Optional<? extends ServiceDiscoveryClient.ServiceDetails> details = serviceDiscoveryClient.getServiceDetails(serviceName);
+            if (details.isPresent()) {
+                // For external services, return a proxy that handles calls
+                return new ExternalServiceProxy(serviceName, serviceDiscoveryClient, externalServiceInvoker);
+            }
+            log.debug("External service not found: {}", serviceName);
         }
 
         log.error("Service bean not found: {}", serviceName);

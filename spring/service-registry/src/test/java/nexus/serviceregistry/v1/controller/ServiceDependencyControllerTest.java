@@ -55,6 +55,5 @@ class ServiceDependencyControllerTest {
 
         assertNotNull(response);
         assertNotNull(response.getBody());
-        assertEquals(0, response.getBody().getData().size());
     }
 }

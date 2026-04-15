@@ -1,31 +1,33 @@
 package com.angrysurfer.spring.nexus.login.e2e;
 
-import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
-import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
-import com.angrysurfer.spring.nexus.login.LoginResponse;
-import com.angrysurfer.spring.nexus.login.LoginService;
-import com.angrysurfer.spring.nexus.login.client.UserAccessClient;
-import com.angrysurfer.nexus.user.UserRegistrationDTO;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
+
+import java.time.Duration; // Import Duration
+import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.time.Duration; // Import Duration
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
-import org.mockito.quality.Strictness;
-import org.mockito.junit.jupiter.MockitoSettings;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.spring.nexus.login.LoginService;
+import com.angrysurfer.spring.nexus.login.client.UserAccessClient;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)

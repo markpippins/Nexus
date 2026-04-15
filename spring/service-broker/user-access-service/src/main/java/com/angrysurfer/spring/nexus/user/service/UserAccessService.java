@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import com.angrysurfer.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
 import com.angrysurfer.spring.nexus.user.model.UserRegistration;

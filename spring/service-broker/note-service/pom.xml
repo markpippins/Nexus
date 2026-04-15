@@ -47,7 +47,7 @@
         </dependency>
         <dependency>
             <groupId>com.angrysurfer.nexus</groupId>
-            <artifactId>user-api</artifactId>
+            <artifactId>nexus-user-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.angrysurfer.nexus</groupId>

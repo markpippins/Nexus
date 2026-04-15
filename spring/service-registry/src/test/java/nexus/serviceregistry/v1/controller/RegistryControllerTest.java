@@ -122,6 +122,7 @@ class RegistryControllerTest {
         ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<Service>> response = registryController.getAllRegisteredServices(PageRequest.of(0, 10));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         verify(registrationService).getAllActiveServices();
     }
 
@@ -133,6 +134,7 @@ class RegistryControllerTest {
         ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<Map<String, Object>>> response = registryController.getAllServicesWithHosted(PageRequest.of(0, 10));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
         verify(registrationService).getAllServicesWithHosted();
     }
 

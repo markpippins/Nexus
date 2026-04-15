@@ -205,7 +205,7 @@
             </dependency>
             <dependency>
                 <groupId>com.angrysurfer.nexus</groupId>
-                <artifactId>user-api</artifactId>
+                <artifactId>nexus-user-api</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
