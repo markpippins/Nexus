@@ -5,6 +5,8 @@ import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
 import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
+import com.angrysurfer.spring.nexus.broker.spi.ExternalServiceInvoker;
+import com.angrysurfer.spring.nexus.broker.spi.ServiceDiscoveryClient;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
@@ -33,6 +35,12 @@ class BrokerTest {
     @Mock
     private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
+    @Mock
+    private ServiceDiscoveryClient serviceDiscoveryClient;
+
+    @Mock
+    private ExternalServiceInvoker externalServiceInvoker;
+
     private Validator validator;
 
     private Broker broker;
@@ -44,7 +52,8 @@ class BrokerTest {
         localValidatorFactoryBean.afterPropertiesSet();
         validator = localValidatorFactoryBean;
 
-        broker = new Broker(applicationContext, objectMapper, validator);
+        broker = new Broker(applicationContext, objectMapper, validator,
+                serviceDiscoveryClient, externalServiceInvoker);
     }
 
     @Test
