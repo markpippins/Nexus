@@ -124,9 +124,9 @@ export class UpsertLookupDialogComponent {
                         name: i.name,
                         description: i.description,
                         activeFlag: i.activeFlag !== false, // default true
-                        url: i.url || '',
-                        currentVersion: i.currentVersion || '',
-                        ltsVersion: i.ltsVersion || '',
+                        url: '', // url field not on LookupItem interface
+                        currentVersion: i.version || '',
+                        ltsVersion: i.ltsFlag ? i.version || '' : '',
                         defaultComponentId: i.defaultComponentId || null
                     });
                 } else {
@@ -149,7 +149,18 @@ export class UpsertLookupDialogComponent {
         this.isSaving.set(true);
         const url = this.baseUrl();
         const type = this.type();
-        const payload: Partial<LookupItem> = this.form.value;
+
+        // Build payload based on form values, mapping to LookupItem interface
+        const formValue = this.form.value;
+        const payload: Partial<LookupItem> = {
+            name: formValue.name,
+            description: formValue.description,
+            activeFlag: formValue.activeFlag,
+            defaultComponentId: formValue.defaultComponentId,
+            // Map version fields to LookupItem structure
+            version: formValue.currentVersion || undefined,
+            ltsFlag: formValue.ltsVersion ? true : undefined,
+        };
 
         try {
             let result: LookupItem;
