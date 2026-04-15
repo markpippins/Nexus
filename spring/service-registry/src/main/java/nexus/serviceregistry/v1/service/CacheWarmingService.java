@@ -1,6 +1,7 @@
 package nexus.serviceregistry.v1.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +54,7 @@ public class CacheWarmingService {
     private final ServiceRepository serviceRepository;
     private final DeploymentRepository deploymentRepository;
 
-    private final CacheManager cacheManager;
+    private final Optional<CacheManager> cacheManager;
 
     public CacheWarmingService(FrameworkRepository frameworkRepository,
             FrameworkCategoryRepository frameworkCategoryRepository,
@@ -64,7 +65,7 @@ public class CacheWarmingService {
             LibraryCategoryRepository libraryCategoryRepository,
             ServiceRepository serviceRepository,
             DeploymentRepository deploymentRepository,
-            CacheManager cacheManager) {
+            Optional<CacheManager> cacheManager) {
         this.frameworkRepository = frameworkRepository;
         this.frameworkCategoryRepository = frameworkCategoryRepository;
         this.frameworkLanguageRepository = frameworkLanguageRepository;
@@ -193,8 +194,11 @@ public class CacheWarmingService {
      * Check if a cache is populated.
      */
     public boolean isCachePopulated(String cacheName) {
+        if (cacheManager.isEmpty()) {
+            return false;
+        }
         try {
-            org.springframework.cache.Cache cache = cacheManager.getCache(cacheName);
+            org.springframework.cache.Cache cache = cacheManager.get().getCache(cacheName);
             if (cache == null) {
                 return false;
             }
@@ -216,15 +220,17 @@ public class CacheWarmingService {
         StringBuilder stats = new StringBuilder();
         stats.append("Cache Statistics:\n");
 
-        try {
-            for (String cacheName : cacheManager.getCacheNames()) {
-                org.springframework.cache.Cache cache = cacheManager.getCache(cacheName);
-                if (cache != null) {
-                    stats.append(String.format("  - %s: active\n", cacheName));
+        if (cacheManager.isPresent()) {
+            try {
+                for (String cacheName : cacheManager.get().getCacheNames()) {
+                    org.springframework.cache.Cache cache = cacheManager.get().getCache(cacheName);
+                    if (cache != null) {
+                        stats.append(String.format("  - %s: active\n", cacheName));
+                    }
                 }
+            } catch (Exception e) {
+                stats.append("Error retrieving cache statistics: ").append(e.getMessage());
             }
-        } catch (Exception e) {
-            stats.append("Error retrieving cache statistics: ").append(e.getMessage());
         }
 
         return stats.toString();
@@ -234,11 +240,15 @@ public class CacheWarmingService {
      * Clear all caches (for admin/testing purposes).
      */
     public void clearAllCaches() {
+        if (cacheManager.isEmpty()) {
+            log.debug("No cache manager available, skipping cache clear");
+            return;
+        }
         log.warn("Clearing all caches...");
 
         try {
-            for (String cacheName : cacheManager.getCacheNames()) {
-                org.springframework.cache.Cache cache = cacheManager.getCache(cacheName);
+            for (String cacheName : cacheManager.get().getCacheNames()) {
+                org.springframework.cache.Cache cache = cacheManager.get().getCache(cacheName);
                 if (cache != null) {
                     cache.clear();
                     log.debug("Cleared cache: {}", cacheName);

@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import com.angrysurfer.nexus.dto.ServiceStatus;
@@ -55,12 +56,16 @@ public class ServiceStatusCacheService {
     // Flag to track Redis availability
     private volatile boolean redisAvailable = true;
 
-    public ServiceStatusCacheService(RedisTemplate<String, Object> redisTemplate,
-            StringRedisTemplate stringRedisTemplate,
+    public ServiceStatusCacheService(@Nullable RedisTemplate<String, Object> redisTemplate,
+            @Nullable StringRedisTemplate stringRedisTemplate,
             ObjectMapper objectMapper) {
         this.redisTemplate = redisTemplate;
         this.stringRedisTemplate = stringRedisTemplate;
         this.objectMapper = objectMapper;
+        if (redisTemplate == null || stringRedisTemplate == null) {
+            redisAvailable = false;
+            log.info("ServiceStatusCacheService initialized without Redis (Redis not available)");
+        }
     }
 
     /**
@@ -346,6 +351,10 @@ public class ServiceStatusCacheService {
             return false;
         }
 
+        if (stringRedisTemplate == null) {
+            return false;
+        }
+
         try {
             stringRedisTemplate.getConnectionFactory().getConnection().ping();
             return true;
@@ -371,6 +380,9 @@ public class ServiceStatusCacheService {
      * Attempt to reconnect to Redis
      */
     public boolean attemptReconnect() {
+        if (stringRedisTemplate == null) {
+            return false;
+        }
         try {
             stringRedisTemplate.getConnectionFactory().getConnection().ping();
             redisAvailable = true;
