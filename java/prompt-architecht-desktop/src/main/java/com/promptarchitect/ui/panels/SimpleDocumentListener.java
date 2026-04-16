@@ -1,9 +1,5 @@
 package com.promptarchitect.ui.panels;
 
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import java.awt.*;
-
 public class SimpleDocumentListener implements javax.swing.event.DocumentListener {
     private final java.util.function.Consumer<javax.swing.event.DocumentEvent> action;
 

@@ -70,6 +70,7 @@ public class BrokerController {
                 v1Request.getOperation(),
                 v1Request.getParams(),
                 v1Request.getRequestId());
+                
         if (v1Request.isEncrypt() != null) {
             legacyRequest.setEncrypt(v1Request.isEncrypt());
         }

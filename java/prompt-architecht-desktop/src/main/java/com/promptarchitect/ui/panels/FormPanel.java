@@ -1,16 +1,26 @@
 package com.promptarchitect.ui.panels;
 
-import com.promptarchitect.model.*;
+import com.promptarchitect.model.PromptSpecification;
 import com.promptarchitect.ui.components.CollapsibleSection;
 import com.promptarchitect.ui.components.DynamicListPanel;
-
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import javax.swing.BoxLayout;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.border.EmptyBorder;
 
 public class FormPanel extends JPanel {
     private final PromptSpecification spec;

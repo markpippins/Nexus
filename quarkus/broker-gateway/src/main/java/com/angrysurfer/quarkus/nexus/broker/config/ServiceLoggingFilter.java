@@ -1,16 +1,16 @@
 package com.angrysurfer.quarkus.nexus.broker.config;
 
+import java.io.IOException;
+
+import org.jboss.logging.Logger;
+
+import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
+
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.container.ContainerResponseContext;
 import jakarta.ws.rs.container.ContainerResponseFilter;
 import jakarta.ws.rs.ext.Provider;
-import org.jboss.logging.Logger;
-
-import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
-import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
-
-import java.io.IOException;
 
 @Provider
 public class ServiceLoggingFilter implements ContainerRequestFilter, ContainerResponseFilter {

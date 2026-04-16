@@ -1,14 +1,26 @@
 package com.promptarchitect;
 
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.Font;
+
+import javax.swing.ButtonGroup;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JRadioButtonMenuItem;
+import javax.swing.JSplitPane;
+import javax.swing.SwingUtilities;
+
 import com.formdev.flatlaf.FlatDarculaLaf;
 import com.formdev.flatlaf.FlatIntelliJLaf;
-import com.formdev.flatlaf.FlatLightLaf;
 import com.promptarchitect.model.PromptSpecification;
 import com.promptarchitect.ui.panels.FormPanel;
 import com.promptarchitect.ui.panels.JsonPreviewPanel;
-
-import javax.swing.*;
-import java.awt.*;
 
 public class PromptArchitectApp extends JFrame {
     private FormPanel formPanel;
