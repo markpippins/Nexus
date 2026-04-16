@@ -1,15 +1,15 @@
 package com.angrysurfer.helidon.nexus.user.service;
 
-import com.angrysurfer.nexus.user.UserDTO;
-import com.angrysurfer.nexus.user.UserRegistrationDTO;
+import java.util.logging.Logger;
+
 import com.angrysurfer.helidon.nexus.user.model.UserRegistration;
 import com.angrysurfer.helidon.nexus.user.repository.UserRegistrationRepository;
+import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.util.logging.Logger;
 
 @ApplicationScoped
 public class UserAccessService {
@@ -24,7 +24,8 @@ public class UserAccessService {
     }
 
     @BrokerOperation("validateUser")
-    public UserRegistrationDTO validateUser(@BrokerParam("alias") String alias, @BrokerParam("identifier") String password) {
+    public UserRegistrationDTO validateUser(@BrokerParam("alias") String alias,
+            @BrokerParam("identifier") String password) {
 
         log.info("Validating user " + alias);
         UserRegistration userReg = userRepository.findByAlias(alias).orElse(null);

@@ -1,12 +1,10 @@
 package com.promptarchitect.model;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Behavior {
@@ -27,12 +25,27 @@ public class Behavior {
         edgeCases.add("Empty list states showing placeholders");
     }
 
-    public List<String> getStateChanges() { return stateChanges; }
-    public void setStateChanges(List<String> stateChanges) { this.stateChanges = stateChanges; }
+    public List<String> getStateChanges() {
+        return stateChanges;
+    }
 
-    public List<String> getValidation() { return validation; }
-    public void setValidation(List<String> validation) { this.validation = validation; }
+    public void setStateChanges(List<String> stateChanges) {
+        this.stateChanges = stateChanges;
+    }
 
-    public List<String> getEdgeCases() { return edgeCases; }
-    public void setEdgeCases(List<String> edgeCases) { this.edgeCases = edgeCases; }
+    public List<String> getValidation() {
+        return validation;
+    }
+
+    public void setValidation(List<String> validation) {
+        this.validation = validation;
+    }
+
+    public List<String> getEdgeCases() {
+        return edgeCases;
+    }
+
+    public void setEdgeCases(List<String> edgeCases) {
+        this.edgeCases = edgeCases;
+    }
 }

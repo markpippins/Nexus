@@ -3,11 +3,8 @@ package nexus.serviceregistry.v1.repository;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import nexus.serviceregistry.v1.entity.Deployment;
 import nexus.serviceregistry.v1.entity.ServiceBackend;
 
 @Repository

@@ -1,7 +1,7 @@
 package nexus.serviceregistry.v1.controller;
 
-import nexus.serviceregistry.v1.entity.ServiceLibrary;
-import nexus.serviceregistry.v1.repository.ServiceLibraryRepository;
+import java.util.Optional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Optional;
+import nexus.serviceregistry.v1.entity.ServiceLibrary;
+import nexus.serviceregistry.v1.repository.ServiceLibraryRepository;
 
 @RestController
 @RequestMapping("/api/v1/service-libraries")
@@ -40,27 +40,33 @@ public class ServiceLibraryController {
             @RequestParam(required = false) Boolean dev,
             @RequestParam(required = false) Boolean production,
             org.springframework.data.domain.Pageable pageable) {
-        
+
         if (serviceId != null) {
             if (Boolean.TRUE.equals(direct)) {
                 log.info("Fetching direct libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse.fromPage(serviceLibraryRepository.findByServiceIdAndIsDirect(serviceId, true, pageable)));
+                return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse
+                        .fromPage(serviceLibraryRepository.findByServiceIdAndIsDirect(serviceId, true, pageable)));
             } else if (Boolean.TRUE.equals(dev)) {
                 log.info("Fetching dev libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse.fromPage(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, true, pageable)));
+                return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse.fromPage(
+                        serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, true, pageable)));
             } else if (Boolean.TRUE.equals(production)) {
                 log.info("Fetching production libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse.fromPage(serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, false, pageable)));
+                return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse.fromPage(
+                        serviceLibraryRepository.findByServiceIdAndIsDevDependency(serviceId, false, pageable)));
             } else {
                 log.info("Fetching libraries for service ID: {}", serviceId);
-                return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse.fromPage(serviceLibraryRepository.findByServiceId(serviceId, pageable)));
+                return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse
+                        .fromPage(serviceLibraryRepository.findByServiceId(serviceId, pageable)));
             }
         } else if (libraryId != null) {
             log.info("Fetching services using library ID: {}", libraryId);
-            return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse.fromPage(serviceLibraryRepository.findByLibraryId(libraryId, pageable)));
+            return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse
+                    .fromPage(serviceLibraryRepository.findByLibraryId(libraryId, pageable)));
         } else {
             log.info("Fetching all service-library relationships");
-            return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse.fromPage(serviceLibraryRepository.findAll(pageable)));
+            return ResponseEntity.ok(nexus.serviceregistry.v1.dto.SpringPagedResponse
+                    .fromPage(serviceLibraryRepository.findAll(pageable)));
         }
     }
 

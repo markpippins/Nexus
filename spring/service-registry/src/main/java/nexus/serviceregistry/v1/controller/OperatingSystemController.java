@@ -2,7 +2,6 @@ package nexus.serviceregistry.v1.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -32,7 +31,8 @@ public class OperatingSystemController {
     }
 
     @GetMapping
-    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<OperatingSystem>> getAll(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<OperatingSystem>> getAll(
+            org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all operating systems");
         org.springframework.data.domain.Page<OperatingSystem> operatingSystems = repository.findAll(pageable);
         log.debug("Fetched {} operating systems", operatingSystems.getNumberOfElements());

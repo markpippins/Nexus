@@ -1,9 +1,10 @@
 package com.angrysurfer.spring.nexus.user.integration;
 
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
-import com.angrysurfer.spring.nexus.user.model.UserRegistration;
-import com.angrysurfer.spring.nexus.user.repository.UserRegistrationRepository;
-import com.angrysurfer.spring.nexus.user.service.UserAccessService;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,7 +18,10 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import static org.junit.jupiter.api.Assertions.*;
+import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.spring.nexus.user.model.UserRegistration;
+import com.angrysurfer.spring.nexus.user.repository.UserRegistrationRepository;
+import com.angrysurfer.spring.nexus.user.service.UserAccessService;
 
 /**
  * Integration tests for User Access Service.

@@ -3,11 +3,6 @@ package com.promptarchitect.model;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class PromptSpecification {
 
@@ -35,27 +30,67 @@ public class PromptSpecification {
     }
 
     // Getters and Setters
-    public Context getContext() { return context; }
-    public void setContext(Context context) { this.context = context; }
+    public Context getContext() {
+        return context;
+    }
 
-    public Requirements getRequirements() { return requirements; }
-    public void setRequirements(Requirements requirements) { this.requirements = requirements; }
+    public void setContext(Context context) {
+        this.context = context;
+    }
 
-    public UiSpec getUiSpec() { return uiSpec; }
-    public void setUiSpec(UiSpec uiSpec) { this.uiSpec = uiSpec; }
+    public Requirements getRequirements() {
+        return requirements;
+    }
 
-    public DataSpec getDataSpec() { return dataSpec; }
-    public void setDataSpec(DataSpec dataSpec) { this.dataSpec = dataSpec; }
+    public void setRequirements(Requirements requirements) {
+        this.requirements = requirements;
+    }
 
-    public Behavior getBehavior() { return behavior; }
-    public void setBehavior(Behavior behavior) { this.behavior = behavior; }
+    public UiSpec getUiSpec() {
+        return uiSpec;
+    }
 
-    public Testing getTesting() { return testing; }
-    public void setTesting(Testing testing) { this.testing = testing; }
+    public void setUiSpec(UiSpec uiSpec) {
+        this.uiSpec = uiSpec;
+    }
 
-    public Contracts getContracts() { return contracts; }
-    public void setContracts(Contracts contracts) { this.contracts = contracts; }
+    public DataSpec getDataSpec() {
+        return dataSpec;
+    }
 
-    public Generate getGenerate() { return generate; }
-    public void setGenerate(Generate generate) { this.generate = generate; }
+    public void setDataSpec(DataSpec dataSpec) {
+        this.dataSpec = dataSpec;
+    }
+
+    public Behavior getBehavior() {
+        return behavior;
+    }
+
+    public void setBehavior(Behavior behavior) {
+        this.behavior = behavior;
+    }
+
+    public Testing getTesting() {
+        return testing;
+    }
+
+    public void setTesting(Testing testing) {
+        this.testing = testing;
+    }
+
+    public Contracts getContracts() {
+        return contracts;
+    }
+
+    public void setContracts(Contracts contracts) {
+        this.contracts = contracts;
+    }
+
+    public Generate getGenerate() {
+        return generate;
+    }
+
+    public void setGenerate(Generate generate) {
+        this.generate = generate;
+    }
 }

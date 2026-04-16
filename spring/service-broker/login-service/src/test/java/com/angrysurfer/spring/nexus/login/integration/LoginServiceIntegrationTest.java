@@ -18,9 +18,9 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
-import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.login.LoginService;
 import com.angrysurfer.spring.nexus.login.client.UserAccessClient;
+import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)

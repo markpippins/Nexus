@@ -1,11 +1,20 @@
 package com.promptarchitect.ui.components;
 
-import javax.swing.*;
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+
+import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
-import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.function.Consumer;
 
 public class CollapsibleSection extends JPanel {
     private boolean isExpanded = true;
@@ -20,9 +29,8 @@ public class CollapsibleSection extends JPanel {
     public CollapsibleSection(String title) {
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor")),
-            new EmptyBorder(0, 0, 5, 0)
-        ));
+                BorderFactory.createLineBorder(UIManager.getColor("Component.borderColor")),
+                new EmptyBorder(0, 0, 5, 0)));
 
         // Header panel
         headerPanel = new JPanel(new BorderLayout());

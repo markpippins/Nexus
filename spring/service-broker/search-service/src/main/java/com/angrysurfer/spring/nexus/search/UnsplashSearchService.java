@@ -1,24 +1,21 @@
 package com.angrysurfer.spring.nexus.search;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
-
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-
-import java.time.Instant;
 
 @Service("unsplashSearchService")
 public class UnsplashSearchService {
@@ -26,10 +23,11 @@ public class UnsplashSearchService {
     private static final Logger log = LoggerFactory.getLogger(UnsplashSearchService.class);
 
     private final RestTemplate restTemplate;
-    
+
     private final SearchResultsCacheRepository cacheRepository;
 
-    // Unsplash API key - in a real implementation, this should be configured via properties
+    // Unsplash API key - in a real implementation, this should be configured via
+    // properties
     private String unsplashApiKey = "YOUR_UNSPLASH_ACCESS_KEY_HERE";
 
     private static final long CACHE_TTL_MINUTES = 30; // Cache TTL in minutes
@@ -55,7 +53,8 @@ public class UnsplashSearchService {
         }
 
         // Validate configuration
-        if (unsplashApiKey == null || unsplashApiKey.isEmpty() || unsplashApiKey.equals("YOUR_UNSPLASH_ACCESS_KEY_HERE")) {
+        if (unsplashApiKey == null || unsplashApiKey.isEmpty()
+                || unsplashApiKey.equals("YOUR_UNSPLASH_ACCESS_KEY_HERE")) {
             throw new IllegalStateException("Unsplash API Key is required. Please set it in application.properties.");
         }
 
@@ -65,30 +64,30 @@ public class UnsplashSearchService {
 
         try {
             log.debug("Making Unsplash search request to: {}", url);
-            
+
             // Create headers for Unsplash API
             HttpHeaders headers = new HttpHeaders();
             headers.set("Authorization", "Client-ID " + unsplashApiKey);
             HttpEntity<String> entity = new HttpEntity<>("", headers);
-            
+
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-            
+
             if (response.getStatusCode().is2xxSuccessful()) {
                 Map<String, Object> data = response.getBody();
-                
+
                 // Extract results from the response
                 List<Map<String, Object>> rawResults = (List<Map<String, Object>>) data.get("results");
                 List<SearchResultItem> items = new ArrayList<>();
-                
+
                 if (rawResults != null) {
                     for (Map<String, Object> rawResult : rawResults) {
                         SearchResultItem item = new SearchResultItem();
                         item.setKind((String) rawResult.get("id")); // Unsplash photo ID as kind
-                        
+
                         // Extract basic information
                         item.setTitle((String) rawResult.get("alt_description"));
                         item.setDescription((String) rawResult.get("description"));
-                        
+
                         // Extract URLs
                         Map<String, Object> urls = (Map<String, Object>) rawResult.get("urls");
                         if (urls != null) {
@@ -97,7 +96,7 @@ public class UnsplashSearchService {
                             item.setThumbImageUrl((String) urls.get("thumb"));
                             item.setFullImageUrl((String) urls.get("full"));
                         }
-                        
+
                         // Extract photographer information
                         Map<String, Object> user = (Map<String, Object>) rawResult.get("user");
                         if (user != null) {
@@ -108,7 +107,7 @@ public class UnsplashSearchService {
                                 item.setPhotographerPortfolioUrl((String) userLinks.get("html"));
                             }
                         }
-                        
+
                         // Extract image statistics
                         Map<String, Object> stats = (Map<String, Object>) rawResult.get("statistics");
                         if (stats != null) {
@@ -121,19 +120,19 @@ public class UnsplashSearchService {
                                 item.setViewCount((Integer) views.get("total"));
                             }
                         }
-                        
+
                         // Extract dimensions
                         Integer width = (Integer) rawResult.get("width");
                         Integer height = (Integer) rawResult.get("height");
                         item.setWidth(width);
                         item.setHeight(height);
-                        
+
                         // Extract timestamps
                         String createdAt = (String) rawResult.get("created_at");
                         String updatedAt = (String) rawResult.get("updated_at");
                         item.setCreatedAt(createdAt);
                         item.setUpdatedAt(updatedAt);
-                        
+
                         // Extract categories/tags
                         List<Map<String, Object>> tags = (List<Map<String, Object>>) rawResult.get("tags");
                         if (tags != null) {
@@ -146,10 +145,10 @@ public class UnsplashSearchService {
                             }
                             item.setTags(tagNames);
                         }
-                        
+
                         // Set the timestamp to current time
                         item.setTimestamp(Instant.now());
-                        
+
                         items.add(item);
                     }
                 }
@@ -157,12 +156,12 @@ public class UnsplashSearchService {
                 SearchResult result = new SearchResult();
                 result.setItems(items);
                 result.setRawResponse(data);
-                
+
                 // Cache the result in MongoDB before returning
                 SearchResultsCacheEntry newCacheEntry = new SearchResultsCacheEntry(query, items, CACHE_TTL_MINUTES);
                 cacheRepository.save(newCacheEntry);
                 log.info("Cached Unsplash search result in MongoDB for query: {}", query);
-                
+
                 return result;
             } else {
                 log.error("Unsplash search API returned error: {}", response.getStatusCode());
@@ -176,7 +175,7 @@ public class UnsplashSearchService {
             throw new RuntimeException("Failed to fetch Unsplash search results: " + e.getMessage());
         }
     }
-    
+
     /**
      * Find a valid cache entry (not expired) for the given query
      */

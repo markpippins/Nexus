@@ -1,10 +1,9 @@
 package com.promptarchitect.model;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class UiSpec {
@@ -26,12 +25,27 @@ public class UiSpec {
         elements.add(new UiElement("button", "Copy Prompt JSON", null, "handleCopy"));
     }
 
-    public List<UiElement> getElements() { return elements; }
-    public void setElements(List<UiElement> elements) { this.elements = elements; }
+    public List<UiElement> getElements() {
+        return elements;
+    }
 
-    public String getLayout() { return layout; }
-    public void setLayout(String layout) { this.layout = layout; }
+    public void setElements(List<UiElement> elements) {
+        this.elements = elements;
+    }
 
-    public String getTheme() { return theme; }
-    public void setTheme(String theme) { this.theme = theme; }
+    public String getLayout() {
+        return layout;
+    }
+
+    public void setLayout(String layout) {
+        this.layout = layout;
+    }
+
+    public String getTheme() {
+        return theme;
+    }
+
+    public void setTheme(String theme) {
+        this.theme = theme;
+    }
 }

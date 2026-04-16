@@ -1,7 +1,5 @@
 package nexus.serviceregistry.v1.controller;
 
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -33,7 +31,8 @@ public class FrameworkLanguageController {
     }
 
     @GetMapping
-    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<FrameworkLanguage>> getAll(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.angrysurfer.nexus.dto.PagedResponse<FrameworkLanguage>> getAll(
+            org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all framework languages");
         org.springframework.data.domain.Page<FrameworkLanguage> languages = repository.findAll(pageable);
         log.debug("Fetched {} framework languages", languages.getNumberOfElements());

@@ -4,7 +4,8 @@ import java.io.Serializable;
 
 /**
  * User Data Transfer Object.
- * Framework-agnostic DTO shared across Spring, Helidon, and Quarkus implementations.
+ * Framework-agnostic DTO shared across Spring, Helidon, and Quarkus
+ * implementations.
  */
 public class UserDTO implements Serializable {
 
@@ -14,6 +15,7 @@ public class UserDTO implements Serializable {
     private String alias;
     private String email;
     private boolean admin;
+    private String avatarUrl;
 
     public UserDTO() {
     }
@@ -48,5 +50,13 @@ public class UserDTO implements Serializable {
 
     public void setAdmin(boolean admin) {
         this.admin = admin;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 }

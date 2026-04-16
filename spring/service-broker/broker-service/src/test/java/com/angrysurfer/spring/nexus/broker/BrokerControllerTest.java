@@ -1,11 +1,15 @@
 package com.angrysurfer.spring.nexus.broker;
 
-import com.angrysurfer.spring.nexus.admin.logging.service.AdminLoggingService;
-import com.angrysurfer.spring.nexus.broker.Broker;
-import com.angrysurfer.spring.nexus.broker.BrokerController;
-import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
-import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
-import com.angrysurfer.spring.nexus.broker.api.v1.ServiceResponseBody;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
+import java.util.Collections;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,11 +18,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
-import java.util.Collections;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import com.angrysurfer.spring.nexus.admin.logging.service.AdminLoggingService;
+import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
+import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
+import com.angrysurfer.spring.nexus.broker.api.v1.ServiceResponseBody;
 
 @ExtendWith(MockitoExtension.class)
 class BrokerControllerTest {
@@ -39,8 +42,8 @@ class BrokerControllerTest {
     @Test
     void testSubmitRequestSuccess() {
         // Arrange
-        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = 
-            new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest("testService", "testOperation",
+        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest(
+                "testService", "testOperation",
                 Collections.emptyMap(), "test-request");
         ServiceResponse<?> mockResponse = ServiceResponse.ok("Test Data", "test-request");
 
@@ -63,11 +66,11 @@ class BrokerControllerTest {
     @Test
     void testSubmitRequestError() {
         // Arrange
-        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = 
-            new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest("testService", "testOperation",
+        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest(
+                "testService", "testOperation",
                 Collections.emptyMap(), "test-request");
         ServiceResponse<?> mockResponse = ServiceResponse.error(
-            java.util.List.of(java.util.Map.of("error", "Service error")), "test-request");
+                java.util.List.of(java.util.Map.of("error", "Service error")), "test-request");
 
         doReturn(mockResponse).when(broker).submit(any(ServiceRequest.class));
 
@@ -109,7 +112,7 @@ class BrokerControllerTest {
     void testTestBrokerEndpointError() {
         // Arrange
         ServiceResponse<?> mockResponse = ServiceResponse.error(
-            java.util.List.of(java.util.Map.of("error", "Test error")), "test-request");
+                java.util.List.of(java.util.Map.of("error", "Test error")), "test-request");
 
         doReturn(mockResponse).when(broker).submit(any(ServiceRequest.class));
 
@@ -129,8 +132,8 @@ class BrokerControllerTest {
     @Test
     void testBrokerSubmitInvokedWithCorrectRequest() {
         // Arrange
-        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = 
-            new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest("userService", "createUser",
+        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest(
+                "userService", "createUser",
                 java.util.Map.of("name", "John", "email", "john@example.com"), "request-123");
 
         ServiceResponse<?> mockResponse = ServiceResponse.ok("User created", "request-123");
@@ -168,8 +171,8 @@ class BrokerControllerTest {
 
         // Check that the broker field is set
         // Note: We can't directly access private fields, so we test behavior instead
-        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = 
-            new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest("test", "test", Collections.emptyMap(), "test");
+        com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest v1Request = new com.angrysurfer.spring.nexus.broker.api.v1.ServiceRequest(
+                "test", "test", Collections.emptyMap(), "test");
         ServiceResponse<?> expectedResponse = ServiceResponse.ok("test", "test");
         doReturn(expectedResponse).when(broker).submit(any(ServiceRequest.class));
 

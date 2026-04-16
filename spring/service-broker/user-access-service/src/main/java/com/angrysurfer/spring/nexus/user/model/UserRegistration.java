@@ -2,7 +2,7 @@ package com.angrysurfer.spring.nexus.user.model;
 
 import java.io.Serializable;
 
-import com.angrysurfer.nexus.user.UserRegistrationDTO;
+import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

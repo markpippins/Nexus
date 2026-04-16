@@ -1,23 +1,20 @@
 package com.angrysurfer.spring.nexus.search;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
-
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-
-import java.time.Instant;
 
 @Service("googleSearchService")
 public class GoogleSearchService {
@@ -25,7 +22,7 @@ public class GoogleSearchService {
     private static final Logger log = LoggerFactory.getLogger(GoogleSearchService.class);
 
     private final RestTemplate restTemplate;
-    
+
     private final SearchResultsCacheRepository cacheRepository;
 
     // @Value("${google.search.api.key:#{null}}")
@@ -33,7 +30,7 @@ public class GoogleSearchService {
 
     // @Value("${google.search.engine.id:#{null}}")
     private String searchEngineId = "e44fd2743cc9e49c8";
-    
+
     // Cache TTL in minutes (default 30 minutes)
     private static final long CACHE_TTL_MINUTES = 30;
 
@@ -60,7 +57,8 @@ public class GoogleSearchService {
         // Validate configuration
         if (googleApiKey == null || googleApiKey.isEmpty()) {
             log.warn("Google API Key is not configured. Search functionality will fail.");
-            // Return an empty result instead of throwing an exception to satisfy test expectations
+            // Return an empty result instead of throwing an exception to satisfy test
+            // expectations
             SearchResult result = new SearchResult();
             result.setItems(null);
             result.setRawResponse(null);
@@ -69,7 +67,8 @@ public class GoogleSearchService {
 
         if (searchEngineId == null || searchEngineId.isEmpty()) {
             log.warn("Search Engine ID is not configured. Search functionality will fail.");
-            // Return an empty result instead of throwing an exception to satisfy test expectations
+            // Return an empty result instead of throwing an exception to satisfy test
+            // expectations
             SearchResult result = new SearchResult();
             result.setItems(null);
             result.setRawResponse(null);
@@ -78,16 +77,16 @@ public class GoogleSearchService {
 
         // Properly URL encode the query
         String encodedQuery = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8);
-        String url = String.format("https://www.googleapis.com/customsearch/v1?key=%s&cx=%s&q=%s", 
-                                  googleApiKey, searchEngineId, encodedQuery);
+        String url = String.format("https://www.googleapis.com/customsearch/v1?key=%s&cx=%s&q=%s",
+                googleApiKey, searchEngineId, encodedQuery);
 
         try {
             log.debug("Making request to: {}", url);
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, Map.class);
-            
+
             if (response.getStatusCode().is2xxSuccessful()) {
                 Map<String, Object> data = response.getBody();
-                
+
                 // Extract items from the response
                 List<Map<String, Object>> rawItems = (List<Map<String, Object>>) data.get("items");
                 List<SearchResultItem> items = null; // Keep as null if rawItems is null
@@ -125,16 +124,17 @@ public class GoogleSearchService {
                 SearchResult result = new SearchResult();
                 result.setItems(items);
                 result.setRawResponse(data);
-                
+
                 // Cache the result in MongoDB before returning
                 SearchResultsCacheEntry newCacheEntry = new SearchResultsCacheEntry(query, items, CACHE_TTL_MINUTES);
                 cacheRepository.save(newCacheEntry);
                 log.info("Cached result in MongoDB for query: {}", query);
-                
+
                 return result;
             } else {
                 log.error("Google search API returned error: {}", response.getStatusCode());
-                // Return an empty result instead of throwing an exception to satisfy test expectations
+                // Return an empty result instead of throwing an exception to satisfy test
+                // expectations
                 SearchResult result = new SearchResult();
                 result.setItems(null);
                 result.setRawResponse(null);
@@ -142,21 +142,23 @@ public class GoogleSearchService {
             }
         } catch (org.springframework.web.client.ResourceAccessException e) {
             log.error("Network error performing Google search: {}", e.getMessage());
-            // Return an empty result instead of throwing an exception to satisfy test expectations
+            // Return an empty result instead of throwing an exception to satisfy test
+            // expectations
             SearchResult result = new SearchResult();
             result.setItems(null);
             result.setRawResponse(null);
             return result;
         } catch (Exception e) {
             log.error("Error performing Google search: {}", e.getMessage());
-            // Return an empty result instead of throwing an exception to satisfy test expectations
+            // Return an empty result instead of throwing an exception to satisfy test
+            // expectations
             SearchResult result = new SearchResult();
             result.setItems(null);
             result.setRawResponse(null);
             return result;
         }
     }
-    
+
     /**
      * Find a valid cache entry (not expired) for the given query
      */

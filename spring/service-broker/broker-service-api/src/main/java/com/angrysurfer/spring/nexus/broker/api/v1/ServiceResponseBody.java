@@ -3,7 +3,6 @@ package com.angrysurfer.spring.nexus.broker.api.v1;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -77,7 +76,8 @@ public class ServiceResponseBody implements Serializable {
         return response;
     }
 
-    public static ServiceResponseBody error(String service, String operation, List<ResponseError> errors, String requestId) {
+    public static ServiceResponseBody error(String service, String operation, List<ResponseError> errors,
+            String requestId) {
         ServiceResponseBody response = new ServiceResponseBody(false, requestId, Instant.now());
         response.setErrors(errors);
         response.setService(service);
@@ -204,8 +204,7 @@ public class ServiceResponseBody implements Serializable {
      */
     @SuppressWarnings("unchecked")
     public com.angrysurfer.spring.nexus.broker.api.ServiceResponse<Object> toLegacy() {
-        com.angrysurfer.spring.nexus.broker.api.ServiceResponse<Object> legacy =
-            new com.angrysurfer.spring.nexus.broker.api.ServiceResponse<>();
+        com.angrysurfer.spring.nexus.broker.api.ServiceResponse<Object> legacy = new com.angrysurfer.spring.nexus.broker.api.ServiceResponse<>();
         legacy.setOk(this.ok);
         legacy.setData(this.data);
         legacy.setRequestId(this.requestId);

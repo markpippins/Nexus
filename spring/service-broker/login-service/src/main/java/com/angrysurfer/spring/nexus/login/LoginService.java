@@ -8,15 +8,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
-
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
-import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
 import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
 import com.angrysurfer.spring.nexus.login.client.UserAccessClient;
+import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
 
 import feign.FeignException;
 

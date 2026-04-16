@@ -9,7 +9,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
@@ -49,10 +48,11 @@ public class BrokerAutoRegistration {
         for (String beanName : beanNames) {
             Object bean = context.getBean(beanName);
             Class<?> beanClass = bean.getClass();
-            
-            // Skip Spring internal beans and proxies if possible, but we need to check methods
+
+            // Skip Spring internal beans and proxies if possible, but we need to check
+            // methods
             // AOP proxies might hide annotations, but Spring usually handles this.
-            
+
             List<String> operations = new ArrayList<>();
             for (Method method : beanClass.getMethods()) {
                 if (method.isAnnotationPresent(BrokerOperation.class)) {
@@ -95,7 +95,8 @@ public class BrokerAutoRegistration {
                     Map<String, Object> params = new HashMap<>();
                     params.put("registration", registration);
 
-                    ServiceRequest request = new ServiceRequest("serviceRegistry", "register", params, "auto-reg-" + serviceName);
+                    ServiceRequest request = new ServiceRequest("serviceRegistry", "register", params,
+                            "auto-reg-" + serviceName);
                     ServiceResponse<?> response = remoteBrokerClient.submit(request);
 
                     if (response.isOk()) {
@@ -111,7 +112,8 @@ public class BrokerAutoRegistration {
                     Map<String, Object> params = new HashMap<>();
                     params.put("registration", registration);
 
-                    ServiceRequest request = new ServiceRequest("serviceRegistry", "register", params, "auto-reg-" + serviceName);
+                    ServiceRequest request = new ServiceRequest("serviceRegistry", "register", params,
+                            "auto-reg-" + serviceName);
                     broker.submit(request);
 
                     log.info("Auto-registered service with local broker: {}", serviceName);
@@ -120,7 +122,7 @@ public class BrokerAutoRegistration {
                 log.error("Failed to auto-register service: {}", serviceName, e);
             }
         }
-        
+
         log.info("Auto-registration complete.");
     }
 }

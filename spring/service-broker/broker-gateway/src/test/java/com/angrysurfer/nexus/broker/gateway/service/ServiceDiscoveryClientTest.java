@@ -1,7 +1,13 @@
 package com.angrysurfer.nexus.broker.gateway.service;
 
-import com.angrysurfer.spring.nexus.broker.gateway.service.ServiceDiscoveryClientImpl;
-import com.angrysurfer.spring.nexus.broker.spi.ServiceDiscoveryClient;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,11 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import com.angrysurfer.spring.nexus.broker.gateway.service.ServiceDiscoveryClientImpl;
 
 @ExtendWith(MockitoExtension.class)
 class ServiceDiscoveryClientTest {

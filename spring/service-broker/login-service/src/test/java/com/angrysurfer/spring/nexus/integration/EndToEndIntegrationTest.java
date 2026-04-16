@@ -12,9 +12,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 
-import com.angrysurfer.nexus.user.UserRegistrationDTO;
 import com.angrysurfer.spring.nexus.login.LoginService;
 import com.angrysurfer.spring.nexus.login.client.UserAccessClient;
+import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
 
 @ExtendWith(MockitoExtension.class)
 class EndToEndIntegrationTest {

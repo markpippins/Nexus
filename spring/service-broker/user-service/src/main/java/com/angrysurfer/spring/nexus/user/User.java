@@ -39,7 +39,8 @@ public class User implements Serializable {
         dto.setAdmin(isAdmin());
         dto.setAvatarUrl(getAvatarUrl());
         // Note: identifier not included in DTO for security
-        // Note: social media fields (followers, following, friends) removed - deprecated
+        // Note: social media fields (followers, following, friends) removed -
+        // deprecated
         return dto;
     }
 
