@@ -1,3 +1,7 @@
+/**
+ * Deprecated: This DTO has moved under com.aibizarchitect.nexus.core adapters.
+ * This class remains to ease migration and will be pruned manually later.
+ */
 package com.angrysurfer.spring.nexus.broker.api;
 
 import java.io.Serializable;
@@ -10,6 +14,7 @@ import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 
 @Data
+@Deprecated
 public class ServiceRegistration implements Serializable {
     
     private static final long serialVersionUID = 1L;
