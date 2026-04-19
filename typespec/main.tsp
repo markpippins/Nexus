@@ -15,6 +15,9 @@ import "./restfs/operations.tsp";
 import "./lookups/models.tsp";
 import "./lookups/operations.tsp";
 
+// Service Core API (canonical core)
+import "./core/models.tsp";
+
 // Service Broker API
 import "./service-broker/broker-service/api/models.tsp";
 import "./service-broker/broker-service/api/operations.tsp";

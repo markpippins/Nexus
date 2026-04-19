@@ -1,0 +1,11 @@
+{
+  "id": "b325f66c-ca77-4c10-a75c-a937b432814c",
+  "type": "StepRejected",
+  "timestamp": "2026-04-09T04:00:29.434668+00:00",
+  "source": "system",
+  "payload": {
+    "idea_id": "evt-0004",
+    "step": "requirements",
+    "reason": "step 'vocabulary' must be completed before 'requirements'"
+  }
+}

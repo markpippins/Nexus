@@ -1,0 +1,11 @@
+{
+  "id": "3559da26-5ae4-481c-9c42-196bf773faab",
+  "type": "StepRejected",
+  "timestamp": "2026-04-09T04:03:45.026657+00:00",
+  "source": "system",
+  "payload": {
+    "idea_id": "evt-0004",
+    "step": "compile",
+    "reason": "step 'requirements' must be completed before 'compile'"
+  }
+}

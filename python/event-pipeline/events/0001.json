@@ -1,0 +1,9 @@
+{
+  "id": "evt-0001",
+  "type": "IdeaCaptured",
+  "timestamp": "2026-04-08T12:00:00Z",
+  "source": "human",
+  "payload": {
+    "idea": "Prototype Cassandra projection for AI events"
+  }
+}

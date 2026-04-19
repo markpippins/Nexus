@@ -1,0 +1,878 @@
+{
+  "kind": "customsearch#search",
+  "url": {
+    "type": "application/json",
+    "template": "https://www.googleapis.com/customsearch/v1?q={searchTerms}&num={count?}&start={startIndex?}&lr={language?}&safe={safe?}&cx={cx?}&sort={sort?}&filter={filter?}&gl={gl?}&cr={cr?}&googlehost={googleHost?}&c2coff={disableCnTwTranslation?}&hq={hq?}&hl={hl?}&siteSearch={siteSearch?}&siteSearchFilter={siteSearchFilter?}&exactTerms={exactTerms?}&excludeTerms={excludeTerms?}&linkSite={linkSite?}&orTerms={orTerms?}&dateRestrict={dateRestrict?}&lowRange={lowRange?}&highRange={highRange?}&searchType={searchType}&fileType={fileType?}&rights={rights?}&imgSize={imgSize?}&imgType={imgType?}&imgColorType={imgColorType?}&imgDominantColor={imgDominantColor?}&alt=json"
+  },
+  "queries": {
+    "request": [
+      {
+        "title": "Google Custom Search - angular 20",
+        "totalResults": "142000000",
+        "searchTerms": "angular 20",
+        "count": 10,
+        "startIndex": 1,
+        "inputEncoding": "utf8",
+        "outputEncoding": "utf8",
+        "safe": "off",
+        "cx": "e44fd2743cc9e49c8"
+      }
+    ],
+    "nextPage": [
+      {
+        "title": "Google Custom Search - angular 20",
+        "totalResults": "142000000",
+        "searchTerms": "angular 20",
+        "count": 10,
+        "startIndex": 11,
+        "inputEncoding": "utf8",
+        "outputEncoding": "utf8",
+        "safe": "off",
+        "cx": "e44fd2743cc9e49c8"
+      }
+    ]
+  },
+  "context": {
+    "title": "Throttler"
+  },
+  "searchInformation": {
+    "searchTime": 0.425766,
+    "formattedSearchTime": "0.43",
+    "totalResults": "142000000",
+    "formattedTotalResults": "142,000,000"
+  },
+  "items": [
+    {
+      "kind": "customsearch#result",
+      "title": "Home • Angular",
+      "htmlTitle": "Home • <b>Angular</b>",
+      "link": "https://angular.dev/",
+      "displayLink": "angular.dev",
+      "snippet": "v20. ctrl K; Docs · Tutorials · Playground · Reference. more_horiz. routine. This site uses cookies from Google to deliver its services and to analyze traffic.",
+      "htmlSnippet": "<b>v20</b>. ctrl K; Docs &middot; Tutorials &middot; Playground &middot; Reference. more_horiz. routine. This site uses cookies from Google to deliver its services and to analyze traffic.",
+      "formattedUrl": "https://angular.dev/",
+      "htmlFormattedUrl": "https://<b>angular</b>.dev/",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTx_BHGINIXRTKf0dUOspUnjLkX5blJ9UYqpKPMwTc3ZGkoVpDh7Nfp-mA&s",
+            "width": "310",
+            "height": "163"
+          }
+        ],
+        "metatags": [
+          {
+            "application-name": "Angular",
+            "msapplication-tilecolor": "#e90464",
+            "msapplication-config": "/assets/icons/browserconfig.xml",
+            "og:image": "https://angular.dev/assets/images/ng-image.jpg",
+            "theme-color": "#ffffff",
+            "og:type": "website",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "Home • Angular",
+            "twitter:url": "https://angular.dev/",
+            "author": "Angular Team",
+            "apple-mobile-web-app-title": "Angular",
+            "og:title": "Home • Angular",
+            "og:description": "The web development framework for building modern apps.",
+            "twitter:creator": "@Angular",
+            "twitter:image": "https://angular.dev/assets/images/ng-image.jpg",
+            "twitter:site": "@Angular",
+            "viewport": "width=device-width, initial-scale=1",
+            "twitter:description": "The web development framework for building modern apps.",
+            "og:url": "https://angular.dev/"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://angular.dev/assets/images/ng-image.jpg"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Announcing Angular v20. The past couple of years have been… | by ...",
+      "htmlTitle": "Announcing <b>Angular v20</b>. The past couple of years have been… | by ...",
+      "link": "https://blog.angular.dev/announcing-angular-v20-b5c9c06cf301",
+      "displayLink": "blog.angular.dev",
+      "snippet": "May 28, 2025 ... Angular v20 is our latest release where we have spent countless hours polishing some of our in-progress features for the rock-solid developer experience that ...",
+      "htmlSnippet": "May 28, 2025 <b>...</b> <b>Angular v20</b> is our latest release where we have spent countless hours polishing some of our in-progress features for the rock-solid developer experience that&nbsp;...",
+      "formattedUrl": "https://blog.angular.dev/announcing-angular-v20-b5c9c06cf301",
+      "htmlFormattedUrl": "https://blog.<b>angular</b>.dev/announcing-<b>angular</b>-v20-b5c9c06cf301",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcToeWN44uFClzG0zG02D4bt9OSbYTu2aSwMQeEz2qjcbTk-7Tt-D0MH3LYT&s",
+            "width": "308",
+            "height": "164"
+          }
+        ],
+        "metatags": [
+          {
+            "apple-itunes-app": "app-id=828256236, app-argument=/announcing-angular-v20-b5c9c06cf301, affiliate-data=pt=698524&ct=smart_app_banner&mt=8",
+            "og:image": "https://miro.medium.com/v2/da:true/resize:fit:1200/0*AKeww522_kpUoxEc",
+            "twitter:app:url:iphone": "medium://p/b5c9c06cf301",
+            "theme-color": "#000000",
+            "article:published_time": "2025-05-28T18:33:27.760Z",
+            "twitter:card": "summary_large_image",
+            "og:site_name": "Medium",
+            "al:android:package": "com.medium.reader",
+            "twitter:label1": "Reading time",
+            "twitter:app:id:iphone": "828256236",
+            "title": "Announcing Angular v20. The past couple of years have been… | by Minko Gechev | Angular Blog",
+            "al:ios:url": "medium://p/b5c9c06cf301",
+            "og:description": "The past couple of years have been transformative for Angular, as we’ve unleashed major advancements like reactivity with Signals and the…",
+            "twitter:creator": "@mgechev",
+            "al:ios:app_store_id": "828256236",
+            "twitter:data1": "15 min read",
+            "twitter:image:alt": "A banner image showing the text “Angular v20” with the Angular logo in the front. Under this, there’s the number 20 in a animated construction site with a skyline.",
+            "twitter:site": "@angular",
+            "og:type": "article",
+            "og:image:alt": "A banner image showing the text “Angular v20” with the Angular logo in the front. Under this, there’s the number 20 in a animated construction site with a skyline.",
+            "twitter:title": "Announcing Angular v20",
+            "al:ios:app_name": "Medium",
+            "author": "Minko Gechev",
+            "og:title": "Announcing Angular v20",
+            "al:web:url": "https://blog.angular.dev/announcing-angular-v20-b5c9c06cf301",
+            "article:author": "https://medium.com/@mgechev",
+            "twitter:image:src": "https://miro.medium.com/v2/da:true/resize:fit:1200/0*AKeww522_kpUoxEc",
+            "al:android:url": "medium://p/b5c9c06cf301",
+            "referrer": "unsafe-url",
+            "fb:app_id": "542599432471018",
+            "viewport": "width=device-width,minimum-scale=1,initial-scale=1,maximum-scale=1",
+            "twitter:description": "The past couple of years have been transformative for Angular, as we’ve unleashed major advancements like reactivity with Signals and the…",
+            "og:url": "https://blog.angular.dev/announcing-angular-v20-b5c9c06cf301",
+            "twitter:app:name:iphone": "Medium",
+            "al:android:app_name": "Medium"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://miro.medium.com/v2/da:true/resize:fit:1200/0*AKeww522_kpUoxEc"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Angular V20 - Whats Coming? : r/Angular2",
+      "htmlTitle": "<b>Angular V20</b> - Whats Coming? : r/Angular2",
+      "link": "https://www.reddit.com/r/Angular2/comments/1kq9hzs/angular_v20_whats_coming/",
+      "displayLink": "www.reddit.com",
+      "snippet": "May 19, 2025 ... Does anyone have a good resource or know what is incoming in v20? Wondering what will be definitively out of Developer Preview and what can ...",
+      "htmlSnippet": "May 19, 2025 <b>...</b> Does anyone have a good resource or know what is incoming in <b>v20</b>? Wondering what will be definitively out of Developer Preview and what can&nbsp;...",
+      "formattedUrl": "https://www.reddit.com/r/Angular2/comments/.../angular_v20_whats_comi...",
+      "htmlFormattedUrl": "https://www.reddit.com/r/<b>Angular</b>2/comments/.../<b>angular</b>_v20_whats_comi...",
+      "pagemap": {
+        "metatags": [
+          {
+            "og:image": "https://share.redd.it/preview/post/1kq9hzs",
+            "theme-color": "#000000",
+            "og:image:width": "1200",
+            "og:type": "website",
+            "og:image:alt": "An image containing a preview of the post",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "r/Angular2 on Reddit: Angular V20 - Whats Coming?",
+            "og:site_name": "Reddit",
+            "og:title": "r/Angular2 on Reddit: Angular V20 - Whats Coming?",
+            "og:image:height": "630",
+            "msapplication-navbutton-color": "#000000",
+            "og:description": "Posted by u/Own_Read2075 - 26 votes and 54 comments",
+            "twitter:image": "https://share.redd.it/preview/post/1kq9hzs",
+            "apple-mobile-web-app-status-bar-style": "black",
+            "twitter:site": "@reddit",
+            "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+            "apple-mobile-web-app-capable": "yes",
+            "og:ttl": "600",
+            "og:url": "https://www.reddit.com/r/Angular2/comments/1kq9hzs/angular_v20_whats_coming/?seeker-session=true"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Angular 20 - What's New - Angular.love",
+      "htmlTitle": "<b>Angular 20</b> - What&#39;s New - Angular.love",
+      "link": "https://angular.love/angular-20-whats-new",
+      "displayLink": "angular.love",
+      "snippet": "May 29, 2025 ... Angular 20 has just been released, introducing brand-new APIs, developer-experience enhancements, improved type checking, better CLI diagnostics, and the ...",
+      "htmlSnippet": "May 29, 2025 <b>...</b> <b>Angular 20</b> has just been released, introducing brand-new APIs, developer-experience enhancements, improved type checking, better CLI diagnostics, and the&nbsp;...",
+      "formattedUrl": "https://angular.love/angular-20-whats-new",
+      "htmlFormattedUrl": "https://<b>angular</b>.love/<b>angular</b>-<b>20</b>-whats-new",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQYq3w45mS1n-PhUXlMFYvnJL39f-LeSQYDWpHMEvdd44gF9A57hoTJJ1A&s",
+            "width": "300",
+            "height": "168"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://wp.angular.love/wp-content/uploads/2025/05/Okladki-blog-1920-x-1080-px-15.png",
+            "image": "https://wp.angular.love/wp-content/uploads/2025/05/Okladki-blog-1920-x-1080-px-15.png",
+            "og:type": "article",
+            "og:image:width": "1920",
+            "article:modifiedd_time": "2025-07-22T09:24:33+00:00",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "Angular 20 - What’s New - Angular.love",
+            "og:site_name": "Angular.love",
+            "twitter:url": "https://angular.love/angular-20-whats-new",
+            "og:title": "Angular 20 - What’s New - Angular.love",
+            "twitter:label1": "Napisane przez",
+            "og:image:height": "1080",
+            "twitter:label2": "Szacowany czas czytania",
+            "og:description": "Angular.love - a place for all Angular enthusiasts created to inspire and educate.",
+            "twitter:data1": "Dawid Kostka",
+            "twitter:image": "https://wp.angular.love/wp-content/uploads/2025/05/Okladki-blog-1920-x-1080-px-15.png",
+            "article:publisher": "https://www.facebook.com/www.angular.love",
+            "twitter:data2": "13 minut",
+            "viewport": "width=device-width, initial-scale=1",
+            "twitter:description": "Angular.love - a place for all Angular enthusiasts created to inspire and educate.",
+            "og:locale": "en_US",
+            "name": "Angular 20 - What’s New - Angular.love",
+            "og:url": "https://angular.love/angular-20-whats-new"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://wp.angular.love/wp-content/uploads/2025/05/Okladki-blog-1920-x-1080-px-15.png"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Angular 20 - removing suffixes from components / services : r/Angular2",
+      "htmlTitle": "<b>Angular 20</b> - removing suffixes from components / services : r/Angular2",
+      "link": "https://www.reddit.com/r/Angular2/comments/1l9iq1s/angular_20_removing_suffixes_from_components/",
+      "displayLink": "www.reddit.com",
+      "snippet": "Jun 12, 2025 ... The component suffix there is redundant and unnecessary. So that means at the very least, the suffix would drop from the component class name.",
+      "htmlSnippet": "Jun 12, 2025 <b>...</b> The component suffix there is redundant and unnecessary. So that means at the very least, the suffix would drop from the component class name.",
+      "formattedUrl": "https://www.reddit.com/.../Angular2/.../angular_20_removing_suffixes_fro...",
+      "htmlFormattedUrl": "https://www.reddit.com/.../<b>Angular</b>2/.../<b>angular</b>_<b>20</b>_removing_suffixes_fro...",
+      "pagemap": {
+        "metatags": [
+          {
+            "og:image": "https://share.redd.it/preview/post/1l9iq1s",
+            "theme-color": "#000000",
+            "og:image:width": "1200",
+            "og:type": "website",
+            "og:image:alt": "An image containing a preview of the post",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "r/Angular2 on Reddit: Angular 20 - removing suffixes from components / services",
+            "og:site_name": "Reddit",
+            "og:title": "r/Angular2 on Reddit: Angular 20 - removing suffixes from components / services",
+            "og:image:height": "630",
+            "msapplication-navbutton-color": "#000000",
+            "og:description": "Posted by u/matrium0 - 126 votes and 95 comments",
+            "twitter:image": "https://share.redd.it/preview/post/1l9iq1s",
+            "apple-mobile-web-app-status-bar-style": "black",
+            "twitter:site": "@reddit",
+            "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+            "apple-mobile-web-app-capable": "yes",
+            "og:ttl": "600",
+            "og:url": "https://www.reddit.com/r/Angular2/comments/1l9iq1s/angular_20_removing_suffixes_from_components/?seeker-session=true"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Tailwind and Angular 20 · tailwindlabs tailwindcss · Discussion ...",
+      "htmlTitle": "Tailwind and <b>Angular 20</b> · tailwindlabs tailwindcss · Discussion ...",
+      "link": "https://github.com/tailwindlabs/tailwindcss/discussions/18333",
+      "displayLink": "github.com",
+      "snippet": "Jun 20, 2025 ... Hi. I am struggling to get Tailwind 4.1 to work with Angular 20.0.2. Has anyone been succesful at this and could share steps?",
+      "htmlSnippet": "Jun 20, 2025 <b>...</b> Hi. I am struggling to get Tailwind 4.1 to work with <b>Angular</b> 20.0.2. Has anyone been succesful at this and could share steps?",
+      "formattedUrl": "https://github.com/tailwindlabs/tailwindcss/discussions/18333",
+      "htmlFormattedUrl": "https://github.com/tailwindlabs/tailwindcss/discussions/18333",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQtnsgIoCsmMDFLZ1-8L41VtHCUW4ocKixmDIg_1XFewMgxG5SaGDFsFIQ&s",
+            "width": "318",
+            "height": "159"
+          }
+        ],
+        "softwaresourcecode": [
+          {
+            "author": "tailwindlabs",
+            "name": "tailwindcss"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://opengraph.githubassets.com/f28937cf726dc9a39c0f83d55839d22d211114b098eda686c27f1fc858f7904a/tailwindlabs/tailwindcss/discussions/18333",
+            "twitter:card": "summary_large_image",
+            "og:image:width": "1200",
+            "og:site_name": "GitHub",
+            "release": "934146c7614e15bfb4c54ae4fdfe7afa9b8a4974",
+            "html-safe-nonce": "09c881e5878dc4df288a0b0e650ae5128501bdf32a4291171c94da22846dc829",
+            "expected-hostname": "github.com",
+            "og:description": "Hi I am struggling to get Tailwind 4.1 to work with Angular 20.0.2. Has anyone been succesful at this and could share steps? I continually get the following: Error: It looks like you're trying to u...",
+            "browser-errors-url": "https://api.github.com/_private/browser/errors",
+            "octolytics-dimension-user_login": "tailwindlabs",
+            "hostname": "github.com",
+            "browser-stats-url": "https://api.github.com/_private/browser/stats",
+            "route-pattern": "/_view_fragments/Voltron::DiscussionsFragmentsController/show/:user_id/:repository/:discussion_number/discussion_layout(.:format)",
+            "octolytics-dimension-repository_id": "106017343",
+            "octolytics-dimension-repository_network_root_nwo": "tailwindlabs/tailwindcss",
+            "og:image:alt": "Hi I am struggling to get Tailwind 4.1 to work with Angular 20.0.2. Has anyone been succesful at this and could share steps? I continually get the following: Error: It looks like you're trying to u...",
+            "visitor-hmac": "2a7f67c648951878b060368f9684a23a13d1e91e4a06221c709bd9ba87079438",
+            "turbo-cache-control": "no-preview",
+            "request-id": "D416:36B20C:1F88718:2AF0B91:690E2735",
+            "octolytics-dimension-repository_is_fork": "false",
+            "go-import": "github.com/tailwindlabs/tailwindcss git https://github.com/tailwindlabs/tailwindcss.git",
+            "octolytics-dimension-user_id": "67109815",
+            "octolytics-dimension-repository_network_root_id": "106017343",
+            "route-controller": "voltron_discussions_fragments",
+            "octolytics-url": "https://collector.github.com/github/collect",
+            "apple-itunes-app": "app-id=1477376905, app-argument=https://github.com/_view_fragments/Voltron::DiscussionsFragmentsController/show/tailwindlabs/tailwindcss/18333/discussion_layout",
+            "theme-color": "#1e2327",
+            "hovercard-subject-tag": "discussion:8466510",
+            "turbo-body-classes": "logged-out env-production page-responsive",
+            "twitter:image": "https://opengraph.githubassets.com/f28937cf726dc9a39c0f83d55839d22d211114b098eda686c27f1fc858f7904a/tailwindlabs/tailwindcss/discussions/18333",
+            "twitter:site": "@github",
+            "visitor-payload": "eyJyZWZlcnJlciI6IiIsInJlcXVlc3RfaWQiOiJENDE2OjM2QjIwQzoxRjg4NzE4OjJBRjBCOTE6NjkwRTI3MzUiLCJ2aXNpdG9yX2lkIjoiNzExMDI1MzU5MjE4MzcxMTU0NSIsInJlZ2lvbl9lZGdlIjoiaWFkIiwicmVnaW9uX3JlbmRlciI6ImlhZCJ9",
+            "github-keyboard-shortcuts": "repository,copilot",
+            "fetch-nonce": "v2:4b1675f7-7643-5ade-cc03-3e42a52c14ed",
+            "twitter:title": "Tailwind and Angular 20 · tailwindlabs tailwindcss · Discussion #18333",
+            "og:type": "object",
+            "og:title": "Tailwind and Angular 20 · tailwindlabs tailwindcss · Discussion #18333",
+            "og:image:height": "600",
+            "route-action": "discussion_layout",
+            "analytics-location": "/<user-name>/<repo-name>/voltron/discussions_fragments/discussion_layout",
+            "color-scheme": "light dark",
+            "octolytics-dimension-repository_public": "true",
+            "fb:app_id": "1401488693436528",
+            "ui-target": "full",
+            "octolytics-dimension-repository_nwo": "tailwindlabs/tailwindcss",
+            "viewport": "width=device-width",
+            "twitter:description": "Hi I am struggling to get Tailwind 4.1 to work with Angular 20.0.2. Has anyone been succesful at this and could share steps? I continually get the following: Error: It looks like you&#39;re trying ...",
+            "current-catalog-service-hash": "9f0abe34da433c9b6db74bffa2466494a717b579a96b30a5d252e5090baea7be",
+            "og:url": "https://github.com/tailwindlabs/tailwindcss/discussions/18333"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://opengraph.githubassets.com/f28937cf726dc9a39c0f83d55839d22d211114b098eda686c27f1fc858f7904a/tailwindlabs/tailwindcss/discussions/18333"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Angular 20 and Ionic 8.6 bug or something else - Ionic Angular ...",
+      "htmlTitle": "<b>Angular 20</b> and Ionic 8.6 bug or something else - Ionic Angular ...",
+      "link": "https://forum.ionicframework.com/t/angular-20-and-ionic-8-6-bug-or-something-else/248111",
+      "displayLink": "forum.ionicframework.com",
+      "snippet": "Jun 5, 2025 ... I took the route of setting up a project using the Angular CLI which installed latest Angular 20.0.0 set of packages. I then added the ionic angular package ...",
+      "htmlSnippet": "Jun 5, 2025 <b>...</b> I took the route of setting up a project using the <b>Angular</b> CLI which installed latest <b>Angular</b> 20.0.0 set of packages. I then added the ionic <b>angular</b> package&nbsp;...",
+      "formattedUrl": "https://forum.ionicframework.com/t/angular-20-and-ionic-8.../248111",
+      "htmlFormattedUrl": "https://forum.ionicframework.com/t/<b>angular</b>-<b>20</b>-and-ionic-8.../248111",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRUdZ2D101rU-ZQY9txMTcyB5tv618plgSHj_l1rA9yQeQLtUl_RssTzI8s&s",
+            "width": "308",
+            "height": "164"
+          }
+        ],
+        "imageobject": [
+          {
+            "url": "https://global.discourse-cdn.com/ionicframework/original/3X/3/1/3147b922b52d16b3aa73346a1d2cbd1cce5e00b9.png"
+          }
+        ],
+        "person": [
+          {
+            "name": "ginoluigipacitti",
+            "url": "ginoluigipacitti"
+          },
+          {
+            "name": "twestrick",
+            "url": "twestrick"
+          },
+          {
+            "name": "kensentell",
+            "url": "kensentell"
+          },
+          {
+            "name": "avmesquita",
+            "url": "avmesquita"
+          }
+        ],
+        "organization": [
+          {
+            "name": "Drifty Co."
+          }
+        ],
+        "interactioncounter": [
+          {
+            "userinteractioncount": "0",
+            "interactiontype": "http://schema.org/LikeAction"
+          },
+          {
+            "userinteractioncount": "0",
+            "interactiontype": "http://schema.org/LikeAction"
+          },
+          {
+            "userinteractioncount": "0",
+            "interactiontype": "http://schema.org/LikeAction"
+          },
+          {
+            "userinteractioncount": "0",
+            "interactiontype": "http://schema.org/LikeAction"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://global.discourse-cdn.com/ionicframework/original/3X/b/e/be9f21e0d32bf8b9c5f5962918f39bf73128fd5a.png",
+            "theme-color": "#ffffff",
+            "og:type": "website",
+            "twitter:card": "summary_large_image",
+            "twitter:title": "Angular 20 and Ionic 8.6 bug or something else",
+            "article:published_time": "2025-06-05T09:17:05+00:00",
+            "og:site_name": "Ionic Forum",
+            "twitter:url": "https://forum.ionicframework.com/t/angular-20-and-ionic-8-6-bug-or-something-else/248111",
+            "og:title": "Angular 20 and Ionic 8.6 bug or something else",
+            "color-scheme": "light",
+            "og:description": "I took the route of setting up a project using the Angular CLI which installed latest Angular 20.0.0 set of packages. I then added the ionic angular package which is 8.6.0. There were problems running ionic serve as the project name could not be recognized so I had to add --project= which overcame that but when I tried to run ionic generate and picked page it compained about path and name and I could not use that tool. Is there a compatibilty issue with these versions?",
+            "twitter:image": "https://global.discourse-cdn.com/ionicframework/original/3X/b/e/be9f21e0d32bf8b9c5f5962918f39bf73128fd5a.png",
+            "og:ignore_canonical": "true",
+            "viewport": "width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover",
+            "twitter:description": "I took the route of setting up a project using the Angular CLI which installed latest Angular 20.0.0 set of packages. I then added the ionic angular package which is 8.6.0. There were problems running ionic serve as the project name could not be recognized so I had to add --project= which overcame that but when I tried to run ionic generate and picked page it compained about path and name and I could not use that tool. Is there a compatibilty issue with these versions?",
+            "og:article:section": "Ionic Framework",
+            "og:url": "https://forum.ionicframework.com/t/angular-20-and-ionic-8-6-bug-or-something-else/248111",
+            "og:article:section:color": "3C80FF"
+          }
+        ],
+        "discussionforumposting": [
+          {
+            "datemodified": "2025-06-05T09:17:05Z",
+            "articlesection": "Ionic Angular",
+            "position": "1",
+            "text": "I took the route of setting up a project using the Angular CLI which installed latest Angular 20.0.0 set of packages. I then added the ionic angular package which is 8.6.0. There were problems...",
+            "headline": "Angular 20 and Ionic 8.6 bug or something else",
+            "url": "https://forum.ionicframework.com/t/angular-20-and-ionic-8-6-bug-or-something-else/248111",
+            "datepublished": "2025-06-05T09:17:05Z",
+            "mainentityofpage": "https://forum.ionicframework.com/t/angular-20-and-ionic-8-6-bug-or-something-else/248111"
+          }
+        ],
+        "comment": [
+          {
+            "datemodified": "2025-06-05T11:32:28Z",
+            "position": "2",
+            "text": "Angular 20 is not yet supported. See App Development Support Policy - Ionic Framework API",
+            "datepublished": "2025-06-05T11:32:28Z"
+          },
+          {
+            "image": "https://global.discourse-cdn.com/ionicframework/original/3X/8/7/87002fe4be4808c3b5d0c5def73b1895d49f5c74.png",
+            "datemodified": "2025-07-11T10:13:37Z",
+            "position": "3",
+            "text": "I’m looking to upgrade my app from Angular 18 to 20 and was wondering what problems I might encounter. I found this thread. According to @twestrick’s link above, Angular 20 is supported...",
+            "datepublished": "2025-07-11T10:13:37Z"
+          },
+          {
+            "datemodified": "2025-08-25T12:12:18Z",
+            "position": "4",
+            "text": "I have been created standalone app with angular 20 and ionic 8 with publish on firebase. To work as production, I used at application config: importProvidersFrom(IonicModule.forRoot({}))",
+            "datepublished": "2025-08-25T11:23:16Z"
+          }
+        ],
+        "itemlist": [
+          {
+            "itemlistorder": "http://schema.org/ItemListOrderDescending"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://global.discourse-cdn.com/ionicframework/original/3X/b/e/be9f21e0d32bf8b9c5f5962918f39bf73128fd5a.png"
+          }
+        ],
+        "sitenavigationelement": [
+          {
+            "name": "Home",
+            "url": "Home"
+          },
+          {
+            "name": "Categories",
+            "url": "Categories"
+          },
+          {
+            "name": "Guidelines",
+            "url": "Guidelines"
+          },
+          {
+            "name": "Terms of Service",
+            "url": "Terms of Service"
+          },
+          {
+            "name": "Privacy Policy",
+            "url": "Privacy Policy"
+          }
+        ],
+        "listitem": [
+          {
+            "item": "Ionic Framework",
+            "name": "Ionic Framework",
+            "position": "1"
+          },
+          {
+            "item": "Ionic Angular",
+            "name": "Ionic Angular",
+            "position": "2"
+          },
+          {
+            "position": "1",
+            "url": "Angular version update for Ionic 2"
+          },
+          {
+            "position": "2",
+            "url": "AngularFire 2 Setup"
+          },
+          {
+            "position": "3",
+            "url": "Upgrade Ionic2 project to latest Angular2 version"
+          },
+          {
+            "position": "4",
+            "url": "Ionic 2 rc 2.0.0 angualr fire 2 issue"
+          },
+          {
+            "position": "5",
+            "url": "Plan/roadmap for Angularjs2.0 support"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Angular 20 style guide: Theme service confusion | Yaakov Chaikin ...",
+      "htmlTitle": "<b>Angular 20</b> style guide: Theme service confusion | Yaakov Chaikin ...",
+      "link": "https://www.linkedin.com/posts/yaakovchaikin_i-find-the-new-angular-20-style-guide-which-activity-7338685993165742082-sDCF",
+      "displayLink": "www.linkedin.com",
+      "snippet": "Jun 11, 2025 ... I find the new Angular 20 style guide (which is implemented by default in the Angular CLI) hard to comprehend. So, if I want to have a Theme service, and I ask ...",
+      "htmlSnippet": "Jun 11, 2025 <b>...</b> I find the new <b>Angular 20</b> style guide (which is implemented by default in the Angular CLI) hard to comprehend. So, if I want to have a Theme service, and I ask&nbsp;...",
+      "formattedUrl": "https://www.linkedin.com/.../yaakovchaikin_i-find-the-new-angular-20-styl...",
+      "htmlFormattedUrl": "https://www.linkedin.com/.../yaakovchaikin_i-find-the-new-<b>angular</b>-<b>20</b>-styl...",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5dlwBczJBbBZwkKeQbNf71_Ei0QPUf7E59po1C21MWZEMJlTN25O12M5D&s",
+            "width": "183",
+            "height": "275"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://media.licdn.com/dms/image/v2/D4E22AQE_69EzKWXaQg/feedshare-shrink_800/B4EZdhABLHH0Ak-/0/1749679085678?e=2147483647&v=beta&t=ZrCzEgxFwaMjDz00txbSa0lvVREkC3vP4HWkjaLZ8hc",
+            "twitter:title": "Angular 20 style guide: Theme service confusion | Yaakov Chaikin posted on the topic | LinkedIn",
+            "twitter:card": "summary_large_image",
+            "og:type": "article",
+            "al:ios:app_name": "LinkedIn",
+            "twitter:url": "https://www.linkedin.com/posts/yaakovchaikin_i-find-the-new-angular-20-style-guide-which-activity-7338685993165742082-sDCF",
+            "og:title": "Angular 20 style guide: Theme service confusion | Yaakov Chaikin posted on the topic | LinkedIn",
+            "al:android:package": "com.linkedin.android",
+            "pagekey": "p_public_post",
+            "bingbot": "max-image-preview:large, archive",
+            "locale": "en_US",
+            "al:ios:url": "https://www.linkedin.com/posts/yaakovchaikin_i-find-the-new-angular-20-style-guide-which-activity-7338685993165742082-sDCF",
+            "og:description": "I find the new Angular 20 style guide (which is implemented by default in the Angular CLI) hard to comprehend.\n\nSo, if I want to have a Theme service, and I ask it to create it for me:\n\n`ng g s services/theme`\n\nThe CLI will create a theme.ts and name it `class Theme`.\n\nUm... oookkk... But I want to be passing around a Theme model around, so what's the difference between Theme and Theme? 👀 🤯\n\nSo, now I gotta be more specific with how I name my model (ThemeData) instead of being more specific in how I name my service?\n\nOn a completely unrelated note, who is in for a game of Whack-A-Class-Name? | 16 comments on LinkedIn",
+            "al:ios:app_store_id": "288429040",
+            "twitter:image": "https://media.licdn.com/dms/image/v2/D4E22AQE_69EzKWXaQg/feedshare-shrink_800/B4EZdhABLHH0Ak-/0/1749679085678?e=2147483647&v=beta&t=ZrCzEgxFwaMjDz00txbSa0lvVREkC3vP4HWkjaLZ8hc",
+            "al:android:url": "https://www.linkedin.com/posts/yaakovchaikin_i-find-the-new-angular-20-style-guide-which-activity-7338685993165742082-sDCF",
+            "lnkd:url": "https://www.linkedin.com/feed/update/urn:li:activity:7338685993165742082",
+            "twitter:site": "@linkedin",
+            "viewport": "width=device-width, initial-scale=1.0",
+            "twitter:description": "I find the new Angular 20 style guide (which is implemented by default in the Angular CLI) hard to comprehend.\n\nSo, if I want to have a Theme service, and I ask it to create it for me:\n\n`ng g s services/theme`\n\nThe CLI will create a theme.ts and name it `class Theme`.\n\nUm... oookkk... But I want to be passing around a Theme model around, so what's the difference between Theme and Theme? 👀 🤯\n\nSo, now I gotta be more specific with how I name my model (ThemeData) instead of being more specific in how I name my service?\n\nOn a completely unrelated note, who is in for a game of Whack-A-Class-Name? | 16 comments on LinkedIn",
+            "og:url": "https://www.linkedin.com/posts/yaakovchaikin_i-find-the-new-angular-20-style-guide-which-activity-7338685993165742082-sDCF",
+            "al:android:app_name": "LinkedIn"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://media.licdn.com/dms/image/v2/D4E22AQE_69EzKWXaQg/feedshare-shrink_800/B4EZdhABLHH0Ak-/0/1749679085678?e=2147483647&v=beta&t=ZrCzEgxFwaMjDz00txbSa0lvVREkC3vP4HWkjaLZ8hc"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Angular Signals in Practice. Signals have been around in Angular ...",
+      "htmlTitle": "<b>Angular</b> Signals in Practice. Signals have been around in <b>Angular</b> ...",
+      "link": "https://medium.com/ngconf/angular-signals-in-practice-165947bcafd4",
+      "displayLink": "medium.com",
+      "snippet": "Apr 24, 2025 ... Angular v20 Async Redirects: Finally, No More Router Hacks! JavaScript in Plain English. In.",
+      "htmlSnippet": "Apr 24, 2025 <b>...</b> <b>Angular v20</b> Async Redirects: Finally, No More Router Hacks! JavaScript in Plain English. In.",
+      "formattedUrl": "https://medium.com/ngconf/angular-signals-in-practice-165947bcafd4",
+      "htmlFormattedUrl": "https://medium.com/ngconf/<b>angular</b>-signals-in-practice-165947bcafd4",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQxovNVFng0mFZVh8QW04CMpigb8_7TMQQxoIgrOPIt8Z1Sk9blSkoimPpB&s",
+            "width": "310",
+            "height": "163"
+          }
+        ],
+        "metatags": [
+          {
+            "apple-itunes-app": "app-id=828256236, app-argument=/ngconf/angular-signals-in-practice-165947bcafd4, affiliate-data=pt=698524&ct=smart_app_banner&mt=8",
+            "og:image": "https://miro.medium.com/v2/da:true/bc1f8416df0cad099e43cda2872716e5864f18a73bda2a7547ea082aca9b5632",
+            "twitter:app:url:iphone": "medium://p/165947bcafd4",
+            "theme-color": "#000000",
+            "article:published_time": "2025-04-24T12:37:00.831Z",
+            "twitter:card": "summary_large_image",
+            "og:site_name": "Medium",
+            "al:android:package": "com.medium.reader",
+            "twitter:label1": "Reading time",
+            "twitter:app:id:iphone": "828256236",
+            "title": "Angular Signals in Practice. Signals have been around in Angular for… | by Preston Lamb | ngconf | Medium",
+            "al:ios:url": "medium://p/165947bcafd4",
+            "og:description": "Signals have been around in Angular for a while now. But if you are like me, you might still be unsure when or why to use them. Let’s look a",
+            "twitter:creator": "@prestonjlamb",
+            "al:ios:app_store_id": "828256236",
+            "twitter:data1": "4 min read",
+            "twitter:image:alt": "Medium",
+            "twitter:site": "@ngconf",
+            "og:type": "article",
+            "og:image:alt": "Medium",
+            "twitter:title": "Angular Signals in Practice",
+            "al:ios:app_name": "Medium",
+            "author": "Preston Lamb",
+            "og:title": "Angular Signals in Practice",
+            "al:web:url": "https://medium.com/ngconf/angular-signals-in-practice-165947bcafd4",
+            "article:author": "https://medium.com/@pjlamb12",
+            "twitter:image:src": "https://miro.medium.com/v2/da:true/bc1f8416df0cad099e43cda2872716e5864f18a73bda2a7547ea082aca9b5632",
+            "al:android:url": "medium://p/165947bcafd4",
+            "referrer": "unsafe-url",
+            "fb:app_id": "542599432471018",
+            "viewport": "width=device-width,minimum-scale=1,initial-scale=1,maximum-scale=1",
+            "twitter:description": "Signals have been around in Angular for a while now. But if you are like me, you might still be unsure when or why to use them. Let’s look a",
+            "og:url": "https://medium.com/ngconf/angular-signals-in-practice-165947bcafd4",
+            "twitter:app:name:iphone": "Medium",
+            "al:android:app_name": "Medium"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://miro.medium.com/v2/da:true/bc1f8416df0cad099e43cda2872716e5864f18a73bda2a7547ea082aca9b5632"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "customsearch#result",
+      "title": "Is there a compatibility list for Angular / Angular-CLI and Node.js ...",
+      "htmlTitle": "Is there a compatibility list for <b>Angular</b> / <b>Angular</b>-CLI and Node.js ...",
+      "link": "https://stackoverflow.com/questions/60248452/is-there-a-compatibility-list-for-angular-angular-cli-and-node-js",
+      "displayLink": "stackoverflow.com",
+      "snippet": "Feb 16, 2020 ... They remain installed, but through symlinks it is determined which version is currently used. jowey. – jowey. 2020-02-17 20:16:36 +00:00.",
+      "htmlSnippet": "Feb 16, 2020 <b>...</b> They remain installed, but through symlinks it is determined which version is currently used. jowey. – jowey. 2020-02-17 <b>20</b>:16:36 +00:00.",
+      "formattedUrl": "https://stackoverflow.com/.../is-there-a-compatibility-list-for-angular-angula...",
+      "htmlFormattedUrl": "https://stackoverflow.com/.../is-there-a-compatibility-list-for-<b>angular</b>-<b>angula</b>...",
+      "pagemap": {
+        "cse_thumbnail": [
+          {
+            "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSyuYKf6qiOvVBT_-FVj82Pe9J02kFCrdYhAD7sxPbWhucsGPO1LbWiQmU&s",
+            "width": "225",
+            "height": "225"
+          }
+        ],
+        "qapage": [
+          {
+            "image": "https://stackoverflow.com/Content/Sites/stackoverflow/Img/apple-touch-icon@2.png?v=73d79a89bded",
+            "primaryimageofpage": "https://stackoverflow.com/Content/Sites/stackoverflow/Img/apple-touch-icon@2.png?v=73d79a89bded",
+            "ispartof": "https://stackoverflow.com/#website",
+            "name": "Is there a compatibility list for Angular / Angular-CLI and Node.js?",
+            "description": "I periodically run into the problem, having to spin up old Angular projects with deprecated dependencies of Angular. Because I unsually run the latest Node.js version (at least lates LTS version) I",
+            "publisher": "https://stackoverflow.com/#organization",
+            "url": "https://stackoverflow.com/questions/60248452/is-there-a-compatibility-list-for-angular-angular-cli-and-node-js"
+          }
+        ],
+        "question": [
+          {
+            "image": "https://stackoverflow.com/Content/Sites/stackoverflow/Img/apple-touch-icon.png?v=c78bd457575a",
+            "upvotecount": "421",
+            "commentcount": "3",
+            "answercount": "5",
+            "name": "Is there a compatibility list for Angular / Angular-CLI and Node.js?",
+            "datecreated": "2020-02-16 12:28:52Z",
+            "text": "I periodically run into the problem, having to spin up old Angular projects with deprecated dependencies of Angular. Because I unsually run the latest Node.js version (at least lates LTS version)...",
+            "url": "Share"
+          }
+        ],
+        "answer": [
+          {
+            "upvotecount": "1002",
+            "text": "UPDATE: 2024 The new docs introduced a new resource for version compatibility Alternatively you can navigate to compatibility versions by using ngvm, e.g: npx -y ngvm compat Since April 2023...",
+            "datecreated": "2020-02-17 08:36:00Z",
+            "url": "Share"
+          },
+          {
+            "upvotecount": "28",
+            "text": "I acknowledge that this does not actually answer your question. But it does provide some relevant information for current version (which is what brought me here). Here is the official word...",
+            "datecreated": "2020-11-23 21:20:53Z",
+            "url": "Share"
+          },
+          {
+            "upvotecount": "6",
+            "text": "Official document by Angular - https://angular.io/guide/versions They keep it updated and also have a separate list of unsupported versions.",
+            "datecreated": "2023-05-05 04:34:29Z",
+            "url": "Share"
+          },
+          {
+            "upvotecount": "2",
+            "text": "You can use the Angular Update Guide to find the node version supported. This is official guide from Google. Just pretend you are upgrading from a old version. For instance, if you are on Angular...",
+            "datecreated": "2023-04-21 14:59:26Z",
+            "url": "Share"
+          },
+          {
+            "upvotecount": "1",
+            "text": "I have a similar problem. I uninstalled angular cli and reinstaled a previous version several times, until reaching angular cli v9, but when I try to run \"ionic serve\" I still get the same...",
+            "datecreated": "2022-07-31 22:39:44Z",
+            "url": "Share"
+          }
+        ],
+        "person": [
+          {
+            "name": "jowey"
+          },
+          {
+            "name": "jowey",
+            "url": "jowey"
+          },
+          {
+            "name": "Richard Dunn",
+            "url": "Richard Dunn"
+          },
+          {
+            "name": "jowey",
+            "url": "jowey"
+          },
+          {
+            "name": "Yogurtu",
+            "url": "Yogurtu"
+          },
+          {
+            "name": "angularconsulting.au",
+            "url": "angularconsulting.au"
+          },
+          {
+            "name": "jowey",
+            "url": "jowey"
+          },
+          {
+            "name": "JimiSweden",
+            "url": "JimiSweden"
+          },
+          {
+            "name": "P.Brian.Mackey",
+            "url": "P.Brian.Mackey"
+          },
+          {
+            "name": "TomStroemer",
+            "url": "TomStroemer"
+          },
+          {
+            "name": "Noel De Martin",
+            "url": "Noel De Martin"
+          },
+          {
+            "name": "jkyoutsey",
+            "url": "jkyoutsey"
+          },
+          {
+            "name": "Ben Racicot",
+            "url": "Ben Racicot"
+          },
+          {
+            "name": "ThCollignon",
+            "url": "ThCollignon"
+          },
+          {
+            "name": "Sunny Prajapati",
+            "url": "Sunny Prajapati"
+          },
+          {
+            "name": "Animesh Rawat",
+            "url": "Animesh Rawat"
+          },
+          {
+            "name": "dman",
+            "url": "dman"
+          },
+          {
+            "name": "fernando gonzalez",
+            "url": "fernando gonzalez"
+          }
+        ],
+        "metatags": [
+          {
+            "og:image": "https://stackoverflow.com/Content/Sites/stackoverflow/Img/apple-touch-icon@2.png?v=73d79a89bded",
+            "og:type": "website",
+            "twitter:card": "summary",
+            "twitter:title": "Is there a compatibility list for Angular / Angular-CLI and Node.js?",
+            "og:site_name": "Stack Overflow",
+            "twitter:domain": "stackoverflow.com",
+            "viewport": "width=device-width, height=device-height, initial-scale=1.0, minimum-scale=1.0",
+            "twitter:description": "I periodically run into the problem, having to spin up old Angular projects with deprecated dependencies of Angular.\n\nBecause I unsually run the latest Node.js version (at least lates LTS version) I",
+            "og:url": "https://stackoverflow.com/questions/60248452/is-there-a-compatibility-list-for-angular-angular-cli-and-node-js"
+          }
+        ],
+        "comment": [
+          {
+            "text": "Are you reinstalling node modules each time?",
+            "datepublished": "2020-02-16 13:46:44 +00:00"
+          },
+          {
+            "text": "No, I use a version manager to switch between Node.js versions. They remain installed, but through symlinks it is determined which version is currently used.",
+            "datepublished": "2020-02-17 20:16:36 +00:00"
+          },
+          {
+            "text": "Just giving a comment to help search engines, if you have the error \"npm ERR! code ERESOLVE npm ERR! ERESOLVE could not resolve...\" seems to happen because you installed latest nodeJs version...",
+            "datepublished": "2022-08-19 02:08:19 +00:00"
+          },
+          {
+            "text": "I would have prefered an official resource, but I guess this is the best we can get for now (and it seems pretty complete and up to date), thus thank you.",
+            "datepublished": "2020-02-17T20:27:10.8Z+00:00"
+          },
+          {
+            "text": "If you are here you might want to enable multiple versions of node. this is how on nubo.eu/Install-Multiple-Node-Versions-On-Windows (links for mac/linux are on the page, in case the page vanish...",
+            "datepublished": "2021-06-23T16:03:53.85Z+00:00"
+          },
+          {
+            "text": "No unofficial resource for this? The Angular v11 => v12 upgrade guide only states You can no longer use Angular with Node.js version 10 or older. What a useless comment in relation to the unofficia...",
+            "datepublished": "2022-01-10T20:16:11.86Z+00:00"
+          },
+          {
+            "text": "How should the column 'Typescript' be read? It says '4.6.x/4.8.x' for Angular 14. But the link states >= 4.6.0 < 4.8.0, so shouldn't the column state '4.6.x/4.7.x' ?",
+            "datepublished": "2022-08-17T13:18:19.437Z+00:00"
+          },
+          {
+            "text": "There is now an official table with this: angular.io/guide/versions",
+            "datepublished": "2023-04-20T10:43:07.063Z+00:00"
+          },
+          {
+            "text": "Nice idea. A new Angular 13 project has 647 hits for engines within package-lock.json. However, I guess we're looking for the CLI's NodeJS compat here which is \"node\": \"^12.20.0 || ^14.15.0...",
+            "datepublished": "2021-11-04T15:42:54.473Z+00:00"
+          },
+          {
+            "text": "Related discussion on Angular's Github repo.",
+            "datepublished": "2021-12-07T07:13:23.43Z+00:00"
+          },
+          {
+            "text": "Visit angular.dev/reference/versions",
+            "datepublished": "2025-08-08T18:43:16.11Z+00:00"
+          }
+        ],
+        "cse_image": [
+          {
+            "src": "https://stackoverflow.com/Content/Sites/stackoverflow/Img/apple-touch-icon@2.png?v=73d79a89bded"
+          }
+        ]
+      }
+    }
+  ]
+}

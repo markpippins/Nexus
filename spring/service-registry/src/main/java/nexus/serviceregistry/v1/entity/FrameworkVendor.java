@@ -1,7 +1,12 @@
+/**
+ * Deprecated: This class has moved to com.aibizarchitect.nexus.core adapters.
+ * This class remains for backward compatibility during migration.
+ */
 package nexus.serviceregistry.v1.entity;
 
 import jakarta.persistence.*;
 
+@Deprecated
 @Entity
 @Table(name = "vendors")
 public class FrameworkVendor {

@@ -1,0 +1,11 @@
+{
+  "id": "96b11048-f04f-4eda-bb0f-42602ab505c8",
+  "type": "VocabularyDrafted",
+  "timestamp": "2026-04-09T04:00:29.093219+00:00",
+  "source": "agent",
+  "payload": {
+    "idea_id": "evt-0004",
+    "step": "vocabulary",
+    "artifact_path": "/mnt/c/dev/nexus/ai/python/converse/artifacts/evt-0004/vocabulary.json"
+  }
+}

@@ -26,16 +26,32 @@ def _ensure_deps():
     except ImportError:
         pass
 
-    venv_pip = Path(__file__).parent / "venv" / "bin" / "pip"
-    if venv_pip.exists():
-        subprocess.check_call([str(venv_pip), "install", "-q", "-r",
-                               str(Path(__file__).parent / "requirements.txt")])
-        venv_python = Path(__file__).parent / "venv" / "bin" / "python"
-        if venv_python.exists() and str(venv_python) != str(sys.executable):
+    # Determine virtual environment executable locations based on OS
+    venv_dir = Path(__file__).parent / "venv"
+    # Windows uses Scripts, Unix uses bin
+    if (venv_dir / "Scripts" / "pip.exe").exists():
+        venv_pip = venv_dir / "Scripts" / "pip.exe"
+        venv_python = venv_dir / "Scripts" / "python.exe"
+    elif (venv_dir / "bin" / "pip").exists():
+        venv_pip = venv_dir / "bin" / "pip"
+        venv_python = venv_dir / "bin" / "python"
+    else:
+        venv_pip = None
+        venv_python = None
+
+    if venv_pip and venv_pip.exists():
+        subprocess.check_call([
+            str(venv_pip), "install", "-q", "-r",
+            str(Path(__file__).parent / "requirements.txt")
+        ])
+        if venv_python and venv_python.exists() and str(venv_python) != str(sys.executable):
             raise SystemExit(subprocess.call([str(venv_python)] + sys.argv))
     else:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
-                               "-r", str(Path(__file__).parent / "requirements.txt")])
+        # Fallback to system pip
+        subprocess.check_call([
+            sys.executable, "-m", "pip", "install", "-q",
+            "-r", str(Path(__file__).parent / "requirements.txt")
+        ])
 
 
 _ensure_deps()

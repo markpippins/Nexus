@@ -7,6 +7,7 @@ import java.util.Map;
  * A request submitted to the service broker for processing.
  * Aligned with TypeSpec Broker Service API definition.
  */
+@Deprecated
 public class ServiceRequest implements Serializable {
 
     private static final long serialVersionUID = 1L;

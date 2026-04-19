@@ -10,6 +10,7 @@ import java.util.Map;
  * The response body returned by broker service operations.
  * Aligned with TypeSpec Broker Service API definition.
  */
+@Deprecated
 public class ServiceResponseBody implements Serializable {
 
     private static final long serialVersionUID = 1L;

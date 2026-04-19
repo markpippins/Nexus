@@ -1,0 +1,12 @@
+{
+  "id": "88da80b6-bd01-462b-aa8f-103fbe5ff844",
+  "type": "StepRejected",
+  "timestamp": "2026-04-09T05:02:26.248091+00:00",
+  "source": "system",
+  "payload": {
+    "idea_id": "test-idea",
+    "step": "compile",
+    "reason": "Compilation failed: No TypeSpec source file found",
+    "artifact_path": null
+  }
+}

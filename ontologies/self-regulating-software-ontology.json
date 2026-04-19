@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus.platform/self-regulating-software-ontology",
+  "title": "Self-Regulating Software Ontology",
+  "description": "Ontology for discussing and analyzing software systems that self-regulate, with emphasis on contract coverage scanning, drift detection, and autonomous remediation.",
+  "version": "1.0.0",
+
+  "definitions": {
+
+    "Codebase": {
+      "type": "object",
+      "description": "A version-controlled source code repository containing one or more modules.",
+      "properties": {
+        "rootPath": { "type": "string", "format": "uri-reference" },
+        "modules": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Module" }
+        },
+        "contractDefinitions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ContractDefinition" }
+        }
+      },
+      "required": ["rootPath", "modules"]
+    },
+
+    "Module": {
+      "type": "object",
+      "description": "A deployable unit of software (service, library, CLI, UI) that exposes an API or provides functionality.",
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string", "format": "uri-reference" },
+        "technology": { "$ref": "#/definitions/TechnologyStack" },
+        "moduleType": { "$ref": "#/definitions/ModuleType" },
+        "exposedApis": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ApiEndpoint" }
+        },
+        "consumedApis": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "contractStatus": { "$ref": "#/definitions/ContractStatus" }
+      },
+      "required": ["name", "path", "technology", "moduleType", "contractStatus"]
+    },
+
+    "ModuleType": {
+      "type": "string",
+      "enum": [
+        "service",
+        "library",
+        "client_sdk",
+        "gateway",
+        "proxy",
+        "adapter",
+        "agent",
+        "ui",
+        "utility",
+        "desktop"
+      ],
+      "description": "Categorization of the module's role in the platform."
+    },
+
+    "TechnologyStack": {
+      "type": "object",
+      "description": "The technology/language/framework a module is built with.",
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": ["java", "python", "typescript", "javascript", "kotlin", "scala", "go", "rust"]
+        },
+        "framework": {
+          "type": "string",
+          "examples": ["spring-boot", "quarkus", "helidon", "fastapi", "express", "adonisjs", "angular", "moleculer"]
+        },
+        "frameworkVersion": { "type": "string" }
+      },
+      "required": ["language"]
+    },
+
+    "ApiEndpoint": {
+      "type": "object",
+      "description": "A single routable API operation or broker operation exposed by a module.",
+      "properties": {
+        "method": { "type": "string", "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "ANY", "BROKER"] },
+        "path": { "type": "string" },
+        "operationName": { "type": "string" },
+        "requestModel": { "type": "string" },
+        "responseModel": { "type": "string" },
+        "transport": {
+          "type": "string",
+          "enum": ["rest", "broker", "grpc", "graphql", "event"],
+          "default": "rest"
+        }
+      },
+      "required": ["operationName"]
+    },
+
+    "ContractDefinition": {
+      "type": "object",
+      "description": "A formal API contract defined in a specification language (TypeSpec, OpenAPI, protobuf, etc.).",
+      "properties": {
+        "id": { "type": "string" },
+        "specType": {
+          "type": "string",
+          "enum": ["typespec", "openapi", "protobuf", "graphql", "asyncapi"],
+          "default": "typespec"
+        },
+        "path": { "type": "string", "format": "uri-reference" },
+        "namespace": { "type": "string" },
+        "version": { "type": "string" },
+        "coversModules": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Module names this contract claims to describe."
+        },
+        "operations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Operation names defined by this contract."
+        },
+        "models": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Model/type names defined by this contract."
+        }
+      },
+      "required": ["id", "specType", "path"]
+    },
+
+    "ContractStatus": {
+      "type": "object",
+      "description": "The contract coverage state for a single module.",
+      "properties": {
+        "hasContract": { "type": "boolean" },
+        "contractId": { "type": "string", "nullable": true, "description": "References the ContractDefinition.id if one exists." },
+        "coverageType": {
+          "type": "string",
+          "enum": ["full", "partial", "none", "stale"],
+          "description": "full = contract covers all endpoints; partial = some covered; none = no contract; stale = contract exists but module has diverged."
+        },
+        "coveredEndpoints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Operation names that are covered by the contract."
+        },
+        "uncoveredEndpoints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Operation names that have NO corresponding contract definition."
+        },
+        "driftDetected": { "type": "boolean", "default": false },
+        "driftDetails": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DriftReport" },
+          "nullable": true
+        }
+      },
+      "required": ["hasContract", "coverageType"]
+    },
+
+    "DriftReport": {
+      "type": "object",
+      "description": "A specific mismatch detected between a module's actual implementation and its contract definition.",
+      "properties": {
+        "driftType": {
+          "type": "string",
+          "enum": [
+            "missing_endpoint",
+            "missing_operation",
+            "signature_mismatch",
+            "extra_endpoint",
+            "model_divergence",
+            "method_mismatch",
+            "path_mismatch"
+          ]
+        },
+        "expected": { "type": "string" },
+        "actual": { "type": "string" },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "warning", "info"]
+        },
+        "detectedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["driftType", "severity"]
+    },
+
+    "SelfRegulationAction": {
+      "type": "object",
+      "description": "An action taken by the system to autonomously correct contract drift or coverage gaps.",
+      "properties": {
+        "actionType": {
+          "type": "string",
+          "enum": [
+            "generate_typespec",
+            "update_typespec",
+            "generate_client_sdk",
+            "generate_server_stub",
+            "regenerate_openapi",
+            "flag_for_review",
+            "block_deployment",
+            "auto_fix_signature",
+            "notify_owner"
+          ]
+        },
+        "targetModule": { "type": "string" },
+        "triggeredBy": {
+          "type": "string",
+          "enum": ["scan", "ci_pipeline", "drift_detection", "manual"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in_progress", "completed", "failed", "aborted"]
+        },
+        "outputArtifact": { "type": "string", "nullable": true },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actionType", "targetModule", "triggeredBy", "status"]
+    },
+
+    "ScanReport": {
+      "type": "object",
+      "description": "The output of a contract coverage scan across a codebase.",
+      "properties": {
+        "scanId": { "type": "string" },
+        "codebasePath": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "totalModules": { "type": "integer", "minimum": 0 },
+        "modulesWithContracts": { "type": "integer", "minimum": 0 },
+        "modulesWithoutContracts": { "type": "integer", "minimum": 0 },
+        "modulesWithDrift": { "type": "integer", "minimum": 0 },
+        "moduleReports": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ModuleScanReport" }
+        }
+      },
+      "required": ["scanId", "codebasePath", "timestamp", "totalModules"]
+    },
+
+    "ModuleScanReport": {
+      "type": "object",
+      "description": "Per-module results from a contract coverage scan.",
+      "properties": {
+        "moduleName": { "type": "string" },
+        "modulePath": { "type": "string" },
+        "technology": { "$ref": "#/definitions/TechnologyStack" },
+        "hasContract": { "type": "boolean" },
+        "contractPath": { "type": "string", "nullable": true },
+        "endpointCount": { "type": "integer" },
+        "coveredEndpointCount": { "type": "integer" },
+        "driftDetected": { "type": "boolean" },
+        "drifts": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DriftReport" }
+        },
+        "recommendedActions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SelfRegulationAction" }
+        }
+      },
+      "required": ["moduleName", "modulePath", "hasContract", "endpointCount", "coveredEndpointCount"]
+    },
+
+    "TypeSpecModule": {
+      "type": "object",
+      "description": "A directory within the typespec/ tree that defines one or more contracts.",
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string", "format": "uri-reference" },
+        "entryPoint": { "type": "string", "description": "The main.tsp or equivalent entry file." },
+        "namespace": { "type": "string" },
+        "emitters": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Configured output emitters (openapi3, http-client-java, etc.)."
+        },
+        "operations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "models": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["name", "path", "namespace"]
+    },
+
+    "CoverageGap": {
+      "type": "object",
+      "description": "A module that has no TypeSpec definition, representing a self-regulation target.",
+      "properties": {
+        "moduleName": { "type": "string" },
+        "modulePath": { "type": "string", "format": "uri-reference" },
+        "technology": { "$ref": "#/definitions/TechnologyStack" },
+        "exposedEndpointCount": { "type": "integer" },
+        "exposedEndpoints": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ApiEndpoint" }
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low"],
+          "description": "Priority for generating a TypeSpec contract."
+        },
+        "suggestedTypeSpecPath": {
+          "type": "string",
+          "description": "Recommended path under typespec/ for the new contract."
+        },
+        "suggestedNamespace": {
+          "type": "string",
+          "description": "Recommended TypeSpec namespace for the new contract."
+        }
+      },
+      "required": ["moduleName", "modulePath", "exposedEndpointCount"]
+    },
+
+    "SelfRegulatingSystem": {
+      "type": "object",
+      "description": "Top-level model of a software system capable of scanning itself, detecting drift, and self-correcting.",
+      "properties": {
+        "name": { "type": "string" },
+        "codebase": { "$ref": "#/definitions/Codebase" },
+        "typespecRoot": { "type": "string", "format": "uri-reference" },
+        "scanHistory": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/ScanReport" }
+        },
+        "coverageGaps": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/CoverageGap" }
+        },
+        "regulationActions": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/SelfRegulationAction" }
+        },
+        "policy": { "$ref": "#/definitions/RegulationPolicy" }
+      },
+      "required": ["name", "codebase", "typespecRoot"]
+    },
+
+    "RegulationPolicy": {
+      "type": "object",
+      "description": "Rules governing how the system responds to coverage gaps and drift.",
+      "properties": {
+        "requireContractForNewModules": { "type": "boolean", "default": true },
+        "blockDeployOnDrift": { "type": "boolean", "default": false },
+        "autoGenerateTypespec": { "type": "boolean", "default": false },
+        "autoGenerateClients": { "type": "boolean", "default": true },
+        "maxAllowedDriftSeverity": {
+          "type": "string",
+          "enum": ["critical", "warning", "info", "none"],
+          "default": "warning"
+        },
+        "notificationChannels": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+
+  "type": "object",
+  "$ref": "#/definitions/SelfRegulatingSystem"
+}
