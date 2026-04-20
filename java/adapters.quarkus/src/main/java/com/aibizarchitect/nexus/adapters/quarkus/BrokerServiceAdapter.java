@@ -15,12 +15,47 @@ public class BrokerServiceAdapter {
     }
 
     public static ServiceRequest toCanonical(Object legacy) {
-        // Placeholder: convert from Quarkus DTO to canonical core when Quarkus DTOs are available
-        return new ServiceRequest("", "", null, "");
+        // Reflection-based bridge to avoid hard Quarkus DTO dependencies
+        try {
+            Class<?> c = legacy.getClass();
+            Object service = c.getMethod("getService").invoke(legacy);
+            Object operation = c.getMethod("getOperation").invoke(legacy);
+            Object params = c.getMethod("getParams").invoke(legacy);
+            Object reqId = c.getMethod("getRequestId").invoke(legacy);
+            Object encrypt = c.getMethod("getEncrypt").invoke(legacy);
+            Map<String, BinaryData> coreParams = null;
+            if (params instanceof Map) {
+                coreParams = new HashMap<>();
+                for (Map.Entry<?,?> e : ((Map<?,?>)params).entrySet()) {
+                    Object val = e.getValue();
+                    String base64 = val == null ? null : val.toString();
+                    coreParams.put((String)e.getKey(), new SimpleBinary(base64));
+                }
+            }
+            ServiceRequest core = new ServiceRequest(service != null ? service.toString() : "",
+                    operation != null ? operation.toString() : "",
+                    coreParams,
+                    reqId != null ? reqId.toString() : "");
+            if (encrypt != null) core.setEncrypt((Boolean)encrypt);
+            return core;
+        } catch (Exception e) {
+            return new ServiceRequest("", "", null, "");
+        }
     }
 
     public static Object fromCanonical(ServiceRequest core) {
-        // Placeholder: convert canonical core to Quarkus DTO when available
-        return null;
+        Map<String, Object> legacyParams = new HashMap<>();
+        if (core.getParams() != null) {
+            for (Map.Entry<String, BinaryData> e : core.getParams().entrySet()) {
+                legacyParams.put(e.getKey(), e.getValue() != null ? e.getValue().toBase64() : null);
+            }
+        }
+        java.util.HashMap<String, Object> legacy = new java.util.HashMap<>();
+        legacy.put("service", core.getService());
+        legacy.put("operation", core.getOperation());
+        legacy.put("requestId", core.getRequestId());
+        legacy.put("params", legacyParams);
+        legacy.put("encrypt", core.getEncrypt());
+        return legacy;
     }
 }

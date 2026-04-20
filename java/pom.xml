@@ -10,5 +10,6 @@
     <module>adapters.spring</module>
     <module>adapters.helidon</module>
     <module>adapters.quarkus</module>
+    <module>serviceregistry</module>
   </modules>
 </project>

@@ -15,12 +15,49 @@ public class BrokerServiceAdapter {
     }
 
     public static ServiceRequest toCanonical(Object legacy) {
-        // Purely a canonical bridge placeholder for Helidon; implement concrete mapping later
-        return new ServiceRequest("", "", null, "");
+        // Reflection-based bridge to canonical core to avoid hard Helidon DTO dependency at compile time
+        try {
+            Class<?> cls = legacy.getClass();
+            Object service = cls.getMethod("getService").invoke(legacy);
+            Object operation = cls.getMethod("getOperation").invoke(legacy);
+            Object params = cls.getMethod("getParams").invoke(legacy);
+            Object reqId = cls.getMethod("getRequestId").invoke(legacy);
+            Object encrypt = cls.getMethod("getEncrypt").invoke(legacy);
+            Map<String, BinaryData> coreParams = null;
+            if (params instanceof Map) {
+                coreParams = new HashMap<>();
+                for (Map.Entry<?, ?> e : ((Map<?, ?>) params).entrySet()) {
+                    Object val = e.getValue();
+                    String base64 = val == null ? null : val.toString();
+                    coreParams.put((String) e.getKey(), new SimpleBinary(base64));
+                }
+            }
+            ServiceRequest core = new ServiceRequest(service != null ? service.toString() : "",
+                operation != null ? operation.toString() : "",
+                coreParams,
+                reqId != null ? reqId.toString() : "");
+            if (encrypt != null) {
+                core.setEncrypt((Boolean) encrypt);
+            }
+            return core;
+        } catch (Exception e) {
+            return new ServiceRequest("", "", null, "");
+        }
     }
 
     public static Object fromCanonical(ServiceRequest core) {
-        // Placeholder: mapping to Helidon DTO would go here
-        return null;
+        Map<String, Object> legacyParams = new HashMap<>();
+        if (core.getParams() != null) {
+            for (Map.Entry<String, BinaryData> e : core.getParams().entrySet()) {
+                legacyParams.put(e.getKey(), e.getValue() != null ? e.getValue().toBase64() : null);
+            }
+        }
+        java.util.HashMap<String, Object> legacy = new java.util.HashMap<>();
+        legacy.put("service", core.getService());
+        legacy.put("operation", core.getOperation());
+        legacy.put("requestId", core.getRequestId());
+        legacy.put("params", legacyParams);
+        legacy.put("encrypt", core.getEncrypt());
+        return legacy;
     }
 }
