@@ -121,6 +121,21 @@ model FrameworkLanguage extends LinkedLookup {
   ltsVersion?: string;
 }
 // Framework entity models pulled from Spring lookups will be added here via canonical core adapters
+namespace Nexus.ServiceRegistry.V1 {
+  model FrameworkVendor {
+    id: int64;
+    name: string;
+    description?: string;
+    url?: string;
+    activeFlag?: boolean = true;
+  }
+  model FrameworkLanguage {
+    id: int64;
+    name: string;
+    currentVersion?: string;
+    ltsVersion?: string;
+  }
+}
 
 // Additional domain models migrated from Spring v1 into the Java-side service-registry domain
 namespace Nexus.ServiceRegistry.V1 {
