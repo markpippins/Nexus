@@ -1,9 +1,19 @@
-import { Component, ChangeDetectionStrategy, ViewChild, ElementRef, AfterViewInit, OnDestroy, inject, effect } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  OnDestroy,
+  ViewChild,
+  effect,
+  inject,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FitAddon } from '@xterm/addon-fit';
+import { Terminal } from 'xterm';
+import 'xterm/css/xterm.css';
+import { Bash, type BashExecResult } from 'just-bash/browser';
 import { UiPreferencesService } from '../../services/ui-preferences.service.js';
-
-declare var Terminal: any;
-declare var FitAddon: any;
 
 @Component({
   selector: 'app-terminal',
@@ -11,13 +21,37 @@ declare var FitAddon: any;
   imports: [CommonModule],
   templateUrl: './terminal.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [
+    `
+      :host {
+        display: block;
+        height: 100%;
+        min-height: 0;
+      }
+    `,
+  ],
 })
 export class TerminalComponent implements AfterViewInit, OnDestroy {
   @ViewChild('terminal') terminalEl!: ElementRef<HTMLDivElement>;
 
-  private term: any;
-  private fitAddon: any;
-  private resizeObserver!: ResizeObserver;
+  private readonly initialCwd = '/home/user';
+  private term: Terminal | null = null;
+  private fitAddon: FitAddon | null = null;
+  private resizeObserver: ResizeObserver | null = null;
+  private bash = new Bash({
+    cwd: this.initialCwd,
+    env: {
+      TERM: 'xterm-256color',
+    },
+  });
+  private currentCwd = this.initialCwd;
+  private currentEnv: Record<string, string> = {
+    TERM: 'xterm-256color',
+  };
+  private inputBuffer = '';
+  private commandHistory: string[] = [];
+  private historyIndex = -1;
+  private isExecuting = false;
   private hostEl = inject(ElementRef);
   private uiPreferencesService = inject(UiPreferencesService);
 
@@ -44,7 +78,7 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
 
     this.applyTheme(); // Apply initial theme
 
-    this.fitAddon = new FitAddon.FitAddon();
+    this.fitAddon = new FitAddon();
     this.term.loadAddon(this.fitAddon);
 
     this.term.open(this.terminalEl.nativeElement);
@@ -52,32 +86,220 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
     this.fitAddon.fit();
 
     this.term.writeln('\x1B[1;3;34mWelcome to the Nexus Console!\x1B[0m');
+    this.term.writeln('Powered by xterm.js + just-bash');
     this.term.writeln('----------------------------------');
-    this.term.write('$ ');
+    this.writePrompt();
 
-    // Mock terminal interaction
     this.term.onData((data: string) => {
-      if (data === '\r') { // Enter key
-        this.term.write('\r\n$ ');
-      } else if (data === '\x7F') { // Backspace
-        // Do not delete the prompt
-        if (this.term.buffer.active.cursorX > 2) {
-          this.term.write('\b \b');
-        }
-      } else {
-        this.term.write(data);
-      }
+      void this.handleTerminalInput(data);
     });
 
     this.resizeObserver = new ResizeObserver(() => {
       try {
         setTimeout(() => this.fitAddon?.fit(), 0);
       } catch (e) {
-        console.warn("FitAddon resize failed. This can happen during rapid resizing.", e);
+        console.warn('FitAddon resize failed. This can happen during rapid resizing.', e);
       }
     });
 
     this.resizeObserver.observe(this.hostEl.nativeElement);
+  }
+
+  private async handleTerminalInput(data: string): Promise<void> {
+    if (!this.term) {
+      return;
+    }
+
+    if (this.isExecuting) {
+      if (data === '\u0003') {
+        this.term.write('^C');
+      }
+      return;
+    }
+
+    switch (data) {
+      case '\r':
+        await this.executeCurrentCommand();
+        return;
+      case '\u007F':
+        this.handleBackspace();
+        return;
+      case '\u0003':
+        this.handleInterrupt();
+        return;
+      case '\u000C':
+        this.term.clear();
+        this.writePrompt();
+        return;
+      case '\u001b[A':
+        this.navigateHistory(-1);
+        return;
+      case '\u001b[B':
+        this.navigateHistory(1);
+        return;
+      case '\u001b[C':
+      case '\u001b[D':
+      case '\t':
+        return;
+      default:
+        if (this.isPrintableInput(data)) {
+          this.inputBuffer += data;
+          this.term.write(data);
+        }
+    }
+  }
+
+  private async executeCurrentCommand(): Promise<void> {
+    if (!this.term) {
+      return;
+    }
+
+    const command = this.inputBuffer;
+    this.term.write('\r\n');
+
+    if (!command.trim()) {
+      this.inputBuffer = '';
+      this.historyIndex = -1;
+      this.writePrompt();
+      return;
+    }
+
+    if (command.trim() === 'clear') {
+      this.term.clear();
+      this.inputBuffer = '';
+      this.historyIndex = -1;
+      this.writePrompt();
+      return;
+    }
+
+    this.commandHistory.push(command);
+    this.historyIndex = -1;
+    this.inputBuffer = '';
+    this.isExecuting = true;
+
+    try {
+      const result = await this.bash.exec(command, {
+        cwd: this.currentCwd,
+        env: this.currentEnv,
+      });
+
+      this.applyExecutionState(result);
+      this.writeResult(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.term.writeln(`bash: ${message}`);
+    } finally {
+      this.isExecuting = false;
+      this.writePrompt();
+    }
+  }
+
+  private applyExecutionState(result: BashExecResult): void {
+    this.currentEnv = result.env;
+    this.currentCwd = result.env.PWD || this.currentCwd;
+  }
+
+  private writeResult(result: BashExecResult): void {
+    if (!this.term) {
+      return;
+    }
+
+    const stdout = this.normalizeOutput(result.stdout);
+    const stderr = this.normalizeOutput(result.stderr);
+
+    if (stdout) {
+      this.term.write(stdout);
+      if (!stdout.endsWith('\r\n')) {
+        this.term.write('\r\n');
+      }
+    }
+
+    if (stderr) {
+      this.term.write(`\x1b[31m${stderr}\x1b[0m`);
+      if (!stderr.endsWith('\r\n')) {
+        this.term.write('\r\n');
+      }
+    }
+  }
+
+  private handleBackspace(): void {
+    if (!this.term || this.inputBuffer.length === 0) {
+      return;
+    }
+
+    this.inputBuffer = this.inputBuffer.slice(0, -1);
+    this.term.write('\b \b');
+  }
+
+  private handleInterrupt(): void {
+    if (!this.term) {
+      return;
+    }
+
+    this.inputBuffer = '';
+    this.historyIndex = -1;
+    this.term.write('^C\r\n');
+    this.writePrompt();
+  }
+
+  private navigateHistory(direction: -1 | 1): void {
+    if (!this.term || this.commandHistory.length === 0) {
+      return;
+    }
+
+    if (direction === -1) {
+      this.historyIndex =
+        this.historyIndex === -1
+          ? this.commandHistory.length - 1
+          : Math.max(0, this.historyIndex - 1);
+    } else if (this.historyIndex !== -1) {
+      this.historyIndex += 1;
+      if (this.historyIndex >= this.commandHistory.length) {
+        this.historyIndex = -1;
+      }
+    } else {
+      return;
+    }
+
+    this.inputBuffer = this.historyIndex === -1 ? '' : this.commandHistory[this.historyIndex];
+    this.renderInputBuffer();
+  }
+
+  private renderInputBuffer(): void {
+    if (!this.term) {
+      return;
+    }
+
+    this.term.write('\r\x1b[2K');
+    this.writePrompt(false);
+    this.term.write(this.inputBuffer);
+  }
+
+  private writePrompt(includeBuffer = true): void {
+    if (!this.term) {
+      return;
+    }
+
+    this.term.write(`\x1b[1;32m${this.getPrompt()}\x1b[0m`);
+    if (includeBuffer && this.inputBuffer) {
+      this.term.write(this.inputBuffer);
+    }
+  }
+
+  private getPrompt(): string {
+    return `user@nexus:${this.formatPromptPath(this.currentCwd)}$ `;
+  }
+
+  private formatPromptPath(path: string): string {
+    return path === this.initialCwd ? '~' : path.replace(`${this.initialCwd}/`, '~/');
+  }
+
+  private normalizeOutput(output: string): string {
+    return output.replace(/\r?\n/g, '\r\n');
+  }
+
+  private isPrintableInput(data: string): boolean {
+    return data >= ' ' && data !== '\u007F' && !data.startsWith('\u001b');
   }
 
   private applyTheme(): void {
