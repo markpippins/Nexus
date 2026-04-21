@@ -145,6 +145,11 @@ namespace Nexus.ServiceRegistry.V1 {
     name: string;
     activeFlag?: boolean = true;
   }
+  model Host {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
   model EnvironmentType {
     id: int64;
     name: string;

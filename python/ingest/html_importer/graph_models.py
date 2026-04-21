@@ -13,7 +13,7 @@ class InteractionArchetype(Enum):
     COMPRESSION = "COMPRESSION"
     CONSTRAINT_INJECTION = "CONSTRAINT_INJECTION"
 
-TrajectoryState = Literal["active", "suspended", "resumed", "stable", "closed"]
+TrajectoryState = Literal["ACTIVE", "BLOCKED", "INTERMEDIATE", "PAUSED", "CLOSED", "ABORTED"]
 
 @dataclass
 class SemanticLabel:
@@ -53,7 +53,7 @@ class MessageNode:
 class Trajectory:
     id: str
     anchorMessage: str  
-    state: TrajectoryState
+    state: str
     confidence: float
     messages: List[str] = field(default_factory=list) 
 
@@ -166,6 +166,7 @@ class ReconstructedClosureSet:
     resolved_concepts: Set[str] = field(default_factory=set)
     resolves_edges: List[Any] = field(default_factory=list)
     constraints: List[ConstraintNode] = field(default_factory=list)
+    completion_candidate: bool = False
 
 @dataclass
 class MaterializedReplayView:
@@ -180,7 +181,7 @@ class ReconstructedTrajectory:
     messages: List[str] = field(default_factory=list)
     interruptions: List[str] = field(default_factory=list)
     reattachments: List[str] = field(default_factory=list)
-    state: str = "active"  # active | interrupted | resumed | stable
+    state: str = "ACTIVE"  # ACTIVE | BLOCKED | INTERMEDIATE | PAUSED | CLOSED | ABORTED
     
     state_transitions: List[StateEvent] = field(default_factory=list)
     snapshots: List[TrajectorySnapshot] = field(default_factory=list)
@@ -248,3 +249,47 @@ class ConversationGraph:
     def to_dict(self) -> dict:
         from dataclasses import asdict
         return asdict(self)
+
+@dataclass
+class TransitionRequest:
+    trajectory_id: str
+    from_state: str
+    to_state: str
+    trigger: str
+    evidence: Dict[str, Any]
+    confidence: float
+    schema_version: str = "v1"
+    pending_mutations: bool = False
+    constraint_snapshot: List[ConstraintNode] = field(default_factory=list)
+
+@dataclass
+class TransitionDecision:
+    status: str # APPROVE_EXECUTION | ROUTE_TO_SANDBOX | REJECT_TRANSITION
+    reasoning: List[str]
+    required_blockers: List[ConstraintNode] = field(default_factory=list)
+
+@dataclass
+class PolicySnapshot:
+    policy_snapshot_id: str
+    policy_hash: str
+
+@dataclass
+class ExecutionTraceElement:
+    timestep_seq: int
+    request: TransitionRequest
+    decision: TransitionDecision
+    resulting_trajectory_state: str
+    policy_snapshot: PolicySnapshot
+
+@dataclass
+class KernelExecutionTrace:
+    run_id: str
+    mode: str
+    schema_version: str
+    elements: List[ExecutionTraceElement] = field(default_factory=list)
+
+@dataclass
+class ReplayValidationResult:
+    is_valid: bool
+    divergence_reason: Optional[str] = None
+    divergence_element_index: Optional[int] = None

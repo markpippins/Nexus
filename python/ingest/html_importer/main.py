@@ -212,12 +212,24 @@ def main() -> None:
             # Optional Pass 5: Validation evaluations (Disconnected Dict)
             evaluations = TrajectoryEvaluator(graph).evaluate()
             
-            # Replay Kernel Compilation (Phase 4.8 / 5 logic)
-            from replay_kernel import ReplayEngine
+            # NEXUS KERNEL Execution Bootstrapping (Phase 5 orchestration bounds explicit)
+            from nexus_kernel import Kernel, FSMController
+            from transition_synthesizer import TransitionSynthesizer
+            from execution_gate import ExecutionEligibilityGate
+            
             event_stream = []
             for t in graph.reconstructed_trajectories.values():
                 event_stream.extend(t.event_envelopes)
                 
+            kernel = Kernel(
+                synthesizer=TransitionSynthesizer(),
+                layer_c=ExecutionEligibilityGate(),
+                fsm=FSMController()
+            )
+            kernel_result = kernel.run(event_stream, mode="LIVE")
+            
+            # Optional Observer Execution Mapping
+            from replay_kernel import ReplayEngine
             replay_engine = ReplayEngine()
             run_id = f"run_{graph.id}_latest"
             view = replay_engine.replay(run_id, "v1", event_stream)
@@ -267,19 +279,9 @@ def main() -> None:
         from context_assembler import ContextAssembler
         working_set, conflict_set = ContextAssembler(workspace).assemble()
         
-        # LAYER C: Execution Gate isolating limits securely wrapping boundaries seamlessly
-        from execution_gate import ExecutionEligibilityGate
+        # Kernel cleanly evaluates policies systematically without manual overrides in main!
         for graph_id, graph in workspace.conversations.items():
-            if graph.replay_views:
-                latest_run_id = list(graph.replay_views.keys())[-1]
-                v1_view = graph.replay_views[latest_run_id].get("v1")
-                if v1_view:
-                    stream = []
-                    for t in graph.reconstructed_trajectories.values():
-                        stream.extend(t.event_envelopes)
-                        
-                    decision = ExecutionEligibilityGate().evaluate(v1_view, stream, environment="sandbox")
-                    print(f"[{graph_id}] Execution Gate Decision: {decision.status} - {decision.reasoning}")
+             print(f"[{graph_id}] Evaluated Kernel seamlessly statically.")
         
         if args.json:
             graphs_json["workspace"] = {
