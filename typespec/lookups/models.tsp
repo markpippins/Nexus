@@ -145,6 +145,82 @@ namespace Nexus.ServiceRegistry.V1 {
     name: string;
     activeFlag?: boolean = true;
   }
+  model EnvironmentType {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Host {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Deployment {
+    id: int64;
+  }
+  model Library {
+    id: int64;
+    name: string;
+    version?: string;
+  }
+  model LibraryCategory {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model OperatingSystem {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServerType {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Service {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServiceBackend {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServiceConfiguration {
+    id: int64;
+    key: string;
+    value?: string;
+  }
+  model ServiceDependency {
+    id: int64;
+    name: string;
+  }
+  model ServiceLibrary {
+    id: int64;
+    name: string;
+    version?: string;
+  }
+  model ServiceType {
+    id: int64;
+    name: string;
+  }
+  model VisualComponent {
+    id: int64;
+    name: string;
+  }
+}
+  model Framework {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model FrameworkCategory {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
   model Host {
     id: int64;
     name: string;
