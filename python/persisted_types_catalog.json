@@ -1,0 +1,1636 @@
+{
+  "catalog_version": "1.0",
+  "generated_on": "2026-04-21",
+  "purpose": "Consolidated catalog of persisted or persistence-worthy types across python/event-pipeline and python/ingest/html_importer.",
+  "projects": {
+    "event-pipeline": {
+      "source_roots": [
+        "C:\\dev\\nexus\\python\\event-pipeline\\validators\\events.py",
+        "C:\\dev\\nexus\\python\\event-pipeline\\handlers\\base.py",
+        "C:\\dev\\nexus\\python\\event-pipeline\\handlers\\dispatcher.py",
+        "C:\\dev\\nexus\\python\\event-pipeline\\handlers\\steps.py",
+        "C:\\dev\\nexus\\python\\event-pipeline\\agents\\architect_agent.py",
+        "C:\\dev\\nexus\\python\\event-pipeline\\projections\\update_tasks.py"
+      ],
+      "enums": {
+        "EventType": [
+          "IdeaCaptured",
+          "WorkflowPlanned",
+          "StepRequested",
+          "StepApproved",
+          "StepRejected",
+          "KernelPanic",
+          "VocabularyDrafted",
+          "RequirementsFormalized",
+          "TypeSpecDrafted",
+          "SpecCompiled",
+          "RefactorDrafted",
+          "Integrated"
+        ],
+        "StepName": [
+          "vocabulary",
+          "requirements",
+          "typespec",
+          "compile",
+          "refactor",
+          "integrate"
+        ],
+        "WorkflowState": [
+          "draft",
+          "specified",
+          "compiled",
+          "integrated",
+          "synchronized"
+        ],
+        "StepStatus": [
+          "pending",
+          "pending_approval",
+          "approved"
+        ]
+      },
+      "types": {
+        "CommonEventMeta": {
+          "kind": "object",
+          "fields": {
+            "auto_advance": {
+              "type": "boolean",
+              "required": false
+            }
+          }
+        },
+        "PersistedEvent": {
+          "kind": "object",
+          "description": "Common envelope for all persisted event JSON files in events/.",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "EventType",
+              "required": true
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "iso8601",
+              "required": true
+            },
+            "source": {
+              "type": "string",
+              "required": true
+            },
+            "payload": {
+              "type": "object",
+              "required": true
+            },
+            "_meta": {
+              "type": "CommonEventMeta",
+              "required": false
+            }
+          }
+        },
+        "WorkflowVocabulary": {
+          "kind": "object",
+          "description": "Shared vocabulary structure embedded in IdeaCaptured payloads and also persisted as artifacts/<idea_id>/workflow_vocabulary.json.",
+          "fields": {
+            "entities": {
+              "type": "map<string,string>",
+              "required": false
+            },
+            "actions": {
+              "type": "map<string,string>",
+              "required": false
+            },
+            "states": {
+              "type": "map<string,string>",
+              "required": false
+            },
+            "constraints": {
+              "type": "map<string,string>",
+              "required": false
+            },
+            "event_bindings": {
+              "type": "map<string,EventBinding>",
+              "required": false
+            }
+          }
+        },
+        "EventBinding": {
+          "kind": "object",
+          "fields": {
+            "produces_state": {
+              "type": "string",
+              "required": true
+            },
+            "next_action": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "IdeaCapturedPayload": {
+          "kind": "object",
+          "fields": {
+            "idea": {
+              "type": "string",
+              "required": true
+            },
+            "workflow_vocabulary": {
+              "type": "WorkflowVocabulary",
+              "required": false
+            }
+          }
+        },
+        "WorkflowStep": {
+          "kind": "object",
+          "fields": {
+            "step": {
+              "type": "StepName",
+              "required": true
+            },
+            "event_type": {
+              "type": "EventType",
+              "required": true
+            },
+            "state": {
+              "type": "string",
+              "required": true
+            },
+            "next_action": {
+              "type": "string|null",
+              "required": true
+            },
+            "status": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "WorkflowPlannedPayload": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "idea": {
+              "type": "string",
+              "required": true
+            },
+            "vocabulary_path": {
+              "type": "string|null",
+              "required": false
+            },
+            "auto_advance": {
+              "type": "boolean",
+              "required": false
+            },
+            "steps": {
+              "type": "array<WorkflowStep>",
+              "required": true
+            }
+          }
+        },
+        "StepRequestedPayload": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "step": {
+              "type": "StepName",
+              "required": true
+            }
+          }
+        },
+        "StepApprovedPayload": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "step": {
+              "type": "StepName",
+              "required": true
+            }
+          }
+        },
+        "StepRejectedPayload": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "step": {
+              "type": "StepName",
+              "required": true
+            },
+            "reason": {
+              "type": "string",
+              "required": true
+            },
+            "artifact_path": {
+              "type": "string|null",
+              "required": false
+            }
+          }
+        },
+        "KernelPanicPayload": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "step": {
+              "type": "StepName",
+              "required": true
+            },
+            "reason": {
+              "type": "string",
+              "required": true
+            },
+            "action": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "StepCompletionPayload": {
+          "kind": "object",
+          "description": "Base payload used by VocabularyDrafted, RequirementsFormalized, TypeSpecDrafted, SpecCompiled, RefactorDrafted, and Integrated.",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "step": {
+              "type": "StepName",
+              "required": true
+            },
+            "artifact_path": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "TypeSpecDraftedPayload": {
+          "kind": "object",
+          "extends": "StepCompletionPayload",
+          "fields": {
+            "format": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "SpecCompiledPayload": {
+          "kind": "object",
+          "extends": "StepCompletionPayload",
+          "fields": {
+            "exit_code": {
+              "type": "integer",
+              "required": false
+            },
+            "output_files": {
+              "type": "array<string>",
+              "required": false
+            }
+          }
+        },
+        "IntegratedPayload": {
+          "kind": "object",
+          "extends": "StepCompletionPayload",
+          "fields": {
+            "patch_path": {
+              "type": "string",
+              "required": false
+            },
+            "changes_count": {
+              "type": "integer",
+              "required": false
+            }
+          }
+        },
+        "OffsetRecord": {
+          "kind": "object",
+          "description": "Persisted in offsets/architect and offsets/dispatcher.",
+          "fields": {
+            "last_timestamp": {
+              "type": "string",
+              "format": "iso8601",
+              "required": true
+            },
+            "processed_ids": {
+              "type": "array<string>",
+              "required": true
+            }
+          }
+        },
+        "FailureCountRecord": {
+          "kind": "map",
+          "description": "Persisted in artifacts/<idea_id>/.failures.json as step -> consecutive failure count.",
+          "key_type": "StepName",
+          "value_type": "integer"
+        },
+        "WorkflowVocabularyArtifact": {
+          "kind": "object",
+          "fields": {
+            "entities": {
+              "type": "map<string,string>",
+              "required": false
+            },
+            "actions": {
+              "type": "map<string,string>",
+              "required": false
+            },
+            "states": {
+              "type": "map<string,string>",
+              "required": false
+            },
+            "constraints": {
+              "type": "map<string,string>",
+              "required": false
+            },
+            "event_bindings": {
+              "type": "map<string,EventBinding>",
+              "required": false
+            }
+          }
+        },
+        "VocabularyArtifact": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "source_idea": {
+              "type": "string",
+              "required": true
+            },
+            "entities": {
+              "type": "map<string,string>",
+              "required": true
+            },
+            "actions": {
+              "type": "map<string,string>",
+              "required": true
+            },
+            "states": {
+              "type": "map<string,string>",
+              "required": true
+            },
+            "constraints": {
+              "type": "map<string,string>",
+              "required": true
+            },
+            "generated_by": {
+              "type": "string",
+              "required": true
+            },
+            "llm_error": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "RequirementItem": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "description": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "RequirementsArtifact": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "functional_requirements": {
+              "type": "array<RequirementItem>",
+              "required": true
+            },
+            "vocabulary_ref_path": {
+              "type": "string",
+              "required": true
+            },
+            "generated_by": {
+              "type": "string",
+              "required": true
+            },
+            "llm_error": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "TypeSpecSourceArtifact": {
+          "kind": "text",
+          "description": "Persisted as artifacts/<idea_id>/main.tsp rather than JSON."
+        },
+        "CompiledArtifact": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "exit_code": {
+              "type": "integer",
+              "required": true
+            },
+            "stdout": {
+              "type": "string",
+              "required": true
+            },
+            "stderr": {
+              "type": "string",
+              "required": true
+            },
+            "sandbox_files_list": {
+              "type": "array<string>",
+              "required": true
+            },
+            "generated_by": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "CompileFailureArtifact": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "exit_code": {
+              "type": "integer",
+              "required": true
+            },
+            "stdout": {
+              "type": "string",
+              "required": true
+            },
+            "stderr": {
+              "type": "string",
+              "required": true
+            },
+            "generated_by": {
+              "type": "string",
+              "required": true
+            },
+            "status": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "RefactorPlanCore": {
+          "kind": "object",
+          "fields": {
+            "files_to_modify": {
+              "type": "array<any>",
+              "required": false
+            },
+            "new_files": {
+              "type": "array<any>",
+              "required": false
+            },
+            "modifications": {
+              "type": "array<any>",
+              "required": false
+            },
+            "risks": {
+              "type": "array<any>",
+              "required": false
+            },
+            "note": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "RefactorPlanArtifact": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "refactor_plan": {
+              "type": "RefactorPlanCore",
+              "required": true
+            },
+            "generated_by": {
+              "type": "string",
+              "required": true
+            },
+            "llm_error": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "IntegratePlanArtifact": {
+          "kind": "object",
+          "fields": {
+            "idea_id": {
+              "type": "string",
+              "required": true
+            },
+            "status": {
+              "type": "string",
+              "required": true
+            },
+            "patch_path": {
+              "type": "string",
+              "required": true
+            },
+            "changes_summary": {
+              "type": "array<string>",
+              "required": true
+            },
+            "generated_by": {
+              "type": "string",
+              "required": true
+            },
+            "requires_approval": {
+              "type": "boolean",
+              "required": true
+            }
+          }
+        },
+        "WorkflowProjectionStep": {
+          "kind": "object",
+          "fields": {
+            "status": {
+              "type": "StepStatus|string",
+              "required": true
+            },
+            "state": {
+              "type": "string",
+              "required": true
+            },
+            "event_type": {
+              "type": "EventType",
+              "required": true
+            },
+            "next_action": {
+              "type": "string|null",
+              "required": false
+            },
+            "artifact_path": {
+              "type": "string",
+              "required": false
+            },
+            "rejection_reason": {
+              "type": "string",
+              "required": false
+            }
+          }
+        },
+        "WorkflowProjection": {
+          "kind": "object",
+          "description": "Element persisted inside projections/tasks_by_priority.json.",
+          "fields": {
+            "idea": {
+              "type": "string",
+              "required": true
+            },
+            "vocabulary_path": {
+              "type": "string|null",
+              "required": false
+            },
+            "auto_advance": {
+              "type": "boolean",
+              "required": true
+            },
+            "steps": {
+              "type": "map<StepName,WorkflowProjectionStep>",
+              "required": true
+            },
+            "kernel_panic": {
+              "type": "boolean",
+              "required": false
+            },
+            "panic_reason": {
+              "type": "string",
+              "required": false
+            },
+            "current_step": {
+              "type": "StepName|'complete'|'rejected'|null",
+              "required": true
+            }
+          }
+        }
+      }
+    },
+    "html_importer": {
+      "source_roots": [
+        "C:\\dev\\nexus\\python\\ingest\\html_importer\\models.py",
+        "C:\\dev\\nexus\\python\\ingest\\html_importer\\graph_models.py",
+        "C:\\dev\\nexus\\python\\ingest\\html_importer\\trajectory_evaluation.py",
+        "C:\\dev\\nexus\\python\\ingest\\html_importer\\main.py"
+      ],
+      "enums": {
+        "TimestampConfidence": [
+          "high",
+          "medium",
+          "low",
+          "none"
+        ],
+        "TimestampSource": [
+          "dom",
+          "embedded_json",
+          "file_metadata",
+          "synthetic"
+        ],
+        "InteractionArchetype": [
+          "CONSTRUCTION",
+          "EXECUTION",
+          "REFLECTION",
+          "RECONCILIATION",
+          "REVISION",
+          "COUNTERFACTUAL",
+          "AUDIT",
+          "COMPRESSION",
+          "CONSTRAINT_INJECTION"
+        ],
+        "TrajectoryState": [
+          "ACTIVE",
+          "BLOCKED",
+          "INTERMEDIATE",
+          "PAUSED",
+          "CLOSED",
+          "ABORTED"
+        ]
+      },
+      "types": {
+        "TimestampInfo": {
+          "kind": "object",
+          "fields": {
+            "value": {
+              "type": "string|null",
+              "required": true
+            },
+            "confidence": {
+              "type": "TimestampConfidence",
+              "required": true
+            },
+            "source": {
+              "type": "TimestampSource",
+              "required": true
+            },
+            "raw_value": {
+              "type": "string|null",
+              "required": true
+            }
+          }
+        },
+        "ImageReference": {
+          "kind": "object",
+          "fields": {
+            "name": {
+              "type": "string",
+              "required": true
+            },
+            "saved": {
+              "type": "boolean",
+              "required": true
+            },
+            "original_src": {
+              "type": "string|null",
+              "required": true
+            }
+          }
+        },
+        "ConversationMetadata": {
+          "kind": "object",
+          "fields": {
+            "conversation_id": {
+              "type": "string|null",
+              "required": true
+            },
+            "title": {
+              "type": "string|null",
+              "required": true
+            },
+            "create_time": {
+              "type": "string|null",
+              "required": true
+            },
+            "update_time": {
+              "type": "string|null",
+              "required": true
+            },
+            "model": {
+              "type": "string|null",
+              "required": true
+            },
+            "export_source": {
+              "type": "string|null",
+              "required": true
+            }
+          }
+        },
+        "NormalizedMessage": {
+          "kind": "object",
+          "fields": {
+            "message_id": {
+              "type": "string",
+              "required": true
+            },
+            "speaker": {
+              "type": "string",
+              "required": true
+            },
+            "timestamp": {
+              "type": "TimestampInfo",
+              "required": true
+            },
+            "text": {
+              "type": "string",
+              "required": true
+            },
+            "turn_index": {
+              "type": "integer",
+              "required": true
+            },
+            "raw_html_ref": {
+              "type": "string",
+              "required": true
+            },
+            "image_references": {
+              "type": "array<ImageReference>",
+              "required": true
+            }
+          }
+        },
+        "MessageFileResult": {
+          "kind": "object",
+          "fields": {
+            "file": {
+              "type": "string",
+              "required": true
+            },
+            "metadata": {
+              "type": "ConversationMetadata",
+              "required": true
+            },
+            "messages": {
+              "type": "array<NormalizedMessage>",
+              "required": true
+            }
+          }
+        },
+        "MessagesOutput": {
+          "kind": "object",
+          "fields": {
+            "files": {
+              "type": "array<MessageFileResult>",
+              "required": true
+            }
+          }
+        },
+        "SemanticLabel": {
+          "kind": "object",
+          "fields": {
+            "archetype": {
+              "type": "string",
+              "required": true
+            },
+            "confidence": {
+              "type": "number",
+              "required": true
+            },
+            "source_span": {
+              "type": "string",
+              "required": true
+            },
+            "timestamp": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "ConstraintNode": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "state": {
+              "type": "string",
+              "required": true
+            },
+            "constraint_type": {
+              "type": "string",
+              "required": true
+            },
+            "source": {
+              "type": "string",
+              "required": true
+            },
+            "linked_nodes": {
+              "type": "array<string>",
+              "required": true
+            }
+          }
+        },
+        "Relationship": {
+          "kind": "object",
+          "fields": {
+            "source_id": {
+              "type": "string",
+              "required": true
+            },
+            "target_id": {
+              "type": "string",
+              "required": true
+            },
+            "relation_type": {
+              "type": "string",
+              "required": true
+            },
+            "confidence": {
+              "type": "number",
+              "required": true
+            }
+          }
+        },
+        "MessageNode": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "text": {
+              "type": "string",
+              "required": true
+            },
+            "speaker": {
+              "type": "string",
+              "required": true
+            },
+            "timestamp": {
+              "type": "string|null",
+              "required": true
+            },
+            "turn_index": {
+              "type": "integer",
+              "required": true
+            },
+            "sequence_position": {
+              "type": "integer",
+              "required": true
+            },
+            "embedding": {
+              "type": "array<number>|null",
+              "required": true
+            },
+            "trajectoryId": {
+              "type": "string|null",
+              "required": true
+            },
+            "peoIds": {
+              "type": "array<string>",
+              "required": true
+            }
+          }
+        },
+        "Trajectory": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "anchorMessage": {
+              "type": "string",
+              "required": true
+            },
+            "state": {
+              "type": "string",
+              "required": true
+            },
+            "confidence": {
+              "type": "number",
+              "required": true
+            },
+            "messages": {
+              "type": "array<string>",
+              "required": true
+            }
+          }
+        },
+        "Interruption": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "required": true
+            },
+            "messageId": {
+              "type": "string",
+              "required": true
+            },
+            "suspendsTrajectory": {
+              "type": "boolean",
+              "required": true
+            }
+          }
+        },
+        "PEO": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "originMessage": {
+              "type": "string",
+              "required": true
+            },
+            "proposal": {
+              "type": "string",
+              "required": true
+            },
+            "trajectoryId": {
+              "type": "string",
+              "required": true
+            },
+            "status": {
+              "type": "string",
+              "required": true
+            },
+            "decayScore": {
+              "type": "number",
+              "required": true
+            }
+          }
+        },
+        "Concept": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "name": {
+              "type": "string",
+              "required": true
+            },
+            "scope_id": {
+              "type": "string|null",
+              "required": true
+            },
+            "description": {
+              "type": "string|null",
+              "required": true
+            }
+          }
+        },
+        "Speaker": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "name": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "Conversation": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "title": {
+              "type": "string|null",
+              "required": true
+            }
+          }
+        },
+        "StateEvent": {
+          "kind": "object",
+          "fields": {
+            "message_id": {
+              "type": "string",
+              "required": true
+            },
+            "from_state": {
+              "type": "string",
+              "required": true
+            },
+            "to_state": {
+              "type": "string",
+              "required": true
+            },
+            "reason": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "TrajectorySnapshot": {
+          "kind": "object",
+          "fields": {
+            "timestep_message_id": {
+              "type": "string",
+              "required": true
+            },
+            "concepts_active": {
+              "type": "map<string,string|null>",
+              "required": true
+            }
+          }
+        },
+        "ObservationContent": {
+          "kind": "object",
+          "fields": {
+            "concept_ids": {
+              "type": "array<string>",
+              "required": true
+            },
+            "relation": {
+              "type": "string",
+              "required": true
+            },
+            "evidence_pointer": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "Observation": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "source_trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "scope_id": {
+              "type": "string",
+              "required": true
+            },
+            "content": {
+              "type": "ObservationContent|any",
+              "required": true
+            },
+            "polarity": {
+              "type": "string",
+              "required": true
+            },
+            "confidence": {
+              "type": "number",
+              "required": true
+            },
+            "type": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "QuestionBinding": {
+          "kind": "object",
+          "fields": {
+            "required_concept_ids": {
+              "type": "array<string>",
+              "required": true
+            }
+          }
+        },
+        "QuestionNode": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "scope_id": {
+              "type": "string",
+              "required": true
+            },
+            "source_trajectory_id": {
+              "type": "string|null",
+              "required": true
+            },
+            "binding": {
+              "type": "QuestionBinding",
+              "required": true
+            },
+            "status": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "PartialResolution": {
+          "kind": "object",
+          "fields": {
+            "question_id": {
+              "type": "string",
+              "required": true
+            },
+            "satisfied_predicates": {
+              "type": "array<string>",
+              "required": true
+            },
+            "missing_predicates": {
+              "type": "array<string>",
+              "required": true
+            },
+            "candidate_subgraph_roots": {
+              "type": "array<string>",
+              "required": true
+            }
+          }
+        },
+        "ReconstructedClosureSet": {
+          "kind": "object",
+          "fields": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "resolved_concepts": {
+              "type": "array<string>",
+              "storage_note": "Declared as Set[str] in code; persisted as a unique array if serialized to JSON.",
+              "required": true
+            },
+            "resolves_edges": {
+              "type": "array<any>",
+              "required": true
+            },
+            "constraints": {
+              "type": "array<ConstraintNode>",
+              "required": true
+            },
+            "completion_candidate": {
+              "type": "boolean",
+              "required": true
+            }
+          }
+        },
+        "MaterializedReplayView": {
+          "kind": "object",
+          "fields": {
+            "run_id": {
+              "type": "string",
+              "required": true
+            },
+            "schema_version": {
+              "type": "string",
+              "required": true
+            },
+            "closures": {
+              "type": "map<string,ReconstructedClosureSet>",
+              "required": true
+            }
+          }
+        },
+        "IR_EventEnvelope": {
+          "kind": "object",
+          "fields": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "timestep_msg_id": {
+              "type": "string",
+              "required": true
+            },
+            "added_nodes": {
+              "type": "array<string>",
+              "required": true
+            },
+            "modified_nodes": {
+              "type": "array<string>",
+              "required": true
+            },
+            "removed_nodes": {
+              "type": "array<string>",
+              "required": true
+            },
+            "reintroduced_nodes": {
+              "type": "array<string>",
+              "required": true
+            },
+            "emitted_edges": {
+              "type": "array<any>",
+              "required": true
+            },
+            "emitted_observations": {
+              "type": "array<any>",
+              "required": true
+            },
+            "emitted_questions": {
+              "type": "array<any>",
+              "required": true
+            },
+            "partial_resolutions": {
+              "type": "array<any>",
+              "required": true
+            },
+            "emitted_constraints": {
+              "type": "array<any>",
+              "required": true
+            },
+            "semantic_labels": {
+              "type": "array<SemanticLabel>",
+              "required": true
+            },
+            "archetypes": {
+              "type": "array<InteractionArchetype>",
+              "storage_note": "Declared as Set[InteractionArchetype] in code; JSON persistence should normalize to a unique array of enum strings.",
+              "required": true
+            },
+            "schema_version": {
+              "type": "string",
+              "required": true
+            },
+            "timestep_sequence": {
+              "type": "integer",
+              "required": true
+            }
+          }
+        },
+        "ReconstructedTrajectory": {
+          "kind": "object",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "seed_id": {
+              "type": "string",
+              "required": true
+            },
+            "messages": {
+              "type": "array<string>",
+              "required": true
+            },
+            "interruptions": {
+              "type": "array<string>",
+              "required": true
+            },
+            "reattachments": {
+              "type": "array<string>",
+              "required": true
+            },
+            "state": {
+              "type": "TrajectoryState|string",
+              "required": true
+            },
+            "state_transitions": {
+              "type": "array<StateEvent>",
+              "required": true
+            },
+            "snapshots": {
+              "type": "array<TrajectorySnapshot>",
+              "required": true
+            },
+            "event_envelopes": {
+              "type": "array<IR_EventEnvelope>",
+              "required": true
+            },
+            "has_interrupted": {
+              "type": "boolean",
+              "required": true
+            },
+            "concepts_seed": {
+              "type": "array<string>",
+              "storage_note": "Declared as Set[str] in code; JSON persistence should normalize to a unique array.",
+              "required": true
+            },
+            "concepts_active": {
+              "type": "array<string>",
+              "storage_note": "Declared as Set[str] in code; JSON persistence should normalize to a unique array.",
+              "required": true
+            }
+          }
+        },
+        "ConversationGraph": {
+          "kind": "object",
+          "description": "Root semantic graph IR persisted in graph mode output.",
+          "fields": {
+            "id": {
+              "type": "string",
+              "required": true
+            },
+            "build_version": {
+              "type": "string",
+              "required": true
+            },
+            "messages": {
+              "type": "map<string,MessageNode>",
+              "required": true
+            },
+            "conversations": {
+              "type": "map<string,Conversation>",
+              "required": true
+            },
+            "speakers": {
+              "type": "map<string,Speaker>",
+              "required": true
+            },
+            "concepts": {
+              "type": "map<string,Concept>",
+              "required": true
+            },
+            "trajectories": {
+              "type": "map<string,Trajectory>",
+              "required": true
+            },
+            "reconstructed_trajectories": {
+              "type": "map<string,ReconstructedTrajectory>",
+              "required": true
+            },
+            "replay_views": {
+              "type": "map<string,map<string,MaterializedReplayView>>",
+              "required": true
+            },
+            "interruptions": {
+              "type": "map<string,Interruption>",
+              "required": true
+            },
+            "peos": {
+              "type": "map<string,PEO>",
+              "required": true
+            },
+            "questions": {
+              "type": "map<string,QuestionNode>",
+              "required": true
+            },
+            "observations": {
+              "type": "map<string,Observation>",
+              "required": true
+            },
+            "constraints": {
+              "type": "map<string,ConstraintNode>",
+              "required": true
+            },
+            "artifacts": {
+              "type": "map<string,any>",
+              "required": true
+            },
+            "relationships": {
+              "type": "array<Relationship>",
+              "required": true
+            }
+          }
+        },
+        "TransitionRequest": {
+          "kind": "object",
+          "fields": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "from_state": {
+              "type": "string",
+              "required": true
+            },
+            "to_state": {
+              "type": "string",
+              "required": true
+            },
+            "trigger": {
+              "type": "string",
+              "required": true
+            },
+            "evidence": {
+              "type": "map<string,any>",
+              "required": true
+            },
+            "confidence": {
+              "type": "number",
+              "required": true
+            },
+            "schema_version": {
+              "type": "string",
+              "required": true
+            },
+            "pending_mutations": {
+              "type": "boolean",
+              "required": true
+            },
+            "constraint_snapshot": {
+              "type": "array<ConstraintNode>",
+              "required": true
+            }
+          }
+        },
+        "TransitionDecision": {
+          "kind": "object",
+          "fields": {
+            "status": {
+              "type": "string",
+              "required": true
+            },
+            "reasoning": {
+              "type": "array<string>",
+              "required": true
+            },
+            "required_blockers": {
+              "type": "array<ConstraintNode>",
+              "required": true
+            }
+          }
+        },
+        "PolicySnapshot": {
+          "kind": "object",
+          "fields": {
+            "policy_snapshot_id": {
+              "type": "string",
+              "required": true
+            },
+            "policy_hash": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "ExecutionTraceElement": {
+          "kind": "object",
+          "fields": {
+            "timestep_seq": {
+              "type": "integer",
+              "required": true
+            },
+            "request": {
+              "type": "TransitionRequest",
+              "required": true
+            },
+            "decision": {
+              "type": "TransitionDecision",
+              "required": true
+            },
+            "resulting_trajectory_state": {
+              "type": "string",
+              "required": true
+            },
+            "policy_snapshot": {
+              "type": "PolicySnapshot",
+              "required": true
+            }
+          }
+        },
+        "KernelExecutionTrace": {
+          "kind": "object",
+          "fields": {
+            "run_id": {
+              "type": "string",
+              "required": true
+            },
+            "mode": {
+              "type": "string",
+              "required": true
+            },
+            "schema_version": {
+              "type": "string",
+              "required": true
+            },
+            "elements": {
+              "type": "array<ExecutionTraceElement>",
+              "required": true
+            }
+          }
+        },
+        "ReplayValidationResult": {
+          "kind": "object",
+          "fields": {
+            "is_valid": {
+              "type": "boolean",
+              "required": true
+            },
+            "divergence_reason": {
+              "type": "string|null",
+              "required": true
+            },
+            "divergence_element_index": {
+              "type": "integer|null",
+              "required": true
+            }
+          }
+        },
+        "TrajectoryEvaluation": {
+          "kind": "object",
+          "fields": {
+            "trajectory_id": {
+              "type": "string",
+              "required": true
+            },
+            "message_count": {
+              "type": "integer",
+              "required": true
+            },
+            "duration_seconds": {
+              "type": "number",
+              "required": true
+            },
+            "stability_score": {
+              "type": "number",
+              "required": true
+            },
+            "coherence_score": {
+              "type": "number",
+              "required": true
+            },
+            "engagement_score": {
+              "type": "number",
+              "required": true
+            },
+            "interruption_count": {
+              "type": "integer",
+              "required": true
+            },
+            "reattachment_count": {
+              "type": "integer",
+              "required": true
+            },
+            "final_state": {
+              "type": "string",
+              "required": true
+            },
+            "classification": {
+              "type": "string",
+              "required": true
+            }
+          }
+        },
+        "GraphValidation": {
+          "kind": "object",
+          "fields": {
+            "errors": {
+              "type": "array<string>",
+              "required": true
+            },
+            "warnings": {
+              "type": "array<string>",
+              "required": true
+            }
+          }
+        },
+        "GraphFileResult": {
+          "kind": "object",
+          "fields": {
+            "file": {
+              "type": "string",
+              "required": true
+            },
+            "graph": {
+              "type": "ConversationGraph",
+              "required": true
+            },
+            "evaluations": {
+              "type": "map<string,TrajectoryEvaluation>",
+              "required": true
+            },
+            "validation": {
+              "type": "GraphValidation",
+              "required": true
+            }
+          }
+        },
+        "GraphsOutput": {
+          "kind": "object",
+          "fields": {
+            "graphs": {
+              "type": "array<GraphFileResult>",
+              "required": true
+            }
+          }
+        }
+      }
+    }
+  }
+}

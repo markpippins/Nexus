@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test;
 
 public class BrokerServiceAdapterTest {
   @Test
-  public void dummyTest() {
-    BrokerServiceAdapter b = new BrokerServiceAdapter();
-    assertNotNull(b);
+  public void smoke() {
+    BrokerServiceAdapter a = new BrokerServiceAdapter();
+    assertNotNull(a);
   }
 }

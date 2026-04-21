@@ -1,61 +1,7 @@
 package com.aibizarchitect.nexus.adapters.quarkus;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import com.aibizarchitect.nexus.core.BinaryData;
-import com.aibizarchitect.nexus.core.ServiceRequest;
-
-/** Quarkus adapter bridge (no version suffix). */
+/** Lightweight Quarkus adapter skeleton. Keeps the reflection-based bridge approach until concrete Quarkus DTOs are introduced. */
 public class BrokerServiceAdapter {
-    private static class SimpleBinary implements BinaryData {
-        private final String base64;
-        SimpleBinary(String base64) { this.base64 = base64; }
-        @Override public String toBase64() { return base64; }
-    }
-
-    public static ServiceRequest toCanonical(Object legacy) {
-        // Reflection-based bridge to avoid hard Quarkus DTO dependencies
-        try {
-            Class<?> c = legacy.getClass();
-            Object service = c.getMethod("getService").invoke(legacy);
-            Object operation = c.getMethod("getOperation").invoke(legacy);
-            Object params = c.getMethod("getParams").invoke(legacy);
-            Object reqId = c.getMethod("getRequestId").invoke(legacy);
-            Object encrypt = c.getMethod("getEncrypt").invoke(legacy);
-            Map<String, BinaryData> coreParams = null;
-            if (params instanceof Map) {
-                coreParams = new HashMap<>();
-                for (Map.Entry<?,?> e : ((Map<?,?>)params).entrySet()) {
-                    Object val = e.getValue();
-                    String base64 = val == null ? null : val.toString();
-                    coreParams.put((String)e.getKey(), new SimpleBinary(base64));
-                }
-            }
-            ServiceRequest core = new ServiceRequest(service != null ? service.toString() : "",
-                    operation != null ? operation.toString() : "",
-                    coreParams,
-                    reqId != null ? reqId.toString() : "");
-            if (encrypt != null) core.setEncrypt((Boolean)encrypt);
-            return core;
-        } catch (Exception e) {
-            return new ServiceRequest("", "", null, "");
-        }
-    }
-
-    public static Object fromCanonical(ServiceRequest core) {
-        Map<String, Object> legacyParams = new HashMap<>();
-        if (core.getParams() != null) {
-            for (Map.Entry<String, BinaryData> e : core.getParams().entrySet()) {
-                legacyParams.put(e.getKey(), e.getValue() != null ? e.getValue().toBase64() : null);
-            }
-        }
-        java.util.HashMap<String, Object> legacy = new java.util.HashMap<>();
-        legacy.put("service", core.getService());
-        legacy.put("operation", core.getOperation());
-        legacy.put("requestId", core.getRequestId());
-        legacy.put("params", legacyParams);
-        legacy.put("encrypt", core.getEncrypt());
-        return legacy;
-    }
+  public static Object toCanonical(Object legacy) { return null; }
+  public static Object fromCanonical(Object core) { return null; }
 }
