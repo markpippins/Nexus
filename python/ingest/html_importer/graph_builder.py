@@ -56,7 +56,33 @@ class GraphBuilder:
         # Pass 2b: Concept Extraction (Minimal Noise)
         self._extract_concepts()
         
+        # Pass 2c: Structural Query Binding Extraction (Unanswered obligations)
+        self._extract_questions()
+        
         return self
+
+    def _extract_questions(self):
+        """Phase 2c: Map textual query bounds into rigid Structural Obligations using raw nodes strictly."""
+        from graph_models import QuestionNode, QuestionBinding
+        
+        q_idx = 1
+        for msg in self._raw_messages:
+            if "?" in msg.text:
+                # Find concepts directly tied
+                matched_cids = []
+                for cid, c in self.graph.concepts.items():
+                    if c.name.lower() in msg.text.lower():
+                        matched_cids.append(cid)
+                        
+                q_id = f"q_{q_idx}"
+                q_idx += 1
+                self.graph.questions[q_id] = QuestionNode(
+                    id=q_id,
+                    scope_id=self.graph.id,
+                    source_trajectory_id=None,
+                    binding=QuestionBinding(required_concept_ids=matched_cids),
+                    status="OPEN"
+                )
 
     def _extract_concepts(self):
         """Minimal stub generator. Extracts repeated quotes and repeated capitalized terms."""
@@ -88,7 +114,7 @@ class GraphBuilder:
         for term, count in candidate_counts.items():
             if count >= 2:
                 cid = f"concept_{concept_idx}"
-                self.graph.concepts[cid] = Concept(id=cid, name=term)
+                self.graph.concepts[cid] = Concept(id=cid, name=term, scope_id=self.graph.id)
                 concept_idx += 1
 
 

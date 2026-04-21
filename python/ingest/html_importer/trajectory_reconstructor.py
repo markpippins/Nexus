@@ -1,5 +1,5 @@
 from typing import List, Dict, Set
-from graph_models import ConversationGraph, ReconstructedTrajectory
+from graph_models import ConversationGraph, ReconstructedTrajectory, TrajectorySnapshot
 
 class TrajectoryReconstructor:
     """Phase 4: Generates Derived Cognitive Threads over Validated ConversationGraphs."""
@@ -43,12 +43,17 @@ class TrajectoryReconstructor:
                     id=f"rec_{seed.id}",
                     seed_id=seed.id,
                     state="active",
-                    confidence=seed.confidence
                 )
                 traj.messages.append(msg.id)
                 traj.concepts_seed = msg_concepts.copy()
                 traj.concepts_active = msg_concepts.copy()
                 
+                # Lowest stable structural unit scope assignment
+                for cid in msg_concepts:
+                    c = self.graph.concepts[cid]
+                    if c.scope_id == self.graph.id:
+                        c.scope_id = traj.id
+                        
                 self.graph.reconstructed_trajectories[traj.id] = traj
                 active_traj = traj
                 continue
@@ -59,7 +64,6 @@ class TrajectoryReconstructor:
                     id="rec_default_baseline",
                     seed_id="default_seed",
                     state="active",
-                    confidence=1.0
                 )
                 self.graph.reconstructed_trajectories[active_traj.id] = active_traj
                 
@@ -71,6 +75,10 @@ class TrajectoryReconstructor:
                 active_traj.reattachments.append(msg.id)
                 active_traj.transition("resumed", msg.id, "RESPONDS_TO Continuity + Semantic Overlap")
                 active_traj.concepts_active.update(msg_concepts)
+                for cid in msg_concepts:
+                    c = self.graph.concepts[cid]
+                    if c.scope_id == self.graph.id:
+                        c.scope_id = active_traj.id
                 continue
                 
             # Interruption Pass (Structural + Keyword weight drop)
@@ -86,10 +94,17 @@ class TrajectoryReconstructor:
             elif has_keywords:
                  active_traj.interruptions.append(msg.id)
                  active_traj.transition("interrupted", msg.id, "Forced Keyword Interrupt")
+            elif active_traj.state == "interrupted":
+                 # Catchfall for when state is interrupted, semantic overlap is TRUE, but structural overlap was FALSE out of the reattachment pass.
+                 active_traj.interruptions.append(msg.id)
             else:
                 # Normal Sequence Integration
                 active_traj.messages.append(msg.id)
                 active_traj.concepts_active.update(msg_concepts)
+                for cid in msg_concepts:
+                    c = self.graph.concepts[cid]
+                    if c.scope_id == self.graph.id:
+                        c.scope_id = active_traj.id
                 
                 # State Stability Transitions
                 if active_traj.state == "resumed":
@@ -97,5 +112,17 @@ class TrajectoryReconstructor:
                 
                 if active_traj.state == "active" and active_traj.has_interrupted:
                     active_traj.transition("stable", msg.id, "Interruption survival cycle completed")
+                    
+            if active_traj:
+                scope_map = {}
+                for cid in active_traj.concepts_active:
+                    concept = self.graph.concepts.get(cid)
+                    scope_map[cid] = concept.scope_id if concept else None
+                    
+                snapshot = TrajectorySnapshot(
+                    timestep_message_id=msg.id,
+                    concepts_active=scope_map
+                )
+                active_traj.snapshots.append(snapshot)
                     
         return self.graph

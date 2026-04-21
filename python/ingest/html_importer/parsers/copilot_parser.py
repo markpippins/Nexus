@@ -108,29 +108,6 @@ class CopilotParser(BaseParser):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_selector(tag) -> str:
-        """Build a CSS selector-like string pointing to this element."""
-        parts = []
-        for parent in tag.parents:
-            if parent.name == "html":
-                break
-            if parent.get("id"):
-                parts.append(f"#{parent['id']}")
-            elif parent.get("class"):
-                cls = " ".join(parent["class"])
-                parts.append(f"{parent.name}.{cls.replace(' ', '.')}")
-        parts.reverse()
-        tag_id = tag.get("id", "")
-        if tag_id:
-            parts.append(f"#{tag_id}")
-        elif tag.get("class"):
-            cls = " ".join(tag["class"])
-            parts.append(f"{tag.name}.{cls.replace(' ', '.')}")
-        else:
-            parts.append(tag.name)
-        return " > ".join(parts)
-
-    @staticmethod
     def _extract_text(msg_tag, is_user: bool) -> str:
         """Extract readable text from a Copilot message element."""
         if is_user:

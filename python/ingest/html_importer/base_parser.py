@@ -152,6 +152,29 @@ class BaseParser(ABC):
         return False
 
     @staticmethod
+    def _build_selector(tag) -> str:
+        """Build a CSS selector-like string pointing to this element."""
+        parts = []
+        for parent in tag.parents:
+            if parent.name == "html":
+                break
+            if parent.get("id"):
+                parts.append(f"#{parent['id']}")
+            elif parent.get("class"):
+                cls = " ".join(parent["class"])
+                parts.append(f"{parent.name}.{cls.replace(' ', '.')}")
+        parts.reverse()
+        tag_id = tag.get("id", "")
+        if tag_id:
+            parts.append(f"#{tag_id}")
+        elif tag.get("class"):
+            cls = " ".join(tag["class"])
+            parts.append(f"{tag.name}.{cls.replace(' ', '.')}")
+        else:
+            parts.append(tag.name)
+        return " > ".join(parts)
+
+    @staticmethod
     def _infer_extension(src: str) -> str:
         """Guess the file extension from an image src."""
         if not src:
@@ -307,13 +330,7 @@ def detect_and_parse_md(
 ) -> tuple[list[NormalizedMessage], ConversationMetadata]:
     """Try each registered parser on a Markdown file (no BeautifulSoup needed)."""
     # Ensure all parsers are loaded (decorators register them)
-    try:
-        from parsers import chatgpt_parser   # noqa: F401
-        from parsers import copilot_parser    # noqa: F401
-        # from parsers import gemini_parser    # DEPRECATED: commented out - https://linear.app/TODO
-        from parsers import markdown_parser   # noqa: F401
-    except ImportError:
-        pass
+    # The top-level main.py imports these, so this function safely relies on the registry.
 
     for parser in get_parsers():
         if parser.can_handle(None, source_path):

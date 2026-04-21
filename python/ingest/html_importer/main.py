@@ -45,6 +45,8 @@ def _ensure_deps():
             str(Path(__file__).parent / "requirements.txt")
         ])
         if venv_python and venv_python.exists() and str(venv_python) != str(sys.executable):
+            # Re-exec under the venv. We raise SystemExit to pass the exact subprocess exit 
+            # code back to the OS seamlessly (whether 0 for success, or >0 for failure).
             raise SystemExit(subprocess.call([str(venv_python)] + sys.argv))
     else:
         # Fallback to system pip
@@ -168,9 +170,12 @@ def main() -> None:
         from graph_builder import GraphBuilder
         from graph_validator import GraphValidator
         from trajectory_reconstructor import TrajectoryReconstructor
-        from trajectory_evaluator import TrajectoryEvaluator
+        from trajectory_evaluation import TrajectoryEvaluator
         
         graphs_json = {"graphs": []}
+        
+        from workspace import Workspace
+        workspace = Workspace(id="global_workspace")
 
         for filepath, messages, meta in results:
             graph_id = meta.conversation_id or f"conv_{filepath.name}"
@@ -180,17 +185,59 @@ def main() -> None:
             # Pass 4: Reconstruction semantic annotations
             TrajectoryReconstructor(graph).reconstruct()
             
-            # Pass 4.5: Core validation classifications
-            TrajectoryEvaluator().evaluate(graph)
+            # Pass 4.5: Diff Engine Extracts transitions
+            from diff_engine import DiffEngine
+            DiffEngine(graph).compute_diffs()
+
+            # Pass 4.7: Native Subgraph Obligation Execution
+            from question_resolver import QuestionResolver
+            QuestionResolver(graph).resolve()
+
+            # Pass 6: Observation Synthesizer extracts non-executable residue constraints
+            from observation_synthesizer import ObservationSynthesizer
+            ObservationSynthesizer(graph).evaluate_diffs()
+
+            # Pass 6b: Interaction Classifier taxonomy annotation limits post-hoc behaviors
+            from interaction_classifier import InteractionClassifier
+            InteractionClassifier(graph).classify_diffs()
+            
+            # Pass 6c: Constraint Engine bounds map validations
+            from constraint_engine import ConstraintEngine
+            ConstraintEngine(graph).validate_constraints()
+            
+            # Pass 6d: Conflict Detection tracking inconsistency traces implicitly
+            from conflict_detection import ConflictDetector
+            ConflictDetector(graph).detect_conflicts()
+
+            # Optional Pass 5: Validation evaluations (Disconnected Dict)
+            evaluations = TrajectoryEvaluator(graph).evaluate()
+            
+            # Replay Kernel Compilation (Phase 4.8 / 5 logic)
+            from replay_kernel import ReplayEngine
+            event_stream = []
+            for t in graph.reconstructed_trajectories.values():
+                event_stream.extend(t.event_envelopes)
+                
+            replay_engine = ReplayEngine()
+            run_id = f"run_{graph.id}_latest"
+            view = replay_engine.replay(run_id, "v1", event_stream)
+            
+            if run_id not in graph.replay_views:
+                graph.replay_views[run_id] = {}
+            graph.replay_views[run_id]["v1"] = view
+            
+            workspace.conversations[graph.id] = graph
             
             # Final validation layout assertion backstop
             validator = GraphValidator(graph)
             validator.validate()
             
             if args.json:
+                graph_dict = graph.to_dict()
                 graphs_json["graphs"].append({
                     "file": str(filepath),
-                    "graph": graph.to_dict(),
+                    "graph": graph_dict,
+                    "evaluations": {k: v.to_dict() for k, v in evaluations.items()},
                     "validation": {
                         "errors": validator.errors,
                         "warnings": validator.warnings
@@ -203,6 +250,7 @@ def main() -> None:
                 print(f"Relationships: {len(graph.relationships)}")
                 print(f"Concepts: {len(graph.concepts)}")
                 print(f"Trajectories: {len(graph.trajectories)}")
+                print(f"Evaluations: {len(evaluations)}")
                 
                 if validator.errors or validator.warnings:
                     print("-" * 45)
@@ -214,6 +262,37 @@ def main() -> None:
                 else:
                     print("[OK] Validation passed cleanly.")
                 print("---------------------------------------------")
+
+        # Phase 6a: Execute compression natively mapping final constraints
+        from context_assembler import ContextAssembler
+        working_set, conflict_set = ContextAssembler(workspace).assemble()
+        
+        # LAYER C: Execution Gate isolating limits securely wrapping boundaries seamlessly
+        from execution_gate import ExecutionEligibilityGate
+        for graph_id, graph in workspace.conversations.items():
+            if graph.replay_views:
+                latest_run_id = list(graph.replay_views.keys())[-1]
+                v1_view = graph.replay_views[latest_run_id].get("v1")
+                if v1_view:
+                    stream = []
+                    for t in graph.reconstructed_trajectories.values():
+                        stream.extend(t.event_envelopes)
+                        
+                    decision = ExecutionEligibilityGate().evaluate(v1_view, stream, environment="sandbox")
+                    print(f"[{graph_id}] Execution Gate Decision: {decision.status} - {decision.reasoning}")
+        
+        if args.json:
+            graphs_json["workspace"] = {
+                "working_set": {
+                    "resolved_concepts": list(working_set.resolved_concepts),
+                    "resolves_edges": len(working_set.resolves_edges)
+                },
+                "conflict_set": {
+                    "contradicted_concepts": list(conflict_set.contradicted_concepts),
+                    "unresolved_questions": conflict_set.unresolved_questions,
+                    "observations": len(conflict_set.observations)
+                }
+            }
 
         if args.json:
             json_str = json.dumps(graphs_json, indent=2, ensure_ascii=False)
