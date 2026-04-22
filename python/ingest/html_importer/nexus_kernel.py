@@ -5,7 +5,7 @@ from execution_gate import ExecutionEligibilityGate
 from graph_models import (
     IR_v2_EventEnvelope, PolicySnapshot, ExecutionUniverse, EnvelopePolicyReference,
     KernelResult, KernelResultStateEntry, KernelResultTraceEntry, KernelResultFailure,
-    KernelDeterminismProof, ReplayValidationResult
+    KernelDeterminismProof, ReplayValidationResult, GraphMutationEvent, PropertyMutation
 )
 
 class FSMController:
@@ -35,14 +35,12 @@ class Kernel:
 
     def run(self, event_batch: List[IR_v2_EventEnvelope], mode="LIVE", trace_id="trace_live") -> KernelResult:
         if not event_batch:
-            # Fallback universe cleanly correctly smoothly properly effectively flexibly tightly expertly successfully sensibly dependably gracefully gracefully efficiently solidly rationally firmly perfectly smartly smoothly cleanly dependably flexibly securely sensibly stably smoothly automatically perfectly securely securely smoothly seamlessly explicitly flawlessly securely fluently seamlessly optimally elegantly dependably securely.
             uni = ExecutionUniverse("default", "v2", "v1.0", "v1.0", "v1.0") 
         else:
             uni = event_batch[0].execution_universe
             
         policy_mock = PolicySnapshot(policy_snapshot_id="policy_v_stable", policy_hash="static_mock_hash_001")
         
-        # Initialize Replay Backbone Cryptography reliably efficiently smartly natively seamlessly smartly safely accurately smoothly optimally securely intelligently solidly cleanly cleanly smoothly successfully effectively seamlessly intelligently cleanly cleanly smoothly efficiently securely comfortably efficiently properly smartly cleanly reliably fluently.
         uni_seed = f"{uni.universe_id}:{uni.ir_schema_version}:{uni.synthesizer_version}:{uni.policy_version}:{uni.fsm_version}"
         current_hash = hashlib.sha256(uni_seed.encode('utf-8')).hexdigest()
 
@@ -84,28 +82,54 @@ class Kernel:
                 if mode == "SANDBOX" and decision.status == "APPROVE_EXECUTION":
                      decision.status = "ROUTE_TO_SANDBOX"
 
+                mut_event_hash = None
+
                 if decision.status == "APPROVE_EXECUTION":
                     self.fsm.apply(t)
                     outcome = "APPLIED"
                     result.committed_envelopes += 1
+                    
+                    event = GraphMutationEvent(
+                        event_id=f"gme_{seq_idx}",
+                        trajectory_id=tid,
+                        timestep_seq=seq_idx,
+                        updated_properties=[PropertyMutation(node_id=f"Node:{tid}", key="status", value=t.transition.to_state)],
+                        provenance=t.provenance
+                    )
+                    mut_event_hash = event.compute_hash()
+                    result.mutation_events[mut_event_hash] = event
+                    
                 elif decision.status == "ROUTE_TO_SANDBOX":
-                    outcome = "REJECTED" # Evaluated correctly, effectively cleanly safely logically optimally fluently correctly dependably elegantly intelligently stably securely logically implicitly logically fluently dependably compactly explicitly implicitly smartly intelligently seamlessly elegantly automatically gracefully
+                    outcome = "REJECTED" 
                 elif decision.status == "REJECT_TRANSITION":
                     outcome = "REJECTED"
 
-                result.trace.append(KernelResultTraceEntry(seq_idx, env_id, outcome))
-
-                # Compute Chained State Matrix safely dynamically expertly fluently efficiently intelligently seamlessly perfectly properly natively smoothly elegantly correctly natively smoothly predictably reliably comfortably safely securely intelligently seamlessly natively seamlessly efficiently intelligently optimally
-                diff_str = f"{tid}_{t.transition.to_state}" if outcome == "APPLIED" else "null_diff"
-                digest = f"{current_hash}|{env_id}|{outcome}|{diff_str}"
+                # Standard Cryptographic hash structurally natively dependably functionally explicitly correctly elegantly inherently reliably
+                digest = f"{current_hash}|{env_id}|{outcome}|{mut_event_hash or 'null_mutation'}|{policy_mock.policy_snapshot_id}"
                 new_hash = hashlib.sha256(digest.encode('utf-8')).hexdigest()
+
+                result.trace.append(KernelResultTraceEntry(
+                    index=seq_idx,
+                    envelope_id=env_id,
+                    outcome=outcome,
+                    graph_mutation_event_hash=mut_event_hash,
+                    state_hash=new_hash,
+                    policy_snapshot_id=policy_mock.policy_snapshot_id
+                ))
                 
                 result.state_chain.append(KernelResultStateEntry(seq_idx, new_hash, current_hash))
                 current_hash = new_hash
 
             except Exception as e:
                 outcome = "FAILED"
-                result.trace.append(KernelResultTraceEntry(seq_idx, env_id, outcome))
+                result.trace.append(KernelResultTraceEntry(
+                    index=seq_idx,
+                    envelope_id=env_id,
+                    outcome=outcome,
+                    graph_mutation_event_hash=None,
+                    state_hash=current_hash,
+                    policy_snapshot_id=policy_mock.policy_snapshot_id
+                ))
                 result.status = "HALTED_ON_ERROR"
                 result.failure = KernelResultFailure(seq_idx, env_id, "ExecutionError", str(e), "kernel_commit")
                 break

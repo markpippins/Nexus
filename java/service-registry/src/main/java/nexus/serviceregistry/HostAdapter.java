@@ -1,15 +1,14 @@
 package nexus.serviceregistry;
-
-import nexus.serviceregistry.v1.entity.Host as LegacyHost;
+import nexus.serviceregistry.Host; // canonical
 
 public class HostAdapter {
-  public static Host toCanonical(LegacyHost legacy) {
+  public static Host toCanonical(nexus.serviceregistry.v1.entity.Host legacy) {
     if (legacy == null) return null;
     return new Host(legacy.getId(), legacy.getName());
   }
 
-  public static LegacyHost fromCanonical(Host core) {
+  public static nexus.serviceregistry.v1.entity.Host fromCanonical(Host core) {
     if (core == null) return null;
-    return new LegacyHost(core.getId(), core.getName(), core.getActiveFlag());
+    return new nexus.serviceregistry.v1.entity.Host(core.getId(), core.getName(), core.getActiveFlag());
   }
 }

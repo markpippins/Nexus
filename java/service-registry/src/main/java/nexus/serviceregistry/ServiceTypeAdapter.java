@@ -1,14 +1,11 @@
 package nexus.serviceregistry;
-
-import nexus.serviceregistry.v1.entity.ServiceType as LegacyType;
-
 public class ServiceTypeAdapter {
-  public static ServiceType toCanonical(LegacyType legacy) {
+  public static ServiceType toCanonical(nexus.serviceregistry.v1.entity.ServiceType legacy) {
     if (legacy == null) return null;
     return new ServiceType(legacy.getId(), legacy.getName());
   }
-  public static LegacyType fromCanonical(ServiceType core) {
+  public static nexus.serviceregistry.v1.entity.ServiceType fromCanonical(ServiceType core) {
     if (core == null) return null;
-    return new LegacyType(core.getId(), core.getName());
+    return new nexus.serviceregistry.v1.entity.ServiceType(core.getId(), core.getName());
   }
 }

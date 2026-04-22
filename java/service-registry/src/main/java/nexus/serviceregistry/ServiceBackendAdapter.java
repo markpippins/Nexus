@@ -1,14 +1,13 @@
 package nexus.serviceregistry;
-
-import nexus.serviceregistry.v1.entity.ServiceBackend as LegacyBackend;
+import nexus.serviceregistry.ServiceBackend; // canonical
 
 public class ServiceBackendAdapter {
-  public static ServiceBackend toCanonical(LegacyBackend legacy) {
+  public static ServiceBackend toCanonical(nexus.serviceregistry.v1.entity.ServiceBackend legacy) {
     if (legacy == null) return null;
     return new ServiceBackend(legacy.getId(), legacy.getName());
   }
-  public static LegacyBackend fromCanonical(ServiceBackend core) {
+  public static nexus.serviceregistry.v1.entity.ServiceBackend fromCanonical(nexus.serviceregistry.ServiceBackend core) {
     if (core == null) return null;
-    return new LegacyBackend(core.getId(), core.getName(), null);
+    return new nexus.serviceregistry.v1.entity.ServiceBackend(core.getId(), core.getName());
   }
 }

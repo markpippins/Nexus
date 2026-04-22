@@ -1,14 +1,12 @@
 package nexus.serviceregistry;
 
-import nexus.serviceregistry.v1.entity.ServiceLibrary as LegacyLibrary;
-
 public class ServiceLibraryAdapter {
-  public static ServiceLibrary toCanonical(LegacyLibrary legacy) {
+  public static ServiceLibrary toCanonical(nexus.serviceregistry.v1.entity.ServiceLibrary legacy) {
     if (legacy == null) return null;
     return new ServiceLibrary(legacy.getId(), legacy.getName(), legacy.getVersion());
   }
-  public static LegacyLibrary fromCanonical(ServiceLibrary core) {
+  public static nexus.serviceregistry.v1.entity.ServiceLibrary fromCanonical(ServiceLibrary core) {
     if (core == null) return null;
-    return new LegacyLibrary(core.getId(), core.getName(), core.getVersion(), null);
+    return new nexus.serviceregistry.v1.entity.ServiceLibrary(core.getId(), core.getName(), core.getVersion());
   }
 }

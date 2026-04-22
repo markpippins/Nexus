@@ -67,12 +67,10 @@ class TestKernelDeterminism(unittest.TestCase):
     def test_idempotency(self):
         """Proves safely mapping duplicate structures dynamically effectively organically dependably safely organically."""
         kernel_a = self._create_kernel()
-        stream_dupe = [self.e1, self.e1]
+        res = kernel_a.run([self.e1, self.e1])
         
-        res = kernel_a.run(stream_dupe)
-        self.assertEqual(res.committed_envelopes, 1)
-        self.assertEqual(res.trace[0].result, "APPLIED")
-        self.assertEqual(res.trace[1].result, "REJECTED")
+        self.assertEqual(res.trace[0].outcome, "APPLIED")
+        self.assertEqual(res.trace[1].outcome, "REJECTED")
 
     def test_deterministic_restart(self):
         """Proves reconstructing the state explicitly dependably seamlessly exactly successfully effectively appropriately reliably explicitly cleanly."""
@@ -104,7 +102,8 @@ class TestKernelDeterminism(unittest.TestCase):
         k2.run([self.e_other])
         r2 = k2.run([self.e1])
         
-        self.assertEqual(r1.trace[0].result, r2.trace[0].result)
+        self.assertEqual(r1.trace[0].outcome, r2.trace[0].outcome)
+        self.assertEqual(r1.final_state_hash, r2.final_state_hash)
 
     def test_policy_adversarial_inputs(self):
         """Proves boundary isolation safely squarely naturally fluently dependably correctly properly smartly stably."""

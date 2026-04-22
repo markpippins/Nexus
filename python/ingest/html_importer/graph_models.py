@@ -338,10 +338,38 @@ class KernelResultStateEntry:
     prev_hash: str
 
 @dataclass
+class PropertyMutation:
+    node_id: str
+    key: str
+    value: Any
+
+@dataclass
+class GraphMutationEvent:
+    event_id: str
+    trajectory_id: str
+    timestep_seq: int
+    added_nodes: List[str] = field(default_factory=list)
+    modified_nodes: List[str] = field(default_factory=list)
+    removed_nodes: List[str] = field(default_factory=list)
+    added_edges: List[str] = field(default_factory=list)
+    removed_edges: List[str] = field(default_factory=list)
+    updated_properties: List[PropertyMutation] = field(default_factory=list)
+    provenance: EnvelopeProvenance = None
+    schema_version: str = "v2"
+
+    def compute_hash(self) -> str:
+        import hashlib
+        payload = f"{self.trajectory_id}|{self.timestep_seq}|{self.added_nodes}|{self.modified_nodes}|{self.removed_nodes}|{self.added_edges}|{self.removed_edges}|{self.updated_properties}"
+        return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+@dataclass
 class KernelResultTraceEntry:
     index: int
     envelope_id: str
-    result: str
+    outcome: str
+    graph_mutation_event_hash: Optional[str] = None
+    state_hash: Optional[str] = None
+    policy_snapshot_id: Optional[str] = None
 
 @dataclass
 class KernelDeterminismProof:
@@ -360,8 +388,15 @@ class KernelResult:
     failure: Optional[KernelResultFailure] = None
     state_chain: List[KernelResultStateEntry] = field(default_factory=list)
     trace: List[KernelResultTraceEntry] = field(default_factory=list)
+    mutation_events: Dict[str, GraphMutationEvent] = field(default_factory=dict)
     determinism: Optional[KernelDeterminismProof] = None
     policy_snapshot_reference: Optional[EnvelopePolicyReference] = None
+
+@dataclass
+class MaterializedReplayView:
+    run_id: str
+    schema_version: str
+    final_graph_state: Dict[str, Any]
 
 @dataclass
 class ReplayValidationResult:
