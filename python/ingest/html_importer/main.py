@@ -216,17 +216,21 @@ def main() -> None:
             from nexus_kernel import Kernel, FSMController
             from transition_synthesizer import TransitionSynthesizer
             from execution_gate import ExecutionEligibilityGate
+            from ir_migration_layer import IRMigrationLayer
             
             event_stream = []
             for t in graph.reconstructed_trajectories.values():
                 event_stream.extend(t.event_envelopes)
                 
+            migrator = IRMigrationLayer(synthesizer=TransitionSynthesizer())
+            current_states = {} # Empty state mapping cleanly solidly safely
+            migrated_stream = migrator.migrate_batch(event_stream, current_states)
+                
             kernel = Kernel(
-                synthesizer=TransitionSynthesizer(),
                 layer_c=ExecutionEligibilityGate(),
                 fsm=FSMController()
             )
-            kernel_result = kernel.run(event_stream, mode="LIVE")
+            kernel_result = kernel.run(migrated_stream, mode="LIVE")
             
             # Optional Observer Execution Mapping
             from replay_kernel import ReplayEngine

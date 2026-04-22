@@ -1,12 +1,11 @@
 package nexus.serviceregistry;
 
-import nexus.serviceregistry.v1.entity.Deployment as LegacyDeployment;
 import java.time.LocalDateTime;
 
 public class DeploymentAdapter {
-  public static Deployment toCanonical(LegacyDeployment legacy) {
+  public static nexus.serviceregistry.Deployment toCanonical(nexus.serviceregistry.v1.entity.Deployment legacy) {
     if (legacy == null) return null;
-    Deployment core = new Deployment();
+    nexus.serviceregistry.Deployment core = new nexus.serviceregistry.Deployment();
     core.setId(legacy.getId());
     // naive mapping: copy common fields if present
     core.setServiceId(legacy.getService() != null ? legacy.getService().getId() : null);
@@ -31,9 +30,9 @@ public class DeploymentAdapter {
     return core;
   }
 
-  public static LegacyDeployment fromCanonical(Deployment core) {
+  public static nexus.serviceregistry.v1.entity.Deployment fromCanonical(nexus.serviceregistry.Deployment core) {
     if (core == null) return null;
-    LegacyDeployment legacy = new LegacyDeployment();
+    nexus.serviceregistry.v1.entity.Deployment legacy = new nexus.serviceregistry.v1.entity.Deployment();
     legacy.setId(core.getId());
     // conservative; mapping of IDs only for skeletal migration
     // Additional fields can be added as needed

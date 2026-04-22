@@ -210,6 +210,30 @@ namespace Nexus.ServiceRegistry.V1 {
     id: int64;
     name: string;
   }
+  model FrameworkVendorCreate {
+    id?: int64;
+    name: string;
+    description?: string;
+    url?: string;
+    activeFlag?: boolean = true;
+  }
+  model FrameworkVendorUpdate {
+    id: int64;
+    name?: string;
+    description?: string;
+    url?: string;
+    activeFlag?: boolean;
+  }
+  model FrameworkCategoryCreate {
+    id?: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model FrameworkCategoryUpdate {
+    id: int64;
+    name?: string;
+    activeFlag?: boolean;
+  }
 }
   model Framework {
     id: int64;

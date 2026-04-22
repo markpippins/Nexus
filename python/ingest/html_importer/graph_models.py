@@ -252,6 +252,7 @@ class ConversationGraph:
 
 @dataclass
 class TransitionRequest:
+    """COMPILER INTERNAL STRUCTURE ONLY: Represents unresolved intent ambiguity explicitly mapped inside the Compiler Frontend cleanly before committing to IR_v2_EventEnvelope bounds."""
     trajectory_id: str
     from_state: str
     to_state: str
@@ -273,20 +274,94 @@ class PolicySnapshot:
     policy_snapshot_id: str
     policy_hash: str
 
-@dataclass
-class ExecutionTraceElement:
-    timestep_seq: int
-    request: TransitionRequest
-    decision: TransitionDecision
-    resulting_trajectory_state: str
-    policy_snapshot: PolicySnapshot
+
 
 @dataclass
-class KernelExecutionTrace:
+class ExecutionUniverse:
+    universe_id: str
+    ir_schema_version: str
+    synthesizer_version: str
+    policy_version: str
+    fsm_version: str
+
+@dataclass
+class EnvelopeTransition:
+    from_state: str
+    to_state: str
+    transition_type: str
+
+@dataclass
+class EnvelopeProvenance:
+    origin_archetype: str
+    origin_event_id: str
+    origin_component: str
+    timestamp: str
+
+@dataclass
+class EnvelopePolicyReference:
+    policy_set_id: str
+    policy_snapshot_hash: str
+
+@dataclass
+class EnvelopeDeterminism:
+    input_hash: str
+    dependency_hash: str
+
+@dataclass
+class EnvelopeReplay:
+    expected_state: str
+    invariant_checks: List[str]
+
+@dataclass
+class IR_v2_EventEnvelope:
+    envelope_id: str
+    execution_universe: ExecutionUniverse
+    transition: EnvelopeTransition
+    inputs: Dict[str, Any]
+    provenance: EnvelopeProvenance
+    policy_reference: EnvelopePolicyReference
+    determinism: EnvelopeDeterminism
+    replay: EnvelopeReplay
+
+@dataclass
+class KernelResultFailure:
+    failed_envelope_index: int
+    failed_envelope_id: str
+    error_type: str
+    message: str
+    stage: str
+
+@dataclass
+class KernelResultStateEntry:
+    index: int
+    state_hash: str
+    prev_hash: str
+
+@dataclass
+class KernelResultTraceEntry:
+    index: int
+    envelope_id: str
+    result: str
+
+@dataclass
+class KernelDeterminismProof:
+    input_hash: str
+    dependency_hash: str
+    replay_verified: bool
+
+@dataclass
+class KernelResult:
     run_id: str
-    mode: str
-    schema_version: str
-    elements: List[ExecutionTraceElement] = field(default_factory=list)
+    execution_universe: ExecutionUniverse
+    status: str
+    total_envelopes: int
+    committed_envelopes: int
+    final_state_hash: str
+    failure: Optional[KernelResultFailure] = None
+    state_chain: List[KernelResultStateEntry] = field(default_factory=list)
+    trace: List[KernelResultTraceEntry] = field(default_factory=list)
+    determinism: Optional[KernelDeterminismProof] = None
+    policy_snapshot_reference: Optional[EnvelopePolicyReference] = None
 
 @dataclass
 class ReplayValidationResult:

@@ -1,18 +1,13 @@
 package nexus.serviceregistry;
 
-import nexus.serviceregistry.v1.entity.EnvironmentType as LegacyEnvironmentType;
-
 public class EnvironmentTypeAdapter {
-  public static EnvironmentType toCanonical(LegacyEnvironmentType legacy) {
+  public static nexus.serviceregistry.EnvironmentType toCanonical(nexus.serviceregistry.v1.entity.EnvironmentType legacy) {
     if (legacy == null) return null;
-    EnvironmentType core = new EnvironmentType(legacy.getId(), legacy.getName(), legacy.getActiveFlag());
-    return core;
+    return new nexus.serviceregistry.EnvironmentType(legacy.getId(), legacy.getName(), legacy.getActiveFlag());
   }
 
-  public static LegacyEnvironmentType fromCanonical(EnvironmentType core) {
+  public static nexus.serviceregistry.v1.entity.EnvironmentType fromCanonical(nexus.serviceregistry.EnvironmentType core) {
     if (core == null) return null;
-    LegacyEnvironmentType legacy = new LegacyEnvironmentType(core.getId(), core.getName());
-    legacy.setActiveFlag(core.getActiveFlag());
-    return legacy;
+    return new nexus.serviceregistry.v1.entity.EnvironmentType(core.getId(), core.getName(), core.getActiveFlag());
   }
 }

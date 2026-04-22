@@ -1,14 +1,12 @@
 package nexus.serviceregistry;
 
-import nexus.serviceregistry.v1.entity.VisualComponent as LegacyVisual;
-
 public class VisualComponentAdapter {
-  public static VisualComponent toCanonical(LegacyVisual legacy) {
+  public static VisualComponent toCanonical(nexus.serviceregistry.v1.entity.VisualComponent legacy) {
     if (legacy == null) return null;
     return new VisualComponent(legacy.getId(), legacy.getName());
   }
-  public static LegacyVisual fromCanonical(VisualComponent core) {
+  public static nexus.serviceregistry.v1.entity.VisualComponent fromCanonical(VisualComponent core) {
     if (core == null) return null;
-    return new LegacyVisual(core.getId(), core.getName());
+    return new nexus.serviceregistry.v1.entity.VisualComponent(core.getId(), core.getName());
   }
 }

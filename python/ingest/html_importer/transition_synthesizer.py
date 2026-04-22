@@ -2,7 +2,9 @@ from typing import List, Dict, Any
 from graph_models import IR_EventEnvelope, TransitionRequest
 
 class TransitionSynthesizer:
-    """LAYER B: Converts raw structural IR changes into lifecycle transition candidates deterministically avoiding semantic bleeding effectively."""
+    """LAYER B (COMPILER FRONTEND): Converts raw structural IR changes into CompilerInternalStructure (TransitionRequest) ambiguity paths before mapping to IR_v2_EventEnvelope effectively."""
+    
+    SYNTHESIZER_VERSION = "v1.0"
     
     def synthesize(self, envelope: IR_EventEnvelope, current_trajectory_state: str, pending_mutations: bool, constraint_snapshot: List[Any], transaction_id: str = "") -> List[TransitionRequest]:
         candidates: List[TransitionRequest] = []

@@ -1,15 +1,12 @@
 package nexus.serviceregistry;
 
-import nexus.serviceregistry.v1.entity.Framework as LegacyFramework;
-
 public class FrameworkAdapter {
-  public static Framework toCanonical(LegacyFramework legacy) {
+  public static nexus.serviceregistry.Framework toCanonical(nexus.serviceregistry.v1.entity.Framework legacy) {
     if (legacy == null) return null;
-    return new Framework(legacy.getId(), legacy.getName(), legacy.getActiveFlag());
+    return new nexus.serviceregistry.Framework(legacy.getId(), legacy.getName(), legacy.getActiveFlag());
   }
-
-  public static LegacyFramework fromCanonical(Framework core) {
+  public static nexus.serviceregistry.v1.entity.Framework fromCanonical(nexus.serviceregistry.Framework core) {
     if (core == null) return null;
-    return new LegacyFramework(core.getId(), core.getName(), null, null, core.getActiveFlag());
+    return new nexus.serviceregistry.v1.entity.Framework(core.getId(), core.getName(), core.getActiveFlag());
   }
 }
