@@ -116,7 +116,7 @@ The user service is part of the Nexus platform microservices architecture. It pr
 ## Data Models
 
 ### User Entity
-- **Class**: `com.angrysurfer.nexus.user.model.User`
+- **Class**: `com.aibizarchitect.nexus.user.model.User`
 - **Fields**:
   - `id` (String): MongoDB ObjectId
   - `identifier` (String): User identifier (password)
@@ -129,7 +129,7 @@ The user service is part of the Nexus platform microservices architecture. It pr
   - `friends` (Set<User>): Users who are friends with this user
 
 ### UserDTO
-- **Class**: `com.angrysurfer.nexus.user.UserDTO`
+- **Class**: `com.aibizarchitect.nexus.user.UserDTO`
 - **Fields**:
   - `id` (String): MongoDB ObjectId as String
   - `alias` (String): User alias/username

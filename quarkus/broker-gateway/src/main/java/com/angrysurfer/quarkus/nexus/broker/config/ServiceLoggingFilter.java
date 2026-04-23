@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import org.jboss.logging.Logger;
 
-import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
+import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
 
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;

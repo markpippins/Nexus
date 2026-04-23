@@ -56,7 +56,7 @@
             <artifactId>quarkus-vertx</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.angrysurfer.nexus</groupId>
+            <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-service-api</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>

@@ -2,7 +2,7 @@ package com.angrysurfer.helidon.nexus.user.model;
 
 import java.io.Serializable;
 
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

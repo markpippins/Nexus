@@ -1,7 +1,7 @@
 package com.angrysurfer.helidon.nexus.user.rest;
 
 import com.angrysurfer.helidon.nexus.user.service.UserAccessService;
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;

@@ -5,7 +5,7 @@ from execution_gate import ExecutionEligibilityGate
 from graph_models import (
     IR_v2_EventEnvelope, PolicySnapshot, ExecutionUniverse, EnvelopePolicyReference,
     KernelResult, KernelResultStateEntry, KernelResultTraceEntry, KernelResultFailure,
-    KernelDeterminismProof, ReplayValidationResult, GraphMutationEvent, PropertyMutation
+    KernelDeterminismProof, ReplayValidationResult, GraphMutationEvent, SetProperty
 )
 
 class FSMController:
@@ -93,7 +93,7 @@ class Kernel:
                         event_id=f"gme_{seq_idx}",
                         trajectory_id=tid,
                         timestep_seq=seq_idx,
-                        updated_properties=[PropertyMutation(node_id=f"Node:{tid}", key="status", value=t.transition.to_state)],
+                        mutations=[SetProperty(node_id=f"Node:{tid}", key="status", value=t.transition.to_state)],
                         provenance=t.provenance
                     )
                     mut_event_hash = event.compute_hash()

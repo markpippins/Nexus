@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Literal, List, Dict, Any, Set
+from typing import Optional, Literal, List, Dict, Any, Set, Union
 from enum import Enum
 
 class InteractionArchetype(Enum):
@@ -337,30 +337,115 @@ class KernelResultStateEntry:
     state_hash: str
     prev_hash: str
 
+from enum import Enum
+
+class ConflictType(Enum):
+    NONE = "NONE"
+    VALUE = "VALUE"
+    STRUCTURAL = "STRUCTURAL"
+
 @dataclass
-class PropertyMutation:
+class InstructionImpact:
+    read_set: set
+    write_set: set
+    effect_type: str
+
+@dataclass(frozen=True)
+class CreateNode:
+    node_id: str
+    node_type: str
+    def impact(self) -> InstructionImpact:
+        return InstructionImpact(read_set=set(), write_set={f"node:{self.node_id}"}, effect_type="structural")
+
+@dataclass(frozen=True)
+class DeleteNode:
+    node_id: str
+    def impact(self) -> InstructionImpact:
+        return InstructionImpact(read_set={f"node:{self.node_id}"}, write_set={f"node:{self.node_id}"}, effect_type="structural")
+
+@dataclass(frozen=True)
+class SetProperty:
     node_id: str
     key: str
     value: Any
+    def impact(self) -> InstructionImpact:
+        return InstructionImpact(read_set={f"node:{self.node_id}"}, write_set={f"node:{self.node_id}:prop:{self.key}"}, effect_type="value")
+
+@dataclass(frozen=True)
+class RemoveProperty:
+    node_id: str
+    key: str
+    def impact(self) -> InstructionImpact:
+        return InstructionImpact(read_set={f"node:{self.node_id}"}, write_set={f"node:{self.node_id}:prop:{self.key}"}, effect_type="value")
+
+@dataclass(frozen=True)
+class AddEdge:
+    from_node: str
+    to_node: str
+    edge_type: str
+    def impact(self) -> InstructionImpact:
+        return InstructionImpact(read_set={f"node:{self.from_node}", f"node:{self.to_node}"}, write_set={f"edge:{self.from_node}:{self.to_node}:{self.edge_type}"}, effect_type="structural")
+
+@dataclass(frozen=True)
+class RemoveEdge:
+    from_node: str
+    to_node: str
+    edge_type: str
+    def impact(self) -> InstructionImpact:
+        return InstructionImpact(read_set={f"node:{self.from_node}", f"node:{self.to_node}"}, write_set={f"edge:{self.from_node}:{self.to_node}:{self.edge_type}"}, effect_type="structural")
+
+GraphMutation = Union[CreateNode, DeleteNode, SetProperty, RemoveProperty, AddEdge, RemoveEdge]
 
 @dataclass
 class GraphMutationEvent:
     event_id: str
     trajectory_id: str
     timestep_seq: int
-    added_nodes: List[str] = field(default_factory=list)
-    modified_nodes: List[str] = field(default_factory=list)
-    removed_nodes: List[str] = field(default_factory=list)
-    added_edges: List[str] = field(default_factory=list)
-    removed_edges: List[str] = field(default_factory=list)
-    updated_properties: List[PropertyMutation] = field(default_factory=list)
+    mutations: List[GraphMutation] = field(default_factory=list)
     provenance: EnvelopeProvenance = None
     schema_version: str = "v2"
 
     def compute_hash(self) -> str:
         import hashlib
-        payload = f"{self.trajectory_id}|{self.timestep_seq}|{self.added_nodes}|{self.modified_nodes}|{self.removed_nodes}|{self.added_edges}|{self.removed_edges}|{self.updated_properties}"
+        payload_data = [str(m.__dict__) for m in self.mutations]
+        payload = f"{self.trajectory_id}|{self.timestep_seq}|{payload_data}"
         return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+def normalize(value: Any) -> Any:
+    if isinstance(value, dict):
+        return tuple((k, normalize(v)) for k, v in sorted(value.items()))
+    if isinstance(value, list) or isinstance(value, set) or isinstance(value, tuple):
+        return tuple(normalize(v) for v in value)
+    if isinstance(value, float):
+        return ("float", repr(value))
+    if isinstance(value, int):
+        return ("int", repr(value))
+    if isinstance(value, str):
+        return ("str", repr(value))
+    if isinstance(value, bool):
+        return ("bool", repr(value))
+    if value is None:
+        return ("None",)
+    return value
+
+@dataclass(frozen=True)
+class GraphState:
+    nodes: Dict[str, Any] = field(default_factory=dict)
+    edges: Dict[str, Any] = field(default_factory=dict)
+
+    def get_canonical_structure(self) -> tuple:
+        return (
+            "GraphState",
+            ("nodes", tuple((node_id, normalize(n_props)) for node_id, n_props in sorted(self.nodes.items()))),
+            ("edges", tuple((edge_id, normalize(e_props)) for edge_id, e_props in sorted(self.edges.items()))),
+        )
+        
+    def canonical_bytes(self) -> bytes:
+        return repr(self.get_canonical_structure()).encode("utf-8")
+        
+    def compute_hash(self) -> str:
+        import hashlib
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
 @dataclass
 class KernelResultTraceEntry:
@@ -396,7 +481,44 @@ class KernelResult:
 class MaterializedReplayView:
     run_id: str
     schema_version: str
-    final_graph_state: Dict[str, Any]
+    final_graph_state: GraphState
+
+@dataclass(frozen=True)
+class InstructionID:
+    timeline_id: str
+    index: int
+
+@dataclass
+class InstructionMetadata:
+    actor_id: str
+    timestamp: int
+    semantic_tag: str = "default"
+    confidence: float = 1.0
+
+@dataclass
+class TimelineMetadata:
+    creator_id: str
+    reason: str
+
+@dataclass
+class InstructionRecord:
+    instruction: GraphMutation
+    state_hash: str
+    metadata: InstructionMetadata = field(default_factory=lambda: InstructionMetadata("system", 0))
+
+@dataclass
+class Timeline:
+    id: str
+    parent: Optional[str]
+    fork_index: Optional[int]
+    instructions: List[InstructionRecord] = field(default_factory=list)
+    metadata: TimelineMetadata = field(default_factory=lambda: TimelineMetadata("system", "genesis"))
+
+@dataclass
+class Snapshot:
+    timeline_id: str
+    instruction_index: int
+    state: GraphState
 
 @dataclass
 class ReplayValidationResult:

@@ -1,8 +1,8 @@
 package com.angrysurfer.quarkus.nexus.broker.resource;
 
 import com.angrysurfer.quarkus.nexus.broker.service.IBrokerService;
-import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
-import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
+import com.aibizarchitect.nexus.v1.broker.api.ServiceRequest;
+import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
 
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;

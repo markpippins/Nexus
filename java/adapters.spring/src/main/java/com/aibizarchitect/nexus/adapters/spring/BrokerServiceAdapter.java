@@ -1,10 +1,7 @@
 package com.aibizarchitect.nexus.adapters.spring;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import com.aibizarchitect.nexus.core.BinaryData;
-import com.aibizarchitect.nexus.core.ServiceRequest;
+import com.aibizarchitect.nexus.v1.core.BinaryData;
+import com.aibizarchitect.nexus.v1.broker.api.ServiceRequest;
 
 /** Spring adapter bridge (no version suffix). Bridges canonical core to Spring legacy DTOs. */
 public class BrokerServiceAdapter {

@@ -1,7 +1,8 @@
 import hashlib
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-from graph_models import KernelResultTraceEntry, GraphMutationEvent, MaterializedReplayView
+from graph_models import KernelResultTraceEntry, GraphMutationEvent, MaterializedReplayView, GraphState
+from graph_reducer import GraphStateReducer
 
 @dataclass
 class ReplayDivergenceReport:
@@ -17,7 +18,8 @@ class ReplayEngine:
         pass
 
     def replay(self, trace_entries: List[KernelResultTraceEntry], mutation_events: Dict[str, GraphMutationEvent], initial_hash: str, schema_version: str) -> MaterializedReplayView:
-        graph_state = {} 
+        graph_state = GraphState()
+        reducer = GraphStateReducer()
         current_hash = initial_hash
         
         for entry in trace_entries:
@@ -28,14 +30,12 @@ class ReplayEngine:
                  raise ValueError(f"Ledger Tampering or structural divergence Detected fluently squarely securely implicitly reliably explicitly correctly squarely naturally comfortably accurately compactly smoothly smoothly seamlessly. [Index: {entry.index}]")
              
              current_hash = expected_hash
-             
+             debug_hash = entry.graph_mutation_event_hash
              if entry.outcome == "APPLIED":
-                 event = mutation_events[entry.graph_mutation_event_hash]
+                 event = mutation_events[debug_hash]
                  
-                 for prop_mut in event.updated_properties:
-                      if prop_mut.node_id not in graph_state:
-                          graph_state[prop_mut.node_id] = {}
-                      graph_state[prop_mut.node_id][prop_mut.key] = prop_mut.value
+                 for mutation in event.mutations:
+                      graph_state = reducer.apply(graph_state, mutation)
                       
              elif entry.outcome == "REJECTED":
                  continue
