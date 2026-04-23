@@ -1,0 +1,11 @@
+{
+    "id": "evt-0011",
+    "type": "StepRejected",
+    "timestamp": "2026-04-09T04:10:00Z",
+    "source": "human",
+    "payload": {
+        "idea_id": "evt-0004",
+        "step": "requirements",
+        "reason": "Missing FR-4: Event sourcing requirement not captured"
+    }
+}

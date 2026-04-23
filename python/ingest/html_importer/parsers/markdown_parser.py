@@ -65,13 +65,14 @@ class MarkdownParser(BaseParser):
         if not lines or len(lines) > 1:
             return False
         wc = sum(len(l.split()) for l in lines)
-        # Very short, no formatting = likely user acknowledgment
-        if wc > 3:
-            return False
+        # Highly formatted blocks are assistants.
         if self._FMT.search(text):
             return False
         if self._INLINE_FMT.search(text):
             return False
+        
+        # In typical markdown exports, user questions are often just one line or paragraph 
+        # but lack heavy syntax, so if it survived the formatting checks, it's very likely user.
         return True
 
     # ------------------------------------------------------------------

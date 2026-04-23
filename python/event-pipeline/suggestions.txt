@@ -1,0 +1,60 @@
+# Suggestions for Next Steps
+# (Agent-generated, for human review)
+
+## High Priority
+
+### 1. Implement `tsp compile` in CompileHandler
+Replace the placeholder with an actual subprocess call to `tsp compile`.
+The handler should run the command, capture stdout/stderr/exit code,
+and either emit `SpecCompiled` with the output path or emit a compile error
+event that the human can act on.
+
+### 2. Add model warmup / health check
+`deepseek-coder:latest` times out because the model loads on first request.
+Either pull `ollama pull llama3` and switch MODEL_MAP, or add a warmup
+call at handler startup. The Ollama wrapper already has `check_ollama()` —
+just use it in the dispatcher before processing StepRequested events.
+
+### 3. Event file naming convention
+Currently event filenames are a mix of `0001.json` (manual) and UUID
+(auto-generated). Consider standardizing on sequential numbering for
+manual events and UUID for system-generated ones, or go all-UUID.
+
+### 4. Clean up stale events
+The events/ directory contains test events, rejections, and duplicates
+from debugging runs. A `converse clean` command or manual purge would
+make the pipeline clearer.
+
+## Medium Priority
+
+### 5. Workflow vocabulary propagation
+When a workflow vocabulary is provided, it should be written to the
+artifact store and referenced by path rather than embedded in every event.
+This keeps events small and makes the vocabulary auditable.
+
+### 6. Step dependency injection
+Currently `TypeSpecHandler` gets `workflow.get("requirements")` but the
+requirements data isn't in the workflow payload — it's in the artifact file.
+Handlers should be able to load artifacts from prior steps, not just
+the WorkflowPlanned payload.
+
+### 7. Concurrency awareness
+Currently `main.py` runs sequentially. When Ollama is responsive,
+multiple steps from different workflows could run in parallel. The
+dispatcher already loads all events — it could dispatch non-conflicting
+steps concurrently.
+
+## Low Priority (for the larger project)
+
+### 8. Event store abstraction
+Replace flat-file I/O with an interface (`EventStore.read()`, `write()`, `list()`).
+This makes it trivial to swap to SQLite, Postgres, or an event database
+when the bootloader graduates.
+
+### 9. Projection versioning
+Each projection rebuild should get a version number. This enables
+cache invalidation for downstream consumers (e.g., the 3D mesh viewer).
+
+### 10. CLI auto-complete
+Add tab completion for `converse request` (step names, idea_ids) and
+`converse approve` (pending steps only). Small UX win for daily use.

@@ -4,9 +4,9 @@ import java.util.logging.Logger;
 
 import com.angrysurfer.helidon.nexus.user.model.UserRegistration;
 import com.angrysurfer.helidon.nexus.user.repository.UserRegistrationRepository;
-import com.angrysurfer.spring.nexus.broker.spi.BrokerOperation;
-import com.angrysurfer.spring.nexus.broker.spi.BrokerParam;
-import com.angrysurfer.spring.nexus.user.UserRegistrationDTO;
+import com.aibizarchitect.nexus.v1.spring.broker.spi.BrokerOperation;
+import com.aibizarchitect.nexus.v1.spring.broker.spi.BrokerParam;
+import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

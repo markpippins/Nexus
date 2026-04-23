@@ -1,0 +1,11 @@
+{
+  "id": "efd22b2b-3a3e-4289-a14c-e95dd02114bf",
+  "type": "RequirementsFormalized",
+  "timestamp": "2026-04-09T04:03:45.251470+00:00",
+  "source": "agent",
+  "payload": {
+    "idea_id": "evt-0004",
+    "step": "requirements",
+    "artifact_path": "/mnt/c/dev/nexus/ai/python/converse/artifacts/evt-0004/requirements.json"
+  }
+}

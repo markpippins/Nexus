@@ -27,7 +27,7 @@ The SPI follows Java's Service Provider Interface pattern, allowing implementati
 To implement a new service using this SPI:
 
 1. Implement the `BrokerServiceProvider` interface
-2. Create a provider configuration file at `META-INF/services/com.angrysurfer.Nexus.broker.BrokerServiceProvider`
+2. Create a provider configuration file at `META-INF/services/com.aibizarchitect.Nexus.broker.BrokerServiceProvider`
 3. Register the implementation class in the configuration file
 4. Package as a JAR with the broker service on the classpath
 

@@ -1,0 +1,10 @@
+{
+  "id": "7c22f434-0a6d-48fe-9e8f-ce0e230a5d19",
+  "type": "StepRequested",
+  "timestamp": "2026-04-08T18:00:00Z",
+  "source": "human",
+  "payload": {
+    "idea_id": "evt-0004",
+    "step": "compile"
+  }
+}

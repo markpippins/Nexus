@@ -1,0 +1,9 @@
+{
+    "id": "evt-0003",
+    "type": "IdeaCaptured",
+    "timestamp": "2026-04-08T16:25:00Z",
+    "source": "human",
+    "payload": {
+        "idea": "Add real-time notification system for Cassandra"
+    }
+}

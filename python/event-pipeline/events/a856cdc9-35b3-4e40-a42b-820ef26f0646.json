@@ -1,0 +1,55 @@
+{
+  "id": "a856cdc9-35b3-4e40-a42b-820ef26f0646",
+  "type": "WorkflowPlanned",
+  "timestamp": "2026-04-09T04:00:27.639174+00:00",
+  "source": "agent",
+  "payload": {
+    "idea_id": "evt-0003",
+    "idea": "Add real-time notification system for Cassandra",
+    "vocabulary": {},
+    "steps": [
+      {
+        "step": "vocabulary",
+        "event_type": "VocabularyDrafted",
+        "state": "draft",
+        "next_action": "formalize_spec",
+        "status": "pending"
+      },
+      {
+        "step": "requirements",
+        "event_type": "RequirementsFormalized",
+        "state": "specified",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "typespec",
+        "event_type": "TypeSpecDrafted",
+        "state": "specified",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "compile",
+        "event_type": "SpecCompiled",
+        "state": "compiled",
+        "next_action": "intelligent_refactor",
+        "status": "pending"
+      },
+      {
+        "step": "refactor",
+        "event_type": "RefactorDrafted",
+        "state": "integrated",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "integrate",
+        "event_type": "Integrated",
+        "state": "integrated",
+        "next_action": null,
+        "status": "pending"
+      }
+    ]
+  }
+}

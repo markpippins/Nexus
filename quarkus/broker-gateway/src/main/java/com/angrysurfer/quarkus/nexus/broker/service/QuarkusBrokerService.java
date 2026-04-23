@@ -3,8 +3,8 @@ package com.angrysurfer.quarkus.nexus.broker.service;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.angrysurfer.spring.nexus.broker.api.ServiceRequest;
-import com.angrysurfer.spring.nexus.broker.api.ServiceResponse;
+import com.aibizarchitect.nexus.v1.broker.api.ServiceRequest;
+import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.core.Response;

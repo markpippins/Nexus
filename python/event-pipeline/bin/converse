@@ -1,0 +1,271 @@
+#!/usr/bin/env python3
+"""CLI for the agentic pipeline.
+
+Usage:
+    converse capture "<idea>" [--vocabulary file.json] [--no-auto]
+    converse status [idea_id]
+    converse next [idea_id]
+    converse request <idea_id> <step>
+    converse approve <idea_id> <step>
+    converse reject <idea_id> <step> [reason]
+    converse clean [--dry-run]
+"""
+
+import json, os, sys, re, uuid, datetime
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
+EVENT_DIR = os.path.join(PROJECT_ROOT, "events")
+PROJ_FILE = os.path.join(PROJECT_ROOT, "projections", "tasks_by_priority.json")
+
+STEPS = ["vocabulary", "requirements", "typespec", "compile", "refactor", "integrate"]
+
+# Event types that are system-generated (keep these)
+SYSTEM_EVENT_TYPES = {
+    "StepRejected", "KernelPanic",
+    "VocabularyDrafted", "RequirementsFormalized", "TypeSpecDrafted",
+    "SpecCompiled", "RefactorDrafted", "Integrated",
+    "StepApproved", "StepRequested", "WorkflowPlanned",
+    "IdeaCaptured",
+}
+
+
+def _next_sequential_id():
+    """Find the next sequential manual event number."""
+    existing = set()
+    if not os.path.exists(EVENT_DIR):
+        return 1
+    for f in os.listdir(EVENT_DIR):
+        m = re.match(r'^(\d{4})\.json$', f)
+        if m:
+            existing.add(int(m.group(1)))
+    n = 1
+    while n in existing:
+        n += 1
+    return n
+
+
+def write_event(event, manual=False):
+    """Write an event. Manual events get sequential IDs, system events get UUIDs."""
+    if manual:
+        num = _next_sequential_id()
+        filename = f"{num:04d}.json"
+    else:
+        filename = f"{event['id']}.json"
+    path = os.path.join(EVENT_DIR, filename)
+    with open(path, "w") as f:
+        json.dump(event, f, indent=2)
+    print(f"Event created: {filename}")
+
+
+def make_event(etype, idea_id, payload_extra=None):
+    return {
+        "id": str(uuid.uuid4()),
+        "type": etype,
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+        "source": "human",
+        "payload": {"idea_id": idea_id, **(payload_extra or {})},
+    }
+
+
+def cmd_capture(args):
+    if len(args) < 1:
+        print("Usage: converse capture \"<idea>\" [--vocabulary file.json] [--no-auto]")
+        sys.exit(1)
+    idea = args[0]
+    payload = {"idea": idea}
+    auto_advance = True
+    i = 1
+    while i < len(args):
+        if args[i] == "--vocabulary" and i + 1 < len(args):
+            with open(args[i + 1]) as f:
+                payload["workflow_vocabulary"] = json.load(f)
+            i += 2
+        elif args[i] == "--no-auto":
+            auto_advance = False
+            i += 1
+        else:
+            i += 1
+
+    evt = {
+        "id": str(uuid.uuid4()),
+        "type": "IdeaCaptured",
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+        "source": "human",
+        "payload": payload,
+    }
+    # Store auto_advance flag for the architect to pick up
+    if not auto_advance:
+        evt["_meta"] = {"auto_advance": False}
+    write_event(evt, manual=True)
+
+
+def _load_projection():
+    if not os.path.exists(PROJ_FILE):
+        print("No projection found. Run the pipeline first.")
+        sys.exit(1)
+    with open(PROJ_FILE) as f:
+        return json.load(f)
+
+
+def cmd_status(args):
+    data = _load_projection()
+    idea_id = args[0] if args else None
+    for wf in data:
+        if idea_id and wf.get("idea", "")[:len(idea_id)] != idea_id:
+            continue
+        panic = wf.get("kernel_panic", False)
+        marker_panic = "🔴 PANIC" if panic else ""
+        print(f"\nIdea: {wf['idea']}{marker_panic}")
+        auto = "auto" if wf.get("auto_advance") else "manual"
+        print(f"  State: {wf['current_step']} [{auto}]")
+        for name, info in wf["steps"].items():
+            status = info["status"]
+            marker = "◐" if status == "pending_approval" else "✓" if status == "approved" else "✗" if status == "rejected" else "○"
+            print(f"    {marker} {name}: {status}")
+            if info.get("rejection_reason"):
+                print(f"      rejected: {info['rejection_reason']}")
+
+
+def cmd_next(args):
+    data = _load_projection()
+    idea_id = args[0] if args else None
+    for wf in data:
+        if idea_id and wf.get("idea", "")[:len(idea_id)] != idea_id:
+            continue
+        if wf.get("kernel_panic"):
+            print(f"🔴 PANIC: {wf['idea']} — requires human intervention")
+        elif wf["current_step"] == "complete":
+            print(f"Workflow complete: {wf['idea']}")
+        elif wf["current_step"] == "rejected":
+            print(f"Workflow stuck (rejected): {wf['idea']}")
+        else:
+            step = wf["current_step"]
+            info = wf["steps"].get(step, {})
+            next_action = info.get("next_action")
+            print(f"Next: {step}")
+            print(f"  State: {info.get('state', '?')}")
+            if next_action:
+                print(f"  After approval: {next_action}")
+            if info.get("rejection_reason"):
+                print(f"  Previous rejection: {info['rejection_reason']}")
+
+
+def cmd_request(args):
+    if len(args) < 2:
+        print("Usage: converse request <idea_id> <step>")
+        sys.exit(1)
+    idea_id, step = args[0], args[1]
+    if step not in STEPS:
+        print(f"Unknown step: {step}. Valid: {STEPS}")
+        sys.exit(1)
+    write_event(make_event("StepRequested", idea_id, {"step": step}), manual=True)
+
+
+def cmd_approve(args):
+    if len(args) < 2:
+        print("Usage: converse approve <idea_id> <step>")
+        sys.exit(1)
+    write_event(make_event("StepApproved", args[0], {"step": args[1]}), manual=True)
+
+
+def cmd_reject(args):
+    if len(args) < 2:
+        print("Usage: converse reject <idea_id> <step> [reason]")
+        sys.exit(1)
+    reason = " ".join(args[2:]) if len(args) > 2 else "Rejected by user"
+    write_event(make_event("StepRejected", args[0], {"step": args[1], "reason": reason}), manual=True)
+
+
+def cmd_clean(args):
+    """Remove stale/debug events while preserving the audit trail of meaningful events."""
+    dry_run = "--dry-run" in args
+
+    # Keep: manually numbered events, KernelPanic, and the latest completion event per step per idea
+    keep = set()
+    completions = {}  # (idea_id, step_type) -> (timestamp, filename)
+
+    for f in os.listdir(EVENT_DIR):
+        if not f.endswith(".json"):
+            continue
+        # Always keep sequential-numbered events
+        if re.match(r'^\d{4}\.json$', f):
+            keep.add(f)
+            continue
+
+        path = os.path.join(EVENT_DIR, f)
+        try:
+            with open(path) as fh:
+                evt = json.load(fh)
+        except Exception:
+            if not dry_run:
+                os.remove(path)
+                print(f"  Removed (invalid JSON): {f}")
+            else:
+                print(f"  Would remove (invalid JSON): {f}")
+            continue
+
+        evt_type = evt.get("type", "")
+        ts = evt.get("timestamp", "")
+        idea_id = evt.get("payload", {}).get("idea_id", "")
+
+        # Keep all system event types that are meaningful
+        if evt_type in SYSTEM_EVENT_TYPES:
+            # For completion events, keep only the latest per (idea_id, type)
+            if evt_type in ("VocabularyDrafted", "RequirementsFormalized", "TypeSpecDrafted",
+                           "SpecCompiled", "RefactorDrafted", "Integrated"):
+                key = (idea_id, evt_type)
+                if key not in completions or ts > completions[key][0]:
+                    if key in completions:
+                        # Mark old one for removal
+                        old_f = completions[key][1]
+                        if old_f in keep:
+                            keep.remove(old_f)
+                    completions[key] = (ts, f)
+                keep.add(f)
+            else:
+                keep.add(f)
+
+    # Remove files not in keep set
+    removed = 0
+    for f in sorted(os.listdir(EVENT_DIR)):
+        if not f.endswith(".json"):
+            continue
+        if f not in keep:
+            if not dry_run:
+                os.remove(os.path.join(EVENT_DIR, f))
+            print(f"  {'Would remove' if dry_run else 'Removed'}: {f}")
+            removed += 1
+
+    if removed == 0:
+        print("  Nothing to clean.")
+    else:
+        mode = "DRY RUN — no files deleted" if dry_run else "CLEANED"
+        print(f"\n{mode}: {removed} event(s) processed")
+
+
+COMMANDS = {
+    "capture": cmd_capture,
+    "status": cmd_status,
+    "next": cmd_next,
+    "request": cmd_request,
+    "approve": cmd_approve,
+    "reject": cmd_reject,
+    "clean": cmd_clean,
+}
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__)
+        sys.exit(1)
+    cmd = sys.argv[1]
+    if cmd not in COMMANDS:
+        print(f"Unknown command: {cmd}")
+        print(f"Available: {', '.join(COMMANDS.keys())}")
+        sys.exit(1)
+    COMMANDS[cmd](sys.argv[2:])
+
+
+if __name__ == "__main__":
+    main()

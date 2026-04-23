@@ -1,0 +1,3433 @@
+{
+  "name": "magnets",
+  "type": "folder",
+  "children": [
+    {
+      "name": "ai",
+      "type": "folder",
+      "children": [
+        {
+          "name": "claude",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "cline",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "huggingface",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "lovable",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "models",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "perplexity",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "replit",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "rocket.new",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "tools",
+          "type": "folder",
+          "children": [
+            {
+              "name": "cli",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "deepseek",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "gemini",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "opencode",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "qwen",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "ide",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "copilot",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "cursor",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "dyad",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "supabase",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "qoder",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "trae",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "vscode",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "windsurf",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "site",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "dev",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "chef",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "convex",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "name": "copilot",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "deepseek",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "gemini",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "lovable",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "opencode",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "qwen",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "v0",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "vectal.ai",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "vendors",
+          "type": "folder",
+          "children": [
+            {
+              "name": "anthropic",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "google",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "firebase-studio",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "google-ai-studio",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "notion",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "zencoder",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "zendcoder",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "cloud",
+      "type": "folder",
+      "children": [
+        {
+          "name": "chef",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "firebase",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "github",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "googleaistudio",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "sonarcube",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "vercel",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "db",
+      "type": "folder",
+      "children": [
+        {
+          "name": "convex",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "couchbase",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "couchdb",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "elasticsearch",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "indexedDB",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "influxDB",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "memgraph",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "mongoDB",
+          "type": "folder",
+          "children": [
+            {
+              "name": "atlas",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "mongosh",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "neo4j",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "orientdb",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "postgreSQL",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "ravenDB",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "redis",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "solr",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "dev",
+      "type": "folder",
+      "children": [
+        {
+          "name": "clojure",
+          "type": "folder",
+          "children": [
+            {
+              "name": "dsl",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "desktop",
+          "type": "folder",
+          "children": [
+            {
+              "name": "capacitor",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "cordova",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "electron",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "expo",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "ionic",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "nativescript",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "nw.js",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "react-native",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "tauri",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "dotnet",
+          "type": "folder",
+          "children": [
+            {
+              "name": "csharp",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "elixir",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "elm",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "grpc",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "htmx",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "ide",
+          "type": "folder",
+          "children": [
+            {
+              "name": "cursor",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "dyad",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "fleet",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "intellij",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "pycharm",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "qoder",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "spaces",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "springtoolsuite",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "trae",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "vscode",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "webstorm",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "windsurf",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "interop",
+          "type": "folder",
+          "children": [
+            {
+              "name": "edge-js",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "js",
+          "type": "folder",
+          "children": [
+            {
+              "name": "build",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "babel",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "basel",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "bun",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "esbuild",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "nitro",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "parcel",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "rollup",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "vite",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "webpack",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "cms",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "keystone",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "strapi",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "framework",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "adonisjs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "alpinejs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "analog",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "angular",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "analog",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "deps",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "animations",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "common",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "compiler",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "core",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "core-js",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "forms",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "platform-browser",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "platform-browser-dynamic",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "router",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "rxjs",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "zone",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "name": "deps-dev",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "angular",
+                          "type": "folder",
+                          "children": [
+                            {
+                              "name": "cli",
+                              "type": "folder",
+                              "children": []
+                            },
+                            {
+                              "name": "compiler-cli",
+                              "type": "folder",
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "name": "angular-devkit",
+                          "type": "folder",
+                          "children": [
+                            {
+                              "name": "build-angular",
+                              "type": "folder",
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "name": "jasmine",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "jasmine-core",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "karma",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "karma-chrome-launcher",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "karma-coverage-istanbul-reporter",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "karma-jasmine",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "karma-jasmine-html-reporter",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "node",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "tslint",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "types",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "typescript",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "astro",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "better-t",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "better-t-stack",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "deepkit",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "edgejs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "electron",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "elysiaJS",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "ember",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "express",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "expressots",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "fastify",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "feathers",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "h2",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "hapi",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "hono",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "htmx",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "ice.js",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "inertia",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "inferno",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "koa",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "marko.js",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "meteor",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "micro",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "moleculer",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "nestjs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "nextjs",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "blitz",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "payload",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "nitro",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "preact",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "quik",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "react",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "nextjs",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "blitzjs",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "payload",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "name": "preact",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "react-native",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "react-router",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "tanstack-router",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "name": "redux",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "redwoodGraphQL",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "remix",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "remult",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "restify",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "ripple",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "solidjs",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "corvu",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "flowbite-solid",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "tailwindcss",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "name": "kobalt",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "shadcn-solid",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "solid-bootstrap",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "solidstart",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "solidui",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "suid",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "svelte",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "runed",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "shadcn-svelte",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "sveltekit",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "t3",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "tanstack",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "tRpc",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "tsoa",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "typeGraphQL",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "vue",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "nuxt",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "zodios",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "library",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "3Djs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "ag-grid",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "ark-ui",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "core-js",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "D3",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "date.fns",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "day.js",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "dayjs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "gojs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "gsap",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "immer",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "jquery",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "lodash",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "lottie",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "mescius",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "mitosis",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "moment",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "motion",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "motionone",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "partytown",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "phaser",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "pixi",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "popmotion",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "react-spring",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "rxjs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "scribe",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "shadcn",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "stlib",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "tailwindCSS",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "theatre.js",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "theatrejs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "three.js",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "threejs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "underscore.js",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "underscorejs",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "valibot",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "yup",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "zod",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "orm",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "dexie",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "drizzle",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "jazz",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "prizma",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "rxdb",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "runtime",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "bun",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "cloudflare",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "deno",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "node.js",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "npm",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "2fa",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "artifactory",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "jfrog",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "name": "npx",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "nvm",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "testing",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "jest",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "tools",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "directus",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "jvm",
+          "type": "folder",
+          "children": [
+            {
+              "name": "clojure",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "graalvm",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "groovy",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "dsl",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "java",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "advanced",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "eventdriven",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "kafka",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "patterns",
+                          "type": "folder",
+                          "children": [
+                            {
+                              "name": "sourcing",
+                              "type": "folder",
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "name": "rabbitMQ",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "name": "functional",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "higherorderfunctions",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "lamdas",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "streams",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    },
+                    {
+                      "name": "reactive",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "annotations",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "custom",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "classloaders",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "generics",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "bounded",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "typeparams",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "unbounded",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "wildcards",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "interfaces",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "functional",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "methods",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "default",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "static",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "name": "streams",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "testing",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "bdd",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "unit",
+                      "type": "folder",
+                      "children": [
+                        {
+                          "name": "junit",
+                          "type": "folder",
+                          "children": []
+                        },
+                        {
+                          "name": "mockito",
+                          "type": "folder",
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "kotlin",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "htmx",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "loom",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "micronaut",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "quarkus",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "reactor",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "rxjava",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "scala",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "sdkman",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "spring",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "spring-boot",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "spring-projects",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "activemq",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "actuator",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "amqp",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "amqp-streams",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "artemis",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "azure-active-directory",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "azure-cosmos-db",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "azure-keyvault",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "azure-storage",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "azure-support",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "batch",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cache",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "camel",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-bus",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-config-client",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-config-server",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-contract-stub-runner",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-contract-verifier",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-eureka",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-eureka-server",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-feign",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-function",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-gateway",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-gateway-reactive",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-gcp",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-gcp-pubsub",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-gcp-storage",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-loadbalancer",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-resilience4j",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-starter",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-starter-consul-config",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-starter-consul-discovery",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-starter-vault-config",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-starter-zookeeper-config",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-starter-zookeeper-discovery",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-stream",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "cloud-task",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "codecentric-spring-boot-admin-client",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "codecentric-spring-boot-admin-server",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "configuration-processor",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-cassandra",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-cassandra-reactive",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-couchbase",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-couchbase-reactive",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "datadog",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-elasticsearch",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-jdbc",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-jpa",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-ldap",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-mongodb",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-mongodb-reactive",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-neo4j",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-r2dbc",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-redis",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-redis-reactive",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-rest",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "data-rest-explorer",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "db2",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "derby",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "devtools",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "dgs-codegen",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "distributed-tracing",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "docker-compose",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "dynatrace",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "flyway",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "freemarker",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "graphite",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "graphql",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "groovy-templates",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "h2",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "hateoas",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "hsql",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "htmx",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "influx",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "integration",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "jdbc",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "jersey",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "jooq",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "jte",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "kafka",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "kafka-streams",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "liquibase",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "lombok",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "mail",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "mariadb",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "modulith",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "mustache",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "mybatis",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "mysql",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "native",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "netflix-dgs",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "new-relic",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "oauth2-authorization-server",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "oauth2-client",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "oauth2-resource-server",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "oracle",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "otlp-metrics",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "postgresql",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "prometheus",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "pulsar",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "pulsar-reactive",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "quartz",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "restdocs",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "rsocket",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "sbom-cyclone-dx",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "scs-config-client",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "scs-service-registry",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "security",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "sentry",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "session-data-mongodb",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "session-data-redis",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "session-hazelcast",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "session-jdbc",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "solace",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-anthropic",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-azure-openai",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-bedrock",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-bedrock-converse",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-chat-memory-repository-cassandra",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-chat-memory-repository-in-memory",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-chat-memory-repository-jdbc",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-chat-memory-repository-neo4j",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-markdown-document-reader",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-mcp-client",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-mcp-server",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-mistral",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-ollama",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-openai",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-pdf-document-reader",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-postgresml",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-stabilityai",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-tika-document-reader",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-transformers",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-azure",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-azurecosmosdb",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-cassandra",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-chroma",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-elasticsearch",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-gemfire",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-mariadb",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-milvus",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-mongodb-atlas",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-neo4j",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-oracle",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-pgvector",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-pinecone",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-qdrant",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-redis",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-typesense",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vectordb-weaviate",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vertexai-embeddings",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-ai-vertexai-gemini",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-grpc",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-restclient",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-security-webauthn",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-shell",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "spring-webclient",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "sqlserver",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "tanzu-governance-starter",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "tanzu-scg-access-control",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "tanzu-scg-custom",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "tanzu-scg-graphql",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "tanzu-scg-sso",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "tanzu-scg-traffic-control",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "tanzu-scg-transformation",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "testcontainers",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "thymeleaf",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "timefold-solver",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "unboundid-ldap",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "vaadin",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "validation",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "wavefront",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "web",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "webflux",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "web-services",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "websocket",
+                      "type": "folder",
+                      "children": []
+                    },
+                    {
+                      "name": "zipkin",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "lua",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "nim",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "pascal",
+          "type": "folder",
+          "children": [
+            {
+              "name": "delphi",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "lazurus",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "processing",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "python",
+          "type": "folder",
+          "children": [
+            {
+              "name": "django",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "fastapi",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "flask",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "framework",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "django",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "fastapi",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "flask",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "mojo",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "pscript",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "pyscript",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "rust",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "temporal.io",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "zig",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "devops",
+      "type": "folder",
+      "children": [
+        {
+          "name": "ansible",
+          "type": "folder",
+          "children": [
+            {
+              "name": "tower",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "appwrite",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "auth",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "aws",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "azure",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "bash",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "chef",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "docker",
+          "type": "folder",
+          "children": [
+            {
+              "name": "docker-hub",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "edge",
+          "type": "folder",
+          "children": [
+            {
+              "name": "aws",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "lambda",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "cloudflare",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "workers",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "deno",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "digitalocean",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "functions",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "fly.io",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "vercel",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "fnctions",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "github",
+          "type": "folder",
+          "children": [
+            {
+              "name": "actions",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "blacksmith.sh",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "gitlab",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "hashicorp",
+          "type": "folder",
+          "children": [
+            {
+              "name": "vault",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "jenkins",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "jira",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "kasm",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "monorepo",
+          "type": "folder",
+          "children": [
+            {
+              "name": "bun",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "lema",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "npm-workspaces",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "nx",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "rush",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "turborepo",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "yalc",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "yarn-workspaces",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "nix",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "nixos",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "nx",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "pinokio",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "puppet",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "repo",
+          "type": "folder",
+          "children": [
+            {
+              "name": "artifactory",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "jfrog",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "maven",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "monorepo",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "bun",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "lema",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "npm-workspaces",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "nx",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "rush",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "turborepo",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "yalc",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "yarn-workspaces",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "npm",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "pypy",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "splunk",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "supabase",
+          "type": "folder",
+          "children": [
+            {
+              "name": "Dyad",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "terraform",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "udeploy",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "vercel",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "knowledge",
+      "type": "folder",
+      "children": [
+        {
+          "name": "concept",
+          "type": "folder",
+          "children": [
+            {
+              "name": "web",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "router",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "file-based",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "server-components",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "react",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "name": "sse",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "ssr",
+                  "type": "folder",
+                  "children": [
+                    {
+                      "name": "hydration",
+                      "type": "folder",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "obsidian",
+          "type": "folder",
+          "children": [
+            {
+              "name": "httpshelp.obsidian.md",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "sites",
+          "type": "folder",
+          "children": [
+            {
+              "name": "boot.dev",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "pluralsight",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        },
+        {
+          "name": "tools",
+          "type": "folder",
+          "children": [
+            {
+              "name": "notion",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "obsidian",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "httpshelp.obsidian.md",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "linux",
+      "type": "folder",
+      "children": [
+        {
+          "name": "shell",
+          "type": "folder",
+          "children": [
+            {
+              "name": "atuin",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "helix",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "neovim",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "tmux",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "zellij",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "music",
+      "type": "folder",
+      "children": [
+        {
+          "name": "vendors",
+          "type": "folder",
+          "children": [
+            {
+              "name": "1010music",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "bento",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "blackbox",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "fireball",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "lemondrop",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "razmattazz",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "tangerine",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "arturia",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "cre8audio",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "df-audio",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "elektron",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "analog-four",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "analog-heat",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "analog-rytm",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "digitakt",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "digitone",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "octotrack",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "tonverk",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "name": "makenoise",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "polyend",
+              "type": "folder",
+              "children": [
+                {
+                  "name": "play",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "playplus",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "synth",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "tracker",
+                  "type": "folder",
+                  "children": []
+                },
+                {
+                  "name": "trackerplus",
+                  "type": "folder",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "office",
+      "type": "folder",
+      "children": [
+        {
+          "name": "carbone",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "publications",
+      "type": "folder",
+      "children": [
+        {
+          "name": "dev.to",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "medium.com",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "resources",
+      "type": "folder",
+      "children": [
+        {
+          "name": "iconbuddy",
+          "type": "folder",
+          "children": [
+            {
+              "name": "logos",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sbc",
+      "type": "folder",
+      "children": []
+    },
+    {
+      "name": "sec",
+      "type": "folder",
+      "children": [
+        {
+          "name": "iam",
+          "type": "folder",
+          "children": [
+            {
+              "name": "better-auth",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "clerk",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "keycloak",
+              "type": "folder",
+              "children": []
+            },
+            {
+              "name": "stack-auth",
+              "type": "folder",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tech",
+      "type": "folder",
+      "children": [
+        {
+          "name": "wasm",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "webGL",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "webGPU",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    },
+    {
+      "name": "vendors",
+      "type": "folder",
+      "children": [
+        {
+          "name": "clerk",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "microsoft",
+          "type": "folder",
+          "children": []
+        },
+        {
+          "name": "sendgrid",
+          "type": "folder",
+          "children": []
+        }
+      ]
+    }
+  ]
+}

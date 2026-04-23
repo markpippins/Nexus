@@ -750,17 +750,17 @@ Service: broker-gateway
 │
 ├── DEVELOPMENT
 │   ├── spring.data.mongodb.uri = mongodb://localhost:27017/broker
-│   ├── logging.level.com.angrysurfer = DEBUG
+│   ├── logging.level.com.aibizarchitect = DEBUG
 │   └── spring.devtools.restart.enabled = true
 │
 ├── STAGING
 │   ├── spring.data.mongodb.uri = mongodb://staging-db:27017/broker
-│   └── logging.level.com.angrysurfer = INFO
+│   └── logging.level.com.aibizarchitect = INFO
 │
 └── PRODUCTION
     ├── spring.data.mongodb.uri = mongodb://prod-db:27017/broker
     ├── api.secret.key = ********** (secret)
-    └── logging.level.com.angrysurfer = WARN
+    └── logging.level.com.aibizarchitect = WARN
 ```
 
 ### Deployment Status Flow

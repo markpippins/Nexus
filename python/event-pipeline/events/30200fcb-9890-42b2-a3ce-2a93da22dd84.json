@@ -1,0 +1,11 @@
+{
+  "id": "30200fcb-9890-42b2-a3ce-2a93da22dd84",
+  "type": "StepRejected",
+  "timestamp": "2026-04-09T04:00:29.137955+00:00",
+  "source": "system",
+  "payload": {
+    "idea_id": "evt-0004",
+    "step": "compile",
+    "reason": "step 'vocabulary' must be completed before 'compile'"
+  }
+}

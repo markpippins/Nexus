@@ -1,0 +1,226 @@
+[
+  {
+    "idea": "Prototype Cassandra projection for AI events",
+    "vocabulary_path": null,
+    "auto_advance": false,
+    "steps": {
+      "vocabulary": {
+        "status": "pending",
+        "state": "draft",
+        "event_type": "VocabularyDrafted",
+        "next_action": "formalize_spec"
+      },
+      "requirements": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "RequirementsFormalized",
+        "next_action": null
+      },
+      "typespec": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "TypeSpecDrafted",
+        "next_action": null
+      },
+      "compile": {
+        "status": "pending",
+        "state": "compiled",
+        "event_type": "SpecCompiled",
+        "next_action": "intelligent_refactor"
+      },
+      "refactor": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "RefactorDrafted",
+        "next_action": null
+      },
+      "integrate": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "Integrated",
+        "next_action": null
+      }
+    },
+    "current_step": "vocabulary"
+  },
+  {
+    "idea": "Prototype Cassandra projection for AI events",
+    "vocabulary_path": null,
+    "auto_advance": false,
+    "steps": {
+      "vocabulary": {
+        "status": "pending",
+        "state": "draft",
+        "event_type": "VocabularyDrafted",
+        "next_action": "formalize_spec"
+      },
+      "requirements": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "RequirementsFormalized",
+        "next_action": null
+      },
+      "typespec": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "TypeSpecDrafted",
+        "next_action": null
+      },
+      "compile": {
+        "status": "pending",
+        "state": "compiled",
+        "event_type": "SpecCompiled",
+        "next_action": "intelligent_refactor"
+      },
+      "refactor": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "RefactorDrafted",
+        "next_action": null
+      },
+      "integrate": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "Integrated",
+        "next_action": null
+      }
+    },
+    "current_step": "vocabulary"
+  },
+  {
+    "idea": "Add real-time notification system for Cassandra",
+    "vocabulary_path": null,
+    "auto_advance": false,
+    "steps": {
+      "vocabulary": {
+        "status": "pending",
+        "state": "draft",
+        "event_type": "VocabularyDrafted",
+        "next_action": "formalize_spec"
+      },
+      "requirements": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "RequirementsFormalized",
+        "next_action": null
+      },
+      "typespec": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "TypeSpecDrafted",
+        "next_action": null
+      },
+      "compile": {
+        "status": "pending",
+        "state": "compiled",
+        "event_type": "SpecCompiled",
+        "next_action": "intelligent_refactor"
+      },
+      "refactor": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "RefactorDrafted",
+        "next_action": null
+      },
+      "integrate": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "Integrated",
+        "next_action": null
+      }
+    },
+    "current_step": "vocabulary"
+  },
+  {
+    "idea": "Enhance agentic pipeline to support TypeSpec workflow: vocabulary \u2192 drill down \u2192 TypeSpec \u2192 tsp compile \u2192 intelligent refactor",
+    "vocabulary_path": null,
+    "auto_advance": false,
+    "steps": {
+      "vocabulary": {
+        "status": "pending",
+        "state": "draft",
+        "event_type": "VocabularyDrafted",
+        "next_action": "formalize_spec"
+      },
+      "requirements": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "RequirementsFormalized",
+        "next_action": null,
+        "artifact_path": "/mnt/c/dev/nexus/ai/python/converse/artifacts/evt-0004/requirements.json",
+        "rejection_reason": "Missing FR-4: Event sourcing requirement not captured"
+      },
+      "typespec": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "TypeSpecDrafted",
+        "next_action": null
+      },
+      "compile": {
+        "status": "pending",
+        "state": "compiled",
+        "event_type": "SpecCompiled",
+        "next_action": "intelligent_refactor",
+        "rejection_reason": "step 'typespec' must be completed before 'compile'"
+      },
+      "refactor": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "RefactorDrafted",
+        "next_action": null
+      },
+      "integrate": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "Integrated",
+        "next_action": null
+      }
+    },
+    "current_step": "vocabulary"
+  },
+  {
+    "idea": "Integrate event bindings into the workflow vocabulary",
+    "vocabulary_path": null,
+    "auto_advance": false,
+    "steps": {
+      "vocabulary": {
+        "status": "pending_approval",
+        "state": "draft",
+        "event_type": "VocabularyDrafted",
+        "next_action": "formalize_spec",
+        "artifact_path": "/mnt/c/dev/nexus/ai/python/converse/artifacts/evt-0006/vocabulary.json"
+      },
+      "requirements": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "RequirementsFormalized",
+        "next_action": null
+      },
+      "typespec": {
+        "status": "pending",
+        "state": "specified",
+        "event_type": "TypeSpecDrafted",
+        "next_action": null
+      },
+      "compile": {
+        "status": "pending",
+        "state": "compiled",
+        "event_type": "SpecCompiled",
+        "next_action": "intelligent_refactor"
+      },
+      "refactor": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "RefactorDrafted",
+        "next_action": null
+      },
+      "integrate": {
+        "status": "pending",
+        "state": "integrated",
+        "event_type": "Integrated",
+        "next_action": null
+      }
+    },
+    "current_step": "vocabulary"
+  }
+]

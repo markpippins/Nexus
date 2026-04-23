@@ -1,0 +1,10 @@
+{
+    "id": "evt-0010",
+    "type": "StepRequested",
+    "timestamp": "2026-04-09T04:05:00Z",
+    "source": "human",
+    "payload": {
+        "idea_id": "evt-0004",
+        "step": "requirements"
+    }
+}

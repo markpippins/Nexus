@@ -1,0 +1,11 @@
+# Agentic Pipeline Enhancement - Priority Order
+
+[x] 1. Step execution handlers - Each workflow step (VocabularyDrafted, TypeSpecDrafted, etc.) needs a handler that produces artifacts and awaits approval
+[x] 2. State machine enforcement - Prevent invalid transitions (e.g., SpecCompiled before TypeSpecDrafted)
+[x] 3. Human-in-the-loop gate - Add StepApproved/StepRejected events, approval flow
+[x] 4. Artifact tracking - Events must carry artifact_path; projection tracks step → file mapping
+[x] 5. CLI interface - bin/converse with commands: capture, status, complete, approve, reject
+[x] 6. Event validation - Schema validation on event load, graceful error handling
+[x] 7. Feedback/redo loops - StepRejected resets status, supports arbitrary redo depth
+[x] 8. Offset resilience - Move single file to offsets/architect.json with structured metadata
+[x] 9. Projection query API - bin/converse status, bin/converse next commands

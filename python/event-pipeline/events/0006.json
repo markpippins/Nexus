@@ -1,0 +1,48 @@
+{
+    "id": "evt-0006",
+    "type": "IdeaCaptured",
+    "timestamp": "2026-04-08T17:30:00Z",
+    "source": "human",
+    "payload": {
+        "idea": "Integrate event bindings into the workflow vocabulary",
+        "workflow_vocabulary": {
+            "entities": {
+                "domain_concept": "The raw mental model or 'trashcan' of ideas before formalization.",
+                "functional_requirement": "The specific 'what it does' behavior derived from the domain.",
+                "typespec_source": "The .tsp file acting as the source of truth for the service contracts.",
+                "compiled_artifact": "The output of 'tsp compile' (JSON schema, Java POJOs, or OpenAPI).",
+                "legacy_context": "The existing 'business code' that must remain unpolluted."
+            },
+            "actions": {
+                "capture_idea": "Logging raw discourse into ideas.json.",
+                "formalize_spec": "Translating functional requirements into TypeSpec syntax.",
+                "emit_event": "Creating a new JSON file in the events/ directory to trigger the pipeline.",
+                "compile_spec": "Running the TypeSpec compiler to generate machine-readable contracts.",
+                "intelligent_refactor": "The process of Qwen merging new artifacts into existing code while maintaining architectural integrity.",
+                "project_state": "Updating the tasks_by_priority.json or the 3D mesh view."
+            },
+            "states": {
+                "draft": "Ideas are being captured; no code has been touched.",
+                "specified": "The TypeSpec exists but hasn't been compiled.",
+                "compiled": "The contract is solid; waiting for refactoring logic.",
+                "integrated": "The new functionality is live in the sandbox code.",
+                "synchronized": "The 3D mesh view reflects the actual state of the registry."
+            },
+            "constraints": {
+                "infrastructure_isolation": "No DevOps/Docker/K8s leakage into the sandbox.",
+                "semantic_purity": "Business logic must remain decoupled from infrastructure concerns.",
+                "deterministic_logging": "Every change must be traced back to an event in the log."
+            },
+            "event_bindings": {
+                "IdeaCaptured": {
+                    "produces_state": "draft",
+                    "next_action": "formalize_spec"
+                },
+                "SpecCompiled": {
+                    "produces_state": "compiled",
+                    "next_action": "intelligent_refactor"
+                }
+            }
+        }
+    }
+}

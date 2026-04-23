@@ -1,0 +1,10 @@
+{
+  "id": "aad50558-e5a3-4aae-888e-1c5eed82b6fe",
+  "type": "StepRequested",
+  "timestamp": "2026-04-09T04:32:53.493693+00:00",
+  "source": "human",
+  "payload": {
+    "idea_id": "evt-0006",
+    "step": "vocabulary"
+  }
+}

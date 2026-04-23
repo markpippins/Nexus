@@ -51,6 +51,46 @@ model FrameworkVendor extends LinkedLookup {
   /** Vendor name (e.g., "VMware", "Red Hat") */
   name: string;
 }
+/** Basic domain entities for the service registry (migrations from Spring v1). */
+namespace Nexus.ServiceRegistry.V1.Entity {
+  model EnvironmentType {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Host {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Service {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Deployment {
+    id: int64;
+    service?: string;
+    environment?: string;
+    host?: string;
+    version?: string;
+    deployedAt?: utcDateTime;
+    status?: string;
+    port?: int32;
+    contextPath?: string;
+    healthCheckUrl?: string;
+    healthStatus?: string;
+    lastHealthCheck?: utcDateTime;
+    processId?: string;
+    containerName?: string;
+    deploymentPath?: string;
+    startedAt?: utcDateTime;
+    stoppedAt?: utcDateTime;
+    activeFlag?: boolean = true;
+    createdAt?: utcDateTime;
+    updatedAt?: utcDateTime;
+  }
+}
 
 /**
  * Framework category lookup.
@@ -79,6 +119,279 @@ model FrameworkLanguage extends LinkedLookup {
 
   /** Long-term support version of the language */
   ltsVersion?: string;
+}
+// Framework entity models pulled from Spring lookups will be added here via canonical core adapters
+namespace Nexus.ServiceRegistry.V1 {
+  model FrameworkVendor {
+    id: int64;
+    name: string;
+    description?: string;
+    url?: string;
+    activeFlag?: boolean = true;
+  }
+  model FrameworkLanguage {
+    id: int64;
+    name: string;
+    currentVersion?: string;
+    ltsVersion?: string;
+  }
+  model Framework {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model FrameworkCategory {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model EnvironmentType {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Host {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Deployment {
+    id: int64;
+  }
+  model Library {
+    id: int64;
+    name: string;
+    version?: string;
+  }
+  model LibraryCategory {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model OperatingSystem {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServerType {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Service {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServiceBackend {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServiceConfiguration {
+    id: int64;
+    key: string;
+    value?: string;
+  }
+  model ServiceDependency {
+    id: int64;
+    name: string;
+  }
+  model ServiceLibrary {
+    id: int64;
+    name: string;
+    version?: string;
+  }
+  model ServiceType {
+    id: int64;
+    name: string;
+  }
+  model VisualComponent {
+    id: int64;
+    name: string;
+  }
+  model FrameworkVendorCreate {
+    id?: int64;
+    name: string;
+    description?: string;
+    url?: string;
+    activeFlag?: boolean = true;
+  }
+  model FrameworkVendorUpdate {
+    id: int64;
+    name?: string;
+    description?: string;
+    url?: string;
+    activeFlag?: boolean;
+  }
+  model FrameworkCategoryCreate {
+    id?: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model FrameworkCategoryUpdate {
+    id: int64;
+    name?: string;
+    activeFlag?: boolean;
+  }
+}
+  model Framework {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model FrameworkCategory {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Host {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model EnvironmentType {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Host {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Deployment {
+    id: int64;
+    service?: string;
+    environment?: string;
+    host?: string;
+    version?: string;
+    deployedAt?: utcDateTime;
+    status?: string;
+    port?: int32;
+    contextPath?: string;
+    healthCheckUrl?: string;
+    healthStatus?: string;
+    lastHealthCheck?: utcDateTime;
+    startedAt?: utcDateTime;
+    stoppedAt?: utcDateTime;
+    activeFlag?: boolean = true;
+    createdAt?: utcDateTime;
+    updatedAt?: utcDateTime;
+  }
+  model Library {
+    id: int64;
+    name: string;
+    version?: string;
+    activeFlag?: boolean = true;
+  }
+  model LibraryCategory {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model OperatingSystem {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServerType {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model Service {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServiceBackend {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServiceConfiguration {
+    id: int64;
+    key: string;
+    value?: string;
+  }
+  model ServiceDependency {
+    id: int64;
+    name: string;
+  }
+  model ServiceLibrary {
+    id: int64;
+    name: string;
+    version?: string;
+  }
+  model ServiceType {
+    id: int64;
+    name: string;
+  }
+  model VisualComponent {
+    id: int64;
+    name: string;
+  }
+}
+
+// Additional domain models migrated from Spring v1 into the Java-side service-registry domain
+namespace Nexus.ServiceRegistry.V1 {
+  model Library {
+    id: int64;
+    name: string;
+    version?: string;
+    activeFlag?: boolean = true;
+  }
+  model LibraryCategory {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model OperatingSystem {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServerType {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServiceBackend {
+    id: int64;
+    name: string;
+    activeFlag?: boolean = true;
+  }
+  model ServiceConfiguration {
+    id: int64;
+    key: string;
+    value?: string;
+  }
+  model ServiceDependency {
+    id: int64;
+    name: string;
+  }
+  model ServiceLibrary {
+    id: int64;
+    name: string;
+    version?: string;
+  }
+  model VisualComponent {
+    id: int64;
+    name: string;
+  }
+  model ServiceType {
+    id: int64;
+    name: string;
+  }
+  model Deployment {
+    id: int64;
+    // lightweight mapping fields
+    service?: string;
+    environment?: string;
+    server?: string;
+    version?: string;
+  }
 }
 
 // ============================================================================

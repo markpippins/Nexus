@@ -1,0 +1,55 @@
+{
+  "id": "c7c79fca-cbe3-43c0-9234-2bab2f34195b",
+  "type": "WorkflowPlanned",
+  "timestamp": "2026-04-09T04:03:44.367643+00:00",
+  "source": "agent",
+  "payload": {
+    "idea_id": "evt-0001",
+    "idea": "Prototype Cassandra projection for AI events",
+    "vocabulary": {},
+    "steps": [
+      {
+        "step": "vocabulary",
+        "event_type": "VocabularyDrafted",
+        "state": "draft",
+        "next_action": "formalize_spec",
+        "status": "pending"
+      },
+      {
+        "step": "requirements",
+        "event_type": "RequirementsFormalized",
+        "state": "specified",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "typespec",
+        "event_type": "TypeSpecDrafted",
+        "state": "specified",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "compile",
+        "event_type": "SpecCompiled",
+        "state": "compiled",
+        "next_action": "intelligent_refactor",
+        "status": "pending"
+      },
+      {
+        "step": "refactor",
+        "event_type": "RefactorDrafted",
+        "state": "integrated",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "integrate",
+        "event_type": "Integrated",
+        "state": "integrated",
+        "next_action": null,
+        "status": "pending"
+      }
+    ]
+  }
+}
