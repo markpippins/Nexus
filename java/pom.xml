@@ -8,10 +8,11 @@
   <modules>
     <module>core</module>
     <module>broker-service-api</module>
+    <module>user-api</module>
+    <module>service-registry-api</module>
+
     <module>adapters.spring</module>
     <module>adapters.helidon</module>
     <module>adapters.quarkus</module>
-    <module>service-registry-api</module>
-    <module>user-api</module>
   </modules>
 </project>
