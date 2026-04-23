@@ -22,8 +22,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
-import com.aibizarchitect.nexus.v1.spring.login.LoginResponse;
-import com.aibizarchitect.nexus.v1.spring.login.LoginService;
 import com.aibizarchitect.nexus.v1.spring.login.client.UserAccessClient;
 import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 
