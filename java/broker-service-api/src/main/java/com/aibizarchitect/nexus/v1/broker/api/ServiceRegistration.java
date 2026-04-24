@@ -7,9 +7,7 @@ import java.util.Map;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
-import lombok.Data;
 
-@Data
 public class ServiceRegistration implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -30,20 +28,52 @@ public class ServiceRegistration implements Serializable {
     private Instant lastHeartbeat;
     private ServiceStatus status;
 
+    public String getServiceName() {
+        return serviceName;
+    }
+
     public void setServiceName(String serviceName) {
         this.serviceName = serviceName;
+    }
+
+    public Map<String, Object> getMetadata() {
+        return metadata;
+    }
+
+    public Instant getLastHeartbeat() {
+        return lastHeartbeat;
+    }
+
+    public void setLastHeartbeat(Instant lastHeartbeat) {
+        this.lastHeartbeat = lastHeartbeat;
+    }
+
+    public String getHealthCheck() {
+        return healthCheck;
+    }
+
+    public void setHealthCheck(String healthCheck) {
+        this.healthCheck = healthCheck;
+    }
+
+    public List<String> getOperations() {
+        return operations;
     }
 
     public void setOperations(List<String> operations) {
         this.operations = operations;
     }
 
+    public String getEndpoint() {
+        return endpoint;
+    }
+
     public void setEndpoint(String endpoint) {
         this.endpoint = endpoint;
     }
 
-    public void setHealthCheck(String healthCheck) {
-        this.healthCheck = healthCheck;
+    public ServiceStatus getStatus() {
+        return status;
     }
 
     public void setStatus(ServiceStatus status) {

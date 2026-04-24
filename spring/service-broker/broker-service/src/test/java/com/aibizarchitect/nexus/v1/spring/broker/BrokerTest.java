@@ -21,7 +21,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
-import com.aibizarchitect.nexus.v1.spring.broker.Broker;
 import com.aibizarchitect.nexus.v1.broker.api.ServiceRequest;
 import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
 import com.aibizarchitect.nexus.v1.spring.broker.spi.BrokerOperation;
