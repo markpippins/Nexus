@@ -18,7 +18,6 @@
         <dependency>
             <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-service-api</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
 </project>

@@ -20,12 +20,10 @@
         <dependency>
             <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-service-api</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-service-spi</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <dependency>

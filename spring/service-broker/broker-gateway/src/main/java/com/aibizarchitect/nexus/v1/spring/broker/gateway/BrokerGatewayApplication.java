@@ -15,8 +15,7 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         "com.aibizarchitect.nexus.v1.spring.search",
         "com.aibizarchitect.nexus.v1.spring.registry",
         "com.aibizarchitect.nexus.v1.spring.admin.logging"
-})
-@ComponentScan(basePackages = {
+})@ComponentScan(basePackages = {
         "com.aibizarchitect.nexus.v1.spring.broker",
         "com.aibizarchitect.nexus.v1.spring.user",
         "com.aibizarchitect.nexus.v1.spring.fs",

@@ -58,6 +58,7 @@ public class ServiceRegistryRegistrationService {
             RegistryService registryService) {
         this.restTemplate = restTemplate;
         this.registryService = registryService;
+        log.info("ServiceRegistryRegistrationService initialized");
     }
 
     @EventListener(ApplicationReadyEvent.class)
