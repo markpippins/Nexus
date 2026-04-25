@@ -1,7 +1,7 @@
 package com.aibizarchitect.nexus.adapters.spring;
 
-import com.aibizarchitect.nexus.v1.core.BinaryData;
 import com.aibizarchitect.nexus.v1.broker.api.ServiceRequest;
+import com.aibizarchitect.nexus.v1.core.BinaryData;
 
 /** Spring adapter bridge (no version suffix). Bridges canonical core to Spring legacy DTOs. */
 public class BrokerServiceAdapter {

@@ -54,6 +54,22 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
   private isExecuting = false;
   private hostEl = inject(ElementRef);
   private uiPreferencesService = inject(UiPreferencesService);
+  // SSE log streaming for broker logs
+  private logEventSource: EventSource | null = null;
+
+  private getLogStreamUrl(): string {
+    // try {
+    //   const origin = typeof window !== 'undefined' && window.location?.origin
+    //     ? window.location.origin
+    //     : '';
+    //   if (origin) {
+    //     return origin.replace(/\/+$/, '') + '/api/v1/broker/logs/stream';
+    //   }
+    // } catch {
+    //   // ignore and fallback below
+    // }
+    return 'http://localhost:8080/api/v1/broker/logs/stream';
+  }
 
   constructor() {
     effect(() => {
@@ -160,6 +176,21 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
     if (!command.trim()) {
       this.inputBuffer = '';
       this.historyIndex = -1;
+      this.writePrompt();
+      return;
+    }
+
+    // Support lightweight client-side control commands
+    const trimmedCmd = command.trim();
+    if (trimmedCmd === 'start-logging') {
+      this.startLogging();
+      this.inputBuffer = '';
+      this.writePrompt();
+      return;
+    }
+    if (trimmedCmd === 'stop-logging') {
+      this.stopLogging();
+      this.inputBuffer = '';
       this.writePrompt();
       return;
     }
@@ -322,6 +353,54 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
     }
     if (this.term) {
       this.term.dispose();
+    }
+    // Ensure SSE stream is cleaned up
+    if (this.logEventSource) {
+      try {
+        this.logEventSource.close();
+      } catch {
+        // ignore
+      }
+      this.logEventSource = null;
+    }
+  }
+
+  private startLogging(): void {
+    // Close any existing stream
+    if (this.logEventSource) {
+      try { this.logEventSource.close(); } catch {}
+      this.logEventSource = null;
+    }
+    const url = this.getLogStreamUrl();
+    this.logEventSource = new EventSource(url);
+    // Broker traffic events are named via SSE "event:" header. Listen explicitly.
+    this.logEventSource.addEventListener('broker-traffic', (ev: MessageEvent) => {
+      const raw = ev.data ?? '';
+      // Try to parse JSON payload for nicer formatting; fall back to raw data
+      try {
+        const payload = JSON.parse(raw);
+        this.term?.writeln(`broker-traffic: ${JSON.stringify(payload)}\n`);
+      } catch {
+        this.term?.writeln(`broker-traffic: ${raw}\n`);
+      }
+    });
+    this.logEventSource.addEventListener('ping', (ev: MessageEvent) => {
+      const ts = ev.data ?? '';
+      this.term?.writeln(`ping: ${ts}`);
+    });
+    this.logEventSource.onerror = () => {
+      this.term?.writeln('[broker-stream-log-error]');
+      try { this.logEventSource?.close(); } catch {}
+      this.logEventSource = null;
+    };
+    this.term?.writeln('[broker-logs-stream] started');
+  }
+
+  private stopLogging(): void {
+    if (this.logEventSource) {
+      try { this.logEventSource.close(); } catch {}
+      this.logEventSource = null;
+      this.term?.writeln('[broker-logs-stream] stopped');
     }
   }
 }

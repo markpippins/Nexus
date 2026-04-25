@@ -1,5 +1,7 @@
 package com.aibizarchitect.nexus.v1.spring.broker;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.UUID;
@@ -14,10 +16,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.aibizarchitect.nexus.v1.broker.api.BrokerTrafficEvent;
+import com.aibizarchitect.nexus.v1.broker.api.BrokerTrafficPublisher;
 import com.aibizarchitect.nexus.v1.broker.api.ServiceRequest;
 import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
 import com.aibizarchitect.nexus.v1.broker.api.ServiceResponseBody;
-import com.aibizarchitect.nexus.v1.spring.service.AdminLoggingService;
+
 
 @CrossOrigin(originPatterns = "*", allowedHeaders = "*", allowCredentials = "true", methods = { RequestMethod.GET,
         RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS })
@@ -26,13 +30,14 @@ import com.aibizarchitect.nexus.v1.spring.service.AdminLoggingService;
 public class BrokerController {
 
     private static final Logger log = LoggerFactory.getLogger(BrokerController.class);
+    private static final String LOG_SOURCE = "BrokerController.submitRequest";
 
     private final Broker broker;
-    private final AdminLoggingService adminLoggingService;
+    private final BrokerTrafficPublisher brokerTrafficPublisher;
 
-    public BrokerController(Broker broker, AdminLoggingService adminLoggingService) {
+    public BrokerController(Broker broker, BrokerTrafficPublisher brokerTrafficPublisher) {
         this.broker = broker;
-        this.adminLoggingService = adminLoggingService;
+        this.brokerTrafficPublisher = brokerTrafficPublisher;
         log.info("BrokerController initialized");
     }
 
@@ -57,72 +62,74 @@ public class BrokerController {
     public ResponseEntity<ServiceResponseBody> submitRequest(
             @RequestBody(required = false) ServiceRequest v1Request) {
         log.debug("Received request: {}", v1Request);
+        Instant start = Instant.now();
+        ServiceRequest legacyRequest = null;
+        ServiceResponse<?> legacyResponse = null;
 
-        // Handle null request
-        if (v1Request == null) {
-            ServiceResponse<?> legacyResponse = ServiceResponse.error(
-                    java.util.List.of(java.util.Map.of("code", "invalid_request", "message", "Request body is null")),
-                    "null");
+        try {
+            if (v1Request == null) {
+                legacyResponse = ServiceResponse.error(
+                        java.util.List.of(java.util.Map.of("code", "invalid_request", "message", "Request body is null")),
+                        "null");
+                ServiceResponseBody response = ServiceResponseBody.fromLegacy(legacyResponse);
+                publishTrafficEvent(start, null, legacyResponse, response.isOk(), 400, null);
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            legacyRequest = new ServiceRequest(
+                    v1Request.getService(),
+                    v1Request.getOperation(),
+                    v1Request.getParams(),
+                    v1Request.getRequestId());
+
+            if (Objects.nonNull(v1Request.isEncrypt()) && v1Request.isEncrypt()) {
+                legacyRequest.setEncrypt(v1Request.isEncrypt());
+            }
+
+            legacyResponse = broker.submit(legacyRequest);
+
             ServiceResponseBody response = ServiceResponseBody.fromLegacy(legacyResponse);
-            return ResponseEntity.badRequest().body(response);
-        }
+            int httpStatus = response.isOk() ? 200 : 400;
+            publishTrafficEvent(start, legacyRequest, legacyResponse, response.isOk(), httpStatus, null);
 
-        // Convert v1 request to legacy request for Broker processing
-        ServiceRequest legacyRequest = new ServiceRequest(
-                v1Request.getService(),
-                v1Request.getOperation(),
-                v1Request.getParams(),
-                v1Request.getRequestId());
+            log.debug("Returning: {}", response);
 
-        if (Objects.nonNull(v1Request.isEncrypt()) && v1Request.isEncrypt()) {
-            legacyRequest.setEncrypt(v1Request.isEncrypt());
-        }
-
-        // Log the request before processing it
-        UUID logId = null;
-        String userId = extractUserId(v1Request);
-        // try {
-        // var logEntry = adminLoggingService.logRequest(legacyRequest, userId);
-        // if (logEntry != null) {
-        // logId = logEntry.getId();
-        // }
-        // } catch (Exception e) {
-        // log.error("Error logging request: {}", e.getMessage(), e);
-        // }
-
-        ServiceResponse<?> legacyResponse = broker.submit(legacyRequest);
-
-        // Convert legacy response to v1 response
-        ServiceResponseBody response = ServiceResponseBody.fromLegacy(legacyResponse);
-
-        // Update the log entry with success/failure status
-        // if (logId != null) {
-        // adminLoggingService.updateLogEntry(logId, response.isOk(),
-        // response.isOk() ? null : extractErrorMessage(response));
-        // }
-
-        log.debug("Returning: {}", response);
-
-        if (response.isOk()) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+            if (response.isOk()) {
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (RuntimeException e) {
+            publishTrafficEvent(start, legacyRequest != null ? legacyRequest : v1Request, legacyResponse, false, 500, e.getMessage());
+            throw e;
         }
     }
 
-    private String extractUserId(com.aibizarchitect.nexus.v1.broker.api.ServiceRequest request) {
-        // Extract userId from request. This could come from a header, or be extracted
-        // from security context
-        // For now, using a default value, but in a real application, this would come
-        // from authentication
-        return "anonymous";
-    }
+    private void publishTrafficEvent(
+            Instant start,
+            ServiceRequest request,
+            ServiceResponse<?> response,
+            boolean ok,
+            int httpStatus,
+            String errorMessage) {
+        String requestId = request != null ? request.getRequestId() : (response != null ? response.getRequestId() : null);
+        String service = request != null ? request.getService() : (response != null ? response.getService() : null);
+        String operation = request != null ? request.getOperation() : (response != null ? response.getOperation() : null);
+        long durationMs = Math.max(0L, Duration.between(start, Instant.now()).toMillis());
 
-    private String extractErrorMessage(ServiceResponseBody response) {
-        // Extract error message from response
-        if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-            return response.getErrors().toString();
+        brokerTrafficPublisher.publish(new BrokerTrafficEvent(
+                UUID.randomUUID().toString(),
+                Instant.now().toString(),
+                durationMs,
+                requestId,
+                service,
+                operation,
+                ok,
+                httpStatus,
+                LOG_SOURCE,
+                request,
+                response,
+                errorMessage));
+
         }
-        return "Unknown error occurred";
     }
-}
