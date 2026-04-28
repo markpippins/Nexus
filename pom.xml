@@ -7,6 +7,8 @@
   <packaging>pom</packaging>
   <modules>
     <module>java</module>
+    <module>spring/service-broker</module>
+    <module>spring/service-registry</module>
   </modules>
   <properties>
     <maven.compiler.source>11</maven.compiler.source>
