@@ -1,4 +1,4 @@
-package com.aibizarchitect.nexus.broker.gateway.service;
+package com.aibizarchitect.nexus.v1.spring.broker.gateway.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

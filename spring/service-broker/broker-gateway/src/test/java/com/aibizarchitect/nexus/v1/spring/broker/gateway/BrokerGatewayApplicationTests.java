@@ -1,4 +1,4 @@
-package com.aibizarchitect.nexus.broker.gateway;
+package com.aibizarchitect.nexus.v1.spring.broker.gateway;
 // package com.aibizarchitect.gateway;
 //
 // import org.junit.jupiter.api.Test;

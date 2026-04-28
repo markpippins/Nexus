@@ -1,4 +1,4 @@
-package com.aibizarchitect.nexus.broker.gateway.service;
+package com.aibizarchitect.nexus.v1.spring.broker.gateway.service;
 
 import com.aibizarchitect.nexus.v1.spring.broker.gateway.service.ExternalServiceInvokerImpl;
 import com.aibizarchitect.nexus.v1.spring.broker.gateway.service.ServiceDiscoveryClientImpl;
