@@ -1,3 +1,4 @@
+
 # HTML Importer — Conceptual Ingestion Layer
 
 ## Purpose
@@ -253,25 +254,25 @@ This ensures that:
 ### Valid Ingestion Use Cases
 
 1. **Importing technical documentation**
-   
+
    - Convert docs to clean artifacts
    - Preserve hierarchy and code examples
    - Allow downstream systems to index
 
 2. **Ingesting articles and blog posts**
-   
+
    - Extract main content
    - Remove ads and sidebars
    - Create semantic snapshots
 
 3. **Processing web-based learning materials**
-   
+
    - Preserve structure
    - Maintain logical flow
    - Support knowledge construction
 
 4. **Archiving web content**
-   
+
    - Create time-independent records
    - Remove presentation noise
    - Ensure reproducibility
@@ -457,7 +458,6 @@ It remains true to:
 - Deterministic processing
 - Cognitive signal preservation
 - One-way information flow
-
 
 The importer transforms **documents** into **processable material**.
 

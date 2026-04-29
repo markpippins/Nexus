@@ -22,7 +22,7 @@ We will expand the Nexus Interaction Reasoning Layer (IRL) taxonomy to natively 
 
 We will implement the structural verification required to graduate a semantic declaration into an actual closure state.
 
-#### [MODIFY] [graph_models.py](file:///c:/dev/nexus/python/ingest/html_importer/graph_models.py)
+#### [MODIFY] [graph_models.py](file:///c:/dev/nexus/python/ingest/html-importer/graph_models.py)
 *Introduce `CompletionCandidate` and validated `Closure` status inside our Reconstructed graphs*:
 - Map "Objectives" cleanly onto `ReconstructedTrajectory` (since Trajectories represent goal arcs). 
 - Add a new validation property: `completion_candidate: bool = False` inside `ReconstructedClosureSet` (representing the Stage 2 structural check).
@@ -30,7 +30,7 @@ We will implement the structural verification required to graduate a semantic de
 
 ### Layer C (Execution Pipeline Validation)
 
-#### [MODIFY] [replay_kernel.py](file:///c:/dev/nexus/python/ingest/html_importer/replay_kernel.py)
+#### [MODIFY] [replay_kernel.py](file:///c:/dev/nexus/python/ingest/html-importer/replay_kernel.py)
 *Dynamically calculate `CompletionCandidate` status:*
 - Modify the Replay Engine so that when generating a `ReconstructedClosureSet`, it checks:
   1. No `OPEN` constraint nodes remain mapped inside the closure.
@@ -38,7 +38,7 @@ We will implement the structural verification required to graduate a semantic de
   3. No pending mutations/unresolved Questions.
 - If true, flip `closure.completion_candidate = True`.
 
-#### [MODIFY] [execution_gate.py](file:///c:/dev/nexus/python/ingest/html_importer/execution_gate.py) // IF REQUIRED
+#### [MODIFY] [execution_gate.py](file:///c:/dev/nexus/python/ingest/html-importer/execution_gate.py) // IF REQUIRED
 - Adjust Layer C gating if necessary so that any downstream action attempting to officially mark an Objective "Completed" strictly requires `CompletionCandidate == True`. 
 
 ## Open Questions

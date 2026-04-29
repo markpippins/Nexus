@@ -75,7 +75,7 @@ def collect_html_files(path: Path) -> list[Path]:
     if path.is_file():
         if path.suffix.lower() in (".html", ".htm", ".md", ".markdown"):
             return [path]
-        print(f"[html_importer] Skipping unsupported file: {path}", file=sys.stderr)
+        print(f"[html-importer] Skipping unsupported file: {path}", file=sys.stderr)
         return []
 
     if path.is_dir():
@@ -94,7 +94,7 @@ def collect_html_files(path: Path) -> list[Path]:
                 deduped.append(f)
         return deduped
 
-    print(f"[html_importer] Path not found: {path}", file=sys.stderr)
+    print(f"[html-importer] Path not found: {path}", file=sys.stderr)
     return []
 
 
@@ -157,7 +157,7 @@ def main() -> None:
     html_files = collect_html_files(target)
 
     if not html_files:
-        print(f"[html_importer] No HTML files found at: {target}", file=sys.stderr)
+        print(f"[html-importer] No HTML files found at: {target}", file=sys.stderr)
         sys.exit(1)
 
     results: list[tuple[Path, list[NormalizedMessage], ConversationMetadata]] = []
@@ -304,7 +304,7 @@ def main() -> None:
             json_str = json.dumps(graphs_json, indent=2, ensure_ascii=False)
             if args.output:
                 Path(args.output).write_text(json_str, encoding="utf-8")
-                print(f"[html_importer] JSON written to {args.output}", file=sys.stderr, flush=True)
+                print(f"[html-importer] JSON written to {args.output}", file=sys.stderr, flush=True)
             else:
                 print(json_str, flush=True)
                 
@@ -314,11 +314,11 @@ def main() -> None:
             json_str = json.dumps(output, indent=2, ensure_ascii=False)
             if args.output:
                 Path(args.output).write_text(json_str, encoding="utf-8")
-                print(f"[html_importer] JSON written to {args.output}", file=sys.stderr, flush=True)
+                print(f"[html-importer] JSON written to {args.output}", file=sys.stderr, flush=True)
             else:
                 print(json_str, flush=True)
         else:
-            print(f"[html_importer] Processing {len(html_files)} file(s) from: {target}", flush=True)
+            print(f"[html-importer] Processing {len(html_files)} file(s) from: {target}", flush=True)
             print("=" * 80, flush=True)
             total_messages = 0
             for filepath, messages, metadata in results:
@@ -337,7 +337,7 @@ def main() -> None:
                     print(msg, flush=True)
 
             print("=" * 80, flush=True)
-            print(f"[html_importer] Done. Total: {total_messages} message(s) from {len(html_files)} file(s).", flush=True)
+            print(f"[html-importer] Done. Total: {total_messages} message(s) from {len(html_files)} file(s).", flush=True)
 
 
 if __name__ == "__main__":

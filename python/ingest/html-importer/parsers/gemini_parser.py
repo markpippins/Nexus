@@ -34,7 +34,7 @@ class GeminiParser(BaseParser):
 
     def parse(self, soup: BeautifulSoup | None, source_path: Path, metadata: ConversationMetadata) -> list[NormalizedMessage]:
         print(
-            f"[html_importer] GeminiParser.parse() called for {source_path.name} "
+            f"[html-importer] GeminiParser.parse() called for {source_path.name} "
             f"— not yet implemented.",
             flush=True,
         )

@@ -7,7 +7,7 @@ We've completely committed to the **Registry + Relationship Graph** (ECS/Compile
 ## Accomplished Work
 
 1. **New Flat Model Module Created**
-   Created [graph_models.py](file:///c:/dev/nexus/python/ingest/html_importer/graph_models.py) utilizing standard Python `dataclasses` (matching the Cognitive Internal Graph layer principles you defined).
+   Created [graph_models.py](file:///c:/dev/nexus/python/ingest/html-importer/graph_models.py) utilizing standard Python `dataclasses` (matching the Cognitive Internal Graph layer principles you defined).
 2. **ConversationGraph Designed as a Registry**
    Implemented dict-based registries (e.g. `messages: Dict[str, MessageNode]`, `concepts: Dict[str, Concept]`) inside `ConversationGraph`, optimizing it for identity-guaranteed references that won't break during merges or exports.
 3. **Preamble and Validation Testing**

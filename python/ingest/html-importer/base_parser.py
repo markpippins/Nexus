@@ -304,7 +304,7 @@ def detect_and_parse(
             metadata.export_source = parser.source_name
             messages = parser.parse(soup, source_path, metadata)
             print(
-                f"[html_importer] Detected source: {parser.source_name} "
+                f"[html-importer] Detected source: {parser.source_name} "
                 f"({len(messages)} messages from {source_path.name})",
                 file=sys.stderr,
                 flush=True,
@@ -318,7 +318,7 @@ def detect_and_parse(
         create_time=file_ts.value,
     )
     print(
-        f"[html_importer] WARNING: No parser could handle {source_path.name}",
+        f"[html-importer] WARNING: No parser could handle {source_path.name}",
         file=sys.stderr,
         flush=True,
     )
@@ -338,7 +338,7 @@ def detect_and_parse_md(
             metadata.export_source = parser.source_name
             messages = parser.parse(None, source_path, metadata)
             print(
-                f"[html_importer] Detected source: {parser.source_name} "
+                f"[html-importer] Detected source: {parser.source_name} "
                 f"({len(messages)} messages from {source_path.name})",
                 file=sys.stderr,
                 flush=True,
@@ -351,7 +351,7 @@ def detect_and_parse_md(
         create_time=file_ts.value,
     )
     print(
-        f"[html_importer] WARNING: No parser could handle {source_path.name}",
+        f"[html-importer] WARNING: No parser could handle {source_path.name}",
         file=sys.stderr,
         flush=True,
     )

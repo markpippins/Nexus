@@ -94,6 +94,7 @@ ConversationMetadata {
 ## Output examples
 
 ### Console
+
 ```
 --------------------------------------------------------------------------------
 [Turn 0] user (2026-04-10T02:06:50+00:00 (low, from file_metadata))
@@ -103,6 +104,7 @@ ConversationMetadata {
 ```
 
 ### JSON
+
 ```json
 {
   "files": [
@@ -167,7 +169,7 @@ class ClaudeParser(BaseParser):
         ...
 ```
 
-2. Import it in `parsers/__init__.py`:
+1. Import it in `parsers/__init__.py`:
 
 ```python
 from parsers.claude_parser import ClaudeParser  # noqa: F401
@@ -178,7 +180,7 @@ The `@register_parser` decorator handles discovery automatically — no changes 
 ## Project structure
 
 ```
-html_importer/
+html-importer/
 ├── main.py               # CLI entry point
 ├── models.py             # NormalizedMessage, TimestampInfo, ConversationMetadata
 ├── base_parser.py        # Strategy pattern (BaseParser + registry)

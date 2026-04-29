@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 from parsers.opencode_parser import OpenCodeParser
 from models import ConversationMetadata
 
-sample_path = Path("c:/dev/nexus/python/ingest/html_importer/samples/OpenCode TypeSpec Refactor.html")
+sample_path = Path("c:/dev/nexus/python/ingest/html-importer/samples/OpenCode TypeSpec Refactor.html")
 with open(sample_path, "r", encoding="utf-8") as f:
     soup = BeautifulSoup(f, "html.parser")
 

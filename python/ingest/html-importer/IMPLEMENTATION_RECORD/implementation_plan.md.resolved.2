@@ -10,11 +10,11 @@ This plan outlines the creation of the multi-pass compilation layer for Nexus, t
 
 ## Proposed Changes
 
-### `html_importer`
+### `html-importer`
 
 We will introduce a new pipeline phase that sits between parsing and finalizing the internal `ConversationGraph`.
 
-#### [NEW] [graph_builder.py](file:///c:/dev/nexus/python/ingest/html_importer/graph_builder.py)
+#### [NEW] [graph_builder.py](file:///c:/dev/nexus/python/ingest/html-importer/graph_builder.py)
 
 We will create a multi-pass `GraphBuilder` object containing strict deterministic stage mutations:
 
@@ -85,7 +85,7 @@ class GraphBuilder:
     # (Private naive extraction logic) ...
 ```
 
-#### [MODIFY] [main.py](file:///c:/dev/nexus/python/ingest/html_importer/main.py)
+#### [MODIFY] [main.py](file:///c:/dev/nexus/python/ingest/html-importer/main.py)
 
 We will refactor standard scripting to adopt a clean Compiler Pipeline methodology. 
 ```python

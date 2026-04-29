@@ -11,11 +11,11 @@ This plan outlines the creation of the Phase 2 core data models (ConversationGra
 
 ## Proposed Changes
 
-### `html_importer`
+### `html-importer`
 
 We will create a new Python module to house the conversation graph models. This keeps the Phase 1 transcript ingestion (`models.py`) decoupled from the Phase 2 graph construction algorithms.
 
-#### [NEW] [graph_models.py](file:///c:/dev/nexus/python/ingest/html_importer/graph_models.py)
+#### [NEW] [graph_models.py](file:///c:/dev/nexus/python/ingest/html-importer/graph_models.py)
 
 We will introduce the following `dataclass` based entities:
 

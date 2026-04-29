@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 import sys
 
-with open("c:/dev/nexus/python/ingest/html_importer/samples/OpenCode TypeSpec Refactor.html", "r", encoding="utf-8") as f:
+with open("c:/dev/nexus/python/ingest/html-importer/samples/OpenCode TypeSpec Refactor.html", "r", encoding="utf-8") as f:
     soup = BeautifulSoup(f, "html.parser")
 
 turns = soup.find_all(attrs={"data-component": "session-turn"})
