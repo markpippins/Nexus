@@ -1,0 +1,116 @@
+# Phase 2: Conversation Graph Data Model Implementation
+
+This plan introduces Phase 2 core data models (`ConversationGraph`, `MessageNode`, `Trajectory`, `Interruption`, `PEO`) using an ECS / Compiler IR architecture. Objects are stored flat in an Object Registry, and relationships define their connections.
+
+## Approved Architecture
+
+The design follows a rigid split in responsibilities:
+1. **Internal Graph Model**: Uses `dataclasses` for fluid, fast, mutation-friendly graph operations.
+2. **External Boundary Layer**: (Phase 1/I-O) Uses `pydantic` (for future boundary layers), while the core graph relies on `dataclasses`.
+
+The Root container (`ConversationGraph`) acts strictly as an Identity & Lookup registry. It does not own meaning; meaning lives in the `relationships` list.
+
+## Proposed Changes
+
+### `html_importer`
+
+Create `graph_models.py` for the core dataclasses, completely decoupled from Phase 1 transcript ingestion (`models.py`).
+
+#### [NEW] [graph_models.py](file:///c:/dev/nexus/python/ingest/html_importer/graph_models.py)
+
+```python
+from dataclasses import dataclass, field
+from typing import Optional, Literal, List, Dict, Any
+
+TrajectoryState = Literal["active", "suspended", "resumed", "stable", "closed"]
+
+@dataclass
+class Relationship:
+    source_id: str
+    target_id: str
+    relation_type: str
+    confidence: float
+
+@dataclass
+class MessageNode:
+    id: str
+    text: str
+    embedding: Optional[List[float]] = None
+    trajectoryId: Optional[str] = None
+    peoIds: List[str] = field(default_factory=list)
+
+@dataclass
+class Trajectory:
+    id: str
+    anchorMessage: str  
+    state: TrajectoryState
+    confidence: float
+    messages: List[str] = field(default_factory=list) 
+
+@dataclass
+class Interruption:
+    id: str
+    type: str 
+    messageId: str
+    suspendsTrajectory: bool
+
+@dataclass
+class PEO:  
+    id: str
+    originMessage: str
+    proposal: str
+    trajectoryId: str
+    status: str 
+    decayScore: float
+
+@dataclass
+class Concept:
+    id: str
+    name: str
+    description: Optional[str] = None
+
+@dataclass
+class Speaker:
+    id: str
+    name: str
+
+@dataclass
+class Conversation:
+    id: str
+    title: Optional[str] = None
+
+@dataclass
+class GraphIndexes:
+    # Future placeholder for inverse lookups (e.g. trajectory_to_messages)
+    pass
+
+@dataclass
+class ConversationGraph:
+    """Root container for a conversation's graph structure acting as an object registry."""
+    id: str
+    
+    # Object Registries
+    messages: Dict[str, MessageNode] = field(default_factory=dict)
+    conversations: Dict[str, Conversation] = field(default_factory=dict)
+    speakers: Dict[str, Speaker] = field(default_factory=dict)
+    concepts: Dict[str, Concept] = field(default_factory=dict)
+    trajectories: Dict[str, Trajectory] = field(default_factory=dict)
+    interruptions: Dict[str, Interruption] = field(default_factory=dict)
+    peos: Dict[str, PEO] = field(default_factory=dict)
+    artifacts: Dict[str, Any] = field(default_factory=dict) # Placeholder for artifacts
+
+    # Relationship Graph
+    relationships: List[Relationship] = field(default_factory=list)
+
+    # Indexes
+    indexes: GraphIndexes = field(default_factory=GraphIndexes)
+```
+
+## Verification Plan
+
+### Automated Tests
+- Import test to ensure `graph_models.py` can be read properly and object instantiations succeed without cyclic or recursion issues.
+- Basic linting checks via Python standard syntax checks parsing.
+
+### Manual Verification
+Ensure models precisely reflect the ECS / separate identity vs meaning architecture discussed.

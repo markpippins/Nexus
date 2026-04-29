@@ -1,0 +1,51 @@
+# Phase 6a: Context Assembler Architecture (Invariant Validation)
+
+Before writing the Context Assembler logic, we must prove the invariant constraint: **Does WorkingSet construction remain invariant under cross-trajectory Observation injection?**
+
+## Invariant Proof: YES
+
+For the Context Assembler to reintroduce "semantic bleed," it would have to make interpretive decisions (e.g. guessing which trajectory has a better or more recent observation). Because our `Observation` primitives are exclusively generated from structural diff mappings across deterministic state boundaries, `WorkingSet` construction is simply an **associative set-filtering operation**.
+
+Given `Workspace(T, O, Q)` where `T`=Trajectories, `O`=Observations, `Q`=Questions:
+- The execution order of trajectory processing does not matter.
+- Merging structural observations `O_1` and `O_2` evaluates deterministically (`O_1 ∪ O_2 = O_2 ∪ O_1`).
+- Therefore, slicing operations bound over these properties remain **structurally invariant**.
+
+## Proposed Architecture Context Assembler
+
+### 1. WorkingSet Schema (in `workspace.py`)
+```python
+from dataclasses import dataclass, field
+from typing import List, Dict
+
+@dataclass
+class WorkingSet:
+    workspace_id: str
+    active_trajectories: List[str] = field(default_factory=list)
+    unresolved_questions: List[str] = field(default_factory=list)
+    promoted_concepts: List[str] = field(default_factory=list)
+    excluded_concepts: List[str] = field(default_factory=list)
+```
+
+### 2. ContextAssembler Subsystem (`context_assembler.py`)
+This represents a purely structural **Compression Interaction** (per our new taxonomy). It reduces the `WorkspaceGraph` footprint into targeted states losslessly.
+
+**Deterministic Filtering Rules:**
+1. **Active Paths:** Any `ReconstructedTrajectory` mapping `state ∈ ["active", "resumed"]`.
+2. **Epistemic Debt:** Any `QuestionNode` mapping `status ∈ ["OPEN", "PARTIALLY_RESOLVED"]`.
+3. **Observation-Driven Concept Promotion:**
+   - If a Concept `cid` is targeted by a `SUPPORTS` or `REINTRODUCES` observation globally → injects into `promoted_concepts`.
+   - If `cid` is targeted by `CONTRADICTS` observation and NOT offset by an equal overriding trajectory → injected into `excluded_concepts` (or just pruned).
+
+## User Review Required
+
+> [!WARNING]
+> How should we define deterministic precedence if cross-trajectory Observations conflict?
+
+If Trajectory A generates a `SUPPORTS` observation for Concept X, and Trajectory B generates a `CONTRADICTS` observation for Concept X (e.g., they drifted apart logically):
+
+When the `ContextAssembler` compresses this Workspace into a single `WorkingSet` for the upcoming Decision Engine layer, how should that conflict be deterministically handled while maintaining invariance?
+1. **Symmetric Contradiction**: Both trajectories are valid, therefore Concept X is promoted into a new explicit queue (e.g., `conflict_concepts`).
+2. **Pessimistic Nullification**: If any contradiction exists, the concept is stripped from `promoted_concepts` because its epistemic reality is unstable. 
+
+Does adding a strict `conflict_concepts` queue appropriately map to your vision of exposing unresolved epistemic diffs into the WorkingSet context without assuming semantic dominance?

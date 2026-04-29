@@ -1,0 +1,44 @@
+# Implementation Plan: Semantic Conflict Classification
+
+This plan introduces semantic operation types (Read/Write domains) to resolve causal timeline synthesis conflicts via algebraic classification (`STRUCTURAL`, `VALUE`, `NONE`), moving away from brute-force overlap detection.
+
+## Proposed Changes
+
+### 1. Developer Specification Documentation
+- **[NEW] `layer_u_conflict_classifier_prompt.md`**: Maps out the 3-level conflict hierarchy and definitions for read-set vs write-set intersections.
+
+### 2. Instruction Impact Definitions
+- **[MODIFY] `graph_models.py`**:
+  - Replace `get_write_set()` with an `InstructionImpact` model.
+  ```python
+  class ConflictType(Enum):
+      NONE = "NONE"
+      VALUE = "VALUE"
+      STRUCTURAL = "STRUCTURAL"
+
+  @dataclass
+  class InstructionImpact:
+      read_set: Set[str]
+      write_set: Set[str]
+      effect_type: str  # "structural" | "value"
+  ```
+  - Map specific primitives to `impact(self) -> InstructionImpact`. For example, `SetProperty` reads `{"node:N"}` and writes `{"node:N:prop:K"}` with a `"value"` effect. `DeleteNode` reads `{"node:N"}`, writes `{"node:N"}` with a `"structural"` effect.
+
+### 3. Conflict Classifier Algebra
+- **[MODIFY] `nexus_merge.py`**:
+  - Implement a `ConflictClassifier` object that evaluates `classify(a, b)`:
+    - Analyzes $Write_A \cap Write_B$. If both effects are `"value"`, returns `VALUE`. If either is `"structural"`, returns `STRUCTURAL`.
+    - Analyzes $Write_A \cap Read_B$. If $A$ executes a `"structural"` write on data that $B$ reads (e.g. A deletes a node that B mutates), it returns `STRUCTURAL`.
+  - Update `ConceptMergeEngine.merge(A, B)` to build resolved output pipelines.
+    - If `STRUCTURAL` conflicts exist, `MergeConflictException` is raised immediately.
+    - If `VALUE` conflicts exist, delegate them to `resolve_value_conflicts()`. (For this MVP, we can configure a simplistic fallback rule like returning a rejection until formal policy resolution handlers are constructed).
+
+### 4. Validation Testing
+- **[MODIFY] `test_kernel_determinism.py`**:
+  - **`test_merge_structural_conflict`**: A deletes node N, B sets property on node N. Engine throws `STRUCTURAL` exception because $Write_{A} \cap Read_{B}$ triggers a structural dependency violation.
+  - **`test_merge_value_conflict_detected`**: A sets `val=1`, B sets `val=2`. Engine correctly isolates the `VALUE` conflict state.
+  - **`test_merge_orthogonal_safe`**: A edits node M, B edits node N. Engine clears as `NONE` and synthesizes the correct sequence.
+
+## Open Questions
+> [!IMPORTANT]
+> For `VALUE` conflicts, would you prefer the `resolve_value_conflicts` method to temporarily escalate to a `MergeConflictException` alongside `STRUCTURAL` conflicts for this iteration, or should I implement a basic primitive aggregator (e.g., configuring an optional target `strategy="LWW"`) as a proof of concept?

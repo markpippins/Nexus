@@ -1,0 +1,27 @@
+# Implement Trajectory FSM Pipeline
+
+This plan maps your explicit Finite State Machine logic into the Nexus Event-Sourced Compiler, fully cementing `Trajectory` as the singular lifecycle truth while aligning Layer C perfectly as the execution arbiter.
+
+## Proposed Changes
+
+### [MODIFY] [graph_models.py](file:///c:/dev/nexus/python/ingest/html_importer/graph_models.py)
+*Formalize and enforce the strict FSM on `Trajectory` natively.*
+- Update `TrajectoryState` Literal to exactly match: `"ACTIVE" | "BLOCKED" | "INTERMEDIATE" | "PAUSED" | "CLOSED" | "ABORTED"`.
+- Update the default `state` in `ReconstructedTrajectory` to `"ACTIVE"`.
+- Modify the `transition()` method inside `ReconstructedTrajectory` to mathematically log invalid state shifts (e.g. attempting to close a BLOCKED trajectory without resolving) or raise structural violations. 
+
+### [MODIFY] [replay_kernel.py](file:///c:/dev/nexus/python/ingest/html_importer/replay_kernel.py) & [context_assembler.py](file:///c:/dev/nexus/python/ingest/html_importer/context_assembler.py)
+*Drive FSM state updates dynamically alongside envelope accumulation.*
+- If envelope introduces a `CONSTRAINT_INJECTION` emitting an `OPEN` constraint of critical type -> enforce `ACTIVE -> BLOCKED`.
+- If an envelope introduces an `INTERMEDIATE_EXECUTION_STATE` semantic flag -> enforce `ACTIVE -> INTERMEDIATE`.
+- If previously OPEN critical constraints are logged as `SATISFIED` on the trajectory -> enforce `BLOCKED -> ACTIVE`.
+
+### [MODIFY] [execution_gate.py](file:///c:/dev/nexus/python/ingest/html_importer/execution_gate.py)
+*Update Layer C gating parameters strictly to evaluation of explicit state transitions rather than pure execution limits.*
+- Make sure `project_objective_completion` inherently relies on the strict FSM state (`trajectory.state == "CLOSED"`).
+- (Optionally) Expand Layer C so that instead of just "APPROVE/REJECT", its execution output maps neatly confirming transition permissibility (e.g., whether `ACTIVE -> CLOSED` bounds are satisfied, or if `ACTIVE -> INTERMEDIATE` is authorized for OpenCode sandbox flows).
+
+## User Review Required
+> [!WARNING]
+> Because Layer C acts as a deterministic policy gate operating *over* structure, should we update `ExecutionEligibilityGate.evaluate()` to proactively accept the *requested* transition as an input parameter? 
+> **For example:** `layer_c.evaluate_transition(view, target_state="CLOSED")`. This means upstream processes query Layer C specifically mapping "Can I transition my trajectory to CLOSED based on this view?", and Layer C mathematically authorizes or rejects that transition rule.

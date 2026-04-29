@@ -1,0 +1,52 @@
+# Phase 3.5: Graph Validation Layer
+
+This phase introduces a compiler-like validation layer (`GraphValidator`) to securely verify the structural integrity of the `ConversationGraph`. It acts as the final gatekeeper before allowing a generated graph forward as a "Trusted IR".
+
+## Proposed Changes
+
+### 1. New Module: `graph_validator.py`
+We will introduce `GraphValidator` configured to execute purely deterministic, read-only passes over a constructed `ConversationGraph`.
+
+It will implement:
+- `validate_identity()`: Ensures graph conservation (no missing nodes, no duplicates).
+- `validate_relationships()`: Ensures no orphan/invalid `source_id` or `target_id` references exist.
+- `validate_sequence()`: Validates that consecutive `NEXT` edges match timeline indexing. 
+- `validate_anchors()`: Ensures `RESPONDS_TO` relationships exclusively map an `assistant` source to a `user` target.
+- `validate_trajectories()`: Enforces anchor validity and bounding constraints on confidences (0 to 1).
+- `validate_concepts()`: Asserts concepts are populated, valid string structures, mapping to allowed schemas.
+
+### 2. Output Diagnostics
+We will update `main.py` so that, upon `.finalize()`, the graph routes straight into `GraphValidator(graph).validate()`.
+If errors are encountered, the compiler will abort the generation of the IR and output compiler-style logs:
+```
+[ERROR] INVALID_TARGET: msg_1029
+[ERROR] RESPONDS_TO mismatch: msg_1044 → assistant cannot point to assistant
+[WARN] ORPHAN_TRAJECTORY: traj_seed_22
+Validation failed: 2 errors, 1 warning
+```
+
+### 3. Unit Tests
+Introduce `test_graph_validator.py` which deliberately constructs corrupted graphs (e.g. broken relationships, missing messages, bad turn indices) and asserts the validator catches them.
+
+---
+
+## User Review Required
+
+> [!WARNING]
+> Please address the following detail regarding the linear `NEXT` check.
+
+### Validation of `NEXT` Edges vs. `turn_index`
+
+In your spec mapping, you mentioned: 
+> `if msg_i.turnIndex + 1 != msg_i+1.turnIndex: error`
+
+However, in Phase 1 (`models.py`), `turn_index` is defined as a shared value between a prompt and response pair:
+> `turn_index: int       # 0-based turn number (user+assistant pair share same turn)`
+
+This means a `user` message with `turn_index = 0` followed `NEXT` by an `assistant` message will *also* have `turn_index = 0`. 
+
+**Proposed Fallback Check**:
+Instead of `msg_i.turnIndex + 1`, I propose we assert that the `msg_i+1` turn index strictly grows logically (e.g. `msg_i+1.turn_index >= msg_i.turn_index`) or we validate chronological timestamps. Are you comfortable with me writing the sequence check to tolerate identical turn chunks for pairs?
+
+## Verification Plan
+We will write tests explicitly testing the compiler error engine on invalid structure arrays, guaranteeing it captures the rule-breaking cases efficiently.

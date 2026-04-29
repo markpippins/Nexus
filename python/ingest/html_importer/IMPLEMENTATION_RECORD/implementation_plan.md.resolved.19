@@ -1,0 +1,67 @@
+# Layer C: Execution Eligibility Gate
+
+This plan implements the **Execution Eligibility Gate** representing the absolute "last mile before action" explicitly enforcing policy logic separately from semantic structures mapping outputs safely cleanly bounding intent out from reality.
+
+## Proposed Architecture
+
+### 1. Gate Definitions (`execution_gate.py`)
+A standalone layer sitting strictly downstream of `ContextAssembler` and `ReplayEngine`. It consumes exclusively structured constraints verifying safety parameters securely.
+
+```python
+from typing import List, Dict, Any
+from graph_models import MaterializedReplayView, IR_EventEnvelope
+from dataclasses import dataclass
+
+@dataclass
+class ExecutionDecision:
+    authorized: bool
+    status: str # "REJECTED", "SANDBOX_ONLY", "APPROVAL_REQUIRED", "AUTHORIZED"
+    reasoning: List[str]
+
+class ExecutionEligibilityGate:
+    """Layer C: Policy enforcement strictly validating structured constraints safely."""
+    
+    def evaluate(self, view: MaterializedReplayView, envelopes: List[IR_EventEnvelope], environment: str) -> ExecutionDecision:
+        reasons = []
+        
+        # 1. Enforce Delegated Request Presence
+        # Traverse sequence checking if explicit delegated request was structurally surfaced natively
+        has_delegated_request = any(
+            InteractionArchetype.DELEGATED_REQUEST in env.archetypes 
+            # Note: This assumes DELEGATED_REQUEST was passed through Layer B into the Envelope
+            for env in envelopes
+        )
+        if not has_delegated_request:
+            return ExecutionDecision(False, "REJECTED", ["Missing explicit Delegated Request archetype flag."])
+
+        # 2. Assert No Active Unresolved Constraints 
+        # (Assuming Constraints are mapped as QuestionNodes or graph states explicitly mapped in WorkingSet/ConflictSet)
+        # 3. Environment Context
+        if environment == "production":
+            pass # Require tighter limits
+            
+        return ExecutionDecision(True, "AUTHORIZED", ["No guardrails violated."])
+```
+
+### 2. Integration (`main.py`)
+Appended rigidly at the literal end of the loop, completely severed from graph reconstruction parameters strictly ensuring outputs only evaluate over explicitly declared inputs stably mappings.
+
+```python
+        # Phase 6a: Extract final execution and epistemic boundaries 
+        from context_assembler import ContextAssembler
+        working_set, conflict_set = ContextAssembler(workspace).assemble()
+
+        # LAYER C: Execution Gate Verification checks purely projecting structure against constraints
+        from execution_gate import ExecutionEligibilityGate
+        decision = ExecutionEligibilityGate().evaluate(view, event_stream, "sandbox")
+        
+        # STOP execution mappings natively cleanly 
+```
+
+## User Review Required
+
+> [!CAUTION]
+> The `InteractionArchetype.DELEGATED_REQUEST` parameter must cross from the Semantics layer successfully into structural validation explicitly.
+
+1. **Archetype Crossing:** Currently, the `InteractionClassifier` labels structures using the deterministic 9 `InteractionArchetypes` (e.g. EXECUTION, CONSTRUCTION). `Delegated Request` is an IRL Semantic taxonomy archetype. Does `InteractionClassifier` also absorb these semantic tags as inputs to map onto the `IR_EventEnvelope`, or are IRL outputs tracked in a parallel `SemanticLabel` property?
+2. **Missing Constraint Identification:** You explicitly noted enforcing *"No unresolved ❗ constraints"*. Are these mapped natively in our current tracking logic as `status="OPEN"` `QuestionNodes` resolving across `ConflictSet`, or is there an explicit `Constraint` node type bounding requirements you'd like engineered?

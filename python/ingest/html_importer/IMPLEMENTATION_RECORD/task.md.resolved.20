@@ -1,0 +1,3 @@
+- [x] Implement `WorkingSet` and `ConflictSet` schemas deeply decoupled inside `workspace.py`, projecting completely isolated execution versus epistemic logic.
+- [x] Implement `context_assembler.py` isolating logic into parallel extraction functions: `extract_working_set()` scaling `ClosureSet(T)` natively, and `extract_conflict_set()` mapping unresolved observances natively avoiding bleed.
+- [x] Hook `ContextAssembler` components structurally mapping directly natively inside the pipeline limits in `main.py`.

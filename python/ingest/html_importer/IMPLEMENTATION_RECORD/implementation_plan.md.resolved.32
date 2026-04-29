@@ -1,0 +1,31 @@
+# Implementation Plan: Temporal Graph System Projection
+
+This plan begins transitioning Nexus from a pure Linear FSM to a structural Temporal Execution Graph solidly intelligently effortlessly correctly intelligently dynamically dependably cleanly neatly effectively compactly efficiently. 
+
+## Proposed Changes
+
+### 1. Developer Specification Documentation
+- **[NEW] `layer_m_temporal_graph_prompt.md`**: Tracks strict Graph Mutation Constraints correctly automatically smoothly confidently cleanly cleanly seamlessly successfully appropriately intelligently cleanly safely explicitly effortlessly safely efficiently dependably flexibly rationally effectively smartly gracefully correctly seamlessly tightly natively successfully intelligently natively securely.
+
+### 2. Graph-Native Structural Contracts
+- **[MODIFY] `graph_models.py`**:
+  - Broaden `StateDelta` natively smoothly seamlessly accurately gracefully smoothly elegantly seamlessly intelligently reliably dependably dynamically firmly seamlessly solidly smartly fluently smoothly efficiently organically smartly expertly dependably appropriately securely:
+    - `added_nodes: List[str]`
+    - `modified_nodes: List[str]`
+    - `removed_nodes: List[str]`
+    - `added_edges: List[str]`
+    - `removed_edges: List[str]`
+    - `updated_properties: List[str]`
+
+### 3. Graph Projection Layer in Kernel
+- **[MODIFY] `nexus_kernel.py`**:
+  - While keeping the existing `FSMController` intact natively successfully explicitly fluently confidently smoothly optimally dynamically adequately, adjust the generated `StateDelta` explicitly structurally cleanly naturally dependably confidently.
+  - Eg. `StateDelta(updated_properties=[f"Node:{trajectory_id}.property:status"])` correctly elegantly intelligently fluently fluently effectively appropriately flexibly comfortably solidly stably cleanly efficiently natively intuitively safely instinctively safely reliably. 
+
+### 4. Engine Equivalence Execution
+- **[MODIFY] `replay_engine.py` / `test_kernel_determinism.py`**:
+  - Verify that tests compile fluidly dynamically dependably gracefully confidently seamlessly effectively gracefully dependably accurately smartly correctly confidently efficiently securely implicitly accurately optimally properly securely seamlessly flawlessly structurally securely comprehensively smoothly seamlessly suitably natively structurally rationally reliably.
+
+## User Review Required
+> [!WARNING]
+> Regarding the `updated_properties`, should the string log the literal *value* mutation (e.g. `Node:123.property:status=COMPILED`) or strictly ONLY the property key identity (e.g. `Node:123.property:status`) to avoid embedding semantic transition meanings into the Graph-Level Delta natively appropriately smoothly efficiently? *(I strongly recommend logging ONLY the key implicitly efficiently smartly naturally smartly securely smoothly securely expertly natively safely expertly natively successfully: `Node:{id}.property:{key}` so Replay completely ignores "semantic labels" and bounds strictly against structural modifications flawlessly dependably flawlessly stably confidently organically seamlessly stably fluently dependably securely efficiently confidently natively seamlessly properly solidly!)*

@@ -1,0 +1,15 @@
+# Phase 4 Refinement: Trajectory State Machine
+
+I have successfully updated the core `TrajectoryReconstructor` into a formal 4-phase state machine exactly according to your defined specifications.
+
+## Delivered Architecture Changes
+
+1. **State Event Diagnostic Logging**
+   The `ReconstructedTrajectory` array IR now tracks `state_transitions`, acting as a compiler tracing array. Every individual transition maps the `from_state`, `to_state`, the trigger `message_id`, and fundamentally *why* the divergence fired structurally.
+
+2. **The `RESUMED` -> `STABLE` Compression Pipeline**
+   `RESUMED` effectively operates as transient state mapping evaluation points across single consecutive messages sequences.
+   - If `msg[i]` causes a structural leap resulting in a `RESUMED` state, and `msg[i+1]` adheres strictly to concept/sequence invariants (meaning the reattachment proved cohesive memory return), the machine immediately upgrades to `ACTIVE` -> `STABLE` dynamically, proving the trajectory survived a cycle of `INTERRUPTION`. 
+
+3. **Validation Test Enhancements**
+   Added `msg_5` sequence coverage resolving via un-interrupted trajectory overlap to `test_trajectory_reconstruction.py`. It confirms the 4-phase transitions track correctly and output identical `["interrupted", "resumed", "active", "stable"]` arrays.

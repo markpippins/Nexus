@@ -1,0 +1,3 @@
+- [x] Modify `graph_models.py` to add `schema_version` to `IR_EventEnvelope` and introduce versioned materialized views preventing state overwrites natively tracking `ReplayRun` boundaries.
+- [x] Build `replay_kernel.py` with `SchemaRegistry` holding pure reduction interpreters (V1). Execute deterministic reconstruction over envelopes generating `ReconstructedClosureSet` natively.
+- [x] Rewrite `main.py` pipeline connecting `ReplayEngine` directly against the execution stream correctly avoiding single mutable fields.

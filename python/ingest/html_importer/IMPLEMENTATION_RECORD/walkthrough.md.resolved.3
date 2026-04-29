@@ -1,0 +1,22 @@
+# Phase 3.5: Validation Layer Implementation
+
+I've successfully introduced the deterministic Graph Validator architecture you requested!
+
+## Invariants Met
+
+1. **Identity Pre-checks**: 
+   The nodes `id` arrays are confirmed via global length parity checks to rule out exact duplicates and orphan IDs right out of the gate.
+2. **Relationships Verification**: 
+   Ensures that no graph node relationship edge (`target_id` or `source_id`) maps to a missing or invalidated message source.
+3. **The `sequence_position` Edge Validations**
+   As clarified, I fully differentiated `sequence_position` (the primary ingestion structural order pointer) from the block grouping `turn_index`. 
+   `MessageNode` structures now carry both independently. 
+   - Strict `NEXT` edge bounds accurately detect and throw `NEXT_SEQUENCE_MISMATCH` where the underlying structure list order breaks temporal sequencing (`position[i]` >= `position[i+1]`).
+   - Weak fallback logic is utilized to additionally audit for missing sequential grouping where `turn_index[i+1] < turn_index[i]`.
+4. **Anchor Integrity & Constraints**:
+   - Standard semantic enforcement verifies `RESPONDS_TO` targeting hits an authorized `user` token.
+   - Any trajectory bounds properly throw confidence checks (must remain floating bounds `0` <= `self` <= `1`), along with validating anchor locations exist in graph nodes.
+5. **CLI Adjustments (`main.py`)**:
+   `GraphValidator(graph).validate()` wraps generation logic naturally, throwing clear list loops of `[ERROR]` and `[WARN]` to mimic deterministic compiler failure output over traditional parsed structures whenever validation detects an issue.
+
+The validation architecture operates entirely independent of the mutation logic of `Pass 1-3`, acting as a purely diagnostic IR assertion block!

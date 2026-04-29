@@ -1,0 +1,111 @@
+# Phase 3: Graph Construction Pipeline
+
+This plan outlines the creation of the multi-pass compilation layer for Nexus, transitioning the architecture from "plumbing JSON" to a true semantic compiler.
+
+## User Review Required
+
+> [!IMPORTANT]
+> The focus is purely on deterministic, structural transformations. No LLMs, embeddings, or complex NLP intelligence will be utilized during this tier. 
+> Please review the naive heuristics proposed for "Concepts" and "Trajectories" to ensure they align with your "stub only" requirement.
+
+## Proposed Changes
+
+### `html_importer`
+
+We will introduce a new pipeline phase that sits between parsing and finalizing the internal `ConversationGraph`.
+
+#### [NEW] [graph_builder.py](file:///c:/dev/nexus/python/ingest/html_importer/graph_builder.py)
+
+We will create a multi-pass `GraphBuilder` object containing strict deterministic stage mutations:
+
+```python
+import re
+from typing import List
+from models import NormalizedMessage
+from graph_models import ConversationGraph, MessageNode, Relationship, Concept, Trajectory
+
+class GraphBuilder:
+    def __init__(self, graph_id: str):
+        self.graph = ConversationGraph(id=graph_id)
+        self._raw_messages: List[NormalizedMessage] = []
+
+    # --- Pass 1: Ingestion ---
+    def ingest_messages(self, messages: List[NormalizedMessage]) -> 'GraphBuilder':
+        """Pass 1: Insert core identities into the graph registry dicts."""
+        self._raw_messages.extend(messages)
+        for msg in messages:
+            node = MessageNode(id=msg.message_id, text=msg.text)
+            self.graph.messages[node.id] = node
+        return self
+
+    # --- Pass 2: Relationships ---
+    def build_relationships(self) -> 'GraphBuilder':
+        """Pass 2: Linear sequencing, Turn responses, and Concept stubs."""
+        for i, msg in enumerate(self._raw_messages):
+            # A. Sequential
+            if i < len(self._raw_messages) - 1:
+                next_msg = self._raw_messages[i+1]
+                self.graph.relationships.append(Relationship(
+                    source_id=msg.message_id, target_id=next_msg.message_id,
+                    relation_type="NEXT", confidence=1.0
+                ))
+            
+            # B. Speaker Transition (assumes alternating turn_index gives a natural response rhythm)
+            if i > 0:
+                prev_msg = self._raw_messages[i-1]
+                if msg.speaker == "assistant" and prev_msg.speaker == "user":
+                    self.graph.relationships.append(Relationship(
+                        source_id=msg.message_id, target_id=prev_msg.message_id,
+                        relation_type="RESPONDS_TO", confidence=1.0
+                    ))
+            
+            # C. Concept Stubs (Naive Noun-phrase heuristic)
+            # Find quoted phrases or Title Cased phrases as a cheap substitute for proper NLP.
+            self._extract_naive_concepts(msg)
+
+        return self
+
+    # --- Pass 3: Trajectories ---
+    def extract_trajectories(self) -> 'GraphBuilder':
+        """Pass 3: Look for Goal-action phrasing and seed Trajectories."""
+        goal_patterns = [r"we should (build|design|create)", r"let's (build|design)", r"i want to (create|build)"]
+        for msg in self._raw_messages:
+            text_lower = msg.text.lower()
+            if any(re.search(p, text_lower) for p in goal_patterns):
+                traj_id = f"traj_seed_{msg.message_id}"
+                self.graph.trajectories[traj_id] = Trajectory(
+                    id=traj_id, anchorMessage=msg.message_id, state="active", confidence=0.3
+                )
+        return self
+
+    def finalize(self) -> ConversationGraph:
+        """Return the locked, complete graph."""
+        return self.graph
+
+    # (Private naive extraction logic) ...
+```
+
+#### [MODIFY] [main.py](file:///c:/dev/nexus/python/ingest/html_importer/main.py)
+
+We will refactor standard scripting to adopt a clean Compiler Pipeline methodology. 
+```python
+# Before
+files = {"files": [{"file": path, "messages": messages }]}
+# After
+graph = GraphBuilder(graph_id=conversation_id).ingest_messages(messages).build_relationships().extract_trajectories().finalize()
+```
+*Note: We must determine how to serialize the Dataclass Graph downstream since the CLI currently dumps normalized messages to JSON.*
+
+## Open Questions
+
+> [!WARNING]
+> Please provide direction on the following:
+
+1. **Serialization vs JSON CLI Output**: Currently `main.py` outputs a structured JSON of `NormalizedMessage` objects. Since Phase 1 is strictly for ingestion, should `main.py` stop printing standard JSON and instead print graph statistics (total nodes, relationships generated)? Or do you want a quick helper method that turns the Dataclass `ConversationGraph` into a giant dictionary so it can still be outputted as JSON?
+2. **Concept Heuristics**: For Pass 2 Concepts, without introducing an ML library (e.g. Spacy), I proposed searching for Double-Quoted terminology or sequences of Title Case words as "stub placeholders." Is this naive Regex stub generator acceptable for now?
+
+## Verification Plan
+We will write a `test_graph_builder.py` unit test to strictly check:
+- Immutable passes (no relational edges are constructed during `ingestion_messages`).
+- Graph preserves correct 1:1 message mapping from inputs.
+- Sequential `NEXT` relationships correspond effectively to `n-1` lengths.

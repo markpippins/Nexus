@@ -1,0 +1,20 @@
+# Phase 6b: Unanswered Obligations via Structural ClosureSets
+
+I have fully formalized Unanswered Questions into explicit constraints! By swapping semantic reliance onto mathematically explicit mathematical subsets, questions successfully scale out structurally across graph layers.
+
+## What Changed:
+
+### 1. Schema Expansion
+- **`graph_models.py`**: Added explicit mapping handling `QuestionNode` struct logic alongside isolated `QuestionBinding` definitions extracting explicit target thresholds tracking exactly `OPEN`, `PARTIALLY_RESOLVED`, and `RESOLVED` boundaries! Added explicit `Observation` type targeting `UNRESOLVED_QUERY`.
+
+### 2. Phase 2c - Native Obligation Bindings (`graph_builder.py`)
+During ingestion, we scan for deterministic text interrogator markers. Natively building a `QuestionNode` bounding explicit `required_concept_ids` pulling exact localized scope boundaries matched from overlapping extractions avoiding cross-layer drifts.
+
+### 3. Phase 4.7 - Mathematical Set Satisfiability (`question_resolver.py`)
+Wrote strict logic matching calculating native overlaps securely explicitly computing bounds!
+- Evaluates `ClosureSet(T)` matching mapping logic straight against target `P` target sets across STABLE execution pipelines natively.
+- Determines logic isolating overlapping subset sets defining strictly explicit states matching outputs mathematically generating `RESOLVES(question_id -> concept_root)` relationship mappings without requiring NLP!
+- Stores derived `PartialResolution` structs mapping incomplete mappings isolating explicitly tracking natively missing derivations driving ContextAssembler outputs safely!
+
+### 4. Phase 6 Emission (`observation_synthesizer.py`)
+Iteratively outputs independent Epistemic Diffs emitting missing structure observations targeting strictly `UNRESOLVED` items bridging logic directly over `Observation` traces preserving Epistemology accurately avoiding semantic assumptions over logic outputs!

@@ -1,0 +1,56 @@
+# Phase 5: Trajectory Evaluation (Cognitive Interpretation)
+
+This plan outlines replacing the previously mutated graph annotations with a pure, non-destructive **Read-Only Evaluator**, explicitly mapping `ReconstructedTrajectory` objects into a dictionary of detached `TrajectoryEvaluation` metrics.
+
+## Proposed Architecture
+
+### `trajectory_evaluation.py`
+We will introduce the explicit output dataclass.
+```python
+from dataclasses import dataclass
+from typing import Dict
+from graph_models import ConversationGraph, ReconstructedTrajectory
+from datetime import datetime
+
+@dataclass
+class TrajectoryEvaluation:
+    trajectory_id: str
+    message_count: int
+    duration_seconds: float
+    stability_score: float
+    coherence_score: float
+    engagement_score: float
+    interruption_count: int
+    reattachment_count: int
+    final_state: str
+    classification: str
+
+class TrajectoryEvaluator:
+    def evaluate(self, graph: ConversationGraph) -> Dict[str, TrajectoryEvaluation]:
+        # Looping over graph.reconstructed_trajectories
+        # No mutations applied. Returns the mapped evaluations.
+```
+
+### Cognitive Metrics (Deterministic)
+The evaluator will utilize the `graph` registry to access `MessageNode` payloads necessary for calculating derived metrics.
+
+- **Duration (`duration_seconds`)**: We will lookup the span across `traj.messages[0]` to `traj.messages[-1]`. Timestamps will be parsed using standard ISO from `TimestampInfo.value`. If no timestamps exist (e.g. CLI tests), defaults to `0.0`.
+- **Stability Score**: `0.5` base. `+0.2` if `state == 'stable'`. `+0.1 * reattachments`. `-0.1 * (interruptions - reattachments)`. Clamped `[0.0, 1.0]`.
+- **Coherence Score**: `len(messages) / (len(messages) + len(interruptions))`. Clamped `[0.0, 1.0]`.
+- **Engagement Score**: `(message_count * max(1, log(duration_seconds+1)))`. Capped/normalized against a reasonable session ceiling to `[0.0, 1.0]`.
+
+### Classification Logic
+The priority tree maps deterministically:
+1. `RESOLVED` → `traj.state == "stable"`
+2. `ABANDONED` → `interruptions > 0 and reattachments == 0`
+3. `WORKING_THREAD` → `message_count >= 6`
+4. `EXPLORATION` → Fallback
+
+## User Review Required
+
+> [!WARNING]
+> Please review the interpretation of `duration_seconds` missing values.
+
+1. **Test Data Timestamps**: During unit testing, we often use mocked `MessageNode` constructs that lack valid ISO timestamp spans. In these tests, `duration_seconds` evaluates to `0.0`, rendering `Engagement Score` mathematically inert. Is this acceptable, or should we simulate sequential delays automatically (e.g., +30s per message) when `TimestampInfo` is missing/mocked?
+
+2. **Scrubbing Phase 4.5**: Since Phase 5 strictly demands no mutations, I will rip out `classification` and `confidence` stored inside `ReconstructedTrajectory` (implemented during Phase 4.5). Do you agree with wiping those fields off the model to maintain strict purity?

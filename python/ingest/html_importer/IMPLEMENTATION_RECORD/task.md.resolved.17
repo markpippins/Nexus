@@ -1,0 +1,5 @@
+- [x] Add `TrajectorySnapshot`, `IR_Diff`, and exactly mapped `Observation` models into `graph_models.py` natively alongside Workspace arrays.
+- [x] Implement snapshot telemetry inside `TrajectoryReconstructor` (Phase 4 materialization mapping full `S_t` states).
+- [x] Build `DiffEngine` natively computing `IR_Diff` arrays mapping deterministically across `TrajectorySnapshot` timelines detecting added/modified/deprecated bounds mathematically.
+- [x] Build `ObservationSynthesizer` mapping purely off `IR_Diff` records into `SUPPORTS`, `CONTRADICTS`, `REFINES`, `REINTRODUCES` observation layers.
+- [x] Connect the output mappings dynamically inside `main.py` pushing evaluations recursively.

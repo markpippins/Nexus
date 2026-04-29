@@ -1,0 +1,40 @@
+# Phase 4: Trajectory Reconstruction Layer
+
+We will implement the pure, graph-traversal derivation layer outputting `ReconstructedTrajectory` configurations, securely mapping the cognitive threading over time.
+
+## Algorithms and Heuristics
+
+1. **Dual Concept Anchoring**
+   - **`concepts_seed`**: A strictly immutable state capturing the concept IDs present in the trajectory's anchor message.
+   - **`concepts_active`**: A dynamic union of concept IDs from all messages legitimately attached directly to the trajectory's `.messages` array.
+
+2. **Interruption Pass (Primary Structural + Secondary Keywords)**
+   - **Primary**: A message lacks any concept overlap with `concepts_active` AND represents a structural divergence (no strong `RESPONDS_TO` keeping it coupled).
+   - **Secondary Weight**: Keyword scanning (`nevermind`, `anyway`, `switching topics`) drops the confidence score of the connection to force an interruption.
+
+3. **Reattachment Protocol (Structural + Semantic Continuity)**
+   - To convert an interruption bounce-back into a `reattachment`, the message MUST hit simultaneous criteria:
+     - **Structural**: Established `RESPONDS_TO` referencing a message in the active trajectory timeline, OR continuous `NEXT` linkage from an active node.
+     - **Semantic**: Non-zero overlap with `concepts_seed` OR `concepts_active`.
+
+4. **Trajectory Conservation Guarantee**
+   - We will utilize a Forward-Scanning State Machine across the chronologically sorted sequence of `ConversationGraph.messages`. 
+   - A single master loop will stream the messages into multiple stateful `ReconstructedTrajectory` trackers.
+   - **Edge Case**: To prevent "pre-seed" orphaned messages (messages occurring before the very first Trajectory Seed), the reconstructor will provision a synthetic `"baseline"` default trajectory capturing pre-ambles, ensuring universal node conservation.
+
+## Proposed Changes
+
+### `trajectory_models.py`
+A new lightweight definitions file:
+- `ReconstructedTrajectory` Dataclass.
+
+### `trajectory_reconstructor.py`
+Houses `TrajectoryReconstructor(graph)`.
+- Precomputes `_msg_concepts[msg_id]` using simple string matching against `graph.concepts`.
+- Streams forward across sorted messages, distributing to the latest active baseline.
+- Flags `.state = "stable"` when the cycle survives an interaction length > 3 messages or 1 full interruption-reattachment cycle.
+
+### `test_trajectory_reconstruction.py`
+Unit tests strictly asserting:
+- The Trajectory Conservation Rule (0 orphaned graph messages).
+- Correct mapping of Interruption / Reappointments into designated arrays based on synthetic divergence mocks.

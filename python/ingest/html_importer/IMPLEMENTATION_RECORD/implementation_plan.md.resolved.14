@@ -1,0 +1,58 @@
+# Phase 6b: Unanswered Questions Protocol
+
+This plan outlines the architecture for structurally mapping unanswered questions as deterministic IR obligations driving epistemic traces during Phase 6 Observation Synthesis, replacing the assumption of missing text with structural closure failures.
+
+## Proposed Architecture
+
+### 1. Schema Expansion (`graph_models.py`)
+To isolate questions as IR obligations, we introduce explicit structures appending to the `ConversationGraph`.
+```python
+from dataclasses import dataclass
+from typing import Literal
+
+QuestionStatus = Literal["OPEN", "PARTIALLY_RESOLVED", "RESOLVED", "DEFERRED"]
+
+@dataclass
+class QuestionNode:
+    id: str  # e.g., 'q_msg123'
+    scope_id: str
+    source_trajectory_id: str
+    content_ref: str  # IR reference string (e.g., matching message ID or concept ID)
+    status: QuestionStatus
+
+# Observation primitive expands
+@dataclass
+class Observation:
+    id: str  
+    type: str # e.g., 'EPISTEMIC_DIFF' | 'UNRESOLVED_QUERY'
+    source_trajectory_id: str
+    scope_id: str
+    content: Any # Handling either ObservationContent IR mappings or discrete Question IDs
+    polarity: str
+    confidence: float
+```
+Additionally, `ConversationGraph` gets a `questions: Dict[str, QuestionNode]` layer, and Phase 6 `DiffEngine` / `ObservationSynthesizer` layers adjust to incorporate the new tracing logic.
+
+### 2. Phase 2c: Ingestion Allocation (`graph_builder.py`)
+During deterministic evaluation in Phase 2, any user message natively possessing interrogation markers (e.g., `?`) constructs a corresponding mapped `QuestionNode` linked via local `scope_id` defaults spanning the current file boundaries.
+
+### 3. Phase 4 Updates (`trajectory_reconstructor.py`)
+During message sequence mappings:
+- Because the architecture forbids destructive updates, "status changes" become appended snapshot traces (e.g., pushing `"RESOLVED"` traces onto a `QuestionNode`'s event history).
+
+### 4. Phase 6 Emission (`observation_synthesizer.py`)
+During Stage B cross-evaluations, we execute the exact formula provided:
+`If QuestionNode exists AND no ResolvesEdge exists AND final_snapshot.status != RESOLVED → emit UNRESOLVED_QUERY`
+
+## User Review Required
+
+> [!WARNING]
+> How do we structurally establish a `RESOLVES` edge bridging Questions without using semantic NLP logic?
+
+Because we extract questions deterministically natively (e.g., checking `?` bounds in `GraphBuilder`), how do we formally fulfill the obligation to transition status to `RESOLVED` or throw a `RESOLVES` edge using purely structural rules?
+
+**Potential Deterministic Approaches:**
+1. **Thread Continuation Threshold**: If an assistant sequentially responds (`RESPONDS_TO`), and that thread eventually survives to flag a `STABLE` trajectory conclusion, we retroactively append a `RESOLVES(question_id -> concept_id)` mapping against highest frequency concepts logged during stabilization.
+2. **Structural Acknowledgment**: If a user submits a follow up message explicitly lacking negative keywords (`No`, `didn't answer`) following an assistant response that shares semantic `concept_overlap` with the question.
+
+Since we cannot let "text looking like an answer" execute the evaluation, what exact structural parameter transitions the `QuestionNode` out of `OPEN` inside `trajectory_reconstructor.py`?

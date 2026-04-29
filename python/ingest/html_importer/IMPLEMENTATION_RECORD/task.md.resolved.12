@@ -1,0 +1,5 @@
+- [ ] Update `graph_models.py` to remove `classification` and `confidence` from `ReconstructedTrajectory`
+- [ ] Remove confidence assignment references in `trajectory_reconstructor.py`
+- [ ] Overwrite `trajectory_evaluation.py` to output the detached `TrajectoryEvaluation` dictionary mapped logically without mutating graph nodes
+- [ ] Rewrite `test_trajectory_evaluator.py` matching Phase 5 test criteria (Clean state assertions, classification definitions, logic isolation, determinism)
+- [ ] Integrate into `main.py` to output evaluation dict safely to JSON representation

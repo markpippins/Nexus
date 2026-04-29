@@ -1,0 +1,66 @@
+# Phase 6: Cross-Trajectory Cognition (Observation Layer)
+
+This plan outlines the architecture for introducing the `Observation` primitive and the Cross-Trajectory Graph (CTG) to negotiate beliefs across isolated trajectories deterministically at the Workspace boundary.
+
+## Proposed Architecture
+
+### 1. The Observation Primitive (`observation_models.py` or `workspace.py`)
+We will introduce the explicit, lightweight, append-only `Observation` model tracking semantic assertions across trajectories.
+```python
+from dataclasses import dataclass
+from typing import Optional, Literal
+
+Polarity = Literal["supporting", "contradicting", "neutral"]
+TargetScope = Literal["self", "other", "global"]
+
+@dataclass
+class Observation:
+    id: str
+    source_trajectory_id: str
+    target_scope: TargetScope
+    content: str  # e.g., concept ID or structured claim
+    confidence: float
+    polarity: Polarity
+    temporal_marker: float # mapping duration or exact timestamp
+```
+
+### 2. Global Observation Store (`workspace.py`)
+The `Workspace` class currently only manages local `ConversationGraph` mappings. This will become the primary persistence layer for the Cross-Trajectory Graph (CTG).
+
+```python
+class Workspace:
+    id: str
+    conversations: Dict[str, ConversationGraph] = field(default_factory=dict)
+    observations: List[Observation] = field(default_factory=list) # Global Store
+```
+
+### 3. Step A: Observation Emission (`trajectory_evaluation.py`)
+`TrajectoryEvaluator` expands its pipeline. After scoring metrics, it will deterministically emit structured observations backing up its findings.
+For example, if a trajectory reaches `RESOLVED`, it emits `supporting` observations for its `concepts_active`.
+
+### 4. Step B: Synthesizer (`observation_synthesizer.py`)
+The `ObservationSynthesizer` traverses the Workspace's `observations` array to:
+- Group observations targeting the same `content` (concepts).
+- Combine confidence scores.
+- Flag polarity tension (e.g., Traj A supports Concept X, Traj B contradicted Concept X).
+
+### 5. Step C: IR Rehydration Hook
+Synthesized observations push constraints back down. Example: If Concept X is highly contradicted globally, we attach a `Constraint` or update the Phase 6 `WorkingSet` flag demoting that concept when exporting context to the Decision Engine.
+
+## User Review Required
+
+> [!WARNING]
+> How should we generate the `content` of an Observation deterministically?
+
+You specified that Phase 6 should remain entirely deterministic ("Without ever needing embeddings or LLMs"). How would you like the `content` and `polarity` generated explicitly during Step A? 
+
+**Proposed Deterministic Approach:**
+1. **Content**: Bound exclusively to graph `Concept` IDs. (e.g., `content = "cid_ir_design"`)
+2. **Polarity**:
+   - `supporting`: Trajectory state == `STABLE` or `classification == RESOLVED`.
+   - `neutral`: Trajectory `classification == EXPLORATION` or `WORKING_THREAD`.
+   - `contradicting`: Trajectory `classification == ABANDONED` matching the concept.
+   
+This allows contradiction detection organically when two different conversation threads map opposing stability conclusions over the exact same Concept/Scope match.
+
+Is this Concept-driven determinism aligned with your vision, or did you want the `content` to encompass literal semantic phrases parsed directly from raw messages using a pattern matcher?

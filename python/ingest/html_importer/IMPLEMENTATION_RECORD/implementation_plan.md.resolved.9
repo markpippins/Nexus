@@ -1,0 +1,44 @@
+# Working Set & Context Assembler Implementation Plan
+
+This layer serves as the "Attention Mechanism" of Nexus. It filters the global, holistic `Workspace` down into a constrained, highly actionable `WorkingSet` tailored for a downstream LLM Decision Engine.
+
+## Proposed Changes
+
+### `working_set_models.py`
+Establish the container that bounds cognitive context.
+```python
+from dataclasses import dataclass, field
+from typing import List
+
+from graph_models import MessageNode, Concept, ReconstructedTrajectory
+
+@dataclass
+class WorkingSet:
+    active_trajectories: List[ReconstructedTrajectory] = field(default_factory=list)
+    recent_stable_trajectories: List[ReconstructedTrajectory] = field(default_factory=list)
+    focus_concepts: List[Concept] = field(default_factory=list)
+    recent_messages: List[MessageNode] = field(default_factory=list)
+```
+
+### `context_assembler.py`
+The rule-based extraction pipeline logic.
+1. **Active Trajectories**: Simple filtered aggregation targeting states `['active', 'resumed']` across the active workspace.
+2. **Recent Stable Trajectories**: Locating newly minted `stable` threads over recently ingested sequences.
+3. **Focus Concepts**: Mapping global instances by name. Concepts that hit `count > 1` (present in multiple `ConversationGraph` structures) are promoted to focus.
+4. **Recent Messages**: Sorting the most recently updated conversation and plucking the last `N=20` nodes to provide immediate conversational scaffolding.
+
+--- 
+
+## User Review Required
+
+> [!WARNING]
+> Please review the deterministic constraints for **Recency** and **Relevance**.
+
+1. **How do we define the newest conversation?** 
+Currently, time representations might be inconsistent, so we could assume the highest absolute `turn_index` / `sequence_position` ID generation or fall back to the parsed timestamps on `NormalizedMessage`. Do you want to explicitly mandate timestamps as the driver for `Recent Messages`, or assume the "last loaded Graph" in the registry?
+
+2. **How to define "Recently Stable"?** 
+Should a `STABLE` trajectory be flagged as "recent" if its last known `.messages` mapping sits within the `N=20` recent message window, or should we just take the last 3 initialized `STABLE` trajectories chronologically?
+
+## Verification Plan
+We will create a multi-graph `Workspace` inside a unit test targeting `ContextAssembler`, mocking shared concepts between graphs and a `stable` trajectory to assert that `WorkingSet.focus_concepts` successfully extracts it via frequency > 1.

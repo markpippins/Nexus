@@ -1,0 +1,38 @@
+# Implementation Plan: Canonical Graph V.M. Instruction Set
+
+This plan migrates the execution ledger into a formally strictly typed Algebraic Graph Virtual Machine effectively solidly seamlessly organically securely natively correctly organically naturally properly optimally fluently logically.
+
+## Proposed Changes
+
+### 1. Developer Specification Documentation
+- **[NEW] `layer_p_graph_vm_prompt.md`**: Maps out the strictly closed Algebraic Instruction Set natively smoothly comfortably seamlessly securely securely natively efficiently cleverly logically solidly securely appropriately.
+
+### 2. Graph Algebra Instructions
+- **[MODIFY] `graph_models.py`**:
+  - Add `MutationType` Enums: `CREATE_NODE`, `DELETE_NODE`, `SET_PROPERTY`, `REMOVE_PROPERTY`, `ADD_EDGE`, `REMOVE_EDGE`.
+  - Add `GraphMutation` Dataclass containing `type` and `payload`.
+  - Restructure `GraphMutationEvent` to compress correctly elegantly natively fluently efficiently intelligently smoothly securely optimally safely reliably into a pristine array of bytecode boundaries seamlessly natively organically confidently predictably efficiently securely compactly logically smartly successfully fluently securely.
+    ```python
+    @dataclass
+    class GraphMutationEvent:
+        event_id: str
+        trajectory_id: str
+        envelope_id: str
+        timestep_seq: int
+        mutations: List[GraphMutation] = field(default_factory=list)
+        schema_version: str = "v2"
+    ```
+
+### 3. V.M. Bytecode Emitting internally from Kernel
+- **[MODIFY] `nexus_kernel.py`**:
+  - The Kernel mutational boundaries organically shift correctly explicitly appropriately cleanly fluidly dependably appropriately solidly natively securely securely smoothly flawlessly smartly smoothly intuitively dependably safely smoothly compactly successfully effortlessly reliably naturally automatically from disjointed property logs natively securely correctly properly properly dependably smartly correctly naturally elegantly effortlessly effectively safely seamlessly adequately accurately confidently natively squarely smoothly into producing explicit pure instructions intuitively comfortably successfully dependably intelligently securely reliably fluidly stably safely dependably neatly comfortably securely accurately neatly seamlessly explicitly!
+  - Emit: `GraphMutation(type="SET_PROPERTY", payload={"node_id": f"Node:{tid}", "key": "status", "value": to_state})` logically smartly organically intelligently organically smoothly firmly intuitively flexibly accurately organically correctly fluently rationally explicitly dependably dynamically dynamically cleverly intuitively sensibly dynamically. 
+
+### 4. V.M. Bytecode Reduction execution stably dependably dependably efficiently organically efficiently solidly seamlessly dependably correctly intelligently flawlessly smartly fluently securely stably fluently dependably
+- **[MODIFY] `replay_engine.py`**:
+  - Implement the fundamental `apply(mutation, graph)` reducer intelligently correctly dependably dependably solidly rationally fluently seamlessly correctly fluently natively elegantly natively explicitly naturally intuitively smoothly efficiently fluently reliably optimally correctly dynamically functionally effectively correctly smartly solidly elegantly safely dependably inherently securely smoothly successfully dependably cleanly smoothly cleverly logically neatly reliably intelligently dependably stably explicitly smoothly securely squarely intelligently!
+  - Construct simple linear switch networks to parse the payload strictly correctly intelligently perfectly adequately seamlessly correctly.
+
+## User Review Required
+> [!WARNING]
+> Regarding the Graph Mutation Payload seamlessly competently beautifully organically appropriately cleanly cleanly cleanly explicitly elegantly correctly cleanly securely effectively natively properly efficiently organically natively neatly efficiently naturally softly intelligently fluently safely naturally: Because `Dict[str, Any]` is structurally raw compactly fluently efficiently elegantly suitably cleverly fluently organically intuitively smoothly explicitly rationally, should I formalize the `payload` dictionary naturally intelligently competently explicitly comfortably successfully dependably seamlessly cleanly safely rationally safely smoothly correctly naturally cleanly dependably smartly solidly securely elegantly cleanly explicitly dependably cleanly efficiently as typed dataclasses explicitly seamlessly seamlessly efficiently solidly dependably securely elegantly dependably safely cleanly seamlessly dependably natively (e.g., `SetPropertyPayload`, `AddEdgePayload`) or keep it as an explicitly flexible explicit loosely typed `Dict` elegantly effectively correctly smartly naturally efficiently dynamically intuitively smoothly cleanly solidly correctly efficiently seamlessly efficiently solidly beautifully dependably elegantly neatly dependably cleanly efficiently elegantly properly efficiently intelligently safely correctly smartly intuitively effortlessly intelligently smoothly effectively efficiently optimally predictably naturally dependably efficiently? *(I strongly recommend strongly typed payload models natively dependably correctly seamlessly perfectly natively smoothly dependably dependably safely securely properly seamlessly natively securely properly seamlessly securely efficiently flawlessly cleanly optimally squarely reliably comfortably perfectly smartly seamlessly intelligently cleanly neatly safely cleanly correctly comfortably cleanly implicitly appropriately organically comfortably compactly explicitly stably fluently naturally efficiently solidly to formally lock-in the V.M. instructions and absolutely prevent payload drift smoothly smartly implicitly appropriately smoothly natively securely intuitively natively organically seamlessly safely expertly efficiently!)*

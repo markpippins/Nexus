@@ -1,0 +1,5 @@
+- `[x]` Define `IR_v2_EventEnvelope` Structures: Implement `EnvelopeTransition`, `EnvelopeProvenance`, `EnvelopePolicyReference`, `EnvelopeDeterminism`, and `EnvelopeReplay` in `graph_models.py`.
+- `[x]` Update `IRMigrationLayer`: Route `IR_v1` into `TransitionSynthesizer` (Compiler Frontend) and compile out `IR_v2_EventEnvelope`.
+- `[x]` Retool `Layer C`: Modify `ExecutionEligibilityGate.evaluate` to explicitly process `IR_v2_EventEnvelope` instead of requests.
+- `[x]` Gut the Runtime (`nexus_kernel.py`): Strip `TransitionSynthesizer` out of the Kernel. The Kernel exclusively iterates over canonical compiled Envelopes now!
+- `[x]` Test Core Pipelines: Assert `main.py` routing functionally works cleanly through the hard compiler boundary.

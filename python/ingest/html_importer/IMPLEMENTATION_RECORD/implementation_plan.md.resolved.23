@@ -1,0 +1,26 @@
+# Implementation Plan: Nexus Kernel Orchestration Layer
+
+This plan formally maps your deterministic `Kernel` abstraction out of `main.py` and into `nexus_kernel.py`, achieving full separation between system orchestration (`Kernel`), execution constraints (`Layer C`), state transitions (`FSM`), and entrypoint logic (`main`).
+
+## Proposed Changes
+
+### 1. Document System Contract
+- **[NEW] `layer_d_kernel_prompt.md`**: Safely mapping your explicit Kernel Interface Spec systematically.
+
+### 2. Implement the Orchestration System
+- **[NEW] `nexus_kernel.py`**:
+  - Implements the explicitly bounded `KernelResult` dataclass.
+  - Generates the `Kernel` core orchestrator mapping strictly the 5 execution stages sequentially: *Ingestion -> Synthesis -> Policy (Layer C) -> Commit (FSM) -> Observation*.
+  - Explicitly executes isolated logic against `mode="LIVE" | "REPLAY" | "SANDBOX"`. 
+
+### 3. Migrate and Clean Entrypoint Logic
+- **[MODIFY] `main.py`**:
+  - Strip the `ExecutionEligibilityGate` loops and `replay_kernel.py` mapping routines completely out.
+  - Implement a simple `Kernel` instantiation routing the mapped `IR_EventEnvelopes` seamlessly off exactly via `kernel.run(event_stream, mode="LIVE")`.
+- **[DELETE/MODIFY] `replay_kernel.py`**:
+  - Functionality merges or replaces cleanly into `nexus_kernel.py` reducing dependency chains completely securely.
+
+## User Review Required
+> [!WARNING]
+> Because `main.py` presently drives numerous other legacy testing passes (like GraphBuilder Phase 1-3, DiffEngine Phase 4.5, ConflictDetector 6d), should I leave those pre-requisite graph construction loops inside `main.py` and ONLY wrap the final IR Event stream phase into `Kernel.run()`, or do you eventually plan to push ALL passes into the Kernel? 
+> *(My plan currently leaves GraphBuilder passes in `main.py` and just wraps the final Layer-C event sequencing into the Kernel).*

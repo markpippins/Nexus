@@ -1,0 +1,4 @@
+- `[x]` Explicit Spec Generation: Create `layer_e_kernel_replay_prompt.md` documenting absolute determinism bounds.
+- `[x]` Structural Primitives: Add `PolicySnapshot`, `ExecutionTraceElement`, `KernelExecutionTrace`, and `ReplayValidationResult` inside `graph_models.py`.
+- `[x]` Policy Input Mapping: Force `ExecutionEligibilityGate.evaluate_transition` to mandate explicit `PolicySnapshot` parameters securely (`execution_gate.py`).
+- `[x]` Trace Output & Validation: Overhaul `nexus_kernel.py` enabling exact strict trace capturing and `validate_replay` equivalence tests.

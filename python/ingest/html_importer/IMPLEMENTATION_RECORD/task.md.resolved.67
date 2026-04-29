@@ -1,0 +1,5 @@
+- `[/]` Spec Definition: Document `layer_u_conflict_classifier_prompt.md`.
+- `[ ]` Impact Model: Introduce `InstructionImpact(read_set, write_set, effect_type)`.
+- `[ ]` Classification: Build the semantic classifier handling `STRUCTURAL` vs `VALUE` overlaps.
+- `[ ]` Strategy Resolution: Implement `ResolutionStrategy` interface and `LastWriteWins`.
+- `[ ]` Verification: Test structural exceptions and resolvable value branches.

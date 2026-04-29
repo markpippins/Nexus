@@ -1,0 +1,4 @@
+- `[/]` Expand `layer_a_irl_prompt.md`: Natively include internal `COMPLETION_DECLARATION` combined dynamically alongside `INTERMEDIATE_EXECUTION_STATE` logic explicitly mapped sequentially.
+- `[x]` Structure Modification (`graph_models.py`): Inject `<ObjectiveBinding>` parameters exclusively securely explicitly tied within `<ReconstructedTrajectory>` parameters. Implement `completion_candidate` explicitly directly atop `<ReconstructedClosureSet>`.
+- `[x]` Engine Processing (`replay_kernel.py`): Extract dynamically checking limits validating safely completion candidate parameter explicitly generating loops cleanly securely exclusively structurally securely.
+- `[ ]` Final Verification: Execute `pytest` ensuring bounds limits explicitly map correctly avoiding errors statically running loops.

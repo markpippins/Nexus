@@ -1,0 +1,4 @@
+- `[/]` Spec Definitions: Document Merge Algebra within `layer_t_concept_merge_prompt.md`.
+- `[ ]` Impact Protocol: Inject `get_write_set()` to all `GraphMutation` primitives.
+- `[ ]` Merge Engine: Construct `nexus_merge.py` featuring `compute_lca`, `detect_conflicts`, and `merge`.
+- `[ ]` Algebra Verification: Instantiate mathematical proof tests inside `test_kernel_determinism.py` covering intersection collisions and disjoint commutativity.

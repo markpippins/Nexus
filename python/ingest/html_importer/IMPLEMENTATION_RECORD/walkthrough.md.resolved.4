@@ -1,0 +1,21 @@
+# Phase 4 Implementation Summary
+
+I have fully implemented the stateful `TrajectoryReconstructor` derivation algorithms! It consumes the strictly validated `ConversationGraph` and deterministically outputs cohesive cognitive threads without breaking any of the designated architectural constraints.
+
+## Technical Details
+
+1. **Dual Concept Sets Implemented**
+   - Trackers now separately record `concepts_seed` (an immutable footprint from the anchor message) and `concepts_active` (a mutable accumulation across sequence continuity).
+
+2. **Accurate Interruption Detection**
+   - The primary trigger strictly keys on structural drift (no active pointers keeping the context constrained) combined with a boolean negative on semantic concept overlap.
+   - Secondary keywords (`by the way`, `switching topics`) are factored in softly to intentionally sink the continuity weight into an interruption.
+
+3. **Reattachment Protocol Enforced**
+   - Reattachments MUST simultaneously provide a structural return mapping (meaning a literal `RESPONDS_TO` pointer aiming at an already secured sequence item) AND a semantic match asserting continuity with the overlapping `concepts_seed`/`concepts_active`.
+
+4. **Trajectory Conservation Rule Validated**
+   - The master loop processes sequentially generated messages. If a conversation preamble exists prior to explicit graph seeds, a synthetic `.id = "rec_default_baseline"` tracker is allocated.
+   - The state machine processes `messages`, `interruptions`, and `reattachments` inclusively. The aggregate component assignments are verified via `unittest` to precisely equal the absolute sum of the structural graph pool (0 dropped orphan nodes). Or stated simply: The engine reconstructs entirely.
+
+Run `python test_trajectory_reconstruction.py` directly to see the explicit validation proving `msg_3` successfully splits off into an interruption array before `msg_4` leverages `RESPONDS_TO` + `Concept("compiler")` to anchor safely inside `reattachment`.

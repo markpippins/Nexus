@@ -1,0 +1,6 @@
+{
+  "artifactType": "ARTIFACT_TYPE_WALKTHROUGH",
+  "summary": "Causal Resolution Context Logic Applied. Nexus now interprets temporal/actor causality fields when resolving state divergence.",
+  "updatedAt": "2026-04-22T20:38:31.385014400Z",
+  "version": "38"
+}

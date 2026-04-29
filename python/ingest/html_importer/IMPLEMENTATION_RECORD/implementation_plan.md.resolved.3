@@ -1,0 +1,31 @@
+# Phase 3: Graph Construction Pipeline
+
+This outlines the finalized multi-pass compilation layer for Nexus.
+
+## Approved Architecture & Fixes
+
+1. **Explicit `RESPONDS_TO` anchoring**: `RESPONDS_TO` relationships dynamically anchor to the *last chronologically observed user message*, eliminating the brittle n-1 adjacency assumption.
+2. **Concept Extraction (Noise Reduction)**: "Concept Stubs" will exclusively focus on:
+   - Phrases encapsulated in double quotes.
+   - Capitalized sequences accumulating a frequency count `>= 2` across the conversation stream.
+3. **Robust Trajectory Seed Categories**: Expanding goal patterns to cover intentionality markers like "we should...", "the goal is...", and "let's try to...".
+4. **CLI Diagnostics**: Upgrading `main.py` with `--mode messages` (default JSON behaviour) and `--mode graph` (produces Graph compiler diagnostics and compilation metrics).
+
+## Proposed Implementation Details
+
+### [NEW] `graph_builder.py`
+A core compilation pipeline converting flattened streams to the deterministic `ConversationGraph`. It retains 3 deliberate passes:
+*   **Pass 1: Ingestion**: Guarantees Identity and Object Registration. Ensures "Graph Conservation Rule" (every message maps exactly 1:1 with graph identity without orphans).
+*   **Pass 2: Relationships**: Constructs relational structures (`NEXT` and `RESPONDS_TO`) and builds stub concepts safely.
+*   **Pass 3: Trajectory Seeds**: Generates structured `active` state trajectories based on Regex intention markers.
+
+### [MODIFY] `main.py`
+We will augment `main.py` to route logic through the structural parser, and conditionalize output reporting to provide the requested compiler diagnostics.
+
+### [NEW] `test_graph_builder.py`
+A comprehensive Python unittesting suite enforcing invariants such as Identity Stability, Ordering, Graph Conservation, and Orphan Node detection.
+
+## Verification Plan
+
+### Automated Tests
+Run standard Python unittest execution against mock normalized message structures to isolate and confirm pipeline transformation phases execute deterministically.
