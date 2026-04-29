@@ -1,7 +1,7 @@
 {
   "catalog_version": "1.0",
   "generated_on": "2026-04-21",
-  "purpose": "Consolidated catalog of persisted or persistence-worthy types across python/event-pipeline and python/ingest/html_importer.",
+  "purpose": "Consolidated catalog of persisted or persistence-worthy types across python/event-pipeline and python/ingest/html-importer.",
   "projects": {
     "event-pipeline": {
       "source_roots": [
@@ -638,12 +638,12 @@
         }
       }
     },
-    "html_importer": {
+    "html-importer": {
       "source_roots": [
-        "C:\\dev\\nexus\\python\\ingest\\html_importer\\models.py",
-        "C:\\dev\\nexus\\python\\ingest\\html_importer\\graph_models.py",
-        "C:\\dev\\nexus\\python\\ingest\\html_importer\\trajectory_evaluation.py",
-        "C:\\dev\\nexus\\python\\ingest\\html_importer\\main.py"
+        "C:\\dev\\nexus\\python\\ingest\\html-importer\\models.py",
+        "C:\\dev\\nexus\\python\\ingest\\html-importer\\graph_models.py",
+        "C:\\dev\\nexus\\python\\ingest\\html-importer\\trajectory_evaluation.py",
+        "C:\\dev\\nexus\\python\\ingest\\html-importer\\main.py"
       ],
       "enums": {
         "TimestampConfidence": [

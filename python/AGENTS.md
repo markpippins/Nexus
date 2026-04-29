@@ -5,7 +5,7 @@ This document defines operational behavior for all agents working inside the Pyt
 ```
 python/
  ├── event-pipeline/
- ├── ingest/html_importer/
+ ├── ingest/html-importer/
  └── fs/fs-crawler/   (Mildred)
 ```
 
@@ -181,16 +181,16 @@ Code must conform to documentation — never the reverse.
 Allowed without approval:
 
 ```
-python/ingest/html_importer/IMPLEMENTATION_RECORD/*
-python/ingest/html_importer/PROMPT_RECORD/*
+python/ingest/html-importer/IMPLEMENTATION_RECORD/*
+python/ingest/html-importer/PROMPT_RECORD/*
 ```
 
 Approval Required:
 
 ```
 python/event-pipeline/ARCHITECTURE.md
-python/ingest/html_importer/DESIGN_PHILOSOPHY.md
-python/ingest/html_importer/COMPILER_CONTRACT.md
+python/ingest/html-importer/DESIGN_PHILOSOPHY.md
+python/ingest/html-importer/COMPILER_CONTRACT.md
 ```
 
 ---
@@ -225,7 +225,7 @@ Standard development cycle:
 This configuration governs:
 
 * `event-pipeline` — deterministic event processing
-* `html_importer` — structured ingestion compiler
+* `html-importer` — structured ingestion compiler
 * `fs-crawler (Mildred)` — filesystem observation agent
 
 All components are treated as **compiler subsystems**, not applications.
