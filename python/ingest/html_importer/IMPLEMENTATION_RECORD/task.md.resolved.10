@@ -1,0 +1,5 @@
+- [ ] Migrate `ReconstructedTrajectory` definitions into `graph_models.py` and attach to `ConversationGraph`
+- [ ] Refactor `trajectory_reconstructor.py` to mutate `graph.reconstructed_trajectories`
+- [ ] Implement `trajectory_evaluator.py` structural evaluation mapping
+- [ ] Add evaluator hooks into `main.py`
+- [ ] Write `test_trajectory_evaluator.py` validation testing

@@ -1,0 +1,5 @@
+- [x] Modify `graph_models.py`: Implement `SemanticLabel` annotation model, add `semantic_labels` array to `IR_EventEnvelope`. Implement explicit `ConstraintNode` isolating `state` (OPEN | SATISFIED | VIOLATED).
+- [x] Update `replay_kernel.py`: Ensure `emitted_constraints` trace correctly parsing into the `ReconstructedClosureSet` securely.
+- [x] Build `constraint_engine.py` (Stub) demonstrating validation pass of `ConstraintNode`s.
+- [x] Implement `execution_gate.py` (Layer C) strictly enforcing bounds checking exclusively for `DELEGATED_REQUEST` semantic labels alongside verifying *zero* `status="OPEN"` limitations.
+- [x] Integrate into `main.py` locking downstream limits cleanly securely validating constraints explicitly avoiding leakage assumptions.

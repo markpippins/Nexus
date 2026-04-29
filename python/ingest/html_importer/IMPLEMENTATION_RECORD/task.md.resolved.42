@@ -1,0 +1,11 @@
+- `[/]` Explicit Spec Generation: Create `layer_h_validation_ladder_prompt.md` documenting absolute Determinism boundaries cleanly seamlessly reliably.
+- `[ ]` Hashing Support: Implement `compute_trace_hash` directly into `KernelExecutionTrace` effectively mapping cleanly naturally securely natively.
+- `[ ]` Core Validation Test Suite (`test_kernel_determinism.py`):
+    - `[ ]` Golden Replay Test
+    - `[ ]` Permutation Rejection Test
+    - `[ ]` Idempotency Test
+    - `[ ]` Deterministic Restart Test
+    - `[ ]` Policy Replay Stability Test
+    - `[ ]` Policy Adversarial Rejection
+    - `[ ]` Phase 3 & 4 Structure Stubs
+- `[ ]` Execute Testing Pipeline cleanly automatically fluently successfully expertly gracefully smoothly!

@@ -1,0 +1,46 @@
+# Phase 4: Trajectory Reconstruction Layer
+
+This plan introduces the extraction and compilation of `ReconstructedTrajectory` objects strictly derived from the validated `ConversationGraph`, generating cognitive threads that reflect the true intent sequence of the conversation.
+
+## Proposed Changes
+
+### 1. New Model: `trajectory_models.py`
+We will establish the output schema using Dataclasses to ensure parity with the boundary definitions.
+
+```python
+from dataclasses import dataclass, field
+from typing import List
+
+@dataclass
+class ReconstructedTrajectory:
+    id: str
+    seed_id: str
+    messages: List[str] = field(default_factory=list)
+    interruptions: List[str] = field(default_factory=list)
+    reattachments: List[str] = field(default_factory=list)
+    state: str = "active" # active | interrupted | resumed | stable
+    confidence: float = 0.0
+```
+
+### 2. New Module: `trajectory_reconstructor.py`
+We will implement the Graph-Traversal engine (`TrajectoryReconstructor`) which reads a `ConversationGraph` and outputs a `List[ReconstructedTrajectory]`.
+
+**Traversal Algorithm Design:**
+1. **Index Graph Edges**: Convert flattened `graph.relationships` into fast lookup dictionaries for sequential `NEXT` edges and `RESPONDS_TO` anchors.
+2. **Seed Expansion**: For each trajectory seed, identify the anchor message. Trace the timeline forward using `NEXT` edges exclusively to determine sequence bounds.
+3. **Concept Tracking**: Compile a "baseline concept set" for the trajectory utilizing the `graph.concepts` occurrences across its messages.
+4. **Interruption Pass**: As we look ahead on the sequence, flag nodes that lack overlap with the "baseline concept set" or match meta-diversion patterns as `interruptions`.
+5. **Reattachment Pass**: If an interrupted timeline surfaces a message containing overlapping concepts, or establishes a `RESPONDS_TO` relationship bouncing back strictly to a message inside the trajectory's `messages` chunk, classify the node as a `reattachment`.
+6. **Stitching/Stability**: Resolve final classifications (`stable` vs `active`) based on segment survival length.
+
+## Open Questions
+
+> [!WARNING]
+> Please review the following deterministic bounds for the reconstruction algorithm.
+
+1. **Baseline Concept Accrual**: When tracking "shared concept overlap", does a trajectory baseline *only* include concepts found inside the *seed/anchor* message itself, or should it continuously collect into a pool as it positively expands through subsequent `messages`?
+2. **Hard Interruption Keywords**: You mentioned "emotional/meta commentary" and "unrelated new goal". Without LLM NLP, should we hardcode explicit string detection triggers for these (e.g., `"by the way"`, `"nevermind"`, `"hold on"`, `"ignore that"`), or purely depend on the absence of Concept overlap?
+3. **RESPONDS_TO Leapfrogging**: Is a `RESPONDS_TO` edge pointing back over the interruption (e.g. an Assistant finally answering the pre-interruption user prompt) considered the primary structural definition of a "reattachment"? 
+
+## Verification Plan
+We will create `test_trajectory_reconstruction.py` using a mock graphical layout with a known interruption sequence to assert that `interruptions` and `reattachments` arrays accurately populate according to structural rules.

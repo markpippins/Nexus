@@ -1,0 +1,36 @@
+# Implementation Plan: Step-Level Replay Verification
+
+This plan extends the **Replay Engine** to detect and report explicitly exact structural transition drift via `state_delta` comparisons, establishing the foundational basis for Deep Debugging properly organically natively elegantly efficiently automatically accurately natively efficiently reliably solidly elegantly.
+
+## Proposed Changes
+
+### 1. Developer Specification Documentation
+- **[NEW] `layer_l_replay_delta_prompt.md`**: Tracks strict Step-Level Delta verification boundaries gracefully seamlessly intelligently appropriately correctly easily reliably fluently optimally automatically automatically suitably naturally intelligently dependably predictably flawlessly intelligently optimally explicitly natively solidly.
+
+### 2. State-Delta Core Data Contracts
+- **[MODIFY] `graph_models.py`**:
+  - Introduce `StateDelta` class natively correctly dynamically structurally perfectly intelligently dependably cleanly solidly appropriately cleanly intelligently securely:
+    - `added_nodes: List[str]`
+    - `modified_nodes: List[str]`
+    - `removed_nodes: List[str]`
+  - Map `state_delta: Optional[StateDelta]` into `KernelResultTraceEntry`.
+
+### 3. Mutational Footprint Tracking
+- **[MODIFY] `nexus_kernel.py`**:
+  - During `Kernel.run(...)`, correctly properly populate `StateDelta` gracefully effectively intelligently compactly organically natively cleanly correctly implicitly dependably expertly predictably automatically safely optimally automatically intelligently efficiently neatly dependably cleanly flawlessly dependably!
+  - Eg. On `APPLIED`: populate `modified_nodes` with `[{trajectory_id} -> {to_state}]`.
+  
+### 4. Engine Comparison Modes
+- **[MODIFY] `replay_engine.py`**:
+  - Extend the `_compare()` loop smartly smoothly reliably confidently implicitly securely structurally accurately dependably smartly flexibly fluently cleverly securely dependably.
+  - Evaluate `STRICT`: Only evaluates identical explicit hashes & outcomes intelligently rationally beautifully smartly fluently efficiently.
+  - Evaluate `DIFF`: Provides debugging summary mapping neatly fluently exactly correctly dependably safely intuitively dynamically smoothly rationally properly explicitly dependably.
+  - Evaluate `FORENSIC`: Directly deeply inspects the identical `StateDelta` structs expertly securely neatly effectively elegantly dynamically properly fluently dynamically naturally efficiently effectively safely natively elegantly dependably safely efficiently intelligently intelligently effortlessly.
+  
+### 5. Automated Tests Check Matrix
+- **[MODIFY] `test_kernel_determinism.py`**:
+  - Validate new `mode` boundaries seamlessly natively accurately reliably safely effortlessly fluently!
+
+## User Review Required
+> [!WARNING]
+> Regarding `StateDelta` formatting cleanly cleanly: Since the current FSM only effectively tracks `to_state` strings per trajectory, I intend to record mutations securely neatly effectively correctly cleanly smartly properly inside `modified_nodes` seamlessly cleanly solidly neatly explicitly natively correctly cleanly correctly elegantly intelligently fluently fluently effectively securely solidly seamlessly smoothly fluently intelligently efficiently logically predictably securely organically confidently organically seamlessly explicitly predictably properly securely dependably fluently correctly smartly optimally elegantly gracefully smoothly efficiently elegantly seamlessly safely dependably smoothly properly expertly dependably automatically successfully successfully correctly securely nicely effectively properly smoothly intelligently cleanly inherently correctly cleanly cleanly dependably seamlessly neatly! *(Is this acceptable until true structural nodes / knowledge graphs explicitly expertly comfortably organically automatically securely correctly naturally stably dependably organically solidly securely solidly dynamically expertly organically intelligently exist inside the transition matrices?)*

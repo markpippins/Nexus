@@ -1,0 +1,63 @@
+# Trajectory Evaluator Implementation Plan
+
+We will create the explicit cognitive thread validation/scoring system that consumes the arrays arrays built during Phase 4 and generates standardized weights for filtering.
+
+## Proposed Components
+
+### `trajectory_models.py`
+Add a `classification: str` string field to `ReconstructedTrajectory` to formalize the string classification rating alongside the `confidence: float`.
+
+```python
+    confidence: float = 0.0
+    classification: str = "unclassified"
+```
+
+### `trajectory_evaluator.py`
+Implement the class struct provided in the prompt:
+
+```python
+class TrajectoryEvaluator:
+    def evaluate(self, trajectories: List[ReconstructedTrajectory]):
+        for traj in trajectories:
+            confidence = self._score(traj)
+            traj.confidence = confidence
+            traj.classification = self._classify(confidence)
+            
+    def _score(self, traj: ReconstructedTrajectory) -> float:
+        # Evaluate heuristics limits [0.0 - 1.0]
+        pass
+        
+    def _classify(self, confidence: float) -> str:
+        # Banding categorization bounds
+        pass
+```
+
+### Scoring Heuristics (`_score`)
+We can execute purely deterministic math over the array footprints compiled locally by Phase 4.
+1. **Base Value**: Start at `0.1` structurally.
+2. **Length Scale**: `+0.1` per node located in `messages` (caps at `+0.4` around 4 messages long).
+3. **Resilience Bonus**: `+0.15` per item in `reattachments` (rewards explicitly surviving interruptions).
+4. **State Multiplier**: Add an explicit `+0.2` hard bonus if `traj.state == "stable"`.
+5. **Bleed Penalty**: Subtract `-0.05` per node in `interruptions` to slightly lower highly fragmented trajectories.
+
+*Scores are mathematically bounded via `min(1.0, max(0.0, score))`.*
+
+### Classification Bounds (`_classify`)
+- **`score < 0.3`** ➔ `"Transient"` (Brief interaction, dropped rapidly)
+- **`score < 0.6`** ➔ `"Developing"` (Average continuity, no stability established)
+- **`score < 0.8`** ➔ `"Established"` (Stable thread, long length, clear context)
+- **`score >= 0.8`** ➔ `"Core Thread"` (Heavy resilience, survived multiple interruptions)
+
+---
+
+## User Review Required
+
+> [!WARNING]
+> Please clarify the Evaluator Input schema logic.
+
+Your API schema outlined: `def evaluate(self, graph: ConversationGraph): for traj in graph.trajectories.values():`
+
+Currently, `graph.trajectories` houses the raw Phase 3 **Seeds** (`Trajectory` models) internally mapped inside the graph state itself.
+However, `messages[]`, `reattachments[]`, and `state_transitions` exclusively live inside the dynamically generated **Phase 4** models (`ReconstructedTrajectory`).
+ 
+**Question**: Should `TrajectoryEvaluator` directly loop over a `List[ReconstructedTrajectory]` emitted by Phase 4? Or do you want Phase 4 to literally attach the `ReconstructedTrajectory` structures *into* the `ConversationGraph` registry during `.finalize()`, effectively giving mutating access back to the graph object before moving to Evaluator?

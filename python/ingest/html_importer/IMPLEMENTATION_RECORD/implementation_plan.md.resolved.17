@@ -1,0 +1,61 @@
+# Phase 6b: Interaction Taxonomy Enforcement Layer
+
+This plan structures the **InteractionClassifier**, a deterministic middleware layer operating strictly *post-execution* to annotate structural transformations into the closed `InteractionArchetype` Enum. This guarantees that interactions characterize reality without generating it.
+
+## Proposed Architecture
+
+### 1. Model Binding (`graph_models.py`)
+To store these post-hoc taxonomy annotations, the `IR_Diff` and other graph objects will receive an `archetypes: Set[InteractionArchetype]` property. Because enforcement validates classification post-generation, this field guarantees execution logic runs entirely blind to these enum states.
+
+```python
+@dataclass
+class IR_Diff:
+    # Existing properties
+    archetypes: Set[InteractionArchetype] = field(default_factory=set)
+```
+
+### 2. InteractionClassifier Component (`interaction_classifier.py`)
+A structural annotation component traversing graph boundaries mapping native structures against the 9-part constraint taxonomy explicitly.
+
+```python
+from graph_models import ConversationGraph, IR_Diff, InteractionArchetype
+
+class InteractionClassifier:
+    def __init__(self, graph: ConversationGraph):
+        self.graph = graph
+        
+    def classify_all(self):
+        # Annotate Diffs natively
+        for traj in self.graph.reconstructed_trajectories.values():
+            for diff in traj.ir_diffs:
+                archetypes = set()
+                
+                # Execution: Native trajectory state continuity
+                archetypes.add(InteractionArchetype.EXECUTION)
+                
+                # Construction: Newly birthed concepts mapped in this diff
+                if diff.added_concepts:
+                    archetypes.add(InteractionArchetype.CONSTRUCTION)
+                    
+                # Revision: Scopes modified across active boundaries natively
+                if diff.modified_concepts:
+                    archetypes.add(InteractionArchetype.REVISION)
+                    
+                # Compression / Reconciliation overlaps handled via external constraints
+                diff.archetypes = archetypes
+```
+
+### 3. Pipeline Location (`main.py`)
+To guarantee NFP-1 compliant execution blindness, the `InteractionClassifier` will insert precisely mapped loops post-layer execution. It does not dictate system steps or influence logic parameters. 
+
+## User Review Required
+
+> [!WARNING]
+> Since the input boundary specified is strictly `IR_Diff`, how should we annotate Non-Diff structural transformations?
+
+You defined classification rules explicitly for items outside of `IR_Diff` native properties (e.g. "RECONCILIATION: Triggered by RESOLVES edge emission" which happens in Phase 4.7, or "REFLECTION: Observation Emission" which happens in Phase 6).
+
+If `InteractionClassifier.classify()` takes `ir_diff` natively as its sole input parameter for execution mapping:
+
+1. Do we expand `IR_Diff` to strictly trace newly birthed `RESOLVES` edges and `Observations` into its property constraints (capturing the entire graph delta per timestep)?
+2. Or does the `InteractionClassifier` traverse the entire `ConversationGraph` object alongside `ir_diff` iteratively, assigning `Archetypes` onto `QuestionNodes`, `Observations`, and `Edges` as independent annotations acting natively outside the Diff boundary?

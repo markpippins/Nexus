@@ -1,0 +1,25 @@
+# Implementation Plan: Transition Synthesizer & Layer C Truth Table
+
+This plan brings the architecture to full formal specification, injecting the new `TransitionSynthesizer` layer securely bridging `IR_EventEnvelope` outputs to formal `TransitionRequest` candidates, and rewriting `Layer C` (Execution Eligibility Gate) to execute strictly over a deterministic `Truth Table`.
+
+## Proposed Changes
+
+### 1. Document System Contracts
+- **[NEW] `layer_b_transition_synthesizer_prompt.md`**: Implements the system prompt you defined securely mapping IR events exclusively into candidate transitions.
+- **[MODIFY] `layer_c_execution_gate_prompt.md`**: Overwrite with the newly formalized `LAYER C — TRANSITION VALIDATION TRUTH TABLE` mapping deterministic outputs natively (`APPROVE_EXECUTION`, `ROUTE_TO_SANDBOX`, `REJECT_TRANSITION`).
+
+### 2. Transition Synthesizer Implementation
+- **[NEW] `transition_synthesizer.py`**:
+  - Implement a `TransitionSynthesizer` class that consumes `IR_EventEnvelope`.
+  - Mechanically extract deterministic variables mapping against the Taxonomies (e.g. `STRUCTURAL_MUTATION`, `TRANSACTION_BOUNDARY_EVENT`).
+  - Calculate `TransitionRequest` candidates structurally mapping rules `A` through `F`.
+
+### 3. Layer C Exact Matrix Refactoring
+- **[MODIFY] `execution_gate.py`**:
+  - Refactor `TransitionDecision` to strictly return one of: `APPROVE_EXECUTION`, `ROUTE_TO_SANDBOX`, or `REJECT_TRANSITION`.
+  - Build out the strict 5-state *(`ACTIVE`, `BLOCKED`, `INTERMEDIATE`, `PAUSED`, `CLOSED`, `ABORTED`)* FSM matching table.
+  - Implement Global Precondition validations (Constraint Gate, Schema Safety, Pending Mutations) sequentially bounding the rules *exactly* as specified in your matrix constraints. 
+
+## User Review Required
+> [!WARNING]
+> By inserting the `TransitionSynthesizer` into the pipeline right before Layer C, should I also explicitly update the compiler orchestrator (like `main.py` or `replay_kernel.py`) to systematically run `TransitionSynthesizer` on all envelopes before they strike Layer C natively?

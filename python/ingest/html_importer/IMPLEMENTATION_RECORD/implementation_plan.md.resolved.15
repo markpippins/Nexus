@@ -1,0 +1,29 @@
+# Implementation Plan: Nexus IR Interaction Archetype Taxonomy
+
+This plan formalizes the closed deterministic contract binding how the Nexus IR Object Registry is structurally allowed to evolve. By strictly classifying all mutations into these 9 exact Interaction Archetypes, we guarantee that the system behaves mathematically reliably without semantic drift.
+
+## Proposed Actions
+
+### 1. Architectural Documentation Artifact (`nexus_interaction_taxonomy.md`)
+We will author a permanent, definitive reference artifact storing this entire closed taxonomy directly inside the project documentation root. This will act as the defining contract that any new pipeline components must map back to before being authorized for implementation.
+
+### 2. Pipeline-to-Archetype Mapping
+To ensure the existing pipeline actively complies with this ontology, we will annotate and classify our existing codebase cleanly against these contracts:
+- **Construction Interaction**: `GraphBuilder` (Phase 1-3)
+- **Execution Interaction**: `TrajectoryReconstructor` (Phase 4)
+- **Reflection Interaction**: `DiffEngine` (Phase 4.5) & `ObservationSynthesizer` (Phase 6 emission)
+- **Reconciliation Interaction**: `QuestionResolver` (Phase 4.7)
+- **Compression Interaction**: Context Assembler operations / Merge engines (Future Phase 6a)
+- **Constraint Injection**: Feedback constraints pushed from synthesized properties back into Workspaces (Future Phase 7)
+- **Audit / Counterfactual / Revision Interactions**: Future abstractions scaling multi-branch hypotheses.
+
+## User Review Required
+
+> [!WARNING]
+> How would you like this formalization integrated into the system?
+
+You have declared a massive and fundamentally powerful **Closed Taxonomy** for all system interactions! 
+
+Because this dictates all future system behavior, how should I formally encode this right now?
+1. **Strategic Documentation**: Should I draft the comprehensive `nexus_interaction_taxonomy.md` explicitly defining these 9 categories strictly as a reference contract ensuring all future context stays bound to it?
+2. **Code Enforcement (Python Types)**: Alternatively, should I explicitly map these as actual base class Python structs (e.g., `class InteractionArchetype(Enum)`) that functions must explicitly flag or return when they touch the `ConversationGraph` (for example, wrapping graph operations inside explicit taxonomy transactions)?

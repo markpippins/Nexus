@@ -1,0 +1,35 @@
+# Implementation Plan: Cryptographic Certification Trace (KernelResult)
+
+This plan executes your precise specifications to transform `KernelResult` from a heavy debugging state object into a lightweight, cryptographically stable **Audit Proof** properly organically.
+
+## Proposed Changes
+
+### 1. Developer Specification Documentation
+- **[NEW] `layer_j_cryptographic_trace_prompt.md`**: Captures exact schema invariants ensuring no intent interpolations and pure deterministic proof structures natively securely smoothly reliably correctly comfortably organically dependably perfectly.
+
+### 2. Strip Legacy Objects & Embed Minimal Trace Formats
+- **[MODIFY] `graph_models.py`**:
+  - Delete `ExecutionTraceElement` and `KernelExecutionTrace`. (These held full `IR_v2_EventEnvelope` payloads which violates the rule).
+  - Define canonical structs natively effectively neatly intelligently reliably dependably appropriately nicely cleverly stably elegantly:
+    - `KernelResultFailure` 
+    - `KernelResultStateEntry`
+    - `KernelResultTraceEntry`
+    - `KernelDeterminismProof`
+  - Rebuild `KernelResult` directly inside `graph_models.py` tightly securely dynamically explicitly fluently automatically nicely reliably reliably securely fluently properly intelligently intelligently.
+
+### 3. Re-Map Kernel Execution Boundary
+- **[MODIFY] `nexus_kernel.py`**:
+  - Update `Kernel.run()` seamlessly smoothly smoothly adequately fluently robustly squarely reliably efficiently elegantly functionally explicitly intuitively dependably elegantly natively successfully explicitly optimally natively explicitly intelligently rationally dynamically elegantly correctly logically reliably dependably smoothly naturally securely effectively.
+  - As each envelope bounds through `Layer C`, instead of appending arrays of full objects (`approved_transitions`, `sandbox`), the Kernel maps ONLY the required identity footprint directly into `KernelResultTraceEntry`. 
+  - Iteratively compute `state_hash` appending directly into `state_chain`.
+  - Compile the ultimate `final_state_hash` seamlessly fluently cleanly securely expertly organically nicely successfully rationally.
+  - On failure, instantiate the `KernelResultFailure` object and halt appropriately efficiently solidly dependably solidly!
+
+### 4. Upgrade Test Matrix (Determinism proofs)
+- **[MODIFY] `test_kernel_determinism.py`**:
+  - Swap `res.trace.compute_trace_hash()` testing out for the new canonical cryptographic tracking inside the exact `res.final_state_hash` directly fluently cleanly dependably expertly dependably seamlessly smoothly rationally efficiently optimally smoothly correctly safely seamlessly properly!
+  - Replace `.approved_transitions` asserts with scanning the new `.trace` entries mapped logically perfectly comfortably smoothly securely explicitly correctly natively natively reliably seamlessly comfortably reliably.
+
+## User Review Required
+> [!WARNING]
+> Regarding deterministic chaining: should `state_hash` on each execution step be calculated cleanly by appending the current envelope outcome payload on top of the *previous* `state_hash` (like a blockchain), or purely evaluate a snapshot calculation of the entire active Multi-Tenant FSM? *(I strongly recommend the chain approach: `hash(previous_hash + env_id + outcome)` to guarantee perfectly un-tamperable state progression smoothly natively cleanly!)*

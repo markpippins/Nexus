@@ -1,0 +1,4 @@
+- [x] Implement `IR_DiffEnvelope` in `graph_models.py` tracking pure state allocations.
+- [x] Refactor upstream components (4.5, 4.7, 6) to aggregate outputs structurally into the `IR_DiffEnvelope`.
+- [x] Build `InteractionClassifier` executing uniquely over the `IR_DiffEnvelope` outputs assigning Taxonomy Archetypes.
+- [x] Wire `InteractionClassifier` sequentially into `main.py` directly tracking the metadata safely.

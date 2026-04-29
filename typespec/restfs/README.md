@@ -5,7 +5,7 @@
 ```
 typespec/
 ├── main.tsp                  # Entry point - imports and service decorator
-├── restfs/
+├── fs/
 │   ├── models.tsp            # All model definitions (FsItem, FsRequest, etc.)
 │   └── operations.tsp        # All operation definitions (listFiles, move, etc.)
 ├── tsp-output/               # Generated code

@@ -1,0 +1,62 @@
+# Phase 4 Refinement: Trajectory State Machine
+
+This plan formalizes Phase 4 as a state machine compiler over the conversational deterministic graph. It replaces implicit loop assignments with strict trajectory lifecycle transitions and introduces a compiler trace log for reconstructive debuggability.
+
+## Proposed Changes
+
+### `trajectory_models.py`
+We will formalize the exact definitions provided in the spec.
+```python
+from dataclasses import dataclass, field
+from typing import List, Set
+
+@dataclass
+class StateEvent:
+    message_id: str
+    from_state: str
+    to_state: str
+    reason: str
+
+@dataclass
+class ReconstructedTrajectory:
+    id: str
+    seed_id: str
+    messages: List[str] = field(default_factory=list)
+    interruptions: List[str] = field(default_factory=list)
+    reattachments: List[str] = field(default_factory=list)
+    
+    state: str = "active" # active | interrupted | resumed | stable
+    confidence: float = 0.0
+
+    state_transitions: List[StateEvent] = field(default_factory=list)
+
+    # Internal trackers for compilation passes
+    concepts_seed: Set[str] = field(default_factory=set)
+    concepts_active: Set[str] = field(default_factory=set)
+```
+
+### `trajectory_reconstructor.py`
+The Trajectory execution loop will be converted to a strict 4-Phase State Machine, evaluating `msg` integration block-by-block.
+
+- **`ACTIVE` block**: Normal traversal. If a primary structural divergence triggers, pushes an `StateEvent(from="active", to="interrupted")` and halts expansion.
+- **`INTERRUPTED` block**: Searches for `RESPONDS_TO` coupled with concept overlaps. If mapped, pushes `StateEvent(from="interrupted", to="resumed")`.
+- **`RESUMED` block**: Requires sequential validation. If continuity persists into the *next* block, pushes `StateEvent(from="resumed", to="active")` followed functionally immediately by checking the `STABLE` invariant (requiring an interruption survival cycle to graduate to STABLE state).
+- **`STABLE` block**: Operates similarly to `ACTIVE`, maintaining `messages` ingestion unless structurally violated, throwing it back down to `INTERRUPTED`.
+
+Every structural drift will append a trace reason into `state_transitions`, effectively producing a compiler log of what exact structural criteria pushed a conversation out of alignment.
+
+## User Review Required
+
+> [!WARNING]
+> Please confirm the `RESUMED -> STABLE` transition requirement.
+
+Currently, the spec lists:
+1. `INTERRUPTED -> RESUMED` (Triggers on combined structural/semantic overlap hit)
+2. `RESUMED -> ACTIVE` (After `1-N` coherent messages)
+3. `ACTIVE / RESUMED -> STABLE` (Survived interruption, reattachment occurred).
+
+**My Proposed Evaluation Flow**:
+If a trajectory enters `RESUMED`, and the *very next* message maintains perfect `active` concept overlap, we transition `RESUMED -> ACTIVE`. Because this thread has *now explicitly survived an interruption cycle*, we instantly evaluate the `STABLE` trigger and transition `ACTIVE -> STABLE`. Is bouncing directly `RESUMED -> ACTIVE -> STABLE` inside consecutive processing steps acceptable?
+
+## Verification Plan
+We will update `test_trajectory_reconstruction.py` to assert that the `state_transitions` list is accurately populated during the test run with the precise string reasons behind state progression events.

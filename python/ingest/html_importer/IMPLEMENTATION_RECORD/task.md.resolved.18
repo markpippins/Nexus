@@ -1,0 +1,4 @@
+- [ ] Update `graph_models.py` schema with `QuestionBinding`, `QuestionNode`, and `PartialResolution` artifacts conforming exactly to structural bounds.
+- [ ] Implement Phase 2c (`graph_builder.py`) deterministic question extraction. Assign `binding` rules by natively mapping any Concepts natively referenced inside the initial interrogating message segment. 
+- [ ] Build `question_resolver.py` (Phase 4.7 Pass). Calculate `ClosureSet(T)` natively evaluating graph reachability and structural `S ⊂ P` equations generating `RESOLVES` edges implicitly.
+- [ ] Append artifacts natively passing unresolved obligations through Observation synthesis logically.

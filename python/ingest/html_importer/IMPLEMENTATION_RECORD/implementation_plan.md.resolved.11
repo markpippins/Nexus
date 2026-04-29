@@ -1,0 +1,45 @@
+# Layer 4: Identity Boundaries (Scope Scaffolding)
+
+To prevent the "Trajectory Over-Merging Collapse" in the upcoming Workspace graph-linking phases, we will introduce a strict `scope_id` barrier into the object registry protecting concept isolation.
+
+## Proposed Changes
+
+### 1. Schema Expansion
+Update `graph_models.py` to bound `Concept` objects geographically.
+
+```python
+@dataclass
+class Concept:
+    id: str  # e.g., 'cid_ir_design'
+    name: str  # e.g., 'IR design'
+    scope_id: Optional[str] = None  # NEW FIELD (e.g., 'workspace_thread_4')
+    description: Optional[str] = None
+```
+
+### 2. Guardrails implementation
+The upcoming cross-conversation unification layer (the Workspace Builder) will be bound by the **"No single-signal merging"** constraint.
+When we attempt to unify trajectories or context in the Workspace, any equivalence checks will implement:
+
+```python
+def is_valid_merge(traj_a, traj_b):
+    signals = 0
+    if len(traj_a.concepts & traj_b.concepts) > 0 and traj_a.scope_id == traj_b.scope_id:
+        signals += 1
+    if traj_a.state == traj_b.state:
+        signals += 1
+    # ...
+    return signals >= 2
+```
+
+## User Review Required
+
+> [!WARNING]
+> How should we compute `scope_id` deterministically?
+
+Currently, `Concept` objects are created deterministically via frequency thresholds during Phase 1-3 Ingestion (`GraphBuilder`). Because there is no NLP/LLM running here to figure out if "IR design" means "Compiler Systems" vs "ML Pipeline", how should we assign `scope_id` right now?
+
+**Proposed Options:**
+1. **Context-Bound Scope**: `scope_id = conversation.id`. The concept is strongly locked to the chat log it was ingested in. It acts as an isolated cluster until an LLM (in a future phase) explicitly merges overlapping concepts into a shared higher-level `scope_id`.
+2. **Trajectory-Bound Scope**: `scope_id = traj.id`. The concept is scoped perfectly to the local Phase 3 seed / Phase 4 cognitive thread that it appeared in.
+
+If we use `conversation.id`, all "IR design" discussions inside the same file share meaning, but cross-file requires explicit unification. Should we map `scope_id` default assignment identically to `self.graph_id` during `GraphBuilder._extract_concepts()`?

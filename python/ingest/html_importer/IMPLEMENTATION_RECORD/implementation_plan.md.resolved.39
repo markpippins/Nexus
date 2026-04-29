@@ -1,0 +1,33 @@
+# Implementation Plan: Concept Merge Engine
+
+This plan implements the Merge Algebra for Timeline Synthesis. Merge is defined as the deterministic reconstruction of instruction sequences from a Least Common Ancestor, not final-state reconciliation.
+
+## Proposed Changes
+
+### 1. Developer Specification Documentation
+- **[NEW] `layer_t_concept_merge_prompt.md`**: Defines the Merge Algebra, conflict resolution models, and history synthesis invariants.
+
+### 2. Instruction Impact Model
+- **[MODIFY] `graph_models.py`**:
+  - Add explicit impact extraction to `GraphMutation` primitives.
+  - Implement a mechanism to return a `WriteSet` (e.g., specific tuple addresses like `("node", "N1", "property", "status")`) for each mutation type.
+  - This enables intersection testing between concurrent deltas.
+
+### 3. The Merge Engine
+- **[NEW] `nexus_merge.py`**:
+  - Implement `ConceptMergeEngine`.
+  - `compute_lca(timeline_a, timeline_b)`: Identifies the exact base fork index shared by both lineages.
+  - `compute_deltas(base, a, b)`: Extracts isolated instruction streams (`Delta A`, `Delta B`).
+  - `detect_conflicts(delta_a, delta_b)`: Identifies write-set intersections with divergent outcomes.
+  - `merge(timeline_a, timeline_b)`: Synthesizes a new merged sequence. Interleaves non-conflicting instructions and raises formal `MergeConflictExceptions` for unresolved structural conflicts.
+
+### 4. Deterministic Validity Tests
+- **[MODIFY] `test_kernel_determinism.py`**:
+  - `test_merge_non_conflicting`: Forks 'main' into 'A' and 'B', modifies separate nodes, merges back cleanly, and asserts the unified state hash.
+  - `test_merge_conflict_rejection`: Forces a collision on the exact same node property across two forks, verifying the engine rejects it mathematically.
+
+## User Review Required
+> [!WARNING]
+> Regarding Instruction Interleaving:
+> When `Delta A` and `Delta B` have disjoint write sets (no conflicts), their instructions must be interleaved to form the new timeline. Does the strict ordering of this interleaving matter to you? 
+> *(I recommend simply appending all Delta A instructions followed by all Delta B instructions relative to the LCA, as commutative non-conflicting mutations will yield the identical graph state hash regardless of their relative application order within the diff window.)*

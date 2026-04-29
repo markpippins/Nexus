@@ -1,0 +1,16 @@
+# Semantic Conflict Classification Installed
+
+ Nexus has upgraded the Conflict Detector into a state-transition decision layer, mapping instruction topologies into an algebraic `InstructionImpact` model indexing specific `read_set` and `write_set` strings with `effect_type` bindings.
+
+### 1. The 3-Level Topology Filter
+Using `ConflictClassifier.classify_pair`, Nexus filters trace differences geometrically to differentiate divergence structures:
+- `STRUCTURAL`: Impossible combinations resulting from Read/Write intersections between concurrent elements (eg Branch A deleting data that Branch B attempts to format) natively halt synthesis completely to prevent cascade failures.
+- `VALUE`: Parameter overlaps targeting the equivalent specific structural `write_sets` no longer cause raw pipeline halts. They escalate to Policy handlers.
+- `NONE`: As isolated operations are detected, timelines append disjoint arrays freely.
+
+### 2. Strategy Routing
+`VALUE` disputes successfully navigate around `MergeConflictExceptions` and shift logic into dedicated structural resolution processors via the `ResolutionStrategy` interface. An initialized `LastWriteWins` framework serves as the MVP proof-of-concept for intercepting ambiguous but functionally resolvable node parameters. This unlocks extensibility parameters allowing the pipeline to eventually digest custom semantic field mappings, CRDT vector protocols, or ontology overrides cleanly.
+
+### 3. Tested Constraints
+- `test_merge_structural_conflict_rejection()`: Creates `DeleteNode()` vs `SetProperty()` traces targeting an identical ID strings. The conflict accurately detects a structural overlap condition and fails parsing automatically.
+- `test_merge_value_conflict_resolution()`: Creates parallel updates attempting to format identical `SetProperty()` bounds with `val=2` and `val=5`. The `ConceptMergeEngine` passes the conflict condition block array to `LastWriteWins` reducing overlapping instructions reliably rather than error-outing. 

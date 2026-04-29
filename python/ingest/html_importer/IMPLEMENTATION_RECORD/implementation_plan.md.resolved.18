@@ -1,0 +1,60 @@
+# Phase 4.8 / 5: Event Envelope Replay Semantics
+
+This protocol institutes the **ReplayEngine**, completing the transition into a fully Event-Sourced Deterministic Compiler. By strictly separating Emission (Phase 4.5/4.7/6) from Reconstruction (Phase 4.8/5), we guarantee that any system re-run yields identically mapped truth footprints from raw Envelope tracing.
+
+## Proposed Architecture
+
+### 1. Schema Extensions (`graph_models.py`)
+To comply with the Total Order (TOC-1) and Schema Versioning limits, we append strict configuration identifiers to the Envelope struct natively. 
+
+```python
+@dataclass
+class IR_EventEnvelope:
+    schema_version: str = "v1.0"
+    trajectory_id: str
+    timestep_msg_id: str
+    timestep_sequence: int = 0  # Enforces TOC-1 strict ordering without ambiguity
+    
+    # ... existing structural delta arrays ...
+```
+
+### 2. ReplayKernel Pure Reducer (`replay_kernel.py`)
+Provides exactly zero dependencies on overarching `ConversationGraph` states, operating completely blindly over ordered arrays of `IR_EventEnvelope`.
+
+```python
+from typing import List, Set
+from dataclasses import dataclass
+from graph_models import IR_EventEnvelope
+
+@dataclass
+class ReconstructedClosureSet:
+    trajectory_id: str
+    concepts: Set[str]
+    edges: List[Any]
+
+class ReplayEngine:
+    def reconstruct(self, envelopes: List[IR_EventEnvelope]) -> ReconstructedClosureSet:
+        """Pure reduce function establishing absolute execution limits."""
+        # 1. Reject mixed schemas
+        # 2. Sort by (trajectory_id, sequence/timestep) enforcing TOC-1
+        # 3. Reduce added_nodes against removed_nodes -> Concepts
+        # 4. Extract target RESOLVES cleanly over emitted_edges -> Edges
+        # 5. Return pure ReconstructedClosureSet
+```
+
+### 3. Pipeline Routing (`main.py`)
+Previously `Context Assembler` ingested data directly from the active, mutable state of the trajectories. Now, it must project ONLY from the pure `ClosureSet(T)` output established strictly straight from the isolated `ReplayEngine` layers natively.
+
+`Emission -> ReplayEngine -> Context Assembler & Classifier`
+
+## User Review Required
+
+> [!WARNING]
+> Regarding `IR_EventEnvelope` construction timelines inside the established pipeline:
+
+Currently, tracking the `added_nodes`, `modified_nodes`, and `removed_nodes` happens during **Phase 4.5** sequentially mapping message footprints natively, while `emitted_edges` (QuestionResolver Phase 4.7) and `emitted_observations` (Phase 6) append their limits natively at the very end of the trajectory stability pipeline. 
+
+Because `ReplayEngine` requires globally fully ordered Envelopes to generate its pure outputs:
+
+1. Should the newly appended `schema_version` reject mismatched limits directly exiting execution safely, or would you natively expect an explicit explicit `migration()` parameter function defined inside `graph_models` tracking future upgrades?
+2. By pushing `ContextAssembler` and `InteractionClassifier` to map directly off `ReplayEngine` outputs, should we overwrite the main `graph.reconstructed_trajectories` values with the reconstructed properties explicitly tracking downstream limits safely preventing duplication errors natively?

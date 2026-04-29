@@ -1,0 +1,45 @@
+# Implement 3-Layer Completion State Architecture
+
+This plan establishes "Completion" as a state transition system across the entire Nexus cognitive compiler rather than relying on assumed silence, completely eliminating the "Completion by Silence" failure mode.
+
+## User Review Required
+
+> [!WARNING]
+> Because Completion maps directly to execution outcomes, this plan proposes modifying `graph_models.py` and Replay boundaries. Please review the architectural mapping choices below before I implement the changes.
+
+## Proposed Changes
+
+### Layer A (Semantic/IRL Prompting)
+
+We will expand the Nexus Interaction Reasoning Layer (IRL) taxonomy to natively identify these signals.
+
+#### [MODIFY] [layer_a_irl_prompt.md](file:///c:/dev/nexus/layer_a_irl_prompt.md)
+*Append two explicit new archetypes to the prompt:*
+1. **🟢 9. Completion Declaration**: (e.g. `COMPLETION_DECLARATION`) Explicit claim of completion. User/agent declared intent.
+2. **🔁 10. Partial / Transactional Boundary**: (e.g. `INTERMEDIATE_EXECUTION_STATE`) "Partial commit boundary". Explicitly NOT completion (e.g. continue prompts, staged diffs). 
+
+### Layer B (Structural IR Models)
+
+We will implement the structural verification required to graduate a semantic declaration into an actual closure state.
+
+#### [MODIFY] [graph_models.py](file:///c:/dev/nexus/python/ingest/html_importer/graph_models.py)
+*Introduce `CompletionCandidate` and validated `Closure` status inside our Reconstructed graphs*:
+- Map "Objectives" cleanly onto `ReconstructedTrajectory` (since Trajectories represent goal arcs). 
+- Add a new validation property: `completion_candidate: bool = False` inside `ReconstructedClosureSet` (representing the Stage 2 structural check).
+- Extend `TrajectoryState` literal to actively include `"completed"` in addition to `"closed"` mapped formally over `StateEvent`.
+
+### Layer C (Execution Pipeline Validation)
+
+#### [MODIFY] [replay_kernel.py](file:///c:/dev/nexus/python/ingest/html_importer/replay_kernel.py)
+*Dynamically calculate `CompletionCandidate` status:*
+- Modify the Replay Engine so that when generating a `ReconstructedClosureSet`, it checks:
+  1. No `OPEN` constraint nodes remain mapped inside the closure.
+  2. A termination signal (like a `COMPLETION_DECLARATION` envelope label) exists.
+  3. No pending mutations/unresolved Questions.
+- If true, flip `closure.completion_candidate = True`.
+
+#### [MODIFY] [execution_gate.py](file:///c:/dev/nexus/python/ingest/html_importer/execution_gate.py) // IF REQUIRED
+- Adjust Layer C gating if necessary so that any downstream action attempting to officially mark an Objective "Completed" strictly requires `CompletionCandidate == True`. 
+
+## Open Questions
+- Does mapping "Objective" directly onto the existing `Trajectory` container (which handles active/interrupted/resumed states natively) align with your vision, or should we introduce a brand new `ObjectiveNode` separate from trajectories?

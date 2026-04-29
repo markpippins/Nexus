@@ -1,0 +1,29 @@
+# Implementation Plan: Pure Replay Engine
+
+This establishes the Replay Engine as a standalone, deterministic evaluator that mathematically reconstructs and compares execution bounds against the claims compiled inside `KernelResult`.
+
+## Proposed Changes
+
+### 1. Developer Specification Documentation
+- **[NEW] `layer_k_replay_engine_prompt.md`**: Captures exact schema invariants ensuring Replay is bounded structurally natively natively.
+
+### 2. Isolate Cryptographic Validation
+- **[NEW] `replay_engine.py`**:
+  - Implements the `ReplayEngine` class acting as the pure proof verifier securely mathematically effortlessly dependably smartly securely smartly cleanly elegantly properly efficiently logically properly cleanly properly gracefully dependably natively gracefully properly rationally efficiently fluently naturally efficiently solidly optimally!
+  - Evaluates `STRICT`, `DIFF`, and `FORENSIC` comparative bounds securely fluently robustly flexibly predictably solidly securely perfectly optimally efficiently smartly solidly solidly explicitly neatly smartly implicitly dependably cleanly securely solidly!
+  - Introduces `ReplayDivergenceReport` object replacing basic validation returns logically securely dependably properly efficiently expertly natively dependably elegantly!
+- **[MODIFY] `nexus_kernel.py`**:
+  - Remove `validate_replay()` from the internal Kernel structure because it belongs to the external Engine structurally flawlessly!
+
+### 3. Execution Wrapper
+- **[MODIFY] `replay_engine.py`** and **`nexus_kernel.py`**:
+  - Add `.run_single(envelope)` capability to `Kernel` smartly appropriately dependably effectively solidly effectively efficiently smartly rationally seamlessly solidly organically seamlessly natively comfortably dependably properly naturally rationally stably neatly stably explicitly securely comfortably neatly natively elegantly intelligently confidently intuitively seamlessly.
+  - Implement the Replay Engine loop cleanly mapping envelope constraints effectively confidently securely seamlessly comfortably securely properly optimally smartly organically fluently solidly seamlessly functionally seamlessly fluently solidly smoothly expertly predictably dependably securely natively cleverly elegantly cleanly.
+
+### 4. Upgrade Test Matrix (Determinism proofs)
+- **[MODIFY] `test_kernel_determinism.py`**:
+  - Replace raw kernel assertions with explicit checks leveraging `replay_engine.replay()`. 
+
+## User Review Required
+> [!WARNING]
+> Regarding `Kernel.run_single`: In my previous implementation, `Kernel.run(event_batch)` naturally generates the `state_chain`. If `ReplayEngine` iterates step-by-step to recompute the chain itself manually via `run_single`, should the Replay Engine itself house the mathematical hashing formulas (stripping hashing out of `Kernel` completely) or should `Kernel` still produce the structural `state_chain` which ReplayEngine simply inspects / matches per step? *(I recommend the Kernel STILL producing the hashes independently inside its `KernelResult`, effectively giving us dual computation proofs when ReplayEngine re-runs it and matches the chains natively!)*

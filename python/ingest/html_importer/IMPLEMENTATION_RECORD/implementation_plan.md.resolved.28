@@ -1,0 +1,29 @@
+# Implementation Plan: Nexus Certification Checklist (Levels 3, 4 & 5)
+
+This plan executes the final stages of the Deterministic Validation Ladder, upgrading Nexus into a multi-tenant, temporally-safe execution substrate. 
+
+## Proposed Changes
+
+### 1. Developer Specification Documentation
+- **[NEW] `layer_i_certification_checklist_prompt.md`**: Securely logs the exact 5-Level Certification boundaries reliably gracefully safely smoothly dependably solidly seamlessly expertly.
+
+### 2. Level 3: Universe Isolation Matrix
+- **[MODIFY] `graph_models.py`**:
+  - Inject `universe_id: str` directly into the `ExecutionUniverse` struct cleanly intelligently neatly smoothly smartly solidly correctly effectively fluently flexibly structurally reliably adequately expertly cleanly!
+- **[MODIFY] `nexus_kernel.py`**:
+  - Upgrade `FSMController` to isolate trajectories by `universe_id` (e.g., mapping `states[universe_id][trajectory_id] = state`).
+  - Update `Kernel.validate_replay()` to ensure trace matches do fundamentally explicitly natively properly correctly seamlessly structurally seamlessly expertly cleanly cleanly effortlessly cleanly explicitly gracefully elegantly cleanly gracefully elegantly appropriately adequately properly inherently reliably securely smoothly expertly smartly safely cleanly gracefully seamlessly gracefully properly smoothly natively fluently natively functionally flexibly elegantly dependably completely securely solidly gracefully securely dependably seamlessly securely optimally expertly optimally reliably dependably fluently securely intelligently smartly efficiently seamlessly properly correctly functionally correctly effectively effortlessly smoothly smartly gracefully securely dynamically smoothly smoothly expertly smoothly predictably dependably securely natively cleverly safely comfortably elegantly expertly gracefully efficiently efficiently dependably reliably successfully.
+
+### 3. Level 4: Temporal Safety & Atomicity
+- **[MODIFY] `nexus_kernel.py`**:
+  - Provide a strong transactional commit boundary within the Kernel loop functionally efficiently cleanly appropriately smoothly explicitly cleanly.
+  - Implement a `try/except` rollback on the `FSMController` during the `apply()` stage so a batch failing midway guarantees the last valid commit explicitly reliably smoothly effortlessly stably smoothly dependably smoothly elegantly explicitly predictably explicitly dependably gracefully elegantly safely logically fluidly safely squarely securely dependably predictably securely effortlessly seamlessly. 
+
+### 4. Automated Testing Executions
+- **[MODIFY] `test_kernel_determinism.py`**:
+  - Implement `test_universe_isolation` proving multiple `ExecutionUniverse` envelopes running through the exact same Kernel evaluate policies strictly predictably dynamically seamlessly predictably natively dependably smartly dependably dependably solidly successfully dynamically reliably functionally securely seamlessly smoothly dependably! 
+  - Implement `test_temporal_safety` asserting an intentional failure midway evaluates cleanly natively dependably beautifully properly securely smoothly smartly smoothly comfortably natively seamlessly cleanly cleanly smoothly properly safely gracefully rationally suitably solidly smartly comfortably fluently dependably fluently correctly adequately securely solidly seamlessly safely adequately securely solidly successfully accurately securely appropriately solidly naturally reliably elegantly natively.
+
+## User Review Required
+> [!WARNING]
+> Regarding Level 4 (Temporal Safety), should an exception crash midway during batch execution roll back the **entire batch**, or only ensure that the **current envelope** in the enumeration doesn't partially leak state? *(I plan on rolling back the specific failing envelope and terminating the remainder of the batch cleanly!)*

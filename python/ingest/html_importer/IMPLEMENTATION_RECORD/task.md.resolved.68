@@ -1,0 +1,5 @@
+- `[ ]` Spec Update: `layer_v_resolution_context_prompt.md`.
+- `[ ]` Context Models: Add `InstructionMetadata` and `TimelineMetadata` to `graph_models.py`.
+- `[ ]` Conflict Grouping: Implement `ConflictGroup` and `ConflictClusterer` inside `nexus_merge.py`.
+- `[ ]` Evaluation Strategy: Plumb `ResolutionContext` and groups into `ResolutionStrategy`.
+- `[ ]` Proof Tests: Establish tests in `test_kernel_determinism.py` covering metadata priorities.

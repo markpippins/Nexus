@@ -1,0 +1,27 @@
+# Implementation Plan: Kernel Replay Equivalence
+
+This plan enforces absolute determinism inside the Kernel execution loop, tracking exact trace pathways and guaranteeing that `LIVE` seamlessly equals `REPLAY` mathematically.
+
+## Proposed Changes
+
+### 1. Developer Specification Documentation
+- **[NEW] `layer_e_kernel_replay_prompt.md`**: Implements your deterministic orchestration rules natively bounded seamlessly explicitly appropriately.
+
+### 2. State Snapshot Logic & Structural Updates
+- **[MODIFY] `graph_models.py`**:
+  - Add `ExecutionTraceElement` and `KernelExecutionTrace` structures capturing exactly ordered snapshots (Trajectory State, Layer C Decision, Constraint Config).
+  - Add `ReplayValidationResult` tracking divergence.
+
+### 3. Layer C Strict Mode Enablement
+- **[MODIFY] `execution_gate.py`**:
+  - Update signatures to `evaluate_transition(self, request: TransitionRequest, environment: str = "production", policy_snapshot: str = "v1")`.
+  - Validate against policy snapshot limits securely cleanly dynamically safely.
+
+### 4. Kernel Deterministic Mapping and Validation
+- **[MODIFY] `nexus_kernel.py`**:
+  - Implement full execution trace dumping into `KernelResult.trace`.
+  - Introduce `Kernel.validate_replay(live_trace: KernelExecutionTrace, replay_trace: KernelExecutionTrace) -> ReplayValidationResult` looping sequentially structurally explicitly verifying perfect deterministic overlap natively accurately securely logically.
+
+## User Review Required
+> [!WARNING]
+> Regarding Policy Snapshots (`policy_snapshot_vX`), do you currently want me to just map these securely as a rigid mock string identifier (e.g. `policy_hash="v_stable"` inside Layer C) for now to validate that the pipeline routes correctly? A full versioned DB-based policy router might be premature, but we definitely need the footprint mapped.

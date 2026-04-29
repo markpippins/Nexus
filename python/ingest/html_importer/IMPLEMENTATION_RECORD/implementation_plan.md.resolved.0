@@ -1,0 +1,86 @@
+# Phase 2: Conversation Graph Data Model Implementation
+
+This plan outlines the creation of the Phase 2 core data models (ConversationGraph, MessageNode, Trajectory, Interruption, PEO) for the Nexus HTML Importer. The goal is to move beyond flat linear transcripts and model the conversation as an event stream and a graph, unlocking support for branching trajectories.
+
+## User Review Required
+
+> [!IMPORTANT]
+> The architectural decision to separate `Message` and `Trajectory` meaning—storing trajectories by reference in messages rather than having messages own trajectories—is the core principle of this schema. 
+> 
+> Please review the proposed data structures, especially the types and their properties, to ensure they match your expectations.
+
+## Proposed Changes
+
+### `html_importer`
+
+We will create a new Python module to house the conversation graph models. This keeps the Phase 1 transcript ingestion (`models.py`) decoupled from the Phase 2 graph construction algorithms.
+
+#### [NEW] [graph_models.py](file:///c:/dev/nexus/python/ingest/html_importer/graph_models.py)
+
+We will introduce the following `dataclass` based entities:
+
+```python
+from dataclasses import dataclass, field
+from typing import Optional, Literal, List, Dict
+
+TrajectoryState = Literal["active", "suspended", "resumed", "stable", "closed"]
+
+@dataclass
+class MessageNode:
+    id: str
+    text: str
+    embedding: Optional[List[float]] = None
+    trajectoryId: Optional[str] = None
+    peoIds: List[str] = field(default_factory=list)
+
+@dataclass
+class Trajectory:
+    id: str
+    anchorMessage: str  # ID of the message that initiated this trajectory
+    state: TrajectoryState
+    confidence: float
+    messages: List[str] = field(default_factory=list)  # List of message IDs
+
+@dataclass
+class Interruption:
+    id: str
+    type: str # Can be tightened to a Literal if types are known
+    messageId: str
+    suspendsTrajectory: bool
+
+@dataclass
+class PEO:  # Pending Offer Object
+    id: str
+    originMessage: str
+    proposal: str
+    trajectoryId: str
+    status: str # e.g. "pending", "accepted", "rejected"
+    decayScore: float
+
+@dataclass
+class ConversationGraph:
+    """Root container for a conversation's graph structure."""
+    id: str
+    messages: Dict[str, MessageNode] = field(default_factory=dict)
+    trajectories: Dict[str, Trajectory] = field(default_factory=dict)
+    interruptions: Dict[str, Interruption] = field(default_factory=dict)
+    peos: Dict[str, PEO] = field(default_factory=dict)
+```
+
+## Open Questions
+
+> [!WARNING]
+> Please answer the following before approving:
+
+1. **Root Object**: For `ConversationGraph`, does a root container tracking dictionaries (keyed by ID) of these objects fit the model you expect, or did you envision a different approach to organizing all the objects?
+2. **Library**: Given that Phase 1 uses Python `dataclasses`, this plan uses `dataclasses` too. Do you want to stick with `dataclasses`, or should we employ `pydantic` for serialization/deserialization and stricter runtime validation?
+3. **Module Structure**: Is it acceptable to place these in a new module called `graph_models.py` rather than augmenting `models.py`?
+
+## Verification Plan
+
+### Automated Tests
+- If required, add a few basic unit tests inside a `test_graph_models.py` script to ensure instantiation and object inter-referencing work properly without recursion issues.
+- Basic linting checks and type hint validation (e.g. `mypy`).
+
+### Manual Verification
+- Review the implemented models for adherence to the critical architectural decision outlined in the prompt.

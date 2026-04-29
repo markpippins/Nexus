@@ -1,0 +1,19 @@
+# Concept Merge Engine Constructed
+
+Nexus now features a deterministic Algebra layer to synthesize timelines by performing calculus over causal boundaries rather than brute-forcing final state states. The system guarantees safe data convergence through instruction locality detection. 
+
+### 1. Instruction Target Localization
+Every `GraphMutation` instruction acts explicitly over isolated target points. A `get_write_set()` method allows deterministic parsing:
+- `SetProperty` targets `{"node:N:prop:K"}`
+- `CreateNode` scopes to `{"node:N"}`
+
+### 2. Timeline Delta Algebra
+The VM isolates topological modifications between divergent chains originating from a base timeline (LCA):
+- It performs `set()` intersects on these execution lists prior to execution.
+- If $W_{\Delta A} \cap W_{\Delta B} \neq \emptyset$, the engine asserts an unhandled intersection and halts.
+- If $W_{A \cap B} == \emptyset$, Nexus guarantees non-conflicting structure and loops the sets sequentially.
+
+### 3. Test Cases Implemented
+The deterministic system provides math verification layers proving functionality limits:
+- `test_merge_non_conflicting()` manipulates two detached node parameters on separate timelines, detecting a safe sequence synthesis and rebuilding an equivalent unified Final Hash.
+- `test_merge_conflict_rejection()` manipulates `{"node:SharedNode:prop:status"}` divergently. The engine correctly flags an exact overlap conflict on the parameter array and breaks via `MergeConflictException`.

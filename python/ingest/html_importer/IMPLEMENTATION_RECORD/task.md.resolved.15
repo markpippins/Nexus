@@ -1,0 +1,3 @@
+- [x] Add `scope_id` to `Concept` dataclass in `graph_models.py`
+- [x] Assign `scope_id = self.graph_id` (representing the conversation) deeply during `_extract_concepts` in `graph_builder.py` (Phase 1-3)
+- [x] During Phase 4 Trajectory Reconstruction in `trajectory_reconstructor.py`, overwrite `concept.scope_id = active_traj.id` when an unclaimed concept is actively evaluated inside a cognitive thread.

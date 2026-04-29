@@ -1,0 +1,56 @@
+# Phase 6: Cross-Trajectory Cognition (Observation Layer)
+
+This updated architecture enforces strict deterministic bounds: Observations are generated *solely* from IR state transitions (diffs) across trajectories, entirely decoupled from lifecycle states or inferred meaning.
+
+## Proposed Architecture
+
+### 1. Updated Observation Schema (`workspace.py`)
+```python
+from dataclasses import dataclass
+from typing import List, Literal
+
+RelationType = Literal["SUPPORTS", "CONTRADICTS", "REFINES", "REINTRODUCES"]
+Polarity = Literal["supporting", "contradicting", "neutral"]
+
+@dataclass
+class ObservationContent:
+    concept_ids: List[str]
+    relation: RelationType
+    evidence_pointer: str  # e.g., IR_node_id triggering the diff
+
+@dataclass
+class Observation:
+    id: str  # e.g. obs_1
+    source_trajectory_id: str
+    scope_id: str
+    content: ObservationContent
+    polarity: Polarity
+    confidence: float
+```
+
+### 2. Step A: Observation Emission (Deterministic Pipeline)
+Rather than executing during isolated evaluations, Phase 6 steps over the completed `ConversationGraph` (or the `Workspace` graph):
+1. **Extract IR Delta**: We walk the message sequences inside trajectories measuring concept introduction.
+2. **Normalize Delta**: Any structural modifications observed in the sequence are bound to their `concept_ids` and `scope_ids`.
+3. **Classify Relation Type**: 
+   - Addition mapped to an IR node → `SUPPORTS`
+   - Reappearance mapping → `REINTRODUCES`
+   - (Removal/Modification details require review — see below).
+4. **Compute Polarity**: Polarity is determined exclusively via cross-trajectory structural analysis. If two trajectories assert identical `concept_ids` under overlapping `scope_ids` and both are valid, it registers `SUPPORTING`.
+
+### 3. Step B: Synthesizer (`observation_synthesizer.py`)
+The `ObservationSynthesizer` acts globally computing consensus across all emitted observations in the overarching `Workspace`.
+
+### 4. Step C: IR Rehydration Hook
+Synthesized beliefs modify `WorkspaceGraph` parameters dynamically feeding into the final decision engines without requiring LLM evaluation loops.
+
+## User Review Required
+
+> [!WARNING]
+> How do we structurally detect concept removals/modifications in our appended IR pipeline?
+
+You specified that `CONTRADICTS` stems from identifying node *removals*, and `REFINES` from *modifications*. 
+
+Because our Phase 1-4 pipeline builds graphs in **batch mode** by continuously appending representations (e.g. `traj.concepts_active` grows cumulatively, messages are appended without ever deleting old ones from the registry), **how do we deterministically identify a "removal" or "modification" inside an append-only structure?** 
+
+Are we introducing explicit deletion mutations (e.g., `traj.concepts_removed`) during Phase 4 reconstruction when structural contradictions occur, or do we deduce "removal" structurally in Step A by checking if an intervening trajectory completely omitted a concept that a prior trajectory successfully anchored?
