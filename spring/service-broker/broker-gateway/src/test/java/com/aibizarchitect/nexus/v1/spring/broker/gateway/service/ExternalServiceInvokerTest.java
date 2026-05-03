@@ -1,8 +1,16 @@
 package com.aibizarchitect.nexus.v1.spring.broker.gateway.service;
 
-import com.aibizarchitect.nexus.v1.spring.broker.gateway.service.ExternalServiceInvokerImpl;
-import com.aibizarchitect.nexus.v1.spring.broker.gateway.service.ServiceDiscoveryClientImpl;
-import com.aibizarchitect.nexus.v1.spring.broker.spi.ServiceDiscoveryClient;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,14 +18,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import com.aibizarchitect.nexus.v1.spring.broker.spi.ServiceDiscoveryClient;
 
 @ExtendWith(MockitoExtension.class)
 class ExternalServiceInvokerTest {

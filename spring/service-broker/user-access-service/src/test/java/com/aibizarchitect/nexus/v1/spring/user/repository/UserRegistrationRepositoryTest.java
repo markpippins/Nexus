@@ -1,7 +1,10 @@
 package com.aibizarchitect.nexus.v1.spring.user.repository;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 
@@ -11,7 +14,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.aibizarchitect.nexus.v1.spring.user.model.UserRegistration;
-import com.aibizarchitect.nexus.v1.spring.user.repository.UserRegistrationRepository;
 
 @ExtendWith(MockitoExtension.class)
 class UserRegistrationRepositoryTest {
