@@ -16,8 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestTemplate;
 
-import com.aibizarchitect.nexus.v1.spring.broker.gateway.service.ServiceDiscoveryClientImpl;
-
 @ExtendWith(MockitoExtension.class)
 class ServiceDiscoveryClientTest {
 

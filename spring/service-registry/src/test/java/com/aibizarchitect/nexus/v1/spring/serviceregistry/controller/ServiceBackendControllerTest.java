@@ -22,12 +22,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.config.TestJpaConfig;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.controller.ServiceBackendController;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceBackend;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.ServiceBackendService;
 import com.aibizarchitect.nexus.v1.dto.DeploymentWithBackendsDto;
 import com.aibizarchitect.nexus.v1.dto.ServiceBackendDto;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.config.TestJpaConfig;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceBackend;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.ServiceBackendService;
 
 @WebMvcTest(ServiceBackendController.class)
 @Import(TestJpaConfig.class)
