@@ -1,0 +1,12 @@
+{
+    "name": "workrequest_pipeline_v1",
+    "skills": [
+        "archive-prompt",
+        "normalize-intent",
+        "resource-binding",
+        "decompose-task",
+        "work-request-emission",
+        "assess-stability",
+        "archive-implementation"
+    ]
+}
