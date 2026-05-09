@@ -1,6 +1,7 @@
 {
     "name": "workrequest_pipeline_v1",
     "skills": [
+        "mode-router",
         "archive-prompt",
         "normalize-intent",
         "resource-binding",

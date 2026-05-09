@@ -4,12 +4,21 @@ set -euo pipefail
 # process.sh (v1) deterministic single-worker dispatcher
 # Directory model: queued, active, complete, failed
 
+if [ -z "${1:-}" ]; then
+  echo "Usage: $0 <project_root>"
+  exit 1
+fi
+
+PROJECT_ROOT=$(cd "$1" && pwd)
+PIPELINE_DIR="$PROJECT_ROOT/.pipeline/WORK_REQUESTS"
+
 DIR="${BASH_SOURCE[0]%/*}"
 DIR=$(cd "$DIR" && pwd)
-QUEUED="$DIR/queued"
-ACTIVE="$DIR/active"
-COMPLETE="$DIR/complete"
-FAILED="$DIR/failed"
+
+QUEUED="$PIPELINE_DIR/queued"
+ACTIVE="$PIPELINE_DIR/active"
+COMPLETE="$PIPELINE_DIR/complete"
+FAILED="$PIPELINE_DIR/failed"
 
 ensure_dirs() {
   mkdir -p "$QUEUED" "$ACTIVE" "$COMPLETE" "$FAILED"
@@ -73,7 +82,7 @@ if has_files "$ACTIVE"; then
     # Execute the oldest now
     REQUEST_PATH="$ACTIVE/$oldest_active"
     if [ -f "$REQUEST_PATH" ]; then
-      python3 executor.py "$REQUEST_PATH" || {
+      python3 "$DIR/executor.py" "$REQUEST_PATH" || {
         mv -f "$REQUEST_PATH" "$FAILED/"
         exit 1
       }
@@ -95,7 +104,7 @@ if [ -n "$oldest_queued" ]; then
   mv -f "$QUEUED/$oldest_queued" "$ACTIVE/"
   # Execute it deterministically
   REQUEST_PATH="$ACTIVE/$oldest_queued"
-  python3 executor.py "$REQUEST_PATH" || {
+  python3 "$DIR/executor.py" "$REQUEST_PATH" || {
     mv -f "$REQUEST_PATH" "$FAILED/"
     exit 1
   }

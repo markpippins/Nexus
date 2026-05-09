@@ -1,16 +1,18 @@
-# Recording Rules (PROMPT_RECORD & IMPLEMENTATION_RECORD)
+# Recording Rules (.pipeline/PROMPT_RECORDS & .pipeline/IMPLEMENTATION_PLAN_RECORD)
 
 ## Overview
+
 To ensure traceability and consistency, the agent must maintain a dual-record system when operating as a planner.
 
 ## Rules
+
 1. **Prompt Archiving**:
-   - Every major task or phase start must have its initiating prompt recorded in `PROMPT_RECORD`.
+   - Every major task or phase start must have its initiating prompt recorded in `.pipeline/PROMPT_RECORDS`.
    - Files should be named `layer_<alpha>_<name>_prompt.md`.
    - If the directory does not exist, the agent should propose creating it.
 
 2. **Implementation Stacking**:
-   - The current state of `implementation_plan.md`, `task.md`, and `walkthrough.md` must be preserved in `IMPLEMENTATION_RECORD`.
+   - The current state of `implementation_plan.md`, `task.md`, and `walkthrough.md` must be preserved in `.pipeline/IMPLEMENTATION_PLAN_RECORD`.
    - The "Stacking Pattern" must be followed:
      - `file.md` (Current)
      - `file.md.resolved` (Snapshot of the most recent completion)

@@ -21,10 +21,12 @@ One or more valid WorkRequest JSON objects.
    - Every WorkRequest MUST include: `id`, `intent_node_id`, `version`, `state`, `layer_mode`, `supersedes`, `derivation`, `path`, `intent_layer`, and optionally `binding_layer` and `execution_layer`.
    - Initial state is ALWAYS `DRAFT`.
 
-2. **Supersession Enforcement**:
+2. **Supersession Enforcement & Immutability (CRITICAL)**:
+   - WorkRequests are strictly IMMUTABLE. You MUST NEVER edit an existing WorkRequest file in-place.
+   - Always emit a completely new file with an incremented version (e.g., `_v2`, `_v3`) for any modification.
    - Detect existing WorkRequests for the same `intent_node_id`.
    - Mark previous versions as `SUPERSEDED`.
-   - Explicitly link them in the `supersedes` array.
+   - Explicitly link them in the `supersedes` array of the new immutable file.
 
 3. **Execution Safety**:
    - Each WorkRequest MUST be atomic and executable without interpretation.

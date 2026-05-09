@@ -7,7 +7,6 @@ import ollama
 
 def run_worker(request_path):
     # This executor implements the strict contract described in v1.0.
-    artifacts_root = "/artifacts"
     result = {
         "workRequestId": "",
         "status": "failure",
@@ -35,6 +34,7 @@ def run_worker(request_path):
         wr_id = req.get("id")
         req_valid = req_valid and all(k in req for k in ("id", "task", "path", "model"))
         if wr_id:
+            artifacts_root = os.path.join(req.get("path", "."), ".pipeline", "WORK_REQUESTS", "artifacts")
             artifacts_dir = os.path.join(artifacts_root, wr_id)
         else:
             artifacts_dir = None
