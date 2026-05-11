@@ -1,0 +1,211 @@
+{
+  "Ingest": {
+    "Actors": {
+      "User": {
+        "roles": [
+          "SourceOfTruth",
+          "IntentDeclarer",
+          "MeaningAssigner",
+          "ConfirmationAuthority"
+        ]
+      },
+      "System": {
+        "roles": [
+          "PreInterpreter",
+          "Classifier",
+          "IntentResolver",
+          "GraphReducer",
+          "AgentActivator"
+        ]
+      },
+      "Avatar": {
+        "roles": [
+          "UIProxy",
+          "SignalEmitter",
+          "StateNarrator"
+        ]
+      }
+    },
+
+    "Sources": {
+      "CaptureInputs": [
+        "TextPaste",
+        "FileUpload",
+        "URL",
+        "VoiceNote",
+        "Screenshot",
+        "RepoLink",
+        "ChatTranscript",
+        "EmailForward",
+        "WatchedFolder",
+        "Webhook",
+        "GitCommit"
+      ]
+    },
+
+    "IngestModes": {
+      "QuickCapture": {
+        "description": "Minimal friction, minimal decisions.",
+        "constraints": ["No required metadata", "Fast path"]
+      },
+      "GuidedIngest": {
+        "description": "Structured ingest for complex artifacts.",
+        "use_cases": ["Specs", "Repos", "Datasets", "Contracts", "ArchitecturalDocs"]
+      },
+      "AutonomousIngest": {
+        "description": "System-driven ingest from continuous sources.",
+        "ui": "AuditConsole"
+      }
+    },
+
+    "States": {
+      "Captured": "Raw material entered the system.",
+      "PreInterpreted": "System has extracted first-pass meaning.",
+      "MeaningAssigned": "User has defined cognitive intent.",
+      "StructuredPreview": "System shows proposed structural impact.",
+      "Committed": "Ingest becomes part of system cognition.",
+      "Activated": "Downstream agents react to new knowledge."
+    },
+
+    "Transitions": [
+      {
+        "from": "Captured",
+        "to": "PreInterpreted",
+        "trigger": "SystemAutoAnalysis"
+      },
+      {
+        "from": "PreInterpreted",
+        "to": "MeaningAssigned",
+        "trigger": "UserConfirmationOrCorrection"
+      },
+      {
+        "from": "MeaningAssigned",
+        "to": "StructuredPreview",
+        "trigger": "SystemGraphProjection"
+      },
+      {
+        "from": "StructuredPreview",
+        "to": "Committed",
+        "trigger": "UserCommit"
+      },
+      {
+        "from": "Committed",
+        "to": "Activated",
+        "trigger": "AgentActivationRules"
+      }
+    ],
+
+    "PreInterpretation": {
+      "ExtractedAttributes": [
+        "DocumentType",
+        "Entities",
+        "IntentSignals",
+        "Scope",
+        "Confidence",
+        "SuggestedClassification"
+      ],
+      "Rules": {
+        "UserOverridesAlwaysWin": true,
+        "NoSilentAutomation": true
+      }
+    },
+
+    "MeaningAssignment": {
+      "CognitiveIntent": [
+        "Knowledge",
+        "Task",
+        "DecisionInput",
+        "ReferenceMaterial",
+        "Conversation",
+        "Dataset",
+        "Experiment",
+        "IdeaSeed"
+      ],
+      "Purpose": [
+        "LearnFromIt",
+        "ActOnIt",
+        "StoreForRecall",
+        "Evaluate",
+        "MergeIntoProject"
+      ],
+      "AttachmentTargets": [
+        "Project",
+        "Agent",
+        "Timeline",
+        "Spec",
+        "ResearchThread",
+        "MemorySpace"
+      ]
+    },
+
+    "StructuralPreview": {
+      "PossibleOutputs": [
+        "KnowledgeNodes",
+        "PendingTasks",
+        "OpenQuestions",
+        "Assumptions",
+        "LinksToProjects",
+        "GraphEdges",
+        "AgentTriggers"
+      ]
+    },
+
+    "CommitPhase": {
+      "Action": "CommitToSystem",
+      "Meaning": "This ingest becomes a cognition event, not a file upload."
+    },
+
+    "PostIngestImpact": {
+      "ImpactTypes": [
+        "ResearchAgentScheduled",
+        "SpecValidatorFlagged",
+        "KnowledgeGraphExpanded",
+        "TaskCreated",
+        "ThreadUpdated",
+        "MemoryReinforced"
+      ]
+    },
+
+    "EventModel": {
+      "Event": {
+        "id": "string",
+        "type": "IngestEvent | PreInterpretationEvent | MeaningAssignmentEvent | CommitEvent | ActivationEvent",
+        "timestamp": "ISO8601",
+        "actor": "User | System | Avatar",
+        "payload": "object",
+        "causes": ["EventId"],
+        "effects": ["StateChange"]
+      },
+      "StateChange": {
+        "from": "string",
+        "to": "string",
+        "reason": "string"
+      }
+    },
+
+    "GraphStateReducer": {
+      "Inputs": [
+        "ExtractedEntities",
+        "UserIntent",
+        "DocumentStructure",
+        "ExistingGraph",
+        "AgentRules"
+      ],
+      "Outputs": [
+        "GraphDiff",
+        "NewNodes",
+        "NewEdges",
+        "UpdatedNodes",
+        "ActivationSignals"
+      ]
+    },
+
+    "Rules": {
+      "CognitiveIntentRequired": true,
+      "UserConfirmationRequired": true,
+      "SystemMaySuggestButNotDecide": true,
+      "EveryIngestCreatesEvent": true,
+      "EveryEventHasTraceability": true
+    }
+  }
+}

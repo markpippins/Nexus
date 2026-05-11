@@ -1,0 +1,67 @@
+{
+  "vocabulary": {
+    "discourse": {
+      "utterance": "A single user or system message, chunked semantically.",
+      "topic": "A coherent subject of discussion.",
+      "subtopic": "A narrower subject nested under a topic.",
+      "digression": "A departure from the active topic that may contain latent requirements.",
+      "callback": "A reference to a previously discussed topic or idea.",
+      "return_marker": "A cue indicating the user wants to resume a prior thread.",
+      "story": "A narrative segment containing implicit requirements.",
+      "insight": "A user realization that may modify or create requirements."
+    },
+
+    "threading": {
+      "design_thread": "A coherent sequence of utterances related to a subsystem or feature.",
+      "activation": "When a thread becomes active.",
+      "deactivation": "When a thread is paused or dropped.",
+      "cross_link": "A semantic relationship between two threads.",
+      "priority": "Relative importance of a thread.",
+      "confidence": "Model confidence in the thread’s inferred meaning."
+    },
+
+    "requirements_ir": {
+      "component": "A system part with behavior, state, and interfaces.",
+      "interface": "A boundary through which components interact.",
+      "operation": "A function or action performed by a component.",
+      "event": "A state-changing occurrence.",
+      "state": "A condition or configuration of a component.",
+      "transition": "A change from one state to another.",
+      "constraint": "A rule restricting system behavior.",
+      "invariant": "A condition that must always hold true.",
+      "data_model": "Structured representation of data entities.",
+      "actor": "A user or external system.",
+      "scenario": "A narrative describing system behavior.",
+      "assumption": "A presumed-true condition.",
+      "open_question": "A detail needing clarification.",
+      "risk": "A potential failure mode.",
+      "requirement": "A functional or non-functional obligation."
+    },
+
+    "formalization": {
+      "typespec_entity": "A TypeSpec construct.",
+      "tla_variable": "A state variable in TLA+.",
+      "tla_action": "A state transition relation.",
+      "tla_invariant": "A safety property.",
+      "cue_schema": "A CUE schema.",
+      "cue_constraint": "A CUE rule restricting values."
+    },
+
+    "ui_annotations": {
+      "highlight_type": "visual cue applied to a snippet (bold, underline, color, glow).",
+      "highlight_reason": "why the system highlighted this snippet (insight, requirement, risk).",
+      "ui_marker_id": "unique ID for the UI element marking the snippet.",
+      "user_acknowledged": "whether the user confirmed or expanded the captured snippet.",
+      "auto_capture": "whether the system captured the snippet automatically.",
+      "capture_scope": "the range of utterances included in the note."
+    },
+
+    "metadata": {
+      "source_utterances": "IDs of utterances supporting this IR element.",
+      "traceability": "Links between IR elements and their origins.",
+      "version": "Version identifier.",
+      "timestamp": "Creation or update time.",
+      "provenance": "Model or human agent responsible."
+    }
+  }
+}
