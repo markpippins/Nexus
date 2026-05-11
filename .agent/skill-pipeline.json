@@ -1,12 +1,23 @@
 {
     "name": "workrequest_pipeline_v1",
     "skills": [
+        "mode-router",
         "archive-prompt",
         "normalize-intent",
-        "resource-binding",
+        "peb-context-binding",
+        "resource-locator",
         "decompose-task",
         "work-request-emission",
+        "peb-validation-layer",
+        "peb-exception-router",
         "assess-stability",
+        "peb-knowledge-formation",
+        "peb-memory-consolidation",
         "archive-implementation"
-    ]
+    ],
+    "feedback_edges": {
+        "peb-knowledge-formation": ["normalize-intent"],
+        "peb-exception-router": ["mode-router"],
+        "assess-stability": ["decompose-task"]
+    }
 }

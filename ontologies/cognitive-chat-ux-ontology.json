@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus.platform/chat-cognition-ontology",
+  "title": "Conversational Cognition and Note-Event Extraction Ontology",
+  "version": "0.1.0",
+
+  "entities": {
+
+    "User": {
+      "description": "A human participant in a conversation.",
+      "properties": {
+        "id": "string",
+        "name": "string",
+        "roles": ["string"],
+        "preferences": {
+          "muteDefault": "boolean",
+          "highlightStyle": "string",
+          "colorOverrides": "object"
+        }
+      }
+    },
+
+    "Message": {
+      "description": "A single unit of conversational text.",
+      "properties": {
+        "id": "string",
+        "authorId": "string",
+        "timestamp": "string",
+        "content": "string",
+        "threadId": "string",
+        "isMuted": "boolean",
+        "ignoreCategory": "string",
+        "semanticUnits": ["SemanticUnit"]
+      }
+    },
+
+    "SemanticUnit": {
+      "description": "A contiguous region of text with inferred meaning.",
+      "properties": {
+        "startIndex": "integer",
+        "endIndex": "integer",
+        "category": "string",
+        "confidence": "number",
+        "weight": "number",
+        "decayRate": "number",
+        "isCandidateNote": "boolean"
+      }
+    },
+
+    "NoteEvent": {
+      "description": "A structured extraction from conversation representing actionable or structural information.",
+      "properties": {
+        "id": "string",
+        "sourceMessageId": "string",
+        "text": "string",
+        "category": "string",
+        "weight": "number",
+        "createdAt": "string",
+        "userAdjusted": "boolean",
+        "boundaries": {
+          "startIndex": "integer",
+          "endIndex": "integer"
+        }
+      }
+    },
+
+    "HighlightRegion": {
+      "description": "A UI-visible region indicating potential note extraction.",
+      "properties": {
+        "messageId": "string",
+        "startIndex": "integer",
+        "endIndex": "integer",
+        "color": "string",
+        "category": "string",
+        "confidence": "number",
+        "isFaded": "boolean"
+      }
+    },
+
+    "AvatarSignal": {
+      "description": "The avatar's visual cue representing cognitive state.",
+      "properties": {
+        "signalType": "string",
+        "intensity": "number",
+        "reason": "string"
+      }
+    },
+
+    "SubsystemSeed": {
+      "description": "A cluster of related note events indicating emerging organizational intent.",
+      "properties": {
+        "id": "string",
+        "relatedNotes": ["string"],
+        "weight": "number",
+        "momentum": "number",
+        "decayRate": "number",
+        "status": "string"
+      }
+    }
+  },
+
+  "actors": {
+    "User": "Human participant",
+    "System": "The cognitive engine performing extraction, weighting, decay, and highlighting",
+    "Avatar": "UI representation of system cognition"
+  },
+
+  "roles": {
+    "User": ["author", "reviewer", "reclassifier"],
+    "System": ["classifier", "highlighter", "predictor", "extractor"],
+    "Avatar": ["noticingIndicator", "confidenceIndicator"]
+  },
+
+  "states": {
+    "MessageState": ["ignored", "analyzed", "highlighted", "noteExtracted"],
+    "SemanticUnitState": ["candidate", "confirmed", "reclassified", "decayed"],
+    "SubsystemState": ["emerging", "stabilizing", "active", "stalled", "decayed"]
+  },
+
+  "transitions": {
+
+    "MessageProcessing": [
+      {
+        "from": "ignored",
+        "to": "analyzed",
+        "trigger": "passesIgnoreList"
+      },
+      {
+        "from": "analyzed",
+        "to": "highlighted",
+        "trigger": "semanticUnitDetected"
+      },
+      {
+        "from": "highlighted",
+        "to": "noteExtracted",
+        "trigger": "userAcceptsOrTimeout"
+      }
+    ],
+
+    "SemanticUnitLifecycle": [
+      {
+        "from": "candidate",
+        "to": "confirmed",
+        "trigger": "userAdjustsOrConfirms"
+      },
+      {
+        "from": "candidate",
+        "to": "decayed",
+        "trigger": "timeWithoutReinforcement"
+      },
+      {
+        "from": "confirmed",
+        "to": "reclassified",
+        "trigger": "userReclassifies"
+      }
+    ],
+
+    "SubsystemLifecycle": [
+      {
+        "from": "emerging",
+        "to": "stabilizing",
+        "trigger": "multipleUsersReinforce"
+      },
+      {
+        "from": "stabilizing",
+        "to": "active",
+        "trigger": "meetingsScheduledOrArtifactsGenerated"
+      },
+      {
+        "from": "active",
+        "to": "stalled",
+        "trigger": "lackOfMentions"
+      },
+      {
+        "from": "stalled",
+        "to": "decayed",
+        "trigger": "extendedSilence"
+      }
+    ]
+  },
+
+  "ignoreList": {
+    "categories": [
+      "personal_life",
+      "emotional_venting",
+      "jokes",
+      "memes",
+      "sports_chatter",
+      "weekend_plans",
+      "family_logistics",
+      "non_work_smalltalk"
+    ]
+  },
+
+  "highlightingRules": {
+    "defaultStyle": "postit",
+    "colorByCategory": {
+      "engineering": "blue",
+      "scheduling": "pink",
+      "compliance": "yellow",
+      "risk": "orange",
+      "finance": "green",
+      "hr": "purple",
+      "lowPriority": "gray"
+    },
+    "fadeThreshold": 0.3
+  },
+
+  "weightingModel": {
+    "localWeight": "per-user corrections",
+    "globalWeight": "cross-user consensus",
+    "decay": {
+      "baseRate": 0.02,
+      "culturalBlockerRate": 0.10,
+      "structuralBlockerRate": 0.005
+    }
+  },
+
+  "culturalBlockers": {
+    "description": "Soft constraints that affect predictions but are never surfaced.",
+    "properties": {
+      "inferred": "boolean",
+      "weight": "number",
+      "decayRate": "number",
+      "effectOnPredictions": ["momentum", "alignment", "proposalFrequency"]
+    }
+  },
+
+  "systemBehavior": {
+    "proposalRules": {
+      "stopProposingWhen": [
+        "momentumLow",
+        "alignmentLow",
+        "culturalBlockerHigh"
+      ],
+      "resumeWhen": [
+        "newMentions",
+        "stakeholderReengagement"
+      ]
+    }
+  }
+}

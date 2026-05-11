@@ -1,8 +1,0 @@
-{
-  "id": "wr-001",
-  "model": "gemma4:e2b",
-  "task": "append the id for this work request to the log file speficied in the path",
-  "path": "/home/codex/bin/work_request/log/work.log",
-  "resources": [],
-  "status": "queued"
-}

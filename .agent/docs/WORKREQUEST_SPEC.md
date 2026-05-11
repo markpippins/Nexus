@@ -18,7 +18,7 @@ A WorkRequest is not a prompt, not a task, and not an implementation.
 
 It is the stable compilation boundary between intent and execution.
 
-2. Design Principles
+1. Design Principles
 2.1 Session Independence
 
 WorkRequests must remain valid outside the model session that produced them.
@@ -49,14 +49,14 @@ History is preserved as a causal chain.
 
 Nexus enforces a 3-Layer IR Model:
 
-Layer	Responsibility
-Intent	System truth or invariant requirement
-Binding	Valid solution space
-Execution	Selected concrete transformation
+Layer Responsibility
+Intent System truth or invariant requirement
+Binding Valid solution space
+Execution Selected concrete transformation
 
 Premature binding is prohibited.
 
-3. Conceptual Model
+1. Conceptual Model
 Human Intent
       ↓
 Prompt
@@ -71,17 +71,17 @@ Code / Artifacts
 
 The WorkRequest functions as the compiler IR between cognition and action.
 
-4. WorkRequest Lifecycle
+1. WorkRequest Lifecycle
 States
-State	Meaning
-DRAFT	Generated but not executed
-READY	Validated for execution
-EXECUTED	Applied by executor
-SUPERSEDED	Replaced by newer WorkRequest
-REJECTED	Invalid or abandoned
+State Meaning
+DRAFT Generated but not executed
+READY Validated for execution
+EXECUTED Applied by executor
+SUPERSEDED Replaced by newer WorkRequest
+REJECTED Invalid or abandoned
 Lifecycle Flow
 Generate → Refine → Validate → Execute → Record Outcome
-5. Required Top-Level Fields
+2. Required Top-Level Fields
 {
   "id": "string",
   "intent_node_id": "string",
@@ -93,7 +93,7 @@ Generate → Refine → Validate → Execute → Record Outcome
   "path": "string",
   "model": "string"
 }
-6. Derivation Block
+3. Derivation Block
 
 The derivation block records semantic lineage.
 
@@ -114,7 +114,7 @@ It answers:
 
 Why does this WorkRequest exist?
 
-7. Layer Definitions
+1. Layer Definitions
 7.1 Intent Layer (Required)
 
 Defines invariant system truth.
@@ -183,7 +183,7 @@ pyproject.toml
 
 Executors must never assume repository root implicitly.
 
-9. Model Attribution
+1. Model Attribution
 "model": "gemini-3.1-pro"
 
 Purpose:
@@ -194,7 +194,7 @@ behavioral analysis.
 
 The model is a compiler frontend, not an authority.
 
-10. Execution Rules
+1. Execution Rules
 
 Executors MUST:
 
@@ -205,15 +205,15 @@ Record outcome externally.
 
 Executors are linkers, not planners.
 
-11. Relationship to PROMPT_RECORD & IMPLEMENTATION_RECORD
-Artifact	Role
-PROMPT_RECORD	Human ↔ Agent dialogue history
-WORKREQUEST	Canonical IR
-IMPLEMENTATION_RECORD	Execution results
+1. Relationship to PROMPT_RECORDS & IMPLEMENTATION_PLAN_RECORD
+Artifact Role
+PROMPT_RECORDS Human ↔ Agent dialogue history
+WORKREQUEST Canonical IR
+IMPLEMENTATION_PLAN_RECORD Execution results
 
 WorkRequests bridge cognition and implementation.
 
-12. Failure Handling
+1. Failure Handling
 
 If execution fails:
 
@@ -223,7 +223,7 @@ Return to Binding Layer.
 
 Intent is never discarded.
 
-13. Anti-Patterns
+1. Anti-Patterns
 ❌ Tactical Patching
 
 Embedding fixes directly in prompts.
@@ -236,7 +236,7 @@ Using @ts-ignore style bypasses without binding justification.
 
 Referencing conversational reasoning.
 
-14. Expected Emergent Properties
+1. Expected Emergent Properties
 
 When followed correctly:
 
@@ -253,7 +253,7 @@ A WorkRequest is not work itself.
 
 It is the proof that work has been understood.
 
-16. Future Extensions (Non-Normative)
+1. Future Extensions (Non-Normative)
 
 Possible additions:
 

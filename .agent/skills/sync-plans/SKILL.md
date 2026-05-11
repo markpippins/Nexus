@@ -6,10 +6,12 @@ description: Synchronizes the implementation records with the written plans and 
 # Sync Plans Skill
 
 ## Purpose
+
 Ensure that the `implementation_plan.md` accurately reflects the state of the codebase and that all planned tasks have been correctly translated into WorkRequests.
 
 ## Rules
-1. Review the current `implementation_plan.md` in `IMPLEMENTATION_RECORD`.
+
+1. Review the current `implementation_plan.md` in `IMPLEMENTATION_PLAN_RECORD`.
 2. Compare the plan with the actual changes made to the codebase and the generated `WorkRequests`.
 3. Update the `implementation_plan.md` to mark completed tasks, update progress, and adjust the roadmap as needed.
 4. Ensure the `walkthrough.md` is updated to reflect the current flow of the system.

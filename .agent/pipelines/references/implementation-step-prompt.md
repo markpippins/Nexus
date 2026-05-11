@@ -13,7 +13,7 @@ Instructions:
 3. Preserve architectural intent and rationale from earlier plans when generating tasks.
 4. Generate WorkRequests ONLY for the CURRENT BEST UNDERSTANDING of the system.
 5. Do NOT reproduce historical plans.
-6. Emit atomic WorkRequests suitable for executor.py.
+6. Emit atomic WorkRequests suitable for .agent/scripts/executor.py.
 7. Each WorkRequest must:
 
    * modify only one logical concern

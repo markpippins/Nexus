@@ -76,13 +76,16 @@ Each project contains a project-local pipeline workspace.
 │       ├── process.sh
 │       └── executor.py
 │
-└── WORKREQUESTS/
-    └── <work-id>/
-        ├── WORK_REQUEST.md
-        ├── PROMPT_RECORD/
-        ├── IMPLEMENTATION_RECORD/
-        ├── OUTPUT/
-        └── STATE.json
+└── .pipeline/
+    ├── IMPLEMENTATION_PLAN_RECORD/
+    ├── PROMPT_RECORDS/
+    └── WORK_REQUESTS/
+        ├── active/
+        ├── artifacts/
+        ├── complete/
+        ├── failed/
+        ├── log/
+        └── queued/
 ```
 
 ### Important Rules
@@ -148,7 +151,7 @@ Skills must be **idempotent** whenever possible.
 
 The compiler maintains two mandatory logs.
 
-### PROMPT_RECORD
+### PROMPT_RECORDS
 
 Tracks:
 
@@ -165,7 +168,7 @@ Purpose:
 
 ---
 
-### IMPLEMENTATION_RECORD
+### IMPLEMENTATION_PLAN_RECORD
 
 Tracks:
 
@@ -191,7 +194,7 @@ The following behaviors are intentional focus areas:
 3. Pipeline folder auto-creation
 4. Relative path normalization
 5. Single shared executor/process scripts
-6. PROMPT_RECORD + IMPLEMENTATION_RECORD not updating after WorkRequest emission
+6. PROMPT_RECORDS + IMPLEMENTATION_PLAN_RECORD not updating after WorkRequest emission
 
 **Priority:**
 Stabilize execution before refactoring into multiple modules.
@@ -306,8 +309,8 @@ Long-term goal:
 ```
 1. Create WorkRequest
 2. Run compiler skill
-3. Review PROMPT_RECORD
-4. Review IMPLEMENTATION_RECORD
+3. Review PROMPT_RECORDS
+4. Review IMPLEMENTATION_PLAN_RECORD
 5. Continue or finalize
 ```
 

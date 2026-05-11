@@ -48,13 +48,16 @@ The system exists to guarantee:
      ├── executor.py      ← Compiler Driver
      └── process.sh       ← Execution Runtime
 
-WORKREQUESTS/
- └── <work-id>/
-     ├── WORK_REQUEST.md
-     ├── PROMPT_RECORD/
-     ├── IMPLEMENTATION_RECORD/
-     ├── OUTPUT/
-     └── STATE.json
+.pipeline/
+ ├── IMPLEMENTATION_PLAN_RECORD/
+ ├── PROMPT_RECORDS/
+ └── WORK_REQUESTS/
+     ├── active/
+     ├── artifacts/
+     ├── complete/
+     ├── failed/
+     ├── log/
+     └── queued/
 ```
 
 ---
@@ -176,7 +179,7 @@ Without recording, deterministic AI workflows are impossible.
 
 Two permanent records exist:
 
-### PROMPT_RECORD
+### PROMPT_RECORDS
 
 Captures:
 
@@ -192,7 +195,7 @@ Equivalent to:
 
 ---
 
-### IMPLEMENTATION_RECORD
+### IMPLEMENTATION_PLAN_RECORD
 
 Captures:
 

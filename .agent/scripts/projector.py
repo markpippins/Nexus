@@ -8,17 +8,16 @@ def generate_work_to_date(root_path, output_file):
     """
     # Find all JSON files that look like WorkRequests
     # Assuming they are in .agent/skills/work-request-emission/scripts/complete or similar
-    # or anywhere in IMPLEMENTATION_RECORD
+    # or anywhere in IMPLEMENTATION_PLAN_RECORD
     
     wr_files = []
     # Search common locations
     search_paths = [
-        os.path.join(root_path, "IMPLEMENTATION_RECORD", "*.json"),
-        os.path.join(root_path, ".agent", "skills", "work-request-emission", "scripts", "artifacts", "*", "request.json")
+        os.path.join(root_path, ".pipeline", "WORK_REQUESTS", "**", "*.json")
     ]
     
     for path in search_paths:
-        wr_files.extend(glob.glob(path))
+        wr_files.extend(glob.glob(path, recursive=True))
 
     work_requests = []
     for f in wr_files:
