@@ -82,12 +82,19 @@ if has_files "$ACTIVE"; then
     # Execute the oldest now
     REQUEST_PATH="$ACTIVE/$oldest_active"
     if [ -f "$REQUEST_PATH" ]; then
+      cp -f "$REQUEST_PATH" "${REQUEST_PATH}.prev"
       python3 "$DIR/executor.py" "$REQUEST_PATH" || {
         mv -f "$REQUEST_PATH" "$FAILED/"
         exit 1
       }
-      # On success, move to complete
-      mv -f "$REQUEST_PATH" "$COMPLETE/"
+      # Assess Stability (Pass 4) - Fixed Point Isomorphism
+      if python3 "$DIR/assess_stability.py" "$REQUEST_PATH" "${REQUEST_PATH}.prev" > /dev/null 2>&1; then
+        mv -f "$REQUEST_PATH" "$COMPLETE/"
+        rm -f "${REQUEST_PATH}.prev"
+      else
+        mv -f "$REQUEST_PATH" "$QUEUED/"
+        rm -f "${REQUEST_PATH}.prev"
+      fi
     fi
   fi
   # After handling startup active, promote next from queued if available
@@ -104,11 +111,19 @@ if [ -n "$oldest_queued" ]; then
   mv -f "$QUEUED/$oldest_queued" "$ACTIVE/"
   # Execute it deterministically
   REQUEST_PATH="$ACTIVE/$oldest_queued"
+  cp -f "$REQUEST_PATH" "${REQUEST_PATH}.prev"
   python3 "$DIR/executor.py" "$REQUEST_PATH" || {
     mv -f "$REQUEST_PATH" "$FAILED/"
     exit 1
   }
-  mv -f "$REQUEST_PATH" "$COMPLETE/"
+  # Assess Stability (Pass 4) - Fixed Point Isomorphism
+  if python3 "$DIR/assess_stability.py" "$REQUEST_PATH" "${REQUEST_PATH}.prev" > /dev/null 2>&1; then
+    mv -f "$REQUEST_PATH" "$COMPLETE/"
+    rm -f "${REQUEST_PATH}.prev"
+  else
+    mv -f "$REQUEST_PATH" "$QUEUED/"
+    rm -f "${REQUEST_PATH}.prev"
+  fi
 fi
 
 exit 0

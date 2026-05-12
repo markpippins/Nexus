@@ -7,6 +7,7 @@
         "peb-context-binding",
         "resource-locator",
         "decompose-task",
+        "peb-merge-recomposition",
         "work-request-emission",
         "peb-validation-layer",
         "peb-exception-router",
