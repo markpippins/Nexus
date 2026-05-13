@@ -3,7 +3,7 @@
     "skills": [
         "mode-router",
         "archive-prompt",
-        "normalize-intent",
+        "requirements-capture",
         "peb-context-binding",
         "resource-locator",
         "decompose-task",
@@ -17,8 +17,14 @@
         "archive-implementation"
     ],
     "feedback_edges": {
-        "peb-knowledge-formation": ["normalize-intent"],
-        "peb-exception-router": ["mode-router"],
-        "assess-stability": ["decompose-task"]
+        "peb-knowledge-formation": [
+            "requirements-capture"
+        ],
+        "peb-exception-router": [
+            "mode-router"
+        ],
+        "assess-stability": [
+            "decompose-task"
+        ]
     }
 }
