@@ -33,9 +33,42 @@ class ReductionResult(TypedDict):
 class RequirementNode(TypedDict):
     state: str
     intent: str | None
+    intent_scope: str
     implementation_hint: str | None
     confidence: float | None
+    narrative: str | None
+    structure: Structure | None
+    constraints: list[str]
+    artifacts: list[ArtifactRef]
+    rationale: str | None
+    acceptance: list[str]
+    status_hint: str | None
     lineage: Lineage
+```
+
+### 2.4a Structure
+```python
+class Structure(TypedDict):
+    entities: list[Entity]
+    relations: list[Relation]
+
+class Entity(TypedDict):
+    name: str
+    type: str
+    props: dict
+
+class Relation(TypedDict):
+    source: str
+    target: str
+    type: str
+```
+
+### 2.4b ArtifactRef
+```python
+class ArtifactRef(TypedDict):
+    path: str
+    description: str
+    type: str
 ```
 
 ### 2.5 Lineage
@@ -90,15 +123,33 @@ All handlers mutate ONLY the in-memory reducer state.
 - create node
 - state = ACTIVE
 - initialize lineage
+- narrative = payload.narrative (or None)
+- structure = payload.structure (or None)
+- constraints = payload.constraints (or [])
+- artifacts = payload.artifacts (or [])
+- intent_scope = payload.intent_scope
 - add to index + graph nodes
 
 ### 5.2 REQ_REFINED
 **Preconditions**: req_id must exist
 **Effect**:
 - update: intent (optional), implementation_hint (optional), confidence (optional)
+- update: narrative (optional — if present in payload, replace fully)
+- update: structure (optional — if present in payload, replace fully)
+- update: constraints (optional — if present in payload, replace fully)
+- update: artifacts (optional — if present in payload, replace fully)
+- update: rationale (optional — if present in payload, replace fully)
+- update: acceptance (optional — if present in payload, replace fully)
+- update: status_hint (optional — if present in payload, replace fully)
+- supersedes is logged as lineage metadata but does NOT affect projection
 - NO state change
 - NO graph change
-**IMPORTANT RULE**: Refinement may set a dirty flag internally, but must not mutate state.
+**IMPORTANT RULES**:
+1. Refinement may set a dirty flag internally, but must not mutate state.
+2. **Replacement semantics**: If a field is present in the payload, its value replaces the previous value entirely (not a diff or merge). If a field is absent, the previous value is preserved unchanged. An empty array or object is an explicit clear.
+3. See [`CANONICAL_REFINEMENT_CONTRACT.md`](./CANONICAL_REFINEMENT_CONTRACT.md) for the full Canonical Refinement Contract governing reducer law and field semantics.
+
+**IMPORTANT: `intent_scope` is NOT refinable.** Any `REQ_REFINED` event containing `intent_scope` in its payload MUST be rejected at validation (see V7).
 
 ### 5.3 REQ_SUPERSEDED
 **Preconditions**: req_id exists, superseded_by exists or is created
@@ -165,7 +216,7 @@ def reduce(events):
     try:
         state = init_empty()
         for event in sorted(events, key=timestamp_then_event_id):
-            dispatch(event, state)
+            dispatch(event, state)  # No merging. No interpretation. No reconciliation. — per CRC §5
         return build_output(state)
     except Exception as e:
         emit_failure_event(e)
@@ -192,6 +243,7 @@ Reject entire event stream if:
 - **V4** — invalid transition (maps to F4 — `FAILURE_TRANSITION_VIOLATION`)
 - **V5** — orphan merge/split references (maps to F5 — `FAILURE_GRAPH_INCONSISTENCY`)
 - **V6** — non-deterministic ordering ambiguity (maps to F3 — `FAILURE_ORDERING_AMBIGUITY`)
+- **V7** — refinement scope violation: `REQ_REFINED` event with `intent_scope` in payload (maps to F4 — `FAILURE_TRANSITION_VIOLATION`)
 
 See [`FAILURE_SEMANTICS.md`](./FAILURE_SEMANTICS.md) for the full failure classification and handling model.
 

@@ -1,24 +1,27 @@
 ---
 name: pipeline-setup
-description: Sets up the standard WorkRequest pipeline directory structure in a target directory.
+description: Orchestrates full pipeline setup — runs pipeline-init then pipeline-intent in sequence.
 ---
 
 # Pipeline Setup Skill
 
 ## Purpose
-Initializes a new or existing project folder with the canonical `.pipeline` directory structure required by the WorkRequest compiler.
+Orchestrates the complete pipeline setup workflow: creates the physical workspace (`pipeline-init`) then establishes the Pipeline Intent Contract (`pipeline-intent`).
+
+This is a sequencing skill. It does no infrastructure work and no intent inference itself.
 
 ## Trigger
-When the user says "set up a pipeline for <target>", or explicitly requests to initialize the pipeline structure.
+When the user says "set up a pipeline for \<target\>", "initialize a pipeline", or "prepare a pipeline workspace".
 
 ## Execution
-Run the bash script located at:
-`/home/codex/dev/nexus/.agent/scripts/pipeline-setup.sh <target_directory>`
 
-The `<target_directory>` is the root folder where `.pipeline` (and its subfolders) will be created.
+### Step 1: Run pipeline-init
+Invoke `pipeline-init` on the target directory to create the canonical `.pipeline` directory structure.
+
+### Step 2: Run pipeline-intent
+Invoke `pipeline-intent` on the same target to analyze context, resolve intent, and write `PIPELINE_INTENT.yaml` plus `pipeline-mode.json`.
 
 ## Expected Result
-A `.pipeline` folder is created in the target directory containing:
-- `IMPLEMENTATION_PLAN_RECORD/`
-- `PROMPT_RECORDS/`
-- `WORK_REQUESTS/` with its subdirectories (`active`, `artifacts`, `complete`, `failed`, `log`, `queued`).
+- `.pipeline/` directory structure
+- `.pipeline/PIPELINE_INTENT.yaml` with valid, normalized intent
+- `.agent/pipeline-mode.json` with mode + intent_source

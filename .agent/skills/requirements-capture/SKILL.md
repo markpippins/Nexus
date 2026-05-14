@@ -53,7 +53,33 @@ These are NOT authoritative and MUST be fully regenerated from events:
   "payload": {
     "intent": "string",
     "implementation_hint": "string",
-    "type": "functional | architectural | constraint | workflow | research | hypothesis | decision | failure"
+    "type": "functional | architectural | constraint | workflow | research | hypothesis | decision | failure",
+    "narrative": "string (markdown)",
+    "structure": {
+      "entities": [
+        {
+          "name": "string",
+          "type": "string",
+          "props": {}
+        }
+      ],
+      "relations": [
+        {
+          "source": "string",
+          "target": "string",
+          "type": "string"
+        }
+      ]
+    },
+    "constraints": ["string"],
+    "artifacts": [
+      {
+        "path": "string",
+        "description": "string",
+        "type": "string"
+      }
+    ],
+    "intent_scope": "problem | capability | behavior | implementation | experiment"
   }
 }
 ```
@@ -66,10 +92,48 @@ These are NOT authoritative and MUST be fully regenerated from events:
   "payload": {
     "intent": "string?",
     "implementation_hint": "string?",
-    "confidence": "number (0.0–1.0)?"
+    "confidence": "number (0.0–1.0)?",
+    "narrative": "string (markdown)?",
+    "structure": {
+      "entities": [
+        {
+          "name": "string",
+          "type": "string",
+          "props": {}
+        }
+      ],
+      "relations": [
+        {
+          "source": "string",
+          "target": "string",
+          "type": "string"
+        }
+      ]
+    },
+    "constraints": ["string"],
+    "artifacts": [
+      {
+        "path": "string",
+        "description": "string",
+        "type": "string"
+      }
+    ],
+    "rationale": "string?",
+    "acceptance": ["string"],
+    "status_hint": "draft | proposed | review",
+    "supersedes": ["EVENT-ID"]
   }
 }
 ```
+
+**Refinement semantics**: All array and object fields are authoritative replacements.
+- Field absent in payload → keep previous value (no change)
+- Field present in payload → replace fully (not a diff or merge, not incremental)
+- Empty array (`[]`) or empty object (`{}`) → explicit clear
+
+This means `REQ_REFINED { "constraints": [...] }` replaces constraints only, while `REQ_REFINED { "constraints": [] }` explicitly clears them. You do not need to send every field on every refinement.
+
+See [`CANONICAL_REFINEMENT_CONTRACT.md`](./CANONICAL_REFINEMENT_CONTRACT.md) for the full Canonical Refinement Contract — the definitive spec governing reducer law, field semantics, multi-agent safety, and the determinism invariant.
 
 ### 4.3 REQ_SUPERSEDED
 ```json
@@ -215,6 +279,17 @@ Edges are derived only from events, never stored directly. **Key Invariant: GRAP
     "intent": "...",
     "implementation_hint": "...",
     "confidence": 0.7,
+    "narrative": "...",
+    "structure": {
+      "entities": [],
+      "relations": []
+    },
+    "constraints": [],
+    "artifacts": [],
+    "rationale": "...",
+    "acceptance": [],
+    "status_hint": "draft",
+    "intent_scope": "behavior",
     "lineage": {
       "parents": [],
       "children": [],
