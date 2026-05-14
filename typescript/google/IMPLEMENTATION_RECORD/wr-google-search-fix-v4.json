@@ -1,0 +1,52 @@
+{
+  "id": "wr-google-search-fix-v4",
+  "intent_node_id": "intent-fix-compilation-a",
+  "version": 4,
+  "state": "DRAFT",
+  "layer_mode": "EXECUTION-BOUND",
+  "supersedes": [
+    "wr-google-search-fix-v3"
+  ],
+  "derivation": {
+    "derived_from": [
+      "wr-google-search-fix-v3"
+    ],
+    "change_type": [
+      "layer_transition",
+      "binding_selection"
+    ],
+    "constraint_cause": [
+      "3_LAYER_SEPARATION_RULE"
+    ],
+    "failed_binding_trigger": [
+      "wr-google-search-fix-v3.task"
+    ],
+    "rejected_strategies": [
+      "Bypass compiler checks",
+      "Define local ambient declarations"
+    ],
+    "semantic_delta": {
+      "scope": "file-local",
+      "resources": "modified",
+      "change_characterization": "Transitioned from flat task to explicit intent-binding-execution 3-layer model."
+    },
+    "notes": "IR restructured to prevent premature binding and explicitly capture the resolution space."
+  },
+  "path": "/home/codex/dev/nexus/typescript/google",
+  "intent_layer": {
+    "requirement": "Node.js type definitions must be available to TypeScript compiler for this module."
+  },
+  "binding_layer": [
+    "Install @types/node via package.json",
+    "Define local ambient declarations in project",
+    "Adjust tsconfig.json lib/module resolution to implicit node types"
+  ],
+  "execution_layer": {
+    "selected_binding": "Install @types/node via package.json",
+    "task": "Add '@types/node' to devDependencies in package.json",
+    "resources": [
+      "package.json"
+    ]
+  },
+  "model": "gemini-3.1-pro"
+}

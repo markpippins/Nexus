@@ -53,7 +53,7 @@ These are NOT authoritative and MUST be fully regenerated from events:
   "payload": {
     "intent": "string",
     "implementation_hint": "string",
-    "type": "functional | architectural | constraint | workflow | research | hypothesis | decision"
+    "type": "functional | architectural | constraint | workflow | research | hypothesis | decision | failure"
   }
 }
 ```
@@ -280,7 +280,7 @@ TRANSITIONS = {
 Each handler returns: updated node state, graph mutations (derived, not stored), and metadata updates.
 
 ## 12. SYSTEM ARCHITECTURE LAYERS
-At this point, the system is a closed loop composed of 7 discrete layers:
+At this point, the system is a closed loop composed of 8 discrete layers:
 1. **Event layer**: append-only semantic history (defined in this `SKILL.md`)
 2. **Reducer layer**: deterministic state + graph construction (defined in [`REDUCER_CONTRACT.md`](./REDUCER_CONTRACT.md))
 3. **Projection layer**: `INDEX`, `GRAPH`, `TO_DATE` (defined in [`GRAPH_SEMANTICS.md`](./GRAPH_SEMANTICS.md))
@@ -288,6 +288,7 @@ At this point, the system is a closed loop composed of 7 discrete layers:
 5. **Execution layer**: deterministic task projection + scheduling (defined in [`EXECUTION_BINDING.md`](./EXECUTION_BINDING.md))
 6. **Conflict Resolution layer**: deterministic ambiguity resolution + blocking logic (defined in [`CONFLICT_RESOLUTION.md`](./CONFLICT_RESOLUTION.md))
 7. **Multi-agent layer**: concurrent proposal system + deterministic arbitration (defined in [`MULTI_AGENT_COORDINATION.md`](./MULTI_AGENT_COORDINATION.md))
+8. **Failure layer**: structured failure representation + deterministic recovery (defined in [`FAILURE_SEMANTICS.md`](./FAILURE_SEMANTICS.md))
 
 ## 13. SYSTEM FORMULA
 ```text
@@ -300,9 +301,11 @@ AGENTS (parallel)
             → QUERY DSL
               → EXECUTION
                 → CONFLICT SYSTEM
-                  → EVENTS
-                    → AGENTS
+                  → FAILURE DETECTION
+                    → FAILURE GRAPH
+                      → EVENTS
+                        → AGENTS
 ```
 
 ## 14. SUMMARY
-The system supports concurrent multi-agent reasoning by restricting agents to stateless event proposal, enforcing a deterministic arbitration layer that linearizes all outputs into a single event log, preserving a globally consistent event-sourced requirement graph under parallel execution.
+The system supports concurrent multi-agent reasoning by restricting agents to stateless event proposal, enforcing a deterministic arbitration layer that linearizes all outputs into a single event log, and representing all failures as first-class event-sourced graph data, preserving a globally consistent, deterministic, and failure-safe requirement graph under parallel execution.

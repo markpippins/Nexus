@@ -1,2 +1,2 @@
-export IMAGE_ROOT_DIR=/mnt/c/dev/images
+export IMAGE_ROOT_DIR=/home/codex/Pictures
 bun --hot run dev | lolcat

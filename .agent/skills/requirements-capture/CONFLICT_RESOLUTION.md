@@ -112,7 +112,11 @@ Highest score wins.
 One branch is deemed non-viable.
 **Event emitted**: `REQ_INVALIDATED`
 
-### 6.6 DEFER_RESOLUTION
+### 6.6 FAILURE_RESOLUTION
+Failure-originated conflicts are resolved by emitting a `FAILURE_RESOLVED` event once the root cause is addressed via `REQ_SUPERSEDED`, `REQ_REFINED`, or `REQ_INVALIDATED`. The failure node remains in the graph for traceability but is marked resolved.
+**Event emitted**: `FAILURE_RESOLVED`
+
+### 6.7 DEFER_RESOLUTION
 Cannot resolve in current information state. Mark conflict as unresolved, block dependent execution.
 
 ## 7. RESOLUTION ORDERING RULE
@@ -160,6 +164,7 @@ You now have:
 3. **Query DSL**: Composable reasoning
 4. **Execution layer**: Task projection + scheduling
 5. **Conflict system (this layer)**: Deterministic ambiguity resolution + blocking logic
+6. **Failure integration**: Failure-originated conflicts resolved through FAILURE_RESOLUTION strategy
 
 ## 13. FINAL FORMULA (FULL SYSTEM)
 ```text
@@ -169,10 +174,11 @@ EVENTS
       → QUERY DSL
         → EXECUTION PLAN
           → CONFLICT DETECTION
-            → RESOLUTION EVENTS
-              → EVENTS
+            → FAILURE DETECTION
+              → RESOLUTION EVENTS
+                → EVENTS
 ```
-Closed loop.
+Closed loop. Failure-safe by design.
 
 ## 14. ONE-SENTENCE SUMMARY
-The system resolves ambiguity by elevating conflicts to first-class graph entities and deterministically transforming them through a finite resolution strategy set, ensuring that even contradictory requirement states produce reproducible execution outcomes.
+The system resolves ambiguity by elevating conflicts and failures to first-class graph entities and deterministically transforming them through a finite resolution strategy set, ensuring that even contradictory and failure-prone requirement states produce reproducible execution outcomes.

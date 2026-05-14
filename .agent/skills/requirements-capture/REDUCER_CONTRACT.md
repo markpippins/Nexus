@@ -15,8 +15,8 @@ def reduce(events: list[Event]) -> ReductionResult:
 ```python
 class Event(TypedDict):
     event_id: str
-    type: str
-    req_id: str
+    type: str  # REQ_* or FAILURE_*
+    req_id: str | None  # None for FAILURE_* events
     timestamp: str
     payload: dict
 ```
@@ -150,13 +150,26 @@ All handlers mutate ONLY the in-memory reducer state.
 - attach result
 - if result == "fail": OPTIONAL policy: state = ACTIVE
 
+### 5.10 FAILURE_EVENT (meta-event)
+**Preconditions**: none
+**Effect**:
+- create FAILURE node in graph (not in INDEX)
+- add edge FAILURE → affected req_ids via FAILURE_AFFECTS
+- NO mutation of requirement state
+- NO change to INDEX
+- Failure nodes persist only in GRAPH, derived from event log
+
 ## 6. REDUCER LOOP (STRICT ORDERING)
 ```python
 def reduce(events):
-    state = init_empty()
-    for event in sorted(events, key=timestamp_then_event_id):
-        dispatch(event, state)
-    return build_output(state)
+    try:
+        state = init_empty()
+        for event in sorted(events, key=timestamp_then_event_id):
+            dispatch(event, state)
+        return build_output(state)
+    except Exception as e:
+        emit_failure_event(e)
+        halt_or_degrade()
 ```
 
 ## 7. DERIVATION RULES
@@ -173,12 +186,14 @@ Built AFTER full replay only.
 
 ## 8. VALIDATION RULES (HARD FAIL CONDITIONS)
 Reject entire event stream if:
-- **V1** — unknown event type
-- **V2** — duplicate event_id
-- **V3** — missing req_id
-- **V4** — invalid transition (see state table)
-- **V5** — orphan merge/split references
-- **V6** — non-deterministic ordering ambiguity
+- **V1** — unknown event type (maps to F1 — `FAILURE_INVALID_EVENT`)
+- **V2** — duplicate event_id (maps to F1 — `FAILURE_INVALID_EVENT`)
+- **V3** — missing req_id (maps to F2 — `FAILURE_IDENTITY_VIOLATION`)
+- **V4** — invalid transition (maps to F4 — `FAILURE_TRANSITION_VIOLATION`)
+- **V5** — orphan merge/split references (maps to F5 — `FAILURE_GRAPH_INCONSISTENCY`)
+- **V6** — non-deterministic ordering ambiguity (maps to F3 — `FAILURE_ORDERING_AMBIGUITY`)
+
+See [`FAILURE_SEMANTICS.md`](./FAILURE_SEMANTICS.md) for the full failure classification and handling model.
 
 ## 9. DETERMINISM GUARANTEE
 The reducer MUST satisfy:
@@ -207,4 +222,4 @@ These are mandatory for implementation validation.
 - Expected: system fails fast before partial reduction
 
 ## 11. FINAL CONTRACT STATEMENT
-The reducer is a pure deterministic function that transforms an ordered append-only event log into a fully materialized requirement index and dependency graph. All state is derived. No mutation, interpretation, or external context is permitted during reduction.
+The reducer is a pure deterministic function that transforms an ordered append-only event log into a fully materialized requirement index and dependency graph. All state is derived. No mutation, interpretation, or external context is permitted during reduction. Failure events are preserved in the log and materialized as graph nodes without mutating requirement state, ensuring deterministic replay of system faults.

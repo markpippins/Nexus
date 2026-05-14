@@ -1,0 +1,220 @@
+Chapter 1: OpenClaw grew up in April
+0:00In April 2026, OpenClaw grew up. The teenager not only got their hands on the keys to the car, they actually grew a prefrontal cortex and can make
+0:088 secondsresponsible decisions. Now, that's what it feels like if you are an OpenClaw user that started in January and you're now in April. Because OpenClaw has been adding features at a break neck pace
+0:1616 secondsthat basically amount to adding a responsible thinking adult brain into the system. What's happening is that
+0:2424 secondsPeter and team are adding the ability to execute complex multi-step orchestrated
+0:3131 secondsworkflows across many different tasks in OpenClaw. The beauty of OpenClaw was always that it was a simple architecture that was extensible that could do many
+0:3939 secondsmany things. That's why people love it so much. But as models get better, you want to be in a place where you can orchestrate more complex runtime
+0:4848 secondsenvironments, more complex agent environments, more complex agentic tasks. And that is the heart of what
+0:5555 secondsOpenClaw released. But there's a problem. And the problem is pretty simple. When you do harder work, you have a hard time assigning all of that work to one brain, right? To one LLM.
+1:071 minute, 7 secondsAnd so what I want to give you today is how to think about these April results thoughtfully and strategically for your
+1:161 minute, 16 secondsclaw. You need to think about where does it make sense to put one LLM in versus another. How do you not be dependent on
+1:241 minute, 24 secondsLLM? And yes, I'm going to give you specific perspective there. And really this is the critical piece. What do you need to build so that you are not stuck
+1:331 minute, 33 secondswhen Anthropic makes another change which they did this month. We'll talk about it. When OpenAI makes a change,
+1:381 minute, 38 secondswhich they did this month, we'll talk about it. Both related to Open Claw. I want you to have your own claw that does its own work. And you need the ability
+1:461 minute, 46 secondsto control the core workflow loop without having to depend on one LLM to
+1:541 minute, 54 secondsdo it. Because if you can swap LLMs, you can do so much more with your claw.
+1:581 minute, 58 secondsThere are so many more use cases. And yes, if you're wondering, what are those use cases? I have a claw. I've been wondering. We will talk about that. We will get into that in this video. And
+2:052 minutes, 5 secondsyes, there's a whole build here. If cloud people are builders, we have a whole build to improve the durability of
+2:122 minutes, 12 secondsyour workflow so it can survive this model war that is happening in April over the OpenClaw agent brain. So, let's
+2:192 minutes, 19 secondshop into it. After all of the progress for OpenClaw in April 2026, OpenClaw is starting to look less like a viral agent demo and more like a real runtime that
+2:282 minutes, 28 secondsgets real work done. And once that happens, the model fight that people report on gets a lot more interesting because the model is no longer the whole
+Chapter 2: From viral demo to serious runtime
+2:352 minutes, 35 secondswork product. It's a brain inside a much larger work loop with a lot more impact.
+2:402 minutes, 40 secondsSo I want to separate very clearly three things that are getting mashed together in April around openclaw. First, open claw itself got more mature. Second, the
+2:492 minutes, 49 secondsmodel layer around it got much more contested. And third, once the runtime can swap brains, memory becomes the strategic layer. That third point is the one I think people are underestimating.
+2:592 minutes, 59 secondsIf the claw can run many brains, which it can, the memory should not live inside any one of those brains and should be built to adjust to the
+3:083 minutes, 8 secondsintelligence you want to apply to a particular workflow. So if you paid attention to OpenClaw a month ago and are kind of checking back in now, the
+3:153 minutes, 15 secondssimple update is, wow, there were a lot of releases and that is true. OpenClaw shipped at a pace that would be exhausting for a normal product team and
+3:223 minutes, 22 secondsalmost absurd for an open source agent framework. There were task updates, memory updates, provider updates,
+3:273 minutes, 27 secondschannel updates, code and automation updates. The release notes alone feel like a product team sprinting while the rest of the market argues about model
+3:353 minutes, 35 secondsaccess. But release velocity is not really the whole point here. The point is that the shape of the product changed with all these releases. A month ago, it
+3:423 minutes, 42 secondswas still pretty easy to describe OpenClaw as a viral open- source agent framework. It gave a model access to your computer and your files and your
+3:493 minutes, 49 secondsbrowser and your apps and your messaging services. It was very powerful. It was a bit messy. It was risky in the way all serious agent systems are risky and it
+3:573 minutes, 57 secondswas compelling because it made the model feel like it had hands. That description is still true. It's just incomplete now.
+4:034 minutes, 3 secondsOpen claw is starting to clarify what kind of thing it actually is. The claw is becoming a particular species of crab
+4:114 minutes, 11 secondsor lobster. It's not just a chatbot rapper. It's not just a claw launcher.
+4:164 minutes, 16 secondsIt's not just a terminal toy for people who want to see how much power they can hand to an AI assistant before something weird happens. Open Claw is becoming an
+4:244 minutes, 24 secondsaction layer for agents. More specifically, it's becoming a runtime abstraction for serious agentic work.
+4:304 minutes, 30 secondsThat sounds abstract. So, let me make it very plain. A chatbot is a place where you ask for help. An agent runtime is a place where work happens. And when you are starting to experiment with agents,
+4:404 minutes, 40 secondsthe bar is how demanding is your agent runtime at quality so you can do serious work. And that's the progress we see
+4:474 minutes, 47 secondswith OpenClaw in April. And I'll get into the details. A serious agent runtime has state. It has tools. It has permissions. It has retries. It has
+4:564 minutes, 56 secondshandoffs. It has context that needs to survive more than one prompt. It has a user who needs to know what happened,
+Chapter 3: The boring stuff that makes work possible
+5:015 minutes, 1 secondwhat failed, what changed, and what ought to happen next. That is a big shift, right? Open claw is moving from can I make the agent do something to can
+5:095 minutes, 9 secondsI build a durable work loop once and route different models through it to get a bunch of different work done. That is a way bigger idea than original open
+5:175 minutes, 17 secondsclaw and it's a wonderful example of how building the right primitives allows very fast progress in the age of AI. And
+5:245 minutes, 24 secondsso hats off to Peter for building an extensible primitive here. The clearest evidence for all this is the boring stuff. And I do mean that as a compliment. When agent products are
+5:335 minutes, 33 secondsimmature, the exciting features get all the attention. A model opens a browser.
+5:375 minutes, 37 secondsA model sends a message. A model buys a car. That was one of the stories that I covered right out of the gate with OpenGL. That stage matters. You need the demo moment. But the next stage is where
+5:455 minutes, 45 secondsthe product either becomes infrastructure or just is a party trick.
+5:495 minutes, 49 secondsAnd infrastructure announces itself with really boring words, right? Tasks, cues,
+5:535 minutes, 53 secondshistories, checkpoints, visible delivery, scoped memory, provider manifests, permission profiles, retry behaviors, tool boundaries. These are
+6:026 minutes, 2 secondsnot the words that make a launch go viral. They are the words that decide whether anyone can build on the system for serious work. Open clause task flow
+6:106 minutes, 10 secondswork is a good example. The docs now describe task flow as the orchestration layer above background tasks. It manages
+6:186 minutes, 18 secondsdurable multi-step flows with their own state and revision tracking while the individual tasks stay a unit of detached work on their own. And that really
+6:266 minutes, 26 secondsmatters because a task you can inspect and route and cancel and recover and deliver back to the right channel is way way different from a chat response. It's
+6:346 minutes, 34 secondsway way different from the original Open Claw vision where you didn't have that idea that you would want to manage multiple tasks like that with your lobster. A web hook triggered workflow
+6:446 minutes, 44 secondsis different from a user manually typing please do this and that is again something that serious work needs. A sub aent that can run its own session and
+6:526 minutes, 52 secondsreport back reliably when it's done is different from one big threat. So the product maturity layer is starting to come together and it's easy to underrate
+7:007 minutesbecause it doesn't look like a single feature. It's a dozen different updates,
+7:037 minutes, 3 secondsdozens of updates that make the agent less fragile. And that is exactly the point. The magic demo is the model did something at all and that was February.
+7:117 minutes, 11 secondsThe mature product is we are actually building real work here. Memory is part of this same story. Early agent memory
+7:187 minutes, 18 secondsof course was mostly a novelty. The bot remembers your name. The bot remembers that you like TypeScript. The bot remembers a preference and inserts it later in a way that feels delightful or
+7:267 minutes, 26 secondsmaybe slightly creepy. That gets attention. But serious work needs a very disciplined memory model. If an agent is operating on a repo and reviewing PRs
+Chapter 4: Task flow, memory, and channel maturity
+7:347 minutes, 34 secondsand triaging incidents or maintaining customer feedback, memory can't just be a pile of things the model said or that you said to the model. You need to know
+7:427 minutes, 42 secondswhere memory comes from. Was it observed from a real source? Was it confirmed by a user? Is it stale? Is it scoped? Should it be retrieved automatically?
+7:497 minutes, 49 secondsDoes it tied to a particular LLM or not?
+7:527 minutes, 52 secondsThose questions sound boring and fussy until you use an agent for real work.
+7:557 minutes, 55 secondsAnd then they become the difference between useful continuity and just a bunch of sludge that accumulates in memory. Open clause memory direction
+8:028 minutes, 2 secondswith memory wiki active memory and a lot of providence rich recall points toward a mental model of memory that's helpful here. Memory is not just
+8:108 minutes, 10 secondspersonalization. Right? Memory is operational context and that changes what the whole product is. If the agent remembers what happened last time, it
+8:188 minutes, 18 secondscan do way more than answer, right? It continues. It reviews against repo conventions. implements against meeting decisions and it starts the next incident with the last incident in view.
+8:288 minutes, 28 secondsAnd that's the second piece of our story here. It's not just about actions, it's about continuity. Channels are the third big piece and this is another place
+8:358 minutes, 35 secondswhere the boring details matter. Open claw being available across Slack and Telegram and Discord and WhatsApp and Teams and Matrix and Fu and other
+8:448 minutes, 44 secondssurfaces is not just a distribution flex. The channel is an important part of the runtime. Different channels have different rules. Threading is different.
+8:518 minutes, 51 secondsMentions are different. File limits are different. Bot permissions are different. An agent that finishes a task but never replies visibly is broken in
+8:588 minutes, 58 secondsone way. An agent that replies in the wrong thread is broken in another. So mature channel behavior isn't glamorous,
+9:049 minutes, 4 secondsbut it's a really important surface to handle. And this is where the open claw story starts to look less like an agent that kind of developed in a chat app and
+9:119 minutes, 11 secondsmore like a runtime that happens to have a bunch of humanfacing surfaces. The human might be in Slack. The agent might be doing code work in GitHub. A sub agent might be analyzing logs. And there may be multiple models involved here,
+9:229 minutes, 22 secondsright? A stronger model might handle the hard stuff while a cheaper model does a first pass classification of intent.
+9:279 minutes, 27 secondsFrom the user's perspective, the work just needs to come back right in the right place with the right amount of detail done at the right time. That is a
+9:349 minutes, 34 secondslarger conception of what an agent can solve and open claw is maturing enough to get there. So that's the key big story in April. OpenClaw got more
+9:449 minutes, 44 secondsmature, but the market drama entered at the same time because while OpenClaw was becoming much more serious, the model layer underneath it got really, really
+9:529 minutes, 52 secondscontested. Anthropic's April move was extremely disliked by the developer community. I can't paint it any other
+9:599 minutes, 59 secondsway. Claw subscriptions were of course never designed to power always on thirdparty agents at scale. That is the basic anthropic position and I kind of get it. Agents aren't normal chat users.
+Chapter 5: Anthropic's April move was deeply unpopular
+10:0910 minutes, 9 secondsThey run longer. They retry. They call tools. They carry more context. They sit in loops. You can't price them the same way, right? They create intermediate work that a human never sees. That's
+10:1710 minutes, 17 secondsalso tokens. They can turn a flat rate consumer subscription into infrastructure for some derivative product. And from Anthropic's point of
+10:2510 minutes, 25 secondsview, that is money losing, right? If Claude is being used as infrastructure,
+10:2810 minutes, 28 secondsAnthropic wants it paid for like infrastructure. Use the API, buy extra usage. You need to protect the margins that make Claude a sustainable user
+10:3610 minutes, 36 secondsexperience. And that is rational, but it was deeply unpopular. And it's also a strategic choice and I don't want to hide those other pieces. If claud is
+10:4510 minutes, 45 secondsbeing used as infrastructure, Enthropic wants it paid for like infrastructure.
+10:4910 minutes, 49 secondsUse the API, buy extra usage, stay inside official products, protect enthropics capacity, protect enthropics margins, protect the direct claer
+10:5810 minutes, 58 secondsexperience. Seems really rational from anthropic's point of view. It's also a very intentional choice that we shouldn't run away from. Anthropic is
+11:0611 minutes, 6 secondseffectively saying Claude is powerful enough to be an agent brain, but Anthropic wants to control the terms under which the brain is used. It doesn't make Claude less useful, but it
+11:1411 minutes, 14 secondschanges the default architecture for a lot of claw builders who started out with Claude. Claude becomes a very premium metered component to Open Claw,
+11:2311 minutes, 23 secondsnot the cheap always on substrate for background loops. It's a different design assumption and frankly it is costing Anthropic with a developer
+11:3111 minutes, 31 secondscommunity even if it's the correct decision for them from a token usage perspective. Remember we have to view a lot of anthropics actions in the past
+11:3911 minutes, 39 secondsmonth as a function of hyperrowth leading to compute constraints and they are making tough choices all across the
+11:4611 minutes, 46 secondsboard to handle that bind and I have a lot of empathy for them because that's not an easy place to be in. This is one of those tough choices and yes it was
+11:5311 minutes, 53 secondsunpopular. It doesn't mean that they had a lot of other options. I I expect they knew it was unpopular and they made the call. Anyway, OpenAI has more online
+12:0112 minutes, 1 secondcompute and they are taking a different posture. Codex is already an Aentic product. OpenAI's help docs now make CEX part of the chat GPT subscription across
+12:1112 minutes, 11 secondsall paid tiers and Open Claw's provider docs describe a Codex OOTH route alongside direct API usage. That matters
+12:1812 minutes, 18 secondsbecause open AI is essentially looking at open claw and seeing distribution within the plan. In fact, Sam Ultman said that very explicitly on May 1st
+12:2712 minutes, 27 secondscalling out that open claw is now just flat available under chat GPT paid plants and that is basically the
+Chapter 6: OpenAI's opposite posture with Codex
+12:3512 minutes, 35 secondsopposite of what anthropic chose to do in April. Think of it from OpenAI's point of view. If they have the compute,
+12:4012 minutes, 40 secondsthen if OpenClaw users route more work to chat GPT and codeex, it reinforces OpenAI's agent strategy. It makes codeex
+12:4712 minutes, 47 secondsmore central and it makes open AAI infrastructure feel like a natural place for open agent workflows to land. And yes, the Peter Steinberger piece matters
+12:5512 minutes, 55 secondshere too. When the creator of OpenClaw is working at OpenAI and OpenAI is making codeex more available as a subscriptionbacked agent surface, the
+13:0313 minutes, 3 secondspower dynamic changes. Enthropic had the model many early users loved. OpenAI now has codecs, subscription access, and a
+13:1013 minutes, 10 secondsstrong incentive to make these workflows feel native on its infrastructure. But I don't think the responsible version of this story is as simple as open AAI wins
+13:1913 minutes, 19 secondsand entropic loses. I think the larger story is that there are many ways to run your agent. And that's a principle that's worth defending. Open clause
+13:2613 minutes, 26 secondsshould not depend on one provider subscription policies to work. It should be able to run on 5.5, claude API, Gemini, DeepSeek, Open Router, O Lama,
+13:3513 minutes, 35 secondsLM Studio, Gemma for whatever comes next. The point of the runtime abstraction is that the action layer can stay stable while the brain changes. And
+13:4313 minutes, 43 secondsthat is the real strategic idea. And that is why Google's Gemma 4 is not a side quest here. Google launched Gemma 4
+13:5013 minutes, 50 secondsunder Apache 2.0. And the positioning is very explicit. These are open models built for advanced reasoning, agentic workflows, and ondevice use. The Google developer post is even more direct.
+14:0014 minutesGemma 4 is meant to bring Agentic skills to the edge, including multi-step planning, autonomous action, offline code generation, and multimodal
+14:0714 minutes, 7 secondsprocessing on device. that matters because it gives builders a credible local branch of the overall runtime tree to play with. Not every agent step
+14:1514 minutes, 15 secondsdeserves frontier model pricing and Google is recognizing that here. And this is where the model conversation gets super practical. The old argument
+14:2314 minutes, 23 secondswas which model is best. The better argument is which model should handle this step. Use a local Gemma class model
+14:3014 minutes, 30 secondsfor cheap background classification for duplicate detection for low-risk triage.
+14:3414 minutes, 34 secondsUse GPT 5.5 through codecs for hard implementation and complex repo work.
+14:3814 minutes, 38 secondsUse cloud API when the judgment, the writing style, or maybe the architectural reasoning is worth the metered cost. Use cheaper hosted models for bulk summarization or formatting.
+14:4714 minutes, 47 secondsYour workflow should be sophisticated enough to survive those routing decisions. And that is the aha moment that I see a lot of builders hitting in
+14:5514 minutes, 55 secondsApril. You can build one work loop once for open claw. And you can stop treating model choice as a permanent architectural decision. Don't be fooled
+Chapter 7: Gemma 4 and the local model branch
+15:0415 minutes, 4 secondsby the arguments about claw versus open air. That's not the point. And this is the headline for builders. The practical unlock is not simply that open claw can use different models. A model drop down.
+15:1415 minutes, 14 secondsOh, fine. It's convenient. But if you are swapping your entire runtime brain that is a strategic shift you need to
+15:2215 minutes, 22 secondsplan for. How do you design workflows that outlive a model, a subscription plan, a provider policy, a context window? That's what I mean by a durable
+15:3115 minutes, 31 secondsworkflow. A durable workflow has a job to do, a place to run, memory of what happened before, and enough structure that the underlying model can change
+15:3815 minutes, 38 secondswithout destroying the workflow. The model still matters, of course,
+15:4015 minutes, 40 secondssometimes it matters more, but it is no longer the product surface. The workflow has its own identity. It has inputs, outputs, permissions, tools, state,
+15:4915 minutes, 49 secondsreview steps, a human-facing channel, a failure mode, memory. The model becomes the reasoning engine inside a much larger operating loop. And as you swap
+15:5715 minutes, 57 secondsthe model, you can do different things with that general purpose loop. Let's imagine you're handling a repo, not an agent that can code in the abstract. I
+16:0516 minutes, 5 secondsmean a workflow that watches GitHub issues and pull requests over time. It triages incoming work, compares new issues against past fixes, knows which
+16:1316 minutes, 13 secondsfiles are risky, and remembers the tests that usually catch regressions. The useful knowledge is not all in the prompt. It's in the history of the
+16:2116 minutes, 21 secondscodebase. old review comments, prior bugs, deployment failures, style preferences, architectural decisions,
+16:2716 minutes, 27 secondsand the uh we tried this and it broke staging lessons that every real team tends to accumulate. If that memory lives inside just a chat transcript,
+16:3516 minutes, 35 secondsobviously your workflow isn't going to work for very long. If it lives inside one provider's product, the workflow is locked to that provider. If it lives
+16:4316 minutes, 43 secondsoutside the model, the runtime can call whichever model is right for the step and still behave like the same operator. That is the idea of a durable workflow.
+16:5116 minutes, 51 secondsA local model can classify the issue and gather context. GPT 5.5 and codeex can make a patch. A review model can inspect the diff. Claude can write a high
+17:0017 minutesjudgment architecture pass if the change is sensitive. You can use whatever model you want here, right? I'm not saying you have to use those models. The user doesn't have to care which brain handled
+17:0717 minutes, 7 secondswhich substep. The user cares that the repo operator understood the job and left the team with something reviewed.
+17:1417 minutes, 14 secondsCode review is a super clean way to talk about this, but I want to call out there's lots of examples where we have
+17:2117 minutes, 21 secondsdurable workflows that are non-technical as well. Like if you are trying to do a scheduled review that has multiple
+17:2817 minutes, 28 secondslayers of your email inbox, which I'm naming email because it's like the number one most popular use for openclaw across nontechnical users. Then that's
+Chapter 8: Which model should handle this step
+17:3517 minutes, 35 secondsmultiple jobs, right? You have to segregate out sensitive emails with high judgment. You have to draft replies if you're going to draft replies. You have
+17:4317 minutes, 43 secondsto automatically review those replies for quality, tone, how it responds to the sender, how it handles the original message. You have to figure out how you
+17:5117 minutes, 51 secondsare threading replies correctly and make sure you have a QA pass for that. You have to handle any artifacts that come with emails like attachments correctly
+17:5817 minutes, 58 secondsand securely. You have lots of tasks with email that would require models. One, remembering how you like this done,
+18:0518 minutes, 5 secondstwo, executing the workflow and the right model getting called. and three,
+18:0918 minutes, 9 secondshaving a durable memory of how all of this goes together so that the next pass works. Incident response is the last example I'll call out here in the video.
+18:1718 minutes, 17 secondsIf you're interested in diving in more to how to use Open Claw in practice, I have net new workflow examples in the Substack, including customer feedback loops, meetings to execution, and more.
+18:2718 minutes, 27 secondsFor this video, I'm picking incident response because the pattern it shows spans a bunch of surfaces, and I think it illustrates, right? You have to deal
+18:3518 minutes, 35 secondswith logs and dashboards and Slack and GitHub and runbooks and deployment history and customer reports and previous postmortems and a live timeline and everyone is panicking and asking
+18:4318 minutes, 43 secondswhat changed at the exact moment when like they're not thinking straight. A durable open claw workflow sits across all of that. And when an incident
+18:5018 minutes, 50 secondsstarts, it gathers context and identifies changes and compares symptoms against prior incidents and drafts the first update and suggests roll back candidates and turns the resolution into
+18:5918 minutes, 59 secondsa postmortem draft. The point is not a magical model does all of this for you. No, you may want a fast model for logs,
+19:0619 minutes, 6 secondsa cheap model for updates, a deep inference model for root cause, but the instant workflow shouldn't need to care at the product level which brain did
+19:1419 minutes, 14 secondswhich step. The same pattern is useful across a bunch of other tasks. And that brings us to the common layer underneath it all, memory. If the workflow is durable and the brain is swappable,
+19:2519 minutes, 25 secondsmemory can't live inside anyone brain.
+19:2719 minutes, 27 secondsThis is the point that connects openclaw to the open brain project. When agents were mostly chat companions, shared memory was useful. When agents become
+19:3519 minutes, 35 secondsreal workers, the way OpenClaw has matured, shared memory is something you have to handle. A worker needs to know what happened before, right? Project
+19:4319 minutes, 43 secondsconventions, people involved, decisions made, etc. If that memory lives inside a single model product, regardless of what
+19:5019 minutes, 50 secondsjob you're doing with your claw, you have a lock-in problem. If it lives in a random chat transcript or only markdown files, you're going to have a retrieval
+19:5819 minutes, 58 secondsproblem. If it lives in the agent scratchpad, you have a continuity problem. If it lives in a userowned memory layer, you have an architecture
+Chapter 9: Durable workflows that survive the session
+20:0520 minutes, 5 secondsproblem. This is why I think an open brain recipe for claw makes sense. Now,
+20:1020 minutes, 10 secondslook, open brain doesn't need to chase every open claw feature and it won't.
+20:1320 minutes, 13 secondsBut open claw users by the thousand are already wiring in open brain on their own. And it just makes sense to publish
+20:2320 minutes, 23 secondsa recipe that makes that easier. It just makes the whole architecture and the whole approach very legible. And so open claw agent memory for open brain is now
+20:3120 minutes, 31 secondslive in our open source GitHub repo. The job here is not to add another abstraction or to complexify your claw.
+20:3720 minutes, 37 secondsThe job is to make the existing pattern very easy to adopt and go through and sort of to publish what works so that thousands of users aren't having to roll
+20:4420 minutes, 44 secondstheir own approach here. So what does the open brain recipe for claw do? It defines how the agent retrieves before
+20:5220 minutes, 52 secondsmeaningful work starts for your claw specifically for serious workflows. The claw is now capable of for project context, people, decisions, prior
+21:0021 minutesfailures, current tasks, constraints. It defines how the agent writes back for serious work for outputs, lessons, unresolved questions, source channel,
+21:0721 minutes, 7 secondsmodel use, task ID, confidence, etc. And finally, user confirmation status. That last piece matters. Agent written memory needs providence. Was this observed from
+21:1621 minutes, 16 secondsa source, inferred by a model, confirmed by a user, imported from a transcript?
+21:2021 minutes, 20 secondsHow do we get it? Is it valid? Can it be used as an instruction later? Without clear labels, memory gets dangerous. But when you have good labels, memory gets
+21:2821 minutes, 28 secondsoperational. And so, yes, I'm releasing multiple recipes here that help you realize this overall vision of open brain for open claw. I'm releasing a
+21:3621 minutes, 36 secondscode review memory recipe that stores reusable lessons from PRs, a task flow worklog that records what a long-running agent attempted, what changed, what
+21:4521 minutes, 45 secondsblocked it, what the next agent should know, and releasing a memory and provenence recipe that labels where the memory was observed and confirmed and imported from. And that becomes
+21:5321 minutes, 53 secondsespecially important in a brain swappable world, which Open Claw can now do really, really well for serious work.
+22:0122 minutes, 1 secondAnd this is what helps you build one loop and swap those brains in and be confident that the memory actually works so that you can actually attack different problems with the same agentic
+22:1022 minutes, 10 secondspipeline. Bad memory makes the agent confidently wrong in a way that often feels personalized. But a good memory architecture makes the agent operate
+22:1822 minutes, 18 secondscontinuously without making it unaccountable. And that's the line I'm looking to draw here with this update for open braids designed specifically
+22:2522 minutes, 25 secondsfor OpenClaw. Now, if you want more detail on these recipes and as I called out on the use cases, I have that on the Substack. Of course, you can head over
+Chapter 10: Memory can't live inside one brain
+22:3322 minutes, 33 secondsto the open-sourced open brain repo and get all of the code right away. But for this video, the important point is the architecture. Open Claw is maturing into
+22:4222 minutes, 42 secondsa runtime. The model layer is becoming swappable and very contested by model makers. Therefore, memory needs to be userowned. And that is really, really
+22:5122 minutes, 51 secondsimportant as we see this OpenAI versus anthropic story continue to unfold. We need to be confident that agent builders
+22:5922 minutes, 59 secondscan design for a world where models can be swapped out really easily. A serious agent workflow needs to survive model
+23:0723 minutes, 7 secondschurn and pricing changes and better local models and everything else we know the future is going to throw at us because otherwise how are you going to
+23:1423 minutes, 14 secondstake advantage of the serious workflow features that allow your claw to be more than a toy and be really useful? Just think about it. If channel delivery is
+23:2323 minutes, 23 secondsunreliable, the agent may do work no one sees. If permissions are sloppy driven by memory, a more capable model makes the system more dangerous. If providence
+23:3123 minutes, 31 secondsfor memory is absent, then the memory itself is untrustworthy. All of this boring product work is what makes exciting work with your claw possible.
+23:4023 minutes, 40 secondsSo the postappril open claw thesis is actually pretty simple. Open claw gives agents an action layer that's really works now. Models provide a reasoning
+23:4823 minutes, 48 secondsengine. Task flow gives work a durable loop. Channels are where humans interact. Memory is a continuity layer.
+23:5423 minutes, 54 secondspermissions and providence are a trust layer. It's good architecture. Once you see the stack this way, the opportunity for builders changes. The opportunity is not make another shallow claw wrapper.
+24:0224 minutes, 2 secondsThat layer is going to get crowded out really quickly. The more interesting opportunity is to build vertical work loops on top of the runtime. Build for sales operations, build for research workflows, build for meeting follow-up,
+24:1324 minutes, 13 secondsbuild for compliance review, build for chief of staff loops, for finance analysis, for personal knowledge maintenance. In each case, the product
+24:2024 minutes, 20 secondsis not an agent. The product is the loop that is tied to that workflow. And the scarce asset is not just access to a
+24:2824 minutes, 28 secondsmodel. The scarce asset is ownership of the memory, the tools, the permissions, the operating rhythm around the model.
+Chapter 11: OpenBrain recipes for OpenClaw
+24:3324 minutes, 33 secondsOpen claw is becoming more useful because it is becoming less dependent on one interaction platform. Look, the labs will keep fighting over open claw's
+24:4224 minutes, 42 secondsbrain. That's inevitable. Frontier models are expensive to train, expensive to serve, and strategically critical. I expect open AAI, Anthropic, Google, and
+24:5024 minutes, 50 secondseveryone else to make choices that reflect their incentives. Some paths will open, some paths will close, some companies will push APIs, some will push subscriptions, some will push official
+24:5824 minutes, 58 secondsagent products, and some will push local models. The builder response should not be religious loyalty to any provider. It should be architecture. Build the
+25:0725 minutes, 7 secondsruntime so the model can change. Build the memory so the user owns it. Build the workflow so it survives the session.
+25:1325 minutes, 13 secondsRight? build routing so cheap that models can do the work they need to do.
+25:1825 minutes, 18 secondsOpen claw has crossed into serious work mode and once you can run multiple brains through the serious work layer
+25:2625 minutes, 26 secondsthat openclaw has added in April, you are in business for a bunch of new use cases, but only if the memory lives
+Chapter 12: Build the runtime so the model can change
+25:3525 minutes, 35 secondsindependently of that brain that is so hotly contested in Silicon Valley right now. And that is your takeaway for Open Claw in April. Stay with me. We have
+25:4325 minutes, 43 secondslots more model updates coming this week. Cheers.
+
+Sync to video time

@@ -1,0 +1,179 @@
+0:00I've been a huge fan and advocate of markdown for as long as I can remember,
+0:033 secondseven to the point where it hurt my career. I literally didn't apply to jobs at companies where I couldn't submit my markdown resume as my official resume
+0:1111 secondsfor the company. I had my entire resume on my GitHub and if I had to or I was really interested, I would just submit a PDF with a single link to the markdown
+0:1919 secondsfile on my GitHub. That's how dedicated I was. I just didn't think all of these fancy ways of presenting information mattered when we had a good, simple,
+0:2727 secondsreliable language for it specifically. I will always be incredibly thankful to John Gruber and Aaron Schwarz for creating something as magical as
+0:3535 secondsMarkdown. Having such a simple, reliable way to just write content and have it come out and render so well, it still
+0:4444 secondshas a bit of a magical feel to it. As someone who tried really hard to make latte work in college, markdown once it clicked for me just kind of became how I
+0:5353 secondswrite everything to this day. Which is why this article immediately grabbed my attention. Why the heck are we still using Markdown? As great as Markdown is,
+1:021 minute, 2 secondsI am more than happy to agree we have went too far with it. Once we got to the point where we were making new file extensions to embed other types of
+1:091 minute, 9 secondscontent into our markdown, we were probably over the line. And now that we're in a world where we're using LLMs and agents and all of these things and
+1:171 minute, 17 secondsMarkdown is the method we communicate between them, it's getting even more questionable. I have a lot of different things I want to talk about with Markdown in the near future. Things like
+1:251 minute, 25 secondshow Markdown is not the right primitive for memory or how Markdown is actually pretty good as a programming scripting language in specific scenarios, which
+1:321 minute, 32 secondswe'll definitely talk a lot about in the future. But today, I want to question the fundamentals. Why are we still using Markdown? What makes it so great? and
+1:401 minute, 40 secondswhat would a better solution for the stuff we do today look like? I've barely even started and I can already imagine all of the Obsidian comments in my head.
+1:491 minute, 49 secondsAnd if I know y'all love anything more than Obsidian, it's probably today's sponsor. I have a question for you.
+1:531 minute, 53 secondsWhat's the most times you've committed code that didn't work just trying to fix CI? I've probably stacked up to 15 commits before just watching CI break
+2:002 minutesagain and again, and all I wanted was the ability to run it locally without having to make more commits. Ideally, in a way that doesn't even force me to leave my editor or my agent. Today's
+2:082 minutes, 8 secondssponsor is RWX. I can tell you about how fast they are or how great they are to work with agents or how they run things in parallel so you don't have to wait for a bunch of stuff that's blocking
+2:162 minutes, 16 secondswhen it doesn't have to be. There's a lot of reasons to use RWX, but I don't want to talk about any of that because I'm in love with the CLI. Once you write the YAML file for your CI, all you have
+2:242 minutes, 24 secondsto do is run their CLI to trigger a run without having to commit the code. So instead of committing, pushing, and waiting for the whole thing to run, you can just run a CLI command locally. It
+2:332 minutes, 33 secondswill then spin up a cloud instance that can still take advantage of all of the caching infra, and all the other things they do, right? and immediately get your feedback as to whether or not it worked.
+2:412 minutes, 41 secondsThis should be enough to sell you. But when you combine it with their agent skill, suddenly it's like, "Oh yeah,
+2:472 minutes, 47 secondsseriously though, run loops are such a great solution to so many different problems. If you're working on a hard feature that you can test, go write the test, commit it, and then tell the
+2:552 minutes, 55 secondsagent, make sure CI passes by running the RWX run command, and then when it passes, commit and push." This is such a good workflow, and I'm amazed nothing
+3:033 minutes, 3 secondselse has it. And this is just the tip of the iceberg. The more you dig in, the more you'll appreciate RWX's unique way of fixing CI so that you will move faster instead of slower. Check out the CI that makes your agents faster at soy.
+3:143 minutes, 14 secondsRwx. So, why the heck are we still using Markdown? There are few things in life that bring me much joy and hate at the same time, like a chocolate that hurts when eaten or markdown. Seriously, why?
+3:253 minutes, 25 secondsHalf of the time we aren't even using the full language. Speaking of which,
+3:283 minutes, 28 secondsthis is a bold opening. HTML is the best programming language. I know you've heard people say that the only programming language they know is HTML.
+3:353 minutes, 35 secondsAnd I know we both rolled our eyes in discontent trying to get our programming language papers out of assembled decks on of papers on how HTML is only a
+3:433 minutes, 43 secondsmarkup language and not a programming language. I mean, yes, we're on the right, but that guy probably has something that we don't have a life.
+3:513 minutes, 51 secondsOkay, already owned and the articles barely started. I I will have you know that my girlfriend loves when I talk
+3:583 minutes, 58 secondsabout HTML and Markdown, but to each their own. Note, when the author is talking about markdown, he is specifically talking about common mark unless stated otherwise because it is
+4:074 minutes, 7 secondsthe unambiguous syntax specification. I love the project. I really appreciate their efforts on making this language a bit more grounded. It's not the specification that's broken. It's the
+4:154 minutes, 15 secondslanguage itself. Oh boy, the good markdown is a minimal language used for type setting trivial documents. It needed to do one simple job. Get a markdown file and output an HTML file.
+4:264 minutes, 26 secondsIt index is as legible as it gets and it's easy to write even with no assists.
+4:304 minutes, 30 secondsLike the C language, you can see the output that will be created. Bold is always open, closed, B tags at the end,
+4:364 minutes, 36 secondsand the italics are the same. Learning curve is simply non-existent if you're just a casual user. Just one look at the cheat sheet and you're ready. But now
+4:434 minutes, 43 secondsthe bad. We don't know what we want. Do we want UI? Do we want a programming language? We don't know. The only reason feature creep exists is because of
+4:524 minutes, 52 secondsunclear specifications. You want a minimal, easily legible markup language. You have markdown. Simple as that,
+4:584 minutes, 58 secondsright? Well, here are two different syntaxes to generate the exact same output. You have the single hash for
+5:055 minutes, 5 secondstitle, hello, stars for doing an italics here for I am, and then unambiguous,
+5:115 minutes, 11 secondswhich you want bold, and then grammar in a block quote. This is roughly how I would write this. I would have used double stars for unambiguous, but I am
+5:195 minutes, 19 secondswhat I am. Actually, actually, I would have used double stars for unambiguous and underscores for that. So, I guess I'm closer to here, but I would never have done the header syntax like this.
+5:275 minutes, 27 secondsGod. Yeah, there is almost no syntax overlap between these other than the block quote at the end. Oh boy, I to
+5:365 minutes, 36 secondshave fun. I hope you have the two eyeballs enough to see that markdown is not what you asked for. These produce two identical outputs and this is just the tip of the iceberg. It has so many
+5:445 minutes, 44 secondspoor decisions baked in that if you try to use it, it will actively fight against you the moment you think you know what you're doing. Let's start with bold itallic and bold itallic. In
+5:525 minutes, 52 secondsmarkdown, you can write a bold in different ways. You have the double star syntax, double underscores, or the B tag. And these are just some of the ways a valid bold can be written. And these
+6:006 minutesare for common mark. If you're using something which isn't marketing itself as common mark compliant, you can very well encounter valid stuff that produces
+6:066 minutes, 6 secondsthe same input like this or this or Yeah. God. Yeah, we've had to deal with so much [ __ ] like this for T3 chat. You
+6:146 minutes, 14 secondsguys have no idea. It is so absurdly difficult to handle all the different weird cases for markdown rendering. But
+6:226 minutes, 22 secondsI will also personally say the edge cases for latte are even worse. So yeah,
+6:286 minutes, 28 seconds[snorts] and don't even get him started on layered ones like this. Oh god, I don't even want to try to parse this.
+6:346 minutes, 34 secondsOkay, we got the two star here. Then this one is an italic. So this whole section is bold here. This one is italicized. This is italicized.
+6:426 minutes, 42 secondsA is bolded here. Not italicized. This is reitalicized. Of is italicized. This
+6:496 minutes, 49 secondsis italics. And this is doubled the italics for the lead here. I think that hurt.
+6:576 minutes, 57 secondsor this. Oh no, no, please no. I'm not even going to try on that one. This thing is actually
+7:057 minutes, 5 secondsso peak that we have a class of parser vulnerabilities called redos, regular expression denial of service that are affecting this. Like this 6.9 severity
+7:147 minutes, 14 secondslevel CVE for markdown. It this is a legit DOS vulnerability.
+7:207 minutes, 20 secondsYou just put a bunch of stars in a link and it can't process it. Beautiful. Beautiful.
+7:267 minutes, 26 secondsYeah, this string here takes 65,553 steps. That will [ __ ] over anything.
+7:337 minutes, 33 secondsGreat. Super cool. We love that.
+7:377 minutes, 37 secondsSo, how much worse can it possibly get here? Exhibit B. Am was a good idea. But this in old languages where compilers
+7:447 minutes, 44 secondswere producing optimal code like a river in a desert, inline assembly helped them write performance critical code with ease in the cost of the compiler
+7:527 minutes, 52 secondsengineers blood, sweat, tears in the birth of their firstborn son. Yeah,
+7:567 minutes, 56 secondswriting your inline assembly to get perfect code is hellish. It's one of the reasons that a project like ffmpeg is so tough but also so important. Inline as
+8:048 minutes, 4 secondsallowed stuff like simd operations before the compiler support in for them.
+8:078 minutes, 7 secondsYou want an overview of early SIMD generation failures, you can take a look at those here. Oh god, that's the last thing I want to look at. Now, let's take this wonderful idea and bolt it directly
+8:168 minutes, 16 secondsinto the most bloated singlethreaded sandboxed environment, expecting a simple and easy way to write documents.
+8:218 minutes, 21 secondsAnd that's how inline HTML inside Markdown was born. Oh boy. Inline HTML allows you to do stuff like this. I've
+8:298 minutes, 29 secondshad so many problems with inline HTML in Markdown personally that I am even more on this author side now. Yeah, I am an
+8:368 minutes, 36 secondsinsert simple programmer doing span class fancy text elegant close span programming div class animation. And
+8:448 minutes, 44 secondshere's my portfolio clos. Isn't this just simple? Isn't this just neat? The main reason why correct markdown parsing is exceptionally hard isn't because
+8:528 minutes, 52 secondsmarkdown syntax is so hard to comprehend. It's only onetenth of the issue. The real issue is that to ship a markdown parser, you also need to ship a
+9:009 minutesfriendly HTML parser. You're using HTML inside of Markdown. Why not use HTML from the start? Fair. I actually remember now friend of the channel who
+9:099 minutes, 9 secondsmight even be here right now, Jacob Evans tried really hard a while back and it looks like he has given it up since,
+9:169 minutes, 16 secondsbut he tried super hard to have a single markdown file for his GitHub profile and for his homepage by serving the markdown
+9:249 minutes, 24 secondsas HTML because there's enough overlap that hypothetically you could write a valid HTML homepage and have it render
+9:319 minutes, 31 secondsas your profile as well without code between the two. literally the same exact bites for both. And the results were hellish. He tried really hard to
+9:409 minutes, 40 secondsmake it work. But man, it was very fun watching him try. Markdown in and of itself isn't powerful enough to satisfy the simple monkey brain developers like
+9:489 minutes, 48 secondsthe author who's only satisfied when the site looks good enough. Good enough in this case means it needs to have at least basic latex support with tix support with the ability to install
+9:579 minutes, 57 secondspackages, plant UML, mermaid, custom styling, custom short codes, tagging and taxonomy, proper footnotes, bib tech
+10:0410 minutes, 4 secondssupport. I don't want a simple job from the simple tool too. To nail a painting to the wall, I need a hammer. In this case, the hammer is Markdown. But what
+10:1210 minutes, 12 secondsif I wanted to paint too? I'll break the canvas the moment I try to paint it with a hammer. Breaking the canvas also means a whole lot of CVEes primarily around cross-ite scripting vulnerabilities.
+10:2010 minutes, 20 secondsThis has me thinking. It has me thinking. I want to take a look at my blog and see how [ __ ] my markdown is. I haven't thought about this in a while.
+10:2710 minutes, 27 secondsSo, we already have a helmet here. That's great.
+10:3110 minutes, 31 secondsI have an iframe embedded because it's a YouTube video. So, in the first 13 lines in the second paragraph here, I'm
+10:3810 minutes, 38 secondsalready doing weird HTML [ __ ] Then the rest is fine. Oh, here's a great one. I needed to have an image tag that was
+10:4510 minutes, 45 secondsalso a link. So, I put an image HTML tag inside of brackets to attach the link.
+10:5210 minutes, 52 secondsIsn't this wonderful? I had to check two posts to find some cursed [ __ ] More cursed HTML and lined. Man, I used to be
+11:0011 minutesso good at writing. It's a shame that the syntax is awful. Yeah, get the idea.
+11:0411 minutes, 4 secondsIt as soon as you want to use markdown for more interesting stuff, you end up writing some cursed stuff. Every time we
+11:1111 minutes, 11 secondsallow inline HTML, plug-in hooks, or embedded execution engines, we expand the attack surface. The result is predictable recurring cross-sight scripting vulnerabilities across major
+11:1911 minutes, 19 secondsMarkdown implementations and much much more. And this will continue to rise with the vibe shaded parsers that are hitting the market. Yep, I've seen a lot
+11:2611 minutes, 26 secondsof attempts to rethink how we parse markdown because all of the agents spit out Markdown. We want to make things that are better, faster, and more reliable, and all of them are just full of exploits, edge cases,
+11:3611 minutes, 36 secondsvulnerabilities, and more. Apparently, Obsidian Markdown is even more cursed.
+11:3911 minutes, 39 secondsI'm sure I will love that. Speaking of things I love, we're now in exhibit C. The old and obscure syntax. Markdown,
+11:4511 minutes, 45 secondslike all the good tech we have around the worldwide web, was made in the good old 2000s. Markdown was inspired by pre-existing conventions for marking up plain text in email and Usenet posts.
+11:5411 minutes, 54 secondsMind you, before 2000, most serious mail looked like this. You see this quote syntax, putting the colon at the start of every line.
+12:0212 minutes, 2 secondsOh god, this ending in the signature. Do you see the beauty of it? The quote syntax, the vertical separation with pipes. This is what markdown was needed
+12:1012 minutes, 10 secondsfor which it would fail horribly at because in Markdown you can't divide the screen into n parts without inline HTML blackmagic. But because of this legacy you have two different ways of writing
+12:1812 minutes, 18 secondsheadings. The normal way and the ATX way. You have two different ways and more than two CVE of writing bold and itallic. You have two different ways of writing horizontal rules which collide
+12:2712 minutes, 27 secondswith one of them colliding with the set text header syntax. You have two different ways of writing unordered lists. You have an ordered list which doesn't care about how you ordered them.
+12:3512 minutes, 35 secondsAnd you have a footnote syntax which moves the entire grammar to context dependent grammar. And I remember the first time I saw that like the right way
+12:4212 minutes, 42 secondsto do lists in markdown. The correct thing is to put zeros because then your markdown parser can number them correctly. And if you change the order of things, you don't have to go redo all the numbers.
+12:5212 minutes, 52 secondsSo much [ __ ] Oh. Oh, I didn't see this line. This language is literally the C++ of markup languages. Oh man, now that I've seen this, I can't unsee this.
+13:0313 minutes, 3 secondsThat is entirely correct. This might be my favorite programming video ever other than maybe the OOP is garbage video.
+13:1213 minutes, 12 secondsIt's two hours long and I had to stop and pause and go back to it later because unlike most 2-hour long videos,
+13:1913 minutes, 19 secondsI couldn't watch that one in the background cuz it was too good. So, I actually sat and like walked in and just stared at my phone for 2 hours. My roommate at the time asked if I was okay. I was like, I'm more than okay.
+13:2913 minutes, 29 secondsYou're going to have to watch this after. This video is so good. highly recommend it. And knowing that, having that still in my head, C++ and markdown,
+13:3913 minutes, 39 secondsyeah, there's a lot of overlap. Nearly everything can be done in two different ways, which some of them might allow for cross-ite scripting and somehow leak memory in HTML. It's used everywhere,
+13:4713 minutes, 47 secondsbut it also fails everywhere equally.
+13:4913 minutes, 49 secondsAnd now we're at exhibit D. You can't simply just parse it. You also have to use it. Parsing is the easy thing. If you remember, I told you that the
+13:5713 minutes, 57 secondsfootnote syntax moves this grammar up to a contextsensitive one. Let me elucidate you. Okay. So if we have this syntax
+14:0414 minutes, 4 secondswith the carrot for a citation, this becomes test bracket one there. But if we actually handle a citation at the
+14:1214 minutes, 12 secondsbottom, now the markdown changes because this is now a link instead. Previously,
+14:1714 minutes, 17 secondsit just put this in. Now this thing further on changes how this part here is parsed. Oh boy. Actually though,
+14:2414 minutes, 24 secondsfootnotes aren't supported in common mark. They have links. The only notable difference is that link syntax means you can put only one word after the
+14:3214 minutes, 32 secondsdefinition as opposed to a shameful explanation of why bananas on pizza is a good idea. Reference style links and footnotes require global definition
+14:3814 minutes, 38 secondsresolution. A token's meaning depends on declarations elsewhere in the document that breaks purely contextfree parsing assumptions. Erggo the updates to a CSG
+14:4714 minutes, 47 secondsfrom a CFG. I had some intuition that markdown as as we use it was a context-sensitive grammar, but god damn,
+14:5414 minutes, 54 secondsthis is a really really damning example of that.
+14:5914 minutes, 59 secondsAll this is a lot of words for saying if you want a simple language, it should say simple. Rendering is the hard thing.
+15:0515 minutes, 5 secondsI think this is the most controversial part about the author's rant because nobody wants to admit that what we use and need are two very different things.
+15:1215 minutes, 12 secondsVanilla markdown needs a transliterator which is literally a onetoone mapping function. You see bold and then HTML bold comes out. But modern markdown has
+15:2015 minutes, 20 secondsto support stuff like footnotes which takes this simple transliterator into a full-blown compiler. And after you made this step, here's the ladder that you'll
+15:2815 minutes, 28 secondsclimb. I need a personal knowledge management system. Oh boy, the Obsidian people are going to love this requirement. I'll need footnotes. Cool.
+15:3515 minutes, 35 secondsWe're now in a CSG grammar. Now we've built a compiler. Oh, you want custom callouts, hooks that bind HTML with markdown? Now you have a dependency
+15:4215 minutes, 42 secondsgraph. I'll need math. Well, you need type setting library integrations, too.
+15:4615 minutes, 46 secondsSo, your dependency graph just got way more complex with execution engines as well. And if you want custom styling,
+15:5115 minutes, 51 secondscustom CSS, you have to deal with CSS injections with file-based scoping rules. This one is really fun. Having CSS in one markdown file and making sure
+15:5915 minutes, 59 secondsit doesn't break things in others. Good luck. Have fun. This is a great section y'all will love. I swear what I have to do in Obsidian work to make my needs
+16:0616 minutes, 6 secondsusing markdown make it seem like notion made a sane decision copying Word and Excel internally instead. Yeah, the
+16:1316 minutes, 13 secondsauthor thinks that notion seems sane because of how bad Markdown is. Do you understand how absurd that is? Honestly,
+16:2016 minutes, 20 secondsokay, here I'm going to drop my hot take here. I like notion's use of markdown as hotkeys effectively where you can export
+16:2816 minutes, 28 secondsmarkdown from notion, but the formatting of it's broken and garbage. It's so bad.
+16:3316 minutes, 33 secondsSo, like don't do that. But when I'm typing in notion, the fact that I can just use markdown syntax to change the element without having to learn a whole bunch of new hotkeys, that's really
+16:4116 minutes, 41 secondsnice. Like if I'm looking at the notion doc for this video, I say sup and I decide this should actually be a title hash space. Now it's a title. Oh, I want
+16:5016 minutes, 50 secondsa smaller one. Two hash three hash space. That's really nice. But that's a different use case. That's not the
+16:5716 minutes, 57 secondssyntax we're using. That is a syntax or grammar that we're familiar with being used effectively as a hotkey layer. Bun.
+17:0317 minutes, 3 secondsUh, Wabo just linked me async syntax in markdown. This is JS though. But still,
+17:1117 minutes, 11 secondsthis syntax for doing execution with awaits in blockers is so cursed. This is like view levels
+17:1917 minutes, 19 secondsof curse but in a markup language. Async markdown, not even once.
+17:2517 minutes, 25 secondsThis This horrifies me. I feel sick. Oh god, there's more. Oh, this is data view.js JS as text in oh no I want
+17:3417 minutes, 34 secondsnothing to do with any of this save me get me away no let's let's see how we solve this according to the author you ask the guy with a majestic beard with
+17:4117 minutes, 41 seconds30 plus years of experience in 886 assembly the answer is plain text you ask the guy with MacBook and openclaw running three different Mac minis making
+17:4917 minutes, 49 secondsa startup a day the answer is MDX no I okay I'm not an openclaw guy with three Mac minis I do have three Mac minis in
+17:5617 minutes, 56 secondsthis apartment but only one is on I even know MDX is not the right answer here you ask the guy who codes can see for a living. The answer is restructured text.
+18:0318 minutes, 3 secondsIf you ask the author, the answer's none. All of these solutions are broken in their own ways. Plain text is beautiful, but I can't show it to somebody that doesn't know what a null
+18:1018 minutes, 10 secondspointer dreference is. Restructured text is wonderful if you only read it and never write it. And MDX is so busy trying to be HTML, it forgets it needs
+18:1818 minutes, 18 secondsto be legible. And the biggest problem in all of them is that they don't have a build system. We cut corners in the name of speed. If they had a build system, a
+18:2618 minutes, 26 secondssane, unambiguous, legible syntax purpose built for what it's needed to be. I think all of the problems will be fixed. Don't allow inline HTML. Allow
+18:3418 minutes, 34 secondsfor well-defined short codes and functions to manipulate the text. Allow for custom hooks to be executed before, during, and after the compilation. Oh,
+18:4118 minutes, 41 secondsso you are in favor of async markdown. And most importantly, define everything.
+18:4518 minutes, 45 secondsWhat we need is a customuilt tool, not a Frankenstein's monster that we dare to call a language. Not saying markdown or markup should be a programming language.
+18:5218 minutes, 52 secondsI'm saying we are trying to use it like one. And because it lacks a formal foundation, it's failing at both. I genuinely think that a proper build system around a ser markup language with
+19:0019 minutescompile time hook support can fix a lot of the problems around this with the right constraints. At this point, we should just let go of markdown for good and look for our answers elsewhere,
+19:0919 minutes, 9 secondsprobably with a trivially parsible grammar. He has a whole formal language theory section here. Markup languages are a standard text encoding system
+19:1619 minutes, 16 secondsconsisting of a set of symbols inserted in a text document to control its structure, formatting, or the relationship between its parts. And programming languages are computer
+19:2519 minutes, 25 secondsprogramming languages. Any of various languages for expressing a set of detailed instructions for a digital computer. So you can clearly see these official definitions are not the way to
+19:3319 minutes, 33 secondsgo. So he's going to use another separate one. A language is a programming language if it's tingcomplete. Oh god. So markdown is definitely a programming language. I
+19:4019 minutes, 40 secondswrite JavaScript for a living. So we're not going to get into eBnf and contextfree languages. Articles in the description if you're the type that
+19:4819 minutes, 48 secondscares about these depths to turn completeness things. God, none of these words are in the Bible. The thing separating a set of mathematical axioms
+19:5619 minutes, 56 secondsfrom provability to non-provability is the want of recursion self-reference,
+20:0020 minuteswhich manifests itself as the common multiplication operation. A trivial observation can have non-trivial reactions. Yeah. Oh god, I missed this.
+20:0920 minutes, 9 secondsMan, I forgot about this. This was in 2012. Jeff Atwood wrote an article begging Gruber to give up markdown or at
+20:1720 minutes, 17 secondsleast bless these attempts to make a better standard. Oh man, this is actually really good. I wish that this happened. RIP. John Gruber's original
+20:2420 minutes, 24 secondsMarkdown.Ppl is one of the worst small programs I've ever read. Completely riddled with outright bugs and missed features that continually bite its users in the ass. It's awful even by the
+20:3320 minutes, 33 secondsalready low standards of handwritten many past reax based spaghetti parsers.
+20:3720 minutes, 37 secondsNobody should be using this original script. And unfortunately, many of the other implementations out there are direct transliterations that replicate all of its absurd errors. Like where if
+20:4520 minutes, 45 secondsyou mention the MD5 hash of another token in the document, the hash will be replaced with the token because it uses that as inline escaping mechanisms. But I got hit with a cross-sight scripting
+20:5320 minutes, 53 secondsvirus that got through the filters because of this. Jesus Christ. And another markdown is a disaster from last year.
+21:0821 minutes, 8 secondsWild. I did not know there was this quiet cult of people fighting the chaos that is Markdown, but it's really cool to see and I have a lot of respect for
+21:1721 minutes, 17 secondsthe author for taking the time to write this. Thank you to Barack for writing this. This was a fantastic read. I did
+21:2421 minutes, 24 secondsnot realize how much I hated Markdown and I use it every day. This article very much pushed me over the edge to more deeply appreciate how bad it is.
+21:3421 minutes, 34 secondsSadly, this author does not have a Twitter or anything linked, so I can't throw you at anything other than his blog, but I would recommend checking it out if you're nerdy about these things.
+21:4121 minutes, 41 secondsAnd the original article has even more fun details if you want to check it out yourself. I got nothing else, though. I can't help but notice the irony of me
+21:4921 minutes, 49 secondswearing this HTML shirt, and I'm going to resist the urge to go rewrite all of my stuff in HTML or maybe a new markup language I make up myself. Please don't
+21:5621 minutes, 56 secondsmake me do this, guys. T3 down is not the solution, but I am admitting [sighs]
+22:0222 minutes, 2 secondsa little bit of temptation. Until next time, peace nerds.

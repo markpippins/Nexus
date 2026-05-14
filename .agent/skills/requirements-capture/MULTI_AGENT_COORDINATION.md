@@ -72,6 +72,7 @@ Yes—agents can conflict too.
 - **A1 — Contradictory proposals**: Two agents propose incompatible events (e.g., `REQ_SUPERSEDED` vs `REQ_REFINED` on same req_id).
 - **A2 — Duplicate event emission**: Same semantic event proposed twice.
 - **A3 — Structural race condition**: Two agents modify same node concurrently.
+- **A4 — Failure cascade**: One agent's failure event blocks another agent's proposals via FAILURE_AFFECTS edges, requiring explicit resolution before the blocked agent may proceed.
 
 ## 7. ARBITRATION STRATEGIES
 All arbitration MUST use one of these deterministic policies:
@@ -154,7 +155,8 @@ You now have a complete system:
 4. **Query DSL**: Composable reasoning layer
 5. **Execution layer**: Task projection system
 6. **Conflict system**: Explicit ambiguity modeling + resolution
-7. **Multi-agent layer (this)**: Concurrent proposal system + deterministic arbitration
+7. **Multi-agent layer**: Concurrent proposal system + deterministic arbitration
+8. **Failure integration (this layer)**: Failure cascade detection + agent divergence routing
 
 ## 15. FINAL FORMULA
 ```text
@@ -167,10 +169,12 @@ AGENTS (parallel)
             → QUERY DSL
               → EXECUTION
                 → CONFLICT SYSTEM
-                  → EVENTS
-                    → AGENTS
+                  → FAILURE DETECTION
+                    → FAILURE GRAPH
+                      → EVENTS
+                        → AGENTS
 ```
-Closed loop. Fully deterministic. Concurrency-safe by construction.
+Closed loop. Fully deterministic. Concurrency-safe by construction. Failure-safe by design.
 
 ## 16. ONE-SENTENCE SUMMARY
-The system supports concurrent multi-agent reasoning by restricting agents to stateless event proposal, enforcing a deterministic arbitration layer that linearizes all outputs into a single event log, preserving a globally consistent event-sourced requirement graph under parallel execution.
+The system supports concurrent multi-agent reasoning by restricting agents to stateless event proposal, enforcing a deterministic arbitration layer that linearizes all outputs into a single event log, and routing agent divergence and failure cascades through the failure graph, preserving a globally consistent event-sourced requirement graph under parallel execution.

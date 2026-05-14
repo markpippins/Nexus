@@ -1,0 +1,8 @@
+{
+  "profile": "openai",
+  "env": {
+    "OPENAI_BASE_URL": "http://localhost:11434/v1",
+    "OPENAI_MODEL": "llama3:latest"
+  },
+  "createdAt": "2026-05-14T00:06:11.193Z"
+}
