@@ -29,6 +29,7 @@ The script is idempotent — running it multiple times on the same target is saf
 .pipeline/
   IMPLEMENTATION_PLAN_RECORD/
   PROMPT_RECORDS/
+  RESPONSE_RECORDS/
   WORK_REQUESTS/
     active/
     artifacts/

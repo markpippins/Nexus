@@ -8,6 +8,36 @@ description: Records the current state of requirements as an append-only event l
 ## 1. SYSTEM OVERVIEW
 This system is an event-sourced requirements engine.
 
+### 1.1 System Boundary
+
+requirements-capture is a **domain-modeling-only** subsystem. It operates within the `ExecutionState` context established by the control plane. See [`REQUIREMENTS_CAPTURE_BOUNDARY.md`](../../docs/REQUIREMENTS_CAPTURE_BOUNDARY.md) for the full specification.
+
+**Non-negotiable rule**: `requirements-capture` never decides *how* execution happens. It only decides *what work exists*.
+
+| Question | Answered by |
+|---|---|
+| *What kind of run is this?* | `normalize-intent` |
+| *Where does it go?* | `mode-router` |
+| *What work exists?* | `requirements-capture` |
+
+**Hard constraints (F1–F3):**
+- F1 — No intent inference: MUST NOT infer autonomy level, safety mode, execution mode, or routing preference
+- F2 — No structural execution influence: MUST NOT choose validators, change execution order, inject stages, or alter pipeline topology
+- F3 — No control feedback: MUST NOT cause `ExecutionState ← requirements-capture output`. `ExecutionState` is read-only
+
+**Input rules:**
+- MAY consume: conversation history, artifacts, prior execution events, domain context, user requirements statements
+- MAY read `ExecutionState` as read-only context
+- MAY NOT consume: `PIPELINE_INTENT.yaml`, routing configuration, mode selection logic, `ExecutionState` mutation authority
+
+**Output rules:**
+- MAY emit: `WorkRequestGraph`, `RequirementEvents`, `RequirementAnnotations`
+- MUST NOT emit: routing hints, execution modes, validator directives, pipeline stage decisions
+
+**Dependency direction:**
+- Allowed: `requirements-capture → execution types`
+- Forbidden: `requirements-capture → control-plane modules` (normalize-intent, mode-router, etc.)
+
 **Core Principle**
 All requirement state is derived deterministically from an append-only event log. There is no mutable requirement state.
 

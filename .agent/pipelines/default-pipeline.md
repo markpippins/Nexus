@@ -2,26 +2,26 @@
 
 ## Overview
 
-The `.agent` pipeline is a deterministic transformation engine that converts user intent into auditable, lifecycle-managed `WorkRequests`. It is designed as a compilation pipeline, separating free reasoning (outside the pipeline) from structured transformation (inside the pipeline).
+The `.agent` pipeline is a deterministic transformation engine within a three-layer architecture: **Control Plane → Execution Pipeline → Observation Layer** (see `COMPILER_ARCHITECTURE.md §1.1`). It converts user intent into auditable, lifecycle-managed `WorkRequests`. It is designed as a compilation pipeline, separating free reasoning (outside the pipeline) from structured transformation (inside the pipeline).
+
+**Control Plane Precondition**: Before this pipeline executes, `normalize-intent` has produced canonical `ExecutionState` and `mode-router` has selected this pipeline. All stages consume `ExecutionState` as a read-only execution contract. No stage interprets `PIPELINE_INTENT.yaml` or derives `ExecutionState`.
 
 ## Pipeline Flow
 
 The default sequence of operations is:
 
-0. **`resolve-intent`**: Load `.pipeline/PIPELINE_INTENT.yaml`, validate against schema v1, normalize to ExecutionState, reject invalid combinations. If ambiguous, halt and report.
-
 1. **`archive-prompt`**: Verbatim capture of the original user request with an assigned `prompt_id`.
 
-2. **`requirements-capture`**: Transformation of the raw prompt into a structured internal representation. Behavior depends on `processingMode`:
-   - `generate`: emit requirements as WR intent blocks
-   - `execute`: bind requirements to target project resources
-   - `transform`: operate on existing WR lifecycle states
+2. **`requirements-capture`**: Transformation of the raw prompt into a structured internal representation. Consumes `ExecutionState` as a read-only execution contract. Does not interpret intent or modify execution authority. Behavior reflects `ExecutionState`:
+   - `READ_ONLY_PLAN`: emit requirements as WR intent blocks
+   - `CODE_EXECUTION`: bind requirements to target project resources
+   - `TRANSFORM_PIPELINE`: operate on existing WR lifecycle states
 
 3. **`resource-binding`**: Mapping of the structured intent to specific project resources (files/directories). Gates on `mutationScope.filesystem.read`.
 
 4. **`decompose-task`**: Breaking down the goal into atomic units of work.
 
-5. **`work-request-emission`**: Generation of lifecycle-aware `WorkRequest` objects (v1, v2, etc.). Only active when `processingMode == generate`.
+5. **`work-request-emission`**: Generation of lifecycle-aware `WorkRequest` objects (v1, v2, etc.). Emits work requests consistent with `ExecutionState.processingMode`.
 
 6. **`archive-implementation`**: Snapshotting the planning state and materializing the `WORK_TO_DATE.md` projection. Respects `mutationScope.filesystem.write` for record format.
 

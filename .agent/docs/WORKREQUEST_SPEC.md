@@ -88,11 +88,14 @@ Generate → Refine → Validate → Execute → Record Outcome
   "version": number,
   "state": "DRAFT | READY | EXECUTED | SUPERSEDED | REJECTED",
   "layer_mode": "INTENT | BINDING | EXECUTION-BOUND",
+  "domain": "specification | execution",
   "supersedes": [],
   "derivation": {},
   "path": "string",
   "model": "string"
 }
+
+Domain boundary: 99% of WorkRequests live in the `specification` domain as pre-execution IR. Execution nodes are derived expansions at runtime and are tagged `execution`.
 3. Derivation Block
 
 The derivation block records semantic lineage.
@@ -205,13 +208,14 @@ Record outcome externally.
 
 Executors are linkers, not planners.
 
-1. Relationship to PROMPT_RECORDS & IMPLEMENTATION_PLAN_RECORD
+1. Relationship to PROMPT_RECORDS, RESPONSE_RECORDS & IMPLEMENTATION_PLAN_RECORD
 Artifact Role
 PROMPT_RECORDS Human ↔ Agent dialogue history
-WORKREQUEST Canonical IR
+WORKREQUEST Canonical IR (Phase 1 → Phase 2 handoff)
+RESPONSE_RECORDS Execution outputs
 IMPLEMENTATION_PLAN_RECORD Execution results
 
-WorkRequests bridge cognition and implementation.
+WorkRequests bridge cognition and implementation. The WorkRequestGraph is the authoritative handoff artifact between Phase 1 (Specification Compiler) and Phase 2 (Execution Runtime). Once emitted, it is stable — Phase 2 may not reinterpret it.
 
 1. Failure Handling
 

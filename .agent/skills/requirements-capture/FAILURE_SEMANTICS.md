@@ -79,6 +79,14 @@ FailureEvent = {
 | `FAILURE_ARBITRATION_COLLAPSE` | arbitration | error |
 | `FAILURE_AGENT_DIVERGENCE` | arbitration | error |
 
+### 2.5 VALIDATION LAYER FAILURES
+
+- **F12 — ValidationFailure**: A structural (static) or behavioral (runtime) validation rule was violated. See [`VALIDATOR_SPEC.md`](../../docs/VALIDATOR_SPEC.md) for the full rule set.
+
+| Failure Type | Scope | Severity |
+|---|---|---|
+| `FAILURE_VALIDATION` | validation | WARN / ERROR / FATAL |
+
 ## 4. FAILURE HANDLING RULES
 
 ### 4.1 HARD FAILURE (FATAL)
@@ -101,6 +109,23 @@ System:
 Examples: partial query ambiguity, localized conflict cluster.
 
 ### 4.3 DEFERRED FAILURE
+
+System:
+1. emits FAILURE event
+2. marks as unresolved
+3. routes into conflict system
+
+Examples: execution deadlock cycles, unresolved arbitration ties.
+
+### 4.4 VALIDATION FAILURE SEVERITY DISPATCH
+
+| Validation Severity | Static Lane Effect | Runtime Lane Effect |
+|---|---|---|
+| WARN | Log warning, proceed to freeze | Log warning, continue tick |
+| ERROR | Abort compilation, no ExecutionGraph | Block transition, node stays in current state |
+| FATAL | Abort compilation, no ExecutionGraph | Emit FailureNode (if node context) or ValidationFailure only (system-level) |
+
+Rule: Runtime FATAL with an active node context → FailureNode. Runtime FATAL without node context → ValidationFailure only. See [`VALIDATOR_SPEC.md`](../../docs/VALIDATOR_SPEC.md).
 
 System:
 1. emits FAILURE event

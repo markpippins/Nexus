@@ -20,7 +20,7 @@ Also called in sequence after `pipeline-init` when the user says "set up a pipel
 ## Execution
 
 ### Step 1: Analyze context
-Apply deterministic inference rules per `PIPELINE_INTENT_MODEL.md §5.1`:
+Apply deterministic inference rules per `PIPELINE_INTENT_SPEC.md §5.1`:
 
 | Context | direction | processingMode | mutationScope |
 |---|---|---|---|

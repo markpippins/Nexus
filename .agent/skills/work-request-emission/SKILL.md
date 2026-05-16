@@ -3,7 +3,7 @@ name: work-request-emission
 description: Helper skill for emitting work requests conforming to the execution kernel contract.
 ---
 
-workrequest generation rules defined at: ./references/WORKREQUEST_GENERATION_RULES.md
+workrequest generation rules defined at: ./references/WORK_REQUEST_GENERATION_RULES.md
 
 
 ## Purpose

@@ -19,7 +19,7 @@ When the user says "set up a pipeline for \<target\>", "initialize a pipeline", 
 Invoke `pipeline-init` on the target directory to create the canonical `.pipeline` directory structure.
 
 ### Step 2: Run pipeline-intent
-Invoke `pipeline-intent` on the same target to analyze context, resolve intent, and write `PIPELINE_INTENT.yaml` plus `pipeline-mode.json`.
+Invoke `pipeline-intent` on the same target to analyze context and write `PIPELINE_INTENT.yaml` plus `pipeline-mode.json`.
 
 ## Expected Result
 - `.pipeline/` directory structure

@@ -8,4 +8,4 @@ Acts as the Hard-Fail Circuit Breaker and Edge-Router, enforcing decentralized e
 
 ## Output
 - `HALT`: Execution aborted (Hard Law Breaches).
-- `ROUTE_TO_PLANNER`: Signal routed via feedback edge to `mode-router` to resolve soft conflicts and `PEB_EXTENSION_PROPOSAL`s.
+- `ROUTE_TO_PLANNER`: Generate `ExceptionEvent` for observation layer diagnostic stream. No routing influence. `mode-router` is excluded from the escalation path.

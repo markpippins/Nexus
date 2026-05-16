@@ -1,4 +1,7 @@
-# Pipeline Intent Model v1
+# Pipeline Intent Specification v1 — Control Plane
+
+> **This is a control-plane specification. It defines the pre-pipeline compiler pass.
+> It is not a pipeline stage. Pipeline stages begin only after ExecutionState is produced.**
 
 ## 1. Problem Statement
 
@@ -8,7 +11,7 @@ When asked to "set up a pipeline in project X", agents routinely misinterpret wh
 - **Misinterpretation B**: "Project X should consume WorkRequests at runtime" — treating the pipeline as a runtime dependency
 - **Reality**: The pipeline is a **development tool** applied to project X. Project X is the target of pipeline-driven changes, not a participant in the pipeline.
 
-The Pipeline Intent Model eliminates this ambiguity by making the pipeline's relationship to its target project explicit through a structured contract.
+The Pipeline Intent Specification eliminates this ambiguity by making the pipeline's relationship to its target project explicit through a structured contract that the [`normalize-intent`](../skills/normalize-intent/SKILL.md) compiler pass validates and normalizes.
 
 ---
 
@@ -31,8 +34,8 @@ What the pipeline does with WorkRequests.
 
 | Value | Meaning |
 |---|---|
-| `generate` | Pipeline produces WorkRequests for downstream consumers. No code mutation. (Was `producer`.) |
-| `execute` | Pipeline reads and applies WorkRequests — writes code, makes changes. (Was `consumer`.) |
+| `generate` | Pipeline produces WorkRequests for downstream consumers. No code mutation. |
+| `execute` | Pipeline reads and applies WorkRequests — writes code, makes changes. |
 | `transform` | Pipeline converts WorkRequests between lifecycle states (e.g., DRAFT → READY). |
 
 ### 2.3 mutationScope
@@ -64,7 +67,7 @@ mutationScope:
 
 ### 3.1 ExecutionState Derivation
 
-The three axes are not independently executable. They compose into a single derived **ExecutionState** used for routing decisions.
+The three axes are not independently executable. They compose into a single derived **ExecutionState** used for routing decisions. This derivation is implemented by [`normalize-intent`](../skills/normalize-intent/SKILL.md).
 
 ```
 ExecutionState = f(direction, processingMode, mutationScope)
@@ -75,11 +78,13 @@ ExecutionState = f(direction, processingMode, mutationScope)
 | `READ_ONLY_PLAN` | external | generate | filesystem.read=true, code.write=false, runtime.instrument=false |
 | `CODE_EXECUTION` | external | execute | code.write=true, runtime.instrument=false |
 | `RUNTIME_INSTRUMENT` | internal | execute | code.write=true, runtime.instrument=true |
-| `TRANSFORM` | external | transform | filesystem.read=true, filesystem.write=non-code-only, code.write=false |
+| `TRANSFORM_PIPELINE` | external | transform | filesystem.read=true, filesystem.write=non-code-only, code.write=false |
+
+Note: `TRANSFORM` was renamed to `TRANSFORM_PIPELINE` in v1.1 of the routing model.
 
 ### 3.2 Valid Intent Combinations
 
-Invalid combinations MUST fail intent resolution. No coercion.
+Invalid combinations MUST fail intent resolution. No coercion. These rules are enforced by `normalize-intent` rules R2–R4.
 
 | Direction | processingMode | filesystem.write | code.write | runtime.instrument | Valid |
 |---|---|---|---|---|---|
@@ -99,8 +104,8 @@ Invalid combinations MUST fail intent resolution. No coercion.
 
 `pipelineIntent` is **immutable after initialization**.
 
-- No stage may mutate the canonical intent
-- Stages may emit `IntentProposal` events (for logging/audit)
+- No component may mutate the canonical intent
+- Components may emit `IntentProposal` events (for logging/audit)
 - `IntentProposal` events are validated but do not change `pipelineIntent`
 - Changing intent requires a new pipeline initialization
 
@@ -108,7 +113,7 @@ Invalid combinations MUST fail intent resolution. No coercion.
 
 ## 4. Intent Declaration Schema
 
-Declared in `.pipeline/PIPELINE_INTENT.yaml`:
+Declared in `.pipeline/PIPELINE_INTENT.yaml` (the input file read by `normalize-intent`):
 
 ```yaml
 pipelineIntent:
@@ -127,7 +132,9 @@ pipelineIntent:
 
 ---
 
-## 5. Intent Resolution
+## 5. Intent Resolution (Authoring Rules)
+
+These inference rules are used by [`pipeline-intent`](../skills/pipeline-intent/SKILL.md) to *author* a `PIPELINE_INTENT.yaml` from user context. They are not part of the validation or normalization pass — that is the responsibility of `normalize-intent`.
 
 ### 5.1 Deterministic Inference Rules
 
@@ -151,34 +158,49 @@ If multiple valid intents match the same input:
 
 ---
 
-## 6. Intent Normalization Layer
+## 6. Normalization Pass
 
-Before any routing decision, raw intent undergoes normalization:
+Before any routing decision, the raw `PIPELINE_INTENT.yaml` undergoes deterministic normalization by the [`normalize-intent`](../skills/normalize-intent/SKILL.md) compiler pass:
 
 ```
-PIPELINE_INTENT.yaml
+PIPELINE_INTENT.yaml  (or pipeline-mode.json fallback)
         ↓
-Intent Normalizer
-  - validates against schema v1
-  - rejects invalid combinations per §3.2 validity matrix
-  - canonicalizes flags to canonical form
-  - derives ExecutionState per §3.1
-  - outputs normalized intent object
+normalize-intent (CONTROL PLANE — exclusive owner)
+  - validates schema (R1)
+  - checks mode compatibility matrix (R2)
+  - enforces direction consistency (R3)
+  - enforces mutation safety (R4)
+  - derives ExecutionState (ES1–ES5)
+  - verifies determinism (R5)
+  - outputs canonical ExecutionState
         ↓
-ExecutionState
+ExecutionState (canonical, pre-validated)
         ↓
-Mode Router (or other consumer)
+mode-router (PURE ROUTER — consumes ExecutionState only)
 ```
 
 Raw axis values are never consumed directly by routing logic. Only the normalized ExecutionState is used. This prevents future drift between the schema and execution rules.
 
+**Invariant**: `normalize-intent` is the exclusive owner of ExecutionState derivation. No other component may interpret `PIPELINE_INTENT.yaml` or derive ExecutionState.
+
+Pipeline stages begin ONLY after ExecutionState is produced.
+
 ---
 
-## 7. Contract Binding Table
+## 7. Contract Tables
+
+### 7.1 Control Plane
+
+| Component | Reads | Produces |
+|---|---|---|
+| `pipeline-intent` | User context + project analysis | `PIPELINE_INTENT.yaml` |
+| `normalize-intent` | `PIPELINE_INTENT.yaml` (or `pipeline-mode.json`) | Canonical `ExecutionState` |
+| `mode-router` | `ExecutionState` | Execution pipeline selection |
+
+### 7.2 Execution Pipeline
 
 | Stage | Reads | Effect |
 |---|---|---|
-| `mode-router` | ExecutionState | Selects plan/execute/instrument mode for the agent |
 | `requirements-capture` | processingMode | Determines WorkRequest shape (generate vs execute vs transform) |
 | `archive-prompt` | mutationScope.filesystem | Determines whether prompts may reference code files |
 | `work-request-emission` | processingMode | Generates WRs only if processingMode=generate |
@@ -195,22 +217,24 @@ Raw axis values are never consumed directly by routing logic. Only the normalize
 ```
 Request: "set up a pipeline in project X"
 
-Inference:
+Inference (pipeline-intent):
   Target has src/         → direction=external-only
   Making changes          → processingMode=execute
   Writing code            → mutationScope.code.write=true
+
+Validation (normalize-intent):
+  Schema valid            → R1 pass
+  EXECUTE + code.write    → R2 pass (ANY mutationScope allowed)
+  external + execute      → R3 pass
+  No mutation safety issue → R4 pass
 
 Result:
   direction: external-only
   processingMode: execute
   mutationScope:
-    filesystem:
-      read: true
-      write: all
-    code:
-      write: true
-    runtime:
-      instrument: false
+    filesystem: { read: true, write: all }
+    code:       { write: true }
+    runtime:    { instrument: false }
 
 ExecutionState: CODE_EXECUTION
 Meaning: Pipeline is a dev tool, not a runtime integration.
@@ -221,21 +245,23 @@ Meaning: Pipeline is a dev tool, not a runtime integration.
 ```
 Request: "generate WorkRequests from this architecture discussion"
 
-Inference:
+Inference (pipeline-intent):
   "plan" keyword          → processingMode=generate
   No code changes         → mutationScope.code.write=false
+
+Validation (normalize-intent):
+  Schema valid            → R1 pass
+  generate + code.write=false → R2 pass
+  external + generate     → R3 pass
+  No mutation safety issue → R4 pass
 
 Result:
   direction: external-only
   processingMode: generate
   mutationScope:
-    filesystem:
-      read: true
-      write: non-code-only
-    code:
-      write: false
-    runtime:
-      instrument: false
+    filesystem: { read: true, write: non-code-only }
+    code:       { write: false }
+    runtime:    { instrument: false }
 
 ExecutionState: READ_ONLY_PLAN
 ```
@@ -245,22 +271,24 @@ ExecutionState: READ_ONLY_PLAN
 ```
 Request: "add telemetry to the payment service"
 
-Inference:
+Inference (pipeline-intent):
   "instrument" keyword      → direction=internal-instrumentation
   "telemetry" keyword       → mutationScope.runtime.instrument=true
   Code changes needed       → mutationScope.code.write=true
+
+Validation (normalize-intent):
+  Schema valid                → R1 pass
+  execute + code.write=true   → R2 pass
+  internal + execute          → R3 pass
+  No mutation safety issue    → R4 pass
 
 Result:
   direction: internal-instrumentation
   processingMode: execute
   mutationScope:
-    filesystem:
-      read: true
-      write: all
-    code:
-      write: true
-    runtime:
-      instrument: true
+    filesystem: { read: true, write: all }
+    code:       { write: true }
+    runtime:    { instrument: true }
 
 ExecutionState: RUNTIME_INSTRUMENT
 ```
