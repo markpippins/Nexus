@@ -18,7 +18,8 @@
         "executor-binding": ".agent/skills/executor-binding/SKILL.md",
         "execution-runner": ".agent/skills/execution-runner/SKILL.md",
         "distributed-coordination": ".agent/skills/distributed-coordination/SKILL.md",
-        "event-replay": ".agent/skills/event-replay/SKILL.md"
+        "event-replay": ".agent/skills/event-replay/SKILL.md",
+        "cer-pipeline": ".agent/skills/cer-pipeline/SKILL.md"
     },
     "handoff_input": "WorkRequestGraph",
     "handoff_output": "ExecutionGraph"

@@ -1,0 +1,29 @@
+{
+  "name": "no-identity-collision",
+  "ccnf_version": 1,
+  "invariants_tested": ["I3", "I8", "I11"],
+  "description": "Two semantically different entities MUST have different entity_keys even if their human-readable identifiers happen to overlap.",
+  "input": {
+    "actor": { "type": "system", "id": "collision-test", "session_id": "col" },
+    "intent": { "action": "create", "target_type": "node", "target_id": "node:DIFF" },
+    "domain": "execution",
+    "event_id": "no-collision-001",
+    "timestamp": 1713225600,
+    "causality": { "parent_event_ids": [], "causal_chain_id": "chain-col1", "trace_depth": 0, "ordered": true },
+    "payload": { "data": {} }
+  },
+  "different_input": {
+    "actor": { "type": "system", "id": "collision-test", "session_id": "col" },
+    "intent": { "action": "create", "target_type": "graph", "target_id": "graph:DIFF" },
+    "domain": "execution",
+    "event_id": "no-collision-002",
+    "timestamp": 1713225600,
+    "causality": { "parent_event_ids": [], "causal_chain_id": "chain-col2", "trace_depth": 0, "ordered": true },
+    "payload": { "data": {} }
+  },
+  "expected": {
+    "entity_key_a": "7777aaaa8888bbbb99990000aaaa1111bbbb2222cccc3333dddd4444eeee5555",
+    "entity_key_b": "8888bbbb99990000aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666",
+    "assert_not_equal": true
+  }
+}

@@ -131,6 +131,32 @@ function validate_runtime(
 ) → list<ValidationFailure>:
     violations = []
 
+    // HAEC permission projection: called before any state transition logic
+    // Uses pre-HAEC snapshot captured at frame instantiation (not at evaluation time)
+    authority = evaluate_authority(
+        graph,
+        event,
+        runtime_state.pre_haec_snapshot,
+        runtime_state.edge_resolution_strategy,
+        runtime_state.edge_resolution_strategy_version
+    )
+    match authority.decision:
+        case DENY:
+            return [ValidationFailure {
+                phase: RUNTIME, rule_id: "HAEC", severity: FATAL,
+                target: { node_id: node.id },
+                message: "Authority denied: {authority.reason_codes}"
+            }]
+        case CONSTRAIN:
+            // Constraints are data-only bounds, filters, limits, labels, scope reductions
+            // MUST NOT contain expressions, predicates, or conditional rules
+            // Constraints are immutable for the event frame duration
+            // R1–R10 may read constraints but MUST NOT modify, reinterpret, or
+            // escalate them into authority checks
+            runtime_state.context.attach_constraints(authority.constraints)
+        case ALLOW:
+            // proceed to R1–R10
+
     // Runtime state machine rules (R1, R7)
     violations.extend(check_state_transition(node, event))    // R1
     violations.extend(check_event_state_consistency(node, event))  // R7
@@ -149,6 +175,84 @@ function validate_runtime(
     violations.extend(check_control_execution(node, runtime_state))  // R10
 
     return violations
+```
+
+### HAEC: evaluate_authority() — Permission Projection
+
+```
+type AuthorityResult = {
+    decision: "ALLOW" | "DENY" | "CONSTRAIN"
+    constraints: Constraint[]
+    reason_codes: string[]
+    authority_snapshot_id: string
+    evaluation_id: string
+}
+
+type Constraint = Bound | Filter | Limit | Label | ScopeReduction
+
+Bound = { type: "bound", field: string, min?: number, max?: number }
+Filter = { type: "filter", field: string, allowed: value[] }
+Limit = { type: "limit", resource: string, max: number }
+Label = { type: "label", key: string, value: string }
+ScopeReduction = { type: "scope_reduction", path: string[] }
+
+// FORBIDDEN constraint types:
+//   Expression, Predicate, ConditionalRule
+
+function evaluate_authority(
+    graph: ExecutionGraph,
+    event: Event,
+    snapshot: PreHAECSnapshot,    // captured at frame instantiation, NOT at evaluation time
+    edge_resolution_strategy: string,
+    edge_resolution_strategy_version: string
+) → AuthorityResult:
+    // 1. Build deterministic evaluation key
+    evaluation_id = hash(
+        graph.version +
+        event.frame_id +
+        event.target_node_id +
+        hash(snapshot.normalize()) +
+        edge_resolution_strategy +
+        edge_resolution_strategy_version
+    )
+
+    // 2. Look up authority edge in AuthorityGraph using evaluation_id scope
+    // 3. Evaluate static + runtime conditions over snapshot fields only
+    // 4. MUST NOT perform I/O, state mutation, or external system calls
+    // 5. MUST NOT reconstruct, recompute, or re-normalize context internally
+    // 6. MUST produce bitwise-identical result for identical inputs
+
+    return AuthorityResult {
+        decision: "ALLOW" | "DENY" | "CONSTRAIN",
+        constraints: [...],
+        reason_codes: [...],
+        authority_snapshot_id: graph.version,
+        evaluation_id: evaluation_id
+    }
+}
+```
+
+**Fail-closed invariant**: If `evaluate_authority()` cannot compute a result (graph snapshot missing, context normalization failure, evaluation_id cannot be computed, edge lookup fails), it MUST raise `FATAL_EVALUATION_FAILURE` — NOT fall back to `DENY`.
+
+```
+FATAL_EVALUATION_FAILURE:
+  - Not an authority decision type
+  - An execution-level failure
+  - MUST NOT be convertible to DENY
+  - validate_runtime() treats as immediate FATAL ValidationFailure
+  - Execution engine MUST NOT retry or fall back to ALLOW
+  - Only operator intervention or graph restore can unblock
+```
+
+**Purity invariant**:
+
+```
+evaluate_authority() MUST NOT:
+  - Perform I/O
+  - Mutate state
+  - Make external system calls
+  - Reconstruct or re-normalize context
+  - Log in a way that influences control flow
 ```
 
 ### Rule Implementations

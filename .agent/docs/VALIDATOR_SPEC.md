@@ -1,14 +1,16 @@
-# ExecutionGraph Validator v1 — Dual-Lane Specification
+# ExecutionGraph Validator v1 — Four-Dimension Specification
 
 ## 1. Overview
 
 The ExecutionGraph Validator ensures that every ExecutionGraph is structurally sound before execution and remains semantically valid during execution.
 
-It operates in two orthogonal lanes:
+It operates across four orthogonal dimensions:
 
-| Lane | Time | Scope | Failure Effect |
+| Dimension | Time | Scope | Failure Effect |
 |---|---|---|---|
+| AEI (Authority Graph) | Pre-lowering, after mode-router | System component topology validity | Abort — no lowering permitted |
 | Static | After lowering, before freeze | Structural correctness | Reject artifact creation |
+| HAEC (permission) | Inside runtime validation, before R1 | Per-transition permission | DENY → abort transition; CONSTRAIN → attach limits |
 | Runtime | During scheduler execution | Behavioral correctness | Mutate execution trajectory |
 
 ```
@@ -21,14 +23,18 @@ Validation is **hard gating logic**, not advisory.
 
 ## 2. Core Semantics
 
-### 2.1 Dual-Lane Principle
+### 2.1 Four-Dimension Principle
 
-The two lanes are orthogonal. They do NOT share lifecycle consequences.
+The four dimensions are orthogonal. They do NOT share lifecycle consequences.
 
 ```
+AEI validation ensures topology validity.
 Static validation ensures structural correctness.
+HAEC ensures per-transition permission.
 Runtime validation ensures behavioral correctness.
 ```
+
+A graph that passes static validation may still fail at runtime. A runtime failure does not retroactively invalidate static validation. Authority evaluations are separate from both.
 
 A graph that passes static validation may still fail at runtime. A runtime failure does not retroactively invalidate static validation.
 
@@ -51,7 +57,7 @@ A graph that passes static validation may still fail at runtime. A runtime failu
     "node_id": "optional",
     "edge_id": "optional"
   },
-  "rule_id": "S5 | R3 | R10",
+  "rule_id": "S5 | R3 | R10 | HAEC | HAEC_DISTRIBUTED_MISMATCH | FATAL_EVALUATION_FAILURE",
   "severity": "WARN | ERROR | FATAL",
   "message": "...",
   "context": {}
@@ -545,7 +551,48 @@ for each reference:
         → FATAL "AEI4": "peb-exception-router → mode-router is a severed feedback edge"
 ```
 
-### V11.4 Severity Dispatch
+### V11.4 HAEC — Permission Projection (Runtime Sub-Evaluation)
+
+HAEC is NOT a lane. It is a **permission projection** over a pending transition, invoked inside `validate_runtime()` before any R1–R10 rules. See [`AUTHORITY_GRAPH_IR.md`](./AUTHORITY_GRAPH_IR.md) for the full specification.
+
+**Causal position inside runtime validation**:
+
+```
+validate_runtime(node, event, state):
+    1. evaluate_authority(graph, event, pre_haec_snapshot, ...)
+       → AuthorityResult: ALLOW | DENY | CONSTRAIN
+    2. if DENY → return FATAL ValidationFailure (rule_id: "HAEC")
+    3. if CONSTRAIN → attach constraints to context
+    4. continue with R1–R10
+```
+
+**HAEC rules integrated into the validator**:
+
+| Rule | Enforces |
+|---|---|
+| HAEC-R1 | Evaluation identity includes versioned `edge_resolution_strategy` |
+| HAEC-R2 | Constraints are data-only (no expressions, predicates, conditional rules) |
+| HAEC-R3 | Canonical serialization with constraint ordering by type→field→hash |
+| HAEC-R4 | Snapshot captured at frame instantiation; no control-flow from constraints |
+| HAEC-R5 | `FATAL_EVALUATION_FAILURE` disjoint from `DENY` — no conversion between them |
+| HAEC-R6 | Bitwise idempotency — canonical serialization for distributed agreement |
+| HAEC-R7 | Single evaluation per `(event_frame_id, target_node_id)` — no re-evaluation within frame |
+| HAEC-R8 | `evaluate_authority()` is pure — no I/O, no state mutation, no context reconstruction |
+
+### V11.5 Four-Dimension Invariant
+
+The four dimensions are isolated:
+
+| Dimension | Question | Effect |
+|---|---|---|
+| AEI | Is this structure legal? | FATAL → abort |
+| HAEC | Is this transition permitted in this exact frame? | DENY → abort transition |
+| Static | Is this graph structurally correct? | FATAL/ERROR → reject artifact |
+| Runtime | Given permission, does this obey state rules? | FATAL/ERROR → trajectory mutation |
+
+Only Runtime can mutate system state. Only HAEC can authorize a transition. Only AEI can define valid structure. No cross-talk. No fallback interpretation.
+
+### V11.6 Severity Dispatch
 
 All AEI violations are FATAL. No ERROR or WARN level exists for authority validation.
 
@@ -564,3 +611,136 @@ validate_authority() → FATAL  ⇒  no graph generation
 ```
 
 Authority validation is an existence-level gate. A violation means the system's component architecture is invalid. No downstream processing occurs.
+
+---
+
+## V12. CER Validation Rules
+
+### V12.1 Purpose
+
+The CER validation rules ensure that the Canonical Event Record store is internally consistent, identity-stable, and properly linked. These rules operate on the EventLog as a whole (cross-event validation), not on individual events.
+
+**When**: Continuously — during CER pipeline write path, during snapshot creation, and during replay rehydration.
+
+**Failure effect**: FATAL violations abort the current operation (event ingestion halts, snapshot creation fails, replay aborts). ERROR violations are reported but do not block.
+
+### V12.2 Rule Set
+
+#### V12.1 — Schema Compliance
+
+Every event in the EventLog MUST conform to the CER schema defined in [`CER_SPEC.md §1`](./CER_SPEC.md).
+
+```
+for each event in EventLog:
+    if missing required field OR type mismatch OR invalid enum value:
+        → FATAL "V12.1": "CER schema violation at event {event_id}: {details}"
+```
+
+#### V12.2 — Identity Collision Detection
+
+Two events with the same `entity_key` MUST have consistent `state_delta` history. Inconsistency indicates identity collision.
+
+```
+for each pair (A, B) where A.identity.entity_key == B.identity.entity_key:
+    if A.state_delta conflicts with B.state_delta (same field, different values, both non-null):
+        → FATAL "V12.2": "Identity collision: {entity_key} diverged in state_delta at {A.event_id} vs {B.event_id}"
+```
+
+**Exception**: ALIAS events (compression.strategy == "alias") are excluded — they carry no state_delta and explicitly tag identity merges.
+
+#### V12.3 — Anti-Collapse Guard Integrity
+
+Rule 4 from CER_SPEC.md MUST be enforceable. If the causal dependency index exists, verify that no invalid cross-chain collapse occurred.
+
+```
+Requires: causal dependency index (write-time derived artifact)
+If index exists:
+    for each collapsed entity pair (A, B):
+        if A.causality.causal_chain_id != B.causality.causal_chain_id
+        AND state_delta diverges semantically
+        AND both have downstream dependents in index:
+            → FATAL "V12.3": "Anti-collapse guard violation: {entity_key}"
+If index does not exist:
+    → WARN "V12.3": "Causal dependency index missing — anti-collapse guard unenforceable"
+```
+
+#### V12.4 — Orphan DELTA Detection
+
+Every DELTA event MUST have a FULL ancestor in the same `causal_chain_id` AND `domain scope`, reachable via the `ancestor_event_id` chain.
+
+```
+for each event where compression.strategy == "delta":
+    ancestor = resolve_event(event.ancestor_event_id)
+    if ancestor is null:
+        → FATAL "V12.4": "Orphan DELTA: {event_id} ancestor_event_id {ancestor_event_id} not found"
+    if ancestor.causality.causal_chain_id != event.causality.causal_chain_id:
+        → FATAL "V12.4": "Cross-chain DELTA: {event_id} ancestor in different causal chain"
+    if ancestor.compression.strategy == "delta":
+        → ERROR "V12.4": "Chained DELTA: {event_id} ancestor is also DELTA (must trace to FULL)"
+```
+
+#### V12.5 — ALIAS Cycle Detection
+
+`alias_keys` MUST NOT form a cycle and MUST resolve to a unique primary `entity_key`.
+
+```
+for each event where compression.strategy == "alias":
+    visited = set()
+    current = event.identity.entity_key
+    while current in alias_index:
+        if current in visited:
+            → FATAL "V12.5": "ALIAS cycle detected: {visited}"
+        visited.add(current)
+        current = alias_index[current].entity_key
+    // Must terminate at unique primary key
+```
+
+#### V12.6 — AEI↔CER Cross-Validation
+
+Compile-time AEI structural identity MUST be consistent with CER runtime identity resolution. A mismatch between what the architecture says should exist and what the identity system observes is FATAL.
+
+```
+for each entity_key referenced in both AEI constraints and CER store:
+    if AEI.type != CER.identity.type:
+        → FATAL "V12.6": "AEI/CER type mismatch for {entity_key}: AEI={AEI.type} CER={CER.type}"
+    if AEI.scope != CER.identity.scope:
+        → FATAL "V12.6": "AEI/CER scope mismatch for {entity_key}: AEI={AEI.scope} CER={CER.scope}"
+```
+
+#### V12.7 — CCNF Version Anchor
+
+Every CER MUST carry a `ccnf_version` that matches the current CCNF engine version, OR an explicit migration path must exist.
+
+```
+for each event in EventLog:
+    if event.ccnf_version != CURRENT_CCNF_VERSION:
+        if migration_path_exists(event.ccnf_version, CURRENT_CCNF_VERSION):
+            continue  // explicit migration allowed
+        else:
+            → FATAL "V12.7": "CCNF version mismatch: event={event.ccnf_version} engine={CURRENT_CCNF_VERSION}"
+```
+
+### V12.3 CER Validation Module
+
+```
+validator/
+  cer/
+    schema_compliance.rs    — V12.1
+    identity_collision.rs   — V12.2
+    anti_collapse_guard.rs  — V12.3
+    orphan_delta.rs         — V12.4
+    alias_cycle.rs          — V12.5
+    aei_cer_crosswalk.rs    — V12.6
+    ccnf_version_anchor.rs  — V12.7
+```
+
+### V12.4 Relationship to Other Validator Layers
+
+| Layer | Covers | Interaction |
+|---|---|---|
+| AEI (V11) | Compile-time structural identity | V12.6 cross-validates AEI ↔ CER |
+| Static (S1–S10) | Graph structural correctness | Independent — CER does not validate graphs |
+| HAEC | Per-transition permission | Independent — CER does not authorize transitions |
+| Runtime (R1–R10) | Behavioral correctness | Independent — CER events are input to replay, not runtime state |
+
+CER validation is a **horizontal consistency layer** — it validates the event store itself, not the execution semantics.

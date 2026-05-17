@@ -49,7 +49,7 @@ Observation ∉ Runtime State
 
 ## 4. View AST (Observation Type System)
 
-Phase 3 introduces a View AST. These are high-level semantic interpretations, distinct from raw replay observations.
+Phase 3 introduces a View AST. These are high-level semantic interpretations, distinct from raw replay observations. All views use `entity_key` from CER identity for stable entity resolution.
 
 ### 4.1 Base View Node
 
@@ -63,9 +63,13 @@ Phase 3 introduces a View AST. These are high-level semantic interpretations, di
   },
   "projection_time": "REPLAY | LIVE | SNAPSHOT",
   "derived_from": {
-    "event_log_hash": "abc123",
+    "cer_log_hash": "abc123",
     "execution_graph_hash": "def456",
     "replay_state_hash": "ghi789"
+  },
+  "entity_resolution": {
+    "ccnf_version": 1,
+    "collapse_engine_version": 1
   },
   "content": {},
   "ephemeral": true
@@ -80,6 +84,8 @@ Structural interpretation of ExecutionGraph over time:
 - topology summary (immutable, but reveal structural properties)
 - execution density heatmap (concurrent vs sequential regions)
 - completion ratio per lifecycle state
+- entity_key-based dedup: nodes with identical entity_key counted once
+- alias chains resolved via collapse_key for cross-snapshot consistency
 
 ### 4.3 NodeView
 
@@ -89,6 +95,7 @@ Per-node semantic interpretation:
 - input/output trace (artifact refs per transition)
 - executor performance metrics (duration, retries)
 - retry chain (linked list of retry attempts)
+- entity_key-based identity: node identity stable across renames via collapse_key and alias_keys
 
 ### 4.4 TraceView
 
@@ -97,6 +104,7 @@ Causal chain reconstruction:
 - full event lineage for a given node or subtree
 - dependency walk (upstream and downstream)
 - root-cause tracing (failure → causal ancestor chain)
+- entity_key-based tracing: follows stable identity across causal chains
 
 Equivalent to: `event → event → event` (causal closure).
 
@@ -108,6 +116,7 @@ Derived DAG from runtime behavior:
 - blocked paths and their root cause
 - critical path analysis (longest chain)
 - parallelization efficiency
+- identity collapse for cross-snapshot consistency (nodes renamed between snapshots resolved via alias_keys)
 
 ### 4.6 FailureView
 
@@ -261,20 +270,55 @@ View AST (ephemeral)
 
 ### 8.2 What the Observation Engine calls
 
-```
-function observe(query, eventLog, executionGraph):
+```python
+function observe(query, cer_event_log, executionGraph,
+                  ccnf_version=1, collapse_engine_version=1, rehydration_version=1):
     replayEngine = new ReplayEngine()
-    state = replayEngine.replay(eventLog)
-    return projectView(query, state, eventLog, executionGraph)
+    state = replayEngine.replay(
+        cer_event_log,
+        empty_state(),
+        ccnf_version,
+        collapse_engine_version,
+        rehydration_version
+    )
+    return projectView(query, state, cer_event_log, executionGraph)
 
-function projectView(query, state, eventLog, executionGraph):
+function projectView(query, state, cer_event_log, executionGraph):
     switch query.type:
-        case "graph":      return GraphView(state, executionGraph)
-        case "node":       return NodeView(state, query.node_id)
-        case "trace":      return TraceView(state, query.node_id, eventLog)
-        case "dependency": return DependencyView(state, executionGraph)
-        case "failure":    return FailureView(state, eventLog)
-        case "system":     return SystemView(state, eventLog)
+        case "graph":      return GraphView(state, executionGraph, cer_event_log)  # with entity_key dedup
+        case "node":       return NodeView(state, query.node_id, cer_event_log)   # with alias resolution
+        case "trace":      return TraceView(state, query.node_id, cer_event_log)
+        case "dependency": return DependencyView(state, executionGraph, cer_event_log)  # with identity collapse
+        case "failure":    return FailureView(state, cer_event_log)
+        case "system":     return SystemView(state, cer_event_log)
+```
+
+### 8.3 Synthetic Event Handling
+
+The Observation Engine MAY emit SYNTHETIC observation events for inferred causal edges. These are:
+- Marked with `synthetic: true` and `derivation_source: [event_ids]`
+- NEVER stored in the CER Event Log
+- Session-bound ephemeral views only
+- Distinguished from CER SYNTHETIC compression strategy events
+
+```python
+function infer_causal_edge(source_event, target_event, cer_event_log):
+    # Verify both source and target exist in CER log
+    # Deterministic inference: if target.causality.parent_event_ids contains
+    # source.event_id, the edge is real. Otherwise, it's inferred.
+    if target.event_id in source.causality.parent_event_ids:
+        return None  # real edge, no inference needed
+    # Otherwise emit synthetic observation
+    return {
+        "type": "SyntheticCausalEdge",
+        "synthetic": true,
+        "derivation_source": [source.event_id, target.event_id],
+        "content": {
+            "source_id": source.event_id,
+            "target_id": target.event_id,
+            "confidence": "inferred"
+        }
+    }
 ```
 
 ## 9. Relationship to Event System
@@ -322,9 +366,13 @@ ExecutionGraph (AST)
   ↓
 Distributed Runtime
   ↓
-EventLog
+CER Pipeline (stateless transform)
   ↓
-Replay Engine (state reconstruction)
+CER Event Log (canonical truth)
+  ↓
+Replay Engine (rehydrate + fold)
+  ↓
+Snapshot Engine (async compression)
   ↓
 Observation Engine (semantic interpretation)
   ↓
@@ -346,12 +394,48 @@ The architecture is now:
                 ↓
             EVENT LOG
                 ↓
-          REPLAY ENGINE
+            REPLAY ENGINE
                 ↓
         OBSERVATION LAYER
 ```
 
 Phase 3 introduces semantic introspection over deterministic execution history — meaning derived from execution, not execution itself.
+
+---
+
+## 12. CER Identity Resolution in Views
+
+### 12.1 Principle
+
+CER identity layers (`entity_key`, `collapse_key`, `alias_keys`) provide stable entity resolution across all observation views. The observation engine uses the same identity system as the CER pipeline, producing views that are self-consistent across time.
+
+### 12.2 Per-View Identity Rules
+
+| View | Identity Rule |
+|---|---|
+| `GraphView` | Nodes deduplicated by `entity_key`. `collapse_key` enables cross-snapshot structural comparison |
+| `NodeView` | Node identity is stable through renames via `alias_keys`. The view resolves all aliases to the primary `entity_key` |
+| `TraceView` | Traces follow `entity_key` across causal chains. A renamed node retains its trace continuity |
+| `DependencyView` | Identity collapse resolves renamed nodes across snapshots for consistent dependency analysis |
+| `FailureView` | Failure lineage references `entity_key`, not node_id. Survives node re-creation and renaming |
+| `SystemView` | Host and lease identities use `entity_key` for stable distributed system observation |
+
+### 12.3 Identity Table
+
+The observation engine MAY maintain an identity resolution table for the view session:
+
+```json
+{
+  "entity_key": "abc123...",
+  "canonical_type": "node",
+  "collapse_key": "executiongraph.node.scheduler",
+  "aliases_seen": ["scheduler-v1", "scheduler-v2", "scheduler"],
+  "first_seen_event": "event_id",
+  "last_seen_event": "event_id"
+}
+```
+
+This table is session-bound and ephemeral — never stored in the CER Event Log.
 
 ---
 

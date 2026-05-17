@@ -255,7 +255,7 @@ Pipeline lifecycle:
  7. Static validator: validate structural soundness (S1–S10). Halt on ERROR/FATAL.
  8. ExecutionGraph emitted (frozen, handed to Phase 2)
  9. Phase 2 receives ExecutionGraph
-10. Scheduler tick loop: evaluate readiness, claim nodes (distributed), acquire executors, dispatch, observe, [runtime validator], transition
+10. Scheduler tick loop: evaluate readiness, claim nodes (distributed), acquire executors, [HAEC permission projection → AuthorityResult], dispatch, observe, [runtime validator R1–R10], transition
 11. All nodes terminal (SUCCEEDED | FAILED | SKIPPED | BLOCKED)
 12. ExecutionGraphCompleted event emitted
 13. Outputs produced (RESPONSE_RECORDS, artifacts)

@@ -1,0 +1,19 @@
+{
+  "name": "intent-controlled-vocabulary",
+  "ccnf_version": 1,
+  "invariants_tested": ["I8"],
+  "description": "Free-text intent that maps to controlled vocabulary is normalized.",
+  "input": {
+    "actor": { "type": "system", "id": "intent-test", "session_id": "intent" },
+    "intent": { "action": "create", "target_type": "node", "target_id": "node:INTENT" },
+    "domain": "execution",
+    "event_id": "intent-cv-001",
+    "timestamp": 1713225600,
+    "causality": { "parent_event_ids": [], "causal_chain_id": "chain-intent", "trace_depth": 0, "ordered": true },
+    "payload": { "data": { "node:INTENT": { "type": "computation" } } }
+  },
+  "expected": {
+    "entity_key": "9999aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa7777bbbb",
+    "canonical_hash": "ffff6666aaaa7777bbbb888899990000aaaa1111bbbb2222cccc3333dddd4444"
+  }
+}

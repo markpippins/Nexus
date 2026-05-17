@@ -1,0 +1,30 @@
+{
+  "name": "entity-key-changes-on-scope",
+  "ccnf_version": 1,
+  "invariants_tested": ["I3", "I8", "I11"],
+  "description": "Different identity.scope produces different entity_key even if all other fields are identical.",
+  "input_a": {
+    "actor": { "type": "system", "id": "scope-test", "session_id": "scope" },
+    "intent": { "action": "create", "target_type": "graph", "target_id": "graph:SCOPE" },
+    "domain": "execution",
+    "event_id": "identity-scope-001",
+    "timestamp": 1713225600,
+    "causality": { "parent_event_ids": [], "causal_chain_id": "chain-scope", "trace_depth": 0, "ordered": true },
+    "payload": { "data": {} }
+  },
+  "input_b": {
+    "actor": { "type": "system", "id": "scope-test", "session_id": "scope" },
+    "intent": { "action": "create", "target_type": "graph", "target_id": "graph:SCOPE" },
+    "domain": "specification",
+    "event_id": "identity-scope-002",
+    "timestamp": 1713225600,
+    "causality": { "parent_event_ids": [], "causal_chain_id": "chain-scope", "trace_depth": 0, "ordered": true },
+    "payload": { "data": {} }
+  },
+  "expected": {
+    "entity_key_a": "4444dddd5555eeee6666ffff7777aaaa8888bbbb99990000aaaa1111bbbb2222",
+    "entity_key_b": "5555eeee6666ffff7777aaaa8888bbbb99990000aaaa1111bbbb2222cccc3333",
+    "canonical_hash_a": "cccc3333dddd4444eeee5555ffff6666aaaa7777bbbb888899990000aaaa1111",
+    "canonical_hash_b": "dddd4444eeee5555ffff6666aaaa7777bbbb888899990000aaaa1111bbbb2222"
+  }
+}

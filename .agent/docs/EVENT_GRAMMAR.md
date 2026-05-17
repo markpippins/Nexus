@@ -1,4 +1,12 @@
-# Event Grammar v2
+# Event Grammar v3
+
+## 0. Canonical Format
+
+All events are stored as **Canonical Event Records (CER)**. Raw input is a transient ingestion format only — see [`CER_SPEC.md`](./CER_SPEC.md) for the full schema specification and [`CER_CCNF.md`](./CER_CCNF.md) for the canonical normalization function.
+
+This document defines the event type taxonomy, causal grammar, and system constraints. The CER schema absorbs and extends these definitions.
+
+---
 
 ## 1. Two-Tier System: Artifacts and Events
 
@@ -21,32 +29,85 @@ Events are:
 
 ---
 
-## 2. Base Event Schema
+## 2. Base Event Schema (CER)
 
-Every event conforms to this base structure:
+Every event conforms to the CER base schema. All fields are always present (null/empty for missing values).
 
 ```json
 {
   "event_id": "uuid",
-  "type": "EventType",
-  "timestamp": "ISO-8601",
-  "domain": "specification | execution | observation | system",
-  "caused_by": "event_id | null",
-  "root_prompt_id": "prompt_ref",
-  "artifact_refs": ["artifact/path"],
-  "data": {}
+  "event_version": 1,
+  "ccnf_version": 1,
+  "system": "nexus",
+  "domain": "specification | execution | lowering | system | observation",
+  "timestamp": 1730000000,
+  "actor": {
+    "type": "llm | user | system | agent",
+    "id": "string",
+    "session_id": "string"
+  },
+  "intent": {
+    "type": "normalized_verb",
+    "action": "create | update | delete | execute | validate | emit",
+    "target_type": "node | edge | graph | state | artifact",
+    "target_id": "type:id"
+  },
+  "identity": {
+    "entity_key": "SHA256 hex",
+    "type": "node | event | artifact | rule | graph",
+    "scope": "executiongraph.v2 | specification | system",
+    "collapse_key": "human-stable-key",
+    "alias_keys": []
+  },
+  "causality": {
+    "parent_event_ids": ["uuid"],
+    "causal_chain_id": "uuid",
+    "trace_depth": 0,
+    "ordered": true
+  },
+  "artifact_refs": ["type:id"],
+  "state_delta": [
+    {
+      "artifact_id": "type:id",
+      "before_hash": "SHA256 hex | null",
+      "after_hash": "SHA256 hex",
+      "patch": {}
+    }
+  ],
+  "payload": {
+    "type": "structured | blob | reference",
+    "data": {}
+  },
+  "compression": {
+    "strategy": "full | delta | alias | synthetic",
+    "lossless": true,
+    "compression_version": 1
+  },
+  "signature": {
+    "hash": "SHA256 hex",
+    "signed_by": null
+  }
 }
 ```
 
 | Field | Rule |
 |---|---|
 | `event_id` | Globally unique, monotonic |
-| `type` | Strictly enumerated AST node class (see §3) |
+| `event_version` | Schema version. Backwards compatible. Never reused |
+| `ccnf_version` | CCNF epoch. Defines identity space. See [`CER_CCNF.md §11`](./CER_CCNF.md) |
 | `domain` | Which plane this event belongs to |
-| `caused_by` | Parent causal event. `null` only for `PromptSubmitted` |
-| `root_prompt_id` | Root causal ancestor. Always set. |
-| `artifact_refs` | Links to artifact paths. Must have ≥1 entry unless `type ∈ {SystemEvent, ErrorEvent}` |
-| `data` | Small structured payload. No artifact duplication. |
+| `timestamp` | Epoch seconds (int64). No timezone, no ISO strings |
+| `actor` | Who/what caused this event |
+| `intent` | Controlled vocabulary. See CCNF Step 4 |
+| `identity` | Three-layer identity: entity_key (cryptographic), collapse_key (semantic), alias_keys (historical) |
+| `causality` | Causal ancestry. `parent_event_ids[0]` is immediate parent. `causal_chain_id` is the root lineage |
+| `artifact_refs` | Value-bound `type:id` pairs. Immutable per event. Must have ≥1 entry unless domain=system |
+| `state_delta` | Artifact-scoped patches. One per artifact in artifact_refs. Null before_hash for create |
+| `payload` | Event-specific structured data |
+| `compression` | Compression strategy. FULL = complete state, DELTA = patch only, ALIAS = identity merge only, SYNTHETIC = reconstructed |
+| `signature` | SHA256 of canonical serialization (CCNF Step 8) |
+
+**Legacy adapter**: Pre-CER events with the old schema (`type`, `caused_by`, `root_prompt_id`, `data`) are adapted at replay time via the LegacyCERAdapter, which maps to this schema. See [`CER_SPEC.md §9`](./CER_SPEC.md).
 
 ---
 
@@ -129,7 +190,7 @@ Note: `Observation` domain events are **ephemeral** — emitted by the replay en
     "node_id": "optional",
     "edge_id": "optional"
   },
-  "rule_id": "S5 | R3 | R10",
+  "rule_id": "S5 | R3 | R10 | HAEC | HAEC_DISTRIBUTED_MISMATCH | FATAL_EVALUATION_FAILURE",
   "severity": "WARN | ERROR | FATAL",
   "message": "...",
   "context": {}
@@ -174,14 +235,14 @@ Note: `Observation` domain events are **ephemeral** — emitted by the replay en
 Only one root per causal tree:
 ```
 PromptSubmitted := root node
-caused_by = null
+causality.parent_event_ids = []
 ```
 
 ### Rule 2 — Causal continuity
 
 Every non-root event must have a parent:
 ```
-∀ event E ≠ PromptSubmitted: E.caused_by ≠ null
+∀ event E ≠ PromptSubmitted: |E.causality.parent_event_ids| ≥ 1
 ```
 
 No orphan events allowed.
@@ -261,7 +322,7 @@ Once emitted, an event is never modified. State changes produce new events.
 
 ### Rule 6 — Deterministic replay
 
-Given `root_prompt_id`, the system must be able to reconstruct the full causal chain of WorkRequests, Responses, and Execution sequence without external context.
+Given `causal_chain_id`, the system must be able to reconstruct the full causal chain of WorkRequests, Responses, and Execution sequence without external context.
 
 ---
 
@@ -281,9 +342,9 @@ Each event represents exactly one causal decision, state transition, or executio
 ### 5.3 Causal locality
 
 Events reference only:
-- parent event (`caused_by`)
-- root prompt (`root_prompt_id`)
-- directly adjacent artifacts
+- parent event (`causality.parent_event_ids[0]`)
+- causal chain root (`causality.causal_chain_id`)
+- directly adjacent artifacts (`artifact_refs`)
 
 No long-range arbitrary links unless explicitly tagged.
 
@@ -319,32 +380,34 @@ Where:
 
 ## 7. Storage Model
 
-### 7.1 Location
+### 7.1 CER Canonical Store
+
+All events are stored as CER in a domain-partitioned, causal-chain-indexed layout:
 
 ```
-.pipeline/EVENTS/{domain}/{YYYY}/{MM}/{event-id}.json
+.pipeline/
+  events/
+    cer/
+      {domain}/
+        {causal_chain_id}/
+          events.log      ← sequential CER events (JSON lines format)
+          index.json      ← event offset index (event_id → byte offset)
 ```
 
-### 7.2 Event contents (minimal, referential)
+### 7.2 Legacy Events (Pre-CER)
 
-```json
-{
-  "event_id": "abc123",
-  "type": "ExecutionStarted",
-  "timestamp": "2026-05-14T12:00:00Z",
-  "caused_by": "event_789",
-  "root_prompt_id": "prompt_1",
-  "artifact_refs": ["WORKREQUESTS/wr_12"],
-  "data": {
-    "executor": "midi-engine"
-  }
-}
+Raw legacy events remain at their original location, untouched:
+
+```
+.pipeline/events/legacy/{domain}/{YYYY}/{MM}/{event-id}.json
 ```
 
-### 7.3 Constraints
+These are readable at replay via the LegacyCERAdapter — see [`CER_SPEC.md §9`](./CER_SPEC.md).
 
-- Events are append-only
-- Events are domain-partitioned
+### 7.3 Storage Constraints
+
+- Events are append-only within each `events.log`
+- Events are domain-partitioned and causal-chain-indexed
 - Events are fully referential — no duplication of full artifact payloads
 - Events are reconstructible from artifacts if the event log is lost
 - Events are NOT authoritative state
@@ -355,6 +418,27 @@ Where:
 
 ```
 Artifacts = System State
-Events = Causal Trace over Artifact transitions
-Graphs = Interpretations of Artifacts + Events
+ CER Events = Causal Trace over Artifact transitions
+   Graphs = Interpretations of Artifacts + Events
+   Snapshots = Derived compression of CER history (deletable, regenerable)
+```
+
+---
+
+## 9. CER Versioning
+
+Events carry three independent version axes. See [`CER_SPEC.md §2`](./CER_SPEC.md) for full specification.
+
+| Axis | Field | Role |
+|---|---|---|
+| Schema version | `event_version` | Structure changes. Backwards compatible |
+| Compression version | `compression.compression_version` | Compression algorithm changes |
+| Domain version | `identity.scope` | Execution semantics version |
+
+**Versioning rule:**
+
+Events are immutable across schema versions. Transformation happens via adapters, never mutation:
+
+```
+v1 event → v2 reader → normalized CER
 ```

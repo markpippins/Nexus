@@ -1,41 +1,58 @@
 ---
 name: event-replay
 phase: post-execution
-status: implemented
+status: specified
 ---
 
 # Event Replay Skill
 
 ## Purpose
-Deterministic reconstruction of ExecutionGraph state from the event log. The replay engine is a pure fold over events. It does not execute work — it reconstructs what happened.
+Deterministic reconstruction of ExecutionGraph state from the CER event log. The replay engine is a pure fold over rehydrated events. It does not execute work — it reconstructs what happened.
 
 This is a post-execution utility skill. It is not a pipeline stage.
 
 ## References
-- [Spec: Event Replay Engine v1](../docs/REPLAY_ENGINE.md)
+- [Spec: Event Replay Engine v2](../docs/REPLAY_ENGINE.md)
 - [Schema: Execution Graph Schema v2 §8.13](../docs/EXECUTION_GRAPH_SCHEMA.md)
-- [Event Grammar v2](../docs/EVENT_GRAMMAR.md)
+- [Event Grammar v3](../docs/EVENT_GRAMMAR.md)
+- [CER Specification v1](../docs/CER_SPEC.md)
+- [CER CCNF v1](../docs/CER_CCNF.md)
+- [CER Pipeline Skill](../skills/cer-pipeline/SKILL.md)
 
 ## Input
-- `events: EventLog` — totally ordered, append-only event stream
-- `checkpoint?: Checkpoint` — optional starting state for incremental replay
+- `cer_events: CER[]` — CER events from the canonical store
+- `snapshot?: Snapshot` — optional starting state (from snapshot engine)
 - `mode: "full" | "incremental" | "time_travel" | "branch"`
 - `cursor?: ReplayCursor` — target position (for time-travel) or hypothetical events (for branch)
-- `CHECKPOINT_INTERVAL: int` — how often to write checkpoints (default 100)
+- `ccnf_version: int` — CCNF identity epoch (default 1)
+- `collapse_engine_version: int` — semantic collapse version (default 1)
+- `rehydration_version: int` — rehydration semantics version (default 1)
 
 ## Output
 - `state: RuntimeSnapshot` — reconstructed execution graph + scheduler + distributed state
 - `observations: ObservationEvent[]` — ephemeral derived views (in-memory only, not persisted)
-- `checkpoints: Checkpoint[]` — written to `.pipeline/EXECUTIONS/` (cache artifacts)
+- `snapshots: Snapshot[]` — written to `.pipeline/snapshots/{domain}/{causal_chain_id}/` (derived artifacts)
 
 ## Constraints
 - MUST NOT execute nodes
 - MUST NOT call executors
 - MUST NOT mutate external systems
 - MUST NOT persist observation events to the Event Log
-- MUST be deterministic — same events + same initial state → same output
+- MUST be deterministic — same events + same versions → same output
+- MUST rehydrate CER events before fold loop
+- MUST load from snapshots (not checkpoints — checkpoint model is deprecated)
 
 ## Execution
+
+### Step 0: Rehydrate CER events
+
+```python
+def rehydrate_cer_events(cer_events, ccnf_version, collapse_engine_version,
+                         rehydration_version, prior_event_store):
+    return rehydrate(cer_events, collapse_engine_version, prior_event_store)
+    # Full rehydration pipeline defined in cer-pipeline/SKILL.md (Read Path)
+    # Steps: decompress DELTA → resolve ALIAS → expand SYNTHETIC → semantic collapse
+```
 
 ### Step 1: Load initial state
 
@@ -48,10 +65,10 @@ match mode:
         start_index = 0
 
     case "incremental":
-        checkpoint = load_nearest_checkpoint(checkpoint_dir, target_index)
-        state = checkpoint.execution_graph_state
-        start_index = checkpoint.event_index + 1
-        verify_checkpoint(checkpoint, events)
+        snapshot = load_nearest_snapshot(snapshot_dir, target_index)
+        verify_triple_version_lock(snapshot, ccnf_version, collapse_engine_version, rehydration_version)
+        state = snapshot.entity_state_index
+        start_index = snapshot.event_range.end + 1
 
     case "time_travel":
         state = empty_execution_state()
@@ -64,13 +81,16 @@ match mode:
         // After replaying real events, apply hypothetical_events
 ```
 
-### Step 2: Fold loop
+### Step 2: Fold loop over rehydrated events
 
 ```
 cursor = { eventIndex: start_index, time: null }
 
-for i from start_index to len(events) - 1:
-    event = events[i]
+rehydrated = rehydrate_cer_events(cer_events, ccnf_version,
+                                   collapse_engine_version, rehydration_version)
+
+for i from start_index to len(rehydrated) - 1:
+    event = rehydrated[i]
     state = apply_event(state, event)
     cursor.eventIndex = i
     cursor.time = event.timestamp
@@ -79,11 +99,10 @@ for i from start_index to len(events) - 1:
         emit_observations(state, cursor)
         return state  // stop here for time-travel
 
-    if should_checkpoint(i):
-        write_checkpoint(i, state)
-
     if emit_observations_every_step:
         emit_observations(state, cursor)
+```
+
 ```
 
 ### Step 3: Apply event reducers
@@ -186,42 +205,38 @@ function emit_observations(state, cursor):
 
 Observations are in-memory only. They are NOT appended to the EventLog.
 
-### Step 5: Manage checkpoints
+### Step 5: Snapshot creation (async, delegated)
 
-```
-function should_checkpoint(event_index):
-    return (event_index % CHECKPOINT_INTERVAL == 0)
-        OR is_hot_state_change(state)
+Snapshots are created by the independent Snapshot Engine, not by the replay engine. The replay engine only reads snapshots.
 
-function write_checkpoint(event_index, state):
-    checkpoint = {
-        checkpoint_id: fmt("ckpt-{:04d}", event_index),
-        event_index,
-        event_hash: sha256(event_log[event_index]),
-        execution_graph_state: state.nodes,
-        scheduler_state: state.scheduler,
-        distributed_state: state.distributed,
-        timestamp: now()
-    }
-    write_to(checkpoint_path(event_index), checkpoint)
+See [`CER_SNAPSHOT_ENGINE.md`](../docs/CER_SNAPSHOT_ENGINE.md) for the full specification.
 
-function load_checkpoint(event_index):
-    checkpoint = read_from(checkpoint_path(event_index))
-    actual_hash = sha256(event_log[checkpoint.event_index])
-    assert checkpoint.event_hash == actual_hash
-        // checkpoint invalid or corrupted — fall back to full replay
-    return checkpoint
+```python
+function load_snapshot(causal_chain_id, snapshot_n, ccnf_version,
+                       collapse_engine_version, rehydration_version):
+    snapshot = read_from(snapshot_path(causal_chain_id, snapshot_n))
+
+    # Triple-version lock verification
+    assert snapshot.ccnf_version == ccnf_version
+    assert snapshot.collapse_engine_version == collapse_engine_version
+    assert snapshot.rehydration_version == rehydration_version
+
+    # Hash chain anchor verification
+    global_hash = SHA256(snapshot.entity_state_index + snapshot.event_range)
+    assert global_hash == snapshot.global_hash
+
+    return snapshot
 ```
 
 ### Step 6: Debugger API
 
-```
-function inspect(node_id, cursor):
-    state = replay(events[0..cursor.eventIndex])
+```python
+function inspect(node_id, cursor, cer_events, ccnf_version, collapse_engine_version):
+    state = replay(cer_events, empty_state(), ccnf_version, collapse_engine_version)
     return state.nodes[node_id]
 
-function trace(node_id, events):
-    return [e for e in events if e.node_id == node_id]
+function trace(node_id, cer_events):
+    return [e for e in cer_events if e.artifact_refs.contains(f"node:{node_id}")]
 
 function dependency_chain(node_id, state):
     chain = []
@@ -236,48 +251,52 @@ function dependency_chain(node_id, state):
 
 ### full_replay()
 ```
-replay(event_log, empty_state())
+replay(cer_events, empty_state(), ccnf_version, collapse_engine_version, rehydration_version)
 ```
 Returns final state + all observations.
 
-### incremental_replay(target_index)
+### incremental_replay(target_causal_chain_id)
 ```
-checkpoint = load_nearest_checkpoint(target_index)
-state = checkpoint.state
-replay(event_log[checkpoint.event_index + 1 : target_index], state)
+snapshot = load_nearest_snapshot(target_causal_chain_id)
+state = snapshot.entity_state_index
+rehydrated = rehydrate(cer_events[start:target], collapse_engine_version, rehydration_version)
+fold(rehydrated, state)
 ```
-Returns state at target_index.
+Returns state at target position.
 
 ### time_travel_replay(target_cursor)
 ```
-replay(event_log[0 : target_cursor.eventIndex], empty_state())
+rehydrated = rehydrate(cer_events[0:target], collapse_engine_version, rehydration_version)
+fold(rehydrated[0:cursor.eventIndex], empty_state())
 ```
 Returns state at cursor position.
 
 ### branch_replay(hypothetical_events)
 ```
-state = replay(event_log, empty_state())
-state = replay(hypothetical_events, state)
+state = replay(cer_events, empty_state(), ...)
+state = replay(hypothetical_events, state, ...)
 ```
 Returns hypothetical state.
 
-## Checkpoint Directory Structure
+## Snapshot Directory Structure
 
 ```
-.pipeline/EXECUTIONS/
-    checkpoint-0000.json    # initial state
-    checkpoint-0100.json    # every N events (configurable)
-    checkpoint-0200.json
-    ...
+.pipeline/snapshots/
+    {domain}/
+        {causal_chain_id}/
+            snapshot_0001.cer.json
+            snapshot_0002.cer.json
+            ...
 ```
 
 ## Validation
 
 | Check | Failure |
 |---|---|
-| Event log is append-only | Reject replay |
-| Event timestamps are monotonic | Warn, continue (logical order preserved) |
-| Checkpoint hash matches event | Fall back to full replay |
+| CER schema compliance | Reject replay |
+| Triple-version lock on snapshot | Fall back to full replay, log warning |
+| DELTA ancestor_event_id resolves | Abort rehydration |
+| ALIAS cycle detected | Abort rehydration |
 | Replay completed without error | Return state |
 | Observation events not stored | Invariant enforced by skill |
 
@@ -285,8 +304,10 @@ Returns hypothetical state.
 
 | Error | Response |
 |---|---|
-| Corrupted checkpoint | Fall back to full replay, log warning |
-| Event log truncated | Replay up to available events, report gap |
+| Corrupted snapshot (hash mismatch) | Fall back to full replay, log warning |
+| CER event log truncated | Replay up to available events, report gap |
+| Orphan DELTA (missing ancestor) | Abort rehydration, report corrupted log |
 | Unknown event type | Skip event, log warning, continue |
 | Observation stream disconnected | Discard observations, continue replay |
-| Checkpoint write failure | Log warning, continue without checkpoint |
+| Snapshot read failure | Log warning, continue without snapshot |
+| CCNF version mismatch | Fall back to LegacyCERAdapter if migration exists, otherwise abort |

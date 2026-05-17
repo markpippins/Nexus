@@ -113,19 +113,27 @@ NodeState = fold(events)
 
 No mutable shared memory exists between scheduler instances.
 
-### 5.2 State Derivation
+### 5.2 State Derivation via CER
 
-Each scheduler independently replays the event log to compute the current ExecutionGraph state:
+Each scheduler independently rehydrates and replays the CER event log to compute the current ExecutionGraph state:
 
-```
-function derive_state(event_log) → RuntimeSnapshot:
+```python
+function derive_state(cer_event_log, ccnf_version, collapse_engine_version, rehydration_version):
+    rehydrated = rehydrate(
+        cer_event_log,
+        collapse_engine_version,
+        rehydration_version
+    )
     state = empty_graph()
-    for event in event_log:
+    for event in rehydrated:
         state = apply(state, event)
     return state
+
+# All hosts use the same version parameters → identical state
+assert derive_state(log, HOST_A) == derive_state(log, HOST_B)
 ```
 
-Since events are append-only and immutable, all schedulers derive identical state from identical event logs.
+Since CER events are append-only, immutable, and CCNF-normalized, all schedulers derive identical state from identical event logs regardless of host environment. The `entity_key` in each event provides a globally stable identity that survives host failures and reconnections.
 
 ## 6. Claim Protocol
 
@@ -144,16 +152,34 @@ READY(node) ⇔
     AND host has capacity
 ```
 
-**Step 2 — Attempt Claim**
+**Step 2 — Attempt Claim (CER Format)**
 
-Scheduler emits to the event log:
+Scheduler emits a CER event to the event log:
 
-```
-NodeClaimed {
-    node_id,
-    host_id,
-    lease_id,
-    lease_expiration
+```json
+{
+  "event_id": "uuid",
+  "domain": "execution",
+  "intent": { "action": "execute", "target_type": "node", "target_id": "node:EX-003" },
+  "identity": {
+    "entity_key": "SHA256(canonical_entity_signature)",
+    "type": "event",
+    "scope": "executiongraph.v2",
+    "collapse_key": null,
+    "alias_keys": []
+  },
+  "causality": { "parent_event_ids": ["...", "..."], "causal_chain_id": "uuid", "trace_depth": 5 },
+  "payload": {
+    "type": "structured",
+    "data": {
+      "node_id": "EX-003",
+      "host_id": "host-1",
+      "lease_id": "uuid",
+      "lease_expiration": 1730000100
+    }
+  },
+  "compression": { "strategy": "full", "lossless": true, "compression_version": 1 },
+  "signature": { "hash": "SHA256 hex", "signed_by": "host-1" }
 }
 ```
 
@@ -475,8 +501,8 @@ The event log produced by the distributed scheduler is consumed by the Replay En
 
 - Replay is agnostic to the number of schedulers — only event order matters
 - Time-travel replay works identically across single-host and distributed execution
-- Checkpoints cache derived state for fast incremental replay without re-processing the full log
-- The round-trip invariant `Replay(trace(x)) = x` holds for distributed execution as well
+- Snapshots (CER-triggered) provide fast incremental replay instead of checkpoints
+- The round-trip invariant `Replay(Rehydrate(trace(x))) = x` holds for distributed execution as well
 
 ## 18. Mental Model
 
@@ -497,3 +523,46 @@ Event Log (History)
 ```
 
 This is a distributed programming language runtime — not a workflow engine.
+
+---
+
+## X. CER Identity in Distributed Mode
+
+### X.1 entity_key as Global Node Identity
+
+In distributed mode, `entity_key` provides a globally stable identity for every entity (nodes, graphs, leases, hosts). Unlike `node_id` (which may be host-local or session-scoped), `entity_key` is:
+
+- Derived from CCNF canonical entity signature (no host-specific, time-specific, or environment-specific inputs)
+- Identical across all hosts for the same entity
+- Survives host failures and reconnections
+
+```
+∀ host A, host B:
+    CCNF(entity, HOST_A).identity.entity_key == CCNF(entity, HOST_B).identity.entity_key
+```
+
+All distributed claims, leases, and conflict resolutions use `entity_key` alongside `node_id` for identity resolution.
+
+### X.2 CER Signature for Cross-Host Verification
+
+Every CER event carries a `signature.hash` — the SHA256 of the canonical serialization (CCNF Step 8). Receiving hosts verify:
+
+```
+on receive CER event from remote host:
+    recomputed = SHA256(canonical_serialize(event))
+    assert recomputed == event.signature.hash
+    if mismatch → reject event, emit ValidationFailure { rule_id: "CER_SIGNATURE_MISMATCH", severity: FATAL }
+```
+
+This ensures:
+- No tampering (accidental or intentional) between emission and observation
+- No serialization drift across different host environments
+- Every host can independently verify event integrity without trusting the emitter
+
+### X.3 causal_chain_id as Distributed Agreement Scope
+
+All hosts within a causal chain share the same identity namespace. The `causal_chain_id` defines the scope within which distributed agreement is required:
+
+- Claims within the same `causal_chain_id` are resolved by event log ordering (as before)
+- Claims across different `causal_chain_id` values are independent — no cross-chain conflict resolution needed
+- Anti-collapse guard (Rule 4) cross-references `causal_chain_id` to prevent invalid identity merges in distributed mode
