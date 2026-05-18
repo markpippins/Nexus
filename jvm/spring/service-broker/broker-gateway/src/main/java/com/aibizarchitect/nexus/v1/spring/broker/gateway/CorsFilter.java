@@ -64,7 +64,7 @@ public class CorsFilter implements Filter {
         }
     }
 
-    @org.springframework.beans.factory.annotation.Value("${allowed.origins}")
+    @org.springframework.beans.factory.annotation.Value("${allowed.origins:*}")
     private String[] allowedOrigins;
 
     private boolean isTrustedOrigin(String origin) {

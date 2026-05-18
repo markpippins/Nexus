@@ -47,7 +47,7 @@ public class ServiceRegistryHeartbeatClient {
     @Value("${service.registry.url:http://localhost:8085}")
     private String hostServerUrl;
 
-    @Value("${service.name}")
+    @Value("${service.name:unknown-service}")
     private String serviceName;
 
     @Value("${server.port:8080}")

@@ -15,7 +15,6 @@ public class ServiceDiscoveryClientImpl implements ServiceDiscoveryClient {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceDiscoveryClientImpl.class);
 
-    @Value("${service.registry.url:http://localhost:8085}")
     private final String hostServerUrl;
 
     private final RestTemplate restTemplate;
