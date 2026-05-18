@@ -1,35 +1,28 @@
 ---
 name: assess-stability
-description: Observational analytical layer that evaluates intent node stability without assuming pipeline authority.
+description: PASS 4 (Fixed-Point Convergence Semantics) of the Nexus Kernel Compiler. Emits structural graph stability signals.
 ---
 
-# Assess Stability Skill
-
 ## Purpose
-To track and report the stability of compilation for a given intent node over time. This skill is purely observational and does NOT gate, modify, or halt the pipeline.
+Acts as a pure mathematical function detecting graph structural fixed points: $\Phi(G) \equiv G$. It has zero control flow authority; it only emits a structural assessment signal.
 
 ## Input
-- Historical and current WorkRequests for a given `intent_node_id`.
-- The current structured `derivation` metadata of the latest WorkRequest.
+- The latest frozen `WorkRequest` JSON snapshot ($G_n$).
+- The previously frozen `WorkRequest` JSON snapshot ($G_{n-1}$) from lineage.
 
 ## Output
-A `stability-assessment` JSON artifact.
+A signal block containing:
+- `is_converged`: boolean
+- `reason`: string
 
-## Schema
-```json
-{
-  "intent_node_id": "string",
-  "stability_score": "float (0.0 to 1.0)",
-  "signals": {
-    "semantic_delta_trend": "decreasing | increasing | stable",
-    "resource_binding_stable": "boolean",
-    "supersession_frequency": "low | medium | high",
-    "architectural_reversals": "integer"
-  },
-  "recommendation": "PROMOTE_TO_CANDIDATE | HOLD_DRAFT | REVISE_INTENT"
-}
-```
+## Rules (Convergence Calculus)
 
-## Rules
-1. **No Authority**: This assessment does not automatically change a WorkRequest's state (e.g., it cannot actually promote a DRAFT to CANDIDATE). It only provides a recommendation.
-2. **Deterministic Evaluation**: Ensure the assessment is derived from objective changes in the WorkRequest sequence, using the `supersedes` array and `derivation` metadata to compute `signals`.
+1. **Pure Function Restriction**: You are an evaluator. You MUST NOT use heuristic, probabilistic, or semantic "feelings" to assess stability. Stability is purely structural.
+2. **Fixed-Point Conditions**: You must evaluate the following 5 strict conditions. The graph is converged ONLY if ALL are true:
+   - **No Expansion Changes**: The structure of `decomposition.steps` has not grown or mutated since the last iteration.
+   - **No Reduction Changes**: The `merge_history` and `lineage.branches` show no unresolved structural conflicts requiring arbitration.
+   - **No Pending Execution Nodes**: All terminal nodes in the DAG possess a `status` of `completed` (or equivalent closure).
+   - **Dependency Closure Satisfied**: Every explicitly declared dependency link resolves to a valid, generated artifact or completed step. No dangling edges.
+   - **Lineage Stability**: The graph did not introduce new lineage branches in the current iteration.
+3. **Determinism**: The output signal MUST be strictly deterministic based ONLY on the two graph snapshots.
+4. **Signal Emission**: If all 5 conditions are met, emit `is_converged: true`. Otherwise, emit `is_converged: false` with the explicit structural reason why convergence failed.

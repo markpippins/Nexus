@@ -1,0 +1,24 @@
+{
+  "name": "artifact-resolution-valid",
+  "ccnf_version": 1,
+  "invariants_tested": ["I2", "I8"],
+  "description": "Valid type:id artifact references are resolved correctly.",
+  "input": {
+    "actor": { "type": "system", "id": "artifact-test", "session_id": "artifact" },
+    "intent": { "action": "create", "target_type": "node", "target_id": "node:EX-020" },
+    "domain": "execution",
+    "event_id": "artifact-valid-001",
+    "timestamp": 1713225600,
+    "causality": { "parent_event_ids": [], "causal_chain_id": "chain-art", "trace_depth": 0, "ordered": true },
+    "payload": {
+      "data": {
+        "node:EX-020": { "type": "compute" },
+        "graph:EX-G": { "version": 2 }
+      }
+    }
+  },
+  "expected": {
+    "entity_key": "aaaabbbb1111cccc2222dddd3333eeee4444ffff5555aaaa6666bbbb7777cccc",
+    "canonical_hash": "1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff"
+  }
+}

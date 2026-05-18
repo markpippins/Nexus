@@ -99,7 +99,7 @@ set -e
 
 # Git commit from https://github.com/docker/docker-install when
 # the script was uploaded (Should only be modified by upload job):
-SCRIPT_COMMIT_SHA="c04fb16bb8bd8ed6ce884bb40570cbcd6101ae0c"
+SCRIPT_COMMIT_SHA="f2b0ef96e1f2a34340caf3c72a0a727aa0c48ec7"
 
 # strip "v" prefix if present
 VERSION="${VERSION#v}"
@@ -301,7 +301,7 @@ start_docker_daemon() {
 		is_dry_run || >&2 echo "Using systemd to manage Docker service"
 		if (
 			is_dry_run || set -x
-			$sh_c systemctl enable --now docker.service 2>/dev/null
+			$sh_c "systemctl enable --now docker.service 2>/dev/null"
 		); then
 			is_dry_run || echo "INFO: Docker daemon enabled and started" >&2
 		else
@@ -418,7 +418,7 @@ check_forked() {
 do_install() {
 	echo "# Executing docker install script, commit: $SCRIPT_COMMIT_SHA"
 
-	if command_exists docker; then
+	if [ "$REPO_ONLY" != "1" ] && command_exists docker; then
 		cat >&2 <<-'EOF'
 			Warning: the "docker" command appears to already exist on this system.
 

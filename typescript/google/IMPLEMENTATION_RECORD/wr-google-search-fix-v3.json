@@ -1,0 +1,41 @@
+{
+  "id": "wr-google-search-fix-v3",
+  "intent_node_id": "intent-fix-compilation-a",
+  "version": 3,
+  "state": "SUPERSEDED",
+  "supersedes": [
+    "wr-google-search-fix-v2"
+  ],
+  "derivation": {
+    "derived_from": [
+      "wr-google-search-fix-v2"
+    ],
+    "change_type": [
+      "structural_alignment",
+      "type_resolution"
+    ],
+    "constraint_cause": [
+      "SEMANTIC_DISCIPLINE_RULE",
+      "TASK_FORM_RULE"
+    ],
+    "failed_binding_trigger": [
+      "wr-google-search-fix-v2.task",
+      "wr-google-search-fix-v2.derivation.constraint_cause"
+    ],
+    "rejected_strategies": [
+      "Semi-open-ended task resolution"
+    ],
+    "semantic_delta": {
+      "scope": "file-local",
+      "resources": "modified",
+      "change_characterization": "Aligns the package to valid TypeScript compilation semantics by explicitly linking required type declaration dependencies."
+    },
+    "notes": "Converted derivation narratives into structural pointers and decomposed task into verifiable explicit transformations."
+  },
+  "path": "/home/codex/dev/nexus/typescript/google",
+  "task": "Insert type declaration module '@types/node' into package.json devDependencies.",
+  "resources": [
+    "package.json"
+  ],
+  "model": "gemini-3.1-pro"
+}

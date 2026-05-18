@@ -13,7 +13,7 @@ An AdonisJS-based reverse proxy that sits in front of `spring/broker-gateway` to
                                   │
                                   ▼
                         ┌─────────────────┐
-                        │  Host-Server    │
+                        │  Registry Service    │
                         │  (Registration) │
                         │  Port: 8888     │
                         └─────────────────┘
@@ -36,6 +36,7 @@ An AdonisJS-based reverse proxy that sits in front of `spring/broker-gateway` to
 
 1. **Transparent Proxying**: All requests (except `/health`) are forwarded to broker-gateway
 2. **ServiceResponse Error Format**: When the upstream fails, the proxy returns errors in the same JSON format as broker-gateway:
+
    ```json
    {
      "ok": false,
@@ -49,7 +50,8 @@ An AdonisJS-based reverse proxy that sits in front of `spring/broker-gateway` to
      "encrypt": false
    }
    ```
-3. **Host-Server Registration**: On startup, the proxy registers with service-registry and sends heartbeats every 30 seconds
+
+3. **Registry Service Registration**: On startup, the proxy registers with service-registry and sends heartbeats every 30 seconds
 4. **Graceful Shutdown**: Deregisters from service-registry on application termination
 5. **Request Context Headers**: Adds `X-Forwarded-For`, `X-Real-IP`, and `X-Forwarded-By` headers for rate limiting and tracing
 
@@ -86,7 +88,7 @@ HOST=0.0.0.0
 # Upstream broker-gateway
 BROKER_GATEWAY_URL=http://localhost:8081
 
-# Host-Server registration
+# Registry Service registration
 HOST_SERVER_URL=http://localhost:8888
 SERVICE_NAME=broker-gateway-proxy
 SERVICE_HOST=localhost
@@ -118,6 +120,7 @@ GET /health
 ```
 
 Returns:
+
 ```json
 {
   "status": "UP",
@@ -129,6 +132,7 @@ Returns:
 ### Proxy
 
 All other requests are forwarded to broker-gateway with:
+
 - Original HTTP method preserved
 - Query parameters preserved
 - Request body forwarded (JSON, form-urlencoded, or raw)

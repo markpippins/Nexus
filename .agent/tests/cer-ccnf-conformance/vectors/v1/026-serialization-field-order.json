@@ -1,0 +1,19 @@
+{
+  "name": "serialization-field-order",
+  "ccnf_version": 1,
+  "invariants_tested": ["I8"],
+  "description": "CER serialization must use fixed field order regardless of output medium. Any input field order produces the same serialized output.",
+  "input": {
+    "actor": { "type": "system", "id": "serial-test", "session_id": "serial" },
+    "intent": { "action": "create", "target_type": "node", "target_id": "node:SERIAL" },
+    "domain": "execution",
+    "event_id": "serial-order-001",
+    "timestamp": 1713225600,
+    "causality": { "parent_event_ids": [], "causal_chain_id": "chain-serial", "trace_depth": 0, "ordered": true },
+    "payload": { "data": { "node:SERIAL": { "value": "test" } } }
+  },
+  "expected": {
+    "entity_key": "ddddeeee4444ffff5555aaaa6666bbbb7777cccc8888dddd9999eeee0000ffff",
+    "canonical_hash": "4444555566667777888899990000aaaabbbbccccddddeeeeffff111122223333"
+  }
+}

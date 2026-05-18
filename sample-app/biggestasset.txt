@@ -1,0 +1,247 @@
+Chapter 1: You're building your most important asset and don't own it
+0:00Right now all of us are building the most important asset of our careers in AI systems all over the place and we're not owning any of it and it's fragmented
+0:088 secondsright we are building it in chat GPT we're building it in perplexity we're building it in claude and we are putting in our own context our own thoughts our
+0:1616 secondsown ideas our own documents and this is all a massive problem of fragmentation that nobody has an answer for. We need a
+0:2424 secondsbring your own context, a BYOC system for the enterprise worker in 2026. And we have none. Right now, all we have are
+0:3333 secondsIT departments that say do not bring your personal AI in the door. We hate that. And we have corporate IT rollouts
+0:4242 secondsfor tools that are supposed to be equivalent to what we use at home, but they're not. And the reason they're not is context. The reason they're not is
+0:5151 secondsthey don't know us like we have our personal AIs that know us. In other words, the bet that Sam and Daario have
+0:5959 secondsbeen making worked. The fact that we care about which AI instance we use is a function of their ability to build
+1:081 minute, 8 secondsmemory systems. And I don't just mean them, right? If you use perplexity enough, you have this effect. I call it a honing effect. The system hones to you
+1:171 minute, 17 secondsand your cognitive behavioral pathways the more you use it. There is really an intelligence at work here and it adapts
+1:251 minute, 25 secondsto you because it can look at previous context depending on how the orchestrators of these systems have designed them and they are deliberately
+1:341 minute, 34 secondsdesigning them to make them sticky. This is as old as Silicon Valley consumer habit loops. You build a product, you want it to be sticky so you design
+1:421 minute, 42 secondsthings that sustain engagement. This is how Facebook is addictive. This is how Instagram is addictive. This is why people make big speeches on the floors of Congress about Tik Tok. Consumer
+1:511 minute, 51 secondsproducts are designed to be addictive and memory helps us make AI addictive.
+1:561 minute, 56 secondsAnd so we have memory that helps us to do this work. And it turns out that when you make a product for consumers that's addictive because you use memory, you
+2:052 minutes, 5 secondsprovide a really big side benefit to all of us workers. Because when we use it professionally, we benefit from all the
+2:142 minutes, 14 secondsprevious work that we did. And so I don't say that just to sort of score cheap points. I'm not saying it's bad that memory exists in these tools. It's
+2:222 minutes, 22 secondsactually really helpful. It has the side effect for us of also making them very difficult to leave. And that is exactly
+Chapter 2: The honing effect and why switching AIs hurts
+2:302 minutes, 30 secondswhy they're sticky and it's why we need a way to bring our own context elsewhere with us between tools into the workplace. You name it. Our context needs to be much more mobile than it is.
+2:412 minutes, 41 secondsSo in this video, I'm going to break down why that's a hard problem, what we can do about it, and how I'm building
+2:482 minutes, 48 secondssomething to help make that easier. But first, let me be specific about what we're accumulating. because it's very easy to just gesture at AI context and
+2:572 minutes, 57 secondssay, "Oh, it's a bunch of stuff. It has some economic value, etc." There are four specific layers of context. And I
+3:043 minutes, 4 secondsthink if we don't understand what we mean by AI context, particularly in a professional capacity, we're going to misunderstand the problem. And the
+3:113 minutes, 11 secondsreason I'm emphasizing a professional capacity is because this is where the conflict is the sharpest. If I want to migrate between my personal chat GPT and
+3:203 minutes, 20 secondsmy personal claude, it's a little bit of a hassle because the company you're taking data out from doesn't want you to do that and doesn't make it super easy.
+3:263 minutes, 26 secondsUh, but that's it, right? There's no policies in the way. The larger, more complicated question is how you actually separate out the elements of your
+3:353 minutes, 35 secondsprofessional context from everything else you're doing so that you can make that portable. That is a hard problem and no one is addressing it well today.
+3:433 minutes, 43 secondsSo, what are those elements? We have to understand them in order to get into the problem space. Number one, domain encoding. Over months of daily use, you
+3:523 minutes, 52 secondshave probably taught your AI, your industry vocabulary, the company's products that you use, your market dynamics, your competitive landscape,
+4:004 minutesthe regulatory environment you operate in, the internal acronyms your team uses, the way your organization thinks about strategy. And if you're sitting
+4:074 minutes, 7 secondsthere and saying, "I don't do that. I don't ever use my personal AI for company stuff." You are in the minority.
+4:134 minutes, 13 secondsMore than 60% of workers surveyed say they use their personal AI at work. Most people do whether or not the IT
+4:214 minutes, 21 secondsdepartment approves and they do partly because of the context problem. And I think we need to acknowledge that. And I rarely rarely rarely see people recognize it for the issue that it is.
+4:304 minutes, 30 secondsMost people misunderstand AI. They think, "Oh, it's just a random interchangeable tool. You get clawed on this computer. You get clawed on this computer. They're going to be the same."
+4:404 minutes, 40 secondsthey're not going to be the same because of the context and domain encoding is a part of that context. And part of what makes it hard to move and recognize is
+4:474 minutes, 47 secondsthat you didn't give all of that domain information to your AI by sitting there and writing it a briefing document.
+4:544 minutes, 54 secondsInstead, you gave it that information daily in little bits and pieces over the course of hundreds or thousands of conversations. And that means you may
+Chapter 3: Layer 1: Domain encoding you didn't realize you gave
+5:035 minutes, 3 secondsnot fully realize all the stuff you gave. And that is part of what makes it hard is because if we were to sit down and to write out this is all the context
+5:115 minutes, 11 secondsthat we have laid out over months and months and months of AI, we couldn't do it. I couldn't do it. You couldn't do it. It's too hard and too complicated.
+5:185 minutes, 18 secondsWe don't know the context we know. And that is part of what makes it hard to move. This is functionally equivalent to the institutional knowledge that used to
+5:255 minutes, 25 secondslive in a senior employees head. It took years to build in the old model. You learned your industry through experience, through osmosis, through
+5:345 minutes, 34 secondsmentorship, through hanging out with the senior engineer at the water cooler. That was the only way to learn. With AI,
+5:395 minutes, 39 secondsthat encoding is happening faster because the only way we can interact is by writing things down explicitly in conversation. So that is faster. You get
+5:485 minutes, 48 secondsyears of progress in months if you're intentionally writing things down.
+5:505 minutes, 50 secondsThat's part of how we see people make progress quickly. But if you start out fresh with a new AI, anybody will tell you it feels like you're talking to a
+5:595 minutes, 59 secondsstranger. you still don't have that domain information. And even if you could accumulate it quickly because it's entirely a verbal pattern, it still takes a long time. It still sucks. And the more it sucks to use a new AI,
+6:096 minutes, 9 secondsthat's a sign to you that you've done a great job encoding that domain knowledge into your existing AI. Right? Good job.
+6:166 minutes, 16 secondsNow, it's hard to move. So, let's make that easier. The second layer of context is workflow calibration. Beyond knowing your domain, your AI has also learned
+6:246 minutes, 24 secondshow you work, how you like your research structured, how you want your code reviewed, what a good first draft looks like for your documents, the sequence of
+6:336 minutes, 33 secondssteps you follow when analyzing a new problem, a new market, the format you want your internal memos to be in, how you like your Slack summaries published.
+6:416 minutes, 41 secondsYou've established these patterns through a lot of repetition, through a lot of edits you've given, through the way you've held a high bar. This is why,
+6:476 minutes, 47 secondsby the way, I emphasize holding a high bar when you talk to AI. The higher the bar, the more you are encoding that bar, so it's easier to hold it over time.
+6:556 minutes, 55 secondsWhen you open a new conversation with an AI, you know, the AI already knows the shape of what you're going to ask based on previous conversations. It just does.
+7:047 minutes, 4 secondsAnd we don't realize how much of a help that is till we try a new AI. And it feels like we're grinding in first gear on the car. And yes, that really saves
+7:127 minutes, 12 secondsyou time. A calibration can save you five, six, seven, eight turns of conversation because the AI is more likely to get it right the first time
+7:207 minutes, 20 secondsbecause it knows what you want. Now, the third layer is the behavioral relationship, and that's the one that matters the most, but I think it's also
+7:277 minutes, 27 secondsthe hardest to articulate. So, I'm going to try to be very precise here. This is the emergent understanding your AI develops about how to work with you
+Chapter 4: Layer 2: Workflow calibration saves you 5-8 turns
+7:367 minutes, 36 secondsspecifically, not your stated preferences. Those are very easy to write down. the unstated preferences.
+7:427 minutes, 42 secondsWhen you need to be challenged versus when you need to just execute and get stuff done, how technical to go, when you the prompter did not specify a
+7:507 minutes, 50 secondslevel, whether a question that you ask is an invitation to talk or whether it's just rhetorical, how much preamble you tolerate before you want to get to the
+7:587 minutes, 58 secondspoint. These are things where the AI is inferring how you want it to behave based on your response to its responses.
+8:088 minutes, 8 secondsAnd this happens very subtly. It is almost never explicitly instructed despite what people may tell you and
+8:158 minutes, 15 secondsit's very very difficult for you to see yourself doing it. It's one of those things like your nose. You don't see your nose. Your nose is right in front of your eyes. Your eyes block it out.
+8:248 minutes, 24 secondsSame thing. You don't see the way the LLM is shaping itself to your patterns of response, but it is. This layer is
+8:338 minutes, 33 secondsbuilt through hundreds and hundreds of microcorrections, right? the times you rephrased a prompt because the first output missed the point. Uh the times
+8:408 minutes, 40 secondsyou said no no no more like this and provided an example. The times the AI did get it right and you kept going and you didn't give it a comment. It's like
+8:488 minutes, 48 secondsthe compound interest on a relationship except in this case it is the compound behavioral difference the LLM learns
+8:558 minutes, 55 secondsfrom interacting with you over time. And so this is like the difference between working with a colleague you've known for a year and working with a brand new colleague. Right? that the colleague
+9:039 minutes, 3 secondsyou've known for a year knows exactly how you are going to respond when faced with a particular situation. That is not true of your new colleagues. They have
+9:109 minutes, 10 secondsto learn that. Same with AI. The fourth layer is the artifact layer or the demonstrated capability layer and it doesn't really exist today. So right now
+9:199 minutes, 19 secondswhen we do work with AI and we produce artifacts, right? We produce documents,
+9:239 minutes, 23 secondswe produce spreadsheets, we produce powerpoints, we produce code, all of it ends up as artifacts we copy, paste and move somewhere else. And frankly, who
+Chapter 5: Layer 3: Behavioral relationship and unstated preferences
+9:319 minutes, 31 secondsknows where it all gets to. What we are missing if you are a professional is a way to say this is an artifact that I
+9:399 minutes, 39 secondsmade. This is how I made it and this is how I know it was good. And you want to bring the context around that artifact,
+9:479 minutes, 47 secondsaround your intent over with you to your next role. Not because you want to steal trade secrets, not because you want to take information, not because you want
+9:559 minutes, 55 secondsto copy it verbatim, but because you want to take the encoded thinking, the encoded rationale, the way you taught the AI to think through pros and cons,
+10:0610 minutes, 6 secondswhich you can take and move to a new role, and you want to bring that with you. That is how you demonstrate capability, right? And and one of the
+10:1310 minutes, 13 secondsthings that we look for when we're interviewing is this demonstrated capability. We don't care if someone brings their exact strategy over from the previous company. In fact, we don't
+10:2110 minutes, 21 secondswant them to. That would be inappropriate. What we want them to do is show us they can build that, that they understand how to build trade-offs
+10:2810 minutes, 28 secondsinto that strategy, and then they can do a competent job with us. That's the whole point of interviewing. Well,
+10:3310 minutes, 33 secondsincreasingly, we do that work in AI, and when we want to talk about how we did it, it's buried in some chat somewhere. So, good luck finding it, right? Like,
+10:4110 minutes, 41 secondsit's hard to explain what you did because it's all emergent in a series of like 800 chats and you have to go back and find it and oh no, did they store the document? Where did you put the
+10:5010 minutes, 50 secondsdocument? It's a mess. So there you have it. The four layers of the problem we have to solve. Domain encoding is one.
+10:5610 minutes, 56 secondsBehavioral change is another. How you coordinate workflows is another. And then finally, understanding how to communicate your thinking process around
+11:0511 minutes, 5 secondsartifacts is a fourth. These are all really important pieces, but because we don't break apart the problem, I think we look at as just general context. And that makes it really hard to be specific
+11:1411 minutes, 14 secondsabout a solution. If you're sitting here wondering, is this a real issue? Is this only for people walking into specific companies? It is an almost universal
+11:2011 minutes, 20 secondsissue and it will affect all of us in the next couple years. Not because there's some magical wave that's coming for all of us at the same time, but
+11:2811 minutes, 28 secondsbecause on average over the next two years, are you likely to look for another job at some point? Are you likely to be on the hiring market at some point? Are you likely to switch AIs or need to add a new AI at some point?
+11:3711 minutes, 37 secondsThe answer to one of those is probably yes. Sometimes it's an unforced job change. Sometimes it's a job change where we're looking for more. Sometimes,
+11:4511 minutes, 45 secondsfrankly, the company brings in a new AI and it wasn't a job change, but we have a responsibility change. You moved over now you have a new AI regime. A new
+11:5311 minutes, 53 secondsagreement was signed with Anthropic and not OpenAI. The company AI changes. All of these things trigger this problem.
+Chapter 6: Layer 4: Artifact history and demonstrated capability
+12:0112 minutes, 1 secondThis is a problem that I would bet you a lunch affects 90% of us in the next two years if we're in the professional workforce. one way or another. Whether
+12:1012 minutes, 10 secondswe are switching AI at work because the company told us to and its policy,
+12:1312 minutes, 13 secondswhether we're doing it on purpose because we got permission to use a new tool, whether we're switching roles and that led to an AI change, whether we are switching to a new company and there's a
+12:2212 minutes, 22 secondsnew AI regime, whether we got fired and have to use our personal AI tools, but we want to bring our work context or vice versa. All of us are in this boat
+12:3012 minutes, 30 secondstogether. And to be clear, this is a genuine market failure. I don't want to put this on us as individuals. Employers want to hire AI capable people and have
+12:3912 minutes, 39 secondsno reliable way to evaluate that capability or understand what they bring. Candidates want to demonstrate AI capability and have no structured way to
+12:4712 minutes, 47 secondstalk about that or show it or bring that context in with them. And the credential gap is kind of being filled by vibes,
+12:5212 minutes, 52 secondsright? Like you say, "Oh, I can do all of this stuff, but how do we know you can do all of this stuff?" At this point, there are major companies,
+12:5812 minutes, 58 secondsincluding Meta, that are resorting to flying you in on their dime and locking you in a room with their laptop and their tools to see what you can do. And we are going to see more of that because
+13:0613 minutes, 6 secondswe just don't understand how to use AI because bringing context with us is so hard. And by the way, in that example,
+13:1513 minutes, 15 secondsyou don't bring your context with you.
+13:1613 minutes, 16 secondsAnd so we're just assuming that you can use these new tools from scratch to generate extraordinary results when really you would want to say, I've
+13:2513 minutes, 25 secondsgenerated these results partly because I've honed this tool as a working companion and now I'm going to have to switch companions and it's going to feel like I lost a leg for a few months. If I were there and I had to switch AI tools,
+13:3513 minutes, 35 secondseven if I knew Claude code well, which I do, and I had to move into a new environment and it was a brand new cloud code and I had to do magical things with it, it would take me longer, I would
+13:4413 minutes, 44 secondsunderperform relative to where I actually am because I don't have that context. Why has nobody solved it on the platform side? I think the reason nobody
+13:5213 minutes, 52 secondshas solved it is pretty simple. It's incentives, right? None of the model makers has an incentive to solve this problem. They all want to keep you
+13:5913 minutes, 59 secondsinside, right? None of them want to lose you. Every single platform makes it easy to get context in and relatively hard to
+14:0614 minutes, 6 secondsget context out. And none of them are doing any kind of a job at helping you separate personal and professional context out or helping you separate
+14:1514 minutes, 15 secondsprofessional context from trade secrets and things that are inappropriate to bring to a new workplace. Now, you might think, well, this is ripe for a
+14:2214 minutes, 22 secondsthird-party build and there are well-funded VC startups going after this. And so, the answer here, the reason why we haven't broken through, I think it's more interesting, right? It's
+Chapter 7: Why this affects 90% of us in the next two years
+14:3014 minutes, 30 secondsnot a cash problem. I think it's that memory layer startups are failing to capture people where they feel the pain
+14:3714 minutes, 37 secondspoint. Right? This is a diffuse painoint from a product strategy perspective. You feel it all the time. It hurts, but it
+14:4514 minutes, 45 secondsdoesn't hurt in the dramatic FOMO, my tire is out on my car kind of way,
+14:4914 minutes, 49 secondsright? It is the kind of there's a funky sound in the car kind of a painoint. And it might be your engine giving out and costing you 20,000 miles, but you don't
+14:5814 minutes, 58 secondsreally think of it that way. You think of it as I'll drive it as long as I can until I have to take it to the shop. It is a diffuse painoint. Memory and how we
+15:0615 minutes, 6 secondsuse memory sucks when we have a new AI to use. It sucks all the time. It sucks every chat. It may affect how often we use it. It certainly affects our
+15:1415 minutes, 14 secondsperformance, but it is duse enough that are we really going to go and seek out a third party tool? If the third party
+15:2115 minutes, 21 secondstool exists, does it provide the linkages we need between the major platforms? Does it bring our personal context with us? Is it going to diverge
+15:3015 minutes, 30 secondstrade secrets I don't want to take to the new place? Like there are all of these questions that none of these memory providers are really answering.
+15:3615 minutes, 36 secondsPlus the fact that it's not a specific highly painful moment in a single point in time, which is usually the sign for a good product. Like we talk in product
+15:4415 minutes, 44 secondsstrategy about like candy products and opium products. This kind of third party memory tool is very much a candy product. And what I mean by that is it's great. It's nice to have. We like it.
+15:5415 minutes, 54 secondsWe're glad we have it. we're not going to go out and seek it because it doesn't immediately solve the thing that makes us really suffer. Whereas an opium
+16:0216 minutes, 2 secondsproduct, pardon the crassness, is the kind of product that we must take to cut pain off because it's so so so painful.
+16:1116 minutes, 11 secondsIt's acutely painful. This is not an acutely painful product problem. And so memory startups are struggling to solve it. So given all of this, given the
+16:1916 minutes, 19 secondsplatform hostility, given the injection challenges, given the calibration gap,
+16:2316 minutes, 23 secondsthe diffuse pain, what would it actually mean to own your own AI working intelligence over time to treat your professional context like an asset?
+16:3216 minutes, 32 secondsThat's the question I'm asking. That's the thing I'm building against. That's the thing I want to challenge you to think about. I think it starts with a shift in mindset. We need to treat our
+16:4116 minutes, 41 secondsAI context as a professional working asset that we will nurture for the rest of our careers. Period. End of sentence.
+16:4716 minutes, 47 secondsIt's not something that happens to you inside platforms. It's not something platforms should own. It's something you should build and carry. And at a practical level, this means your working
+16:5616 minutes, 56 secondsidentity does need to live somewhere that you can control. The simplest version and the one available to you today is a structured document. Right? A
+Chapter 8: Why platforms won't solve it and startups struggle
+17:0417 minutes, 4 secondsmarkdown file is the very simplest version of this. It's not probably good enough to get the job done, but a well-crafted markdown file put together
+17:1217 minutes, 12 secondsproperly can capture a fair bit of domain context, communication preferences, workflow patterns,
+17:1817 minutes, 18 secondsrecurring projects, style, and you can audit it and make sure it doesn't include any uh inappropriate detailed information from your previous work. And
+17:2517 minutes, 25 secondsyou can generate that with help from an AI that knows you best, right? And you can review it and you can edit it and you can paste it wherever you need to go. And it's sort of a band-aid. It
+17:3417 minutes, 34 secondshelps you to close the gap a little bit and it's certainly positive ROI if you're willing to spend 30 minutes on it and it's probably the simplest fix out there. I would say the stronger version of this is a personal context server,
+17:4617 minutes, 46 secondsright? An MCP native memory store that any compliant AI agent can discover and query against on demand. This flips the
+17:5417 minutes, 54 secondsarchitecture from pushbased where you paste a document in to pullbased. The AI retrieves what it needs for the current task. The AI can query your context
+18:0318 minutes, 3 secondsselectively. It can pull in your B2B pricing heristics for example uh or your editorial preferences or whatever it is and it doesn't just dump the entire
+18:1018 minutes, 10 secondsprofile into every single conversation window which is very tokenheavy. And critically the AI can also if it's constructed properly write back. It can say you know the user prefers this
+18:1918 minutes, 19 secondsformat for strategy docs as you yourself evolve over the course of your working career. Because isn't that the point of a professional asset is that if it if this is an asset that records our
+18:2818 minutes, 28 secondsprofessional growth, it should grow with us. And I think a database does a better job of that than just a working document. And if you're wondering, am I
+18:3518 minutes, 35 secondsbuilding both? You got that right. I am 100% building and launching prompts that help you to elicit the right working
+18:4418 minutes, 44 secondsinformation from the AI that knows you best. I am building a structured output format so you can get them into a markdown if that's the bandaid that you
+18:5218 minutes, 52 secondsthink you can use. And I'm also building a solution that plugs into OpenBrain that lets you pull together your
+18:5918 minutes, 59 secondsprofessional working context into a single database that an MCP server can hit because I want you to have options,
+19:0519 minutes, 5 secondsright? And if you want to listen to this and paste this transcript into AI and say, "Screw open brain, I can do it myself." More power to you. I want you
+19:1219 minutes, 12 secondsto have this as an asset that helps you to build your career over time. And shout out to MCP. Part of why this whole idea is viable is because the model
+19:1919 minutes, 19 secondscontext profile is effectively the USBC connector for AI. Everything plugs into it. It is a universal connector and that
+19:2719 minutes, 27 secondsmeans even your work AI can plug into it. Now I know that there are some work AIs that shut off those external MCPs as part of their special security policies.
+19:3819 minutes, 38 secondsOne, I think that most AIs to do their work need to be a little bit less shut down than that and that's a policy conversation. And two, if it is that
+19:4619 minutes, 46 secondsshutdown, you can still use a markdown file and get a little way with that. So,
+19:5019 minutes, 50 secondsif you want to make this yourself or if you want to follow my guide to making this, I'm going to give you a really clear rundown here. Start with
+19:5619 minutes, 56 secondsextraction. The AI that knows you best already has a rich model for how you work. You can ask it to articulate that model through a series of structured
+Chapter 9: The solution: extraction, database, MCP
+20:0420 minutes, 4 secondsprompts. Your domain context can be extracted. your communication preferences, ditto, workflow patterns,
+20:1020 minutes, 10 secondsstyle, recurring projects, behavioral patterns that it's observed about you.
+20:1420 minutes, 14 secondsMaybe you've never asked them. Run a structured extraction prompt. I can provide you with one against your primary AI. Review and edit the output
+20:2220 minutes, 22 secondsand you have a portable representation of your entire working identity. It's not perfect. It's not a full behavior calibration. Think of it as a 720 pixel
+20:3120 minutes, 31 secondsvideo. Like, it's pretty good. It's not 4K, but the capturable layers, right?
+20:3520 minutes, 35 secondsThey can all be there, right? It can capture the domain encoding you do. It can capture the workflow calibration you do. It can capture both stated and
+20:4220 minutes, 42 secondsobserved preferences. And that's substantial. Having them in a document you own is a fundamentally better position to be in than having them
+20:4920 minutes, 49 secondslocked in a platform's memory system. It is a win by itself. The second big piece, and I think this one's really important, is to not be satisfied with a
+20:5720 minutes, 57 secondsdocument, but instead insist on writing to evolvable infrastructure you control.
+21:0221 minutes, 2 secondsYou know how we had personal websites in the 2010s and that was the thing like you have to own your own domain name and your domain name is your front door to
+21:1021 minutes, 10 secondsthe internet and we'll all link it on our LinkedIn profiles etc. Well, your personal database is kind of going to be that for the 2020s because data is what
+21:1821 minutes, 18 secondsallows you to bring this context with you reliably. You need to write to infrastructure you manage. And so write your extracted profile to a persistent
+21:2721 minutes, 27 secondsdatabase. And yes, I have a plugin for this. I'll show you how to do it with embeddings that you can own and a retrieval system you can host. This can
+21:3521 minutes, 35 secondsbe a local Postgress instance. It can be a superbase project. It can be a VPS. It's whatever you want to run, right?
+21:4021 minutes, 40 secondsThe point is that your canonical working identity is important enough to put in a database now because guess what? This is the way the web is going and it should
+21:4921 minutes, 49 secondslive with you, not inside a platform a company owns. And if you're wondering,
+21:5321 minutes, 53 secondsis it that difficult? I have had thousands of people build the open brain system. This is based on including many non-technical people. It is not that
+22:0122 minutes, 1 secondhard. You can totally do it even if you're nontechnical. I think the larger point is really simple. Your assets are now complex enough to justify a database
+22:0922 minutes, 9 secondsfrom a digital perspective. Your assets in the digital space are not just a thin paper resume. It is actually the
+22:1722 minutes, 17 secondsaccumulated rich pattern of working that you bring to the table whenever you do a job. And that has had no hope. And then
+22:2422 minutes, 24 secondsof course the next piece is exposing it via MCP. It needs an outbound, right?
+22:2822 minutes, 28 secondsAnd this is the part that makes everything else compound, right? Because MCP is not just a deacto open standard by which AI operates. It's also a read
+22:3622 minutes, 36 secondswrite standard. So, it allows you once you expose it via MCP to plug it into any AI you're using and to start to both
+22:4322 minutes, 43 secondsread and pull in the stuff you need and also write and evolve the database over time, which allows you to have an evolvable, portable working memory for
+22:5222 minutes, 52 secondsyour professional life. And that's kind of a big deal because the next time you get stuck with a new AI and they're like, "Good luck with your new claude.
+22:5922 minutes, 59 secondsBless you. Off you go. Be just as productive as with the old Chad GPT that knew six months of history about you." You actually have an answer for that.
+Chapter 10: Shout out to MCP as the USB-C connector for AI
+23:0523 minutes, 5 secondsAnd this this happens so much. It's so painful. And I don't know why we have not had a larger conversation about it.
+23:1423 minutes, 14 secondsI've looked around and most of the conversations that we have had have been focused on either switching between chat
+23:2123 minutes, 21 secondsGPT and claude or have focused on the idea that to solve this problem you need to have an eagle eye on the screen on
+23:3023 minutes, 30 secondsyour personal computer or your work computer all the time. In other words,
+23:3423 minutes, 34 secondsthe only way to solve it is to have some sort of all-seeing photographic memory that screenshots your screen every 10 seconds and that's how it knows what you're working on and that's how it
+23:4223 minutes, 42 secondsbrings the context layer in. I find that a little creepy. I don't know about you.
+23:4623 minutes, 46 secondsI don't think that's the solution that I would go for. I understand why people think that's the beall endall solution because it feels complete. But I don't
+23:5423 minutes, 54 secondsthink it's correct. I think the more correct solution is to go back to the behavior we use to express these preferences in the first place, which is
+24:0224 minutes, 2 secondsin chat with our AI, and to actually extract it from there in a reliable way.
+24:0724 minutes, 7 secondsbasically pull back from the AI you're used to working with the preferences you have implicitly encoded and get those
+24:1524 minutes, 15 secondsinto a a space and a format that allows you to be in control and I think that's a much more reliable way to do things
+24:2224 minutes, 22 secondsand I think MCP allows us as individuals to propose a solution to the industry that doesn't force us to wait on some
+24:3024 minutes, 30 secondsstartup doesn't force us to wait on the big players to make memory interchangeable which I don't think they will do absent a congressional ruling,
+24:3824 minutes, 38 secondsright? They just have no incentive to do so. It also critically allows us to not wait on IT departments because if I had
+24:4624 minutes, 46 secondsto say one corner of most companies that tends to be most cautious about AI, it's the IT department. They have a lot to
+24:5424 minutes, 54 secondslose. And they have a lot to lose partly because the burden for mistakes in security falls on the IT department.
+25:0125 minutes, 1 secondThey're the ones at risk. They're the ones with their necks on the line. And there's a lot of risks that go with AI deployment. So, it's really natural for them to say, "No, you can't bring your
+25:0825 minutes, 8 secondsAI. That's too risky. Use ours." But I don't think most of them really realize the difference in performance you get
+25:1625 minutes, 16 secondswhen you work with an AI that knows you well. People who work with AI a lot and who have an AI that knows them well will tell you they're two, three, four, five
+25:2425 minutes, 24 secondstimes more productive working with the exact same AI. Claude if it's cla but it's the instance that knows them.
+Chapter 11: Professional capital in the AI age
+25:3325 minutes, 33 secondsAnd all of those encoded preferences help them be that much faster. And I think companies don't realize that that has real work implications and they should. And I think something like this,
+25:4325 minutes, 43 secondshaving a responsible solution like this where we say we're not trying to port over company secrets. We are trying to just bring the working context that
+25:5125 minutes, 51 secondshelps us understand how a particular employee works with a particular AI and bring that working style over in a responsible way so that they can work
+26:0026 minuteseffectively. that feels like a really productive response to that, right?
+26:0326 minutes, 3 secondsThat's that's a grownup response to that reasonable concern. And I think it opens the door to a more permissive IT policy. So that's it. That's the architecture.
+26:1126 minutes, 11 secondsYou can you can generate it with a prompt, which I'll give you. You can write it to a database you can control.
+26:1626 minutes, 16 secondsYou can expose it via MCP and you're kind of off to the races. And yes, I'm building tooling to make this easier.
+26:2026 minutes, 20 secondsI'm building extraction prompts. I'm building profile specs. building implementation guides because I think the faster this practice spreads, the
+26:2826 minutes, 28 secondsstronger the pressure will grow on platforms and on companies to take the idea that you deserve to bring your professional context with you seriously.
+26:3726 minutes, 37 secondsAnd I really get on my soap box about this because I think that this is one of those things where we are effectively taking away a large part of our professional lives and making it
+26:4626 minutes, 46 secondsdifficult for us to continue a seamless path of growth in the AI age when we really need to be growing fast. That's what everybody tells us and it's harder
+26:5326 minutes, 53 secondsnow. And so we need to have solutions that allow us to bring our own context with us. Look, if I step back, I think we're in the early years of a shift in what professional capital really means.
+27:0227 minutes, 2 secondsAnd I don't think most of us have absorbed the implications, including companies, right? For decades, your value as a knowledge worker came from four things, just four. What you knew,
+27:1127 minutes, 11 secondswhat you could do, who you knew, and what you could prove that you'd done,
+27:1527 minutes, 15 secondsright? Skills, abilities, network, and track record. All of it accumulated over the years. All of it was portable in the sense that it lived in your head, in
+27:2327 minutes, 23 secondsyour relationships, and in your reputation. Employers could benefit from your professional capital while you were there, and they could not really keep it
+27:3127 minutes, 31 secondswhen you left. AI is creating a fifth category of professional capital, right?
+27:3627 minutes, 36 secondsYour working intelligence, the accumulated context in the calibration that makes you effective with AI tools.
+27:4327 minutes, 43 secondsAnd this category has a property that the others did not. It occurs outside your head, inside systems controlled by
+27:5227 minutes, 52 secondsthird parties who have a direct financial interest in keeping it there.
+27:5527 minutes, 55 secondsYour skills live in your head. Nobody can lock them up. Your network lives in your relationships. LinkedIn can make it easier to maintain, but it can prevent you from knowing people. Your track
+28:0328 minutes, 3 secondsrecord lives in your reputation, in your references, in the memory of the people you've worked with. Your AI working intelligence though that lives on
+28:1028 minutes, 10 secondsservers that belong to Anthropic, to OpenAI, to Google, to Microsoft,
+28:1528 minutes, 15 secondsfragmented across accounts that cannot talk to each other, governed by terms of service you did not negotiate and subject to change at any time. This is
+28:2228 minutes, 22 secondsnew and the newness of it is why most of us haven't really reacted yet. I think we don't have the instinct for this that we have for the others. When you build a
+Chapter 12: Memory replaced models as the moat of 2026
+28:3028 minutes, 30 secondsskill, you know you own it, right? When you build an AI context, the ownership question seems sort of unsettled. It may not even occur to you that it's an asset
+28:3728 minutes, 37 secondsyou should own until you try and take it somewhere or wish that it was there and it's not anymore. I think the professionals who recognize this now and act on it, building their own portable
+28:4628 minutes, 46 secondscontext, maintaining their working identity deliberately as if it was a career asset because it is, you're going to have a meaningful and compounding advantage as AI keeps getting better.
+28:5528 minutes, 55 secondsNot because the tooling is perfect today. It's definitely not, but because the habit of ownership itself is a valuable recurring skill to have. The
+29:0329 minutes, 3 secondsperson who maintains a portable AI working identity moves between tools with less friction, switches jobs with less context loss, and compounds their
+29:1129 minutes, 11 secondsAI effectiveness across platforms as they grow in their skills instead of starting over every time they cross a boundary. Ultimately, I think memory has
+29:2029 minutes, 20 secondsreplaced models as the moat of 2026. The platforms that built their retention around your accumulated context are
+29:2929 minutes, 29 secondswinning right now. The question is whether you keep pouring that context into walled gardens and hoping for the best or whether you start building the professional asset that travels with you
+29:3729 minutes, 37 secondsregardless of which AI, which account or which employer you're working with next year. I know which bet I'm making. Best of luck.
+

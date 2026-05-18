@@ -20,6 +20,7 @@ PIPELINE_DIR="$TARGET_DIR/.pipeline"
 # Create the main directories
 mkdir -p "$PIPELINE_DIR/IMPLEMENTATION_PLAN_RECORD"
 mkdir -p "$PIPELINE_DIR/PROMPT_RECORDS"
+mkdir -p "$PIPELINE_DIR/RESPONSE_RECORDS"
 mkdir -p "$PIPELINE_DIR/WORK_REQUESTS"
 
 # Create the Work Request subdirectories

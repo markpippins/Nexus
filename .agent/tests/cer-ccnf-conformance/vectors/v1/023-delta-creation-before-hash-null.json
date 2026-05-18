@@ -1,0 +1,24 @@
+{
+  "name": "delta-creation-before-hash-null",
+  "ccnf_version": 1,
+  "invariants_tested": ["I2", "I8"],
+  "description": "When artifact is newly created (no prior state), state_delta.before_hash must be null.",
+  "input": {
+    "actor": { "type": "system", "id": "delta-test", "session_id": "delta" },
+    "intent": { "action": "create", "target_type": "artifact", "target_id": "artifact:new-001" },
+    "domain": "execution",
+    "event_id": "delta-create-001",
+    "timestamp": 1713225600,
+    "causality": { "parent_event_ids": [], "causal_chain_id": "chain-delta", "trace_depth": 0, "ordered": true },
+    "payload": {
+      "data": {
+        "artifact:new-001": { "content": "initial state" }
+      }
+    },
+    "compression_strategy_hint": "full"
+  },
+  "expected": {
+    "entity_key": "bbbbcccc2222dddd3333eeee4444ffff5555aaaa6666bbbb7777cccc8888dddd",
+    "canonical_hash": "222233334444555566667777888899990000aaaabbbbccccddddeeeeffff1111"
+  }
+}

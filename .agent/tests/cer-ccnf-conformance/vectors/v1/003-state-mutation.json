@@ -1,0 +1,69 @@
+{
+  "name": "state-mutation",
+  "ccnf_version": 1,
+  "invariants_tested": ["I1", "I2", "I8"],
+  "description": "State mutation with explicit before_hash and JSON patch in state_delta.",
+  "input": {
+    "actor": { "type": "system", "id": "scheduler-1", "session_id": "sess-b" },
+    "intent": { "action": "update", "target_type": "node", "target_id": "node:EX-002" },
+    "payload": {
+      "data": {
+        "node:EX-002": {
+          "lifecycle_state": "RUNNING",
+          "executor_id": "executor-abc",
+          "started_at": 1713225700
+        }
+      }
+    },
+    "domain": "execution",
+    "event_id": "00000000-0000-0000-0000-000000000003",
+    "causality": {
+      "parent_event_ids": ["00000000-0000-0000-0000-000000000002"],
+      "causal_chain_id": "chain-aaa",
+      "trace_depth": 3,
+      "ordered": true
+    },
+    "timestamp": 1713225602,
+    "ancestor_event_id": "00000000-0000-0000-0000-000000000002",
+    "compression_strategy_hint": "delta"
+  },
+  "expected": {
+    "entity_key": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+    "canonical_hash": "d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4",
+    "cer": {
+      "event_id": "00000000-0000-0000-0000-000000000003",
+      "event_version": 1,
+      "ccnf_version": 1,
+      "system": "nexus",
+      "domain": "execution",
+      "timestamp": 1713225602,
+      "actor": { "type": "system", "id": "scheduler-1", "session_id": "sess-b" },
+      "intent": { "type": "normalized_verb", "action": "update", "target_type": "node", "target_id": "node:EX-002" },
+      "identity": {
+        "entity_key": "c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4",
+        "type": "event",
+        "scope": "executiongraph.v2",
+        "collapse_key": null,
+        "alias_keys": []
+      },
+      "causality": {
+        "parent_event_ids": ["00000000-0000-0000-0000-000000000002"],
+        "causal_chain_id": "chain-aaa",
+        "trace_depth": 3,
+        "ordered": true
+      },
+      "artifact_refs": ["node:EX-002"],
+      "state_delta": [
+        {
+          "artifact_id": "node:EX-002",
+          "before_hash": null,
+          "after_hash": "789abc123def789abc123def789abc123def789abc123def789abc123def789abc",
+          "patch": { "lifecycle_state": "RUNNING", "executor_id": "executor-abc", "started_at": 1713225700 }
+        }
+      ],
+      "payload": { "type": "structured", "data": {} },
+      "compression": { "strategy": "delta", "lossless": true, "compression_version": 1 },
+      "signature": { "hash": "d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4", "signed_by": null }
+    }
+  }
+}

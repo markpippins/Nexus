@@ -1,2 +1,1 @@
-export FS_ROOT_DIR=./fs_root
-bun --hot run dev | lolcat
+bun run fs-serv.ts fs_root/ | lolcat
