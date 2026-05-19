@@ -6,7 +6,7 @@ echo "Starting file-system-server tests..."
 
 # Start the server in the background
 echo "Starting server..."
-FS_ROOT_DIR=/tmp/test-fs-root npx tsx fs-serv.ts > server.log 2>&1 &
+FS_ROOT_DIR=/tmp/test-fs-root bun run fs-serv.ts > server.log 2>&1 &
 SERVER_PID=$!
 
 # Wait for server to start
@@ -23,7 +23,7 @@ fi
 
 # Run the tests
 echo "Running tests..."
-npx tsx test-fs-server.ts
+bun run test-fs-server.ts
 
 TEST_RESULT=$?
 

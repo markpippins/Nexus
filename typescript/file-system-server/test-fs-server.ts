@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'url';
 import * as http from 'http';
 import * as path from 'path';
 
@@ -325,35 +326,43 @@ async function runTests() {
         await tester.listDirectory([]);
         console.log();
 
-        // Test 14: Move a file instead of copy (since copy had an issue)
-        await tester.moveItem([...renamedDir, 'test_file.txt'], [...renamedDir, 'nested_dir', 'moved_file.txt']);
+        // Test 14: Copy a file
+        await tester.copyItem([...renamedDir, 'test_file.txt'], [...renamedDir, 'nested_dir', 'copied_file.txt']);
         console.log();
 
-        // Test 15: List the nested directory after move
+        // Test 15: List the nested directory after copy
         await tester.listDirectory([...renamedDir, 'nested_dir']);
         console.log();
 
-        // Test 16: Delete the moved file
+        // Test 16: Move a file
+        await tester.moveItem([...renamedDir, 'nested_dir', 'copied_file.txt'], [...renamedDir, 'nested_dir', 'moved_file.txt']);
+        console.log();
+
+        // Test 17: List the nested directory after move
+        await tester.listDirectory([...renamedDir, 'nested_dir']);
+        console.log();
+
+        // Test 18: Delete the moved file
         await tester.deleteFile([...renamedDir, 'nested_dir'], 'moved_file.txt');
         console.log();
 
-        // Test 17: List the nested directory after deletion
+        // Test 19: List the nested directory after deletion
         await tester.listDirectory([...renamedDir, 'nested_dir']);
         console.log();
 
-        // Test 18: Clean up - delete the nested directory
+        // Test 20: Clean up - delete the nested directory
         await tester.deleteDirectory([...renamedDir, 'nested_dir']);
         console.log();
 
-        // Test 19: List the renamed directory after deletion
+        // Test 21: List the renamed directory after deletion
         await tester.listDirectory(renamedDir);
         console.log();
 
-        // Test 20: Clean up - delete the test directory
+        // Test 22: Clean up - delete the test directory
         await tester.deleteDirectory(renamedDir);
         console.log();
 
-        // Test 21: List root to see final state
+        // Test 23: List root to see final state
         await tester.listDirectory([]);
         console.log();
 
@@ -400,6 +409,6 @@ async function runFullTestSuite() {
     console.log('\nAll test suites completed successfully!');
 }
 
-if (require.main === module) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
     runFullTestSuite().catch(console.error);
 }
