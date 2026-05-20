@@ -1,0 +1,22 @@
+{
+  "name": "key-ordering",
+  "ccnf_version": 1,
+  "invariants_tested": ["I8"],
+  "description": "Input with keys in reverse lexicographic order must produce same CER as canonical-order input. Validates CCNF Step 3.1.",
+  "input": {
+    "z_last": "should-be-last",
+    "domain": "system",
+    "b_field": "beta",
+    "event_id": "key-order-test-001",
+    "a_field": "alpha",
+    "intent": { "action": "emit", "target_type": "state", "target_id": "test:001" },
+    "timestamp": 1713225600,
+    "payload": { "data": {} },
+    "actor": { "type": "system", "id": "test", "session_id": "test" },
+    "causality": { "parent_event_ids": [], "causal_chain_id": "chain-test", "trace_depth": 0, "ordered": true }
+  },
+  "expected": {
+    "entity_key": "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6",
+    "canonical_hash": "b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+  }
+}

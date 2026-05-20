@@ -1,0 +1,26 @@
+{
+    "name": "execution_pipeline_v3",
+    "phase": "post-specification",
+    "description": "Phase 1.5 lowering pass + Phase 2 scheduler: lowers WorkRequestGraph to frozen ExecutionGraph, then interprets it via a deterministic scheduler AST interpreter.",
+    "stages": [
+        {
+            "id": "execution-lowering",
+            "skill_ref": ".agent/skills/execution-lowering/SKILL.md",
+            "description": "Phase 1.5: transforms WorkRequestGraph into frozen ExecutionGraph — validate, select executors, expand [Prepare, Execute, Finalize], project dependencies, resolve data channels, lower constraints, initialize lifecycle, assemble"
+        },
+        {
+            "id": "execution-scheduler",
+            "skill_ref": ".agent/skills/execution-scheduler/SKILL.md",
+            "description": "Phase 2: deterministic AST interpreter — tick loop with readiness evaluation, claim protocol (distributed), executor acquisition, dispatch, observation processing, state transitions, resource arbitration, control node interpretation, completion detection"
+        }
+    ],
+    "sub_skills": {
+        "executor-binding": ".agent/skills/executor-binding/SKILL.md",
+        "execution-runner": ".agent/skills/execution-runner/SKILL.md",
+        "distributed-coordination": ".agent/skills/distributed-coordination/SKILL.md",
+        "event-replay": ".agent/skills/event-replay/SKILL.md",
+        "cer-pipeline": ".agent/skills/cer-pipeline/SKILL.md"
+    },
+    "handoff_input": "WorkRequestGraph",
+    "handoff_output": "ExecutionGraph"
+}

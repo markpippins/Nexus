@@ -27,7 +27,7 @@ Edge = {
 ```
 
 ### 2.3 Edge Types
-`EdgeType ∈ { CREATED, REFINES, SPLITS_TO, MERGED_INTO, SUPERSEDED_BY, DUPLICATE_OF, IMPLEMENTS, TESTS }`
+`EdgeType ∈ { CREATED, REFINES, SPLITS_TO, MERGED_INTO, SUPERSEDED_BY, DUPLICATE_OF, IMPLEMENTS, TESTS, FAILURE_AFFECTS, FAILURE_CAUSES }`
 
 ## 3. EDGE DERIVATION RULES (FROM EVENTS)
 This is the most important section.
@@ -73,6 +73,18 @@ Where `implementation_ref_node` is a synthetic node (e.g. commit hash, build art
 **Rule**: `add edge(req → test_result_node, TESTS)`
 Where `test_result_node` is: `PASS`, `FAIL`, or structured test artifact reference.
 
+### 3.9 FAILURE_EVENT (meta-event)
+**Rule**:
+```python
+failure_node = create_failure_node(event)
+for affected_req in extract_affected(event):
+    add edge(failure_node → affected_req, FAILURE_AFFECTS)
+```
+**Properties**:
+- failure nodes are not requirement nodes; they exist only in GRAPH
+- failure edges do not alter INDEX state
+- failures are replayable from event log
+
 ## 4. GRAPH INVARIANTS
 - **I1 — Edge immutability**: Once derived from an event prefix, an edge is never removed or mutated. Graph is replay-based.
 - **I2 — Node persistence**: Any req_id appearing in any event must exist as a node. Even if invalidated, superseded, or aliased.
@@ -111,13 +123,14 @@ This is where the system becomes useful.
 The graph encodes causal intent transformation, not just structure. Each edge type maps to a semantic transformation:
 
 | Edge | Meaning |
-|---|---|
+|---|---|---|
 | `SPLITS_TO` | decomposition of intent |
 | `MERGED_INTO` | synthesis of intent |
 | `SUPERSEDED_BY` | replacement of intent |
 | `DUPLICATE_OF` | identity resolution |
 | `IMPLEMENTS` | realization |
 | `TESTS` | validation |
+| `FAILURE_AFFECTS` | causal impact of failure |
 
 ## 8. TEMPORAL SEMANTICS (IMPORTANT)
 The graph is time-aware but not time-stamped internally.
@@ -130,11 +143,12 @@ The system guarantees:
 - **Replay equivalence**: `GRAPH = f(event_log)`. No alternative construction path exists.
 
 ## 10. FINAL SYSTEM PICTURE
-You now have 4 layers:
+You now have 5 layers:
 1. **Event Log (truth)**: Append-only semantic history
 2. **Reducer (logic)**: Pure function transforming events → state
 3. **INDEX (state projection)**: Current semantic snapshot
 4. **GRAPH (causal projection)**: Relationship + lineage + dependency structure
+5. **FAILURE GRAPH (failure projection)**: Failure nodes + causal impact edges derived from FAILURE events
 
 ## 11. ONE SENTENCE SUMMARY
-The system is a deterministic event-sourced semantic graph engine where requirement identities evolve through typed transitions, and all structural relationships are reconstructed as causal edges derived from an immutable event history.
+The system is a deterministic event-sourced semantic graph engine where requirement identities evolve through typed transitions and failures are represented as first-class causal nodes, with all structural relationships reconstructed as typed edges derived from an immutable event history.

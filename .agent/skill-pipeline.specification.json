@@ -1,0 +1,20 @@
+{
+    "name": "specification_pipeline_v1",
+    "phase": "specification",
+    "description": "Phase 1 compiler front-end: converts user intent into structured WorkRequests via requirements extraction and IR lowering.",
+    "stages": [
+        {
+            "id": "archive-prompt",
+            "skill_ref": ".agent/skills/archive-prompt/SKILL.md"
+        },
+        {
+            "id": "requirements-capture",
+            "skill_ref": ".agent/skills/requirements-capture/SKILL.md"
+        },
+        {
+            "id": "work-request-emission",
+            "skill_ref": null
+        }
+    ],
+    "handoff_artifact": "WorkRequestGraph"
+}

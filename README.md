@@ -1,6 +1,6 @@
 # Nexus
-A comprehensive polyglot microservices platform featuring broker-based service architecture, service mesh management, and distributed service discovery.
 
+A comprehensive polyglot microservices platform featuring broker-based service architecture, service mesh management, and distributed service discovery.
 
 ## Overview
 
@@ -8,7 +8,7 @@ The Nexus platform is a distributed system supporting multiple programming langu
 
 - **✅ Service Mesh Management**: Real-time service discovery and visualization via Nexus UI
 - **✅ Broker Gateway**: Central hub for request routing and service orchestration  
-- **✅ Host-Server Registry**: Persistent service registry with MySQL/H2 storage
+- **✅ Registry Service Registry**: Persistent service registry with MySQL/H2 storage
 - **✅ Polyglot SDKs**: Production-ready client libraries (Python, Node.js, Go)
 - **✅ Broker Gateway Proxy**: Advanced reverse proxy with rate limiting and logging
 - **✅ External Service Integration**: Seamless integration of services across frameworks
@@ -29,7 +29,7 @@ The Nexus platform is a distributed system supporting multiple programming langu
                                   │                                  │
                                   ▼                                  │
                         ┌─────────────────┐                         │
-                        │  Host-Server    │◀────────────────────────┘
+                        │  Registry Service    │◀────────────────────────┘
                         │  (Registry)     │
                         │  Port 8085      │
                         └─────────────────┘
@@ -50,8 +50,10 @@ The Nexus platform is a distributed system supporting multiple programming langu
 
 ### **Core Components**
 
-#### 1. **Host-Server** (Port 8085)
+#### 1. **Registry Service** (Port 8085)
+
 **Service Registry & Management**
+
 - Persistent service registry (MySQL/H2)
 - Framework management (Spring Boot, Quarkus, Helidon, Node.js, Go, Python)
 - Service discovery via operation-based lookup
@@ -59,8 +61,10 @@ The Nexus platform is a distributed system supporting multiple programming langu
 - Configuration management per environment
 - Real-time service health monitoring
 
-#### 2. **Broker Gateway** (Port 8081) 
+#### 2. **Broker Gateway** (Port 8081)
+
 **Request Routing & Service Orchestration**
+
 - ServiceRequest/ServiceResponse protocol
 - Automatic service discovery and routing
 - External service proxy with fallback mechanisms
@@ -68,7 +72,9 @@ The Nexus platform is a distributed system supporting multiple programming langu
 - Load balancing and circuit breaker patterns
 
 #### 3. **Broker Gateway Proxy** (Port 8080)
+
 **Reverse Proxy (AdonisJS)**
+
 - Public-facing entry point for all client requests
 - Rate limiting and request logging
 - Auto-registration with host-server
@@ -77,7 +83,9 @@ The Nexus platform is a distributed system supporting multiple programming langu
 - Request context headers for tracing
 
 #### 4. **Nexus Service Mesh UI**
+
 **Real-time Service Management Console**
+
 - Service mesh visualization (default view)
 - Framework-grouped service listing
 - Dependency graph visualization
@@ -88,9 +96,9 @@ The Nexus platform is a distributed system supporting multiple programming langu
 ### **Service Discovery Flow**
 
 ```
-1. Service Registration → Host-Server (/api/registry/register)
+1. Service Registration → Registry Service (/api/registry/register)
 2. Client Request → Broker Proxy (Port 8080)
-3. Service Discovery → Host-Server (operation-based lookup)
+3. Service Discovery → Registry Service (operation-based lookup)
 4. Request Routing → Broker Gateway → Target Service
 5. Response Chain → Target Service → Broker Gateway → Proxy → Client
 6. Health Monitoring → Continuous heartbeat and status updates
@@ -105,11 +113,13 @@ The Atomic Platform has evolved from a file-explorer-based tool to a **comprehen
 ### Recent Major Achievements
 
 #### **Application Separation**
+
 - **Nexus**: Service Mesh Management Console (default view)
 - **Throttler**: Search & Discovery Engine
 - Clean separation of concerns between service management and search capabilities
 
 #### **Service Discovery System**
+
 - **Service Discovery Client**: Host-server integration for service lookup
 - **External Service Invoker**: Dynamic external service invocation  
 - **Broker Auto Registration**: Annotation-based service exposure
@@ -117,7 +127,9 @@ The Atomic Platform has evolved from a file-explorer-based tool to a **comprehen
 - **Unified Interface**: Same API for local and external services
 
 #### **Polyglot Service Integration**
+
 Support for multiple programming languages and frameworks:
+
 - **Java**: Spring Boot 3.5.0, Quarkus 3.15.1, Helidon MP
 - **Node.js**: Express, NestJS, AdonisJS, Moleculer
 - **Python**: FastAPI, Django, Flask
@@ -125,6 +137,7 @@ Support for multiple programming languages and frameworks:
 - **Operation-based routing** across all frameworks
 
 #### **Service Mesh UI**
+
 - **ServiceMeshComponent**: Full service mesh visualization
 - **ServiceTreeComponent**: Framework-grouped service listing
 - **ServiceGraphComponent**: Dependency visualization
@@ -134,6 +147,7 @@ Support for multiple programming languages and frameworks:
 ## ✅ Features
 
 ### **Polyglot SDK Support**
+
 **Complete client libraries for multiple languages:**
 
 - **Python SDK** (`python/broker-client/`) - Service discovery, operation invocation, health checking
@@ -141,6 +155,7 @@ Support for multiple programming languages and frameworks:
 - **Go SDK** (`go/broker-client/`) - Standard library implementation, no external dependencies
 
 **Usage Example (Python)**:
+
 ```python
 from atomic_broker_sdk import create_client, ServiceDetails
 
@@ -149,6 +164,7 @@ response = client.invoke_operation("getUserRegistrationForToken", {"token": "sam
 ```
 
 ### **Supported Frameworks**
+
 **Production-ready integrations:**
 
 - **Java**: Spring Boot 3.5.0, Quarkus 3.15.1, Helidon MP
@@ -158,6 +174,7 @@ response = client.invoke_operation("getUserRegistrationForToken", {"token": "sam
 - **Others**: .NET Core, Rust (planned)
 
 ### **Service Registration & Discovery**
+
 **Automatic service integration:**
 
 ```bash
@@ -173,15 +190,18 @@ POST /api/registry/register
 ```
 
 ### **Real-time Service Mesh**
+
 **Nexus UI provides:**
+
 - Live service status monitoring
 - Dependency graph visualization
 - Service operations (restart, logs, health)
 - Framework-grouped service listing
 - Performance metrics and alerts
+
 3. **Token Validation**: Other services (like file-service, note-service) validate tokens with login-service via broker communication
-4. **Access Control**: Token validation ensures users can only access their own resources
-5. **Service Decoupling**: All inter-service communication now occurs through the broker service to improve modularity and maintainability
+2. **Access Control**: Token validation ensures users can only access their own resources
+3. **Service Decoupling**: All inter-service communication now occurs through the broker service to improve modularity and maintainability
 
 #### Current Token-Based Integrations
 
@@ -194,6 +214,7 @@ POST /api/registry/register
 #### Broker Service Integration Pattern
 
 Many services now communicate internally through the broker service rather than direct HTTP calls:
+
 - Services register with the broker and use ServiceRequest/ServiceResponse patterns for communication
 - This provides better service discovery, load balancing, and fault tolerance
 - The broker acts as a central orchestration point for all internal service communications
@@ -247,6 +268,7 @@ The platform supports **dynamic service registration** for polyglot microservice
 4. **Admin UI**: Real-time visibility into registered services
 
 **Registration Flow**:
+
 ```
 Moleculer Service → Host Server (register) → Persistent DB
 Broker Gateway → Host Server (query) → Route to service

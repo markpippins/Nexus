@@ -1,3 +1,4 @@
 {
-    "mode": "execute"
+    "mode": "execute",
+    "intent_source": ".pipeline/PIPELINE_INTENT.yaml"
 }

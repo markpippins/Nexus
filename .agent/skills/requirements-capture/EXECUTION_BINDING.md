@@ -61,7 +61,7 @@ READY(req) =
 
 ### 5.3 BLOCKED SET
 Derived via reverse dependency traversal:
-`BLOCKED = IMPACT_SET_OF(implemented but unfinished dependencies)`
+`BLOCKED = IMPACT_SET_OF(implemented but unfinished dependencies) UNION TRAVERSE(FAILURE_AFFECTS, DOWNSTREAM)`
 
 ## 6. TASK STATE MACHINE
 ### 6.1 States
@@ -113,10 +113,11 @@ ExecutionPlan = {
 4. **Stage 4 — Scheduling classification**: assign `READY / BLOCKED / PENDING`
 
 ## 10. EXECUTION SAFETY INVARIANTS
-- **I1 — No direct mutation of requirements**: Execution layer MUST NOT modify INDEX, modify GRAPH, or emit events.
+- **I1 — No direct mutation of requirements**: Execution layer MUST NOT modify INDEX, modify GRAPH, or emit events. Failure events are the sole exception and must pass through the event system, not bypass it.
 - **I2 — Execution is ephemeral**: Tasks exist only in runtime. If recomputed, tasks must be identical.
 - **I3 — Single direction of causality**: `REQUIREMENTS → TASKS`, NOT `TASKS → REQUIREMENTS`.
-- **I4 — No hidden state**: All task status must be derivable from INDEX, GRAPH, and execution input snapshot.
+- **I4 — No hidden state**: All task status must be derivable from INDEX, GRAPH, FAILURE GRAPH, and execution input snapshot.
+- **I5 — Failure-aware scheduling**: Tasks blocked by failure edges MUST NOT be scheduled as READY.
 
 ## 11. FEEDBACK LOOP (CRITICAL)
 Execution outcomes re-enter system ONLY as events. Execution NEVER bypasses event system.
@@ -148,7 +149,8 @@ You now have a complete closed loop:
 2. **Reduction layer**: Deterministic state + graph builder
 3. **Query layer**: Composable reasoning system
 4. **Execution layer (this spec)**: Deterministic task projection + scheduling
-5. **Feedback loop**: Execution → events → system evolution
+5. **Failure detection layer**: Run-time failure observation + propagation via FAILURE_GRAPH
+6. **Feedback loop**: Execution → events → system evolution
 
 ## 13. FINAL FORMULA
 ```
@@ -156,9 +158,10 @@ SYSTEM = f(event_log)
   → reducer → (index, graph)
   → query_dsl
   → execution_projection
+  → failure_detection → failure_graph
   → feedback_events
   → event_log
 ```
 
 ## 14. ONE-SENTENCE SUMMARY
-Execution is a pure, ephemeral projection of query results over a deterministic event-sourced requirements graph, with all outcomes fed back exclusively through the event system, preserving full reversibility and reproducibility of system state.
+Execution is a pure, ephemeral projection of query results over a deterministic event-sourced requirements graph, with all outcomes (including failure detection) fed back exclusively through the event system, preserving full reversibility, reproducibility, and failure traceability of system state.

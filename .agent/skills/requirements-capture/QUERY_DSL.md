@@ -73,6 +73,15 @@ These are syntactic sugar over primitives.
 ### 4.9 READY FOR TEST
 `READY_TO_TEST() = SELECT(state == IMPLEMENTED)`
 
+### 4.10 FAILURE SET
+`FAILURES() = SELECT(type == "failure")`
+
+### 4.11 FAILURE IMPACT
+`FAILURE_IMPACT(req_id) = TRAVERSE({req_id}, {FAILURE_AFFECTS}, UPSTREAM)`
+
+### 4.12 BLOCKED BY FAILURE
+`BLOCKED_BY_FAILURE(req_id) = TRAVERSE({req_id}, {FAILURE_AFFECTS}, DOWNSTREAM)`
+
 ## 5. COMPOSABILITY RULES
 All queries must support composition:
 `QUERY ::= primitive | QUERY ⊕ QUERY | TRAVERSE(QUERY, ...)`
@@ -126,11 +135,12 @@ def canonical(req_id): ...
 ```
 
 ## 9. SYSTEM COMPLETENESS STATEMENT
-At this point the system has 4 discrete layers:
+At this point the system has 5 discrete layers:
 1. **Event layer**: append-only semantic history
 2. **Reducer layer**: deterministic state + graph construction
 3. **Projection layer**: INDEX, GRAPH, TO_DATE
 4. **Query layer**: composable reasoning interface (this spec)
+5. **Failure query layer**: queryable failure nodes + causal impact edges
 
 ## 10. ONE-SENTENCE FINAL FORM
-The system is a deterministic event-sourced semantic graph engine with a pure functional query layer over materialized projections, enabling reproducible reasoning over requirement evolution, lineage, and impact.
+The system is a deterministic event-sourced semantic graph engine with a pure functional query layer over materialized projections, enabling reproducible reasoning over requirement evolution, lineage, impact, and failure causality, with failures surfaced as first-class queryable entities.

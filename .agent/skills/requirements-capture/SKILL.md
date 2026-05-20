@@ -8,6 +8,36 @@ description: Records the current state of requirements as an append-only event l
 ## 1. SYSTEM OVERVIEW
 This system is an event-sourced requirements engine.
 
+### 1.1 System Boundary
+
+requirements-capture is a **domain-modeling-only** subsystem. It operates within the `ExecutionState` context established by the control plane. See [`REQUIREMENTS_CAPTURE_BOUNDARY.md`](../../docs/REQUIREMENTS_CAPTURE_BOUNDARY.md) for the full specification.
+
+**Non-negotiable rule**: `requirements-capture` never decides *how* execution happens. It only decides *what work exists*.
+
+| Question | Answered by |
+|---|---|
+| *What kind of run is this?* | `normalize-intent` |
+| *Where does it go?* | `mode-router` |
+| *What work exists?* | `requirements-capture` |
+
+**Hard constraints (F1–F3):**
+- F1 — No intent inference: MUST NOT infer autonomy level, safety mode, execution mode, or routing preference
+- F2 — No structural execution influence: MUST NOT choose validators, change execution order, inject stages, or alter pipeline topology
+- F3 — No control feedback: MUST NOT cause `ExecutionState ← requirements-capture output`. `ExecutionState` is read-only
+
+**Input rules:**
+- MAY consume: conversation history, artifacts, prior execution events, domain context, user requirements statements
+- MAY read `ExecutionState` as read-only context
+- MAY NOT consume: `PIPELINE_INTENT.yaml`, routing configuration, mode selection logic, `ExecutionState` mutation authority
+
+**Output rules:**
+- MAY emit: `WorkRequestGraph`, `RequirementEvents`, `RequirementAnnotations`
+- MUST NOT emit: routing hints, execution modes, validator directives, pipeline stage decisions
+
+**Dependency direction:**
+- Allowed: `requirements-capture → execution types`
+- Forbidden: `requirements-capture → control-plane modules` (normalize-intent, mode-router, etc.)
+
 **Core Principle**
 All requirement state is derived deterministically from an append-only event log. There is no mutable requirement state.
 
@@ -53,7 +83,33 @@ These are NOT authoritative and MUST be fully regenerated from events:
   "payload": {
     "intent": "string",
     "implementation_hint": "string",
-    "type": "functional | architectural | constraint | workflow | research | hypothesis | decision"
+    "type": "functional | architectural | constraint | workflow | research | hypothesis | decision | failure",
+    "narrative": "string (markdown)",
+    "structure": {
+      "entities": [
+        {
+          "name": "string",
+          "type": "string",
+          "props": {}
+        }
+      ],
+      "relations": [
+        {
+          "source": "string",
+          "target": "string",
+          "type": "string"
+        }
+      ]
+    },
+    "constraints": ["string"],
+    "artifacts": [
+      {
+        "path": "string",
+        "description": "string",
+        "type": "string"
+      }
+    ],
+    "intent_scope": "problem | capability | behavior | implementation | experiment"
   }
 }
 ```
@@ -66,10 +122,48 @@ These are NOT authoritative and MUST be fully regenerated from events:
   "payload": {
     "intent": "string?",
     "implementation_hint": "string?",
-    "confidence": "number (0.0–1.0)?"
+    "confidence": "number (0.0–1.0)?",
+    "narrative": "string (markdown)?",
+    "structure": {
+      "entities": [
+        {
+          "name": "string",
+          "type": "string",
+          "props": {}
+        }
+      ],
+      "relations": [
+        {
+          "source": "string",
+          "target": "string",
+          "type": "string"
+        }
+      ]
+    },
+    "constraints": ["string"],
+    "artifacts": [
+      {
+        "path": "string",
+        "description": "string",
+        "type": "string"
+      }
+    ],
+    "rationale": "string?",
+    "acceptance": ["string"],
+    "status_hint": "draft | proposed | review",
+    "supersedes": ["EVENT-ID"]
   }
 }
 ```
+
+**Refinement semantics**: All array and object fields are authoritative replacements.
+- Field absent in payload → keep previous value (no change)
+- Field present in payload → replace fully (not a diff or merge, not incremental)
+- Empty array (`[]`) or empty object (`{}`) → explicit clear
+
+This means `REQ_REFINED { "constraints": [...] }` replaces constraints only, while `REQ_REFINED { "constraints": [] }` explicitly clears them. You do not need to send every field on every refinement.
+
+See [`CANONICAL_REFINEMENT_CONTRACT.md`](./CANONICAL_REFINEMENT_CONTRACT.md) for the full Canonical Refinement Contract — the definitive spec governing reducer law, field semantics, multi-agent safety, and the determinism invariant.
 
 ### 4.3 REQ_SUPERSEDED
 ```json
@@ -215,6 +309,17 @@ Edges are derived only from events, never stored directly. **Key Invariant: GRAP
     "intent": "...",
     "implementation_hint": "...",
     "confidence": 0.7,
+    "narrative": "...",
+    "structure": {
+      "entities": [],
+      "relations": []
+    },
+    "constraints": [],
+    "artifacts": [],
+    "rationale": "...",
+    "acceptance": [],
+    "status_hint": "draft",
+    "intent_scope": "behavior",
     "lineage": {
       "parents": [],
       "children": [],
@@ -280,7 +385,7 @@ TRANSITIONS = {
 Each handler returns: updated node state, graph mutations (derived, not stored), and metadata updates.
 
 ## 12. SYSTEM ARCHITECTURE LAYERS
-At this point, the system is a closed loop composed of 7 discrete layers:
+At this point, the system is a closed loop composed of 8 discrete layers:
 1. **Event layer**: append-only semantic history (defined in this `SKILL.md`)
 2. **Reducer layer**: deterministic state + graph construction (defined in [`REDUCER_CONTRACT.md`](./REDUCER_CONTRACT.md))
 3. **Projection layer**: `INDEX`, `GRAPH`, `TO_DATE` (defined in [`GRAPH_SEMANTICS.md`](./GRAPH_SEMANTICS.md))
@@ -288,6 +393,7 @@ At this point, the system is a closed loop composed of 7 discrete layers:
 5. **Execution layer**: deterministic task projection + scheduling (defined in [`EXECUTION_BINDING.md`](./EXECUTION_BINDING.md))
 6. **Conflict Resolution layer**: deterministic ambiguity resolution + blocking logic (defined in [`CONFLICT_RESOLUTION.md`](./CONFLICT_RESOLUTION.md))
 7. **Multi-agent layer**: concurrent proposal system + deterministic arbitration (defined in [`MULTI_AGENT_COORDINATION.md`](./MULTI_AGENT_COORDINATION.md))
+8. **Failure layer**: structured failure representation + deterministic recovery (defined in [`FAILURE_SEMANTICS.md`](./FAILURE_SEMANTICS.md))
 
 ## 13. SYSTEM FORMULA
 ```text
@@ -300,9 +406,11 @@ AGENTS (parallel)
             → QUERY DSL
               → EXECUTION
                 → CONFLICT SYSTEM
-                  → EVENTS
-                    → AGENTS
+                  → FAILURE DETECTION
+                    → FAILURE GRAPH
+                      → EVENTS
+                        → AGENTS
 ```
 
 ## 14. SUMMARY
-The system supports concurrent multi-agent reasoning by restricting agents to stateless event proposal, enforcing a deterministic arbitration layer that linearizes all outputs into a single event log, preserving a globally consistent event-sourced requirement graph under parallel execution.
+The system supports concurrent multi-agent reasoning by restricting agents to stateless event proposal, enforcing a deterministic arbitration layer that linearizes all outputs into a single event log, and representing all failures as first-class event-sourced graph data, preserving a globally consistent, deterministic, and failure-safe requirement graph under parallel execution.

@@ -1,0 +1,38 @@
+{
+  "id": "wr-go-transcript-strip-v1",
+  "intent_node_id": "intent-strip-transcripts",
+  "version": 1,
+  "state": "DRAFT",
+  "layer_mode": "EXECUTION-BOUND",
+  "supersedes": [],
+  "derivation": {
+    "derived_from": [],
+    "change_type": [
+      "new_feature"
+    ],
+    "constraint_cause": [
+      "3_LAYER_SEPARATION_RULE"
+    ],
+    "failed_binding_trigger": [],
+    "rejected_strategies": [],
+    "semantic_delta": {
+      "scope": "project-local",
+      "resources": "modified",
+      "change_characterization": "Adds a Go application to strip timestamps from transcript files."
+    },
+    "notes": "Compiled from user intent into an execution-bound WorkRequest."
+  },
+  "path": "/home/codex/dev/nexus/sample-app",
+  "intent_layer": {
+    "requirement": "YouTube transcript files must be processable and stored without initial timestamp markers."
+  },
+  "binding_layer": [
+    "Write a Go application that reads *.txt files, removes timestamps using regex, and writes to new files with ' - stripped' suffix."
+  ],
+  "execution_layer": {
+    "selected_binding": "Write a Go application that reads *.txt files, removes timestamps using regex, and writes to new files with ' - stripped' suffix.",
+    "task": "Create a file named main.go. The program should use filepath.Glob to find *.txt files (ignoring those ending in ' - stripped.txt'), read each file line by line, remove timestamps matching `^\\d+:\\d+(?:\\s*minutes?,?\\s*\\d+\\s*seconds?)?`, trim whitespace, and write the cleaned lines to a new file named `<basename> - stripped.txt`.",
+    "resources": []
+  },
+  "model": "gemini-3.1-pro"
+}

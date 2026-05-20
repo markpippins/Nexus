@@ -11,8 +11,9 @@
     "rootDir": "./",
     "declaration": true,
     "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "types": ["node"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "./*.ts"],
   "exclude": ["node_modules", "dist"]
 }

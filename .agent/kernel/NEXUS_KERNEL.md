@@ -19,7 +19,7 @@ A WorkRequest is a typed, versioned, partially-ordered Directed Acyclic Cognitiv
 3. **RequirementsBlock**: What must be true for success. (functional, non_functional, system, tool).
 4. **ConstraintBlock (Sandbox Definition)**: Hard boundaries that must not be violated. (forbidden_actions, safety, resource_limits, architecture).
 5. **SuccessCriteriaBlock (Termination Logic)**: Deterministic stop conditions. (validation_rules, acceptance_tests, completion_conditions, failure_modes).
-6. **ExecutionStateBlock (Runtime Truth)**: The process control block. (status, current_step, progress, retries, error_state).
+6. **ExecutionFrame (Runtime Truth)**: The process control block. (status, current_step, progress, retries, error_state).
 7. **LineageBlock (Cognitive Ancestry Graph)**: Semantic versioning and dependency tracking. (derived_from, supersedes, branches, merge_history).
 8. **ArtifactBlock**: Outputs of cognition tying reasoning to the filesystem. (produced_files, intermediate_outputs).
 9. **MetadataBlock**: Telemetry and context. (created_at, updated_at, agent_id, mode).

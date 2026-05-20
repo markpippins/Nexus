@@ -5,8 +5,9 @@
   "type": "module",
   "main": "src/server.ts",
   "scripts": {
-    "start": "npx tsx src/server.ts",
-    "dev": "npx tsx --watch src/server.ts"
+    "start": "bash start.sh",
+    "dev": "bun run --watch fs-serv.ts fs_root/",
+    "test": "bash run-tests.sh"
   },
   "dependencies": {
     "dotenv": "^16.0.0",
@@ -14,8 +15,8 @@
     "winston": "^3.11.0"
   },
   "devDependencies": {
+    "@types/node": "^20.19.41",
     "tsx": "^4.0.0",
-    "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   }
 }
