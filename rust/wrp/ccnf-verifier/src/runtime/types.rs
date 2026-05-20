@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExecutionRequest {
     pub request_id: String,
@@ -62,6 +60,9 @@ pub struct ExecutionReceipt {
     pub request_id: String,
     pub ccnf_hash: String,
     pub cer_root_hash: String,
+    pub trace_root_hash: String,
+    pub trace_event_count: u64,
+    pub replay_binding_hash: String,
     pub status: ExecutionStatus,
     pub failure: Option<FailureNode>,
     pub timing: Timing,
