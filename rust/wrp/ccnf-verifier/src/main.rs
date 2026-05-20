@@ -7,6 +7,8 @@ mod vectors;
 mod verifier;
 mod ffi;
 mod error;
+mod runtime;
+mod projection;
 
 use std::path::Path;
 use std::env;
