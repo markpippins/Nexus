@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -25,11 +26,11 @@ public class GoogleSearchService {
 
     private final SearchResultsCacheRepository cacheRepository;
 
-    // @Value("${google.search.api.key:#{null}}")
-    private String googleApiKey = "AIzaSyAfVHkNv8-YVyz1eSitseZLTHcXW4NTyI4";
+    @Value("${google.search.api.key:#{null}}")
+    private String googleApiKey;
 
-    // @Value("${google.search.engine.id:#{null}}")
-    private String searchEngineId = "e44fd2743cc9e49c8";
+    @Value("${google.search.engine.id:#{null}}")
+    private String searchEngineId;
 
     // Cache TTL in minutes (default 30 minutes)
     private static final long CACHE_TTL_MINUTES = 30;

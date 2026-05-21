@@ -2,7 +2,9 @@ package com.aibizarchitect.nexus.v1.spring.broker.gateway;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
 @SpringBootApplication
@@ -15,7 +17,14 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         "com.aibizarchitect.nexus.v1.spring.search",
         "com.aibizarchitect.nexus.v1.spring.registry",
         "com.aibizarchitect.nexus.v1.spring.admin.logging"
-})@ComponentScan(basePackages = {
+})
+@EnableJpaRepositories(basePackages = {
+        "com.aibizarchitect.nexus.v1.spring.user"
+})
+@EntityScan(basePackages = {
+        "com.aibizarchitect.nexus.v1.spring.user"
+})
+@ComponentScan(basePackages = {
         "com.aibizarchitect.nexus.v1.spring.broker",
         "com.aibizarchitect.nexus.v1.spring.user",
         "com.aibizarchitect.nexus.v1.spring.fs",
