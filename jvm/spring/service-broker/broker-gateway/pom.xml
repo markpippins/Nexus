@@ -68,6 +68,10 @@
             <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-discovery-service</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.aibizarchitect.nexus</groupId>
+            <artifactId>file-service</artifactId>
+        </dependency>
         <!-- <dependency>
             <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>export-service</artifactId>
@@ -92,8 +96,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-mongodb</artifactId>
         </dependency>
-        <!-- JPA and H2 Database are not needed since MongoDB is used for persistence -->
-        <!--
+        <!-- JPA and H2 Database for user-access-service (MySQL-based auth) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -103,7 +106,6 @@
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
-        -->
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

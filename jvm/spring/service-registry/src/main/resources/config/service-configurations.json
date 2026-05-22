@@ -11,7 +11,7 @@
   {
     "serviceName": "spring-broker-gateway",
     "configKey": "server.port",
-    "configValue": "8080",
+    "configValue": "8081",
     "environment": "ALL",
     "type": "NUMBER",
     "isSecret": false,

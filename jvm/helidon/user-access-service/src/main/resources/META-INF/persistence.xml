@@ -9,6 +9,7 @@
         <class>com.angrysurfer.helidon.nexus.user.model.UserRegistration</class>
         <properties>
             <property name="jakarta.persistence.schema-generation.database.action" value="update"/>
+            <property name="hibernate.dialect" value="org.hibernate.dialect.PostgreSQLDialect"/>
             <property name="hibernate.show_sql" value="false"/>
             <property name="hibernate.format_sql" value="false"/>
         </properties>

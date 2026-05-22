@@ -11,9 +11,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkCategory;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkLanguage;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkVendor;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceConfiguration;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkCategoryRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkLanguageRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkVendorRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceConfigurationRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceTypeRepository;
@@ -26,15 +32,24 @@ public class ExternalServiceRegistrationService {
 
     private final ServiceRepository serviceRepository;
     private final FrameworkRepository frameworkRepository;
+    private final FrameworkCategoryRepository frameworkCategoryRepository;
+    private final FrameworkLanguageRepository frameworkLanguageRepository;
+    private final FrameworkVendorRepository frameworkVendorRepository;
     private final ServiceTypeRepository serviceTypeRepository;
     private final ServiceConfigurationRepository serviceConfigurationRepository;
 
     public ExternalServiceRegistrationService(ServiceRepository serviceRepository,
                                                FrameworkRepository frameworkRepository,
+                                               FrameworkCategoryRepository frameworkCategoryRepository,
+                                               FrameworkLanguageRepository frameworkLanguageRepository,
+                                               FrameworkVendorRepository frameworkVendorRepository,
                                                ServiceTypeRepository serviceTypeRepository,
                                                ServiceConfigurationRepository serviceConfigurationRepository) {
         this.serviceRepository = serviceRepository;
         this.frameworkRepository = frameworkRepository;
+        this.frameworkCategoryRepository = frameworkCategoryRepository;
+        this.frameworkLanguageRepository = frameworkLanguageRepository;
+        this.frameworkVendorRepository = frameworkVendorRepository;
         this.serviceTypeRepository = serviceTypeRepository;
         this.serviceConfigurationRepository = serviceConfigurationRepository;
     }
@@ -71,12 +86,39 @@ public class ExternalServiceRegistrationService {
                 Framework newFramework = new Framework();
                 newFramework.setName(registration.getFramework());
                 newFramework.setDescription("Auto-generated framework for " + registration.getFramework());
-                newFramework.setActiveFlag(true); // Assuming default to active
+                newFramework.setActiveFlag(true);
                 newFramework.setCreatedAt(LocalDateTime.now());
                 newFramework.setUpdatedAt(LocalDateTime.now());
-                newFramework.setVendorId(1L); // Default vendor ID
-                newFramework.setCategoryId(1L); // Default category ID
-                newFramework.setLanguageId(1L); // Default language ID
+
+                // Look up and set actual entity references (ID setters are no-ops)
+                // Use name-based lookup since auto-generated IDs are not predictable
+                FrameworkVendor vendor = frameworkVendorRepository.findByName("Unknown")
+                        .orElseGet(() -> {
+                            FrameworkVendor v = new FrameworkVendor();
+                            v.setName("Unknown");
+                            v.setDescription("Unknown vendor");
+                            return frameworkVendorRepository.save(v);
+                        });
+                newFramework.setVendor(vendor);
+
+                FrameworkCategory category = frameworkCategoryRepository.findByName("OTHER")
+                        .orElseGet(() -> {
+                            FrameworkCategory c = new FrameworkCategory();
+                            c.setName("OTHER");
+                            c.setDescription("Other");
+                            return frameworkCategoryRepository.save(c);
+                        });
+                newFramework.setCategory(category);
+
+                FrameworkLanguage language = frameworkLanguageRepository.findByName("Java")
+                        .orElseGet(() -> {
+                            FrameworkLanguage l = new FrameworkLanguage();
+                            l.setName("Java");
+                            l.setDescription("Java");
+                            return frameworkLanguageRepository.save(l);
+                        });
+                newFramework.setLanguage(language);
+
                 framework = Optional.of(frameworkRepository.save(newFramework));
                 service.setFrameworkId(framework.get().getId());
                 log.debug("New framework created and assigned: {}", framework.get().getName());
@@ -278,7 +320,49 @@ public class ExternalServiceRegistrationService {
             }
         }
 
+        // Fallback: search hosted services
+        Optional<com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service> hostedParent = findParentByHostedOperation(operation);
+        if (hostedParent.isPresent()) {
+            return hostedParent;
+        }
+
         log.warn("No service found for operation: {}", operation);
+        return Optional.empty();
+    }
+
+    private Optional<com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service> findParentByHostedOperation(String operation) {
+        log.debug("Searching hosted services for operation: {}", operation);
+        List<com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service> allServices = serviceRepository.findByStatus("ACTIVE");
+
+        for (com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service parent : allServices) {
+            Optional<ServiceConfiguration> configOpt = serviceConfigurationRepository
+                    .findByServiceAndConfigKey(parent, "hostedServices");
+
+            if (configOpt.isPresent()) {
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    List<Map<String, Object>> hostedServices = mapper.readValue(
+                            configOpt.get().getConfigValue(),
+                            mapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+
+                    for (Map<String, Object> hosted : hostedServices) {
+                        Object opsObj = hosted.get("operations");
+                        if (opsObj instanceof List) {
+                            @SuppressWarnings("unchecked")
+                            List<String> ops = (List<String>) opsObj;
+                            if (ops.contains(operation)) {
+                                log.debug("Found operation {} in hosted service {} within parent {}",
+                                        operation, hosted.get("serviceName"), parent.getName());
+                                return Optional.of(parent);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse hosted services JSON for parent: {}", parent.getName(), e);
+                }
+            }
+        }
+
         return Optional.empty();
     }
 
@@ -325,7 +409,59 @@ public class ExternalServiceRegistrationService {
             return Optional.of(details);
         }
 
+        // Fallback: search hosted services
+        Optional<Map<String, Object>> hostedDetails = findHostedServiceDetails(serviceName);
+        if (hostedDetails.isPresent()) {
+            return hostedDetails;
+        }
+
         log.warn("Service not found for details: {}", serviceName);
+        return Optional.empty();
+    }
+
+    private Optional<Map<String, Object>> findHostedServiceDetails(String serviceName) {
+        log.debug("Searching hosted services for: {}", serviceName);
+        List<com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service> allServices = serviceRepository.findByStatus("ACTIVE");
+
+        for (com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service parent : allServices) {
+            Optional<ServiceConfiguration> configOpt = serviceConfigurationRepository
+                    .findByServiceAndConfigKey(parent, "hostedServices");
+
+            if (configOpt.isPresent()) {
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    List<Map<String, Object>> hostedServices = mapper.readValue(
+                            configOpt.get().getConfigValue(),
+                            mapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+
+                    for (Map<String, Object> hosted : hostedServices) {
+                        if (serviceName.equals(hosted.get("serviceName"))) {
+                            String endpoint = (String) hosted.getOrDefault("endpoint", "");
+                            String healthCheck = (String) hosted.getOrDefault("healthCheck", "");
+                            String framework = (String) hosted.getOrDefault("framework", "unknown");
+                            String status = (String) hosted.getOrDefault("status", "ACTIVE");
+                            Object operationsObj = hosted.get("operations");
+                            String operations = operationsObj != null ? operationsObj.toString() : "";
+
+                            Map<String, Object> details = Map.of(
+                                    "serviceName", serviceName,
+                                    "endpoint", endpoint,
+                                    "healthCheck", healthCheck,
+                                    "framework", framework,
+                                    "status", status,
+                                    "operations", operations,
+                                    "parentService", parent.getName());
+
+                            log.debug("Found hosted service: {} within parent: {}", serviceName, parent.getName());
+                            return Optional.of(details);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse hosted services JSON for parent: {}", parent.getName(), e);
+                }
+            }
+        }
+
         return Optional.empty();
     }
 

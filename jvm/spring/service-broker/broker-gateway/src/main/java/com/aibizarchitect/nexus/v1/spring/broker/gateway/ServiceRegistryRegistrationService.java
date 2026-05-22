@@ -34,7 +34,7 @@ public class ServiceRegistryRegistrationService {
     @Value("${service.registry.url:http://localhost:8085}")
     private String hostServerUrl;
 
-    @Value("${server.port:8080}")
+    @Value("${server.port:8081}")
     private int port;
 
     @Value("${spring.application.name:spring-broker-gateway}")

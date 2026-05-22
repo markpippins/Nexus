@@ -14,11 +14,12 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node", "jest"]
   },
   "include": [
     "services/**/*",
-    "moleculer.config.ts"
+    "moleculer.config.ts",
+    "test/**/*"
   ],
   "exclude": [
     "node_modules",

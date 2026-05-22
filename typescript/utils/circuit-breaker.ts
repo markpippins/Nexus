@@ -194,7 +194,7 @@ const SERVICES: ServiceConfig[] = [
   {
     name: 'broker-gateway',
     healthEndpoint: '/health',
-    port: 8080, // Assuming default Spring Boot port
+    port: 8081, // Updated to match Spring Broker Gateway port
     protocol: 'http'
   }
 ];

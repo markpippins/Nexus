@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -25,8 +26,8 @@ public class YouTubeSearchService {
     
     private final SearchResultsCacheRepository cacheRepository;
 
-    // YouTube API key - in a real implementation, this should be configured via properties
-    private String youtubeApiKey = "AIzaSyAfVHkNv8-YVyz1eSitseZLTHcXW4NTyI4";
+    @Value("${youtube.api.key:#{null}}")
+    private String youtubeApiKey;
 
     private static final long CACHE_TTL_MINUTES = 30; // Cache TTL in minutes
 

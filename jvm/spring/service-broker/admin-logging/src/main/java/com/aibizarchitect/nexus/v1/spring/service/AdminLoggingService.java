@@ -20,7 +20,7 @@ public class AdminLoggingService {
 
     private final AdminLogRepository adminLogRepository;
 
-    @Value("${server.port:8080}")
+    @Value("${server.port:8081}")
     private int serverPort;
 
     @Value("${server.servlet.context-path:/}")

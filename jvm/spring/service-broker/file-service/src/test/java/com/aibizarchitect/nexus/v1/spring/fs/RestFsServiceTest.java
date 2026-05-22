@@ -1,32 +1,31 @@
 package com.aibizarchitect.nexus.v1.spring.fs;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import org.mockito.Mock;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.aibizarchitect.nexus.v1.spring.broker.Broker;
 import com.aibizarchitect.nexus.v1.broker.api.ServiceRequest;
 import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
-import com.aibizarchitect.nexus.v1.spring.broker.Broker;
 import com.aibizarchitect.nexus.v1.spring.fs.api.FsListResponse;
 
 @ExtendWith(MockitoExtension.class)
@@ -76,13 +75,12 @@ class RestFsServiceTest {
         String token = "invalid-token";
         List<String> path = Arrays.asList("home", "user");
         // ServiceResponse with error for invalid token
-        ServiceResponse<?> serviceResponse = ServiceResponse.error(List.of(Map.of("error", "User not found")),
-                "test-id");
+        ServiceResponse<?> serviceResponse = ServiceResponse.error(List.of(Map.of("error", "User not found")), "test-id");
         doReturn(serviceResponse).when(broker).submit(any(ServiceRequest.class));
 
         // Act & Assert
         RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> restFsService.listFiles(token, path));
+            () -> restFsService.listFiles(token, path));
 
         assertTrue(exception.getMessage().contains("Invalid token or user not found"));
     }
@@ -186,24 +184,22 @@ class RestFsServiceTest {
 
     // @Test
     // void testRenameSuccess() {
-    // // Arrange
-    // String token = "test-token";
-    // List<String> path = Arrays.asList("home", "user", "oldname.txt");
-    // String newName = "newname.txt";
-    // Map<String, Object> userRegistration = Map.of("alias", "testUser");
-    // Map<String, Object> mockResponse = Map.of("renamed", "old", "to", "new");
-    // ServiceResponse<?> serviceResponse = ServiceResponse.ok(userRegistration,
-    // "test-id");
-    // doReturn(serviceResponse).when(broker).submit(any(ServiceRequest.class));
-    // doReturn(mockResponse).when(restFsClient).rename(anyString(), anyList(),
-    // anyString());
+    //     // Arrange
+    //     String token = "test-token";
+    //     List<String> path = Arrays.asList("home", "user", "oldname.txt");
+    //     String newName = "newname.txt";
+    //     Map<String, Object> userRegistration = Map.of("alias", "testUser");
+    //     Map<String, Object> mockResponse = Map.of("renamed", "old", "to", "new");
+    //     ServiceResponse<?> serviceResponse = ServiceResponse.ok(userRegistration, "test-id");
+    //     doReturn(serviceResponse).when(broker).submit(any(ServiceRequest.class));
+    //     doReturn(mockResponse).when(restFsClient).rename(anyString(), anyList(), anyString());
 
-    // // Act
-    // var result = restFsService.rename(token, path, newName);
+    //     // Act
+    //     var result = restFsService.rename(token, path, newName);
 
-    // // Assert
-    // assertNotNull(result);
-    // verify(restFsClient).rename(anyString(), eq(path), eq(newName));
+    //     // Assert
+    //     assertNotNull(result);
+    //     verify(restFsClient).rename(anyString(), eq(path), eq(newName));
     // }
 
     @Test
@@ -286,7 +282,8 @@ class RestFsServiceTest {
         List<String> sourcePath = Arrays.asList("home", "ai", ".space");
         List<String> destPath = Arrays.asList("home", "ai");
         List<Map<String, Object>> items = Arrays.asList(
-                Map.of("name", "def.json", "type", "file"));
+            Map.of("name", "def.json", "type", "file")
+        );
         Map<String, Object> userRegistration = Map.of("alias", "testUser");
         Map<String, Object> mockResponse = Map.of("moved", "items");
         ServiceResponse<?> serviceResponse = ServiceResponse.ok(userRegistration, "test-id");
@@ -314,8 +311,7 @@ class RestFsServiceTest {
         String resultAlias = null;
         try {
             // Call the private method through reflection for testing purposes
-            java.lang.reflect.Method method = RestFsService.class.getDeclaredMethod("getUserAliasFromToken",
-                    String.class);
+            java.lang.reflect.Method method = RestFsService.class.getDeclaredMethod("getUserAliasFromToken", String.class);
             method.setAccessible(true);
             resultAlias = (String) method.invoke(restFsService, token);
         } catch (Exception e) {
@@ -336,8 +332,7 @@ class RestFsServiceTest {
         // Use reflection to test the private method
         String resultAlias = null;
         try {
-            java.lang.reflect.Method method = RestFsService.class.getDeclaredMethod("getUserAliasFromToken",
-                    String.class);
+            java.lang.reflect.Method method = RestFsService.class.getDeclaredMethod("getUserAliasFromToken", String.class);
             method.setAccessible(true);
             resultAlias = (String) method.invoke(restFsService, token);
         } catch (Exception e) {
@@ -375,9 +370,9 @@ class RestFsServiceTest {
     @Test
     void testNullToken() {
         // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> restFsService.listFiles(null, Arrays.asList("home", "user")));
-
+        RuntimeException exception = assertThrows(RuntimeException.class, 
+            () -> restFsService.listFiles(null, Arrays.asList("home", "user")));
+        
         assertTrue(exception.getMessage().contains("Token is required"));
     }
 

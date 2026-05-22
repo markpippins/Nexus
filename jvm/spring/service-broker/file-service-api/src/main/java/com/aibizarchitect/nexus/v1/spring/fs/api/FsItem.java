@@ -1,19 +1,16 @@
 package com.aibizarchitect.nexus.v1.spring.fs.api;
 
-import java.time.OffsetDateTime;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
 
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class FsItem {
 
     private String name;
     private String type;
     private long size;
-    private OffsetDateTime lastModified;
+    private double lastModified;
     private String lastModifiedDate;
     private String url;
     private String thumbnailUrl;

@@ -34,7 +34,7 @@ class BrokerGatewayClient {
      * @param {string} options.hostServerUrl - URL of host server for service discovery
      */
     constructor(options = {}) {
-        this.gatewayUrl = options.gatewayUrl?.replace(/\/$/, '') || 'http://localhost:8080';
+        this.gatewayUrl = options.gatewayUrl?.replace(/\/$/, '') || 'http://localhost:8081';
         this.hostServerUrl = options.hostServerUrl?.replace(/\/$/, '') || 'http://localhost:8085';
         
         this.client = axios.create({

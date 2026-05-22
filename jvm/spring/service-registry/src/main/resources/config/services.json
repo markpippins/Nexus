@@ -4,7 +4,7 @@
     "description": "Spring Boot broker gateway for service orchestration",
     "framework": "Spring Boot",
     "type": "GATEWAY",
-    "defaultPort": 8080,
+    "defaultPort": 8081,
     "apiBasePath": "/api/broker",
     "repositoryUrl": "https://github.com/yourorg/spring-broker-gateway",
     "status": "ACTIVE",

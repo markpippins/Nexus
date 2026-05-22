@@ -1,7 +1,6 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.repository;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.EnvironmentType;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -10,9 +9,7 @@ import java.util.Optional;
 
 @Repository
 public interface EnvironmentTypeRepository extends JpaRepository<EnvironmentType, Long> {
-    @Cacheable(value = "environmentTypes", key = "#name")
     Optional<EnvironmentType> findByName(String name);
 
-    @Cacheable(value = "environmentTypes", key = "'search:' + #name")
     List<EnvironmentType> findByNameContainingIgnoreCase(String name);
 }
