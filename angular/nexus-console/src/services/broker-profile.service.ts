@@ -9,7 +9,7 @@ const DEFAULT_PROFILES: BrokerProfile[] = [
   {
     id: 'default-local',
     name: 'Local (Debug)',
-    brokerUrl: 'localhost:8080',
+    brokerUrl: 'localhost:8081',
     imageUrl: 'http://localhost:8081',
   },
 ];

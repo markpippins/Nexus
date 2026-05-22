@@ -77,7 +77,7 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
                      <!-- Port -->
                      <div class="flex flex-col gap-1">
                         <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Port</label>
-                        <input type="number" formControlName="port" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="8080">
+                        <input type="number" formControlName="port" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="8081">
                      </div>
                  </div>
 

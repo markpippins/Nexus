@@ -68,7 +68,7 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
     // } catch {
     //   // ignore and fallback below
     // }
-    return 'http://localhost:8080/api/v1/broker/logs/stream';
+    return 'http://localhost:8081/api/v1/broker/logs/stream';
   }
 
   constructor() {
