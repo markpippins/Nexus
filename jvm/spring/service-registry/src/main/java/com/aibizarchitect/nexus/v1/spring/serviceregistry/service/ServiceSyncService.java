@@ -28,7 +28,7 @@ public class ServiceSyncService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${broker.gateway.url:http://localhost:8080/api/broker/submitRequest}")
+    @Value("${broker.gateway.url:http://localhost:8081/api/broker/submitRequest}")
     private String brokerUrl;
 
     public ServiceSyncService(ServiceRepository serviceRepository,

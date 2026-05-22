@@ -24,8 +24,8 @@ export class BrokerProxyController {
   private brokerGatewayUrl: string
 
   constructor() {
-    // Get broker gateway URL from environment variables, default to localhost:8080
-    this.brokerGatewayUrl = process.env.BROKER_GATEWAY_URL || 'http://localhost:8080'
+    // Get broker gateway URL from environment variables, default to localhost:8081
+    this.brokerGatewayUrl = process.env.BROKER_GATEWAY_URL || 'http://localhost:8081'
   }
 
   async proxyRequest(request: any, response: any) {

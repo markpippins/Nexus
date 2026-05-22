@@ -1,0 +1,9 @@
+server:
+  port: 9093
+
+javax.sql.DataSource.user-access-ds:
+  dataSourceClassName: org.postgresql.ds.PGSimpleDataSource
+  dataSource.url: jdbc:postgresql://localhost:5432/nexus
+  dataSource.user: pguser
+  dataSource.password: pgpass
+  maximumPoolSize: 5

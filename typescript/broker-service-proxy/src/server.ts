@@ -31,12 +31,12 @@ app.use((req: Request, res: Response) => {
 });
 
 // Get port from environment variable or default to 3333
-const port = parseInt(process.env.BROKER_PROXY_PORT || '3333', 10);
+const port = parseInt(process.env.BROKER_PROXY_PORT || '3334', 10);
 const host = process.env.HOST || '0.0.0.0';
 
 app.listen(port, host, () => {
   console.log(`Broker Service Proxy server running on ${host}:${port}`);
-  console.log(`Broker Gateway URL: ${process.env.BROKER_GATEWAY_URL || 'http://localhost:8080'}`);
+  console.log(`Broker Gateway URL: ${process.env.BROKER_GATEWAY_URL || 'http://localhost:8081'}`);
 });
 
 export default app;

@@ -7,7 +7,7 @@ async function testProxy() {
   try {
     // Test health endpoint
     console.log('1. Testing health endpoint...');
-    const healthResponse = await axios.get('http://localhost:3333/health');
+    const healthResponse = await axios.get('http://localhost:3334/health');
     console.log('✓ Health check passed:', healthResponse.data);
 
     // Test proxy endpoint with a sample request (this will fail if broker-gateway is not running)
@@ -20,7 +20,7 @@ async function testProxy() {
     };
 
     try {
-      const proxyResponse = await axios.post('http://localhost:3333/api/broker/submitRequest', sampleRequest, {
+      const proxyResponse = await axios.post('http://localhost:3334/api/broker/submitRequest', sampleRequest, {
         timeout: 5000 // 5 seconds timeout for this test
       });
       console.log('✓ Proxy request successful:', proxyResponse.data);

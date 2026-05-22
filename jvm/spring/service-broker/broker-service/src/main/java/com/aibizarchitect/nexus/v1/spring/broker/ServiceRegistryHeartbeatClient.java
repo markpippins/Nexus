@@ -50,7 +50,7 @@ public class ServiceRegistryHeartbeatClient {
     @Value("${service.name:unknown-service}")
     private String serviceName;
 
-    @Value("${server.port:8080}")
+    @Value("${server.port:8081}")
     private int servicePort;
 
     @Value("${service.host:localhost}")

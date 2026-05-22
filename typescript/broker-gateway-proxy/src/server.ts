@@ -81,8 +81,8 @@ const host = process.env.HOST || '0.0.0.0';
 
 app.listen(port, host, () => {
   logger.info(`Broker Service Proxy server running on ${host}:${port}`, { port, host });
-  logger.info(`Broker Gateway URL: ${process.env.BROKER_GATEWAY_URL || 'http://localhost:8080'}`, {
-    brokerGatewayUrl: process.env.BROKER_GATEWAY_URL || 'http://localhost:8080'
+  logger.info(`Broker Gateway URL: ${process.env.BROKER_GATEWAY_URL || 'http://localhost:8081'}`, {
+    brokerGatewayUrl: process.env.BROKER_GATEWAY_URL || 'http://localhost:8081'
   });
 });
 
