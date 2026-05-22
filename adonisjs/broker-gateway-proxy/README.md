@@ -15,7 +15,7 @@ An AdonisJS-based reverse proxy that sits in front of `spring/broker-gateway` to
                         ┌─────────────────┐
                         │  Registry Service    │
                         │  (Registration) │
-                        │  Port: 8888     │
+                         │  Port: 8085     │
                         └─────────────────┘
 ```
 
@@ -61,7 +61,7 @@ An AdonisJS-based reverse proxy that sits in front of `spring/broker-gateway` to
 |---------|------|------|
 | **broker-gateway-proxy** | 8080 | Public-facing entry point (clients connect here) |
 | **broker-gateway** | 8081 | Internal upstream (not exposed to clients) |
-| **service-registry** | 8888 | Service registry |
+| **service-registry** | 8085 | Service registry |
 
 ## Getting Started
 
@@ -69,7 +69,7 @@ An AdonisJS-based reverse proxy that sits in front of `spring/broker-gateway` to
 
 - Node.js 20+
 - broker-gateway running on port 8081
-- service-registry running on port 8888 (optional, for registration)
+- service-registry running on port 8085 (optional, for registration)
 
 ### Installation
 
@@ -89,7 +89,7 @@ HOST=0.0.0.0
 BROKER_GATEWAY_URL=http://localhost:8081
 
 # Registry Service registration
-HOST_SERVER_URL=http://localhost:8888
+HOST_SERVER_URL=http://localhost:8085
 SERVICE_NAME=broker-gateway-proxy
 SERVICE_HOST=localhost
 SERVICE_PORT=8080
@@ -143,7 +143,7 @@ All other requests are forwarded to broker-gateway with:
 To test the proxy end-to-end:
 
 1. **Update broker-gateway** to listen on port 8081 (update `application.properties`)
-2. **Start service-registry** on port 8888
+2. **Start service-registry** on port 8085
 3. **Start the proxy**: `npm run dev` in this directory
 4. **Update Nexus UI**: Point `environment.ts` to port 8080
 

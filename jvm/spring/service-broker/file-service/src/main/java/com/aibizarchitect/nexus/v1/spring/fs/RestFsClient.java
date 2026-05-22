@@ -3,6 +3,8 @@ package com.aibizarchitect.nexus.v1.spring.fs;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -17,6 +19,8 @@ import com.aibizarchitect.nexus.v1.spring.fs.api.FsRequest;
 @Service("restFsClient")
 public class RestFsClient {
 
+    private static final Logger log = LoggerFactory.getLogger(RestFsClient.class);
+
     private final RestTemplate restTemplate;
     
     @Value("${restfs.api.url}")
@@ -24,6 +28,7 @@ public class RestFsClient {
 
     public RestFsClient(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
+        log.info("RestFsClient initialized, apiUrl: {}", apiUrl);
     }
 
     private <T> T post(FsRequest request, Class<T> responseType) {
