@@ -591,7 +591,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const newProfile = {
       name: newName,
-      brokerUrl: 'localhost:8080',
+      brokerUrl: 'localhost:8081',
       imageUrl: '',
       autoConnect: false,
     };
