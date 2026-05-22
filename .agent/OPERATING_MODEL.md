@@ -1,4 +1,24 @@
 
+> **Note:** This document describes the **aspirational** operating model for the
+> WorkRequest pipeline architecture. The current system operates under
+> **CEGL/ADR governance** — see `go/wrp/ccnf-ref/` for the actual governance
+> implementation (CEGL-A states, transition ledger, ADR stack). The WorkRequest
+> pipeline is not active; agent behavior follows the agent boot procedure in
+> `CLAUDE.md`.
+
+## Canonical Integrity Rule (CIR-1)
+
+Every declared reference, derivation, or dependency in configuration or governance
+artifacts must resolve to an existing, reachable, and authoritative definition at
+the same layer of truth it claims to operate in.
+
+If such a definition does not exist, the reference must either be removed or
+explicitly downgraded to an aspirational or non-operational annotation that cannot
+be consumed by execution or routing logic.
+
+**Validation:** Any system consuming configuration under CIR-1 must validate
+reference resolvability before execution or routing decisions are derived.
+
 # Operating Model - MANDATORY
 
 Before responding to any request:

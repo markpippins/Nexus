@@ -1,0 +1,87 @@
+name: CIR Ontology Lint
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  cir1:
+    name: "CIR-1: Phantom references"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: CIR-1 scan
+        run: make cir1-scan
+        shell: bash
+      - name: CIR-1 lint
+        run: make cir1-lint
+        shell: bash
+      - name: CIR-1 strict gate
+        run: make cir1-validate
+        shell: bash
+
+  cir2:
+    name: "CIR-2: Cross-layer isolation"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: CIR-2 cross-layer gate
+        run: make cir2-validate
+        shell: bash
+
+  cir3:
+    name: "CIR-3: Execution semantics contract"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: CIR-3 execution gate
+        run: make cir3-validate
+        shell: bash
+
+  cir4:
+    name: "CIR-4: Static derived state"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: CIR-4 derived state gate
+        run: make cir4-validate
+        shell: bash
+
+  cir5:
+    name: "CIR-5: Single Canonical Authority"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: CIR-5 authority consistency gate
+        run: make cir5-validate
+        shell: bash

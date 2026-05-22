@@ -57,7 +57,7 @@ pipelineIntent:
 ### Step 4: Update pipeline-mode.json
 Write to `<target>/.agent/pipeline-mode.json`:
 - `mode`: `plan` if ExecutionState is READ_ONLY_PLAN or TRANSFORM, `execute` otherwise
-- `intent_source`: `.pipeline/PIPELINE_INTENT.yaml`
+- `intent_source: <removed: CIR-1 — no pipeline exists>
 
 ## Expected Result
 - `.pipeline/PIPELINE_INTENT.yaml` with valid, normalized intent
