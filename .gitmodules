@@ -1,0 +1,3 @@
+[submodule "go/wrp/ccnf-ref"]
+	path = go/wrp/ccnf-ref
+	url = https://github.com/markpippins/nexus-go-ccnf-ref.git
