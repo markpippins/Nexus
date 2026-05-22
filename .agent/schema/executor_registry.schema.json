@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Executor Registry",
+  "description": "Registry of bounded executors available to the Nexus runtime.",
+  "type": "object",
+  "properties": {
+    "executors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "executor_id": {
+            "type": "string",
+            "description": "Unique identifier for the executor"
+          },
+          "supports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Specific WorkRequest types or operations supported by this executor"
+          },
+          "invocation_contract": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["cli", "http", "module"]
+              },
+              "command": {
+                "type": "string"
+              }
+            },
+            "required": ["type"]
+          },
+          "system_prompt": {
+            "type": "string",
+            "description": "The mandatory prompt context bound to this executor"
+          }
+        },
+        "required": ["executor_id", "supports", "invocation_contract"]
+      }
+    }
+  },
+  "required": ["executors"]
+}

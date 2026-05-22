@@ -20,6 +20,16 @@ ACTIVE="$PIPELINE_DIR/active"
 COMPLETE="$PIPELINE_DIR/complete"
 FAILED="$PIPELINE_DIR/failed"
 
+select_executor() {
+  local backend="${NEXUS_MODEL_BACKEND:-}"
+  backend=$(echo "$backend" | tr '[:upper:]' '[:lower:]')
+  if [ "$backend" = "opencode" ]; then
+    echo "$DIR/executor_cloud.py"
+    return 0
+  fi
+  echo "$DIR/executor.py"
+}
+
 ensure_dirs() {
   mkdir -p "$QUEUED" "$ACTIVE" "$COMPLETE" "$FAILED"
 }
@@ -60,6 +70,7 @@ has_files() {
 }
 
 ensure_dirs
+EXECUTOR_SCRIPT="$(select_executor)"
 
 # Global halt: if any files present in failed/, stop immediately
 if has_files "$FAILED"; then
@@ -83,7 +94,7 @@ if has_files "$ACTIVE"; then
     REQUEST_PATH="$ACTIVE/$oldest_active"
     if [ -f "$REQUEST_PATH" ]; then
       cp -f "$REQUEST_PATH" "${REQUEST_PATH}.prev"
-      python3 "$DIR/executor.py" "$REQUEST_PATH" || {
+      python3 "$EXECUTOR_SCRIPT" "$REQUEST_PATH" || {
         mv -f "$REQUEST_PATH" "$FAILED/"
         exit 1
       }
@@ -112,7 +123,7 @@ if [ -n "$oldest_queued" ]; then
   # Execute it deterministically
   REQUEST_PATH="$ACTIVE/$oldest_queued"
   cp -f "$REQUEST_PATH" "${REQUEST_PATH}.prev"
-  python3 "$DIR/executor.py" "$REQUEST_PATH" || {
+  python3 "$EXECUTOR_SCRIPT" "$REQUEST_PATH" || {
     mv -f "$REQUEST_PATH" "$FAILED/"
     exit 1
   }

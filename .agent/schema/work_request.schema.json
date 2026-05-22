@@ -16,112 +16,311 @@
     "metadata"
   ],
   "properties": {
-    "id": { "type": "string" },
-    "version": { "type": "integer", "minimum": 1 },
+    "id": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
     "intent": {
       "type": "object",
-      "required": ["problem_statement", "desired_outcome", "domain", "priority", "user_intent_trace", "abstraction_level"],
+      "required": [
+        "problem_statement",
+        "desired_outcome",
+        "domain",
+        "priority",
+        "user_intent_trace",
+        "abstraction_level"
+      ],
       "properties": {
-        "problem_statement": { "type": "string" },
-        "desired_outcome": { "type": "string" },
-        "domain": { "type": "string" },
-        "priority": { "enum": ["low", "medium", "high", "critical"] },
-        "user_intent_trace": { "type": "string" },
-        "abstraction_level": { "enum": ["task", "system", "architecture", "research"] }
+        "problem_statement": {
+          "type": "string"
+        },
+        "desired_outcome": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "priority": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "user_intent_trace": {
+          "type": "string"
+        },
+        "abstraction_level": {
+          "enum": [
+            "task",
+            "system",
+            "architecture",
+            "research"
+          ]
+        }
       }
     },
     "decomposition": {
       "type": "object",
-      "required": ["strategy", "steps", "parallelism_model", "recursion_allowed"],
+      "required": [
+        "strategy",
+        "steps",
+        "parallelism_model",
+        "recursion_allowed"
+      ],
       "properties": {
-        "strategy": { "type": "string" },
+        "strategy": {
+          "type": "string"
+        },
         "steps": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["step_id", "description", "dependencies", "outputs", "type"],
+            "required": [
+              "step_id",
+              "description",
+              "dependencies",
+              "outputs",
+              "type"
+            ],
             "properties": {
-              "step_id": { "type": "string" },
-              "description": { "type": "string" },
-              "dependencies": { "type": "array", "items": { "type": "string" } },
-              "outputs": { "type": "array", "items": { "type": "string" } },
-              "type": { "enum": ["analysis", "generation", "transformation", "validation", "execution"] }
+              "step_id": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "dependencies": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "type": {
+                "enum": [
+                  "analysis",
+                  "generation",
+                  "transformation",
+                  "validation",
+                  "execution"
+                ]
+              }
             }
           }
         },
-        "parallelism_model": { "type": "string" },
-        "recursion_allowed": { "type": "boolean" }
+        "parallelism_model": {
+          "type": "string"
+        },
+        "recursion_allowed": {
+          "type": "boolean"
+        }
       }
     },
     "requirements": {
       "type": "object",
       "properties": {
-        "functional": { "type": "array", "items": { "type": "string" } },
-        "non_functional": { "type": "array", "items": { "type": "string" } },
-        "system_requirements": { "type": "array", "items": { "type": "string" } },
-        "tool_requirements": { "type": "array", "items": { "type": "string" } }
+        "functional": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "non_functional": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "system_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tool_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "constraints": {
       "type": "object",
       "properties": {
-        "forbidden_actions": { "type": "array", "items": { "type": "string" } },
-        "safety_constraints": { "type": "array", "items": { "type": "string" } },
+        "forbidden_actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "safety_constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "resource_limits": {
           "type": "object",
           "properties": {
-            "tokens": { "type": "integer" },
-            "time_ms": { "type": "integer" },
-            "memory_mb": { "type": "integer" }
+            "tokens": {
+              "type": "integer"
+            },
+            "time_ms": {
+              "type": "integer"
+            },
+            "memory_mb": {
+              "type": "integer"
+            }
           }
         },
-        "architectural_constraints": { "type": "array", "items": { "type": "string" } }
+        "architectural_constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "success_criteria": {
       "type": "object",
       "properties": {
-        "validation_rules": { "type": "array", "items": { "type": "string" } },
-        "acceptance_tests": { "type": "array", "items": { "type": "string" } },
+        "validation_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "acceptance_tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "completion_conditions": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["condition", "evaluator"],
+            "required": [
+              "condition",
+              "evaluator"
+            ],
             "properties": {
-              "condition": { "type": "string" },
-              "evaluator": { "type": "string" }
+              "condition": {
+                "type": "string"
+              },
+              "evaluator": {
+                "type": "string"
+              }
             }
           }
         },
-        "failure_modes": { "type": "array", "items": { "type": "string" } }
+        "failure_modes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "execution_state": {
-      "type": "object",
-      "properties": {
-        "status": { "enum": ["pending", "decomposed", "in_progress", "blocked", "validating", "completed", "failed"] },
-        "current_step": { "type": ["string", "null"] },
-        "progress": { "type": "number" },
-        "retries": { "type": "integer" },
-        "error_state": { "type": ["string", "null"] },
-        "context_snapshot_ref": { "type": "string" },
-        "last_updated": { "type": "string" }
+      "status": "quarantined_CIR4",
+      "reason": "non_replayable_derived_state",
+      "original": {
+        "status": "quarantined_CIR3",
+        "reason": "missing_execution_contract",
+        "original": {
+          "status": "quarantined_CIR4",
+          "reason": "non_replayable_derived_state",
+          "original": {
+            "status": "quarantined_CIR3",
+            "reason": "missing_execution_contract",
+            "original": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "enum": [
+                    "pending",
+                    "decomposed",
+                    "in_progress",
+                    "blocked",
+                    "validating",
+                    "completed",
+                    "failed"
+                  ]
+                },
+                "current_step": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "progress": {
+                  "type": "number"
+                },
+                "retries": {
+                  "type": "integer"
+                },
+                "error_state": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "context_snapshot_ref": {
+                  "type": "string"
+                },
+                "last_updated": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "lineage": {
       "type": "object",
       "properties": {
-        "derived_from": { "type": "array", "items": { "type": "string" } },
-        "supersedes": { "type": ["string", "null"] },
-        "branches": { "type": "array", "items": { "type": "string" } },
+        "derived_from": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supersedes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "merge_history": {
           "type": "array",
           "items": {
             "type": "object",
             "properties": {
-              "from": { "type": "string" },
-              "strategy": { "type": "string" }
+              "from": {
+                "type": "string"
+              },
+              "strategy": {
+                "type": "string"
+              }
             }
           }
         }
@@ -135,10 +334,18 @@
           "items": {
             "type": "object",
             "properties": {
-              "path": { "type": "string" },
-              "type": { "type": "string" },
-              "hash": { "type": "string" },
-              "origin_step": { "type": "string" }
+              "path": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "hash": {
+                "type": "string"
+              },
+              "origin_step": {
+                "type": "string"
+              }
             }
           }
         },
@@ -147,8 +354,12 @@
           "items": {
             "type": "object",
             "properties": {
-              "step_id": { "type": "string" },
-              "data_ref": { "type": "string" }
+              "step_id": {
+                "type": "string"
+              },
+              "data_ref": {
+                "type": "string"
+              }
             }
           }
         }
@@ -157,11 +368,32 @@
     "metadata": {
       "type": "object",
       "properties": {
-        "created_at": { "type": "string" },
-        "updated_at": { "type": "string" },
-        "agent_id": { "type": "string" },
-        "mode": { "type": "string" },
-        "tags": { "type": "array", "items": { "type": "string" } }
+        "created_at": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "agent_id": {
+          "type": "string"
+        },
+        "mode": {
+          "status": "quarantined_CIR3",
+          "reason": "missing_execution_contract",
+          "original": {
+            "status": "quarantined_CIR3",
+            "reason": "missing_execution_contract",
+            "original": {
+              "type": "string"
+            }
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     }
   }

@@ -1,0 +1,17 @@
+{
+  "executors": [
+    {
+      "executor_id": "gemini-flash-builder-v1",
+      "supports": [
+        "CODE_WRITE",
+        "REFACTOR",
+        "DOC_UPDATE"
+      ],
+      "invocation_contract": {
+        "type": "cli",
+        "command": "./scripts/run-gemini-builder.sh"
+      },
+      "system_prompt": "You are a deterministic execution engine bounded by specific capabilities. You are given an immutable WorkRequest. Do not plan, reason, or alter intent. Execute the exact instructions and return a structured Execution Receipt containing your mutations."
+    }
+  ]
+}
