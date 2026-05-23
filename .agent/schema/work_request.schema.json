@@ -10,7 +10,6 @@
     "requirements",
     "constraints",
     "success_criteria",
-    "execution_state",
     "lineage",
     "artifacts",
     "metadata"
@@ -233,62 +232,6 @@
         }
       }
     },
-    "execution_state": {
-      "status": "quarantined_CIR4",
-      "reason": "non_replayable_derived_state",
-      "original": {
-        "status": "quarantined_CIR3",
-        "reason": "missing_execution_contract",
-        "original": {
-          "status": "quarantined_CIR4",
-          "reason": "non_replayable_derived_state",
-          "original": {
-            "status": "quarantined_CIR3",
-            "reason": "missing_execution_contract",
-            "original": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "enum": [
-                    "pending",
-                    "decomposed",
-                    "in_progress",
-                    "blocked",
-                    "validating",
-                    "completed",
-                    "failed"
-                  ]
-                },
-                "current_step": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "progress": {
-                  "type": "number"
-                },
-                "retries": {
-                  "type": "integer"
-                },
-                "error_state": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "context_snapshot_ref": {
-                  "type": "string"
-                },
-                "last_updated": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "lineage": {
       "type": "object",
       "properties": {
@@ -378,15 +321,7 @@
           "type": "string"
         },
         "mode": {
-          "status": "quarantined_CIR3",
-          "reason": "missing_execution_contract",
-          "original": {
-            "status": "quarantined_CIR3",
-            "reason": "missing_execution_contract",
-            "original": {
-              "type": "string"
-            }
-          }
+          "type": "string"
         },
         "tags": {
           "type": "array",

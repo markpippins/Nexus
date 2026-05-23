@@ -2,16 +2,21 @@
 """
 CIR Deterministic Patch Engine — CIR-1 through CIR-5 with CIR-SDM.
 
-Applies deterministic, AST-safe patches to JSON configuration files.
-Uses CIR Semantic Domain Model (CIR-SDM) to scope enforcement by
-artifact semantic domain and interpretation mode.
+Diagnostic-only by default. Use --apply to write changes.
+
+Usage:
+    python tools/cir1/patch.py                     # dry-run (show diffs)
+    python tools/cir1/patch.py --apply             # write changes
 
 Design principle:
     CIR-1 violations are auto-removed (they are structurally broken).
-    CIR-2/3/4/5 violations are quarantined (wrapped, never silently rewritten).
+    CIR-2/3/4/5 violations are reported but NOT wrapped by default.
+    Use --apply to quarantine violations in-place.
 """
 
+import difflib
 import json
+import sys
 from pathlib import Path
 
 FORBIDDEN_CROSS_LAYER_TOKENS = [
@@ -54,12 +59,14 @@ def classify(path: str):
         return ("SCHEMA", None)
     if any(x in p for x in ["/vectors/", "/tests/", "/logs/", "/samples/", "/specimens/"]):
         return ("DATA", None)
+    if "pgv.state_machine" in p:
+        return ("GOVERNANCE", "CANONICAL")
+    if "transition_ledger" in p:
+        return ("GOVERNANCE", "STATEFUL")
     if p.startswith("go/wrp/ccnf-ref/") and not any(x in p for x in ["/vectors/", "/tests/"]):
         return ("GOVERNANCE", "CANONICAL")
     if p.startswith(".agent/"):
         return ("GOVERNANCE", "ASPIRATIONAL")
-    if "transition_ledger" in p:
-        return ("GOVERNANCE", "STATEFUL")
     if p.startswith(".tools/") or p.startswith(".github/"):
         return ("GOVERNANCE", "CANONICAL")
     if "/runtime/" in p or "/executor/" in p:
@@ -353,6 +360,10 @@ def patch_cir5(obj, path, duplicates_set, mode, domain):
 # ─── Main ────────────────────────────────────────────────────────────────────
 
 def main():
+    import sys
+    apply_changes = "--apply" in sys.argv
+    dry_run = not apply_changes
+
     load_native_domains()
 
     # ── Pass 0: CIR-5 cross-file index (scope-aware) ─────────────────────────
@@ -388,8 +399,21 @@ def main():
         patched = json.dumps(data, indent=2, sort_keys=False)
 
         if patched != original:
-            p.write_text(patched + "\n")
-            print(f"[patched] {p}")
+            if apply_changes:
+                p.write_text(patched + "\n")
+                print(f"[patched] {p}")
+            else:
+                import difflib
+                diff = difflib.unified_diff(
+                    original.splitlines(),
+                    patched.splitlines(),
+                    fromfile=str(p),
+                    tofile=str(p),
+                    lineterm="",
+                )
+                print(f"\n[diff] {p}")
+                for line in diff:
+                    print(line)
             patched_any = True
 
     if not patched_any:

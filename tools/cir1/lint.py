@@ -88,13 +88,15 @@ def classify(path: str):
     if any(x in p for x in ["/vectors/", "/tests/", "/logs/", "/samples/", "/specimens/"]):
         return ("DATA", None)
 
-    # 4. GOVERNANCE — subtyped
+    # 4. GOVERNANCE — subtyped (STATEFUL before CCNF catch-all)
+    if "pgv.state_machine" in p:
+        return ("GOVERNANCE", "CANONICAL")
+    if "transition_ledger" in p:
+        return ("GOVERNANCE", "STATEFUL")
     if p.startswith("go/wrp/ccnf-ref/") and not any(x in p for x in ["/vectors/", "/tests/"]):
         return ("GOVERNANCE", "CANONICAL")
     if p.startswith(".agent/"):
         return ("GOVERNANCE", "ASPIRATIONAL")
-    if "transition_ledger" in p:
-        return ("GOVERNANCE", "STATEFUL")
     if p.startswith(".tools/") or p.startswith(".github/"):
         return ("GOVERNANCE", "CANONICAL")
 
