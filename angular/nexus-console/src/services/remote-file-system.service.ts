@@ -1,5 +1,5 @@
 import { FileSystemProvider, ItemReference } from './file-system-provider.js';
-import { FileSystemNode } from '../models/file-system.model.js';
+import { FileSystemNode, Mount } from '../models/file-system.model.js';
 import { FsService } from './fs.service.js';
 import { BrokerProfile } from '../models/broker-profile.model.js';
 
@@ -78,6 +78,10 @@ export class RemoteFileSystemService implements FileSystemProvider {
 
   saveFileContent(path: string[], name: string, content: string): Promise<void> {
     return this.fsService.saveFileContent(this.profile.brokerUrl ?? '', this.token, path, name, content);
+  }
+
+  listMounts(): Promise<Mount[]> {
+    return this.fsService.listMounts(this.profile.brokerUrl ?? '', this.token);
   }
 
   async getFolderTree(): Promise<FileSystemNode> {

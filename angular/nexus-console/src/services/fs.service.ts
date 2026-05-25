@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { BrokerService } from './broker.service.js';
-import { FileSystemNode } from '../models/file-system.model.js';
+import { FileSystemNode, Mount } from '../models/file-system.model.js';
 import { ItemReference } from './file-system-provider.js';
 
 const SERVICE_NAME = 'restFsService';
@@ -25,6 +25,10 @@ export class FsService {
 
   listFiles(brokerUrl: string, token: string, path: string[]): Promise<FileSystemNode[]> {
     return this.brokerService.submitRequest<FileSystemNode[]>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'listFiles', { path, token });
+  }
+
+  listMounts(brokerUrl: string, token: string): Promise<Mount[]> {
+    return this.brokerService.submitRequest<Mount[]>(this.constructBrokerUrl(brokerUrl), 'mountService', 'listMounts', { token });
   }
 
   async getFileContent(brokerUrl: string, token: string, path: string[], filename: string): Promise<string> {
