@@ -90,11 +90,11 @@ export class RemoteFileSystemService implements FileSystemProvider {
   }
 
   getFileContent(path: string[], name: string): Promise<string> {
-    return this.fsService.getFileContent(this.profile.brokerUrl ?? '', this.token, path, name);
+    return this.fsService.getFileContent(this.profile.brokerUrl ?? '', this.token, this.resolveMountPath(path), name);
   }
 
   saveFileContent(path: string[], name: string, content: string): Promise<void> {
-    return this.fsService.saveFileContent(this.profile.brokerUrl ?? '', this.token, path, name, content);
+    return this.fsService.saveFileContent(this.profile.brokerUrl ?? '', this.token, this.resolveMountPath(path), name, content);
   }
 
   listMounts(): Promise<Mount[]> {
@@ -142,57 +142,55 @@ export class RemoteFileSystemService implements FileSystemProvider {
   }
 
   hasFile(path: string[], filename: string): Promise<boolean> {
-    return this.fsService.hasFile(this.profile.brokerUrl ?? '', this.token, path, filename);
+    return this.fsService.hasFile(this.profile.brokerUrl ?? '', this.token, this.resolveMountPath(path), filename);
   }
 
   hasFolder(path: string[], folderName: string): Promise<boolean> {
-    return this.fsService.hasFolder(this.profile.brokerUrl ?? '', this.token, path, folderName);
+    return this.fsService.hasFolder(this.profile.brokerUrl ?? '', this.token, this.resolveMountPath(path), folderName);
   }
 
   createDirectory(path: string[], name: string): Promise<void> {
-    return this.fsService.createDirectory(this.profile.brokerUrl ?? '', this.token, [...path, name]);
+    return this.fsService.createDirectory(this.profile.brokerUrl ?? '', this.token, [...this.resolveMountPath(path), name]);
   }
 
   async removeDirectory(path: string[], name: string): Promise<void> {
-    // The associated .magnet file is inside the directory, so it will be removed
-    // by the backend's recursive delete. No special handling needed here.
-    await this.fsService.removeDirectory(this.profile.brokerUrl ?? '', this.token, [...path, name]);
+    const resolved = this.resolveMountPath(path);
+    await this.fsService.removeDirectory(this.profile.brokerUrl ?? '', this.token, [...resolved, name]);
   }
 
   createFile(path: string[], name: string): Promise<void> {
-    return this.fsService.createFile(this.profile.brokerUrl ?? '', this.token, path, name);
+    return this.fsService.createFile(this.profile.brokerUrl ?? '', this.token, this.resolveMountPath(path), name);
   }
 
   deleteFile(path: string[], name: string): Promise<void> {
-    return this.fsService.deleteFile(this.profile.brokerUrl ?? '', this.token, path, name);
+    return this.fsService.deleteFile(this.profile.brokerUrl ?? '', this.token, this.resolveMountPath(path), name);
   }
 
   async rename(path: string[], oldName: string, newName: string): Promise<void> {
-    const fromPath = [...path, oldName];
-    const toPath = [...path, newName];
-
-    // Renaming the folder will also move any decorator files (like .magnet) inside it.
-    // No special handling needed here for sibling files.
+    const resolved = this.resolveMountPath(path);
+    const fromPath = [...resolved, oldName];
+    const toPath = [...resolved, newName];
     await this.fsService.rename(this.profile.brokerUrl ?? '', this.token, fromPath, toPath);
+  }
+
+  move(sourcePath: string[], destPath: string[], items: ItemReference[]): Promise<void> {
+    return this.fsService.move(this.profile.brokerUrl ?? '', this.token, this.resolveMountPath(sourcePath), this.resolveMountPath(destPath), items);
+  }
+
+  async copy(sourcePath: string[], destPath: string[], items: ItemReference[]): Promise<void> {
+    const resolvedSource = this.resolveMountPath(sourcePath);
+    const resolvedDest = this.resolveMountPath(destPath);
+    const copyPromises = items.map(item => {
+      const fromPath = [...resolvedSource, item.name];
+      const toPath = [...resolvedDest, item.name];
+      return this.fsService.copy(this.profile.brokerUrl ?? '', this.token, fromPath, toPath);
+    });
+    await Promise.all(copyPromises);
   }
 
   uploadFile(path: string[], file: File): Promise<void> {
     console.warn(`File upload not implemented in live mode. File: ${file.name}, Path: ${path.join('/')}`);
     return Promise.resolve();
-  }
-
-  move(sourcePath: string[], destPath: string[], items: ItemReference[]): Promise<void> {
-    return this.fsService.move(this.profile.brokerUrl ?? '', this.token, sourcePath, destPath, items);
-  }
-
-  async copy(sourcePath: string[], destPath: string[], items: ItemReference[]): Promise<void> {
-    const copyPromises = items.map(item => {
-      const fromPath = [...sourcePath, item.name];
-      const toPath = [...destPath, item.name];
-      return this.fsService.copy(this.profile.brokerUrl ?? '', this.token, fromPath, toPath);
-    });
-
-    await Promise.all(copyPromises);
   }
 
   importTree(destPath: string[], data: FileSystemNode): Promise<void> {
