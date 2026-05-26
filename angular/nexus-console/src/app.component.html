@@ -109,6 +109,7 @@
           </button>
         </div>
 
+        @if (currentViewMode() !== 'nexus-rms') {
         <app-toolbar
           [viewMode]="currentViewMode()"
           [meshViewMode]="meshViewMode()"
@@ -204,7 +205,7 @@
           (graphSubViewChange)="onGraphSubViewChange($event)"
         >
         </app-toolbar>
-
+        }
         <div class="flex-1 flex flex-row overflow-hidden relative">
           <div #mainContentWrapper class="flex-1 flex flex-col overflow-hidden min-w-0">
             <div class="flex-1 flex flex-row overflow-hidden">
@@ -301,6 +302,8 @@
                       (viewModeChange)="onMeshViewModeChange($event)"
                       (graphSubViewChange)="onGraphSubViewChange($event)"
                     ></app-service-mesh>
+                  } @else if (currentViewMode() === 'nexus-rms') {
+                    <app-rms-iframe></app-rms-iframe>
                   }
                 </div>
 
@@ -394,6 +397,7 @@
               </div>
             </div>
 
+            @if (currentViewMode() !== 'nexus-rms') {
             <!-- Content Status Bar (CRUD screens only) -->
             @if (activePanePlatformNode() && contentStatusInfo()) {
               <div
@@ -501,11 +505,12 @@
                 </div>
               }
             </div>
+          }
           </div>
         </div>
       </div>
       <!-- Close the main content wrapper div -->
-      @if (isDetailPaneOpen()) {
+      @if (isDetailPaneOpen() && currentViewMode() !== 'nexus-rms') {
         <app-detail-pane
           [path]="activePanePath()"
           [isSavedItemsVisible]="isSavedItemsVisible()"
@@ -534,6 +539,8 @@
           } @else {
             (Console)
           }
+        } @else if (currentViewMode() === 'nexus-rms') {
+          Requirements Management
         } @else {
           File Explorer
           @if (isSplitView()) {
