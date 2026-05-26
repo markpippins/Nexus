@@ -1,7 +1,7 @@
 
 
 
-import { Component, ChangeDetectionStrategy, signal, computed, inject, effect, untracked, Renderer2, ElementRef, OnDestroy, Injector, OnInit, ViewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, effect, untracked, Renderer2, ElementRef, NgZone, OnDestroy, Injector, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FileExplorerComponent } from './components/file-explorer/file-explorer.component.js';
 import { SidebarComponent } from './components/sidebar/sidebar.component.js';
@@ -63,6 +63,7 @@ import { GatewayEditorComponent } from './components/gateway-editor/gateway-edit
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
 import { GatewayManagementComponent } from './components/gateway-management/gateway-management.component.js';
 import { HostServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
+import { RmsIframeComponent } from './components/rms-iframe/rms-iframe.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 
 interface PanePath {
@@ -112,7 +113,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, RmsIframeComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -136,6 +137,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private injector = inject(Injector);
   private document: Document = inject(DOCUMENT);
   private renderer = inject(Renderer2);
+  private ngZone = inject(NgZone);
   private elementRef = inject(ElementRef);
   private dbService = inject(DbService);
   private uiPreferencesService = inject(UiPreferencesService);
@@ -168,7 +170,7 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'nexus-rms'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -1926,6 +1928,9 @@ export class AppComponent implements OnInit, OnDestroy {
         return m;
       });
 
+      // Sync mounts to the provider so getFolderTree uses mount nodes
+      this.syncProviderMounts();
+
       this.toastService.show(`Successfully connected to ${profile.name}.`);
 
     } catch (e) {
@@ -1963,6 +1968,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.notesService.removeToken(profile.id);
 
+    this.mountedProfileMounts.update(m => {
+      const newMap = new Map(m);
+      newMap.delete(profile.name);
+      return newMap;
+    });
+
     // If any pane was inside the unmounted profile, navigate it to root
     this.panePaths.update(paths => {
       return paths.map(p => {
@@ -1975,6 +1986,16 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.loadFolderTree();
     this.toastService.show(`Disconnected from ${profile.name}.`);
+  }
+
+  /** Sync mounts from mountedProfileMounts to each connected RemoteFileSystemService provider. */
+  private syncProviderMounts(): void {
+    this.mountedProfileMounts().forEach((mounts, profileName) => {
+      const provider = this.remoteProviders().get(profileName);
+      if (provider instanceof RemoteFileSystemService) {
+        provider.setMounts(mounts);
+      }
+    });
   }
 
   onConnectToServer(profileId: string): void {
@@ -2259,21 +2280,30 @@ export class AppComponent implements OnInit, OnDestroy {
     const streamEl = container.querySelector('app-idea-stream');
     const initialStreamHeight = streamEl ? streamEl.getBoundingClientRect().height : 0;
 
-    this.unlistenStreamResizeMove = this.renderer.listen('document', 'mousemove', (e: MouseEvent) => {
-      const dy = startY - e.clientY;
-      let newStreamHeight = initialStreamHeight + dy;
+    this.ngZone.runOutsideAngular(() => {
+      const onMove = (e: MouseEvent) => {
+        const dy = startY - e.clientY;
+        let newStreamHeight = initialStreamHeight + dy;
 
-      const minHeight = 100;
-      const consoleHeight = this.isConsoleCollapsed() ? 28 : (this.consolePaneHeight() / 100 * containerRect.height);
-      const maxHeight = containerRect.height - 100 - consoleHeight; // Leave 100px for file explorer
+        const minHeight = 100;
+        const consoleHeight = this.isConsoleCollapsed() ? 28 : (this.consolePaneHeight() / 100 * containerRect.height);
+        const maxHeight = containerRect.height - 100 - consoleHeight;
 
-      if (newStreamHeight < minHeight) newStreamHeight = minHeight;
-      if (newStreamHeight > maxHeight) newStreamHeight = maxHeight;
+        if (newStreamHeight < minHeight) newStreamHeight = minHeight;
+        if (newStreamHeight > maxHeight) newStreamHeight = maxHeight;
 
-      this.streamPaneHeight.set((newStreamHeight / containerRect.height) * 100);
+        this.streamPaneHeight.set((newStreamHeight / containerRect.height) * 100);
+      };
+
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        this.ngZone.run(() => this.stopStreamResize());
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     });
-
-    this.unlistenStreamResizeUp = this.renderer.listen('document', 'mouseup', () => this.stopStreamResize());
   }
 
   private stopStreamResize(): void {
@@ -2294,21 +2324,30 @@ export class AppComponent implements OnInit, OnDestroy {
     const consolePane = container.querySelector('[data-console-pane]');
     const initialConsoleHeight = consolePane ? consolePane.getBoundingClientRect().height : 0;
 
-    this.unlistenConsoleResizeMove = this.renderer.listen('document', 'mousemove', (e: MouseEvent) => {
-      const dy = startY - e.clientY;
-      let newConsoleHeight = initialConsoleHeight + dy;
+    this.ngZone.runOutsideAngular(() => {
+      const onMove = (e: MouseEvent) => {
+        const dy = startY - e.clientY;
+        let newConsoleHeight = initialConsoleHeight + dy;
 
-      const minHeight = 100; // Minimum height in pixels for the console when expanded
-      const streamHeight = this.isStreamVisible() ? (this.isStreamPaneCollapsed() ? 28 : (this.streamPaneHeight() / 100 * containerRect.height)) : 0;
-      const maxHeight = containerRect.height - 100 - streamHeight; // Leave 100px for file explorer
+        const minHeight = 100;
+        const streamHeight = this.isStreamVisible() ? (this.isStreamPaneCollapsed() ? 28 : (this.streamPaneHeight() / 100 * containerRect.height)) : 0;
+        const maxHeight = containerRect.height - 100 - streamHeight;
 
-      if (newConsoleHeight < minHeight) newConsoleHeight = minHeight;
-      if (newConsoleHeight > maxHeight) newConsoleHeight = maxHeight;
+        if (newConsoleHeight < minHeight) newConsoleHeight = minHeight;
+        if (newConsoleHeight > maxHeight) newConsoleHeight = maxHeight;
 
-      this.consolePaneHeight.set((newConsoleHeight / containerRect.height) * 100);
+        this.consolePaneHeight.set((newConsoleHeight / containerRect.height) * 100);
+      };
+
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        this.ngZone.run(() => this.stopConsoleResize());
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     });
-
-    this.unlistenConsoleResizeUp = this.renderer.listen('document', 'mouseup', () => this.stopConsoleResize());
   }
 
   private stopConsoleResize(): void {
