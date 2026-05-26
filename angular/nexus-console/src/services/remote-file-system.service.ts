@@ -4,17 +4,34 @@ import { FsService } from './fs.service.js';
 import { BrokerProfile } from '../models/broker-profile.model.js';
 
 export class RemoteFileSystemService implements FileSystemProvider {
+  private mounts: Mount[] = [];
+
   constructor(
     public readonly profile: BrokerProfile,
     private fsService: FsService,
     private token: string
   ) { }
 
+  setMounts(mounts: Mount[]): void {
+    this.mounts = mounts;
+  }
+
+  /** Translate a path whose first segment is a mount name into the backing path. */
+  private resolveMountPath(path: string[]): string[] {
+    if (path.length === 0 || this.mounts.length === 0) return path;
+    const mount = this.mounts.find(m => m.name === path[0]);
+    if (mount && mount.rootPath && mount.rootPath.length > 0) {
+      return [...mount.rootPath, ...path.slice(1)];
+    }
+    return path;
+  }
+
   async getContents(path: string[]): Promise<FileSystemNode[]> {
+    const resolvedPath = this.resolveMountPath(path);
     const response: any = await this.fsService.listFiles(
       this.profile.brokerUrl ?? '',
       this.token,
-      path
+      resolvedPath
     );
 
     let rawItems: any[] = [];
@@ -56,7 +73,7 @@ export class RemoteFileSystemService implements FileSystemProvider {
     // This is extensible for other file/folder decorators in the future.
     if (folderNodes.length > 0) {
       const magnetChecks = folderNodes.map(folder =>
-        this.hasFile([...path, folder.name], '.magnet').catch(() => false) // Gracefully handle errors
+        this.hasFile([...resolvedPath, folder.name], '.magnet').catch(() => false) // Gracefully handle errors
       );
 
       const magnetResults = await Promise.all(magnetChecks);
@@ -85,6 +102,25 @@ export class RemoteFileSystemService implements FileSystemProvider {
   }
 
   async getFolderTree(): Promise<FileSystemNode> {
+    // When mounts are available, show mount nodes as children instead of raw root directory
+    if (this.mounts.length > 0) {
+      const mountChildren: FileSystemNode[] = this.mounts.map(mount => ({
+        name: mount.name,
+        type: 'folder',
+        children: [],
+        childrenLoaded: false,
+        metadata: { mountId: mount.id, rootPath: mount.rootPath },
+      }));
+
+      return {
+        name: this.profile.name,
+        type: 'folder',
+        children: mountChildren,
+        childrenLoaded: true,
+      };
+    }
+
+    // Fallback to raw root directory listing when no mounts exist
     const topLevelItems = await this.getContents([]);
     const children = topLevelItems.map((item): FileSystemNode => {
       if (item.type === 'folder') {

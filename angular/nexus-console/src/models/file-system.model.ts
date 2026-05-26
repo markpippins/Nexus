@@ -26,6 +26,7 @@ export interface Mount {
   name: string;
   type: string;
   defaultMount: boolean;
+  rootPath: string[];
 }
 
 export interface SearchResultNode extends FileSystemNode {
