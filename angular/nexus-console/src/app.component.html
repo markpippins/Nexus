@@ -451,58 +451,21 @@
               [class.border-t]="isConsoleCollapsed()"
               [class.border-[rgb(var(--color-border-base))]]="isConsoleCollapsed()"
             >
-              <!-- Console Header -->
-              <div
-                class="flex items-center justify-between border-b border-[rgb(var(--color-border-base))] px-4"
-                [class.h-12]="!isConsoleCollapsed()"
-                [class.h-7]="isConsoleCollapsed()"
-              >
-                @if (!isConsoleCollapsed()) {
-                  <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]"
-                    >Console</span
-                  >
-                } @else {
+              @if (isConsoleCollapsed()) {
+                <div class="flex items-center justify-between px-4 h-7">
                   <span class="text-xs text-[rgb(var(--color-text-muted))]">Console</span>
-                }
-                <button
-                  (click)="toggleConsole()"
-                  [title]="isConsoleCollapsed() ? 'Expand Console' : 'Collapse Console (Ctrl + `)'"
-                  class="p-2 -mr-2 rounded-md text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
-                >
-                  @if (isConsoleCollapsed()) {
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z"
-                        clip-rule="evenodd"
-                      />
+                  <button
+                    (click)="toggleConsole()"
+                    title="Expand Console"
+                    class="p-2 -mr-2 rounded-md text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" />
                     </svg>
-                  } @else {
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      class="h-5 w-5"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  }
-                </button>
-              </div>
-              <!-- Console Content -->
-              @if (!isConsoleCollapsed()) {
-                <div class="flex-1 overflow-hidden p-2">
-                  <app-terminal></app-terminal>
+                  </button>
                 </div>
+              } @else {
+                <app-terminal (collapse)="toggleConsole()"></app-terminal>
               }
             </div>
           }
