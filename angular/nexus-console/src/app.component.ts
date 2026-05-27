@@ -952,7 +952,7 @@ export class AppComponent implements OnInit, OnDestroy {
           type: 'folder' as const,
           isServerRoot: true,
           profileId: p.id,
-          connected: true, // Host servers are considered connected if they exist
+          connected: this.healthCheckService.getServiceStatus(p.imageUrl) !== 'DOWN', // Show X overlay when registry is DOWN
           healthStatus: this.healthCheckService.getServiceStatus(p.imageUrl),
           children: [],
           childrenLoaded: false,
