@@ -1434,7 +1434,7 @@ export class AppComponent implements OnInit, OnDestroy {
       type: 'folder' as const,
       isServerRoot: true,
       profileId: p.id,
-      connected: true, // Host servers are considered connected if they exist
+      connected: this.healthCheckService.getServiceStatus(p.imageUrl) !== 'DOWN', // Show X overlay when registry is DOWN
       healthStatus: this.healthCheckService.getServiceStatus(p.imageUrl),
       children: [],
       childrenLoaded: false,
@@ -1914,6 +1914,15 @@ export class AppComponent implements OnInit, OnDestroy {
       const provider = new RemoteFileSystemService(profile, this.fsService, token);
       const imageService = new ImageService(profile, this.imageClientService, this.preferencesService, this.healthCheckService, this.localConfigService);
 
+      // Load mounts BEFORE updating mountedProfiles so the tree rebuild sees mount data
+      const mounts = await provider.listMounts();
+      provider.setMounts(mounts);
+      this.mountedProfileMounts.update(map => {
+        const m = new Map(map);
+        m.set(profile.name, mounts);
+        return m;
+      });
+
       this.mountedProfiles.update(p => [...p, profile]);
       this.mountedProfileUsers.update(m => new Map(m).set(profile.id, user));
       this.mountedProfileTokens.update(m => new Map(m).set(profile.id, token));
@@ -1921,14 +1930,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.remoteImageServices.update(m => new Map(m).set(profile.name, imageService));
       this.notesService.setToken(profile.id, token);
 
-      const mounts = await provider.listMounts();
-      this.mountedProfileMounts.update(map => {
-        const m = new Map(map);
-        m.set(profile.name, mounts);
-        return m;
-      });
-
-      // Sync mounts to the provider so getFolderTree uses mount nodes
+      // Sync mounts to remaining providers (provider already has them via setMounts above)
       this.syncProviderMounts();
 
       this.toastService.show(`Successfully connected to ${profile.name}.`);
