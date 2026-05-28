@@ -368,6 +368,18 @@ export class ArchitectureVizService {
         this.allNodes.set([]);
     }
 
+    private static randomId(): string {
+        if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        // Fallback UUID v4
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
     public addNode(
         type: NodeType,
         pos: { x: number, y: number, z: number } = { x: 0, y: 0, z: 0 },
@@ -378,9 +390,9 @@ export class ArchitectureVizService {
     ): string {
         if (!this.scene) {
             console.error('ArchitectureVizService: addNode called before initialize()');
-            return idOverride || crypto.randomUUID();
+            return idOverride || ArchitectureVizService.randomId();
         }
-        const id = idOverride || crypto.randomUUID();
+        const id = idOverride || ArchitectureVizService.randomId();
         const config = this.registry.getConfig(type);
 
         const colorHex = colorOverride ? parseInt(colorOverride.replace('#', ''), 16) : config.defaultColor;
