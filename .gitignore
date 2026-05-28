@@ -1,0 +1,6 @@
+node_modules/
+target/
+bun.lock
+package-lock.json
+.vscode/
+.angular/
