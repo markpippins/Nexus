@@ -260,4 +260,34 @@ public class RestFsService {
         return restFsClient.moveItems(alias, sourcePath, destPath, items);
     }
 
+    @BrokerOperation("pulseCheck")
+    public boolean pulseCheck() {
+        return restFsClient.pulseCheck();
+    }
+
+    @BrokerOperation("ensureDefaultDirectory")
+    public Map<String, Object> ensureDefaultDirectory(@BrokerParam("token") String token) {
+        String alias = getUserAliasFromToken(token);
+        List<String> defaultPath = List.of("users", alias, "default");
+
+        try {
+            // Check if default directory already exists
+            Map<String, Object> hasResult = restFsClient.hasFolder(alias, List.of("users", alias), "default");
+            boolean exists = hasResult != null && Boolean.TRUE.equals(hasResult.get("exists"));
+
+            if (!exists) {
+                restFsClient.createDirectory(alias, defaultPath);
+            }
+
+            // Verify it was created
+            Map<String, Object> verifyResult = restFsClient.hasFolder(alias, List.of("users", alias), "default");
+            boolean verified = verifyResult != null && Boolean.TRUE.equals(verifyResult.get("exists"));
+
+            return Map.of("ok", verified, "path", defaultPath);
+        } catch (Exception e) {
+            log.error("Failed to ensure default directory for alias {}: {}", alias, e.getMessage());
+            return Map.of("ok", false, "path", defaultPath, "error", e.getMessage());
+        }
+    }
+
 }
