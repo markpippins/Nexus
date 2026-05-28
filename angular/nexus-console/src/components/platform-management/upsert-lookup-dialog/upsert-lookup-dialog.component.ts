@@ -118,8 +118,28 @@ export class UpsertLookupDialogComponent {
 
         effect(() => {
             if (this.isOpen()) {
+                // Attempt to refresh backend visual components so the
+                // dropdown shows real numeric IDs instead of fallback strings.
+                if (this.isServiceType() && !this.registry.backendLoaded()) {
+                    this.registry.refresh();
+                }
+
                 const i = this.item();
                 if (i) {
+                    // Guard: if defaultComponentId is a non-numeric string (e.g.
+                    // from INITIAL_REGISTRY fallback), treat it as null to avoid
+                    // sending an invalid ID to the backend.
+                    //
+                    // The list GET response includes `defaultComponent: { id: N }`
+                    // but NOT `defaultComponentId` (that field is @Transient on the
+                    // backend).  Fall back to `defaultComponent.id` when present.
+                    const rawId: unknown =
+                        i.defaultComponentId ?? (i.defaultComponent as any)?.id;
+                    const safeId: number | null =
+                        rawId === null || rawId === undefined ? null :
+                        typeof rawId === 'number' ? rawId :
+                        typeof rawId === 'string' && /^\d+$/.test(rawId) ? Number(rawId) :
+                        null;
                     this.form.patchValue({
                         name: i.name,
                         description: i.description,
@@ -127,7 +147,7 @@ export class UpsertLookupDialogComponent {
                         url: '', // url field not on LookupItem interface
                         currentVersion: i.version || '',
                         ltsVersion: i.ltsFlag ? i.version || '' : '',
-                        defaultComponentId: i.defaultComponentId || null
+                        defaultComponentId: safeId
                     });
                 } else {
                     this.form.reset({ defaultComponentId: null, activeFlag: true });
@@ -152,11 +172,20 @@ export class UpsertLookupDialogComponent {
 
         // Build payload based on form values, mapping to LookupItem interface
         const formValue = this.form.value;
+        // Guard: defaultComponentId must be numeric (backend expects Long).
+        // The INITIAL_REGISTRY fallback uses string IDs like 'sys-cache' which
+        // the backend rejects with 400. Coerce non-numeric non-null values to null.
+        const rawComponentId: unknown = formValue.defaultComponentId;
+        const safeComponentId: number | null =
+            rawComponentId === null || rawComponentId === undefined ? null :
+            typeof rawComponentId === 'number' ? rawComponentId :
+            typeof rawComponentId === 'string' && /^\d+$/.test(rawComponentId) ? Number(rawComponentId) :
+            null;
         const payload: Partial<LookupItem> = {
             name: formValue.name,
             description: formValue.description,
             activeFlag: formValue.activeFlag,
-            defaultComponentId: formValue.defaultComponentId,
+            defaultComponentId: safeComponentId,
             // Map version fields to LookupItem structure
             version: formValue.currentVersion || undefined,
             ltsFlag: formValue.ltsVersion ? true : undefined,
@@ -176,8 +205,10 @@ export class UpsertLookupDialogComponent {
             this.saved.emit(result);
             this.close.emit();
         } catch (e) {
-            console.error(`Failed to save ${type}`, e);
-            alert(`Failed to save ${type}`);
+            const msg = e instanceof Error ? e.message : String(e);
+            const stack = e instanceof Error ? e.stack : '';
+            console.error(`Failed to save ${type}:`, { message: msg, stack, url, type, payload: JSON.stringify(payload) });
+            alert(`Failed to save ${type}\n\n${msg}`);
         } finally {
             this.isSaving.set(false);
         }

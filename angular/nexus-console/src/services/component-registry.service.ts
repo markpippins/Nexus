@@ -14,8 +14,15 @@ export class ComponentRegistryService {
     // Master list of all components
     private registry = signal<ComponentConfig[]>([]);
 
+    /** Whether backend components have been successfully loaded at least once. */
+    public readonly backendLoaded = signal(false);
+
     // Derived Accessors
-    public allComponents = this.registry.asReadonly();
+    public allComponents = computed(() => {
+        return [...this.registry()].sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        );
+    });
 
     public availableTypes = computed(() => this.registry().map(c => c.type));
 
@@ -24,6 +31,10 @@ export class ComponentRegistryService {
     }
 
     private getBaseUrl(): string {
+        // Prefer the active profile's resolved base URL over profiles[0]
+        const activeUrl = this.hostProfileService.activeBaseUrl();
+        if (activeUrl) return activeUrl;
+
         const profiles = this.hostProfileService.profiles();
         if (profiles.length === 0) {
             return 'http://localhost:8085'; // Default fallback
@@ -34,20 +45,37 @@ export class ComponentRegistryService {
         return url;
     }
 
-    async loadComponents() {
+    /** Retry loading components from the backend with exponential backoff. */
+    async loadComponents(retries = 2): Promise<void> {
         const baseUrl = this.getBaseUrl();
-        try {
-            const components = await this.platformService.getVisualComponents(baseUrl);
-            if (components && components.length > 0) {
-                this.registry.set(components);
-            } else {
-                // Fallback to initial registry if backend empty/fails (or seeding hasn't run)
-                this.registry.set([...INITIAL_REGISTRY]);
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            try {
+                const components = await this.platformService.getVisualComponents(baseUrl);
+                if (components && components.length > 0) {
+                    this.registry.set(components);
+                    this.backendLoaded.set(true);
+                    console.log(`[ComponentRegistry] Loaded ${components.length} visual components from backend (attempt ${attempt + 1})`);
+                    return;
+                }
+            } catch (e) {
+                console.warn(`[ComponentRegistry] Attempt ${attempt + 1} failed to load visual components:`, e);
             }
-        } catch (e) {
-            console.error('Failed to load components', e);
+            if (attempt < retries) {
+                // Wait with exponential backoff before retry
+                await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+            }
+        }
+        // All retries exhausted — fall back to initial registry only if we haven't
+        // already loaded backend data on a prior attempt.
+        if (!this.backendLoaded()) {
+            console.warn('[ComponentRegistry] All load attempts failed, falling back to initial registry');
             this.registry.set([...INITIAL_REGISTRY]);
         }
+    }
+
+    /** Force a re-fetch of visual components from the backend. */
+    async refresh(): Promise<void> {
+        await this.loadComponents();
     }
 
     getConfig(type: NodeType): ComponentConfig {

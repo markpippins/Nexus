@@ -591,7 +591,7 @@ export interface LookupItem {
     version?: string;
     ltsFlag?: boolean;
     activeFlag?: boolean;
-    defaultComponentId?: number;
+    defaultComponentId?: number | null;
     defaultComponent?: ComponentConfig;
 }
 
