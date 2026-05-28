@@ -79,4 +79,12 @@ export class FsService {
   copy(brokerUrl: string, token: string, fromPath: string[], toPath: string[]): Promise<void> {
     return this.brokerService.submitRequest(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'copy', { fromPath, toPath, token });
   }
+
+  pulseCheck(brokerUrl: string): Promise<boolean> {
+    return this.brokerService.submitRequest<boolean>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'pulseCheck', {});
+  }
+
+  ensureDefaultDirectory(brokerUrl: string, token: string): Promise<{ ok: boolean; path: string[] }> {
+    return this.brokerService.submitRequest<{ ok: boolean; path: string[] }>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'ensureDefaultDirectory', { token });
+  }
 }

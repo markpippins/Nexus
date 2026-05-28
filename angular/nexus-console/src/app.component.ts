@@ -214,6 +214,7 @@ export class AppComponent implements OnInit, OnDestroy {
   mountedProfileIds = computed(() => this.mountedProfiles().map(p => p.id));
   private remoteProviders = signal<Map<string, RemoteFileSystemService>>(new Map());
   private remoteImageServices = signal<Map<string, ImageService>>(new Map());
+  filesystemHealth = signal<Map<string, boolean>>(new Map());
 
   // --- Status Bar State ---
   pane1Status = signal<PaneStatus>({ selectedItemsCount: 0, totalItemsCount: 0, filteredItemsCount: null });
@@ -627,6 +628,13 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     const rootName = path[0];
+
+    // System mount folder under File Systems — gateway profile level
+    // Path is ['File Systems', 'gateway-name'] — at mount container level, not actionable
+    if (rootName === 'File Systems' && path.length === 2) {
+      return false;
+    }
+
     const profile = this.profileService.profiles().find(p => p.name === rootName);
 
     if (profile) {
@@ -972,15 +980,16 @@ export class AppComponent implements OnInit, OnDestroy {
           }
 
 
-          // File Systems folder
+            // File Systems folder
           if (rootName === 'File Systems') {
             // Return only connected gateways that offer file services
             const mountedIds = this.mountedProfileIds();
             const allBrokerProfiles = this.profileService.profiles();
 
             // Filter to only return profiles that are currently mounted/connected
+            // AND have a healthy file-system server
             const connectedFileServiceGateways = allBrokerProfiles.filter(p =>
-              mountedIds.includes(p.id)
+              mountedIds.includes(p.id) && this.filesystemHealth().get(p.name) === true
             );
 
             // Convert to FileSystemNode format
@@ -1354,19 +1363,24 @@ export class AppComponent implements OnInit, OnDestroy {
     // Build broker gateway nodes
     for (const profile of allProfiles) {
       const isConnected = mountedIds.includes(profile.id);
+      const fsHealthy = this.filesystemHealth().get(profile.name) === true;
 
       if (isConnected) {
         const provider = this.remoteProviders().get(profile.name);
         if (provider) {
           try {
             const remoteTree = await provider.getFolderTree();
+            // If filesystem is unhealthy, suppress mount children in sidebar
+            const children = fsHealthy ? remoteTree.children : [];
             remoteRoots.push({
-              ...remoteTree,
-              name: profile.name, // Ensure the root name is the profile name
+              name: profile.name,
+              type: 'folder' as FileType,
               isServerRoot: true,
               profileId: profile.id,
               connected: true,
               healthStatus: this.healthCheckService.getServiceStatus(profile.imageUrl),
+              children: children,
+              childrenLoaded: fsHealthy ? remoteTree.childrenLoaded : true,
             });
           } catch (e) {
             console.error(`Failed to get folder tree for ${profile.name}`, e);
@@ -1419,7 +1433,17 @@ export class AppComponent implements OnInit, OnDestroy {
     // Find the "File Systems" node
     const fileSystemsNode = hostNodes.find(n => n.name === 'File Systems');
     if (fileSystemsNode) {
+      // Add connected, mounted gateway profiles as children of File Systems
+      const mountedGateways = remoteRoots
+        .filter(r => r.connected === true)
+        .map(r => ({
+          ...r,
+          isServerRoot: false,
+          metadata: { ...r.metadata, mountId: true },
+        }));
+      fileSystemsNode.children = mountedGateways;
       fileSystemsNode.childrenLoaded = true;
+      fileSystemsNode.isVirtualFolder = true;
     }
 
     // Prepare the Local Session to be added at root level
@@ -1914,14 +1938,35 @@ export class AppComponent implements OnInit, OnDestroy {
       const provider = new RemoteFileSystemService(profile, this.fsService, token);
       const imageService = new ImageService(profile, this.imageClientService, this.preferencesService, this.healthCheckService, this.localConfigService);
 
-      // Load mounts BEFORE updating mountedProfiles so the tree rebuild sees mount data
-      const mounts = await provider.listMounts();
-      provider.setMounts(mounts);
-      this.mountedProfileMounts.update(map => {
-        const m = new Map(map);
-        m.set(profile.name, mounts);
-        return m;
-      });
+      // Pulse check the file-system server before listing mounts
+      let fsHealthy = false;
+      try {
+        fsHealthy = await provider.pulseCheck();
+      } catch (pulseErr) {
+        this.toastService.show(`File-system server is unreachable for ${profile.name}.`, 'warning');
+      }
+
+      this.filesystemHealth.update(m => new Map(m).set(profile.name, fsHealthy));
+
+      if (fsHealthy) {
+        // Ensure the user's default directory exists
+        try {
+          await provider.ensureDefaultDirectory();
+        } catch (dirErr) {
+          console.warn(`Could not ensure default directory for ${profile.name}:`, dirErr);
+        }
+
+        // Load mounts BEFORE updating mountedProfiles so the tree rebuild sees mount data
+        const mounts = await provider.listMounts();
+        provider.setMounts(mounts);
+        this.mountedProfileMounts.update(map => {
+          const m = new Map(map);
+          m.set(profile.name, mounts);
+          return m;
+        });
+      } else {
+        this.toastService.show(`File-system server is unreachable for ${profile.name}.`, 'warning');
+      }
 
       this.mountedProfiles.update(p => [...p, profile]);
       this.mountedProfileUsers.update(m => new Map(m).set(profile.id, user));
@@ -1943,6 +1988,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onUnmountProfile(profile: BrokerProfile): void {
     this.mountedProfiles.update(p => p.filter(item => item.id !== profile.id));
+
+    this.filesystemHealth.update(m => {
+      const newMap = new Map(m);
+      newMap.delete(profile.name);
+      return newMap;
+    });
 
     this.mountedProfileUsers.update(m => {
       const newMap = new Map(m);
@@ -2124,6 +2175,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.folderPropertiesService.handleDelete(path);
     }
     this.loadFolderTree();
+    this.triggerRefresh();
   }
 
   onSidebarDeleteItem(path: string[]): void {

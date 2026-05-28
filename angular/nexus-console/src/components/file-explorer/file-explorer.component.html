@@ -646,7 +646,8 @@
             </div>
             <div class="my-1 h-px bg-[rgb(var(--color-border-base))]"></div>
           }
-          @if (!cm.item) {
+          @if (!isInFileSystemsRoot()) {
+            @if (!cm.item) {
             <!-- Background menu -->
             <div
               class="px-3 py-1.5 hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer"
@@ -735,6 +736,7 @@
           >
             Properties
           </div>
+          }
         } @else if (isInServiceRegistriesFolder()) {
           <!-- CONTEXT MENU FOR SERVICE REGISTRIES FOLDER -->
           @if (!cm.item) {

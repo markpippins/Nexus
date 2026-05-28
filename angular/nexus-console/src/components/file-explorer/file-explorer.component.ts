@@ -225,12 +225,20 @@ export class FileExplorerComponent implements OnDestroy {
     return p.length === 1 && p[0] === 'Gateways';
   });
 
+  // Check if we're at a system mount folder under File Systems (gateway profile level)
+  // Path is ['File Systems', 'gateway-name'] — file ops not available here
+  isInFileSystemsRoot = computed(() => {
+    const p = this.path();
+    return p.length === 2 && p[0] === 'File Systems';
+  });
+
   // Check if renaming is allowed - only in File Systems path or Local Session
   isRenamingAllowed = computed(() => {
     const p = this.path();
     const sessionName = this.localConfigService.sessionName();
     // Renaming is allowed within File Systems or the Local Session root
-    if (p.length > 0 && p[0] === 'File Systems') return true;
+    // but NOT at the system mount folder level
+    if (p.length > 0 && p[0] === 'File Systems' && !this.isInFileSystemsRoot()) return true;
     if (p.length > 0 && p[0] === sessionName) return true;
     return false;
   });
@@ -974,6 +982,11 @@ export class FileExplorerComponent implements OnDestroy {
     if (this.path().length === 0 && item.isServerRoot) {
       // For a server root, we always request the 'cloud' icon from its specific image service.
       return serviceToUse.getIconUrl({ ...item, name: 'cloud' });
+    }
+
+    // If the item has a mountId, request the "mount" image
+    if (item.metadata?.['mountId']) {
+      return serviceToUse.getIconUrl(item, 'mount');
     }
 
     // Use custom image name from folder properties if set, otherwise use folder name.

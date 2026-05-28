@@ -28,6 +28,18 @@ export class RemoteFileSystemService implements FileSystemProvider {
 
   async getContents(path: string[]): Promise<FileSystemNode[]> {
     const resolvedPath = this.resolveMountPath(path);
+
+    // When listing root contents for a mounted gateway, return mount nodes
+    if (resolvedPath.length === 0 && this.mounts.length > 0) {
+      return this.mounts.map(mount => ({
+        name: mount.name,
+        type: 'folder',
+        children: [],
+        childrenLoaded: false,
+        metadata: { mountId: mount.id, rootPath: mount.rootPath },
+      }));
+    }
+
     const response: any = await this.fsService.listFiles(
       this.profile.brokerUrl ?? '',
       this.token,
@@ -195,5 +207,13 @@ export class RemoteFileSystemService implements FileSystemProvider {
 
   importTree(destPath: string[], data: FileSystemNode): Promise<void> {
     return Promise.reject(new Error('Import operation is not supported for remote file systems.'));
+  }
+
+  pulseCheck(): Promise<boolean> {
+    return this.fsService.pulseCheck(this.profile.brokerUrl ?? '');
+  }
+
+  ensureDefaultDirectory(): Promise<{ ok: boolean; path: string[] }> {
+    return this.fsService.ensureDefaultDirectory(this.profile.brokerUrl ?? '', this.token);
   }
 }
