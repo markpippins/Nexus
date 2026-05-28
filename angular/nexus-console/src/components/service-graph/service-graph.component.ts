@@ -144,8 +144,17 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         // Resolve Visual Component
         let compConfig = this.registry.getConfigById(String(svc.componentOverrideId));
 
+        // Try ServiceType.defaultComponentId (numeric, from API when set)
         if (!compConfig && svc.type?.defaultComponentId) {
           compConfig = this.registry.getConfigById(String(svc.type.defaultComponentId));
+        }
+
+        // Fallback: backend returns `type.defaultComponent: { id: N }` but
+        // NOT `type.defaultComponentId` (it's @Transient). The number may
+        // come through as number or string — getConfigById coerces with String().
+        if (!compConfig && svc.type?.defaultComponent?.id !== undefined &&
+            svc.type.defaultComponent.id !== null) {
+          compConfig = this.registry.getConfigById(String(svc.type.defaultComponent.id));
         }
 
         // Fallback or use resolved config
