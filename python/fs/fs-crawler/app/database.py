@@ -63,6 +63,12 @@ async def init_databases():
             await session.execute(text("SELECT 1"))
         logger.info("MySQL connection established")
         
+        # Create tables if they don't exist
+        from models.mysql_models import LibraryPath, FileType, MetadataHandler, HandlerFileType, ScanOperation
+        async with mysql_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("MySQL tables initialized")
+        
     except Exception as e:
         logger.error("Failed to initialize databases", error=str(e))
         raise

@@ -313,10 +313,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           backgroundColor: 'background.default',
           minHeight: '100vh',
-          mt: '64px', // Account for fixed AppBar
+          mt: '64px',
+          display: 'flex',
+          justifyContent: 'center',
         }}
       >
-        {children}
+        <Box sx={{ width: '100%', maxWidth: 1400 }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   )

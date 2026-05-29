@@ -180,7 +180,7 @@ const Dashboard: React.FC = () => {
                       Uptime: {getUptimeString(systemStatus.uptime_seconds)}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Started: {formatDistanceToNow(new Date(systemStatus.startup_time))} ago
+                      Started: {systemStatus.startup_time ? `${formatDistanceToNow(new Date(systemStatus.startup_time))} ago` : 'N/A'}
                     </Typography>
                   </Box>
                   <Box sx={{ mt: 'auto' }}>
@@ -450,7 +450,7 @@ const Dashboard: React.FC = () => {
                   <Box>
                     <Typography variant="body1" sx={{ fontWeight: 500 }}>{scan.path}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Started: {formatDistanceToNow(new Date(scan.started_at))} ago
+                      Started: {scan.started_at ? `${formatDistanceToNow(new Date(scan.started_at))} ago` : 'N/A'}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

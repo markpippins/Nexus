@@ -528,7 +528,7 @@ const Scanning: React.FC = () => {
                         </Box>
                       )}
                       <Typography variant="caption" color="text.secondary">
-                        Started: {formatDistanceToNow(new Date(scan.started_at))} ago
+                        Started: {scan.started_at ? `${formatDistanceToNow(new Date(scan.started_at))} ago` : 'N/A'}
                         {scan.deep_scan === 'true' && ' • Deep Scan'}
                       </Typography>
                     </Box>
@@ -627,7 +627,7 @@ const Scanning: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {formatDistanceToNow(new Date(scan.started_at))} ago
+                          {scan.started_at ? `${formatDistanceToNow(new Date(scan.started_at))} ago` : 'N/A'}
                         </Typography>
                       </TableCell>
                       <TableCell>

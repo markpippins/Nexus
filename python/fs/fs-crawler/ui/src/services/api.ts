@@ -36,7 +36,7 @@ export const systemApi = {
     axios.get('/system/status').then(res => res.data),
   
   getHealth: (): Promise<HealthStatus> =>
-    api.get('/health').then(res => res.data),
+    axios.get('/health').then(res => res.data),
 }
 
 // Library management endpoints

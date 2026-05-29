@@ -5,7 +5,7 @@ uvicorn[standard]==0.24.0
 # Database Drivers
 motor==3.3.2  # Async MongoDB
 redis==5.0.1
-sqlalchemy==2.0.23
+sqlalchemy>=2.0.36
 aiomysql==0.2.0
 
 # Data Validation & Serialization

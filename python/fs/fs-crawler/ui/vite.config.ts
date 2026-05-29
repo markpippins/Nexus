@@ -12,17 +12,18 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+    allowedHosts: ['iridium'],
     proxy: {
       '/api': {
-        target: 'http://172.16.30.23:8004',
+        target: 'http://localhost:8004',
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://172.16.30.23:8004',
+        target: 'http://localhost:8004',
         changeOrigin: true,
       },
       '/system': {
-        target: 'http://172.16.30.23:8004',
+        target: 'http://localhost:8004',
         changeOrigin: true,
       }
     }
