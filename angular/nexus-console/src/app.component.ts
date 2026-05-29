@@ -1730,8 +1730,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   // --- Graph Visualization Control Handlers ---
-  onGraphModeChange(mode: 'camera' | 'edit'): void {
-    this.vizService.setMode(mode);
+  onGraphModeChange(mode: 'camera' | 'auto' | 'edit'): void {
+    this.vizService.setViewMode(mode);
   }
 
   onToggleSimulation(): void {
