@@ -128,4 +128,24 @@ public class RestFsClient {
         req.setFilename(foldername);
         return post(req, Map.class);
     }
+
+    // ===============================
+    // Health Check
+    // ===============================
+
+    public boolean pulseCheck() {
+        try {
+            // Derive base URL from apiUrl (strip trailing /fs if present)
+            String baseUrl = apiUrl;
+            if (baseUrl.endsWith("/fs")) {
+                baseUrl = baseUrl.substring(0, baseUrl.length() - 3);
+            }
+            ResponseEntity<Map> response = restTemplate.getForEntity(baseUrl + "/health", Map.class);
+            Map body = response.getBody();
+            return body != null && "UP".equals(body.get("status"));
+        } catch (Exception e) {
+            log.warn("File-system server pulse check failed: {}", e.getMessage());
+            return false;
+        }
+    }
 }

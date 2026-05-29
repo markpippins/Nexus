@@ -2,6 +2,7 @@ package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceTypeRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.VisualComponentRepository;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,9 +19,11 @@ public class ServiceTypeController {
     private static final Logger log = LoggerFactory.getLogger(ServiceTypeController.class);
 
     private final ServiceTypeRepository repository;
+    private final VisualComponentRepository visualComponentRepository;
 
-    public ServiceTypeController(ServiceTypeRepository repository) {
+    public ServiceTypeController(ServiceTypeRepository repository, VisualComponentRepository visualComponentRepository) {
         this.repository = repository;
+        this.visualComponentRepository = visualComponentRepository;
     }
 
     @GetMapping
@@ -48,6 +51,11 @@ public class ServiceTypeController {
     @PostMapping
     public ResponseEntity<ServiceType> create(@RequestBody ServiceType serviceType) {
         log.info("Creating service type with name: {}", serviceType.getName());
+        // Resolve defaultComponent from transient defaultComponentId
+        if (serviceType.getDefaultComponentId() != null) {
+            visualComponentRepository.findById(serviceType.getDefaultComponentId())
+                .ifPresent(serviceType::setDefaultComponent);
+        }
         try {
             ServiceType savedServiceType = repository.save(serviceType);
             log.info("Service type created successfully with ID: {}", savedServiceType.getId());
@@ -70,6 +78,13 @@ public class ServiceTypeController {
                 .map(existing -> {
                     existing.setName(details.getName());
                     existing.setDescription(details.getDescription());
+                    existing.setActiveFlag(details.getActiveFlag());
+                    if (details.getDefaultComponentId() != null) {
+                        visualComponentRepository.findById(details.getDefaultComponentId())
+                            .ifPresent(existing::setDefaultComponent);
+                    } else {
+                        existing.setDefaultComponent(null);
+                    }
                     ServiceType updatedServiceType = repository.save(existing);
                     log.info("Service type updated successfully with ID: {}", updatedServiceType.getId());
                     return ResponseEntity.ok(updatedServiceType);

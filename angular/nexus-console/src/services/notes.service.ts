@@ -25,20 +25,18 @@ export class NotesService {
   }
 
   isConnected(path: string[]): boolean {
-    if (path.length === 0) { // Home root is always connected
-      return true;
+    if (path.length === 0) {
+      return true; // Home root is always connected
     }
 
     const rootName = path[0];
-    const profile = this.brokerProfileService.profiles().find(p => p.name === rootName);
+    const sessionName = this.localConfigService.sessionName();
 
-    // If no profile matches, or it's the local session, it's connected.
-    if (!profile || rootName === this.localConfigService.sessionName()) {
-      return true;
-    }
+    // Notes only available under Local Session and File Systems
+    if (rootName === sessionName) return true;
+    if (rootName === 'File Systems') return true;
 
-    // It's a remote path. Check for token.
-    return this.tokens.has(profile.id);
+    return false;
   }
 
   private constructBrokerUrl(baseUrl: string): string {

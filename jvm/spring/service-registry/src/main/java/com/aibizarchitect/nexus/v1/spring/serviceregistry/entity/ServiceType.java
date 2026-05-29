@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "service_types")
@@ -30,6 +31,9 @@ public class ServiceType {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "default_component_id")
     private VisualComponent defaultComponent;
+
+    @Transient
+    private Long defaultComponentId;
 
     public ServiceType() {
     }
@@ -80,5 +84,13 @@ public class ServiceType {
 
     public void setDefaultComponent(VisualComponent defaultComponent) {
         this.defaultComponent = defaultComponent;
+    }
+
+    public Long getDefaultComponentId() {
+        return defaultComponentId;
+    }
+
+    public void setDefaultComponentId(Long defaultComponentId) {
+        this.defaultComponentId = defaultComponentId;
     }
 }

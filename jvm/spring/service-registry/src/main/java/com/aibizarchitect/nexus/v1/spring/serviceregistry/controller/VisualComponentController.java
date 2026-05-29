@@ -2,6 +2,9 @@ package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.VisualComponent;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.VisualComponentRepository;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -18,7 +21,8 @@ public class VisualComponentController {
     }
 
     @GetMapping
-    public ResponseEntity<com.aibizarchitect.nexus.v1.dto.PagedResponse<VisualComponent>> getAll(org.springframework.data.domain.Pageable pageable) {
+    public ResponseEntity<com.aibizarchitect.nexus.v1.dto.PagedResponse<VisualComponent>> getAll(
+            @PageableDefault(sort = "name", direction = Sort.Direction.ASC, size = 200) Pageable pageable) {
         return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(repository.findAll(pageable)));
     }
 

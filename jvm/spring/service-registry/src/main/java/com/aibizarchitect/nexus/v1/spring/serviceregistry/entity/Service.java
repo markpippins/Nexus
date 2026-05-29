@@ -24,7 +24,7 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "services")
 @JsonIgnoreProperties({ "deployments", "serviceConfigs", "serviceDependenciesAsConsumer",
-        "serviceDependenciesAsProvider", "subModules" })
+        "serviceDependenciesAsProvider", "subModules", "parentService" })
 public class Service {
 
     @Id

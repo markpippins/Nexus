@@ -1,14 +1,20 @@
 <div class="viz-container" (window:click)="closeContextMenu()">
   <!-- Header Controls -->
-  <!-- <div class="header-bar">
+  <div class="header-bar">
     <div class="mode-switcher">
       <button
         (click)="setMode('camera')"
-        [class.active]="currentMode() === 'camera' && !isSimulationActive()"
+        [class.active]="viewMode() === 'camera' && !isSimulationActive()"
       >
         🎥 Camera
       </button>
-      <button (click)="setMode('edit')" [class.active]="currentMode() === 'edit'">✋ Move</button>
+      <button
+        (click)="setMode('auto')"
+        [class.active]="viewMode() === 'auto'"
+      >
+        🔄 Auto
+      </button>
+      <button (click)="setMode('edit')" [class.active]="viewMode() === 'edit'">✋ Edit</button>
     </div>
 
     <button (click)="toggleSimulation()" [class.active]="isSimulationActive()" class="sim-btn">
@@ -37,7 +43,7 @@
       <button (click)="resetDemo()">Reset</button>
       <button (click)="clearCanvas()" class="danger">Clear</button>
     </div>
-  </div> -->
+  </div>
 
   <!-- Main Content Area -->
   <div class="content-area" (contextmenu)="onContextMenu($event)">
