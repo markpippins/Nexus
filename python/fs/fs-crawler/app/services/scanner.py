@@ -50,9 +50,9 @@ class ScannerService:
         
     async def _init_clients(self):
         """Initialize database clients if not already done"""
-        if not self.redis_client:
+        if self.redis_client is None:
             self.redis_client = get_redis()
-        if not self.mongodb:
+        if self.mongodb is None:
             self.mongodb = get_mongodb()
 
     async def _redis(self, method: str, *args, default=None, **kwargs):
@@ -382,7 +382,7 @@ class ScannerService:
                 "status": "running",
                 "files_processed": 0,
                 "deep_scan": str(deep_scan),
-                "resume": False,
+                "resume": 0,
                 "current_directory": "",
                 "completed_files": "[]",  # JSON list of completed files
                 "remaining_queue": "[]"   # JSON list of remaining files
