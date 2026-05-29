@@ -101,10 +101,10 @@ const serveStaticFile = async (baseName: string, res: http.ServerResponse, searc
           'Cache-Control': 'public, max-age=3600' // Cache for 1 hour
         });
         res.end(fileContent);
-        logger.info('File served successfully', { baseName, filePath, location });
+        logger.info(`File served successfully: ${baseName}`, { baseName, filePath, location });
         return true; // File found and served
       } catch (error) {
-        logger.debug(`File not found or inaccessible`, { baseName, filePath, location, error: (error as Error).message });
+        logger.debug(`File not found or inaccessible: ${baseName}`, { baseName, filePath, location, error: (error as Error).message });
         // Continue to try next location
       }
     }
@@ -126,10 +126,10 @@ const serveStaticFile = async (baseName: string, res: http.ServerResponse, searc
             'Cache-Control': 'public, max-age=3600' // Cache for 1 hour
           });
           res.end(fileContent);
-          logger.info('File served successfully', { fileName, filePath, location, ext });
+          logger.info(`File served successfully: ${fileName}`, { fileName, filePath, location, ext });
           return true; // File found and served
         } catch (error) {
-          logger.debug(`File not found or inaccessible`, { fileName, filePath, location, ext, error: (error as Error).message });
+          logger.debug(`File not found or inaccessible: ${fileName}`, { fileName, filePath, location, ext, error: (error as Error).message });
           // Continue to try next extension/location
         }
       }
@@ -140,7 +140,7 @@ const serveStaticFile = async (baseName: string, res: http.ServerResponse, searc
 
 const server = http.createServer(async (req, res) => {
   // Log incoming requests
-  logger.info(`Incoming request`, {
+  logger.info(`Incoming request: ${req.url}`, {
     method: req.method,
     url: req.url,
     headers: req.headers
@@ -163,6 +163,7 @@ const server = http.createServer(async (req, res) => {
 
   const parsedUrl = url.parse(req.url ?? '', true);
   const pathParts = (parsedUrl.pathname ?? '').split('/').filter(p => p);
+  const requestedImage = pathParts.length > 0 ? pathParts.join('/') : '/';
 
   // Handle health check endpoint
   if (req.url === '/health' && req.method === 'GET') {
@@ -238,21 +239,21 @@ const server = http.createServer(async (req, res) => {
         fileServed = await serveStaticFile(ext, res);
       } else {
         const filePath = pathParts.join('/');
-        logger.info('Default Search', { requestedPath: filePath });
+        logger.info(`Default Search: ${filePath}`, { requestedPath: filePath });
         // Default route - treat the entire path as a filename and search through all folder locations
         fileServed = await serveStaticFile(filePath, res, FOLDER_LOCATIONS);
       }
     }
 
     if (!fileServed) {
-      logger.warn('File not found', { path: req.url, pathParts, endpoint: pathParts[0], params: pathParts.slice(1) });
+      logger.warn(`File not found: ${req.url}`, { path: req.url, pathParts, endpoint: pathParts[0], params: pathParts.slice(1) });
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Not Found', path: req.url }));
     } else {
-      logger.info('Request processed successfully', { path: req.url, pathParts, endpoint: pathParts[0], params: pathParts.slice(1) });
+      logger.info(`Request processed successfully: ${req.url}`, { path: req.url, pathParts, endpoint: pathParts[0], params: pathParts.slice(1) });
     }
   } catch (e) {
-    logger.error('Error processing request:', { error: (e as Error).message, stack: (e as Error).stack, path: req.url, pathParts, endpoint: pathParts[0], params: pathParts.slice(1) });
+    logger.error(`Error processing request: ${req.url}`, { error: (e as Error).message, stack: (e as Error).stack, path: req.url, pathParts, endpoint: pathParts[0], params: pathParts.slice(1) });
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Server Error', message: (e as Error).message }));
   }

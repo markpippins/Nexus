@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { BrokerService } from './broker.service.js';
-import { FileSystemNode } from '../models/file-system.model.js';
+import { FileSystemNode, Mount } from '../models/file-system.model.js';
 import { ItemReference } from './file-system-provider.js';
 
 const SERVICE_NAME = 'restFsService';
@@ -25,6 +25,10 @@ export class FsService {
 
   listFiles(brokerUrl: string, token: string, path: string[]): Promise<FileSystemNode[]> {
     return this.brokerService.submitRequest<FileSystemNode[]>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'listFiles', { path, token });
+  }
+
+  listMounts(brokerUrl: string, token: string): Promise<Mount[]> {
+    return this.brokerService.submitRequest<Mount[]>(this.constructBrokerUrl(brokerUrl), 'mountService', 'listMounts', { token });
   }
 
   async getFileContent(brokerUrl: string, token: string, path: string[], filename: string): Promise<string> {
@@ -74,5 +78,13 @@ export class FsService {
 
   copy(brokerUrl: string, token: string, fromPath: string[], toPath: string[]): Promise<void> {
     return this.brokerService.submitRequest(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'copy', { fromPath, toPath, token });
+  }
+
+  pulseCheck(brokerUrl: string): Promise<boolean> {
+    return this.brokerService.submitRequest<boolean>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'pulseCheck', {});
+  }
+
+  ensureDefaultDirectory(brokerUrl: string, token: string): Promise<{ ok: boolean; path: string[] }> {
+    return this.brokerService.submitRequest<{ ok: boolean; path: string[] }>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'ensureDefaultDirectory', { token });
   }
 }

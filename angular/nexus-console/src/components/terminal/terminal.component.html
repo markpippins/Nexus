@@ -1,1 +1,56 @@
-<div #terminal class="w-full h-full"></div>
+<div class="w-full h-full flex flex-col min-h-0">
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    @for (session of sessions(); track session.id; let i = $index) {
+      <div
+        class="tab"
+        [class.active]="i === activeIndex()"
+        (click)="switchTab(i)"
+      >
+        @if (editingIndex() === i) {
+          <input
+            class="rename-input"
+            [value]="editLabelInput()"
+            (input)="editLabelInput.set($any($event.target).value)"
+            (blur)="commitRename(i)"
+            (keydown.enter)="commitRename(i)"
+            (keydown.escape)="cancelRename()"
+            (click)="$event.stopPropagation()"
+            autofocus
+          />
+        } @else {
+          <span class="tab-label" (dblclick)="startRename(i); $event.stopPropagation()">
+            {{ session.label }}
+          </span>
+        }
+        <button
+          class="tab-close"
+          (click)="removeTab(i); $event.stopPropagation()"
+          title="Close tab"
+        >
+          &times;
+        </button>
+      </div>
+    }
+    <button class="add-tab-btn" (click)="addTab()" title="New terminal tab">
+      +
+    </button>
+    <div class="flex-1"></div>
+    <button class="collapse-btn" (click)="collapse.emit()" title="Collapse Console">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Terminal Area -->
+  <div class="terminal-area">
+    @for (session of sessions(); track session.id; let i = $index) {
+      <div
+        #terminalContainer
+        class="terminal-container"
+        [class.hidden]="i !== activeIndex()"
+      ></div>
+    }
+  </div>
+</div>

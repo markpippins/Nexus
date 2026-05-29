@@ -1,11 +1,11 @@
 
 
 
-import { Component, ChangeDetectionStrategy, signal, computed, inject, effect, Renderer2, ElementRef, OnDestroy, Injector, OnInit, ViewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, effect, untracked, Renderer2, ElementRef, NgZone, OnDestroy, Injector, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FileExplorerComponent } from './components/file-explorer/file-explorer.component.js';
 import { SidebarComponent } from './components/sidebar/sidebar.component.js';
-import { FileSystemNode, FileType } from './models/file-system.model.js';
+import { FileSystemNode, FileType, Mount } from './models/file-system.model.js';
 import { FileSystemProvider, ItemReference } from './services/file-system-provider.js';
 import { BrokerProfileService } from './services/broker-profile.service.js';
 import { HostProfileService } from './services/host-profile.service.js';
@@ -40,26 +40,9 @@ import { FolderPropertiesService } from './services/folder-properties.service.js
 import { TextEditorService } from './services/note-dialog.service.js';
 import { TextEditorDialogComponent } from './components/note-view-dialog/note-view-dialog.component.js';
 import { DbService } from './services/db.service.js';
-import { GoogleSearchService, GoogleSearchParams } from './services/google-search.service.js';
-import { UnsplashService } from './services/unsplash.service.js';
 import { GeminiService, GeminiSearchParams } from './services/gemini.service.js';
-import { YoutubeSearchService } from './services/youtube-search.service.js';
-import { AcademicSearchService } from './services/academic-search.service.js';
-import { GoogleSearchResult } from './models/google-search-result.model.js';
-import { ImageSearchResult } from './models/image-search-result.model.js';
-import { YoutubeSearchResult } from './models/youtube-search-result.model.js';
-import { AcademicSearchResult } from './models/academic-search-result.model.js';
 import { NodeType } from './models/tree-node.model.js';
-import { WebResultCardComponent } from './components/stream-cards/web-result-card.component.js';
-import { ImageResultCardComponent } from './components/stream-cards/image-result-card.component.js';
-import { GeminiResultCardComponent } from './components/stream-cards/gemini-result-card.component.js';
-import { YoutubeResultCardComponent } from './components/stream-cards/youtube-result-card.component.js';
-import { AcademicResultCardComponent } from './components/stream-cards/academic-result-card.component.js';
-import { WebResultListItemComponent } from './components/stream-list-items/web-result-list-item.component.js';
-import { ImageResultListItemComponent } from './components/stream-list-items/image-result-list-item.component.js';
-import { GeminiResultListItemComponent } from './components/stream-list-items/gemini-result-list-item.component.js';
-import { YoutubeResultListItemComponent } from './components/stream-list-items/youtube-result-list-item.component.js';
-import { AcademicResultListItemComponent } from './components/stream-list-items/academic-result-list-item.component.js';
+import { IdeaStreamComponent } from './components/idea-stream/idea-stream.component.js';
 import { PreferencesDialogComponent } from './components/preferences-dialog/preferences-dialog.component.js';
 import { TerminalComponent } from './components/terminal/terminal.component.js';
 import { NotesService } from './services/notes.service.js';
@@ -80,6 +63,7 @@ import { GatewayEditorComponent } from './components/gateway-editor/gateway-edit
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
 import { GatewayManagementComponent } from './components/gateway-management/gateway-management.component.js';
 import { HostServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
+import { RmsIframeComponent } from './components/rms-iframe/rms-iframe.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 
 interface PanePath {
@@ -92,23 +76,6 @@ interface PaneStatus {
   filteredItemsCount: number | null;
 }
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
-
-// Type definitions for items in the unified stream
-type GeminiResult = { query: string; text: string; publishedAt: string; };
-
-type StreamItem =
-  | (GoogleSearchResult & { type: 'web' })
-  | (ImageSearchResult & { type: 'image' })
-  | (YoutubeSearchResult & { type: 'youtube' })
-  | (AcademicSearchResult & { type: 'academic' })
-  | (GeminiResult & { type: 'gemini' });
-
-type StreamItemType = 'web' | 'image' | 'youtube' | 'academic' | 'gemini';
-type StreamSortKey = 'relevance' | 'title' | 'source' | 'date';
-interface StreamSortCriteria {
-  key: StreamSortKey;
-  direction: 'asc' | 'desc';
-}
 
 const readOnlyProviderOps = {
   createDirectory: () => Promise.reject(new Error('Operation not supported.')),
@@ -146,7 +113,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, WebResultCardComponent, ImageResultCardComponent, GeminiResultCardComponent, YoutubeResultCardComponent, AcademicResultCardComponent, WebResultListItemComponent, ImageResultListItemComponent, GeminiResultListItemComponent, YoutubeResultListItemComponent, AcademicResultListItemComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, RmsIframeComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -170,15 +137,12 @@ export class AppComponent implements OnInit, OnDestroy {
   private injector = inject(Injector);
   private document: Document = inject(DOCUMENT);
   private renderer = inject(Renderer2);
+  private ngZone = inject(NgZone);
   private elementRef = inject(ElementRef);
   private dbService = inject(DbService);
   private uiPreferencesService = inject(UiPreferencesService);
   private homeProvider: FileSystemProvider;
-  private googleSearchService = inject(GoogleSearchService);
-  private unsplashService = inject(UnsplashService);
   private geminiService = inject(GeminiService);
-  private youtubeSearchService = inject(YoutubeSearchService);
-  private academicSearchService = inject(AcademicSearchService);
   private notesService = inject(NotesService);
   private healthCheckService = inject(HealthCheckService);
   private treeManager = inject(TreeManagerService);
@@ -206,7 +170,7 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'nexus-rms'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -222,17 +186,15 @@ export class AppComponent implements OnInit, OnDestroy {
   isStreamVisible = this.uiPreferencesService.isStreamVisible;
   isConsoleCollapsed = this.uiPreferencesService.isConsoleCollapsed;
   isStreamPaneCollapsed = this.uiPreferencesService.isStreamPaneCollapsed;
-  isStreamActiveSearchEnabled = this.uiPreferencesService.isStreamActiveSearchEnabled;
 
   shouldShowStreamPane = computed(() => {
     if (!this.isStreamVisible()) return false;
 
     const path = this.activePanePath();
-    if (path.length > 0 && path[0] === 'Platform Management') {
-      return false;
-    }
+    if (path.length === 0) return false;
 
-    return true;
+    const sessionName = this.localConfigService.sessionName();
+    return path[0] === sessionName || path[0] === 'File Systems';
   });
 
   // --- Content Status Bar (CRUD screens) ---
@@ -248,9 +210,11 @@ export class AppComponent implements OnInit, OnDestroy {
   mountedProfiles = signal<BrokerProfile[]>([]);
   mountedProfileUsers = signal<Map<string, User>>(new Map());
   mountedProfileTokens = signal<Map<string, string>>(new Map());
+  mountedProfileMounts = signal<Map<string, Mount[]>>(new Map());
   mountedProfileIds = computed(() => this.mountedProfiles().map(p => p.id));
   private remoteProviders = signal<Map<string, RemoteFileSystemService>>(new Map());
   private remoteImageServices = signal<Map<string, ImageService>>(new Map());
+  filesystemHealth = signal<Map<string, boolean>>(new Map());
 
   // --- Status Bar State ---
   pane1Status = signal<PaneStatus>({ selectedItemsCount: 0, totalItemsCount: 0, filteredItemsCount: null });
@@ -591,7 +555,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const newProfile = {
       name: newName,
-      brokerUrl: 'localhost:8080',
+      brokerUrl: 'localhost:8081',
       imageUrl: '',
       autoConnect: false,
     };
@@ -657,16 +621,6 @@ export class AppComponent implements OnInit, OnDestroy {
     return true;
   });
 
-  isStreamToolbarVisible = computed(() => {
-    const path = this.activePanePath();
-    if (path.length === 0) return false;
-
-    const root = path[0];
-    const sessionName = this.localConfigService.sessionName();
-
-    return root === sessionName || root === 'File Systems' || root === 'Gateways';
-  });
-
   isActionableContext = computed(() => {
     const path = this.activePanePath();
     if (path.length === 0) {
@@ -674,6 +628,13 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     const rootName = path[0];
+
+    // System mount folder under File Systems — gateway profile level
+    // Path is ['File Systems', 'gateway-name'] — at mount container level, not actionable
+    if (rootName === 'File Systems' && path.length === 2) {
+      return false;
+    }
+
     const profile = this.profileService.profiles().find(p => p.name === rootName);
 
     if (profile) {
@@ -905,9 +866,6 @@ export class AppComponent implements OnInit, OnDestroy {
   webviewContent = this.webviewService.viewRequest;
   textEditorContent = this.textEditorService.viewRequest;
 
-  // --- Bookmarks ---
-  bookmarkedLinks = this.bookmarkService.bookmarkedLinks;
-
   // --- Theme Dropdown ---
   isThemeDropdownOpen = signal(false);
   themeMenuPosition = signal({ top: '0px', right: '0px' });
@@ -917,107 +875,6 @@ export class AppComponent implements OnInit, OnDestroy {
     { id: 'theme-dark', name: 'Dark' },
   ];
   currentTheme = this.uiPreferencesService.theme;
-
-  // --- Idea Stream State ---
-  streamResultsForPane1 = signal<StreamItem[]>([]);
-  streamResultsForPane2 = signal<StreamItem[]>([]);
-  streamDisplayMode = signal<'grid' | 'list'>('grid');
-  streamSourceToggle = signal<'all' | 'active' | 'left' | 'right'>('active');
-  streamSearchQuery = signal('');
-
-  readonly streamFilterTypes: { type: StreamItemType; label: string; iconPath: string }[] = [
-    { type: 'web', label: 'Web', iconPath: 'M10 18a8 8 0 100-16 8 8 0 000 16zM4.75 5.177a3.502 3.502 0 014.22.613l.31.39a.75.75 0 001.442 0l.31-.39a3.502 3.502 0 014.22-.613A4.502 4.502 0 0119 8.5v.081a4.5 4.5 0 01-5.138 4.417l-.27-1.353a.75.75 0 00-1.44-.288l-1.045 1.62a.75.75 0 00.288 1.441l1.354.27a4.5 4.5 0 01-4.416 5.137H8.5a4.502 4.502 0 01-3.323-1.413 3.502 3.502 0 01-.613-4.22l.39-.31a.75.75 0 000-1.442l-.39-.31a3.502 3.502 0 01-.613-4.22A4.502 4.502 0 014.75 5.177z' },
-    { type: 'image', label: 'Images', iconPath: 'M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4V5h12v10zM6 8a1 1 0 100-2 1 1 0 000 2zm2 4l-2 3h8l-3-4-2 2.5L8 12z' },
-    { type: 'youtube', label: 'Videos', iconPath: 'M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z' },
-    { type: 'academic', label: 'Academic', iconPath: 'M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 16c1.255 0 2.443-.29 3.5-.804V4.804zM14.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 0114.5 16c1.255 0 2.443-.29 3.5-.804v-10A7.968 7.968 0 0014.5 4z' },
-    { type: 'gemini', label: 'AI', iconPath: 'M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z' }
-  ];
-  activeStreamFilters = signal<Set<StreamItemType>>(new Set(this.streamFilterTypes.map(f => f.type)));
-
-  isStreamSortDropdownOpen = signal(false);
-  streamSortCriteria = signal<StreamSortCriteria>({ key: 'relevance', direction: 'asc' });
-
-  // Filtered and sorted stream results for rendering
-  visibleStreamResults = computed(() => {
-    const source = this.streamSourceToggle();
-    let combinedResults: StreamItem[] = [];
-
-    if (source === 'all') {
-      combinedResults = [...this.streamResultsForPane1(), ...this.streamResultsForPane2()];
-    } else if (source === 'left') {
-      combinedResults = this.streamResultsForPane1();
-    } else if (source === 'right') {
-      combinedResults = this.streamResultsForPane2();
-    } else { // 'active'
-      combinedResults = this.activePaneId() === 1 ? this.streamResultsForPane1() : this.streamResultsForPane2();
-    }
-    return combinedResults;
-  });
-
-  processedStreamResults = computed(() => {
-    let items = this.visibleStreamResults();
-    const query = this.streamSearchQuery().toLowerCase();
-    const filters = this.activeStreamFilters();
-    const sort = this.streamSortCriteria();
-
-    // 1. Filter by query
-    if (query) {
-      items = items.filter(item => {
-        if ('title' in item && item.title.toLowerCase().includes(query)) return true;
-        if ('snippet' in item && item.snippet?.toLowerCase().includes(query)) return true;
-        if ('description' in item && item.description?.toLowerCase().includes(query)) return true;
-        if ('text' in item && item.text.toLowerCase().includes(query)) return true;
-        return false;
-      });
-    }
-
-    // 2. Filter by type
-    items = items.filter(item => filters.has(item.type));
-
-    // 3. Sort
-    items.sort((a, b) => {
-      if (sort.key === 'relevance') {
-        return 0; // Maintain original order which is assumed to be relevance
-      }
-
-      let valA: string = '';
-      let valB: string = '';
-
-      const getSource = (item: StreamItem): string => {
-        switch (item.type) {
-          case 'web':
-            return item.source ?? '';
-          case 'image':
-            return item.source ?? '';
-          case 'youtube':
-            return item.channelTitle ?? '';
-          case 'academic':
-            return item.publication ?? '';
-          case 'gemini':
-            return 'Gemini';
-        }
-      };
-
-      switch (sort.key) {
-        case 'title':
-          valA = ('title' in a ? a.title : ('description' in a ? a.description : a.query)) ?? '';
-          valB = ('title' in b ? b.title : ('description' in b ? b.description : b.query)) ?? '';
-          break;
-        case 'source':
-          valA = getSource(a);
-          valB = getSource(b);
-          break;
-        case 'date':
-          valA = a.publishedAt ?? '0';
-          valB = b.publishedAt ?? '0';
-          // For dates, we want newest first by default, so we reverse the comparison
-          return new Date(valB).getTime() - new Date(valA).getTime();
-      }
-      return valA.localeCompare(valB, undefined, { sensitivity: 'base' });
-    });
-
-    return items;
-  });
 
   // --- Pane Context Signals for Stream ---
   pane1Context = computed(() => {
@@ -1103,7 +960,7 @@ export class AppComponent implements OnInit, OnDestroy {
           type: 'folder' as const,
           isServerRoot: true,
           profileId: p.id,
-          connected: true, // Host servers are considered connected if they exist
+          connected: this.healthCheckService.getServiceStatus(p.imageUrl) !== 'DOWN', // Show X overlay when registry is DOWN
           healthStatus: this.healthCheckService.getServiceStatus(p.imageUrl),
           children: [],
           childrenLoaded: false,
@@ -1123,15 +980,16 @@ export class AppComponent implements OnInit, OnDestroy {
           }
 
 
-          // File Systems folder
+            // File Systems folder
           if (rootName === 'File Systems') {
             // Return only connected gateways that offer file services
             const mountedIds = this.mountedProfileIds();
             const allBrokerProfiles = this.profileService.profiles();
 
             // Filter to only return profiles that are currently mounted/connected
+            // AND have a healthy file-system server
             const connectedFileServiceGateways = allBrokerProfiles.filter(p =>
-              mountedIds.includes(p.id)
+              mountedIds.includes(p.id) && this.filesystemHealth().get(p.name) === true
             );
 
             // Convert to FileSystemNode format
@@ -1505,19 +1363,24 @@ export class AppComponent implements OnInit, OnDestroy {
     // Build broker gateway nodes
     for (const profile of allProfiles) {
       const isConnected = mountedIds.includes(profile.id);
+      const fsHealthy = this.filesystemHealth().get(profile.name) === true;
 
       if (isConnected) {
         const provider = this.remoteProviders().get(profile.name);
         if (provider) {
           try {
             const remoteTree = await provider.getFolderTree();
+            // If filesystem is unhealthy, suppress mount children in sidebar
+            const children = fsHealthy ? remoteTree.children : [];
             remoteRoots.push({
-              ...remoteTree,
-              name: profile.name, // Ensure the root name is the profile name
+              name: profile.name,
+              type: 'folder' as FileType,
               isServerRoot: true,
               profileId: profile.id,
               connected: true,
               healthStatus: this.healthCheckService.getServiceStatus(profile.imageUrl),
+              children: children,
+              childrenLoaded: fsHealthy ? remoteTree.childrenLoaded : true,
             });
           } catch (e) {
             console.error(`Failed to get folder tree for ${profile.name}`, e);
@@ -1570,7 +1433,17 @@ export class AppComponent implements OnInit, OnDestroy {
     // Find the "File Systems" node
     const fileSystemsNode = hostNodes.find(n => n.name === 'File Systems');
     if (fileSystemsNode) {
+      // Add connected, mounted gateway profiles as children of File Systems
+      const mountedGateways = remoteRoots
+        .filter(r => r.connected === true)
+        .map(r => ({
+          ...r,
+          isServerRoot: false,
+          metadata: { ...r.metadata, mountId: true },
+        }));
+      fileSystemsNode.children = mountedGateways;
       fileSystemsNode.childrenLoaded = true;
+      fileSystemsNode.isVirtualFolder = true;
     }
 
     // Prepare the Local Session to be added at root level
@@ -1585,7 +1458,7 @@ export class AppComponent implements OnInit, OnDestroy {
       type: 'folder' as const,
       isServerRoot: true,
       profileId: p.id,
-      connected: true, // Host servers are considered connected if they exist
+      connected: this.healthCheckService.getServiceStatus(p.imageUrl) !== 'DOWN', // Show X overlay when registry is DOWN
       healthStatus: this.healthCheckService.getServiceStatus(p.imageUrl),
       children: [],
       childrenLoaded: false,
@@ -1830,20 +1703,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.uiPreferencesService.toggleRssFeed();
   }
 
-  toggleStream(): void {
-    this.uiPreferencesService.toggleStream();
-  }
-
   toggleConsole(): void {
     this.uiPreferencesService.toggleConsole();
-  }
-
-  toggleStreamPaneCollapse(): void {
-    this.uiPreferencesService.toggleStreamPaneCollapse();
-  }
-
-  toggleStreamActiveSearch(): void {
-    this.uiPreferencesService.toggleStreamActiveSearch();
   }
 
   triggerRefresh(): void {
@@ -2077,6 +1938,36 @@ export class AppComponent implements OnInit, OnDestroy {
       const provider = new RemoteFileSystemService(profile, this.fsService, token);
       const imageService = new ImageService(profile, this.imageClientService, this.preferencesService, this.healthCheckService, this.localConfigService);
 
+      // Pulse check the file-system server before listing mounts
+      let fsHealthy = false;
+      try {
+        fsHealthy = await provider.pulseCheck();
+      } catch (pulseErr) {
+        this.toastService.show(`File-system server is unreachable for ${profile.name}.`, 'warning');
+      }
+
+      this.filesystemHealth.update(m => new Map(m).set(profile.name, fsHealthy));
+
+      if (fsHealthy) {
+        // Ensure the user's default directory exists
+        try {
+          await provider.ensureDefaultDirectory();
+        } catch (dirErr) {
+          console.warn(`Could not ensure default directory for ${profile.name}:`, dirErr);
+        }
+
+        // Load mounts BEFORE updating mountedProfiles so the tree rebuild sees mount data
+        const mounts = await provider.listMounts();
+        provider.setMounts(mounts);
+        this.mountedProfileMounts.update(map => {
+          const m = new Map(map);
+          m.set(profile.name, mounts);
+          return m;
+        });
+      } else {
+        this.toastService.show(`File-system server is unreachable for ${profile.name}.`, 'warning');
+      }
+
       this.mountedProfiles.update(p => [...p, profile]);
       this.mountedProfileUsers.update(m => new Map(m).set(profile.id, user));
       this.mountedProfileTokens.update(m => new Map(m).set(profile.id, token));
@@ -2084,7 +1975,8 @@ export class AppComponent implements OnInit, OnDestroy {
       this.remoteImageServices.update(m => new Map(m).set(profile.name, imageService));
       this.notesService.setToken(profile.id, token);
 
-      await this.loadFolderTree();
+      // Sync mounts to remaining providers (provider already has them via setMounts above)
+      this.syncProviderMounts();
 
       this.toastService.show(`Successfully connected to ${profile.name}.`);
 
@@ -2096,6 +1988,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onUnmountProfile(profile: BrokerProfile): void {
     this.mountedProfiles.update(p => p.filter(item => item.id !== profile.id));
+
+    this.filesystemHealth.update(m => {
+      const newMap = new Map(m);
+      newMap.delete(profile.name);
+      return newMap;
+    });
 
     this.mountedProfileUsers.update(m => {
       const newMap = new Map(m);
@@ -2123,6 +2021,12 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.notesService.removeToken(profile.id);
 
+    this.mountedProfileMounts.update(m => {
+      const newMap = new Map(m);
+      newMap.delete(profile.name);
+      return newMap;
+    });
+
     // If any pane was inside the unmounted profile, navigate it to root
     this.panePaths.update(paths => {
       return paths.map(p => {
@@ -2135,6 +2039,16 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.loadFolderTree();
     this.toastService.show(`Disconnected from ${profile.name}.`);
+  }
+
+  /** Sync mounts from mountedProfileMounts to each connected RemoteFileSystemService provider. */
+  private syncProviderMounts(): void {
+    this.mountedProfileMounts().forEach((mounts, profileName) => {
+      const provider = this.remoteProviders().get(profileName);
+      if (provider instanceof RemoteFileSystemService) {
+        provider.setMounts(mounts);
+      }
+    });
   }
 
   onConnectToServer(profileId: string): void {
@@ -2261,6 +2175,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.folderPropertiesService.handleDelete(path);
     }
     this.loadFolderTree();
+    this.triggerRefresh();
   }
 
   onSidebarDeleteItem(path: string[]): void {
@@ -2375,10 +2290,6 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.isThemeDropdownOpen() && !target.closest('.theme-menu')) {
       this.isThemeDropdownOpen.set(false);
     }
-    // Close stream sort dropdown
-    if (this.isStreamSortDropdownOpen() && !target.closest('.stream-sort-menu')) {
-      this.isStreamSortDropdownOpen.set(false);
-    }
   }
 
   // --- Resizing logic ---
@@ -2416,26 +2327,37 @@ export class AppComponent implements OnInit, OnDestroy {
   startStreamResize(event: MouseEvent): void {
     this.isResizingStream = true;
     event.preventDefault();
-    const container = this.mainContentWrapperEl.nativeElement;
+    const container = this.mainContentWrapperEl?.nativeElement;
+    if (!container) { console.warn('[AppComponent] mainContentWrapperEl not available'); return; }
     const startY = event.clientY;
     const containerRect = container.getBoundingClientRect();
-    const initialStreamHeight = container.children[2].getBoundingClientRect().height;
+    const streamEl = container.querySelector('app-idea-stream');
+    const initialStreamHeight = streamEl ? streamEl.getBoundingClientRect().height : 0;
 
-    this.unlistenStreamResizeMove = this.renderer.listen('document', 'mousemove', (e: MouseEvent) => {
-      const dy = startY - e.clientY;
-      let newStreamHeight = initialStreamHeight + dy;
+    this.ngZone.runOutsideAngular(() => {
+      const onMove = (e: MouseEvent) => {
+        const dy = startY - e.clientY;
+        let newStreamHeight = initialStreamHeight + dy;
 
-      const minHeight = 100;
-      const consoleHeight = this.isConsoleCollapsed() ? 28 : (this.consolePaneHeight() / 100 * containerRect.height);
-      const maxHeight = containerRect.height - 100 - consoleHeight; // Leave 100px for file explorer
+        const minHeight = 100;
+        const consoleHeight = this.isConsoleCollapsed() ? 28 : (this.consolePaneHeight() / 100 * containerRect.height);
+        const maxHeight = containerRect.height - 100 - consoleHeight;
 
-      if (newStreamHeight < minHeight) newStreamHeight = minHeight;
-      if (newStreamHeight > maxHeight) newStreamHeight = maxHeight;
+        if (newStreamHeight < minHeight) newStreamHeight = minHeight;
+        if (newStreamHeight > maxHeight) newStreamHeight = maxHeight;
 
-      this.streamPaneHeight.set((newStreamHeight / containerRect.height) * 100);
+        this.streamPaneHeight.set((newStreamHeight / containerRect.height) * 100);
+      };
+
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        this.ngZone.run(() => this.stopStreamResize());
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     });
-
-    this.unlistenStreamResizeUp = this.renderer.listen('document', 'mouseup', () => this.stopStreamResize());
   }
 
   private stopStreamResize(): void {
@@ -2449,26 +2371,37 @@ export class AppComponent implements OnInit, OnDestroy {
   startConsolePaneResize(event: MouseEvent): void {
     this.isResizingConsole = true;
     event.preventDefault();
-    const container = this.mainContentWrapperEl.nativeElement;
+    const container = this.mainContentWrapperEl?.nativeElement;
+    if (!container) return;
     const startY = event.clientY;
     const containerRect = container.getBoundingClientRect();
-    const initialConsoleHeight = container.children[this.isStreamVisible() ? 4 : 2].getBoundingClientRect().height;
+    const consolePane = container.querySelector('[data-console-pane]');
+    const initialConsoleHeight = consolePane ? consolePane.getBoundingClientRect().height : 0;
 
-    this.unlistenConsoleResizeMove = this.renderer.listen('document', 'mousemove', (e: MouseEvent) => {
-      const dy = startY - e.clientY;
-      let newConsoleHeight = initialConsoleHeight + dy;
+    this.ngZone.runOutsideAngular(() => {
+      const onMove = (e: MouseEvent) => {
+        const dy = startY - e.clientY;
+        let newConsoleHeight = initialConsoleHeight + dy;
 
-      const minHeight = 100; // Minimum height in pixels for the console when expanded
-      const streamHeight = this.isStreamVisible() ? (this.isStreamPaneCollapsed() ? 28 : (this.streamPaneHeight() / 100 * containerRect.height)) : 0;
-      const maxHeight = containerRect.height - 100 - streamHeight; // Leave 100px for file explorer
+        const minHeight = 100;
+        const streamHeight = this.isStreamVisible() ? (this.isStreamPaneCollapsed() ? 28 : (this.streamPaneHeight() / 100 * containerRect.height)) : 0;
+        const maxHeight = containerRect.height - 100 - streamHeight;
 
-      if (newConsoleHeight < minHeight) newConsoleHeight = minHeight;
-      if (newConsoleHeight > maxHeight) newConsoleHeight = maxHeight;
+        if (newConsoleHeight < minHeight) newConsoleHeight = minHeight;
+        if (newConsoleHeight > maxHeight) newConsoleHeight = maxHeight;
 
-      this.consolePaneHeight.set((newConsoleHeight / containerRect.height) * 100);
+        this.consolePaneHeight.set((newConsoleHeight / containerRect.height) * 100);
+      };
+
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        this.ngZone.run(() => this.stopConsoleResize());
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     });
-
-    this.unlistenConsoleResizeUp = this.renderer.listen('document', 'mouseup', () => this.stopConsoleResize());
   }
 
   private stopConsoleResize(): void {
@@ -2541,192 +2474,32 @@ export class AppComponent implements OnInit, OnDestroy {
     // For now, just logging as requested.
   }
 
-  // --- Stream ---
+  onStreamPaneCollapseToggled(): void {
+    this.uiPreferencesService.toggleStreamPaneCollapse();
+  }
 
-  private loadStreamResultsForPanes = effect(async () => {
-    // This effect reacts to changes in pane contexts, ensuring it runs on every navigation.
-    const contexts: ({ id: number; } & ReturnType<typeof this.pane1Context>)[] = [];
+  onStreamActiveSearchToggled(): void {
+    this.uiPreferencesService.toggleStreamActiveSearch();
+  }
 
-    if (this.isSplitView()) {
-      contexts.push({ id: 1, ...this.pane1Context() });
-      contexts.push({ id: 2, ...this.pane2Context() });
-    } else {
-      const activeId = this.activePaneId();
-      contexts.push({ id: activeId, ...(activeId === 1 ? this.pane1Context() : this.pane2Context()) });
+  toggleStream(): void {
+    this.uiPreferencesService.toggleStream();
+  }
+
+  onComplexSearchRequested(): void {
+    this.openComplexSearchDialog();
+  }
+
+  onGeminiSearchRequested(): void {
+    this.openGeminiSearchDialog();
+  }
+
+  // Auto-uncollapse the stream pane when navigating to a visible context
+  // Use untracked to avoid re-triggering when user manually toggles collapse
+  private autoUncollapseStream = effect(() => {
+    if (this.shouldShowStreamPane() && untracked(() => this.isStreamPaneCollapsed())) {
+      this.uiPreferencesService.setStreamPaneCollapsed(false);
     }
-
-    for (const context of contexts) {
-      const { id, path, profile, token } = context;
-
-      let isMagnetFolder = false;
-      if (path.length > 0) {
-        const provider = this.getProvider(path);
-        // The provider's internal path does not include the root name (e.g., 'Local Session')
-        const providerPath = path.slice(1);
-        isMagnetFolder = await provider.hasFile(providerPath, '.magnet');
-      }
-
-      // If not a magnet folder OR active search is disabled, clear results.
-      if (!isMagnetFolder || !this.isStreamActiveSearchEnabled()) {
-        if (id === 1) {
-          this.streamResultsForPane1.set([]);
-        } else {
-          this.streamResultsForPane2.set([]);
-        }
-        continue; // Move to the next pane context
-      }
-
-      // --- If it IS a magnet folder AND active search is enabled, proceed with the existing search logic ---
-      const rootName = path[0];
-      const relativePath = path.slice(1);
-
-      const query = relativePath.length > 0 ? relativePath[relativePath.length - 1] : rootName;
-      const simpleSearchQuery = relativePath.join(', ');
-
-      const promises: Promise<StreamItem[]>[] = [];
-
-      // If we have a profile and token, we are in a "real search" context.
-      // We will only call the real services (Google Search) and potentially real services (Gemini).
-      if (profile && token) {
-        const safeBrokerUrl = profile.brokerUrl || '';
-        const searchParams: GoogleSearchParams = {
-          brokerUrl: safeBrokerUrl,
-          token: token,
-          query: simpleSearchQuery
-        };
-        promises.push(
-          this.googleSearchService.search(searchParams)
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'web' as const, paneId: id })))
-        );
-
-        // Gemini Search (could be real or mock depending on API key)
-        promises.push(
-          this.geminiService.search(query)
-            .then(text => [{ query, text, publishedAt: new Date().toISOString(), type: 'gemini' as const, paneId: id }])
-        );
-      } else {
-        // Otherwise, we are in a "mock search" context (e.g., Local Session).
-        // Call all the mock services.
-        promises.push(
-          this.unsplashService.search(query)
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'image' as const, paneId: id })))
-        );
-
-        promises.push(
-          this.youtubeSearchService.search(query)
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'youtube' as const, paneId: id })))
-        );
-
-        promises.push(
-          this.academicSearchService.search(query)
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'academic' as const, paneId: id })))
-        );
-
-        promises.push(
-          this.geminiService.search(query)
-            .then(text => [{ query, text, publishedAt: new Date().toISOString(), type: 'gemini' as const, paneId: id }])
-        );
-      }
-
-      try {
-        const results = await Promise.all(promises);
-        const flattenedResults = results.flat();
-
-        if (id === 1) {
-          this.streamResultsForPane1.set(flattenedResults);
-        } else {
-          this.streamResultsForPane2.set(flattenedResults);
-        }
-
-      } catch (error) {
-        console.error(`Failed to load stream results for pane ${id}`, error);
-        if (id === 1) {
-          this.streamResultsForPane1.set([]);
-        } else {
-          this.streamResultsForPane2.set([]);
-        }
-      }
-    }
-  }, { allowSignalWrites: true });
-
-  onStreamSearchChange(event: Event): void {
-    this.streamSearchQuery.set((event.target as HTMLInputElement).value);
-  }
-
-  toggleStreamFilter(type: StreamItemType): void {
-    this.activeStreamFilters.update(current => {
-      const newSet = new Set(current);
-      if (newSet.has(type)) {
-        newSet.delete(type);
-      } else {
-        newSet.add(type);
-      }
-      return newSet;
-    });
-  }
-
-  toggleAllStreamFilters(): void {
-    if (this.activeStreamFilters().size === this.streamFilterTypes.length) {
-      this.activeStreamFilters.set(new Set());
-    } else {
-      this.activeStreamFilters.set(new Set(this.streamFilterTypes.map(f => f.type)));
-    }
-  }
-
-  toggleStreamSortDropdown(event: MouseEvent): void {
-    event.stopPropagation();
-    this.isStreamSortDropdownOpen.update(v => !v);
-  }
-
-  onStreamSortChange(key: StreamSortKey): void {
-    this.streamSortCriteria.set({ key, direction: 'asc' }); // Direction is handled in computed for now
-    this.isStreamSortDropdownOpen.set(false);
-  }
-
-  getStreamItemLink(item: StreamItem): string {
-    switch (item.type) {
-      case 'web':
-      case 'academic':
-        return item.link;
-      case 'image':
-        return item.url;
-      case 'youtube':
-        return `https://www.youtube.com/watch?v=${item.videoId}`;
-      case 'gemini':
-        // Gemini results don't have a unique link, so we create one from content
-        return `gemini:${item.query}:${item.publishedAt}`;
-    }
-  }
-
-  onBookmarkToggled(item: StreamItem): void {
-    const link = this.getStreamItemLink(item);
-    const existing = this.bookmarkService.findBookmarkByLink(link);
-
-    if (existing) {
-      this.bookmarkService.deleteBookmark(existing._id);
-      this.toastService.show('Bookmark removed.');
-    } else {
-      let newBookmark: NewBookmark;
-      switch (item.type) {
-        case 'web':
-          newBookmark = { type: 'web', title: item.title, link: item.link, snippet: item.snippet, source: item.source };
-          break;
-        case 'image':
-          newBookmark = { type: 'image', title: item.description, link: item.url, thumbnailUrl: item.thumbnailUrl, snippet: `by ${item.photographer}`, source: item.source };
-          break;
-        case 'youtube':
-          newBookmark = { type: 'youtube', title: item.title, link: `https://www.youtube.com/watch?v=${item.videoId}`, thumbnailUrl: item.thumbnailUrl, snippet: item.description, source: item.channelTitle };
-          break;
-        case 'academic':
-          newBookmark = { type: 'academic', title: item.title, link: item.link, snippet: item.snippet, source: item.publication };
-          break;
-        case 'gemini':
-          newBookmark = { type: 'gemini', title: `Gemini: ${item.query}`, link: this.getStreamItemLink(item), snippet: item.text, source: 'Gemini' };
-          break;
-      }
-      this.bookmarkService.addBookmark(this.activePanePath(), newBookmark);
-      this.toastService.show('Bookmark saved to current folder.');
-    }
-  }
+  });
 }
 

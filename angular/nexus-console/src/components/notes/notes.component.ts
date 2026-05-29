@@ -28,6 +28,7 @@ export class NotesComponent implements OnDestroy {
   mode = signal<'edit' | 'preview'>('edit');
   isLoading = signal(false);
   private saveTimeout: any;
+  private lastLoadedPath: string | null = null;
 
   @ViewChild('editor') editorTextarea: ElementRef<HTMLTextAreaElement> | undefined;
 
@@ -45,7 +46,12 @@ export class NotesComponent implements OnDestroy {
   constructor() {
     effect(() => {
       // When path changes, load the note for the new path.
-      this.path();
+      const currentPath = this.path();
+      const pathKey = currentPath.join('/');
+      if (this.lastLoadedPath === pathKey) {
+        return;
+      }
+      this.lastLoadedPath = pathKey;
       if (this.isNoteAvailable()) {
         this.loadNote();
       } else {

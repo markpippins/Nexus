@@ -200,8 +200,8 @@ export class UpsertServerDialogComponent implements OnInit {
         try {
             // Load all lookups in parallel
             const [st, et, os] = await Promise.all([
-                this.platformService.getLookup(url, 'server-types'),
-                this.platformService.getLookup(url, 'environments'),
+                this.platformService.getLookup(url, 'server-types').catch(() => []),
+                this.platformService.getLookup(url, 'environments').catch(() => []),
                 this.platformService.getLookup(url, 'operating-systems').catch(() => [])
             ]);
             this.serverTypes.set(st);

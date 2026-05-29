@@ -165,6 +165,10 @@ export class UiPreferencesService {
     this.preferences.update(p => ({ ...p, isStreamPaneCollapsed: !p.isStreamPaneCollapsed }));
   }
 
+  setStreamPaneCollapsed(value: boolean): void {
+    this.preferences.update(p => ({ ...p, isStreamPaneCollapsed: value }));
+  }
+
   toggleChatPaneCollapse(): void {
     this.preferences.update(p => ({ ...p, isChatPaneCollapsed: !p.isChatPaneCollapsed }));
   }

@@ -230,8 +230,8 @@ export class UpsertLibraryDialogComponent implements OnInit {
     private async loadLookups() {
         try {
             const [cats, langs] = await Promise.all([
-                this.platformService.getLookup(this.baseUrl(), 'library-categories'),
-                this.platformService.getLookup(this.baseUrl(), 'framework-languages')
+                this.platformService.getLookup(this.baseUrl(), 'library-categories').catch(() => []),
+                this.platformService.getLookup(this.baseUrl(), 'framework-languages').catch(() => [])
             ]);
             this.categories.set(cats);
             this.languages.set(langs);
