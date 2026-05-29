@@ -70,6 +70,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // Stable ID key to detect whether service list actually changed (not just reference)
   private lastServiceIds = '';
+
+  // Track whether the last build used the backend registry, so we can
+  // force a full rebuild when backend components become available.
   private lastRegistryReady = false;
 
   // Context Menu State
@@ -137,12 +140,10 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
       if (!services || services.length === 0) return;
       if (allComponents.length === 0) return; // Wait for registry (at least fallback)
-      // Only resolve visual styles when backend registry is loaded.
-      // INITIAL_REGISTRY uses string IDs (sys-rest, sys-cache) that won't
-      // match the numeric IDs returned by the /api/v1/services endpoint.
-      const registryReady = this.registry.backendLoaded();
 
-      // Skip full rebuild when nothing changed (prevents position snap-back on poll cycles)
+      // Skip full rebuild when service list hasn't changed AND registry hasn't
+      // transitioned from fallback to backend (which would change component IDs).
+      const registryReady = this.registry.backendLoaded();
       const ids = services.map(s => s.id).sort().join(',');
       if (ids === this.lastServiceIds && registryReady === this.lastRegistryReady) {
         // Lightweight update: refresh labels without clearScene
