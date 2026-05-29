@@ -74,6 +74,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Track whether the last build used the backend registry, so we can
   // force a full rebuild when backend components become available.
   private lastRegistryReady = false;
+  private refreshingRegistry = false;
 
   // Context Menu State
   contextMenu = signal<{
@@ -137,6 +138,14 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       if (!this.isInitialized()) return;
       const services = this.services();
       const allComponents = this.registry.allComponents(); // Dependency to ensure loaded
+
+      // Trigger a backend component load if the registry is still on fallback.
+      // refresh() is async — when it completes, registry signal updates,
+      // allComponents recomputes, and this effect re-runs with backend data.
+      if (!this.registry.backendLoaded() && !this.refreshingRegistry) {
+        this.refreshingRegistry = true;
+        this.registry.refresh().finally(() => this.refreshingRegistry = false);
+      }
 
       if (!services || services.length === 0) return;
       if (allComponents.length === 0) return; // Wait for registry (at least fallback)
