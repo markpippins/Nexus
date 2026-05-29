@@ -172,29 +172,27 @@ export class UpsertDeploymentDialogComponent implements OnInit {
         const url = this.baseUrl();
         if (!url) return;
 
-        try {
-            const [srvs, hosts, envs] = await Promise.all([
-                this.platformService.getServices(url),
-                this.platformService.getServers(url),
-                this.platformService.getLookup(url, 'environment-types')
-            ]);
-            this.services.set(srvs);
-            // Filter out sub-modules from the dropdown
-            const standalone = srvs.filter(s => !s.parentServiceId);
-            this.standaloneServices.set(standalone);
-            this.servers.set(hosts);
-            this.environments.set(envs);
+        // Load each lookup independently — one failure shouldn't clear the others
+        let srvs: ServiceInstance[] = [];
+        let hosts: Host[] = [];
+        let envs: LookupItem[] = [];
 
-            // If editing, map environment enum to ID
-            const d = this.deployment();
-            if (d && d.environment) {
-                const matched = envs.find(e => e.name.toUpperCase() === d.environment);
-                if (matched) {
-                    this.form.patchValue({ environmentId: matched.id });
-                }
+        try { srvs = await this.platformService.getServices(url); } catch (e) { console.error('Failed to load services', e); }
+        try { hosts = await this.platformService.getServers(url); } catch (e) { console.error('Failed to load servers', e); }
+        try { envs = await this.platformService.getLookup(url, 'environments'); } catch (e) { console.error('Failed to load environments', e); }
+
+        const standalone = srvs.filter(s => !s.parentServiceId);
+        this.standaloneServices.set(standalone);
+        this.servers.set(hosts);
+        this.environments.set(envs);
+
+        // If editing, map environment enum to ID
+        const d = this.deployment();
+        if (d && d.environment) {
+            const matched = envs.find(e => e.name.toUpperCase() === d.environment);
+            if (matched) {
+                this.form.patchValue({ environmentId: matched.id });
             }
-        } catch (e) {
-            console.error('Failed to load options', e);
         }
     }
 

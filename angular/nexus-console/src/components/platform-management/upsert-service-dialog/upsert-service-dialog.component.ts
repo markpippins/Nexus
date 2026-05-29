@@ -191,17 +191,28 @@ export class UpsertServiceDialogComponent implements OnInit {
         const url = this.baseUrl();
         if (!url) return;
 
+        // Load each lookup independently so one failure doesn't empty all three
         try {
-            const [fw, types, parents] = await Promise.all([
-                this.platformService.getFrameworks(url),
-                this.platformService.getLookup(url, 'service-types'),
-                this.platformService.getStandaloneServices(url)
-            ]);
+            const fw = await this.platformService.getFrameworks(url);
             this.frameworks.set(fw);
-            this.serviceTypes.set(types);
-            this.parentServices.set(parents);
         } catch (e) {
-            console.error('Failed to load options', e);
+            console.error('Failed to load frameworks', e);
+        }
+        try {
+            const types = await this.platformService.getLookup(url, 'service-types');
+            this.serviceTypes.set(types);
+        } catch (e) {
+            console.error('Failed to load service types', e);
+        }
+        try {
+            const allServices = await this.platformService.getServices(url);
+            // Show all services as potential parents, excluding self when editing
+            const currentId = this.service()?.id;
+            this.parentServices.set(
+                allServices.filter(s => String(s.id) !== String(currentId))
+            );
+        } catch (e) {
+            console.error('Failed to load services for parent dropdown', e);
         }
     }
 
