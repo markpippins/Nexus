@@ -67,6 +67,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Initialization flag
   private isInitialized = signal(false);
 
+  // Stable ID key to detect whether service list actually changed (not just reference)
+  private lastServiceIds = '';
+
   // Context Menu State
   contextMenu = signal<{
     visible: boolean,
@@ -132,6 +135,22 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
       if (!services || services.length === 0) return;
       if (allComponents.length === 0) return; // Wait for registry
+
+      // Skip full rebuild when service IDs haven't changed (prevents position snap-back on poll cycles)
+      const ids = services.map(s => s.id).sort().join(',');
+      if (ids === this.lastServiceIds) {
+        // Lightweight update: refresh labels without clearScene
+        services.forEach(svc => {
+          const node = this.vizService.getNode(String(svc.id));
+          if (node) {
+            node.label = svc.name;
+            node.description = svc.description || 'No description';
+          }
+        });
+        this.vizService.updateAllLabels();
+        return;
+      }
+      this.lastServiceIds = ids;
 
       // Clear existing scene first
       this.vizService.clearScene();

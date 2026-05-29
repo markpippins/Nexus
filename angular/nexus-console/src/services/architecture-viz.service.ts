@@ -54,6 +54,9 @@ export class ArchitectureVizService {
     // Key: "fromId::toId" (using :: as separator because UUIDs contain -)
     private connectionLines: Map<string, THREE.Line> = new Map();
 
+    // Persistent position store — survives clearScene() and component lifecycle
+    private readonly savedPositions = new Map<string, { x: number; y: number; z: number }>();
+
     // Selection & Interaction
     private selectionBox!: THREE.BoxHelper;
     private selectedNodeId: string | null = null;
@@ -366,6 +369,7 @@ export class ArchitectureVizService {
         this.deselect();
         this.cleanupParticles();
         this.allNodes.set([]);
+        // NOTE: Do NOT clear this.savedPositions — they must survive rebuilds
     }
 
     private static randomId(): string {
@@ -393,6 +397,10 @@ export class ArchitectureVizService {
             return idOverride || ArchitectureVizService.randomId();
         }
         const id = idOverride || ArchitectureVizService.randomId();
+        // Use saved position if one exists for this node ID (survives clearScene rebuilts)
+        const saved = this.savedPositions.get(id);
+        const finalPos = saved ? { ...saved } : pos;
+
         const config = this.registry.getConfig(type);
 
         const colorHex = colorOverride ? parseInt(colorOverride.replace('#', ''), 16) : config.defaultColor;
@@ -420,7 +428,7 @@ export class ArchitectureVizService {
         });
 
         const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set(pos.x, pos.y, pos.z);
+        mesh.position.set(finalPos.x, finalPos.y, finalPos.z);
         mesh.scale.setScalar(config.scale);
         mesh.userData = { id, type };
 
@@ -440,7 +448,7 @@ export class ArchitectureVizService {
         }
 
         const nodeData: NodeData = {
-            id, type, label, description, position: pos,
+            id, type, label, description, position: finalPos,
             color: '#' + new THREE.Color(colorHex).getHexString(),
             connectedTo: []
         };
@@ -498,6 +506,19 @@ export class ArchitectureVizService {
 
         if (this.selectedNodeId === id) this.deselect();
         this.updateAllNodesSignal();
+    }
+
+    public getNode(id: string): NodeData | undefined {
+        return this.nodes.get(id)?.data;
+    }
+
+    public updateAllLabels(): void {
+        this.nodes.forEach((node) => {
+            const labelDiv = node.labelObj?.element;
+            if (labelDiv) {
+                labelDiv.textContent = node.data.label;
+            }
+        });
     }
 
     // --- Connection Management ---
@@ -646,6 +667,8 @@ export class ArchitectureVizService {
                 if (node) {
                     node.mesh.position.copy(targetPoint);
                     node.data.position = { x: targetPoint.x, y: targetPoint.y, z: targetPoint.z };
+                    // Persist the adjusted position so it survives clearScene rebuilds
+                    this.savedPositions.set(node.data.id, { ...node.data.position });
 
                     this.selectionBox.update();
                     // Connections are updated in the animate loop now
