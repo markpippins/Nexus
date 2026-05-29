@@ -74,16 +74,19 @@ class ScannerService:
         await self._init_clients()
         
         from database import async_session_maker
+        from sqlalchemy import select
+
         async with async_session_maker() as session:
-            # TODO: Query all enabled library paths
-            # For now, use a placeholder
-            library_paths = ["/media/music", "/media/videos"]  # Placeholder
+            result = await session.execute(
+                select(LibraryPath).where(LibraryPath.scan_enabled == True)
+            )
+            libraries = result.scalars().all()
             
-        for path in library_paths:
-            if os.path.exists(path) and os.access(path, os.R_OK):
-                await self.scan_path(path)
-            else:
-                logger.warning("Path not accessible", path=path)
+            for lib in libraries:
+                if os.path.exists(lib.path) and os.access(lib.path, os.R_OK):
+                    await self.scan_path(lib.path, deep_scan=lib.deep_scan)
+                else:
+                    logger.warning("Path not accessible", path=lib.path)
     
     async def scan_path(self, root_path: str, deep_scan: bool = False):
         """
