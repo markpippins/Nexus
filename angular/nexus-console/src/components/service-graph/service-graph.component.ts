@@ -52,6 +52,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // Interaction Mode
   currentMode = this.vizService.modeSignal;
+  viewMode = this.vizService.viewMode;
   isSimulationActive = this.vizService.isSimulationActive;
 
   // Tools - loaded from Registry Service
@@ -69,6 +70,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // Stable ID key to detect whether service list actually changed (not just reference)
   private lastServiceIds = '';
+  private lastRegistryReady = false;
 
   // Context Menu State
   contextMenu = signal<{
@@ -134,11 +136,15 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       const allComponents = this.registry.allComponents(); // Dependency to ensure loaded
 
       if (!services || services.length === 0) return;
-      if (allComponents.length === 0) return; // Wait for registry
+      if (allComponents.length === 0) return; // Wait for registry (at least fallback)
+      // Only resolve visual styles when backend registry is loaded.
+      // INITIAL_REGISTRY uses string IDs (sys-rest, sys-cache) that won't
+      // match the numeric IDs returned by the /api/v1/services endpoint.
+      const registryReady = this.registry.backendLoaded();
 
-      // Skip full rebuild when service IDs haven't changed (prevents position snap-back on poll cycles)
+      // Skip full rebuild when nothing changed (prevents position snap-back on poll cycles)
       const ids = services.map(s => s.id).sort().join(',');
-      if (ids === this.lastServiceIds) {
+      if (ids === this.lastServiceIds && registryReady === this.lastRegistryReady) {
         // Lightweight update: refresh labels without clearScene
         services.forEach(svc => {
           const node = this.vizService.getNode(String(svc.id));
@@ -151,6 +157,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         return;
       }
       this.lastServiceIds = ids;
+      this.lastRegistryReady = registryReady;
 
       // Clear existing scene first
       this.vizService.clearScene();
@@ -304,8 +311,8 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // --- Actions ---
 
-  setMode(mode: 'camera' | 'edit') {
-    this.vizService.setInteractionMode(mode);
+  setMode(mode: 'camera' | 'auto' | 'edit') {
+    this.vizService.setViewMode(mode);
   }
 
   toggleSimulation() {
