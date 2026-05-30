@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { BrokerProfile } from '../../models/broker-profile.model.js';
 import { BrokerProfileService } from '../../services/broker-profile.service.js';
+import { CreateUserDialogComponent } from './create-user-dialog/create-user-dialog.component.js';
 
 interface FormState {
     id: string;
@@ -24,7 +25,7 @@ const INITIAL_FORM_STATE: FormState = {
 
 @Component({
     selector: 'app-gateway-editor',
-    imports: [CommonModule, FormsModule],
+    imports: [CommonModule, FormsModule, CreateUserDialogComponent],
     templateUrl: './gateway-editor.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -58,6 +59,8 @@ export class GatewayEditorComponent {
     );
 
     isMounted = computed(() => this.mountedProfileIds().includes(this.profileId()));
+
+    isCreateUserOpen = signal(false);
 
     constructor() {
         // Load profile data when profileId changes

@@ -985,7 +985,7 @@ export class FileExplorerComponent implements OnDestroy {
     }
 
     // If the item has a mountId, request the "mount" image
-    if (item.metadata?.['mountId']) {
+    if (item.metadata?.['mountId'] && !item.metadata['isMountChild']) {
       return serviceToUse.getIconUrl(item, 'mount');
     }
 
