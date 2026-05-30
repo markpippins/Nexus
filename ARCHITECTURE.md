@@ -81,6 +81,7 @@
 | Service Registry | `jvm/spring/service-registry/` | Spring Boot | 8085 | `application.properties` |
 | Broker Gateway | `jvm/spring/service-broker/broker-gateway/` | Spring Boot | 8081 | `application.properties` |
 | Broker Gateway | `jvm/quarkus/broker-gateway/` | Quarkus | 8090 | `application.properties` |
+| **Topology Server** | `jvm/spring/topology-server/` | **Spring Boot** | **8084** | `application.properties` |
 | User Access Service | `jvm/helidon/user-access-service/` | Helidon MP | 9093 | `application.yaml` |
 | File Service | `jvm/spring/service-broker/file-service/` | Spring Boot | TBD | — |
 | File Service API | `jvm/spring/service-broker/file-service-api/` | Spring Boot | TBD | — |
