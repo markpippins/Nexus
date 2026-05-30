@@ -1002,6 +1002,7 @@ export class AppComponent implements OnInit, OnDestroy {
               healthStatus: this.healthCheckService.getServiceStatus(profile.imageUrl),
               children: [],
               childrenLoaded: false,
+              metadata: { mountId: true },
             }));
           }
 
