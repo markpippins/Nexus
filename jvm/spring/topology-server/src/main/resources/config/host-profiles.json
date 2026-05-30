@@ -1,0 +1,20 @@
+[
+  {
+    "profileId": "default-local-host",
+    "name": "Local Host",
+    "hostServerUrl": "http://localhost:8085",
+    "imageUrl": "",
+    "isActive": true,
+    "hostname": null,
+    "ipAddress": null,
+    "environment": null,
+    "operatingSystem": null,
+    "cpuCores": null,
+    "memoryMb": null,
+    "diskGb": null,
+    "region": null,
+    "cloudProvider": null,
+    "status": null,
+    "description": "Default local host server"
+  }
+]

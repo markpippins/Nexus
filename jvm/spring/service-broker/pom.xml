@@ -104,6 +104,11 @@
             </dependency>
             <dependency>
                 <groupId>com.aibizarchitect.nexus</groupId>
+                <artifactId>user-creation-service</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.aibizarchitect.nexus</groupId>
                 <artifactId>user-service</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
@@ -222,6 +227,7 @@
         <module>search-service</module>
         <module>upload-service</module>
         <module>user-access-service</module>
+        <module>user-creation-service</module>
         <module>user-service</module>
     </modules>
 </project>

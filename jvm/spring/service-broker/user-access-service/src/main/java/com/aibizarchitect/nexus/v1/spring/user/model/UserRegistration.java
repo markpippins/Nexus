@@ -42,6 +42,9 @@ public class UserRegistration implements Serializable {
     @Column(nullable = false)
     private boolean admin = false;
 
+    @Column(nullable = false, length = 255)
+    private String identifier;   // password
+
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
     private java.util.Date createdAt;
@@ -109,6 +112,14 @@ public class UserRegistration implements Serializable {
 
     public void setAdmin(boolean admin) {
         this.admin = admin;
+    }
+
+    public String getIdentifier() {
+        return identifier;
+    }
+
+    public void setIdentifier(String identifier) {
+        this.identifier = identifier;
     }
 
     public java.util.Date getCreatedAt() {

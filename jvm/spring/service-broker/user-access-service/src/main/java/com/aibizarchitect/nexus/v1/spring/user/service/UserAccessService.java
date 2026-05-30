@@ -28,19 +28,9 @@ public class UserAccessService {
 
         log.info("Validating user {}", alias);
 
-        // Hardcoded admin check for verification
-        if ("admin".equalsIgnoreCase(alias) && "admin".equals(password)) {
-            UserRegistrationDTO user = new UserRegistrationDTO();
-            user.setId("1");
-            user.setAlias("admin");
-            user.setEmail("admin@example.com");
-            user.setAdmin(true);
-            return user;
-        }
-
         UserRegistration userReg = userRepository.findByAlias(alias).orElse(null);
 
-        if (userReg == null) {
+        if (userReg == null || !password.equals(userReg.getIdentifier())) {
             return null;
         }
 

@@ -1,0 +1,10 @@
+[
+  {
+    "profileId": "default-local",
+    "name": "Local (Debug)",
+    "brokerUrl": "localhost:8081",
+    "imageUrl": "http://localhost:8081",
+    "autoConnect": false,
+    "healthCheckDelayMinutes": null
+  }
+]
