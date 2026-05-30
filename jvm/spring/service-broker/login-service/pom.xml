@@ -36,6 +36,11 @@
 
         <dependency>
             <groupId>com.aibizarchitect.nexus</groupId>
+            <artifactId>broker-service</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-service-api</artifactId>
         </dependency>
 
