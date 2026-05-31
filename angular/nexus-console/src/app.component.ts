@@ -290,14 +290,14 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // Registry Server Profile Editor Detection
   // When path is ['Service Registries', 'Profile Name'], we show the editor
-  pane1HostServerProfileId = computed(() => this.getHostServerProfileIdForPath(this.pane1Path()));
-  pane2HostServerProfileId = computed(() => this.getHostServerProfileIdForPath(this.pane2Path()));
+  pane1RegistryServerProfileId = computed(() => this.getRegistryServerProfileIdForPath(this.pane1Path()));
+  pane2RegistryServerProfileId = computed(() => this.getRegistryServerProfileIdForPath(this.pane2Path()));
 
   // Gateway Profile Editor Detection
   pane1GatewayProfileId = computed(() => this.getGatewayProfileIdForPath(this.pane1Path()));
   pane2GatewayProfileId = computed(() => this.getGatewayProfileIdForPath(this.pane2Path()));
 
-  private getHostServerProfileIdForPath(path: string[]): string | null {
+  private getRegistryServerProfileIdForPath(path: string[]): string | null {
     // Path must be exactly ['Service Registries', 'Profile Name'] to show editor
     if (path.length !== 2 || path[0] !== 'Service Registries') {
       return null;
@@ -501,7 +501,7 @@ export class AppComponent implements OnInit, OnDestroy {
   serviceRegistryToDelete = signal<string | null>(null);
 
   async onDeleteServiceRegistry(): Promise<void> {
-    const profileId = this.serviceRegistryToDelete() || this.pane1HostServerProfileId() || this.pane2HostServerProfileId();
+    const profileId = this.serviceRegistryToDelete() || this.pane1RegistryServerProfileId() || this.pane2RegistryServerProfileId();
     if (profileId) {
       await this.hostProfileService.deleteProfile(profileId);
       this.isDeleteServiceRegistryConfirmOpen.set(false);

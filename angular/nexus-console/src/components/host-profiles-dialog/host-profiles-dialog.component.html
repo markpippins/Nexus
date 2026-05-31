@@ -12,7 +12,7 @@
         class="flex items-center justify-between px-6 py-4 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface))]"
       >
         <h2 class="text-xl font-semibold text-[rgb(var(--color-text-prominent))]">
-          Manage Host Servers
+          Manage Service Registries
         </h2>
         <button
           (click)="onClose()"
@@ -57,7 +57,7 @@
                   clip-rule="evenodd"
                 />
               </svg>
-              Add Host Server
+              Add Service Registry
             </button>
           </div>
           <div class="flex-1 overflow-y-auto p-2 space-y-1">
@@ -170,7 +170,7 @@
             <div class="space-y-6 max-w-2xl mx-auto">
               <div>
                 <h3 class="text-lg font-medium leading-6 text-[rgb(var(--color-text-prominent))]">
-                  {{ selectedProfileId() ? 'Edit Host Server' : 'New Host Server' }}
+                  {{ selectedProfileId() ? 'Edit Service Registry' : 'New Service Registry' }}
                 </h3>
                 <p class="mt-1 text-sm text-[rgb(var(--color-text-muted))]">
                   Configure the connection details for the host server.
@@ -201,7 +201,7 @@
                   <label
                     for="hostServerUrl"
                     class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
-                    >Host Server URL</label
+                    >Service Registry URL</label
                   >
                   <div class="mt-1">
                     <input
@@ -215,7 +215,7 @@
                       class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
                     />
                     <p class="mt-1 text-xs text-[rgb(var(--color-text-muted))]">
-                      The base URL where the host server API is accessible.
+                      The base URL where the service registry API is accessible.
                     </p>
                   </div>
                 </div>
@@ -467,7 +467,7 @@
                   d="M5 12h14M12 5l7 7-7 7"
                 />
               </svg>
-              <p class="text-lg font-medium">Select a host server to edit</p>
+              <p class="text-lg font-medium">Select a service registry to edit</p>
               <p class="text-sm">or create a new one to get started.</p>
             </div>
           }
