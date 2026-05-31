@@ -1,7 +1,7 @@
 [
   {
     "profileId": "strontium",
-    "name": "Local Host",
+    "name": "Strontium Registry",
     "registryServerUrl": "http://strontium:8085",
     "imageUrl": "",
     "isActive": true,
