@@ -422,79 +422,8 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             (onDelete)="onDelete($event)"
                         ></app-lookup-list>
                     }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('ipAddress')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                IP Address
-                                                @if (sortState().column === 'ipAddress') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('type')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Type
-                                                @if (sortState().column === 'type') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('os')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                OS
-                                                @if (sortState().column === 'os') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th (click)="onSort('status')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Status
-                                                @if (sortState().column === 'status') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
-                                            </div>
-                                        </th>
-                                        <th class="p-2 font-semibold text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @for (s of hosts(); track s.id) {
-                                        <tr tabindex="0" (dblclick)="onEdit(s)" (keydown.enter)="onEdit(s)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))]">{{ s.hostname }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.ipAddress }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.hostTypeId }}</td> 
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.operatingSystemId }}</td>
-                                            <td class="p-2 py-1.5">
-                                                <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500">
-                                                    {{ s.status }}
-                                                </span>
-                                            </td>
-                                            <td class="p-2 py-1.5 text-right">
-                                                <button (click)="onEdit(s)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
-                                                <button (click)="onDelete(s)" class="text-red-500 hover:underline text-xs">Delete</button>
-                                            </td>
-                                        </tr>
-                                    } @empty {
-                                        <tr>
-                                            <td colspan="6" class="p-8 text-center text-[rgb(var(--color-text-muted))]">No servers found.</td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
-                    }
                     @case ('service-types') {
                         <app-lookup-list
-                            [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
-                    }
-                    @case ('server-types') {
-                         <app-lookup-list
                             [items]="lookupData()"
                             [type]="managementType()"
                             (onEdit)="onEdit($event)"
