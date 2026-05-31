@@ -26,44 +26,44 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.config.TestJpaConfig;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.controller.ServerTypeController;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServerType;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerTypeRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.controller.HostTypeController;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.HostType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostTypeRepository;
 
-@WebMvcTest(ServerTypeController.class)
+@WebMvcTest(HostTypeController.class)
 @Import(TestJpaConfig.class)
-class ServerTypeControllerTest {
+class HostTypeControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockBean
-    private ServerTypeRepository repository;
+    private HostTypeRepository repository;
 
-    private ServerType testServerType;
+    private HostType testHostType;
 
     @BeforeEach
     void setUp() {
-        testServerType = new ServerType();
-        testServerType.setId(1L);
-        testServerType.setName("Docker Container");
-        testServerType.setDescription("Docker containerized server");
+        testHostType = new HostType();
+        testHostType.setId(1L);
+        testHostType.setName("Docker Container");
+        testHostType.setDescription("Docker containerized host");
     }
 
     @Test
     void getAll() throws Exception {
-        Page<ServerType> page = new PageImpl<>(List.of(testServerType));
+        Page<HostType> page = new PageImpl<>(List.of(testHostType));
         when(repository.findAll(any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/api/v1/server-types"))
+        mockMvc.perform(get("/api/v1/host-types"))
                 .andExpect(status().isOk());
     }
 
     @Test
     void getById_Found() throws Exception {
-        when(repository.findById(1L)).thenReturn(Optional.of(testServerType));
+        when(repository.findById(1L)).thenReturn(Optional.of(testHostType));
 
-        mockMvc.perform(get("/api/v1/server-types/1"))
+        mockMvc.perform(get("/api/v1/host-types/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("Docker Container"));
@@ -73,33 +73,33 @@ class ServerTypeControllerTest {
     void getById_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/v1/server-types/1"))
+        mockMvc.perform(get("/api/v1/host-types/1"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
     void create_Success() throws Exception {
-        when(repository.save(any(ServerType.class))).thenReturn(testServerType);
+        when(repository.save(any(HostType.class))).thenReturn(testHostType);
 
-        mockMvc.perform(post("/api/v1/server-types")
+        mockMvc.perform(post("/api/v1/host-types")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Docker Container\",\"description\":\"Docker containerized server\"}"))
+                .content("{\"name\":\"Docker Container\",\"description\":\"Docker containerized host\"}"))
                 .andExpect(status().isCreated());
     }
 
     @Test
     void update_Success() throws Exception {
-        ServerType existing = new ServerType();
+        HostType existing = new HostType();
         existing.setId(1L);
         existing.setName("Old Type");
 
-        ServerType details = new ServerType();
+        HostType details = new HostType();
         details.setName("New Type");
 
         when(repository.findById(1L)).thenReturn(Optional.of(existing));
-        when(repository.save(any(ServerType.class))).thenReturn(existing);
+        when(repository.save(any(HostType.class))).thenReturn(existing);
 
-        mockMvc.perform(put("/api/v1/server-types/1")
+        mockMvc.perform(put("/api/v1/host-types/1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"New Type\"}"))
                 .andExpect(status().isOk());
@@ -109,7 +109,7 @@ class ServerTypeControllerTest {
     void update_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        mockMvc.perform(put("/api/v1/server-types/1")
+        mockMvc.perform(put("/api/v1/host-types/1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"New Type\"}"))
                 .andExpect(status().isNotFound());
@@ -117,10 +117,10 @@ class ServerTypeControllerTest {
 
     @Test
     void delete_Success() throws Exception {
-        when(repository.findById(1L)).thenReturn(Optional.of(testServerType));
-        doNothing().when(repository).delete(any(ServerType.class));
+        when(repository.findById(1L)).thenReturn(Optional.of(testHostType));
+        doNothing().when(repository).delete(any(HostType.class));
 
-        mockMvc.perform(delete("/api/v1/server-types/1"))
+        mockMvc.perform(delete("/api/v1/host-types/1"))
                 .andExpect(status().isNoContent());
     }
 
@@ -128,7 +128,7 @@ class ServerTypeControllerTest {
     void delete_NotFound() throws Exception {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
-        mockMvc.perform(delete("/api/v1/server-types/1"))
+        mockMvc.perform(delete("/api/v1/host-types/1"))
                 .andExpect(status().isNotFound());
     }
 }

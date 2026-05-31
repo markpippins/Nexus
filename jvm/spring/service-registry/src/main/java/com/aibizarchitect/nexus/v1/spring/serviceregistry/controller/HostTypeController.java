@@ -13,50 +13,50 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServerType;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerTypeRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.HostType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostTypeRepository;
 
 @RestController
-@RequestMapping("/api/v1/server-types")
+@RequestMapping("/api/v1/host-types")
 @CrossOrigin(origins = "*")
 @SuppressWarnings("null")
-public class ServerTypeController {
+public class HostTypeController {
 
-    private static final Logger log = LoggerFactory.getLogger(ServerTypeController.class);
+    private static final Logger log = LoggerFactory.getLogger(HostTypeController.class);
 
-    private final ServerTypeRepository repository;
+    private final HostTypeRepository repository;
 
-    public ServerTypeController(ServerTypeRepository repository) {
+    public HostTypeController(HostTypeRepository repository) {
         this.repository = repository;
     }
 
     @GetMapping
-    public ResponseEntity<com.aibizarchitect.nexus.v1.dto.PagedResponse<ServerType>> getAll(org.springframework.data.domain.Pageable pageable) {
-        log.info("Fetching all server types");
-        org.springframework.data.domain.Page<ServerType> serverTypes = repository.findAll(pageable);
-        log.debug("Fetched {} server types", serverTypes.getNumberOfElements());
-        return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(serverTypes));
+    public ResponseEntity<com.aibizarchitect.nexus.v1.dto.PagedResponse<HostType>> getAll(org.springframework.data.domain.Pageable pageable) {
+        log.info("Fetching all host types");
+        org.springframework.data.domain.Page<HostType> hostTypes = repository.findAll(pageable);
+        log.debug("Fetched {} host types", hostTypes.getNumberOfElements());
+        return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(hostTypes));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ServerType> getById(@PathVariable Long id) {
-        log.info("Fetching server type with id: {}", id);
+    public ResponseEntity<HostType> getById(@PathVariable Long id) {
+        log.info("Fetching host type with id: {}", id);
         return repository.findById(id)
-                .map(serverType -> {
-                    log.debug("Found server type: {}", serverType.getName());
-                    return ResponseEntity.ok(serverType);
+                .map(hostType -> {
+                    log.debug("Found host type: {}", hostType.getName());
+                    return ResponseEntity.ok(hostType);
                 })
                 .orElseGet(() -> {
-                    log.warn("Server type not found with id: {}", id);
+                    log.warn("Host type not found with id: {}", id);
                     return ResponseEntity.notFound().build();
                 });
     }
 
     @PostMapping
-    public ResponseEntity<ServerType> create(@RequestBody ServerType serverType) {
-        log.info("Creating new server type: {}", serverType.getName());
-        ServerType saved = repository.save(serverType);
-        log.debug("Created server type with id: {}", saved.getId());
+    public ResponseEntity<HostType> create(@RequestBody HostType hostType) {
+        log.info("Creating new host type: {}", hostType.getName());
+        HostType saved = repository.save(hostType);
+        log.debug("Created host type with id: {}", saved.getId());
         java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
@@ -66,33 +66,33 @@ public class ServerTypeController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ServerType> update(@PathVariable Long id, @RequestBody ServerType details) {
-        log.info("Updating server type with id: {}", id);
+    public ResponseEntity<HostType> update(@PathVariable Long id, @RequestBody HostType details) {
+        log.info("Updating host type with id: {}", id);
         return repository.findById(id)
                 .map(existing -> {
                     existing.setName(details.getName());
                     existing.setDescription(details.getDescription());
-                    ServerType updated = repository.save(existing);
-                    log.debug("Updated server type: {}", updated.getName());
+                    HostType updated = repository.save(existing);
+                    log.debug("Updated host type: {}", updated.getName());
                     return ResponseEntity.ok(updated);
                 })
                 .orElseGet(() -> {
-                    log.warn("Server type not found for update with id: {}", id);
+                    log.warn("Host type not found for update with id: {}", id);
                     return ResponseEntity.notFound().build();
                 });
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        log.info("Deleting server type with id: {}", id);
+        log.info("Deleting host type with id: {}", id);
         return repository.findById(id)
                 .map(existing -> {
                     repository.delete(existing);
-                    log.debug("Deleted server type: {}", existing.getName());
+                    log.debug("Deleted host type: {}", existing.getName());
                     return ResponseEntity.noContent().<Void>build();
                 })
                 .orElseGet(() -> {
-                    log.warn("Server type not found for deletion with id: {}", id);
+                    log.warn("Host type not found for deletion with id: {}", id);
                     return ResponseEntity.notFound().build();
                 });
     }

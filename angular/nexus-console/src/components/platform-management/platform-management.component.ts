@@ -519,7 +519,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
         <app-upsert-host-dialog
             [isOpen]="isHostDialogOpen()"
             [baseUrl]="baseUrl()"
-            [server]="selectedHostForEdit()"
+            [host]="selectedHostForEdit()"
             (close)="onHostDialogClose()"
             (saved)="onHostSaved()"
         ></app-upsert-host-dialog>

@@ -58,7 +58,7 @@
    - TypeScript: `typescript/broker-gateway-proxy/` (port 3333)
    - TypeScript broker-service-proxy: `typescript/broker-service-proxy/` (port 3334)
    - Rate limiting and request logging
-   - Auto-registration with host-server
+   - Auto-registration with service-registry
    - Heartbeat mechanism (30-second intervals)
    - Request context headers for tracing
 

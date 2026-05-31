@@ -21,7 +21,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "servers")
+@Table(name = "hosts")
 @JsonIgnoreProperties({ "deployments" })
 public class Host {
 
@@ -37,7 +37,7 @@ public class Host {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "server_type_id")
-    private ServerType type;
+    private HostType type;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "environment_type_id")
@@ -77,7 +77,7 @@ public class Host {
     @Column
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "server", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "host", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Deployment> deployments = new HashSet<>();
 
     public Host() {
@@ -107,11 +107,11 @@ public class Host {
         this.ipAddress = ipAddress;
     }
 
-    public ServerType getType() {
+    public HostType getType() {
         return type;
     }
 
-    public void setType(ServerType type) {
+    public void setType(HostType type) {
         this.type = type;
     }
 
@@ -220,7 +220,7 @@ public class Host {
     }
 
     // Backward-compatible ID accessors
-    public Long getServerTypeId() {
+    public Long getHostTypeId() {
         return type != null ? type.getId() : null;
     }
 

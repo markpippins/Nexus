@@ -27,9 +27,9 @@ An AdonisJS-based reverse proxy that sits in front of `spring/broker-gateway` to
 | `config/proxy.ts` | Proxy configuration (upstream URL, timeout, headers to strip/add) |
 | `start/env.ts` | Environment schema validation for all required variables |
 | `start/routes.ts` | Route definitions (health check + catch-all proxy) |
-| `start/host_server.ts` | Preload script for service-registry registration on startup |
+| `start/service_registry_registration.ts` | Preload script for service-registry registration on startup |
 | `app/services/proxy_service.ts` | Core proxy logic - forwards requests to broker-gateway with proper error handling |
-| `app/services/host_server_client.ts` | Host-server registration and heartbeat client |
+| `app/services/service_registry_client.ts` | Service-registry registration and heartbeat client |
 | `app/controllers/proxy_controller.ts` | HTTP controller that delegates to ProxyService |
 
 ## Key Features

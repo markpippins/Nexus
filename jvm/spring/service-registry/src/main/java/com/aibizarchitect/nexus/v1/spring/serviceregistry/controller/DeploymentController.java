@@ -82,7 +82,7 @@ public class DeploymentController {
                 for (Service subModule : subModules) {
                     Deployment subDeployment = new Deployment();
                     subDeployment.setService(subModule);
-                    subDeployment.setServer(deployment.getServer());
+                    subDeployment.setHost(deployment.getHost());
                     subDeployment.setEnvironment(deployment.getEnvironment());
                     subDeployment.setVersion(deployment.getVersion());
                     subDeployment.setStatus(deployment.getStatus());
@@ -180,7 +180,7 @@ public class DeploymentController {
                     List<Deployment> subDeployments = deploymentRepository.findByService_Id(subModule.getId());
                     for (Deployment subDeployment : subDeployments) {
                         // Only delete sub-deployments on the same server
-                        if (subDeployment.getServer() != null && subDeployment.getServer().equals(deployment.getServer())) {
+                        if (subDeployment.getHost() != null && subDeployment.getHost().equals(deployment.getHost())) {
                             deploymentRepository.deleteById(subDeployment.getId());
                             log.info("Deleted sub-module deployment for service {} with ID: {}", subModule.getName(),
                                     subDeployment.getId());

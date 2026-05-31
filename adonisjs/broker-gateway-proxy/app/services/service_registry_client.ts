@@ -2,10 +2,10 @@ import env from '#start/env'
 import logger from '@adonisjs/core/services/logger'
 
 /**
- * HostServerClient handles registration and heartbeat with the service-registry registry
+ * ServiceRegistryClient handles registration and heartbeat with the service-registry registry
  */
-export default class HostServerClient {
-    private hostServerUrl: string
+export default class ServiceRegistryClient {
+    private serviceRegistryUrl: string
     private serviceName: string
     private serviceHost: string
     private servicePort: number
@@ -14,7 +14,7 @@ export default class HostServerClient {
     private isRegistered = false
 
     constructor() {
-        this.hostServerUrl = env.get('HOST_SERVER_URL')
+        this.serviceRegistryUrl = env.get('HOST_SERVER_URL')
         this.serviceName = env.get('SERVICE_NAME')
         this.serviceHost = env.get('SERVICE_HOST')
         this.servicePort = env.get('SERVICE_PORT')
@@ -25,7 +25,7 @@ export default class HostServerClient {
      * Register this service with the service-registry registry
      */
     async register(): Promise<boolean> {
-        const registrationUrl = `${this.hostServerUrl}/api/v1/registry/register`
+        const registrationUrl = `${this.serviceRegistryUrl}/api/v1/registry/register`
 
         const payload = {
             serviceName: this.serviceName,
@@ -70,7 +70,7 @@ export default class HostServerClient {
             return this.register()
         }
 
-        const heartbeatUrl = `${this.hostServerUrl}/api/v1/registry/heartbeat/${this.serviceName}`
+        const heartbeatUrl = `${this.serviceRegistryUrl}/api/v1/registry/heartbeat/${this.serviceName}`
 
         try {
             const response = await fetch(heartbeatUrl, {
@@ -140,7 +140,7 @@ export default class HostServerClient {
             return
         }
 
-        const deregisterUrl = `${this.hostServerUrl}/api/v1/registry/deregister/${this.serviceName}`
+        const deregisterUrl = `${this.serviceRegistryUrl}/api/v1/registry/deregister/${this.serviceName}`
 
         try {
             await fetch(deregisterUrl, {

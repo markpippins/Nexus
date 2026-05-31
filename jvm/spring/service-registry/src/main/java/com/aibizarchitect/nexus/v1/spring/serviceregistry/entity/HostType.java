@@ -8,8 +8,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "server_type")
-public class ServerType {
+@Table(name = "host_type")
+public class HostType {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,10 +24,10 @@ public class ServerType {
     @Column(name = "active_flag")
     private Boolean activeFlag = true;
 
-    public ServerType() {
+    public HostType() {
     }
 
-    public ServerType(Long id, String name, String description, Boolean activeFlag) {
+    public HostType(Long id, String name, String description, Boolean activeFlag) {
         this.id = id;
         this.name = name;
         this.description = description;
