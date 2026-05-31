@@ -56,16 +56,25 @@ export class RegistryServerProfileService {
 
     async loadProfiles(): Promise<void> {
         const profiles = await this.dbService.getAllRegistryServerProfiles();
-        // If DB has profiles, use them. Otherwise keep the default.
-        if (profiles.length > 0) {
-            // Ensure at least one profile is active
-            const hasActive = profiles.some(p => p.isActive === true);
-            if (!hasActive && profiles.length > 0) {
-                profiles[0].isActive = true;
+        // Migrate any legacy hostServerUrl fields to registryServerUrl
+        const migrated = profiles.map(p => {
+            const legacy = p as any;
+            if (legacy.hostServerUrl && !legacy.registryServerUrl) {
+                legacy.registryServerUrl = legacy.hostServerUrl;
+                delete legacy.hostServerUrl;
             }
-            this.profiles.set(profiles);
-            console.log('[RegistryServerProfileService] Loaded profiles from DB', profiles);
-            console.log('[RegistryServerProfileService] Active profile:', profiles.find(p => p.isActive)?.name);
+            return p;
+        });
+        // If DB has profiles, use them. Otherwise keep the default.
+        if (migrated.length > 0) {
+            // Ensure at least one profile is active
+            const hasActive = migrated.some(p => p.isActive === true);
+            if (!hasActive && migrated.length > 0) {
+                migrated[0].isActive = true;
+            }
+            this.profiles.set(migrated);
+            console.log('[RegistryServerProfileService] Loaded profiles from DB', migrated);
+            console.log('[RegistryServerProfileService] Active profile:', migrated.find(p => p.isActive)?.name);
         } else {
             console.log('[RegistryServerProfileService] Using default profile');
         }

@@ -62,7 +62,7 @@ import { ServiceRegistryEditorComponent } from './components/service-registry-ed
 import { GatewayEditorComponent } from './components/gateway-editor/gateway-editor.component.js';
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
 import { GatewayManagementComponent } from './components/gateway-management/gateway-management.component.js';
-import { RegistryServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
+import { RegistryServerManagementComponent } from './components/registry-server-management/registry-server-management.component.js';
 import { RmsIframeComponent } from './components/rms-iframe/rms-iframe.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 

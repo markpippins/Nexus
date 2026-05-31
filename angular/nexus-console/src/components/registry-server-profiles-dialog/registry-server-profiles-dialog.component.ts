@@ -43,8 +43,8 @@ const INITIAL_FORM_STATE: FormState = {
 @Component({
     selector: 'app-registry-server-profiles-dialog',
     imports: [CommonModule, FormsModule],
-    templateUrl: './host-profiles-dialog.component.html',
-    styleUrls: ['./host-profiles-dialog.component.css'],
+    templateUrl: './registry-server-profiles-dialog.component.html',
+    styleUrls: ['./registry-server-profiles-dialog.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RegistryServerProfilesDialogComponent {

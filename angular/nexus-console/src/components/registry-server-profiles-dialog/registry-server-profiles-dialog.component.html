@@ -199,18 +199,18 @@
 
                 <div class="sm:col-span-6">
                   <label
-                    for="hostServerUrl"
+                    for="registryServerUrl"
                     class="block text-sm font-medium text-[rgb(var(--color-text-base))]"
                     >Service Registry URL</label
                   >
                   <div class="mt-1">
                     <input
                       type="url"
-                      name="hostServerUrl"
-                      id="hostServerUrl"
+                      name="registryServerUrl"
+                      id="registryServerUrl"
                       required
-                      [ngModel]="formState().hostServerUrl"
-                      (ngModelChange)="updateField('hostServerUrl', $event)"
+                      [ngModel]="formState().registryServerUrl"
+                      (ngModelChange)="updateField('registryServerUrl', $event)"
                       placeholder="http://hostname:8085"
                       class="shadow-sm focus:ring-[rgb(var(--color-primary-500))] focus:border-[rgb(var(--color-primary-500))] block w-full sm:text-sm border-[rgb(var(--color-border-base))] rounded-md bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] px-3 py-2"
                     />

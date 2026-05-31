@@ -10,7 +10,8 @@ const DB_NAME = 'file-explorer-db';
 const DB_VERSION = 7;
 const PROFILES_STORE = 'server-profiles'; // Legacy
 const BROKER_PROFILES_STORE = 'broker-profiles';
-const REGISTRY_SERVER_PROFILES_STORE = 'registry-server-profiles';
+const HOST_PROFILES_STORE = 'host-profiles'; // Keep old store name for IndexedDB compatibility
+
 const FEEDS_STORE = 'rss-feeds';
 const FOLDER_PROPERTIES_STORE = 'folder-properties';
 const NOTES_STORE = 'notes';
@@ -20,10 +21,11 @@ interface FileExplorerDB extends DBSchema {
     key: string;
     value: BrokerProfile;
   };
-  [REGISTRY_SERVER_PROFILES_STORE]: {
+  [HOST_PROFILES_STORE]: {
     key: string;
     value: RegistryServerProfile;
   };
+
   [FEEDS_STORE]: {
     key: string;
     value: RssFeed;
@@ -77,6 +79,11 @@ export class DbService {
           }
           db.createObjectStore(NOTES_STORE, { keyPath: 'id' });
         }
+        if (oldVersion < 7) {
+          if (!db.objectStoreNames.contains(HOST_PROFILES_STORE)) {
+            db.createObjectStore(HOST_PROFILES_STORE, { keyPath: 'id' });
+          }
+        }
         if (oldVersion < 6) {
           if (!db.objectStoreNames.contains(BROKER_PROFILES_STORE)) {
             db.createObjectStore(BROKER_PROFILES_STORE, { keyPath: 'id' });
@@ -93,35 +100,6 @@ export class DbService {
                   // Map ServerProfile to BrokerProfile: keep common fields. 
                   if (!profile.type || profile.type === 'broker') {
                     await newStore.put(profile);
-                  }
-                  cursor = await cursor.continue();
-                }
-              })();
-            }
-          }
-        }
-        if (oldVersion < 7) {
-          if (!db.objectStoreNames.contains(REGISTRY_SERVER_PROFILES_STORE)) {
-            db.createObjectStore(REGISTRY_SERVER_PROFILES_STORE, { keyPath: 'id' });
-
-            // Migrate host profiles from legacy store if needed
-            if (db.objectStoreNames.contains(PROFILES_STORE)) {
-              const oldStore = transaction.objectStore(PROFILES_STORE);
-              const newStore = transaction.objectStore(REGISTRY_SERVER_PROFILES_STORE);
-              (async () => {
-                let cursor = await oldStore.openCursor();
-                while (cursor) {
-                  const profile = cursor.value;
-                  if (profile.type === 'host') {
-                    // Map ServerProfile to RegistryServerProfile
-                    const hostProfile: RegistryServerProfile = {
-                      id: profile.id,
-                      name: profile.name,
-                      registryServerUrl: profile.registryServerUrl || profile.brokerUrl || '',
-                      imageUrl: profile.imageUrl || '',
-                      description: 'Migrated from legacy profile'
-                    };
-                    await newStore.put(hostProfile);
                   }
                   cursor = await cursor.continue();
                 }
@@ -153,28 +131,6 @@ export class DbService {
   async deleteProfile(id: string): Promise<void> {
     const db = await this.dbPromise;
     await db.delete(BROKER_PROFILES_STORE, id);
-  }
-
-  // --- Registry Server Profile Methods ---
-
-  async getAllRegistryServerProfiles(): Promise<RegistryServerProfile[]> {
-    const db = await this.dbPromise;
-    return db.getAll(REGISTRY_SERVER_PROFILES_STORE);
-  }
-
-  async addRegistryServerProfile(profile: RegistryServerProfile): Promise<void> {
-    const db = await this.dbPromise;
-    await db.put(REGISTRY_SERVER_PROFILES_STORE, profile);
-  }
-
-  async updateRegistryServerProfile(profile: RegistryServerProfile): Promise<void> {
-    const db = await this.dbPromise;
-    await db.put(REGISTRY_SERVER_PROFILES_STORE, profile);
-  }
-
-  async deleteRegistryServerProfile(id: string): Promise<void> {
-    const db = await this.dbPromise;
-    await db.delete(REGISTRY_SERVER_PROFILES_STORE, id);
   }
 
   // --- RSS Feed Methods ---
@@ -236,5 +192,27 @@ export class DbService {
   async getAllNotes(): Promise<Note[]> {
     const db = await this.dbPromise;
     return db.getAll(NOTES_STORE);
+  }
+
+  // --- Registry Server Profile Methods ---
+
+  async getAllRegistryServerProfiles(): Promise<RegistryServerProfile[]> {
+    const db = await this.dbPromise;
+    return db.getAll(HOST_PROFILES_STORE);
+  }
+
+  async addRegistryServerProfile(profile: RegistryServerProfile): Promise<void> {
+    const db = await this.dbPromise;
+    await db.put(HOST_PROFILES_STORE, profile);
+  }
+
+  async updateRegistryServerProfile(profile: RegistryServerProfile): Promise<void> {
+    const db = await this.dbPromise;
+    await db.put(HOST_PROFILES_STORE, profile);
+  }
+
+  async deleteRegistryServerProfile(id: string): Promise<void> {
+    const db = await this.dbPromise;
+    await db.delete(HOST_PROFILES_STORE, id);
   }
 }
