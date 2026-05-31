@@ -352,17 +352,76 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             </table>
                         </div>
                     }
-                    @case ('servers') {
-                        <div class="overflow-x-auto">
-                             <table class="w-full text-left border-collapse">
-                                <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
-                                    <tr>
-                                        <th (click)="onSort('hostname')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
-                                            <div class="flex items-center">
-                                                Hostname
-                                                @if (sortState().column === 'hostname') {
-                                                    <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
-                                                }
+                    @case ('hosts') {
+                        <div class="flex flex-col h-full">
+                            <!-- Hosts List -->
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+                                        <tr>
+                                            <th (click)="onSort('hostname')" class="p-2 font-semibold w-1/4 cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Hostname
+                                                    @if (sortState().column === 'hostname') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('ipAddress')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    IP Address
+                                                    @if (sortState().column === 'ipAddress') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('hostTypeId')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Type
+                                                    @if (sortState().column === 'hostTypeId') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th class="p-2 font-semibold text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (h of hosts(); track h.id) {
+                                            <tr 
+                                                tabindex="0"
+                                                (dblclick)="onEdit(h)"
+                                                (keydown.enter)="onEdit(h)"
+                                                class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]"
+                                            >
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))] font-medium">{{ h.hostname }}</td>
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.ipAddress || '-' }}</td>
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.hostTypeId || '-' }}</td>
+                                                <td class="p-2 py-1.5 text-right whitespace-nowrap">
+                                                    <button (click)="onEdit(h)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
+                                                    <button (click)="onDelete(h)" class="text-red-500 hover:underline text-xs">Delete</button>
+                                                </td>
+                                            </tr>
+                                        } @empty {
+                                            <tr>
+                                                <td colspan="4" class="p-8 text-center text-[rgb(var(--color-text-muted))]">
+                                                    No hosts found.
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+                    @case ('host-types') {
+                         <app-lookup-list
+                            [items]="lookupData()"
+                            [type]="managementType()"
+                            (onEdit)="onEdit($event)"
+                            (onDelete)="onDelete($event)"
+                        ></app-lookup-list>
+                    }
                                             </div>
                                         </th>
                                         <th (click)="onSort('ipAddress')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
@@ -401,7 +460,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @for (s of servers(); track s.id) {
+                                    @for (s of hosts(); track s.id) {
                                         <tr tabindex="0" (dblclick)="onEdit(s)" (keydown.enter)="onEdit(s)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
                                             <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))]">{{ s.hostname }}</td>
                                             <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.ipAddress }}</td>
@@ -651,7 +710,7 @@ export class PlatformManagementComponent {
         });
     });
 
-    servers = computed(() => {
+    hosts = computed(() => {
         return this.sortData(this.rawHosts(), this.sortState(), (item, col) => {
             switch (col) {
                 case 'hostname': return item.hostname;
@@ -769,7 +828,7 @@ export class PlatformManagementComponent {
                     displayType = 'Deployments';
                     break;
                 case 'hosts':
-                    count = this.servers().length;
+                    count = this.hosts().length;
                     displayType = 'Servers';
                     break;
                 case 'libraries':
