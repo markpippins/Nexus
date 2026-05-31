@@ -39,7 +39,7 @@ export class ComponentRegistryService {
         if (profiles.length === 0) {
             return 'http://localhost:8085'; // Default fallback
         }
-        let url = profiles[0].hostServerUrl;
+        let url = profiles[0].registryServerUrl;
         if (!url.startsWith('http')) url = `http://${url}`;
         if (url.endsWith('/')) url = url.slice(0, -1);
         return url;

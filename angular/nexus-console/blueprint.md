@@ -4,17 +4,17 @@
 
 Nexus is a unified service mesh management dashboard allowing users to visualize, monitor, and manage services, deployments, and infrastructure across multiple host servers.
 
-## Current Feature: Active Host Profile Selection
+## Current Feature: Active Registry Server Profile Selection
 
-Implemented the ability for users to designate a specific Host Server profile as "active", which is then used by Platform Management and Service Mesh for all API calls.
+Implemented the ability for users to designate a specific Service Registry profile as "active", which is then used by Platform Management and Service Mesh for all API calls.
 
 ### Implementation Status
 
 ✅ **Completed:**
 
-- **HostProfile Model** (`host-profile.model.ts`):
-  - Added `isActive?: boolean` field to track the active host server.
-- **HostProfileService** (`host-profile.service.ts`):
+- **RegistryServerProfile Model** (`registry-server-profile.model.ts`):
+  - Added `isActive?: boolean` field to track the active registry server profile.
+- **RegistryServerProfileService** (`registry-server-profile.service.ts`):
   - Added `activeProfile` computed signal that returns the currently active profile.
   - Added `activeBaseUrl` computed signal that returns the active profile's properly formatted URL.
   - Added `setActiveProfile(profileId)` method to set a profile as active (deactivates all others).
@@ -22,27 +22,27 @@ Implemented the ability for users to designate a specific Host Server profile as
   - Updated `deleteProfile()` to auto-activate the next available profile if the deleted one was active.
 - **ServiceMeshService** (`service-mesh.service.ts`):
   - Refactored constructor to connect only to the active profile instead of all profiles.
-  - Profile switching now triggers a reconnect to the newly active host server.
-- **HostProfilesDialogComponent**:
+  - Profile switching now triggers a reconnect to the newly active registry server.
+- **RegistryServerProfilesDialogComponent**:
   - Updated UI to display an "Active" badge next to the active profile.
   - Added green ring/highlight around active profile in sidebar list.
   - Added "Set Active" button (checkmark icon) that appears on hover for inactive profiles.
   - Added `setActive()` method to trigger profile activation.
 - **AppComponent** (`app.component.ts`):
   - **Bug Fix**: Updated `getPlatformNodeForPath()` to use `activeProfile` instead of `profiles[0]`.
-  - This fixes the issue where Platform Management CRUD screens were calling the wrong host server.
+  - This fixes the issue where Platform Management CRUD screens were calling the wrong service registry.
 
 ### How It Works
 
-1. Users configure Host Server profiles in the "Manage Host Servers" dialog.
+1. Users configure Service Registry profiles in the "Manage Service Registries" dialog.
 2. One profile is always marked as "active" (indicated by a green badge and ring).
 3. Hovering over an inactive profile shows a checkmark button to "Set as Active".
-4. When the active profile changes, Platform Management and Service Mesh automatically reconnect to the new host server.
-5. All API calls (services, deployments, frameworks, etc.) are routed to the active host server.
+4. When the active profile changes, Platform Management and Service Mesh automatically reconnect to the new registry server.
+5. All API calls (services, deployments, frameworks, etc.) are routed to the active registry server.
 
 ## Previous Feature: Platform Management Images
 
-Ensured that children of the "Platform Management" node (and other Host Server nodes) in the main explorer view request custom images matching their defined icons, consistent with the sidebar tree view.
+Ensured that children of the "Platform Management" node (and other Service Registry nodes) in the main explorer view request custom images matching their defined icons, consistent with the sidebar tree view.
 
 ### Implementation Status
 
@@ -64,9 +64,9 @@ Refining the "Platform Management" explorer tree nodes to match user requirement
 
 ✅ **Completed:**
 
-- Modified `HostServerProvider.ts` to reorder children of `platform` node: Deployments, Hosts, Services, System Health.
+- Modified `RegistryServerProvider.ts` to reorder children of `platform` node: Deployments, Hosts, Services, System Health.
 - Renamed "Service Hosts" to "Hosts" in `fetchPlatformInfo` for consistency.
-- **Folder Rename Restriction**: Added `isRenamingAllowed` computed signal in `FileExplorerComponent` that only allows double-click rename when inside the File Systems path (e.g., Local Session). This prevents accidental renaming of Platform Management, Gateways, and Host Servers items which are managed entities.
+- **Folder Rename Restriction**: Added `isRenamingAllowed` computed signal in `FileExplorerComponent` that only allows double-click rename when inside the File Systems path (e.g., Local Session). This prevents accidental renaming of Platform Management, Gateways, and Service Registries items which are managed entities.
 - Verified build success.
 
 ## Current Feature: Data Dictionary Expansion
@@ -77,11 +77,11 @@ Added "Operating Systems" and "Environments" to the Data Dictionary to support s
 
 ✅ **Completed (Frontend):**
 
-- **HostServerProvider**: Added `Operating Systems` and `Environments` nodes to `getDataDictionaryNodes()` with appropriate icons ('computer' and 'cloud'), API endpoints (`/api/operating-systems` and `/api/environments`), and management types.
+- **RegistryServerProvider**: Added `Operating Systems` and `Environments` nodes to `getDataDictionaryNodes()` with appropriate icons ('computer' and 'cloud'), API endpoints (`/api/operating-systems` and `/api/environments`), and management types.
 - **PlatformManagementComponent**: Added `operating-systems` and `environments` cases to all switch statements (loadData, onAdd, onEdit, onDelete) and template @case entries for displaying these lookup lists.
 - **AppComponent**: Added 'operating systems' and 'environments' to the `validTypes` array in `getPlatformNodeForPath()` for proper path routing to the management component.
 
-✅ **Completed (Backend - Spring Boot host-server):**
+✅ **Completed (Backend - Spring Boot service-registry):**
 
 - **OperatingSystem Entity**: Created new JPA entity `OperatingSystem.java` with fields: id, name, activeFlag, createdAt, updatedAt, and OneToMany relationship to Host.
 - **OperatingSystemRepository**: Created repository interface with caching support.
@@ -127,13 +127,13 @@ Integration of the 3D Service Architecture Graph and Visual Component Editor wit
 
 ## Current Feature: UI Consistency
 
-### Align Toolbar Behavior for Host Servers
+### Align Toolbar Behavior for Service Registries
 
-Updated the toolbar context handling to apply the same rules for Host Servers as Gateways. This ensures that file operation buttons (cut, copy, paste, etc.) are hidden when in a Host Server context, and enabling relevant actions like "Save", "Reset", and "Add Host Server".
+Updated the toolbar context handling to apply the same rules for Service Registries as Gateways. This ensures that file operation buttons (cut, copy, paste, etc.) are hidden when in a Service Registry context, and enabling relevant actions like "Save", "Reset", and "Add Service Registry".
 
-- **Modified**: `src/app.component.html` - Bound `isHostServer` signals to toolbar and updated event handlers.
-- **Modified**: `src/app.component.html` - Bound save/reset triggers to `app-host-server-editor` to enable toolbar-driven saving.
-- **Modified**: `src/components/toolbar/toolbar.component.html` - Hidden "Copy To" and "Move To" dropdowns when in Host Server context.
+- **Modified**: `src/app.component.html` - Bound `isRegistryServer` signals to toolbar and updated event handlers.
+- **Modified**: `src/app.component.html` - Bound save/reset triggers to `app-registry-server-editor` to enable toolbar-driven saving.
+- **Modified**: `src/components/toolbar/toolbar.component.html` - Hidden "Copy To" and "Move To" dropdowns when in Service Registry context.
 
 ### Align Toolbar Behavior for Platform Management
 
@@ -148,20 +148,20 @@ Extended the toolbar consistency to "Platform Management" contexts (e.g., Servic
 
 ### Remove Redundant Header Cards
 
-Removed redundant header cards containing the "Add New ..." buttons from the Gateway and Host Server management views, as this functionality is already provided by the Toolbar.
+Removed redundant header cards containing the "Add New ..." buttons from the Gateway and Service Registry management views, as this functionality is already provided by the Toolbar.
 
 - **Modified**: `src/components/gateway-management/gateway-management.component.ts`
-- **Modified**: `src/components/host-server-management/host-server-management.component.ts`
+- **Modified**: `src/components/registry-server-management/registry-server-management.component.ts`
 
 ## Current Feature: Bug Fixes
 
-### Fixed "Delete Host Server" Button
+### Fixed "Delete Service Registry" Button
 
-Fixed an issue where clicking "Delete" for a Host Server profile would initiate the confirmation logic but fail to show the dialog.
+Fixed an issue where clicking "Delete" for a Service Registry profile would initiate the confirmation logic but fail to show the dialog.
 
-- **Implemented**: Added missing `<app-confirm-dialog>` for `isDeleteHostServerConfirmOpen` in `app.component.html`.
-- **Verified**: Confirmed `onDeleteHostServer` method exists and is correctly wired.
-- **Cleaned**: Removed duplicate/stub implementations of `onDeleteHostServer` mistakenly added during investigation.
+- **Implemented**: Added missing `<app-confirm-dialog>` for `isDeleteRegistryServerConfirmOpen` in `app.component.html`.
+- **Verified**: Confirmed `onDeleteRegistryServer` method exists and is correctly wired.
+- **Cleaned**: Removed duplicate/stub implementations of `onDeleteRegistryServer` mistakenly added during investigation.
 
 ### Fixed Accidental Toolbar Action Triggers
 
@@ -184,7 +184,7 @@ Refactored the Platform Management views to group dictionary Lookup items under 
 - **Added**: "Data Dictionary" node to Platform Management tree.
 - **Moved**: CRUD screens for `Frameworks`, `Service Types`, `Server Types`, `Languages`, `Categories`, and `Library Categories` are now individual nodes under Data Dictionary.
 - **Cleaned**: Removed the tabbed interface from the "Services" view, as these items are now accessed via the tree.
-- **Fixed**: Updated `HostServerProvider.canHandle` to explicitly accept `platform-dictionary-` nodes, resolving an issue where the new dictionary folder would not expand.
+- **Fixed**: Updated `RegistryServerProvider.canHandle` to explicitly accept `platform-dictionary-` nodes, resolving an issue where the new dictionary folder would not expand.
 - **Fixed**: Updated `AppComponent.getPlatformNodeForPath` to correctly resolve nested "Data Dictionary" paths and normalize "Languages" and "Categories" to their platform management types (`framework-languages`, `framework-categories`).
 
 ### Fixed Missing Platform Management Screens
@@ -241,11 +241,11 @@ Enhanced the Component Palette in the Graph View to show realistic shape preview
 
 ### Fixed Backend Build & CORS
 
-Resolved compilation errors in the Host Server caused by missing Lombok-generated methods, which were preventing the new `VisualComponentController` from being deployed.
+Resolved compilation errors in the Service Registry caused by missing Lombok-generated methods, which were preventing the new `VisualComponentController` from being deployed.
 
 - **Fixed**: Manually added missing getters/setters to `Deployment.java`, `Host.java`, `Service.java`, and `ServiceConfiguration.java`.
 - **Verified**: Backend `mvn clean install` passed.
-- **Action Required**: User must restart the Host Server to apply these changes and enable the Visual Component endpoints.
+- **Action Required**: User must restart the Service Registry to apply these changes and enable the Visual Component endpoints.
 
 ## Previous Feature: Service Mesh Sub-Service Visibility
 
@@ -254,9 +254,9 @@ Enhanced the service mesh to display hosted/embedded services within gateway fac
 ### Implemented Features
 
 - **Broker Gateway (Spring Boot)**:
-  - Enhanced `HostServerRegistrationService.getHostedServices()` to include additional metadata (framework, status, type, endpoint, healthCheck).
+  - Enhanced `RegistryServerRegistrationService.getHostedServices()` to include additional metadata (framework, status, type, endpoint, healthCheck).
   - Services embedded in the gateway are now registered with full context.
-- **Host Server (Spring Boot)**:
+- **Service Registry (Spring Boot)**:
   - Enhanced `ExternalServiceRegistration.HostedServiceInfo` DTO with new fields.
   - Updated `storeHostedServices()` to persist all metadata as JSON.
   - Added `getAllServicesWithHosted()` and `getHostedServicesForService()` methods.
@@ -270,16 +270,16 @@ Enhanced the service mesh to display hosted/embedded services within gateway fac
 
 The architecture supports future migration to standalone microservices via deployment profiles (`embedded` vs `standalone`) without code changes.
 
-## Previous Feature: Host Server & Gateway Integration
+## Previous Feature: Service Registry & Gateway Integration
 
-Implemented comprehensive management for Broker Gateways and Host Servers, enabling multi-host connectivity and profile management directly within the application.
+Implemented comprehensive management for Broker Gateways and Service Registries, enabling multi-host connectivity and profile management directly within the application.
 
 ### Implemented Features
 
-- **Host Server Management**:
-  - Integrated `HostServerManagementComponent` into the main application view.
-  - Implemented Add, Edit, and Delete workflows for Host Server profiles.
-  - Connected `HostServerEditorComponent` properly to the application state.
+- **Service Registry Management**:
+  - Integrated `RegistryServerManagementComponent` into the main application view.
+  - Implemented Add, Edit, and Delete workflows for Service Registry profiles.
+  - Connected `RegistryServerEditorComponent` properly to the application state.
 - **Gateway Management**:
   - Finalized `GatewayManagementComponent` integration.
   - Implemented Add, Edit, and Delete workflows for Gateway profiles.
@@ -313,7 +313,7 @@ Enabled double-click interactions in Nexus CRUD screens to open the edit dialog 
 
 ✅ **Completed:**
 
-- **HostServerManagementComponent**: Added double-click handler to Service Registry cards.
+- **RegistryServerManagementComponent**: Added double-click handler to Service Registry cards.
 - **PlatformManagementComponent**: Added double-click handlers to tables for:
   - Services
   - Libraries

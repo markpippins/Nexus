@@ -9,15 +9,15 @@
 ### 1. Architecture Shift Impact
 The application has undergone a significant architectural transformation:
 - **Before**: Direct broker service discovery and display
-- **After**: Host Server-centric approach where services must register with Host Server to be visible
+- **After**: Service Registry-centric approach where services must register with Service Registry to be visible
 
 ### 2. Service Registration Gap
 The broker-gateway services have registration capabilities but may not be successfully registering:
 
 **Evidence Found:**
-- `spring/broker-gateway/src/main/java/com/angrysurfer/atomic/broker/gateway/HostServerRegistrationService.java` exists
+- `spring/broker-gateway/src/main/java/com/angrysurfer/atomic/broker/gateway/ServiceRegistryRegistrationService.java` exists
 - Registration service is properly configured with:
-  - Host Server URL: `http://localhost:8085` (default)
+  - Service Registry URL: `http://localhost:8085` (default)
   - Service name: `spring-broker-gateway`
   - Operations: `["submitRequest", "routeRequest", "healthCheck"]`
   - Health endpoint: `/api/health`
@@ -25,11 +25,11 @@ The broker-gateway services have registration capabilities but may not be succes
 
 ### 3. Current Implementation Analysis
 
-**HostServerProvider.fetchServices()** only queries:
-- Host Server API: `/api/services`
-- Host Server deployments: `/api/deployments`
+**RegistryServerProvider.fetchServices()** only queries:
+- Service Registry API: `/api/services`
+- Service Registry deployments: `/api/deployments`
 
-**Missing**: Direct broker service discovery as fallback when services aren't registered with Host Server.
+**Missing**: Direct broker service discovery as fallback when services aren't registered with Service Registry.
 
 ### 4. Service Mesh Integration Status
 
@@ -43,33 +43,33 @@ The broker-gateway services have registration capabilities but may not be succes
 ## Immediate Action Required
 
 ### Phase 0: Emergency Fix (URGENT)
-Implement dual provider approach in `HostServerProvider.fetchServices()`:
+Implement dual provider approach in `RegistryServerProvider.fetchServices()`:
 
-1. **Primary**: Query Host Server API (current behavior)
+1. **Primary**: Query Service Registry API (current behavior)
 2. **Fallback**: Direct broker service discovery for known endpoints
 3. **Merge**: Combine results with proper deduplication
 
 ### Implementation Plan
 
-#### Step 1: Enhance HostServerProvider
+#### Step 1: Enhance RegistryServerProvider
 ```typescript
-private async fetchServices(profile: HostProfile): Promise<TreeNode[]> {
+private async fetchServices(profile: RegistryServerProfile): Promise<TreeNode[]> {
   try {
-    // Primary: Host Server registered services
-    const hostServerServices = await this.fetchHostServerServices(profile);
+    // Primary: Service Registry registered services
+    const registryServices = await this.fetchRegistryServerServices(profile);
     
     // Fallback: Direct broker discovery
     const brokerServices = await this.fetchBrokerServices(profile);
     
     // Merge and deduplicate
-    return this.mergeServiceLists(hostServerServices, brokerServices);
+    return this.mergeServiceLists(registryServices, brokerServices);
   } catch (e) {
     console.error(`Failed to fetch services from ${profile.name}`, e);
     throw e;
   }
 }
 
-private async fetchBrokerServices(profile: HostProfile): Promise<TreeNode[]> {
+private async fetchBrokerServices(profile: RegistryServerProfile): Promise<TreeNode[]> {
   const knownBrokerEndpoints = [
     'http://localhost:8080', // spring/broker-gateway
     'http://localhost:8090', // quarkus/broker-gateway
@@ -116,7 +116,7 @@ async executeOperation(nodeId: string, operation: string, params: any): Promise<
   // Handle both registered services and fallback-discovered services
   if (nodeId.startsWith('service-') || nodeId.startsWith('broker-service-')) {
     // Extract service info and execute operation
-    // Support both Host Server API and direct broker communication
+    // Support both Service Registry API and direct broker communication
   }
 }
 ```
@@ -137,18 +137,18 @@ interface BrokerDiscoveryConfig {
 ## Testing Strategy
 
 ### 1. Verify Current State
-- [ ] Check if Host Server is running on port 8085
+- [ ] Check if Service Registry is running on port 8085
 - [ ] Check if broker-gateway is running on port 8080
 - [ ] Verify broker-gateway registration logs
-- [ ] Test Host Server `/api/services` endpoint
+- [ ] Test Service Registry `/api/services` endpoint
 
 ### 2. Test Registration Fix
-- [ ] Ensure broker-gateway successfully registers with Host Server
-- [ ] Verify services appear in Host Server API response
-- [ ] Test service operations through Host Server
+- [ ] Ensure broker-gateway successfully registers with Service Registry
+- [ ] Verify services appear in Service Registry API response
+- [ ] Test service operations through Service Registry
 
 ### 3. Test Fallback Discovery
-- [ ] Test with Host Server offline
+- [ ] Test with Service Registry offline
 - [ ] Test with broker services running but not registered
 - [ ] Verify fallback discovery works
 - [ ] Test merged service list display
@@ -192,10 +192,10 @@ interface BrokerDiscoveryConfig {
 
 ## Next Steps
 
-1. **IMMEDIATE**: Implement dual provider approach in HostServerProvider
+1. **IMMEDIATE**: Implement dual provider approach in RegistryServerProvider
 2. **URGENT**: Test broker service registration and fix any configuration issues
 3. **HIGH**: Add fallback broker discovery mechanism
 4. **MEDIUM**: Enhance service operations for discovered services
 5. **LOW**: Add configuration UI for service discovery options
 
-This regression fix will restore the missing broker-gateway service visibility while maintaining the new Host Server-centric architecture and preparing for future service mesh enhancements.
+This regression fix will restore the missing broker-gateway service visibility while maintaining the new Service Registry-centric architecture and preparing for future service mesh enhancements.

@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, Subject, interval, BehaviorSubject, of, firstValueFrom } from 'rxjs';
 import { switchMap, map, catchError, tap, shareReplay, takeUntil } from 'rxjs/operators';
 import { HostProfileService } from './host-profile.service.js';
-import { HostProfile } from '../models/host-profile.model.js';
+import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
 import {
   Framework,
   ServiceInstance,
@@ -26,7 +26,7 @@ import {
 
 export interface ServiceMeshConnection {
   profileId: string;
-  profile: HostProfile;
+  profile: RegistryServerProfile;
   baseUrl: string;
   connected: boolean;
   lastError?: string;
@@ -219,8 +219,8 @@ export class ServiceMeshService {
   // Connection Management
   // =========================================================================
 
-  private getBaseUrl(profile: HostProfile): string {
-    let baseUrl = profile.hostServerUrl;
+  private getBaseUrl(profile: RegistryServerProfile): string {
+    let baseUrl = profile.registryServerUrl;
     if (!baseUrl.startsWith('http')) {
       baseUrl = `http://${baseUrl}`;
     }
@@ -230,7 +230,7 @@ export class ServiceMeshService {
     return baseUrl;
   }
 
-  async connectToProfile(profile: HostProfile): Promise<boolean> {
+  async connectToProfile(profile: RegistryServerProfile): Promise<boolean> {
     const baseUrl = this.getBaseUrl(profile);
 
     try {
@@ -729,8 +729,8 @@ export class ServiceMeshService {
     });
   }
 
-  async executeServiceOperation(serviceId: string, operation: ServiceOperation, profile: HostProfile): Promise<OperationResult> {
-    let baseUrl = profile.hostServerUrl;
+  async executeServiceOperation(serviceId: string, operation: ServiceOperation, profile: RegistryServerProfile): Promise<OperationResult> {
+    let baseUrl = profile.registryServerUrl;
     if (!baseUrl.startsWith('http')) {
       baseUrl = `http://${baseUrl}`;
     }

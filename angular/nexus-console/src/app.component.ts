@@ -288,8 +288,8 @@ export class AppComponent implements OnInit, OnDestroy {
   pane2PlatformNode = computed(() => this.getPlatformNodeForPath(this.pane2Path()));
   activePanePlatformNode = computed(() => this.activePaneId() === 1 ? this.pane1PlatformNode() : this.pane2PlatformNode());
 
-  // Host Server Profile Editor Detection
-  // When path is ['Host Servers', 'Profile Name'], we show the editor
+  // Registry Server Profile Editor Detection
+  // When path is ['Service Registries', 'Profile Name'], we show the editor
   pane1HostServerProfileId = computed(() => this.getHostServerProfileIdForPath(this.pane1Path()));
   pane2HostServerProfileId = computed(() => this.getHostServerProfileIdForPath(this.pane2Path()));
 
@@ -352,7 +352,7 @@ export class AppComponent implements OnInit, OnDestroy {
       if (validTypes.includes(type)) {
         const profile = activeProfile;
         if (profile) {
-          const baseUrl = profile.hostServerUrl.startsWith('http') ? profile.hostServerUrl.replace(/\/$/, '') : `http://${profile.hostServerUrl.replace(/\/$/, '')}`;
+          const baseUrl = profile.registryServerUrl.startsWith('http') ? profile.registryServerUrl.replace(/\/$/, '') : `http://${profile.registryServerUrl.replace(/\/$/, '')}`;
           console.log('[AppComponent] Matched single-element path', { type, baseUrl });
           return { type: normalizeType(type), baseUrl };
         }
@@ -407,7 +407,7 @@ export class AppComponent implements OnInit, OnDestroy {
           if (!normalizedType) {
             return null;
           }
-          const baseUrl = finalProfile.hostServerUrl.startsWith('http') ? finalProfile.hostServerUrl.replace(/\/$/, '') : `http://${finalProfile.hostServerUrl.replace(/\/$/, '')}`;
+          const baseUrl = finalProfile.registryServerUrl.startsWith('http') ? finalProfile.registryServerUrl.replace(/\/$/, '') : `http://${finalProfile.registryServerUrl.replace(/\/$/, '')}`;
           console.log('[AppComponent] Matched Platform Management path', { type, baseUrl, targetProfileName });
           return { type: normalizedType, baseUrl };
         }
@@ -431,7 +431,7 @@ export class AppComponent implements OnInit, OnDestroy {
         }
 
         if (profile) {
-          const baseUrl = profile.hostServerUrl.startsWith('http') ? profile.hostServerUrl.replace(/\/$/, '') : `http://${profile.hostServerUrl.replace(/\/$/, '')}`;
+          const baseUrl = profile.registryServerUrl.startsWith('http') ? profile.registryServerUrl.replace(/\/$/, '') : `http://${profile.registryServerUrl.replace(/\/$/, '')}`;
           console.log('[AppComponent] Matched direct management path', { type: lastElement, baseUrl, profileName: path[0] });
           return { type: normalizeType(lastElement), baseUrl };
         }
@@ -533,7 +533,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.hostProfileService.saveProfile({
       id: Date.now().toString(),
       name,
-      hostServerUrl: 'http://localhost:8000',
+      registryServerUrl: 'http://localhost:8000',
       imageUrl: '',
       status: 'ACTIVE'
     }).then(() => {
@@ -897,32 +897,32 @@ export class AppComponent implements OnInit, OnDestroy {
   private treeAdapters = new Map<string, TreeProviderAdapter>();
 
   constructor() {
-    // Initialize adapters for each Host Server root
-    // Initialize adapters for each Host Server root
+    // Initialize adapters for each Registry Server root
+    // Initialize adapters for each Registry Server root
     // Services, Users, Search etc are now handled by ServiceMeshComponent and no longer mapped to file system
-    // this.treeAdapters.set('Services', new TreeProviderAdapter(this.hostServerProvider, 'services'));
-    // this.treeAdapters.set('Users', new TreeProviderAdapter(this.hostServerProvider, 'users'));
-    // this.treeAdapters.set('File Systems', new TreeProviderAdapter(this.hostServerProvider, 'filesystems'));
+    // this.treeAdapters.set('Services', new TreeProviderAdapter(this.registryServerProvider, 'services'));
+    // this.treeAdapters.set('Users', new TreeProviderAdapter(this.registryServerProvider, 'users'));
+    // this.treeAdapters.set('File Systems', new TreeProviderAdapter(this.registryServerProvider, 'filesystems'));
     this.treeAdapters.set('Platform Management', new TreeProviderAdapter(this.registryServerProvider, 'platform'));
 
     this.homeProvider = {
       getContents: async (path: string[]): Promise<FileSystemNode[]> => {
         console.log('[homeProvider.getContents] path:', path);
-        // Get Host Server children (for platform categories like Services, Users, etc.)
+        // Get Registry Server children (for platform categories like Services, Users, etc.)
         const hostChildren = await this.registryServerProvider.getChildren('root');
         console.log('[homeProvider.getContents] hostChildren:', hostChildren.map(c => c.name));
         const hostNodes: FileSystemNode[] = hostChildren.map(node => {
           // Convert NodeType to FileType
-          let fileType: 'folder' | 'file' | 'host-server' = 'folder';
+          let fileType: 'folder' | 'file' | 'registry-server' = 'folder';
           if (node.type === NodeType.FILE) {
             fileType = 'file';
-          } else if (node.type === NodeType.HOST_SERVER) {
-            fileType = 'host-server';
+          } else if (node.type === NodeType.REGISTRY_SERVER) {
+            fileType = 'registry-server';
           }
 
           return {
             name: node.name,
-            type: node.type === NodeType.HOST_SERVER ? 'host-server' :
+            type: node.type === NodeType.REGISTRY_SERVER ? 'registry-server' :
               node.type === NodeType.FILE ? 'file' : 'folder',
             id: node.id,
             metadata: node.metadata,
@@ -953,7 +953,7 @@ export class AppComponent implements OnInit, OnDestroy {
           };
         });
 
-        // Build host server profile nodes for the Host Servers folder
+        // Build registry server profile nodes for the Host Servers folder
         const allHostProfiles = this.hostProfileService.profiles();
         const hostProfileNodes: FileSystemNode[] = allHostProfiles.map(p => ({
           name: p.name,
@@ -1037,11 +1037,11 @@ export class AppComponent implements OnInit, OnDestroy {
             const nodes = await this.registryServerProvider.getChildren(currentNodeId);
             return nodes.map(node => {
               // Determine the type based on NodeType enum, converting to FileType
-              let fileType: 'file' | 'folder' | 'host-server' = 'folder';
+              let fileType: 'file' | 'folder' | 'registry-server' = 'folder';
               if (node.type === NodeType.FILE) {
                 fileType = 'file';
-              } else if (node.type === NodeType.HOST_SERVER) {
-                fileType = 'host-server';
+              } else if (node.type === NodeType.REGISTRY_SERVER) {
+                fileType = 'registry-server';
               } else {
                 fileType = 'folder';
               }
@@ -1078,7 +1078,7 @@ export class AppComponent implements OnInit, OnDestroy {
           isVirtualFolder: true,
         };
 
-        // Create "Service Registries" virtual folder containing host server profiles
+        // Create "Service Registries" virtual folder containing registry server profiles
         const serviceRegistriesNode: FileSystemNode = {
           name: 'Service Registries',
           type: 'folder' as FileType,
@@ -1247,7 +1247,7 @@ export class AppComponent implements OnInit, OnDestroy {
       return this.homeProvider;
     }
 
-    // Handle "Service Registries" virtual folder - host server profiles are nested under it
+    // Handle "Service Registries" virtual folder - registry server profiles are nested under it
     if (rootName === 'Service Registries') {
       if (path.length === 1) {
         // At the Service Registries folder level itself - return home provider
@@ -1255,7 +1255,7 @@ export class AppComponent implements OnInit, OnDestroy {
         return this.homeProvider;
       }
       // Path is like ['Service Registries', 'ProfileName', ...]
-      // For now, host server profiles don't have navigable children in file explorer
+      // For now, registry server profiles don't have navigable children in file explorer
       // They are informational only
       return this.homeProvider;
     }
@@ -1268,7 +1268,7 @@ export class AppComponent implements OnInit, OnDestroy {
       return this.homeProvider;
     }
 
-    // Check if it's one of the Host Server root nodes (for tree navigation only)
+    // Check if it's one of the Registry Server root nodes (for tree navigation only)
     if (this.treeAdapters.has(rootName)) {
       return this.treeAdapters.get(rootName)!;
     }
@@ -1452,7 +1452,7 @@ export class AppComponent implements OnInit, OnDestroy {
       sessionTree.children = sessionTree.children.filter((c: FileSystemNode) => c.name !== 'Search & Discovery');
     }
 
-    // Build host server profile nodes for the Service Registries folder
+    // Build registry server profile nodes for the Service Registries folder
     const allHostProfiles = this.hostProfileService.profiles();
     const hostProfileNodes: FileSystemNode[] = allHostProfiles.map(p => ({
       name: p.name,
@@ -2084,7 +2084,7 @@ export class AppComponent implements OnInit, OnDestroy {
       const activeId = this.activePaneId();
       this.panePaths.update(paths => {
         const otherPanes = paths.filter(p => p.id !== activeId);
-        return [...otherPanes, { id: activeId, path: ['Host Servers', hostProfile.name] }];
+        return [...otherPanes, { id: activeId, path: ['Service Registries', hostProfile.name] }];
       });
     }
   }

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HostProfileService } from '../../services/host-profile.service.js';
-import { HostProfile } from '../../models/host-profile.model.js';
+import { RegistryServerProfile } from '../../models/registry-server-profile.model.js';
 
 @Component({
   selector: 'app-host-server-management',
@@ -27,8 +27,8 @@ import { HostProfile } from '../../models/host-profile.model.js';
                       <h3 class="font-bold text-[rgb(var(--color-text-prominent))] group-hover:text-[rgb(var(--color-accent-solid-bg))] transition-colors">
                         {{ profile.name }}
                       </h3>
-                      <p class="text-xs text-[rgb(var(--color-text-muted))] truncate max-w-[200px]" [title]="profile.hostServerUrl">
-                        {{ profile.hostServerUrl || 'No Server URL' }}
+                      <p class="text-xs text-[rgb(var(--color-text-muted))] truncate max-w-[200px]" [title]="profile.registryServerUrl">
+                        {{ profile.registryServerUrl || 'No Server URL' }}
                       </p>
                     </div>
                   </div>

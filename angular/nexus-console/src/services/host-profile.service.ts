@@ -1,5 +1,5 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
-import { HostProfile } from '../models/host-profile.model.js';
+import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
 import { DbService } from './db.service.js';
 
 @Injectable({
@@ -8,10 +8,10 @@ import { DbService } from './db.service.js';
 export class HostProfileService {
     private dbService = inject(DbService);
 
-    readonly profiles = signal<HostProfile[]>([{
+    readonly profiles = signal<RegistryServerProfile[]>([{
         id: 'default-local-host',
         name: 'Local Host',
-        hostServerUrl: 'http://localhost:8085',
+        registryServerUrl: 'http://localhost:8085',
         imageUrl: '',
         description: 'Default local host server',
         isActive: true // Default profile is active by default
@@ -21,7 +21,7 @@ export class HostProfileService {
      * Computed signal that returns the currently active host profile.
      * Falls back to the first profile if none is explicitly marked as active.
      */
-    readonly activeProfile = computed<HostProfile | null>(() => {
+    readonly activeProfile = computed<RegistryServerProfile | null>(() => {
         const allProfiles = this.profiles();
         // First, try to find an explicitly active profile
         const active = allProfiles.find(p => p.isActive === true);
@@ -40,7 +40,7 @@ export class HostProfileService {
         const profile = this.activeProfile();
         if (!profile) return null;
 
-        let url = profile.hostServerUrl;
+        let url = profile.registryServerUrl;
         if (!url.startsWith('http')) {
             url = `http://${url}`;
         }
@@ -90,7 +90,7 @@ export class HostProfileService {
         console.log('[HostProfileService] Set active profile:', profileId);
     }
 
-    async saveProfile(profile: HostProfile): Promise<void> {
+    async saveProfile(profile: RegistryServerProfile): Promise<void> {
         const existing = this.profiles().find(p => p.id === profile.id);
         if (existing) {
             await this.dbService.updateHostProfile(profile);

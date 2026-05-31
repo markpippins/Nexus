@@ -5,7 +5,7 @@ import { TreeProvider } from './tree-provider.interface.js';
 import { TreeNode, NodeType, TreeChange, NodeStatus } from '../models/tree-node.model.js';
 import { TreeManagerService } from './tree-manager.service.js';
 import { HostProfileService } from './host-profile.service.js';
-import { HostProfile } from '../models/host-profile.model.js';
+import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
 import { ServiceInstance, Deployment, Framework } from '../models/service-mesh.model.js';
 import { ServiceMeshService } from './service-mesh.service.js';
 
@@ -245,7 +245,7 @@ export class RegistryServerProvider implements TreeProvider {
         return [];
     }
 
-    private async fetchUsers(profile: HostProfile): Promise<TreeNode[]> {
+    private async fetchUsers(profile: RegistryServerProfile): Promise<TreeNode[]> {
         try {
             // For now, let's assume an endpoint exists or returns empty
             const baseUrl = this.getBaseUrl(profile);
@@ -284,7 +284,7 @@ export class RegistryServerProvider implements TreeProvider {
 
 
 
-    private async fetchPlatformInfo(profile: HostProfile): Promise<TreeNode[]> {
+    private async fetchPlatformInfo(profile: RegistryServerProfile): Promise<TreeNode[]> {
         const baseUrl = this.getBaseUrl(profile);
 
         // Fetch running services for the 'Service Mesh' view
@@ -360,7 +360,7 @@ export class RegistryServerProvider implements TreeProvider {
         ];
     }
 
-    private getDataDictionaryNodes(profile: HostProfile): TreeNode[] {
+    private getDataDictionaryNodes(profile: RegistryServerProfile): TreeNode[] {
         const baseUrl = this.getBaseUrl(profile);
         return [
             {
@@ -458,16 +458,16 @@ export class RegistryServerProvider implements TreeProvider {
 
 
 
-    private getBaseUrl(profile: HostProfile): string {
-        let baseUrl = profile.hostServerUrl;
+    private getBaseUrl(profile: RegistryServerProfile): string {
+        let baseUrl = profile.registryServerUrl;
         if (!baseUrl.startsWith('http')) baseUrl = `http://${baseUrl}`;
         if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
         return baseUrl;
     }
 
-    private async fetchServices(profile: HostProfile): Promise<TreeNode[]> {
+    private async fetchServices(profile: RegistryServerProfile): Promise<TreeNode[]> {
         try {
-            let baseUrl = profile.hostServerUrl;
+            let baseUrl = profile.registryServerUrl;
 
             if (!baseUrl.startsWith('http')) {
                 baseUrl = `http://${baseUrl}`;
@@ -516,9 +516,9 @@ export class RegistryServerProvider implements TreeProvider {
         }
     }
 
-    private async fetchDeploymentsForService(profile: HostProfile, serviceId: string): Promise<TreeNode[]> {
+    private async fetchDeploymentsForService(profile: RegistryServerProfile, serviceId: string): Promise<TreeNode[]> {
         try {
-            let baseUrl = profile.hostServerUrl;
+            let baseUrl = profile.registryServerUrl;
 
             if (!baseUrl.startsWith('http')) {
                 baseUrl = `http://${baseUrl}`;
@@ -536,7 +536,7 @@ export class RegistryServerProvider implements TreeProvider {
             return deploymentsResponse.map(deployment => ({
                 id: `deployment-${profile.id}-${deployment.id}`,
                 name: `${deployment.server.hostname}:${deployment.port}`,
-                type: NodeType.HOST_SERVER, // Using HOST_SERVER as a deployment node type
+                type: NodeType.REGISTRY_SERVER, // Using HOST_SERVER as a deployment node type
                 icon: 'settings',
                 hasChildren: false,
                 operations: ['start', 'stop', 'restart'],
@@ -553,7 +553,7 @@ export class RegistryServerProvider implements TreeProvider {
         }
     }
 
-    private async fetchSubModulesForService(profile: HostProfile, serviceId: string): Promise<TreeNode[]> {
+    private async fetchSubModulesForService(profile: RegistryServerProfile, serviceId: string): Promise<TreeNode[]> {
         try {
             const baseUrl = this.getBaseUrl(profile);
             const subModulesUrl = `${baseUrl}/api/v1/services/${serviceId}/sub-modules`;
@@ -667,7 +667,7 @@ export class RegistryServerProvider implements TreeProvider {
 
             if (profile) {
                 const serviceMeshService = inject(ServiceMeshService);
-                let baseUrl = profile.hostServerUrl;
+                let baseUrl = profile.registryServerUrl;
                 if (!baseUrl.startsWith('http')) baseUrl = `http://${baseUrl}`;
                 if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 

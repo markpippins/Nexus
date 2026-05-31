@@ -68,7 +68,7 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
     const hostChildren = await this.registryServerProvider.getChildren('root');
     const hostNodes: GenericTreeNode[] = hostChildren.map(node => {
       // Convert NodeType to GenericNodeType
-      let genericType: 'folder' | 'file' | 'service' | 'user' | 'host-server' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string = 'folder';
+      let genericType: 'folder' | 'file' | 'service' | 'user' | 'registry-server' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string = 'folder';
 
       switch (node.type) {
         case NodeType.SERVICE:
@@ -77,8 +77,8 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
         case NodeType.USER:
           genericType = 'user';
           break;
-        case NodeType.HOST_SERVER:
-          genericType = 'host-server';
+        case NodeType.REGISTRY_SERVER:
+          genericType = 'registry-server';
           break;
         case NodeType.FILE:
           genericType = 'file';
@@ -174,7 +174,7 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
     throw new Error('Method not implemented.');
   }
 
-  async createNode(path: string[], name: string, type: 'folder' | 'file' | 'service' | 'user' | 'host-server' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string): Promise<void> {
+  async createNode(path: string[], name: string, type: 'folder' | 'file' | 'service' | 'user' | 'registry-server' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string): Promise<void> {
     throw new Error('Method not implemented.');
   }
 

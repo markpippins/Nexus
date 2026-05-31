@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HostProfile } from '../../models/host-profile.model.js';
+import { RegistryServerProfile } from '../../models/registry-server-profile.model.js';
 import { HostProfileService } from '../../services/host-profile.service.js';
 
 interface FormState {
     id: string;
     name: string;
-    hostServerUrl: string;
+    registryServerUrl: string;
     imageUrl: string;
     hostname: string;
     ipAddress: string;
@@ -25,7 +25,7 @@ interface FormState {
 const INITIAL_FORM_STATE: FormState = {
     id: '',
     name: '',
-    hostServerUrl: '',
+    registryServerUrl: '',
     imageUrl: '',
     hostname: '',
     ipAddress: '',
@@ -79,12 +79,12 @@ export class HostProfilesDialogComponent {
         });
     }
 
-    startEdit(profile: HostProfile) {
+    startEdit(profile: RegistryServerProfile) {
         this.selectedProfileId.set(profile.id);
         this.formState.set({
             id: profile.id,
             name: profile.name,
-            hostServerUrl: profile.hostServerUrl,
+            registryServerUrl: profile.registryServerUrl,
             imageUrl: profile.imageUrl,
             hostname: profile.hostname || '',
             ipAddress: profile.ipAddress || '',
@@ -108,14 +108,14 @@ export class HostProfilesDialogComponent {
 
     async saveProfile() {
         const form = this.formState();
-        if (!form.name || !form.hostServerUrl) {
+        if (!form.name || !form.registryServerUrl) {
             return; // Basic validation
         }
 
-        const profile: HostProfile = {
+        const profile: RegistryServerProfile = {
             id: form.id || this.generateUUID(),
             name: form.name,
-            hostServerUrl: form.hostServerUrl,
+            registryServerUrl: form.registryServerUrl,
             imageUrl: form.imageUrl,
             hostname: form.hostname,
             ipAddress: form.ipAddress,

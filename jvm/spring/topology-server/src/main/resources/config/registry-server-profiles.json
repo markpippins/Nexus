@@ -1,0 +1,10 @@
+[
+  {
+    "profileId": "default-local-host",
+    "name": "Local Host",
+    "registryServerUrl": "http://localhost:8085",
+    "imageUrl": "",
+    "isActive": true,
+    "description": "Default local service registry"
+  }
+]

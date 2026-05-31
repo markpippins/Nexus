@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { BrokerProfile } from '../models/broker-profile.model.js';
-import { HostProfile } from '../models/host-profile.model.js';
+import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
 import { RssFeed } from '../models/rss-feed.model.js';
 import { FolderProperties } from '../models/folder-properties.model.js';
 import { Note } from '../models/note.model.js';
@@ -22,7 +22,7 @@ interface FileExplorerDB extends DBSchema {
   };
   [HOST_PROFILES_STORE]: {
     key: string;
-    value: HostProfile;
+    value: RegistryServerProfile;
   };
   [FEEDS_STORE]: {
     key: string;
@@ -113,11 +113,11 @@ export class DbService {
                 while (cursor) {
                   const profile = cursor.value;
                   if (profile.type === 'host') {
-                    // Map ServerProfile to HostProfile
-                    const hostProfile: HostProfile = {
+                    // Map ServerProfile to RegistryServerProfile
+                    const hostProfile: RegistryServerProfile = {
                       id: profile.id,
                       name: profile.name,
-                      hostServerUrl: profile.hostServerUrl || profile.brokerUrl || '',
+                      registryServerUrl: profile.registryServerUrl || profile.brokerUrl || '',
                       imageUrl: profile.imageUrl || '',
                       description: 'Migrated from legacy profile'
                     };
@@ -157,17 +157,17 @@ export class DbService {
 
   // --- Host Profile Methods ---
 
-  async getAllHostProfiles(): Promise<HostProfile[]> {
+  async getAllHostProfiles(): Promise<RegistryServerProfile[]> {
     const db = await this.dbPromise;
     return db.getAll(HOST_PROFILES_STORE);
   }
 
-  async addHostProfile(profile: HostProfile): Promise<void> {
+  async addHostProfile(profile: RegistryServerProfile): Promise<void> {
     const db = await this.dbPromise;
     await db.put(HOST_PROFILES_STORE, profile);
   }
 
-  async updateHostProfile(profile: HostProfile): Promise<void> {
+  async updateHostProfile(profile: RegistryServerProfile): Promise<void> {
     const db = await this.dbPromise;
     await db.put(HOST_PROFILES_STORE, profile);
   }

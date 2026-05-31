@@ -1,9 +1,9 @@
 package com.aibizarchitect.nexus.v1.spring.topology.config;
 
 import com.aibizarchitect.nexus.v1.spring.topology.entity.BrokerProfile;
-import com.aibizarchitect.nexus.v1.spring.topology.entity.HostProfile;
+import com.aibizarchitect.nexus.v1.spring.topology.entity.RegistryServerProfile;
 import com.aibizarchitect.nexus.v1.spring.topology.repository.BrokerProfileRepository;
-import com.aibizarchitect.nexus.v1.spring.topology.repository.HostProfileRepository;
+import com.aibizarchitect.nexus.v1.spring.topology.repository.RegistryServerProfileRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.CommandLineRunner;
@@ -17,21 +17,21 @@ import java.util.List;
 public class TopologyDataInitializer implements CommandLineRunner {
 
     private final BrokerProfileRepository brokerProfileRepository;
-    private final HostProfileRepository hostProfileRepository;
+    private final RegistryServerProfileRepository registryServerProfileRepository;
     private final ObjectMapper objectMapper;
 
     public TopologyDataInitializer(BrokerProfileRepository brokerProfileRepository,
-                                   HostProfileRepository hostProfileRepository,
-                                   ObjectMapper objectMapper) {
+                                    RegistryServerProfileRepository registryServerProfileRepository,
+                                    ObjectMapper objectMapper) {
         this.brokerProfileRepository = brokerProfileRepository;
-        this.hostProfileRepository = hostProfileRepository;
+        this.registryServerProfileRepository = registryServerProfileRepository;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public void run(String... args) throws Exception {
         seedBrokerProfiles();
-        seedHostProfiles();
+        seedRegistryServerProfiles();
     }
 
     private void seedBrokerProfiles() throws Exception {
@@ -46,15 +46,15 @@ public class TopologyDataInitializer implements CommandLineRunner {
         }
     }
 
-    private void seedHostProfiles() throws Exception {
-        if (hostProfileRepository.count() > 0) {
+    private void seedRegistryServerProfiles() throws Exception {
+        if (registryServerProfileRepository.count() > 0) {
             return;
         }
 
-        try (InputStream is = new ClassPathResource("config/host-profiles.json").getInputStream()) {
-            List<HostProfile> profiles = objectMapper.readValue(is, new TypeReference<List<HostProfile>>() {});
-            hostProfileRepository.saveAll(profiles);
-            System.out.println("Seeded " + profiles.size() + " host profile(s)");
+        try (InputStream is = new ClassPathResource("config/registry-server-profiles.json").getInputStream()) {
+            List<RegistryServerProfile> profiles = objectMapper.readValue(is, new TypeReference<List<RegistryServerProfile>>() {});
+            registryServerProfileRepository.saveAll(profiles);
+            System.out.println("Seeded " + profiles.size() + " registry server profile(s)");
         }
     }
 }
