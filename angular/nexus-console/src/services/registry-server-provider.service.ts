@@ -179,11 +179,11 @@ export class RegistryServerProvider implements TreeProvider {
                 },
                 {
                     id: `platform-servers-${profile.id}`,
-                    name: 'Servers',
+                    name: 'Hosts',
                     type: NodeType.FOLDER,
                     icon: 'storage',
                     hasChildren: false,
-                    operations: ['manage-servers'],
+                    operations: ['manage-hosts'],
                     metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/servers`, managementType: 'servers' },
                     lastUpdated: new Date()
                 },
@@ -319,11 +319,11 @@ export class RegistryServerProvider implements TreeProvider {
             },
             {
                 id: `platform-servers-${profile.id}`,
-                name: 'Servers',
+                name: 'Hosts',
                 type: NodeType.FOLDER,
                 icon: 'storage',
                 hasChildren: false,
-                operations: ['manage-servers'],
+                operations: ['manage-hosts'],
                 metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/servers`, managementType: 'servers' },
                 lastUpdated: new Date()
             },
@@ -395,7 +395,7 @@ export class RegistryServerProvider implements TreeProvider {
             },
             {
                 id: `platform-dict-servertypes-${profile.id}`,
-                name: 'Server Types',
+                name: 'Host Types',
                 type: NodeType.FOLDER,
                 icon: 'storage',
                 hasChildren: false,

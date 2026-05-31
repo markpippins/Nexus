@@ -327,7 +327,7 @@ export class AppComponent implements OnInit, OnDestroy {
       // Normalize dictionary child types
       if (n === 'data-dictionary') return null; // Data Dictionary is just a folder, don't load data
       if (n === 'service-definitions') return 'services';
-      if (n === 'service-hosts' || n === 'hosts') return 'servers';
+      if (n === 'service-hosts' || n === 'hosts') return 'hosts';
       if (n === 'languages') return 'framework-languages';
       if (n === 'categories') return 'framework-categories';
       return n;
