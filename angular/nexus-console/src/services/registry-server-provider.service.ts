@@ -535,7 +535,7 @@ export class RegistryServerProvider implements TreeProvider {
 
             return deploymentsResponse.map(deployment => ({
                 id: `deployment-${profile.id}-${deployment.id}`,
-                name: `${deployment.server.hostname}:${deployment.port}`,
+                name: `${deployment.host.hostname}:${deployment.port}`,
                 type: NodeType.REGISTRY_SERVER, // Using HOST_SERVER as a deployment node type
                 icon: 'settings',
                 hasChildren: false,

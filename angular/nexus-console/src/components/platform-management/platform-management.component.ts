@@ -5,7 +5,7 @@ import { ServiceInstance, Framework, Deployment, Library } from '../../models/se
 import { UpsertServiceDialogComponent } from './upsert-service-dialog/upsert-service-dialog.component.js';
 import { UpsertFrameworkDialogComponent } from './upsert-framework-dialog/upsert-framework-dialog.component.js';
 import { UpsertDeploymentDialogComponent } from './upsert-deployment-dialog/upsert-deployment-dialog.component.js';
-import { UpsertServerDialogComponent } from './upsert-server-dialog/upsert-server-dialog.component.js';
+import { UpsertHostDialogComponent } from './upsert-host-dialog/upsert-host-dialog.component.js';
 import { LookupListComponent } from './lookup-list/lookup-list.component.js';
 import { UpsertLookupDialogComponent } from './upsert-lookup-dialog/upsert-lookup-dialog.component.js';
 import { UpsertLibraryDialogComponent } from './upsert-library-dialog/upsert-library-dialog.component.js';
@@ -19,7 +19,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
         UpsertServiceDialogComponent,
         UpsertFrameworkDialogComponent,
         UpsertDeploymentDialogComponent,
-        UpsertServerDialogComponent,
+        UpsertHostDialogComponent,
         LookupListComponent,
         UpsertLookupDialogComponent,
         UpsertLibraryDialogComponent,
@@ -331,7 +331,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </td>
                                             <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.environment }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.server?.hostname }}</td>
+                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.host?.hostname }}</td>
                                             <td class="p-2 py-1.5">
                                                  <span [class]="'px-2 py-0.5 rounded-full text-xs font-medium ' + getStatusClass(d.status)">
                                                     {{ d.status }}
@@ -405,7 +405,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                         <tr tabindex="0" (dblclick)="onEdit(s)" (keydown.enter)="onEdit(s)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
                                             <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))]">{{ s.hostname }}</td>
                                             <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.ipAddress }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.serverTypeId }}</td> 
+                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.hostTypeId }}</td> 
                                             <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.operatingSystemId }}</td>
                                             <td class="p-2 py-1.5">
                                                 <span class="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-500">
@@ -516,13 +516,13 @@ import { LookupItem } from '../../services/platform-management.service.js';
             (saved)="onDeploymentSaved()"
         ></app-upsert-deployment-dialog>
 
-        <app-upsert-server-dialog
-            [isOpen]="isServerDialogOpen()"
+        <app-upsert-host-dialog
+            [isOpen]="isHostDialogOpen()"
             [baseUrl]="baseUrl()"
-            [server]="selectedServerForEdit()"
-            (close)="onServerDialogClose()"
-            (saved)="onServerSaved()"
-        ></app-upsert-server-dialog>
+            [server]="selectedHostForEdit()"
+            (close)="onHostDialogClose()"
+            (saved)="onHostSaved()"
+        ></app-upsert-host-dialog>
 
         <app-upsert-lookup-dialog
             [isOpen]="isLookupDialogOpen()"
@@ -571,7 +571,7 @@ export class PlatformManagementComponent {
     private rawServices = signal<ServiceInstance[]>([]);
     private rawFrameworks = signal<Framework[]>([]);
     private rawDeployments = signal<Deployment[]>([]);
-    private rawServers = signal<Host[]>([]);
+    private rawHosts = signal<Host[]>([]);
     private rawLibraries = signal<Library[]>([]);
 
     loading = signal(false);
@@ -643,7 +643,7 @@ export class PlatformManagementComponent {
             switch (col) {
                 case 'service': return item.service?.name;
                 case 'environment': return item.environment;
-                case 'server': return item.server?.hostname;
+                case 'server': return item.host?.hostname;
                 case 'status': return item.status;
                 case 'version': return item.version;
                 default: return (item as any)[col];
@@ -652,11 +652,11 @@ export class PlatformManagementComponent {
     });
 
     servers = computed(() => {
-        return this.sortData(this.rawServers(), this.sortState(), (item, col) => {
+        return this.sortData(this.rawHosts(), this.sortState(), (item, col) => {
             switch (col) {
                 case 'hostname': return item.hostname;
                 case 'ipAddress': return item.ipAddress;
-                case 'type': return item.serverTypeId;
+                case 'type': return item.hostTypeId;
                 case 'os': return item.operatingSystemId;
                 case 'status': return item.status;
                 default: return (item as any)[col];
@@ -687,8 +687,8 @@ export class PlatformManagementComponent {
     isDeploymentDialogOpen = signal(false);
     selectedDeploymentForEdit = signal<Deployment | null>(null);
 
-    isServerDialogOpen = signal(false);
-    selectedServerForEdit = signal<Host | null>(null);
+    isHostDialogOpen = signal(false);
+    selectedHostForEdit = signal<Host | null>(null);
 
     // Lookup State
     lookupData = signal<LookupItem[]>([]);
@@ -852,8 +852,8 @@ export class PlatformManagementComponent {
                     this.rawDeployments.set(d);
                     break;
                 case 'servers':
-                    const h = await this.platformService.getServers(url);
-                    this.rawServers.set(h);
+                    const h = await this.platformService.getHosts(url);
+                    this.rawHosts.set(h);
                     break;
                 case 'service-types':
                 case 'server-types':
@@ -898,8 +898,8 @@ export class PlatformManagementComponent {
                 this.isDeploymentDialogOpen.set(true);
                 break;
             case 'servers':
-                this.selectedServerForEdit.set(null);
-                this.isServerDialogOpen.set(true);
+                this.selectedHostForEdit.set(null);
+                this.isHostDialogOpen.set(true);
                 break;
             case 'service-types':
             case 'server-types':
@@ -938,8 +938,8 @@ export class PlatformManagementComponent {
                 this.isDeploymentDialogOpen.set(true);
                 break;
             case 'servers':
-                this.selectedServerForEdit.set(item);
-                this.isServerDialogOpen.set(true);
+                this.selectedHostForEdit.set(item);
+                this.isHostDialogOpen.set(true);
                 break;
             case 'service-types':
             case 'server-types':
@@ -978,7 +978,7 @@ export class PlatformManagementComponent {
                     await this.platformService.deleteDeployment(url, Number(item.id));
                     break;
                 case 'servers':
-                    await this.platformService.deleteServer(url, Number(item.id));
+                    await this.platformService.deleteHost(url, Number(item.id));
                     break;
                 case 'service-types':
                 case 'server-types':
@@ -1031,12 +1031,12 @@ export class PlatformManagementComponent {
     }
 
     // Server Dialog Handlers
-    onServerDialogClose() {
-        this.isServerDialogOpen.set(false);
-        this.selectedServerForEdit.set(null);
+    onHostDialogClose() {
+        this.isHostDialogOpen.set(false);
+        this.selectedHostForEdit.set(null);
     }
 
-    onServerSaved() {
+    onHostSaved() {
         this.loadData();
     }
 

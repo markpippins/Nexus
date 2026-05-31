@@ -4,7 +4,7 @@ import { ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angula
 import { PlatformManagementService, LookupItem, Host } from '../../../services/platform-management.service.js';
 
 @Component({
-    selector: 'app-upsert-server-dialog',
+    selector: 'app-upsert-host-dialog',
     imports: [CommonModule, ReactiveFormsModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -13,7 +13,7 @@ import { PlatformManagementService, LookupItem, Host } from '../../../services/p
        <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-xl rounded-lg w-full max-w-2xl flex flex-col max-h-[90vh]">
           <div class="p-4 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
             <h2 class="text-lg font-semibold text-[rgb(var(--color-text-base))]">
-              {{ server() ? 'Edit' : 'Add' }} Server
+              {{ host() ? 'Edit' : 'Add' }} Host
             </h2>
             <button (click)="onCancel()" class="text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))]">
               <span class="material-icons">close</span>
@@ -37,10 +37,10 @@ import { PlatformManagementService, LookupItem, Host } from '../../../services/p
                  <!-- Server Type & Env -->
                  <div class="grid grid-cols-2 gap-4">
                      <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Server Type *</label>
-                        <select formControlName="serverTypeId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
-                            <option [value]="null">Select Type</option>
-                            @for (t of serverTypes(); track t.id) {
+                         <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Host Type *</label>
+                        <select formControlName="hostTypeId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                             <option [value]="null">Select Type</option>
+                            @for (t of hostTypes(); track t.id) {
                                 <option [value]="t.id">{{ t.name }}</option>
                             }
                         </select>
@@ -109,7 +109,7 @@ import { PlatformManagementService, LookupItem, Host } from '../../../services/p
                  <!-- Description -->
                  <div class="flex flex-col gap-1">
                     <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Description</label>
-                    <textarea formControlName="description" rows="2" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="Server description"></textarea>
+                     <textarea formControlName="description" rows="2" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="Host description"></textarea>
                  </div>
              </form>
           </div>
@@ -128,20 +128,20 @@ import { PlatformManagementService, LookupItem, Host } from '../../../services/p
     }
   `
 })
-export class UpsertServerDialogComponent implements OnInit {
+export class UpsertHostDialogComponent implements OnInit {
     private fb = inject(FormBuilder);
     private platformService = inject(PlatformManagementService);
 
     isOpen = input.required<boolean>();
     baseUrl = input.required<string>();
-    server = input<Host | null>(null);
+    host = input<Host | null>(null);
 
     close = output<void>();
     saved = output<Host>();
 
     form: FormGroup;
 
-    serverTypes = signal<LookupItem[]>([]);
+    hostTypes = signal<LookupItem[]>([]);
     environmentTypes = signal<LookupItem[]>([]);
     operatingSystems = signal<LookupItem[]>([]);
 
@@ -151,7 +151,7 @@ export class UpsertServerDialogComponent implements OnInit {
         this.form = this.fb.group({
             hostname: ['', Validators.required],
             ipAddress: ['', Validators.required],
-            serverTypeId: [null, Validators.required],
+            hostTypeId: [null, Validators.required],
             environmentTypeId: [null, Validators.required],
             operatingSystemId: [null, Validators.required],
             cpuCores: [null],
@@ -166,12 +166,12 @@ export class UpsertServerDialogComponent implements OnInit {
         effect(() => {
             if (this.isOpen()) {
                 this.loadOptions();
-                const s = this.server();
+                const s = this.host();
                 if (s) {
                     this.form.patchValue({
                         hostname: s.hostname,
                         ipAddress: s.ipAddress,
-                        serverTypeId: s.serverTypeId,
+                        hostTypeId: s.hostTypeId,
                         environmentTypeId: s.environmentTypeId,
                         operatingSystemId: s.operatingSystemId,
                         cpuCores: s.cpuCores,
@@ -200,11 +200,11 @@ export class UpsertServerDialogComponent implements OnInit {
         try {
             // Load all lookups in parallel
             const [st, et, os] = await Promise.all([
-                this.platformService.getLookup(url, 'server-types').catch(() => []),
+                this.platformService.getLookup(url, 'host-types').catch(() => []),
                 this.platformService.getLookup(url, 'environments').catch(() => []),
                 this.platformService.getLookup(url, 'operating-systems').catch(() => [])
             ]);
-            this.serverTypes.set(st);
+            this.hostTypes.set(st);
             this.environmentTypes.set(et);
 
             // If operating systems loaded successfully, use them; otherwise use defaults
@@ -215,7 +215,7 @@ export class UpsertServerDialogComponent implements OnInit {
             }
 
         } catch (e) {
-            console.error('Failed to load server options', e);
+            console.error('Failed to load host options', e);
             // Use defaults if fetching fails
             this.useDefaultOS();
         }
@@ -246,25 +246,25 @@ export class UpsertServerDialogComponent implements OnInit {
         const payload: Partial<Host> = this.form.value;
 
         // Ensure numbers
-        payload.serverTypeId = Number(payload.serverTypeId);
+        payload.hostTypeId = Number(payload.hostTypeId);
         payload.environmentTypeId = Number(payload.environmentTypeId);
         payload.operatingSystemId = Number(payload.operatingSystemId);
         if (payload.cpuCores) payload.cpuCores = Number(payload.cpuCores);
 
         try {
             let result: Host;
-            const current = this.server();
+            const current = this.host();
 
             if (current) {
-                result = await this.platformService.updateServer(url, Number(current.id), payload);
+                result = await this.platformService.updateHost(url, Number(current.id), payload);
             } else {
-                result = await this.platformService.createServer(url, payload);
+                result = await this.platformService.createHost(url, payload);
             }
             this.saved.emit(result);
             this.close.emit();
         } catch (e) {
-            console.error('Failed to save server', e);
-            alert('Failed to save server.');
+            console.error('Failed to save host', e);
+            alert('Failed to save host.');
         } finally {
             this.isSaving.set(false);
         }

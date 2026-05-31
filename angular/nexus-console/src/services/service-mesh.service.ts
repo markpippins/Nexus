@@ -7,7 +7,6 @@ import { RegistryServerProfile } from '../models/registry-server-profile.model.j
 import {
   Framework,
   ServiceInstance,
-  Server,
   Deployment,
   ServiceConfiguration,
   ServiceDependency,
@@ -18,7 +17,7 @@ import {
   OperationResult,
   HealthStatus,
   DeploymentStatus,
-  ServerEnvironment,
+  HostEnvironment,
   ServiceOperation,
   ServiceWithHosted,
   HostedService
@@ -45,7 +44,7 @@ export class ServiceMeshService {
   // Reactive state
   private _frameworks = signal<Framework[]>([]);
   private _services = signal<ServiceInstance[]>([]);
-  private _servers = signal<Server[]>([]);
+  private _hosts = signal<any[]>([]);
   private _deployments = signal<Deployment[]>([]);
   private _dependencies = signal<ServiceDependency[]>([]);
   private _connections = signal<Map<string, ServiceMeshConnection>>(new Map());
@@ -66,7 +65,7 @@ export class ServiceMeshService {
   // Public readonly signals
   readonly frameworks = this._frameworks.asReadonly();
   readonly services = this._services.asReadonly();
-  readonly servers = this._servers.asReadonly();
+  readonly hosts = this._hosts.asReadonly();
   readonly selectedPlatformNode = this._selectedPlatformNode.asReadonly();
   readonly deployments = this._deployments.asReadonly();
   readonly dependencies = this._dependencies.asReadonly();
@@ -101,7 +100,7 @@ export class ServiceMeshService {
   readonly summary = computed<ServiceMeshSummary>(() => {
     const services = this._services();
     const deployments = this._deployments();
-    const servers = this._servers();
+    const hosts = this._hosts();
     const frameworks = this._frameworks();
     const serviceStatuses = this._serviceStatuses();
 
@@ -149,7 +148,7 @@ export class ServiceMeshService {
       console.log('[ServiceMeshService] unhealthyDeployments count:', unhealthyDeployments);
     }
 
-    const activeServers = servers.filter(s => s.status === 'ACTIVE').length;
+    const activeHosts = hosts.filter(s => s.status === 'ACTIVE').length;
 
     console.log('[ServiceMeshService] Healthy count:', healthyDeployments, 'Unhealthy count:', unhealthyDeployments);
 
@@ -158,19 +157,19 @@ export class ServiceMeshService {
       count: services.filter(s => s.framework?.id === f.id).length
     })).filter(fb => fb.count > 0);
 
-    const environments: ServerEnvironment[] = ['DEVELOPMENT', 'STAGING', 'PRODUCTION', 'TEST'];
+    const environments: HostEnvironment[] = ['DEVELOPMENT', 'STAGING', 'PRODUCTION', 'TEST'];
     const environmentBreakdown = environments.map(env => ({
       environment: env,
       count: deployments.filter(d => d.environment === env).length
     })).filter(eb => eb.count > 0);
 
-    console.log('[ServiceMeshService] FINAL SUMMARY VALUES:', {
+      console.log('[ServiceMeshService] FINAL SUMMARY VALUES:', {
       totalServices: services.length,
       activeServices,
       healthyDeployments,
       unhealthyDeployments,
-      totalServers: servers.length,
-      activeServers
+      totalHosts: hosts.length,
+      activeHosts
     });
 
     return {
@@ -178,8 +177,8 @@ export class ServiceMeshService {
       activeServices,
       healthyDeployments,
       unhealthyDeployments,
-      totalServers: servers.length,
-      activeServers,
+      totalHosts: hosts.length,
+      activeHosts,
       frameworkBreakdown,
       environmentBreakdown
     };
@@ -332,7 +331,7 @@ export class ServiceMeshService {
 
     const allFrameworks: Framework[] = [];
     const allServices: ServiceInstance[] = [];
-    const allServers: Server[] = [];
+    const allHosts: any[] = [];
     const allDeployments: Deployment[] = [];
     const allDependencies: ServiceDependency[] = [];
     const allServiceStatuses = new Map<string, { healthStatus: HealthStatus; lastHealthCheck?: string }>();
@@ -340,10 +339,10 @@ export class ServiceMeshService {
 
     for (const connection of connections) {
       try {
-        const [frameworks, services, servers, deployments, dependencies, serviceStatuses, servicesWithHosted] = await Promise.all([
+        const [frameworks, services, hosts, deployments, dependencies, serviceStatuses, servicesWithHosted] = await Promise.all([
           this.fetchFrameworks(connection.baseUrl),
           this.fetchServices(connection.baseUrl),
-          this.fetchServers(connection.baseUrl),
+          this.fetchHosts(connection.baseUrl),
           this.fetchDeployments(connection.baseUrl),
           this.fetchDependencies(connection.baseUrl),
           this.fetchServiceStatuses(connection.baseUrl),
@@ -352,7 +351,7 @@ export class ServiceMeshService {
 
         allFrameworks.push(...frameworks);
         allServices.push(...services);
-        allServers.push(...servers);
+        allHosts.push(...hosts);
         allDeployments.push(...deployments);
         allDependencies.push(...dependencies);
         allServicesWithHosted.push(...servicesWithHosted);
@@ -399,7 +398,7 @@ export class ServiceMeshService {
 
     this._frameworks.set(dedupById(allFrameworks));
     this._services.set(dedupById(allServices));
-    this._servers.set(dedupById(allServers));
+    this._hosts.set(dedupById(allHosts));
     this._deployments.set(dedupById(allDeployments));
     this._dependencies.set(dedupDependencies(allDependencies));
     this._serviceStatuses.set(allServiceStatuses);
@@ -451,9 +450,9 @@ export class ServiceMeshService {
     }
   }
 
-  private async fetchServers(baseUrl: string): Promise<Server[]> {
+  private async fetchHosts(baseUrl: string): Promise<any[]> {
     try {
-      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/servers`));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/hosts`));
       return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];

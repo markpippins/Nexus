@@ -9,7 +9,7 @@ export interface Host {
     id: number;
     hostname: string;
     ipAddress: string;
-    serverTypeId: number;
+    hostTypeId: number;
     environmentTypeId: number;
     operatingSystemId: number;
     cpuCores?: number;
@@ -50,7 +50,7 @@ export interface FrameworkPayload {
 export interface DeploymentPayload {
     serviceId: number;
     environmentId: number;
-    serverId: number;
+    hostId: number;
     version?: string;
     status?: string;
     port?: number;
@@ -267,57 +267,57 @@ export class PlatformManagementService {
     }
 
     // Servers/Hosts CRUD
-    async getServers(baseUrl: string): Promise<Host[]> {
+    async getHosts(baseUrl: string): Promise<Host[]> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/servers`;
+            const url = `${baseUrl}/api/v1/hosts`;
             const response = await firstValueFrom(this.http.get<PagedResponse<Host>>(url));
             return response.data;
         } catch (e) {
-            this.error.set('Failed to fetch servers');
+            this.error.set('Failed to fetch hosts');
             throw e;
         } finally {
             this.loading.set(false);
         }
     }
 
-    async createServer(baseUrl: string, server: Partial<Host>): Promise<Host> {
+    async createHost(baseUrl: string, host: Partial<Host>): Promise<Host> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/servers`;
-            return await firstValueFrom(this.http.post<Host>(url, server));
+            const url = `${baseUrl}/api/v1/hosts`;
+            return await firstValueFrom(this.http.post<Host>(url, host));
         } catch (e) {
-            this.error.set('Failed to create server');
+            this.error.set('Failed to create host');
             throw e;
         } finally {
             this.loading.set(false);
         }
     }
 
-    async updateServer(baseUrl: string, id: number, server: Partial<Host>): Promise<Host> {
+    async updateHost(baseUrl: string, id: number, host: Partial<Host>): Promise<Host> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/servers/${id}`;
-            return await firstValueFrom(this.http.put<Host>(url, server));
+            const url = `${baseUrl}/api/v1/hosts/${id}`;
+            return await firstValueFrom(this.http.put<Host>(url, host));
         } catch (e) {
-            this.error.set('Failed to update server');
+            this.error.set('Failed to update host');
             throw e;
         } finally {
             this.loading.set(false);
         }
     }
 
-    async deleteServer(baseUrl: string, id: number): Promise<void> {
+    async deleteHost(baseUrl: string, id: number): Promise<void> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/servers/${id}`;
+            const url = `${baseUrl}/api/v1/hosts/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
-            this.error.set('Failed to delete server');
+            this.error.set('Failed to delete host');
             throw e;
         } finally {
             this.loading.set(false);
@@ -386,7 +386,7 @@ export class PlatformManagementService {
     private getLookupEndpoint(type: string): string {
         switch (type) {
             case 'service-types': return 'service-types';
-            case 'server-types': return 'server-types';
+            case 'server-types': return 'host-types';
             case 'framework-categories': return 'framework-categories';
             case 'framework-languages': return 'framework-languages';
             case 'library-categories': return 'library-categories';

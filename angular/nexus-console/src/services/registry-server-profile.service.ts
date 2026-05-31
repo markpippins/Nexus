@@ -1,12 +1,20 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
-import { DbService } from './db.service.js';
+import { PagedResponse } from '../models/paged-response.model.js';
+
+const TOPOLOGY_SERVER_URL = 'http://localhost:8084';
+const PROFILES_API = `${TOPOLOGY_SERVER_URL}/api/v1/registry-server-profiles`;
 
 @Injectable({
     providedIn: 'root'
 })
 export class RegistryServerProfileService {
-    private dbService = inject(DbService);
+    private http = inject(HttpClient);
+
+    /** Maps frontend profile id (string) → backend numeric id (Long) */
+    private backendIdMap = new Map<string, number>();
 
     readonly profiles = signal<RegistryServerProfile[]>([{
         id: 'default-local-host',
@@ -55,28 +63,38 @@ export class RegistryServerProfileService {
     }
 
     async loadProfiles(): Promise<void> {
-        const profiles = await this.dbService.getAllRegistryServerProfiles();
-        // Migrate any legacy hostServerUrl fields to registryServerUrl
-        const migrated = profiles.map(p => {
-            const legacy = p as any;
-            if (legacy.hostServerUrl && !legacy.registryServerUrl) {
-                legacy.registryServerUrl = legacy.hostServerUrl;
-                delete legacy.hostServerUrl;
+        try {
+            const response = await firstValueFrom(
+                this.http.get<PagedResponse<any>>(PROFILES_API)
+            );
+            const apiProfiles = response.data || [];
+            if (apiProfiles.length > 0) {
+                // Map API response to frontend model and store backend id mapping
+                const mapped = apiProfiles.map((item: any) => {
+                    this.backendIdMap.set(item.profileId, item.id);
+                    return {
+                        id: item.profileId,
+                        name: item.name,
+                        registryServerUrl: item.registryServerUrl || '',
+                        imageUrl: item.imageUrl || '',
+                        isActive: item.isActive === true,
+                        description: item.description || ''
+                    } as RegistryServerProfile;
+                });
+
+                // Ensure at least one profile is active
+                const hasActive = mapped.some(p => p.isActive === true);
+                if (!hasActive && mapped.length > 0) {
+                    mapped[0].isActive = true;
+                }
+                this.profiles.set(mapped);
+                console.log('[RegistryServerProfileService] Loaded profiles from API', mapped);
+                console.log('[RegistryServerProfileService] Active profile:', mapped.find(p => p.isActive)?.name);
+            } else {
+                console.log('[RegistryServerProfileService] Using default profile');
             }
-            return p;
-        });
-        // If DB has profiles, use them. Otherwise keep the default.
-        if (migrated.length > 0) {
-            // Ensure at least one profile is active
-            const hasActive = migrated.some(p => p.isActive === true);
-            if (!hasActive && migrated.length > 0) {
-                migrated[0].isActive = true;
-            }
-            this.profiles.set(migrated);
-            console.log('[RegistryServerProfileService] Loaded profiles from DB', migrated);
-            console.log('[RegistryServerProfileService] Active profile:', migrated.find(p => p.isActive)?.name);
-        } else {
-            console.log('[RegistryServerProfileService] Using default profile');
+        } catch (e) {
+            console.warn('[RegistryServerProfileService] Failed to load profiles from API, using default', e);
         }
     }
 
@@ -90,9 +108,25 @@ export class RegistryServerProfileService {
             isActive: p.id === profileId
         }));
 
-        // Update all profiles in the database
+        // Update all profiles via the API
         for (const profile of updatedProfiles) {
-            await this.dbService.updateRegistryServerProfile(profile);
+            const backendId = this.backendIdMap.get(profile.id);
+            if (backendId) {
+                try {
+                    await firstValueFrom(
+                        this.http.put(`${PROFILES_API}/${backendId}`, {
+                            profileId: profile.id,
+                            name: profile.name,
+                            registryServerUrl: profile.registryServerUrl,
+                            imageUrl: profile.imageUrl,
+                            isActive: profile.isActive,
+                            description: profile.description
+                        })
+                    );
+                } catch (e) {
+                    console.warn(`[RegistryServerProfileService] Failed to update profile ${profile.id}`, e);
+                }
+            }
         }
 
         this.profiles.set(updatedProfiles);
@@ -101,26 +135,71 @@ export class RegistryServerProfileService {
 
     async saveProfile(profile: RegistryServerProfile): Promise<void> {
         const existing = this.profiles().find(p => p.id === profile.id);
-        if (existing) {
-            await this.dbService.updateRegistryServerProfile(profile);
-            this.profiles.update(current =>
-                current.map(p => p.id === profile.id ? profile : p)
-            );
+        const backendId = this.backendIdMap.get(profile.id);
+
+        if (existing && backendId) {
+            // Update existing profile
+            try {
+                await firstValueFrom(
+                    this.http.put(`${PROFILES_API}/${backendId}`, {
+                        profileId: profile.id,
+                        name: profile.name,
+                        registryServerUrl: profile.registryServerUrl,
+                        imageUrl: profile.imageUrl,
+                        isActive: profile.isActive ?? false,
+                        description: profile.description || ''
+                    })
+                );
+                this.profiles.update(current =>
+                    current.map(p => p.id === profile.id ? profile : p)
+                );
+            } catch (e) {
+                console.error(`[RegistryServerProfileService] Failed to update profile ${profile.id}`, e);
+                throw e;
+            }
         } else {
-            // If this is the first profile, make it active
+            // Create new profile
             if (this.profiles().length === 0) {
                 profile.isActive = true;
             }
-            await this.dbService.addRegistryServerProfile(profile);
-            this.profiles.update(current => [...current, profile]);
+            try {
+                const created = await firstValueFrom(
+                    this.http.post<any>(PROFILES_API, {
+                        profileId: profile.id,
+                        name: profile.name,
+                        registryServerUrl: profile.registryServerUrl,
+                        imageUrl: profile.imageUrl,
+                        isActive: profile.isActive ?? false,
+                        description: profile.description || ''
+                    })
+                );
+                // Store backend id mapping from response
+                this.backendIdMap.set(created.profileId, created.id);
+                this.profiles.update(current => [...current, profile]);
+            } catch (e) {
+                console.error(`[RegistryServerProfileService] Failed to create profile ${profile.id}`, e);
+                throw e;
+            }
         }
     }
 
     async deleteProfile(profileId: string): Promise<void> {
         const profileToDelete = this.profiles().find(p => p.id === profileId);
         const wasActive = profileToDelete?.isActive === true;
+        const backendId = this.backendIdMap.get(profileId);
 
-        await this.dbService.deleteRegistryServerProfile(profileId);
+        if (backendId) {
+            try {
+                await firstValueFrom(
+                    this.http.delete(`${PROFILES_API}/${backendId}`)
+                );
+            } catch (e) {
+                console.error(`[RegistryServerProfileService] Failed to delete profile ${profileId}`, e);
+                throw e;
+            }
+        }
+
+        this.backendIdMap.delete(profileId);
         this.profiles.update(current => current.filter(p => p.id !== profileId));
 
         // If we deleted the active profile, make the first remaining profile active

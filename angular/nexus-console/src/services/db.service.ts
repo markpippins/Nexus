@@ -1,16 +1,14 @@
 import { Injectable } from '@angular/core';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { BrokerProfile } from '../models/broker-profile.model.js';
-import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
 import { RssFeed } from '../models/rss-feed.model.js';
 import { FolderProperties } from '../models/folder-properties.model.js';
 import { Note } from '../models/note.model.js';
 
 const DB_NAME = 'file-explorer-db';
-const DB_VERSION = 7;
+const DB_VERSION = 6;
 const PROFILES_STORE = 'server-profiles'; // Legacy
 const BROKER_PROFILES_STORE = 'broker-profiles';
-const HOST_PROFILES_STORE = 'host-profiles'; // Keep old store name for IndexedDB compatibility
 
 const FEEDS_STORE = 'rss-feeds';
 const FOLDER_PROPERTIES_STORE = 'folder-properties';
@@ -20,10 +18,6 @@ interface FileExplorerDB extends DBSchema {
   [BROKER_PROFILES_STORE]: {
     key: string;
     value: BrokerProfile;
-  };
-  [HOST_PROFILES_STORE]: {
-    key: string;
-    value: RegistryServerProfile;
   };
 
   [FEEDS_STORE]: {
@@ -78,11 +72,6 @@ export class DbService {
             db.deleteObjectStore(NOTES_STORE);
           }
           db.createObjectStore(NOTES_STORE, { keyPath: 'id' });
-        }
-        if (oldVersion < 7) {
-          if (!db.objectStoreNames.contains(HOST_PROFILES_STORE)) {
-            db.createObjectStore(HOST_PROFILES_STORE, { keyPath: 'id' });
-          }
         }
         if (oldVersion < 6) {
           if (!db.objectStoreNames.contains(BROKER_PROFILES_STORE)) {
@@ -194,25 +183,4 @@ export class DbService {
     return db.getAll(NOTES_STORE);
   }
 
-  // --- Registry Server Profile Methods ---
-
-  async getAllRegistryServerProfiles(): Promise<RegistryServerProfile[]> {
-    const db = await this.dbPromise;
-    return db.getAll(HOST_PROFILES_STORE);
-  }
-
-  async addRegistryServerProfile(profile: RegistryServerProfile): Promise<void> {
-    const db = await this.dbPromise;
-    await db.put(HOST_PROFILES_STORE, profile);
-  }
-
-  async updateRegistryServerProfile(profile: RegistryServerProfile): Promise<void> {
-    const db = await this.dbPromise;
-    await db.put(HOST_PROFILES_STORE, profile);
-  }
-
-  async deleteRegistryServerProfile(id: string): Promise<void> {
-    const db = await this.dbPromise;
-    await db.delete(HOST_PROFILES_STORE, id);
-  }
 }

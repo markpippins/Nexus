@@ -39,7 +39,6 @@ import { ExportDialogComponent } from './components/export-dialog/export-dialog.
 import { FolderPropertiesService } from './services/folder-properties.service.js';
 import { TextEditorService } from './services/note-dialog.service.js';
 import { TextEditorDialogComponent } from './components/note-view-dialog/note-view-dialog.component.js';
-import { DbService } from './services/db.service.js';
 import { GeminiService, GeminiSearchParams } from './services/gemini.service.js';
 import { NodeType } from './models/tree-node.model.js';
 import { IdeaStreamComponent } from './components/idea-stream/idea-stream.component.js';
@@ -139,7 +138,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private renderer = inject(Renderer2);
   private ngZone = inject(NgZone);
   private elementRef = inject(ElementRef);
-  private dbService = inject(DbService);
   private uiPreferencesService = inject(UiPreferencesService);
   private homeProvider: FileSystemProvider;
   private geminiService = inject(GeminiService);
@@ -813,7 +811,7 @@ export class AppComponent implements OnInit, OnDestroy {
                 // IMPORTANT: 'type' in Host interface is 'serverTypeId' (number). 
                 // The interface I imported for Host has: serverTypeId: number
 
-                await this.platformManagementService.createServer(baseUrl, payload);
+                await this.platformManagementService.createHost(baseUrl, payload);
               }
               successes++;
             } catch (err) {
