@@ -4,7 +4,7 @@ import { Subscription, firstValueFrom, Subject } from 'rxjs';
 import { TreeProvider } from './tree-provider.interface.js';
 import { TreeNode, NodeType, TreeChange, NodeStatus } from '../models/tree-node.model.js';
 import { TreeManagerService } from './tree-manager.service.js';
-import { HostProfileService } from './host-profile.service.js';
+import { RegistryServerProfileService } from './registry-server-profile.service.js';
 import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
 import { ServiceInstance, Deployment, Framework } from '../models/service-mesh.model.js';
 import { ServiceMeshService } from './service-mesh.service.js';
@@ -16,7 +16,7 @@ export class RegistryServerProvider implements TreeProvider {
     readonly providerType = 'registry-server';
     private treeManager = inject(TreeManagerService);
     private http = inject(HttpClient);
-    private profileService = inject(HostProfileService);
+    private profileService = inject(RegistryServerProfileService);
     private serviceMeshService = inject(ServiceMeshService);
     private updateSubject = new Subject<TreeChange[]>();
 

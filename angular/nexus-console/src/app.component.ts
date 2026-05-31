@@ -8,7 +8,7 @@ import { SidebarComponent } from './components/sidebar/sidebar.component.js';
 import { FileSystemNode, FileType, Mount } from './models/file-system.model.js';
 import { FileSystemProvider, ItemReference } from './services/file-system-provider.js';
 import { BrokerProfileService } from './services/broker-profile.service.js';
-import { HostProfileService } from './services/host-profile.service.js';
+import { RegistryServerProfileService } from './services/registry-server-profile.service.js';
 import { DetailPaneComponent } from './components/detail-pane/detail-pane.component.js';
 import { SessionService } from './services/in-memory-file-system.service.js';
 import { BrokerProfile } from './models/broker-profile.model.js';
@@ -62,7 +62,7 @@ import { ServiceRegistryEditorComponent } from './components/service-registry-ed
 import { GatewayEditorComponent } from './components/gateway-editor/gateway-editor.component.js';
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
 import { GatewayManagementComponent } from './components/gateway-management/gateway-management.component.js';
-import { HostServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
+import { RegistryServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
 import { RmsIframeComponent } from './components/rms-iframe/rms-iframe.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 
@@ -113,7 +113,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, RmsIframeComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, RmsIframeComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -122,7 +122,7 @@ const disconnectedProvider: FileSystemProvider = {
 export class AppComponent implements OnInit, OnDestroy {
   private sessionFs = inject(SessionService);
   private profileService = inject(BrokerProfileService);
-  private hostProfileService = inject(HostProfileService);
+  private registryServerProfileService = inject(RegistryServerProfileService);
   private localConfigService = inject(LocalConfigService);
   private fsService = inject(FsService);
   private imageClientService = inject(ImageClientService);
@@ -303,7 +303,7 @@ export class AppComponent implements OnInit, OnDestroy {
       return null;
     }
     const profileName = path[1];
-    const profile = this.hostProfileService.profiles().find(p => p.name === profileName);
+    const profile = this.registryServerProfileService.profiles().find(p => p.name === profileName);
     return profile?.id ?? null;
   }
 
@@ -320,8 +320,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private getPlatformNodeForPath(path: string[]) {
     // Valid management types
     const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'hosts', 'service hosts', 'lookup tables', 'service types', 'server types', 'framework languages', 'framework categories', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments'];
-    const profiles = this.hostProfileService.profiles();
-    const activeProfile = this.hostProfileService.activeProfile();
+    const profiles = this.registryServerProfileService.profiles();
+    const activeProfile = this.registryServerProfileService.activeProfile();
 
     // Helper to normalize type for component
     const normalizeType = (t: string) => {
@@ -503,7 +503,7 @@ export class AppComponent implements OnInit, OnDestroy {
   async onDeleteServiceRegistry(): Promise<void> {
     const profileId = this.serviceRegistryToDelete() || this.pane1RegistryServerProfileId() || this.pane2RegistryServerProfileId();
     if (profileId) {
-      await this.hostProfileService.deleteProfile(profileId);
+      await this.registryServerProfileService.deleteProfile(profileId);
       this.isDeleteServiceRegistryConfirmOpen.set(false);
       this.serviceRegistryToDelete.set(null);
       await this.loadFolderTree();
@@ -530,7 +530,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!name) return; // User cancelled
 
     const activeId = this.activePaneId();
-    this.hostProfileService.saveProfile({
+    this.registryServerProfileService.saveProfile({
       id: Date.now().toString(),
       name,
       registryServerUrl: 'http://localhost:8000',
@@ -954,7 +954,7 @@ export class AppComponent implements OnInit, OnDestroy {
         });
 
         // Build registry server profile nodes for the Host Servers folder
-        const allHostProfiles = this.hostProfileService.profiles();
+        const allHostProfiles = this.registryServerProfileService.profiles();
         const hostProfileNodes: FileSystemNode[] = allHostProfiles.map(p => ({
           name: p.name,
           type: 'folder' as const,
@@ -1147,7 +1147,7 @@ export class AppComponent implements OnInit, OnDestroy {
     // Monitor health of server profiles
     effect(() => {
       const brokerProfiles = this.profileService.profiles();
-      const hostProfiles = this.hostProfileService.profiles();
+      const hostProfiles = this.registryServerProfileService.profiles();
       const allProfiles = [
         ...brokerProfiles,
         ...hostProfiles.map(p => ({ imageUrl: p.imageUrl, healthCheckDelayMinutes: undefined }))
@@ -1453,7 +1453,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     // Build registry server profile nodes for the Service Registries folder
-    const allHostProfiles = this.hostProfileService.profiles();
+    const allHostProfiles = this.registryServerProfileService.profiles();
     const hostProfileNodes: FileSystemNode[] = allHostProfiles.map(p => ({
       name: p.name,
       type: 'folder' as const,
@@ -2079,7 +2079,7 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     // Try host profiles second
-    const hostProfile = this.hostProfileService.profiles().find(p => p.id === profileId);
+    const hostProfile = this.registryServerProfileService.profiles().find(p => p.id === profileId);
     if (hostProfile) {
       const activeId = this.activePaneId();
       this.panePaths.update(paths => {

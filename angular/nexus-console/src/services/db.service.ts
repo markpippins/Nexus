@@ -10,7 +10,7 @@ const DB_NAME = 'file-explorer-db';
 const DB_VERSION = 7;
 const PROFILES_STORE = 'server-profiles'; // Legacy
 const BROKER_PROFILES_STORE = 'broker-profiles';
-const HOST_PROFILES_STORE = 'host-profiles';
+const REGISTRY_SERVER_PROFILES_STORE = 'registry-server-profiles';
 const FEEDS_STORE = 'rss-feeds';
 const FOLDER_PROPERTIES_STORE = 'folder-properties';
 const NOTES_STORE = 'notes';
@@ -20,7 +20,7 @@ interface FileExplorerDB extends DBSchema {
     key: string;
     value: BrokerProfile;
   };
-  [HOST_PROFILES_STORE]: {
+  [REGISTRY_SERVER_PROFILES_STORE]: {
     key: string;
     value: RegistryServerProfile;
   };
@@ -101,13 +101,13 @@ export class DbService {
           }
         }
         if (oldVersion < 7) {
-          if (!db.objectStoreNames.contains(HOST_PROFILES_STORE)) {
-            db.createObjectStore(HOST_PROFILES_STORE, { keyPath: 'id' });
+          if (!db.objectStoreNames.contains(REGISTRY_SERVER_PROFILES_STORE)) {
+            db.createObjectStore(REGISTRY_SERVER_PROFILES_STORE, { keyPath: 'id' });
 
             // Migrate host profiles from legacy store if needed
             if (db.objectStoreNames.contains(PROFILES_STORE)) {
               const oldStore = transaction.objectStore(PROFILES_STORE);
-              const newStore = transaction.objectStore(HOST_PROFILES_STORE);
+              const newStore = transaction.objectStore(REGISTRY_SERVER_PROFILES_STORE);
               (async () => {
                 let cursor = await oldStore.openCursor();
                 while (cursor) {
@@ -155,26 +155,26 @@ export class DbService {
     await db.delete(BROKER_PROFILES_STORE, id);
   }
 
-  // --- Host Profile Methods ---
+  // --- Registry Server Profile Methods ---
 
-  async getAllHostProfiles(): Promise<RegistryServerProfile[]> {
+  async getAllRegistryServerProfiles(): Promise<RegistryServerProfile[]> {
     const db = await this.dbPromise;
-    return db.getAll(HOST_PROFILES_STORE);
+    return db.getAll(REGISTRY_SERVER_PROFILES_STORE);
   }
 
-  async addHostProfile(profile: RegistryServerProfile): Promise<void> {
+  async addRegistryServerProfile(profile: RegistryServerProfile): Promise<void> {
     const db = await this.dbPromise;
-    await db.put(HOST_PROFILES_STORE, profile);
+    await db.put(REGISTRY_SERVER_PROFILES_STORE, profile);
   }
 
-  async updateHostProfile(profile: RegistryServerProfile): Promise<void> {
+  async updateRegistryServerProfile(profile: RegistryServerProfile): Promise<void> {
     const db = await this.dbPromise;
-    await db.put(HOST_PROFILES_STORE, profile);
+    await db.put(REGISTRY_SERVER_PROFILES_STORE, profile);
   }
 
-  async deleteHostProfile(id: string): Promise<void> {
+  async deleteRegistryServerProfile(id: string): Promise<void> {
     const db = await this.dbPromise;
-    await db.delete(HOST_PROFILES_STORE, id);
+    await db.delete(REGISTRY_SERVER_PROFILES_STORE, id);
   }
 
   // --- RSS Feed Methods ---

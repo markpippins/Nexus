@@ -5,7 +5,7 @@ import { DbService } from './db.service.js';
 @Injectable({
     providedIn: 'root'
 })
-export class HostProfileService {
+export class RegistryServerProfileService {
     private dbService = inject(DbService);
 
     readonly profiles = signal<RegistryServerProfile[]>([{
@@ -13,12 +13,12 @@ export class HostProfileService {
         name: 'Local Host',
         registryServerUrl: 'http://localhost:8085',
         imageUrl: '',
-        description: 'Default local host server',
+        description: 'Default local registry server',
         isActive: true // Default profile is active by default
     }]);
 
     /**
-     * Computed signal that returns the currently active host profile.
+     * Computed signal that returns the currently active registry server profile.
      * Falls back to the first profile if none is explicitly marked as active.
      */
     readonly activeProfile = computed<RegistryServerProfile | null>(() => {
@@ -55,7 +55,7 @@ export class HostProfileService {
     }
 
     async loadProfiles(): Promise<void> {
-        const profiles = await this.dbService.getAllHostProfiles();
+        const profiles = await this.dbService.getAllRegistryServerProfiles();
         // If DB has profiles, use them. Otherwise keep the default.
         if (profiles.length > 0) {
             // Ensure at least one profile is active
@@ -64,10 +64,10 @@ export class HostProfileService {
                 profiles[0].isActive = true;
             }
             this.profiles.set(profiles);
-            console.log('[HostProfileService] Loaded profiles from DB', profiles);
-            console.log('[HostProfileService] Active profile:', profiles.find(p => p.isActive)?.name);
+            console.log('[RegistryServerProfileService] Loaded profiles from DB', profiles);
+            console.log('[RegistryServerProfileService] Active profile:', profiles.find(p => p.isActive)?.name);
         } else {
-            console.log('[HostProfileService] Using default profile');
+            console.log('[RegistryServerProfileService] Using default profile');
         }
     }
 
@@ -83,17 +83,17 @@ export class HostProfileService {
 
         // Update all profiles in the database
         for (const profile of updatedProfiles) {
-            await this.dbService.updateHostProfile(profile);
+            await this.dbService.updateRegistryServerProfile(profile);
         }
 
         this.profiles.set(updatedProfiles);
-        console.log('[HostProfileService] Set active profile:', profileId);
+        console.log('[RegistryServerProfileService] Set active profile:', profileId);
     }
 
     async saveProfile(profile: RegistryServerProfile): Promise<void> {
         const existing = this.profiles().find(p => p.id === profile.id);
         if (existing) {
-            await this.dbService.updateHostProfile(profile);
+            await this.dbService.updateRegistryServerProfile(profile);
             this.profiles.update(current =>
                 current.map(p => p.id === profile.id ? profile : p)
             );
@@ -102,7 +102,7 @@ export class HostProfileService {
             if (this.profiles().length === 0) {
                 profile.isActive = true;
             }
-            await this.dbService.addHostProfile(profile);
+            await this.dbService.addRegistryServerProfile(profile);
             this.profiles.update(current => [...current, profile]);
         }
     }
@@ -111,7 +111,7 @@ export class HostProfileService {
         const profileToDelete = this.profiles().find(p => p.id === profileId);
         const wasActive = profileToDelete?.isActive === true;
 
-        await this.dbService.deleteHostProfile(profileId);
+        await this.dbService.deleteRegistryServerProfile(profileId);
         this.profiles.update(current => current.filter(p => p.id !== profileId));
 
         // If we deleted the active profile, make the first remaining profile active

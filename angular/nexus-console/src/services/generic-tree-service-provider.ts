@@ -4,7 +4,7 @@ import { GenericTreeNode } from '../models/generic-tree.model';
 import { NodeType } from '../models/tree-node.model';
 import { SessionService } from './in-memory-file-system.service';
 import { BrokerProfileService } from './broker-profile.service';
-import { HostProfileService } from './host-profile.service';
+import { RegistryServerProfileService } from './registry-server-profile.service';
 import { RegistryServerProvider } from './registry-server-provider.service';
 
 @Injectable({
@@ -14,7 +14,7 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
   constructor(
     private sessionFs: SessionService,
     private profileService: BrokerProfileService,
-    private hostProfileService: HostProfileService,
+    private registryServerProfileService: RegistryServerProfileService,
     private registryServerProvider: RegistryServerProvider
   ) {
     super();
@@ -122,7 +122,7 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
     }));
 
     // Build host server profile nodes
-    const allHostProfiles = this.hostProfileService.profiles();
+    const allHostProfiles = this.registryServerProfileService.profiles();
     const hostProfileNodes: GenericTreeNode[] = allHostProfiles.map(p => ({
       id: p.id,
       name: p.name,

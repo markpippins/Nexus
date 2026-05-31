@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { ServiceMeshService } from '../../services/service-mesh.service.js';
-import { HostProfileService } from '../../services/host-profile.service.js';
+import { RegistryServerProfileService } from '../../services/registry-server-profile.service.js';
 import {
   ServiceInstance,
   Deployment,
@@ -24,7 +24,7 @@ import {
 })
 export class ServiceDetailsComponent {
   private serviceMeshService = inject(ServiceMeshService);
-  private hostProfileService = inject(HostProfileService);
+  private registryServerProfileService = inject(RegistryServerProfileService);
 
   service = input<ServiceInstance | null>(null);
   deployments = input<Deployment[]>([]);
@@ -78,7 +78,7 @@ export class ServiceDetailsComponent {
     const service = this.service();
     if (service) {
       // Find the first host profile to use for the operation
-      const profiles = this.hostProfileService.profiles();
+      const profiles = this.registryServerProfileService.profiles();
       if (profiles.length > 0) {
         const profile = profiles[0]; // In a more sophisticated version, we could select based on service metadata
         const result = await this.serviceMeshService.executeServiceOperation(service.id, 'restart', profile);
@@ -95,7 +95,7 @@ export class ServiceDetailsComponent {
     const service = this.service();
     if (service) {
       // Find the first host profile to use for the operation
-      const profiles = this.hostProfileService.profiles();
+      const profiles = this.registryServerProfileService.profiles();
       if (profiles.length > 0) {
         const profile = profiles[0];
         const result = await this.serviceMeshService.executeServiceOperation(service.id, 'view-logs', profile);
@@ -114,7 +114,7 @@ export class ServiceDetailsComponent {
     const service = this.service();
     if (service) {
       // Find the first host profile to use for the operation
-      const profiles = this.hostProfileService.profiles();
+      const profiles = this.registryServerProfileService.profiles();
       if (profiles.length > 0) {
         const profile = profiles[0];
         const result = await this.serviceMeshService.executeServiceOperation(service.id, 'start', profile);
@@ -131,7 +131,7 @@ export class ServiceDetailsComponent {
     const service = this.service();
     if (service) {
       // Find the first host profile to use for the operation
-      const profiles = this.hostProfileService.profiles();
+      const profiles = this.registryServerProfileService.profiles();
       if (profiles.length > 0) {
         const profile = profiles[0];
         const result = await this.serviceMeshService.executeServiceOperation(service.id, 'stop', profile);

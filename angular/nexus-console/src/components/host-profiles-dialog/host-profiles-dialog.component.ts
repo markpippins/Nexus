@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RegistryServerProfile } from '../../models/registry-server-profile.model.js';
-import { HostProfileService } from '../../services/host-profile.service.js';
+import { RegistryServerProfileService } from '../../services/registry-server-profile.service.js';
 
 interface FormState {
     id: string;
@@ -41,14 +41,14 @@ const INITIAL_FORM_STATE: FormState = {
 };
 
 @Component({
-    selector: 'app-host-profiles-dialog',
+    selector: 'app-registry-server-profiles-dialog',
     imports: [CommonModule, FormsModule],
     templateUrl: './host-profiles-dialog.component.html',
     styleUrls: ['./host-profiles-dialog.component.css'],
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class HostProfilesDialogComponent {
-    profileService = inject(HostProfileService);
+export class RegistryServerProfilesDialogComponent {
+    profileService = inject(RegistryServerProfileService);
 
     isOpen = input<boolean>(false);
     close = output<void>();

@@ -2,7 +2,7 @@ import { Injectable, inject, signal, computed, effect } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, Subject, interval, BehaviorSubject, of, firstValueFrom } from 'rxjs';
 import { switchMap, map, catchError, tap, shareReplay, takeUntil } from 'rxjs/operators';
-import { HostProfileService } from './host-profile.service.js';
+import { RegistryServerProfileService } from './registry-server-profile.service.js';
 import { RegistryServerProfile } from '../models/registry-server-profile.model.js';
 import {
   Framework,
@@ -37,7 +37,7 @@ export interface ServiceMeshConnection {
 })
 export class ServiceMeshService {
   private http = inject(HttpClient);
-  private hostProfileService = inject(HostProfileService);
+  private registryServerProfileService = inject(RegistryServerProfileService);
 
   private destroy$ = new Subject<void>();
   private pollInterval = 10000; // 10 seconds
@@ -82,7 +82,7 @@ export class ServiceMeshService {
   constructor() {
     // Connect only to the active host profile on startup/change
     effect(() => {
-      const activeProfile = this.hostProfileService.activeProfile();
+      const activeProfile = this.registryServerProfileService.activeProfile();
 
       if (activeProfile) {
         // Clear all existing connections
