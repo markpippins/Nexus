@@ -977,33 +977,6 @@ export class AppComponent implements OnInit, OnDestroy {
             return this.sessionFs.getContents(sessionPath);
           }
 
-
-            // File Systems folder
-          if (rootName === 'File Systems') {
-            // Return only connected gateways that offer file services
-            const mountedIds = this.mountedProfileIds();
-            const allBrokerProfiles = this.profileService.profiles();
-
-            // Filter to only return profiles that are currently mounted/connected
-            // AND have a healthy file-system server
-            const connectedFileServiceGateways = allBrokerProfiles.filter(p =>
-              mountedIds.includes(p.id) && this.filesystemHealth().get(p.name) === true
-            );
-
-            // Convert to FileSystemNode format
-            return connectedFileServiceGateways.map(profile => ({
-              name: profile.name,
-              type: 'folder' as FileType,
-              isServerRoot: true,
-              profileId: profile.id,
-              connected: true,
-              healthStatus: this.healthCheckService.getServiceStatus(profile.imageUrl),
-              children: [],
-              childrenLoaded: false,
-              metadata: { mountId: true },
-            }));
-          }
-
           // Gateways folder - contains broker gateway nodes
           if (rootName === 'Gateways') {
             return brokerProfileNodes;
@@ -1429,22 +1402,6 @@ export class AppComponent implements OnInit, OnDestroy {
       isVirtualFolder: true, // Mark as a virtual organizational folder
     };
 
-    // Find the "File Systems" node
-    const fileSystemsNode = hostNodes.find(n => n.name === 'File Systems');
-    if (fileSystemsNode) {
-      // Add connected, mounted gateway profiles as children of File Systems
-      const mountedGateways = remoteRoots
-        .filter(r => r.connected === true)
-        .map(r => ({
-          ...r,
-          isServerRoot: false,
-          metadata: { ...r.metadata, mountId: true },
-        }));
-      fileSystemsNode.children = mountedGateways;
-      fileSystemsNode.childrenLoaded = true;
-      fileSystemsNode.isVirtualFolder = true;
-    }
-
     // Prepare the Local Session to be added at root level
     if (sessionTree.children) {
       sessionTree.children = sessionTree.children.filter((c: FileSystemNode) => c.name !== 'Search & Discovery');
@@ -1484,7 +1441,6 @@ export class AppComponent implements OnInit, OnDestroy {
     // Build the final tree structure alphabetically
     const rootChildren = [
       ...otherHostNodes,
-      ...(fileSystemsNode ? [fileSystemsNode] : []),
       gatewaysNode,
       ...(platformNode ? [platformNode] : []),
       ...(allHostProfiles.length > 0 ? [serviceRegistriesNode] : []),

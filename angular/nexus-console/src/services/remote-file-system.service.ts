@@ -36,7 +36,7 @@ export class RemoteFileSystemService implements FileSystemProvider {
         type: 'folder',
         children: [],
         childrenLoaded: false,
-        metadata: { mountId: mount.id, rootPath: mount.rootPath, isMountChild: true },
+        metadata: { mountId: mount.id, rootPath: mount.rootPath },
       }));
     }
 
@@ -121,7 +121,7 @@ export class RemoteFileSystemService implements FileSystemProvider {
         type: 'folder',
         children: [],
         childrenLoaded: false,
-        metadata: { mountId: mount.id, rootPath: mount.rootPath, isMountChild: true },
+        metadata: { mountId: mount.id, rootPath: mount.rootPath },
       }));
 
       return {
