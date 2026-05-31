@@ -1,8 +1,8 @@
 [
   {
-    "profileId": "default-local-host",
+    "profileId": "strontium",
     "name": "Local Host",
-    "registryServerUrl": "http://localhost:8085",
+    "registryServerUrl": "http://strontium:8085",
     "imageUrl": "",
     "isActive": true,
     "description": "Default local service registry"

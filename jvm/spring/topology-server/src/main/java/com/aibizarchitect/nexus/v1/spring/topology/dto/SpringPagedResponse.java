@@ -28,17 +28,18 @@ public class SpringPagedResponse {
             }
         }
 
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("page", page.getNumber());
+        meta.put("per_page", page.getSize());
+        meta.put("total", page.getTotalElements());
+        meta.put("last_page", page.getTotalPages());
+
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("data", page.getContent());
-        response.put("totalElements", page.getTotalElements());
-        response.put("totalPages", page.getTotalPages());
-        response.put("number", page.getNumber());
-        response.put("numberOfElements", page.getNumberOfElements());
-        response.put("size", page.getSize());
-        response.put("content", page.getContent());
+        response.put("meta", meta);
 
         if (nextPageUrl != null) {
-            response.put("nextPageUrl", nextPageUrl);
+            meta.put("next_page_url", nextPageUrl);
         }
 
         return response;

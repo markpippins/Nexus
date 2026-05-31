@@ -1,25 +1,17 @@
 import { Injectable } from '@angular/core';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { BrokerProfile } from '../models/broker-profile.model.js';
 import { RssFeed } from '../models/rss-feed.model.js';
 import { FolderProperties } from '../models/folder-properties.model.js';
 import { Note } from '../models/note.model.js';
 
 const DB_NAME = 'file-explorer-db';
 const DB_VERSION = 6;
-const PROFILES_STORE = 'server-profiles'; // Legacy
-const BROKER_PROFILES_STORE = 'broker-profiles';
 
 const FEEDS_STORE = 'rss-feeds';
 const FOLDER_PROPERTIES_STORE = 'folder-properties';
 const NOTES_STORE = 'notes';
 
 interface FileExplorerDB extends DBSchema {
-  [BROKER_PROFILES_STORE]: {
-    key: string;
-    value: BrokerProfile;
-  };
-
   [FEEDS_STORE]: {
     key: string;
     value: RssFeed;
@@ -33,26 +25,16 @@ interface FileExplorerDB extends DBSchema {
     key: string;
     value: Note;
   };
-  // Legacy support for migration type checking if needed
-  [PROFILES_STORE]: {
-    key: string;
-    value: any;
-  };
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Injectable({ providedIn: 'root' })
 export class DbService {
   private dbPromise: Promise<IDBPDatabase<FileExplorerDB>>;
 
   constructor() {
     this.dbPromise = openDB<FileExplorerDB>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion, newVersion, transaction) {
+      upgrade(db, oldVersion) {
         if (oldVersion < 2) {
-          if (!db.objectStoreNames.contains(PROFILES_STORE)) {
-            db.createObjectStore(PROFILES_STORE, { keyPath: 'id' });
-          }
           if (!db.objectStoreNames.contains(FEEDS_STORE)) {
             db.createObjectStore(FEEDS_STORE, { keyPath: 'id' });
           }
@@ -73,53 +55,8 @@ export class DbService {
           }
           db.createObjectStore(NOTES_STORE, { keyPath: 'id' });
         }
-        if (oldVersion < 6) {
-          if (!db.objectStoreNames.contains(BROKER_PROFILES_STORE)) {
-            db.createObjectStore(BROKER_PROFILES_STORE, { keyPath: 'id' });
-
-            // Attempt to migrate data from server-profiles if it exists
-            if (db.objectStoreNames.contains(PROFILES_STORE)) {
-              const oldStore = transaction.objectStore(PROFILES_STORE);
-              const newStore = transaction.objectStore(BROKER_PROFILES_STORE);
-              // We can use a cursor to iterate and copy
-              (async () => {
-                let cursor = await oldStore.openCursor();
-                while (cursor) {
-                  const profile = cursor.value;
-                  // Map ServerProfile to BrokerProfile: keep common fields. 
-                  if (!profile.type || profile.type === 'broker') {
-                    await newStore.put(profile);
-                  }
-                  cursor = await cursor.continue();
-                }
-              })();
-            }
-          }
-        }
       },
     });
-  }
-
-  // --- Broker Profile Methods ---
-
-  async getAllProfiles(): Promise<BrokerProfile[]> {
-    const db = await this.dbPromise;
-    return db.getAll(BROKER_PROFILES_STORE);
-  }
-
-  async addProfile(profile: BrokerProfile): Promise<void> {
-    const db = await this.dbPromise;
-    await db.put(BROKER_PROFILES_STORE, profile);
-  }
-
-  async updateProfile(profile: BrokerProfile): Promise<void> {
-    const db = await this.dbPromise;
-    await db.put(BROKER_PROFILES_STORE, profile);
-  }
-
-  async deleteProfile(id: string): Promise<void> {
-    const db = await this.dbPromise;
-    await db.delete(BROKER_PROFILES_STORE, id);
   }
 
   // --- RSS Feed Methods ---
@@ -182,5 +119,4 @@ export class DbService {
     const db = await this.dbPromise;
     return db.getAll(NOTES_STORE);
   }
-
 }

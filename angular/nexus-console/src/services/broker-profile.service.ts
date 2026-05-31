@@ -1,24 +1,45 @@
 import { Injectable, signal, computed, effect, inject } from '@angular/core';
 import { BrokerProfile } from '../models/broker-profile.model.js';
-import { DbService } from './db.service.js';
+import { TopologyClientService } from './topology-client.service.js';
 
-const PROFILES_STORAGE_KEY = 'file-explorer-broker-profiles';
 const ACTIVE_PROFILE_ID_STORAGE_KEY = 'file-explorer-active-broker-profile-id';
 
-const DEFAULT_PROFILES: BrokerProfile[] = [
-  {
-    id: 'default-local',
-    name: 'Local (Debug)',
-    brokerUrl: 'localhost:8081',
-    imageUrl: 'http://localhost:8081',
-  },
-];
+/** Backend entity shape from topology-server */
+interface BrokerProfileEntity {
+  id: number;
+  profileId: string;
+  name: string;
+  brokerUrl: string;
+  imageUrl: string;
+  autoConnect: boolean;
+  healthCheckDelayMinutes: number;
+}
 
-@Injectable({
-  providedIn: 'root',
-})
+function entityToModel(e: BrokerProfileEntity): BrokerProfile {
+  return {
+    id: e.profileId,
+    name: e.name,
+    brokerUrl: e.brokerUrl,
+    imageUrl: e.imageUrl,
+    autoConnect: e.autoConnect,
+    healthCheckDelayMinutes: e.healthCheckDelayMinutes,
+  };
+}
+
+function modelToEntity(p: BrokerProfile): Partial<BrokerProfileEntity> {
+  return {
+    profileId: p.id,
+    name: p.name,
+    brokerUrl: p.brokerUrl,
+    imageUrl: p.imageUrl,
+    autoConnect: p.autoConnect,
+    healthCheckDelayMinutes: p.healthCheckDelayMinutes,
+  };
+}
+
+@Injectable({ providedIn: 'root' })
 export class BrokerProfileService {
-  private dbService = inject(DbService);
+  private topology = inject(TopologyClientService);
   profiles = signal<BrokerProfile[]>([]);
   activeProfileId = signal<string | null>(null);
 
@@ -29,113 +50,67 @@ export class BrokerProfileService {
     return profiles.find(p => p.id === activeId) ?? null;
   });
 
-  activeConfig = computed<{ brokerUrl: string, imageUrl: string }>(() => {
+  activeConfig = computed<{ brokerUrl: string; imageUrl: string }>(() => {
     const active = this.activeProfile();
     if (active) {
-      return {
-        brokerUrl: active.brokerUrl,
-        imageUrl: active.imageUrl ?? ''
-      };
+      return { brokerUrl: active.brokerUrl, imageUrl: active.imageUrl ?? '' };
     }
-    // Fallback to default if no active profile is found (should not happen after init)
-    return {
-      brokerUrl: DEFAULT_PROFILES[0].brokerUrl,
-      imageUrl: DEFAULT_PROFILES[0].imageUrl ?? ''
-    };
+    const first = this.profiles()[0];
+    return { brokerUrl: first?.brokerUrl ?? 'localhost:8081', imageUrl: first?.imageUrl ?? 'http://localhost:8081' };
   });
 
   constructor() {
     this.loadProfiles();
     effect(() => {
-      // This effect now ONLY persists the active profile ID to localStorage.
       try {
-        const activeId = this.activeProfileId();
-        if (activeId) {
-          localStorage.setItem(ACTIVE_PROFILE_ID_STORAGE_KEY, activeId);
-        } else {
-          localStorage.removeItem(ACTIVE_PROFILE_ID_STORAGE_KEY);
-        }
-      } catch (e) {
-        console.error('Failed to save active profile ID to localStorage', e);
-      }
+        const id = this.activeProfileId();
+        if (id) localStorage.setItem(ACTIVE_PROFILE_ID_STORAGE_KEY, id);
+        else localStorage.removeItem(ACTIVE_PROFILE_ID_STORAGE_KEY);
+      } catch {}
     });
-  }
-
-  private sortProfiles(profiles: BrokerProfile[]): BrokerProfile[] {
-    return profiles.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   }
 
   private async loadProfiles(): Promise<void> {
     try {
-      let profiles = await this.dbService.getAllProfiles();
-
-      if (profiles.length === 0) {
-        // One-time migration from localStorage or use defaults
-        const profilesJson = localStorage.getItem(PROFILES_STORAGE_KEY);
-        const storedProfiles = profilesJson ? JSON.parse(profilesJson) : [];
-
-        if (storedProfiles.length > 0) {
-          profiles = storedProfiles;
-          // Clean up old storage key after migration
-          localStorage.removeItem(PROFILES_STORAGE_KEY);
-        } else {
-          profiles = DEFAULT_PROFILES;
-        }
-
-        // Populate IndexedDB with the determined profiles
-        for (const profile of profiles) {
-          const p = profile as any;
-          // Temporarily cast generic profile to BrokerProfile, might lose 'type' field which is fine
-          const newProfile = {
-            id: p.id,
-            name: p.name,
-            brokerUrl: p.brokerUrl ?? p.url ?? '', // Fallback for migration
-            imageUrl: p.imageUrl ?? '',
-            autoConnect: p.autoConnect,
-            healthCheckDelayMinutes: p.healthCheckDelayMinutes
-          } as BrokerProfile;
-          await this.dbService.addProfile(newProfile);
-        }
-      }
-
-      this.profiles.set(this.sortProfiles(profiles as any)); // DB Service might return generic, casting
+      const entities = await this.topology.get<BrokerProfileEntity>('broker-profiles');
+      const models = entities.map(entityToModel);
+      this.profiles.set(models.sort((a, b) => a.name.localeCompare(b.name)));
 
       const activeId = localStorage.getItem(ACTIVE_PROFILE_ID_STORAGE_KEY);
       if (activeId && this.profiles().some(p => p.id === activeId)) {
         this.activeProfileId.set(activeId);
       } else {
-        // Set first profile as active if none is set or the stored one is invalid
         this.activeProfileId.set(this.profiles()[0]?.id ?? null);
       }
-    } catch (e) {
-      console.error('Failed to load profiles from IndexedDB', e);
-      this.profiles.set(this.sortProfiles([...DEFAULT_PROFILES]));
-      this.activeProfileId.set(DEFAULT_PROFILES[0]?.id ?? null);
+    } catch {
+      console.warn('[BrokerProfileService] Failed to load from topology-server');
+      this.profiles.set([]);
     }
   }
 
-  private generateId(): string {
-    return `profile-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  async addProfile(data: Omit<BrokerProfile, 'id'>): Promise<void> {
+    const payload: any = { profileId: `profile-${Date.now()}`, ...data };
+    const entity = await this.topology.post<BrokerProfileEntity>('broker-profiles', payload);
+    this.profiles.update(p => [...p, entityToModel(entity)].sort((a, b) => a.name.localeCompare(b.name)));
   }
 
-  async addProfile(profileData: Omit<BrokerProfile, 'id'>): Promise<void> {
-    const newProfile: BrokerProfile = { ...profileData, id: this.generateId() };
-    await this.dbService.addProfile(newProfile as any); // Cast for DB service compat if needed
-    this.profiles.update(profiles => this.sortProfiles([...profiles, newProfile]));
-  }
-
-  async updateProfile(updatedProfile: BrokerProfile): Promise<void> {
-    await this.dbService.updateProfile(updatedProfile as any);
-    this.profiles.update(profiles =>
-      this.sortProfiles(profiles.map(p => p.id === updatedProfile.id ? updatedProfile : p))
+  async updateProfile(profile: BrokerProfile): Promise<void> {
+    const entities = await this.topology.get<BrokerProfileEntity>('broker-profiles');
+    const match = entities.find(e => e.profileId === profile.id);
+    if (!match) return;
+    await this.topology.put('broker-profiles', match.id, modelToEntity(profile));
+    this.profiles.update(p =>
+      p.map(x => x.id === profile.id ? profile : x).sort((a, b) => a.name.localeCompare(b.name))
     );
   }
 
   async deleteProfile(id: string): Promise<void> {
-    await this.dbService.deleteProfile(id);
-    this.profiles.update(profiles => profiles.filter(p => p.id !== id));
+    const entities = await this.topology.get<BrokerProfileEntity>('broker-profiles');
+    const match = entities.find(e => e.profileId === id);
+    if (!match) return;
+    await this.topology.delete('broker-profiles', match.id);
+    this.profiles.update(p => p.filter(x => x.id !== id));
     if (this.activeProfileId() === id) {
-      // If the active profile was deleted, set the first one as active
       this.activeProfileId.set(this.profiles()[0]?.id ?? null);
     }
   }

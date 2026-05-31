@@ -20,6 +20,11 @@ public class TopologyDataInitializer implements CommandLineRunner {
     private final RegistryServerProfileRepository registryServerProfileRepository;
     private final ObjectMapper objectMapper;
 
+    private static final String BROKER_PROFILES_PATH = "config/broker-profiles.json";
+    private static final String REGISTRY_SERVER_PROFILES_PATH = "config/registry-server-profiles.json";
+
+    private static boolean reInitialize = true; // Set to true to re-seed data on every startup, false to seed only if empty
+    
     public TopologyDataInitializer(BrokerProfileRepository brokerProfileRepository,
                                     RegistryServerProfileRepository registryServerProfileRepository,
                                     ObjectMapper objectMapper) {
@@ -35,6 +40,10 @@ public class TopologyDataInitializer implements CommandLineRunner {
     }
 
     private void seedBrokerProfiles() throws Exception {
+        if (reInitialize && brokerProfileRepository.count() > 0) {
+            brokerProfileRepository.deleteAll();
+        }
+
         if (brokerProfileRepository.count() > 0) {
             return;
         }
@@ -47,6 +56,10 @@ public class TopologyDataInitializer implements CommandLineRunner {
     }
 
     private void seedRegistryServerProfiles() throws Exception {
+        if (reInitialize && registryServerProfileRepository.count() > 0) {
+            registryServerProfileRepository.deleteAll();
+        }
+
         if (registryServerProfileRepository.count() > 0) {
             return;
         }
