@@ -768,7 +768,7 @@ export class PlatformManagementComponent {
                     count = this.deployments().length;
                     displayType = 'Deployments';
                     break;
-                case 'servers':
+                case 'hosts':
                     count = this.servers().length;
                     displayType = 'Servers';
                     break;
@@ -777,7 +777,7 @@ export class PlatformManagementComponent {
                     displayType = 'Libraries';
                     break;
                 case 'service-types':
-                case 'server-types':
+                case 'host-types':
                 case 'framework-languages':
                 case 'framework-vendors':
                 case 'framework-categories':
@@ -851,12 +851,12 @@ export class PlatformManagementComponent {
                     const d = await this.platformService.getDeployments(url);
                     this.rawDeployments.set(d);
                     break;
-                case 'servers':
+                case 'hosts':
                     const h = await this.platformService.getHosts(url);
                     this.rawHosts.set(h);
                     break;
                 case 'service-types':
-                case 'server-types':
+                case 'host-types':
                 case 'framework-languages':
                 case 'framework-vendors':
                 case 'framework-categories':
@@ -897,12 +897,12 @@ export class PlatformManagementComponent {
                 this.selectedDeploymentForEdit.set(null);
                 this.isDeploymentDialogOpen.set(true);
                 break;
-            case 'servers':
+            case 'hosts':
                 this.selectedHostForEdit.set(null);
                 this.isHostDialogOpen.set(true);
                 break;
             case 'service-types':
-            case 'server-types':
+            case 'host-types':
             case 'framework-languages':
             case 'framework-vendors':
             case 'framework-categories':
@@ -937,12 +937,12 @@ export class PlatformManagementComponent {
                 this.selectedDeploymentForEdit.set(item);
                 this.isDeploymentDialogOpen.set(true);
                 break;
-            case 'servers':
+            case 'hosts':
                 this.selectedHostForEdit.set(item);
                 this.isHostDialogOpen.set(true);
                 break;
             case 'service-types':
-            case 'server-types':
+            case 'host-types':
             case 'framework-languages':
             case 'framework-categories':
             case 'library-categories':
@@ -977,11 +977,11 @@ export class PlatformManagementComponent {
                 case 'deployments':
                     await this.platformService.deleteDeployment(url, Number(item.id));
                     break;
-                case 'servers':
+                case 'hosts':
                     await this.platformService.deleteHost(url, Number(item.id));
                     break;
                 case 'service-types':
-                case 'server-types':
+                case 'host-types':
                 case 'framework-languages':
                 case 'framework-categories':
                 case 'library-categories':
