@@ -3,7 +3,7 @@
     "profileId": "strontium",
     "name": "Strontium Registry",
     "registryServerUrl": "http://strontium:8085",
-    "imageUrl": "",
+    "imageUrl": "http://strontium:9081",
     "isActive": true,
     "description": "Default local service registry"
   }
