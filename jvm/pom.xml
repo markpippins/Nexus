@@ -9,6 +9,7 @@
     <module>shared</module>
     <module>spring/service-broker</module>
     <module>spring/service-registry</module>
+    <module>spring/topology-server</module>
   </modules>
   <properties>
     <maven.compiler.source>21</maven.compiler.source>

@@ -70,7 +70,11 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // Stable ID key to detect whether service list actually changed (not just reference)
   private lastServiceIds = '';
+
+  // Track whether the last build used the backend registry, so we can
+  // force a full rebuild when backend components become available.
   private lastRegistryReady = false;
+  private refreshingRegistry = false;
 
   // Context Menu State
   contextMenu = signal<{
@@ -135,14 +139,20 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       const services = this.services();
       const allComponents = this.registry.allComponents(); // Dependency to ensure loaded
 
+      // Trigger a backend component load if the registry is still on fallback.
+      // refresh() is async — when it completes, registry signal updates,
+      // allComponents recomputes, and this effect re-runs with backend data.
+      if (!this.registry.backendLoaded() && !this.refreshingRegistry) {
+        this.refreshingRegistry = true;
+        this.registry.refresh().finally(() => this.refreshingRegistry = false);
+      }
+
       if (!services || services.length === 0) return;
       if (allComponents.length === 0) return; // Wait for registry (at least fallback)
-      // Only resolve visual styles when backend registry is loaded.
-      // INITIAL_REGISTRY uses string IDs (sys-rest, sys-cache) that won't
-      // match the numeric IDs returned by the /api/v1/services endpoint.
-      const registryReady = this.registry.backendLoaded();
 
-      // Skip full rebuild when nothing changed (prevents position snap-back on poll cycles)
+      // Skip full rebuild when service list hasn't changed AND registry hasn't
+      // transitioned from fallback to backend (which would change component IDs).
+      const registryReady = this.registry.backendLoaded();
       const ids = services.map(s => s.id).sort().join(',');
       if (ids === this.lastServiceIds && registryReady === this.lastRegistryReady) {
         // Lightweight update: refresh labels without clearScene

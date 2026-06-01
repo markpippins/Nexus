@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 
 import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 
-@FeignClient(name = "user-access-service", url = "${user-access-service.url:http://localhost:8083}")
+@FeignClient(name = "user-access-service", url = "${user-access-service.url:http://localhost:8081}")
 public interface UserAccessClient {
 
     @PostMapping(value = "/user/validate", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)

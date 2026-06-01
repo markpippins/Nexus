@@ -26,7 +26,7 @@ public class DeploymentCacheService {
 
     private static final String DEPLOYMENT_KEY_PREFIX = "cache:deployment:";
     private static final String DEPLOYMENTS_BY_SERVICE_PREFIX = "cache:deployments:service:";
-    private static final String DEPLOYMENTS_BY_SERVER_PREFIX = "cache:deployments:server:";
+    private static final String DEPLOYMENTS_BY_HOST_PREFIX = "cache:deployments:host:";
     private static final String DEPLOYMENTS_BY_ENV_PREFIX = "cache:deployments:env:";
     private static final long TTL_MINUTES = 15;
 
@@ -104,30 +104,30 @@ public class DeploymentCacheService {
     }
 
     /**
-     * Get deployments by server ID.
+     * Get deployments by host ID.
      */
-    public List<Deployment> getDeploymentsByServerId(Long serverId) {
-        String key = DEPLOYMENTS_BY_SERVER_PREFIX + serverId;
+    public List<Deployment> getDeploymentsByHostId(Long hostId) {
+        String key = DEPLOYMENTS_BY_HOST_PREFIX + hostId;
 
         try {
             @SuppressWarnings("unchecked")
             List<Deployment> cached = (List<Deployment>) redisTemplate.opsForValue().get(key);
             if (cached != null) {
-                log.debug("Cache hit for deployments by server ID: {}", serverId);
+                log.debug("Cache hit for deployments by host ID: {}", hostId);
                 return cached;
             }
         } catch (Exception e) {
-            log.warn("Redis error getting deployments by server {}, falling back to database: {}", serverId,
+            log.warn("Redis error getting deployments by host {}, falling back to database: {}", hostId,
                     e.getMessage());
         }
 
-        log.debug("Cache miss for deployments by server ID: {}", serverId);
-        List<Deployment> deployments = deploymentRepository.findByServerId(serverId);
+        log.debug("Cache miss for deployments by host ID: {}", hostId);
+        List<Deployment> deployments = deploymentRepository.findByHostId(hostId);
 
         try {
             redisTemplate.opsForValue().set(key, deployments, TTL_MINUTES, TimeUnit.MINUTES);
         } catch (Exception e) {
-            log.warn("Failed to cache deployments by server {}: {}", serverId, e.getMessage());
+            log.warn("Failed to cache deployments by host {}: {}", hostId, e.getMessage());
         }
 
         return deployments;
@@ -232,7 +232,7 @@ public class DeploymentCacheService {
     private void invalidateListCachesForDeployment(Deployment deployment) {
         try {
             redisTemplate.delete(DEPLOYMENTS_BY_SERVICE_PREFIX + deployment.getServiceId());
-            redisTemplate.delete(DEPLOYMENTS_BY_SERVER_PREFIX + deployment.getServerId());
+            redisTemplate.delete(DEPLOYMENTS_BY_HOST_PREFIX + deployment.getHostId());
             redisTemplate.delete(DEPLOYMENTS_BY_ENV_PREFIX + deployment.getEnvironmentId());
             log.debug("Invalidated list caches for deployment ID: {}", deployment.getId());
         } catch (Exception e) {
@@ -247,7 +247,7 @@ public class DeploymentCacheService {
         try {
             redisTemplate.delete(redisTemplate.keys(DEPLOYMENT_KEY_PREFIX + "*"));
             redisTemplate.delete(redisTemplate.keys(DEPLOYMENTS_BY_SERVICE_PREFIX + "*"));
-            redisTemplate.delete(redisTemplate.keys(DEPLOYMENTS_BY_SERVER_PREFIX + "*"));
+            redisTemplate.delete(redisTemplate.keys(DEPLOYMENTS_BY_HOST_PREFIX + "*"));
             redisTemplate.delete(redisTemplate.keys(DEPLOYMENTS_BY_ENV_PREFIX + "*"));
             log.info("Cleared all deployment caches");
         } catch (Exception e) {

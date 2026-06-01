@@ -18,7 +18,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkCategory;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkLanguage;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.LibraryCategory;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServerType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.HostType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.EnvironmentTypeRepository;
@@ -26,7 +26,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkCa
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkLanguageRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.LibraryCategoryRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerTypeRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceTypeRepository;
 
@@ -46,7 +46,7 @@ public class CacheWarmingService {
     private final FrameworkCategoryRepository frameworkCategoryRepository;
     private final FrameworkLanguageRepository frameworkLanguageRepository;
     private final ServiceTypeRepository serviceTypeRepository;
-    private final ServerTypeRepository serverTypeRepository;
+    private final HostTypeRepository hostTypeRepository;
     private final EnvironmentTypeRepository environmentTypeRepository;
     private final LibraryCategoryRepository libraryCategoryRepository;
 
@@ -60,7 +60,7 @@ public class CacheWarmingService {
             FrameworkCategoryRepository frameworkCategoryRepository,
             FrameworkLanguageRepository frameworkLanguageRepository,
             ServiceTypeRepository serviceTypeRepository,
-            ServerTypeRepository serverTypeRepository,
+            HostTypeRepository hostTypeRepository,
             EnvironmentTypeRepository environmentTypeRepository,
             LibraryCategoryRepository libraryCategoryRepository,
             ServiceRepository serviceRepository,
@@ -70,7 +70,7 @@ public class CacheWarmingService {
         this.frameworkCategoryRepository = frameworkCategoryRepository;
         this.frameworkLanguageRepository = frameworkLanguageRepository;
         this.serviceTypeRepository = serviceTypeRepository;
-        this.serverTypeRepository = serverTypeRepository;
+        this.hostTypeRepository = hostTypeRepository;
         this.environmentTypeRepository = environmentTypeRepository;
         this.libraryCategoryRepository = libraryCategoryRepository;
         this.serviceRepository = serviceRepository;
@@ -116,9 +116,9 @@ public class CacheWarmingService {
             List<ServiceType> serviceTypes = serviceTypeRepository.findAll();
             log.debug("Pre-loaded {} service types", serviceTypes.size());
 
-            // Server Types
-            List<ServerType> serverTypes = serverTypeRepository.findAll();
-            log.debug("Pre-loaded {} server types", serverTypes.size());
+            // Host Types
+            List<HostType> hostTypes = hostTypeRepository.findAll();
+            log.debug("Pre-loaded {} host types", hostTypes.size());
 
             // Environment Types
             List<EnvironmentType> environmentTypes = environmentTypeRepository.findAll();
@@ -136,7 +136,7 @@ public class CacheWarmingService {
             categories.forEach(c -> frameworkCategoryRepository.findByName(c.getName()));
             languages.forEach(l -> frameworkLanguageRepository.findByName(l.getName()));
             serviceTypes.forEach(st -> serviceTypeRepository.findByName(st.getName()));
-            serverTypes.forEach(st -> serverTypeRepository.findByName(st.getName()));
+            hostTypes.forEach(ht -> hostTypeRepository.findByName(ht.getName()));
             environmentTypes.forEach(et -> environmentTypeRepository.findByName(et.getName()));
 
             log.info("Static lookup caches warmed successfully");

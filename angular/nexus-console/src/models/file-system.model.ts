@@ -1,4 +1,4 @@
-export type FileType = 'folder' | 'file' | 'host-server';
+export type FileType = 'folder' | 'file' | 'registry-server';
 
 export interface FileSystemNode {
   name: string;

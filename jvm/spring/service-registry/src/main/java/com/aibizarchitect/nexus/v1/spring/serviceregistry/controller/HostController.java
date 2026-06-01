@@ -21,7 +21,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Host;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostRepository;
 
 @RestController
-@RequestMapping("/api/v1/servers")
+@RequestMapping("/api/v1/hosts")
 @CrossOrigin(origins = "*")
 public class HostController {
 
@@ -35,35 +35,35 @@ public class HostController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getServers(
+    public ResponseEntity<?> getHosts(
             @RequestParam(required = false) String hostname,
             org.springframework.data.domain.Pageable pageable) {
         if (hostname != null) {
-            log.info("Fetching server by hostname: {}", hostname);
+            log.info("Fetching host by hostname: {}", hostname);
             return hostRepository.findByHostname(hostname)
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
         } else {
-            log.info("Fetching all hosts/servers from database");
+            log.info("Fetching all hosts from database");
             return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(hostRepository.findAll(pageable)));
         }
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Host> getServerById(@PathVariable Long id) {
-        log.info("Fetching server by ID: {}", id);
+    public ResponseEntity<Host> getHostById(@PathVariable Long id) {
+        log.info("Fetching host by ID: {}", id);
         return hostRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Host> createServer(@RequestBody Host host) {
-        log.info("Creating new server: {}", host.getHostname());
+    public ResponseEntity<Host> createHost(@RequestBody Host host) {
+        log.info("Creating new host: {}", host.getHostname());
 
         // Validate that hostname is unique
         if (hostRepository.findByHostname(host.getHostname()).isPresent()) {
-            log.warn("Server with hostname {} already exists", host.getHostname());
+            log.warn("Host with hostname {} already exists", host.getHostname());
             return ResponseEntity.badRequest().build();
         }
 
@@ -71,7 +71,7 @@ public class HostController {
         host.setActiveFlag(true);
 
         Host savedHost = hostRepository.save(host);
-        log.info("Successfully created server with ID: {}", savedHost.getId());
+        log.info("Successfully created host with ID: {}", savedHost.getId());
         java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
@@ -81,12 +81,12 @@ public class HostController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Host> updateServer(@PathVariable Long id, @RequestBody Host host) {
-        log.info("Updating server with ID: {}", id);
+    public ResponseEntity<Host> updateHost(@PathVariable Long id, @RequestBody Host host) {
+        log.info("Updating host with ID: {}", id);
 
         Optional<Host> existingHostOpt = hostRepository.findById(id);
         if (existingHostOpt.isEmpty()) {
-            log.warn("Server with ID {} not found", id);
+            log.warn("Host with ID {} not found", id);
             return ResponseEntity.notFound().build();
         }
 
@@ -94,32 +94,32 @@ public class HostController {
         Host existingHost = existingHostOpt.get();
         if (!existingHost.getHostname().equals(host.getHostname())) {
             if (hostRepository.findByHostname(host.getHostname()).isPresent()) {
-                log.warn("Server with hostname {} already exists", host.getHostname());
+                log.warn("Host with hostname {} already exists", host.getHostname());
                 return ResponseEntity.badRequest().build();
             }
         }
 
-        // Update the server
+        // Update the host
         host.setId(id);
         Host updatedHost = hostRepository.save(host);
-        log.info("Successfully updated server with ID: {}", id);
+        log.info("Successfully updated host with ID: {}", id);
         return ResponseEntity.ok(updatedHost);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteServer(@PathVariable Long id) {
-        log.info("Deleting server with ID: {}", id);
+    public ResponseEntity<Void> deleteHost(@PathVariable Long id) {
+        log.info("Deleting host with ID: {}", id);
 
         Optional<Host> hostOpt = hostRepository.findById(id);
         if (hostOpt.isEmpty()) {
-            log.warn("Server with ID {} not found", id);
+            log.warn("Host with ID {} not found", id);
             return ResponseEntity.notFound().build();
         }
 
-        // TODO: Check if server has deployments before deleting
+        // TODO: Check if host has deployments before deleting
         // For now, just delete
         hostRepository.deleteById(id);
-        log.info("Successfully deleted server with ID: {}", id);
+        log.info("Successfully deleted host with ID: {}", id);
         return ResponseEntity.noContent().build();
     }
 }

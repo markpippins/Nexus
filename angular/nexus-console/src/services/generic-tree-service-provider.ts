@@ -4,7 +4,7 @@ import { GenericTreeNode } from '../models/generic-tree.model';
 import { NodeType } from '../models/tree-node.model';
 import { SessionService } from './in-memory-file-system.service';
 import { BrokerProfileService } from './broker-profile.service';
-import { HostProfileService } from './host-profile.service';
+import { RegistryServerProfileService } from './registry-server-profile.service';
 import { RegistryServerProvider } from './registry-server-provider.service';
 
 @Injectable({
@@ -14,7 +14,7 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
   constructor(
     private sessionFs: SessionService,
     private profileService: BrokerProfileService,
-    private hostProfileService: HostProfileService,
+    private registryServerProfileService: RegistryServerProfileService,
     private registryServerProvider: RegistryServerProvider
   ) {
     super();
@@ -68,7 +68,7 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
     const hostChildren = await this.registryServerProvider.getChildren('root');
     const hostNodes: GenericTreeNode[] = hostChildren.map(node => {
       // Convert NodeType to GenericNodeType
-      let genericType: 'folder' | 'file' | 'service' | 'user' | 'host-server' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string = 'folder';
+      let genericType: 'folder' | 'file' | 'service' | 'user' | 'registry-server' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string = 'folder';
 
       switch (node.type) {
         case NodeType.SERVICE:
@@ -77,8 +77,8 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
         case NodeType.USER:
           genericType = 'user';
           break;
-        case NodeType.HOST_SERVER:
-          genericType = 'host-server';
+        case NodeType.REGISTRY_SERVER:
+          genericType = 'registry-server';
           break;
         case NodeType.FILE:
           genericType = 'file';
@@ -122,7 +122,7 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
     }));
 
     // Build host server profile nodes
-    const allHostProfiles = this.hostProfileService.profiles();
+    const allHostProfiles = this.registryServerProfileService.profiles();
     const hostProfileNodes: GenericTreeNode[] = allHostProfiles.map(p => ({
       id: p.id,
       name: p.name,
@@ -174,7 +174,7 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
     throw new Error('Method not implemented.');
   }
 
-  async createNode(path: string[], name: string, type: 'folder' | 'file' | 'service' | 'user' | 'host-server' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string): Promise<void> {
+  async createNode(path: string[], name: string, type: 'folder' | 'file' | 'service' | 'user' | 'registry-server' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string): Promise<void> {
     throw new Error('Method not implemented.');
   }
 

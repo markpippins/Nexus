@@ -32,7 +32,7 @@ public class ServiceRegistryRegistrationService {
     private static final Logger LOG = Logger.getLogger(ServiceRegistryRegistrationService.class);
 
     @ConfigProperty(name = "service.registry.url", defaultValue = "http://localhost:8085")
-    String hostServerUrl;
+    String serviceRegistryUrl;
 
     @ConfigProperty(name = "quarkus.http.port", defaultValue = "8090")
     int port;
@@ -117,13 +117,13 @@ public class ServiceRegistryRegistrationService {
 
         try {
             Response response = client
-                    .target(hostServerUrl)
+                    .target(serviceRegistryUrl)
                     .path("/api/v1/registry/register")
                     .request(MediaType.APPLICATION_JSON)
                     .post(Entity.json(registration));
 
             if (response.getStatus() == 200) {
-                LOG.info("Successfully registered with service-registry at " + hostServerUrl);
+                LOG.info("Successfully registered with service-registry at " + serviceRegistryUrl);
                 LOG.info("Service: " + serviceName + " on port " + port);
             } else {
                 LOG.warn("Failed to register with service-registry. Status: " + response.getStatus());
@@ -142,7 +142,7 @@ public class ServiceRegistryRegistrationService {
     private void sendHeartbeat() {
         try {
             Response response = client
-                    .target(hostServerUrl)
+                    .target(serviceRegistryUrl)
                     .path("/api/v1/registry/heartbeat/" + serviceName)
                     .request(MediaType.APPLICATION_JSON)
                     .post(Entity.json("{}"));

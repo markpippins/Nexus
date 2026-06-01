@@ -13,7 +13,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkCategory;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkLanguage;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Host;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServerType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.HostType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceConfiguration;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceDependency;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
@@ -22,7 +22,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkCa
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkLanguageRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerTypeRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceConfigurationRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceDependencyRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
@@ -47,7 +47,7 @@ public class ServicesConsoleClient {
     private final FrameworkCategoryRepository categoryRepository;
     private final FrameworkLanguageRepository languageRepository;
     private final ServiceTypeRepository serviceTypeRepository;
-    private final ServerTypeRepository serverTypeRepository;
+    private final HostTypeRepository hostTypeRepository;
     private final HostRepository hostRepository;
     private final DeploymentRepository deploymentRepository;
     private final ServiceConfigurationRepository serviceConfigurationRepository;
@@ -59,7 +59,7 @@ public class ServicesConsoleClient {
             FrameworkCategoryRepository categoryRepository,
             FrameworkLanguageRepository languageRepository,
             ServiceTypeRepository serviceTypeRepository,
-            ServerTypeRepository serverTypeRepository,
+            HostTypeRepository hostTypeRepository,
             HostRepository hostRepository,
             DeploymentRepository deploymentRepository,
             ServiceConfigurationRepository serviceConfigurationRepository,
@@ -69,7 +69,7 @@ public class ServicesConsoleClient {
         this.categoryRepository = categoryRepository;
         this.languageRepository = languageRepository;
         this.serviceTypeRepository = serviceTypeRepository;
-        this.serverTypeRepository = serverTypeRepository;
+        this.hostTypeRepository = hostTypeRepository;
         this.hostRepository = hostRepository;
         this.deploymentRepository = deploymentRepository;
         this.serviceConfigurationRepository = serviceConfigurationRepository;
@@ -153,33 +153,33 @@ public class ServicesConsoleClient {
         log.warn("Direct database creation not implemented in this client");
     }
 
-    // --- Server Types ---
-    public List<ServerType> getServerTypes() {
-        log.info("Fetching all server types from database");
-        return serverTypeRepository.findAll();
+    // --- Host Types ---
+    public List<HostType> getHostTypes() {
+        log.info("Fetching all host types from database");
+        return hostTypeRepository.findAll();
     }
 
-    public Optional<ServerType> findServerTypeByName(String name) {
-        log.info("Fetching server type by name: {}", name);
-        return serverTypeRepository.findByName(name);
+    public Optional<HostType> findHostTypeByName(String name) {
+        log.info("Fetching host type by name: {}", name);
+        return hostTypeRepository.findByName(name);
     }
 
-    public void createServerType(Map<String, Object> type) {
+    public void createHostType(Map<String, Object> type) {
         log.warn("Direct database creation not implemented in this client");
     }
 
-    // --- Servers (Hosts) ---
-    public List<Host> getServers() {
-        log.info("Fetching all servers from database");
+    // --- Hosts ---
+    public List<Host> getHosts() {
+        log.info("Fetching all hosts from database");
         return hostRepository.findAll();
     }
 
-    public Optional<Host> findServerByHostname(String hostname) {
-        log.info("Fetching server by hostname: {}", hostname);
+    public Optional<Host> findHostByHostname(String hostname) {
+        log.info("Fetching host by hostname: {}", hostname);
         return hostRepository.findByHostname(hostname);
     }
 
-    public void createServer(Map<String, Object> server) {
+    public void createHost(Map<String, Object> host) {
         log.warn("Direct database creation not implemented in this client");
     }
 

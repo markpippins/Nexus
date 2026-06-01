@@ -1,5 +1,5 @@
 // Generic tree node type that can represent any kind of hierarchical entity
-export type GenericNodeType = 'folder' | 'file' | 'host-server' | 'service' | 'user' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string;
+export type GenericNodeType = 'folder' | 'file' | 'registry-server' | 'service' | 'user' | 'gateway' | 'registry' | 'platform' | 'search' | 'virtual-folder' | string;
 
 export interface GenericTreeNode {
   id?: string;                   // Unique identifier (optional for backward compatibility)

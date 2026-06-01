@@ -15,13 +15,13 @@ public class ServiceDiscoveryClientImpl implements ServiceDiscoveryClient {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceDiscoveryClientImpl.class);
 
-    private final String hostServerUrl;
+    private final String serviceRegistryUrl;
 
     private final RestTemplate restTemplate;
 
-    public ServiceDiscoveryClientImpl(@Value("${service.registry.url:http://localhost:8085}") String hostServerUrl,
-                                      RestTemplate restTemplate) {
-        this.hostServerUrl = hostServerUrl;
+    public ServiceDiscoveryClientImpl(@Value("${service.registry.url:http://localhost:8085}") String serviceRegistryUrl,
+                                       RestTemplate restTemplate) {
+        this.serviceRegistryUrl = serviceRegistryUrl;
         this.restTemplate = restTemplate;
     }
 
@@ -30,7 +30,7 @@ public class ServiceDiscoveryClientImpl implements ServiceDiscoveryClient {
         log.debug("Looking for service to handle operation: {}", operation);
 
         try {
-            String url = hostServerUrl + "/api/v1/registry/services/by-operation/" + operation;
+            String url = serviceRegistryUrl + "/api/v1/registry/services/by-operation/" + operation;
             log.debug("Querying service registry at: {}", url);
 
             ServiceInfoImpl serviceInfo = restTemplate.getForObject(url, ServiceInfoImpl.class);
@@ -51,7 +51,7 @@ public class ServiceDiscoveryClientImpl implements ServiceDiscoveryClient {
         log.debug("Getting details for service: {}", serviceName);
 
         try {
-            String url = hostServerUrl + "/api/v1/registry/services/" + serviceName + "/details";
+            String url = serviceRegistryUrl + "/api/v1/registry/services/" + serviceName + "/details";
             log.debug("Querying service details at: {}", url);
 
             ServiceDetailsImpl details = restTemplate.getForObject(url, ServiceDetailsImpl.class);

@@ -13,8 +13,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
+import com.aibizarchitect.nexus.v1.spring.broker.Broker;
 import com.aibizarchitect.nexus.v1.spring.login.LoginService;
-import com.aibizarchitect.nexus.v1.spring.login.client.UserAccessClient;
 
 @ExtendWith(MockitoExtension.class)
 class EndToEndIntegrationTest {
@@ -25,11 +25,11 @@ class EndToEndIntegrationTest {
     private LoginService loginService;
 
     @Mock
-    private UserAccessClient userAccessClient;
+    private Broker broker;
 
     @BeforeEach
     void setUp() {
-        loginService = new LoginService(redisTemplate, userAccessClient);
+        loginService = new LoginService(redisTemplate, broker);
     }
 
     @Nested

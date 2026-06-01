@@ -4,3 +4,5 @@ bun.lock
 package-lock.json
 .vscode/
 .angular/
+*.class
+*.jar

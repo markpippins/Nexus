@@ -47,7 +47,7 @@ export class TreeNodeComponent implements OnInit {
     if (node.isServerRoot) {
       return service.getIconUrl({ ...node, name: 'cloud' });
     }
-    if (node.metadata?.['mountId']) {
+    if (node.metadata?.['mountId'] && !node.metadata?.['isMountChild']) {
       return service.getIconUrl(node, 'mount');
     }
     return service.getIconUrl(node, props?.imageName);

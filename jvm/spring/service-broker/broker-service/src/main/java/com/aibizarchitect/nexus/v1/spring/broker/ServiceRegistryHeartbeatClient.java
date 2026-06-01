@@ -45,7 +45,7 @@ public class ServiceRegistryHeartbeatClient {
     private static final Logger LOG = LoggerFactory.getLogger(ServiceRegistryHeartbeatClient.class);
 
     @Value("${service.registry.url:http://localhost:8085}")
-    private String hostServerUrl;
+    private String serviceRegistryUrl;
 
     @Value("${service.name:unknown-service}")
     private String serviceName;
@@ -113,12 +113,12 @@ public class ServiceRegistryHeartbeatClient {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(registration, headers);
 
-            String url = hostServerUrl + "/api/v1/registry/register";
+            String url = serviceRegistryUrl + "/api/v1/registry/register";
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {
                 registered = true;
-                LOG.info("Successfully registered {} with service-registry at {}", serviceName, hostServerUrl);
+                LOG.info("Successfully registered {} with service-registry at {}", serviceName, serviceRegistryUrl);
             } else {
                 LOG.warn("Failed to register {} with service-registry. Status: {}", serviceName,
                         response.getStatusCode());
@@ -146,7 +146,7 @@ public class ServiceRegistryHeartbeatClient {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<String> request = new HttpEntity<>("{}", headers);
 
-            String url = hostServerUrl + "/api/v1/registry/heartbeat/" + serviceName;
+            String url = serviceRegistryUrl + "/api/v1/registry/heartbeat/" + serviceName;
             ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {

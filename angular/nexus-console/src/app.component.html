@@ -123,7 +123,7 @@
           [isServiceRegistriesNodeSelected]="isServiceRegistriesNodeSelected()"
           [isServiceRegistrySelected]="isServiceRegistrySelected()"
           [isPlatformManagementContext]="isPlatformManagementContext()"
-          [graphInteractionMode]="vizService.modeSignal()"
+          [graphInteractionMode]="vizService.viewMode()"
           [isSimulationActive]="vizService.isSimulationActive()"
           [backgroundColor]="graphBackgroundColor()"
           [graphSubView]="graphSubView()"
@@ -220,9 +220,9 @@
                   [style.width.%]="isSplitView() ? pane1Width() : undefined"
                 >
                   @if (currentViewMode() === 'file-explorer') {
-                    @if (pane1HostServerProfileId()) {
+                    @if (pane1RegistryServerProfileId()) {
                       <app-service-registry-editor
-                        [profileId]="pane1HostServerProfileId()!"
+                        [profileId]="pane1RegistryServerProfileId()!"
                         [saveTrigger]="activePaneId() === 1 ? editorSaveTrigger() : null"
                         [resetTrigger]="activePaneId() === 1 ? editorResetTrigger() : null"
                         (saved)="loadFolderTree()"
@@ -239,12 +239,12 @@
                         (connectGateway)="onConnectToServer($event)"
                       ></app-gateway-editor>
                     } @else if (isServiceRegistriesNodeSelected() && activePaneId() === 1) {
-                      <app-host-server-management
+                      <app-registry-server-management
                         [toolbarAction]="activePaneId() === 1 ? toolbarAction() : null"
                         (addServiceRegistry)="onAddServiceRegistry()"
                         (editServiceRegistry)="onEditServiceRegistryByName($event)"
                         (deleteServiceRegistry)="onDeleteServiceRegistryById($event)"
-                      ></app-host-server-management>
+                      ></app-registry-server-management>
                     } @else if (isGatewaysNodeSelected() && activePaneId() === 1) {
                       <app-gateway-management
                         [mountedProfileIds]="mountedProfileIds()"
@@ -317,9 +317,9 @@
                     ></div>
                   </div>
                   <div class="flex-1 h-full">
-                    @if (pane2HostServerProfileId()) {
+                    @if (pane2RegistryServerProfileId()) {
                       <app-service-registry-editor
-                        [profileId]="pane2HostServerProfileId()!"
+                        [profileId]="pane2RegistryServerProfileId()!"
                         [saveTrigger]="activePaneId() === 2 ? editorSaveTrigger() : null"
                         [resetTrigger]="activePaneId() === 2 ? editorResetTrigger() : null"
                         (saved)="loadFolderTree()"
@@ -336,12 +336,12 @@
                         (connectGateway)="onConnectToServer($event)"
                       ></app-gateway-editor>
                     } @else if (isServiceRegistriesNodeSelected() && activePaneId() === 2) {
-                      <app-host-server-management
+                      <app-registry-server-management
                         [toolbarAction]="activePaneId() === 2 ? toolbarAction() : null"
                         (addServiceRegistry)="onAddServiceRegistry()"
                         (editServiceRegistry)="onEditServiceRegistryByName($event)"
                         (deleteServiceRegistry)="onDeleteServiceRegistryById($event)"
-                      ></app-host-server-management>
+                      ></app-registry-server-management>
                     } @else if (isGatewaysNodeSelected() && activePaneId() === 2) {
                       <app-gateway-management
                         [mountedProfileIds]="mountedProfileIds()"

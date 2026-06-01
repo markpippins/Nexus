@@ -32,7 +32,7 @@ public class ServiceRegistryRegistrationService {
     private static final Logger log = LoggerFactory.getLogger(ServiceRegistryRegistrationService.class);
 
     @Value("${service.registry.url:http://localhost:8085}")
-    private String hostServerUrl;
+    private String serviceRegistryUrl;
 
     @Value("${server.port:8081}")
     private int port;
@@ -122,12 +122,12 @@ public class ServiceRegistryRegistrationService {
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(registration, headers);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    hostServerUrl + "/api/v1/registry/register",
+                    serviceRegistryUrl + "/api/v1/registry/register",
                     request,
                     Map.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {
-                log.info("Successfully registered with service-registry at {}", hostServerUrl);
+                log.info("Successfully registered with service-registry at {}", serviceRegistryUrl);
                 log.info("Service: {} on port {}", serviceName, port);
             } else {
                 log.warn("Failed to register with service-registry. Status: {}", response.getStatusCode());
@@ -168,7 +168,7 @@ public class ServiceRegistryRegistrationService {
             HttpEntity<String> request = new HttpEntity<>("{}", headers);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    hostServerUrl + "/api/v1/registry/heartbeat/" + serviceName,
+                    serviceRegistryUrl + "/api/v1/registry/heartbeat/" + serviceName,
                     request,
                     Map.class);
 

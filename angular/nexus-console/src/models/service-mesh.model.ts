@@ -133,32 +133,14 @@ export interface ServiceWithHosted {
 }
 
 // ============================================================================
-// Server Models
+// Host Models
 // ============================================================================
 
-export type ServerType = 'PHYSICAL' | 'VIRTUAL' | 'CONTAINER' | 'CLOUD';
+export type HostType = 'PHYSICAL' | 'VIRTUAL' | 'CONTAINER' | 'CLOUD';
 
-export type ServerEnvironment = 'DEVELOPMENT' | 'STAGING' | 'PRODUCTION' | 'TEST';
+export type HostEnvironment = 'DEVELOPMENT' | 'STAGING' | 'PRODUCTION' | 'TEST';
 
-export type ServerStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE' | 'DECOMMISSIONED';
-
-export interface Server {
-  id: string;
-  hostname: string;
-  ipAddress: string;
-  type: ServerType;
-  environment: ServerEnvironment;
-  operatingSystem?: string;
-  cpuCores?: number;
-  memoryMb?: number;
-  diskGb?: number;
-  region?: string;
-  cloudProvider?: string;
-  status: ServerStatus;
-  description?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
+export type HostStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE' | 'DECOMMISSIONED';
 
 // ============================================================================
 // Deployment Models
@@ -177,11 +159,11 @@ export type HealthStatus = 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' | 'UNKNOWN';
 export interface Deployment {
   id: string;
   service: ServiceInstance;
-  server: Server;
+  host: any;
   port: number;
   version: string;
   status: DeploymentStatus;
-  environment: ServerEnvironment;
+  environment: HostEnvironment;
   healthCheckUrl?: string;
   healthStatus: HealthStatus;
   deploymentPath?: string;
@@ -309,10 +291,10 @@ export interface ServiceMeshSummary {
   activeServices: number;
   healthyDeployments: number;
   unhealthyDeployments: number;
-  totalServers: number;
-  activeServers: number;
+  totalHosts: number;
+  activeHosts: number;
   frameworkBreakdown: { framework: string; count: number }[];
-  environmentBreakdown: { environment: ServerEnvironment; count: number }[];
+  environmentBreakdown: { environment: HostEnvironment; count: number }[];
 }
 
 export interface FrameworkGroup {
@@ -327,7 +309,7 @@ export interface ServiceTreeNode {
   name: string;
   type: 'framework' | 'service' | 'deployment' | 'server';
   icon: string;
-  status?: HealthStatus | DeploymentStatus | ServiceStatus | ServerStatus;
+  status?: HealthStatus | DeploymentStatus | ServiceStatus | HostStatus;
   children?: ServiceTreeNode[];
   metadata: Record<string, unknown>;
   isExpanded?: boolean;

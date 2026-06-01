@@ -2,14 +2,14 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { ComponentConfig, INITIAL_REGISTRY, NodeType } from '../models/component-config.js';
 import { PlatformManagementService } from './platform-management.service.js';
-import { HostProfileService } from './host-profile.service.js';
+import { RegistryServerProfileService } from './registry-server-profile.service.js';
 
 @Injectable({
     providedIn: 'root'
 })
 export class ComponentRegistryService {
     private platformService = inject(PlatformManagementService);
-    private hostProfileService = inject(HostProfileService);
+    private registryServerProfileService = inject(RegistryServerProfileService);
 
     // Master list of all components
     private registry = signal<ComponentConfig[]>([]);
@@ -32,14 +32,14 @@ export class ComponentRegistryService {
 
     private getBaseUrl(): string {
         // Prefer the active profile's resolved base URL over profiles[0]
-        const activeUrl = this.hostProfileService.activeBaseUrl();
+        const activeUrl = this.registryServerProfileService.activeBaseUrl();
         if (activeUrl) return activeUrl;
 
-        const profiles = this.hostProfileService.profiles();
+        const profiles = this.registryServerProfileService.profiles();
         if (profiles.length === 0) {
             return 'http://localhost:8085'; // Default fallback
         }
-        let url = profiles[0].hostServerUrl;
+        let url = profiles[0].registryServerUrl;
         if (!url.startsWith('http')) url = `http://${url}`;
         if (url.endsWith('/')) url = url.slice(0, -1);
         return url;

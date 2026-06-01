@@ -8,16 +8,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 
+import com.aibizarchitect.nexus.v1.broker.api.ServiceRequest;
 import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
+import com.aibizarchitect.nexus.v1.spring.broker.Broker;
 import com.aibizarchitect.nexus.v1.spring.broker.spi.BrokerOperation;
 import com.aibizarchitect.nexus.v1.spring.broker.spi.BrokerParam;
-import com.aibizarchitect.nexus.v1.spring.login.client.UserAccessClient;
 import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
-
-import feign.FeignException;
 
 @Service("loginService")
 public class LoginService {
@@ -25,12 +22,12 @@ public class LoginService {
     private static final Logger log = LoggerFactory.getLogger(LoginService.class);
 
     private final RedisTemplate<String, Object> redisTemplate;
-    private final UserAccessClient userAccessClient;
+    private final Broker broker;
 
-    public LoginService(RedisTemplate<String, Object> redisTemplate, UserAccessClient userAccessClient) {
+    public LoginService(RedisTemplate<String, Object> redisTemplate, Broker broker) {
         this.redisTemplate = redisTemplate;
-        this.userAccessClient = userAccessClient;
-        log.info("LoginService initialized with Redis integration and UserAccessClient");
+        this.broker = broker;
+        log.info("LoginService initialized with Redis integration and Broker");
     }
 
     @BrokerOperation("login")
@@ -44,24 +41,21 @@ public class LoginService {
         try {
             UserRegistrationDTO user = null;
 
-            if (alias.equalsIgnoreCase("admin") && password.equalsIgnoreCase("admin")) {
-                user = new UserRegistrationDTO();
-                user.setAdmin(true);
-                user.setAlias(alias);
-                user.setId(Long.toString(0));
-            }
-
-            else try {
-                    MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-                    params.add("alias", alias);
-                    params.add("identifier", password);
-                    user = userAccessClient.validateUser(params);
-                } catch (FeignException.Unauthorized e) {
-                    log.warn("Unauthorized login attempt for user: {}", alias);
-                } catch (Exception e) {
-                    log.error("Error calling user-access-service:", e);
-                    // Treat as failure
+            try {
+                ServiceRequest request = new ServiceRequest(
+                    "userAccessService",
+                    "validateUser",
+                    Map.of("alias", alias, "identifier", password),
+                    "login-validate-" + System.currentTimeMillis()
+                );
+                ServiceResponse<?> response = broker.submit(request);
+                if (response.isOk() && response.getData() instanceof UserRegistrationDTO) {
+                    user = (UserRegistrationDTO) response.getData();
                 }
+            } catch (Exception e) {
+                log.error("Error calling user-access-service via broker:", e);
+                // Treat as failure — user stays null
+            }
 
             if (user != null) {
                 // Generate UUID token for successful login
