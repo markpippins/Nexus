@@ -69,7 +69,7 @@ class DeploymentControllerTest {
         testDeployment = new Deployment();
         testDeployment.setId(1L);
         testDeployment.setService(testService);
-        testDeployment.setServer(testServer);
+        testDeployment.setHost(testServer);
         testDeployment.setVersion("1.0.0");
         testDeployment.setStatus("RUNNING");
         testDeployment.setHealthStatus("HEALTHY");
