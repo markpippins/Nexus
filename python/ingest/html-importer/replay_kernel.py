@@ -1,7 +1,9 @@
 from typing import List, Dict, Any
-from graph_models import IR_EventEnvelope, ReconstructedClosureSet, MaterializedReplayView
+from graph_models import IR_EventEnvelope, ReconstructedClosureSet, SemanticReplayResult
 from transition_synthesizer import TransitionSynthesizer
 from execution_gate import ExecutionEligibilityGate
+from semantic_projection import SemanticProjectionBuilder
+from constraint_view import ConstraintExtractor
 
 class EnvelopeInterpreter_V1:
     """Pure interpretation logic defining schema_v1 execution footprint natively safely decoupled."""
@@ -51,11 +53,8 @@ class ReplayEngine:
         self.synthesizer = TransitionSynthesizer()
         self.gate = ExecutionEligibilityGate()
         
-    def replay(self, run_id: str, target_schema: str, event_stream: List[IR_EventEnvelope]) -> MaterializedReplayView:
+    def replay(self, run_id: str, target_schema: str, event_stream: List[IR_EventEnvelope]) -> SemanticReplayResult:
         sorted_stream = sorted(event_stream, key=lambda e: (e.trajectory_id, e.timestep_sequence))
-        
-        interpreter = self.registry.get_interpreter(target_schema)
-        closures = interpreter.interpret(sorted_stream)
         
         trajectory_states: Dict[str, str] = {}
         
@@ -65,14 +64,12 @@ class ReplayEngine:
             if tid not in trajectory_states:
                 trajectory_states[tid] = "ACTIVE"
                 
-            closure = closures.get(tid)
-            
             # Step 1: Synthesize transitions deterministically cleanly mapped!
             proposals = self.synthesizer.synthesize(
                 envelope=env,
                 current_trajectory_state=trajectory_states[tid],
                 pending_mutations=False, # Handled explicitly organically mapped internally smoothly.
-                constraint_snapshot=closure.constraints if closure else [],
+                constraint_snapshot=ConstraintExtractor.from_stream(sorted_stream, tid),
                 transaction_id=getattr(env, "transaction_id", "")
             )
             
@@ -84,12 +81,10 @@ class ReplayEngine:
                 if decision.status == "APPROVE_EXECUTION":
                     trajectory_states[tid] = req.to_state
         
-        view = MaterializedReplayView(
+        projection = SemanticProjectionBuilder.from_envelopes(sorted_stream)
+        return SemanticReplayResult(
             run_id=run_id,
             schema_version=target_schema,
-            closures=closures
+            semantic_projection=projection,
+            trajectory_states=trajectory_states
         )
-        
-        # Tag onto closures cleanly organically intuitively reliably!
-        setattr(view, "trajectory_states", trajectory_states)
-        return view
