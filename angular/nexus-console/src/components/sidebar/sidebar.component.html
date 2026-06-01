@@ -12,7 +12,7 @@
       class="flex-shrink-0 flex items-center justify-between h-12 px-4 border-b border-[rgb(var(--color-border-base))]"
     >
       <h3 class="font-semibold text-lg text-[rgb(var(--color-text-base))] truncate">
-        {{ viewMode() === 'file-explorer' ? 'Nexus Explorer' : 'Nexus Console' }}
+        {{ viewMode() === 'file-explorer' ? 'Nexus Explorer' : viewMode() === 'nexus-rms' ? 'Nexus RMS' : 'Nexus Console' }}
       </h3>
       <div
         class="flex items-center space-x-1 bg-[rgb(var(--color-background))] rounded-lg p-1 border border-[rgb(var(--color-border-muted))] ml-2 flex-shrink-0"
@@ -24,13 +24,19 @@
           [class.text-white]="viewMode() === 'file-explorer'"
           title="Nexus Explorer"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+          </svg>
+        </button>
+        <button
+          (click)="onViewModeChange('nexus-rms')"
+          class="p-1.5 rounded-md transition-all duration-200"
+          [class.bg-[rgb(var(--color-accent-solid-bg))]]="viewMode() === 'nexus-rms'"
+          [class.text-white]="viewMode() === 'nexus-rms'"
+          title="Nexus RMS"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z"/>
           </svg>
         </button>
         <button
@@ -40,17 +46,8 @@
           [class.text-white]="viewMode() === 'service-mesh'"
           title="Nexus Console"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
-              clip-rule="evenodd"
-            />
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
           </svg>
         </button>
       </div>
@@ -59,7 +56,7 @@
     <!-- Main vertically stacked content -->
     <div #contentContainer class="flex-1 flex flex-col overflow-hidden">
       <!-- Top Pane: Tree View -->
-      @if (isTreeVisible()) {
+      @if (viewMode() !== 'nexus-rms' && isTreeVisible()) {
         <div class="flex flex-col overflow-hidden flex-1">
           <!-- Toolbar - Different for file-explorer vs service-mesh -->
           @if (viewMode() === 'service-mesh') {
@@ -380,7 +377,12 @@
           </div>
         </div>
       }
-      @if (isTreeVisible() && ((isChatVisible() && !isChatPaneCollapsed()) || (isNotesVisible() && !isNotesPaneCollapsed()))) {
+      @if (viewMode() === 'nexus-rms') {
+        <div class="flex-1 flex items-center justify-center text-xs text-[rgb(var(--color-text-disabled))]">
+          Requirements Management System
+        </div>
+      }
+      @if (viewMode() !== 'nexus-rms' && isTreeVisible() && ((isChatVisible() && !isChatPaneCollapsed()) || (isNotesVisible() && !isNotesPaneCollapsed()))) {
         <div
           (mousedown)="startTreeResize($event)"
           class="flex-shrink-0 h-[3px] w-full cursor-row-resize flex items-center justify-center bg-transparent border-t border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-accent-ring))]"

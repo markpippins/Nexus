@@ -9,6 +9,8 @@ import { ComponentRegistryService } from './component-registry.service.js';
 
 export type { NodeType } from '../models/component-config.js';
 
+export type ViewMode = 'camera' | 'auto' | 'edit';
+
 export interface NodeData {
     id: string;
     type: NodeType;
@@ -54,10 +56,17 @@ export class ArchitectureVizService {
     // Key: "fromId::toId" (using :: as separator because UUIDs contain -)
     private connectionLines: Map<string, THREE.Line> = new Map();
 
+    // Persistent position store — survives clearScene() and component lifecycle
+    private readonly savedPositions = new Map<string, { x: number; y: number; z: number }>();
+
     // Selection & Interaction
     private selectionBox!: THREE.BoxHelper;
     private selectedNodeId: string | null = null;
     private interactionMode: 'camera' | 'edit' = 'camera';
+
+    // View Mode (3-way: camera | auto | edit)
+    public readonly viewMode = signal<ViewMode>('camera');
+    private savedCameraState: { pos: THREE.Vector3; target: THREE.Vector3; controlsEnabled: boolean } | null = null;
 
     // Dragging State
     private isDragging = false;
@@ -252,7 +261,101 @@ export class ArchitectureVizService {
     }
 
     public setMode(mode: 'camera' | 'edit') {
-        this.setInteractionMode(mode);
+        this.setViewMode(mode);
+    }
+
+    public setViewMode(mode: ViewMode): void {
+        this.viewMode.set(mode);
+
+        // Reset saved camera state if switching away from auto
+        if (mode !== 'auto') {
+            this.savedCameraState = null;
+        }
+
+        if (mode === 'camera') {
+            this.interactionMode = 'camera';
+            this.modeSignal.set('camera');
+            this.controls.enabled = true;
+            this.renderer.domElement.style.cursor = 'grab';
+            this.deselect();
+        } else if (mode === 'auto') {
+            // Auto mode: start in 3D with orbit controls, default cursor
+            this.interactionMode = 'camera';
+            this.modeSignal.set('camera');
+            this.controls.enabled = true;
+            this.renderer.domElement.style.cursor = 'default';
+            this.deselect();
+        } else if (mode === 'edit') {
+            this.setInteractionMode('edit');
+        }
+
+        this.updateAllConnections();
+    }
+
+    /** Compute bounding box of all graph nodes. */
+    private computeNodeBounds(): { min: THREE.Vector3; max: THREE.Vector3 } {
+        const min = new THREE.Vector3(Infinity, Infinity, Infinity);
+        const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+        this.nodes.forEach(node => {
+            const pos = node.mesh.position;
+            min.x = Math.min(min.x, pos.x);
+            min.y = Math.min(min.y, pos.y);
+            min.z = Math.min(min.z, pos.z);
+            max.x = Math.max(max.x, pos.x);
+            max.y = Math.max(max.y, pos.y);
+            max.z = Math.max(max.z, pos.z);
+        });
+        if (this.nodes.size === 0) {
+            return {
+                min: new THREE.Vector3(-10, 0, -10),
+                max: new THREE.Vector3(10, 0, 10)
+            };
+        }
+        return { min, max };
+    }
+
+    /** Switch the camera to a 2D orthographic top-down view of the current scene. */
+    public switchTo2D(): void {
+        if (!this.camera || !this.controls) return;
+
+        // Save current 3D camera state so we can return to it
+        this.savedCameraState = {
+            pos: this.camera.position.clone(),
+            target: (this.controls as any).target.clone(),
+            controlsEnabled: this.controls.enabled
+        };
+
+        // Compute scene bounds to frame all nodes
+        const bounds = this.computeNodeBounds();
+        const center = new THREE.Vector3(
+            (bounds.min.x + bounds.max.x) / 2,
+            0,
+            (bounds.min.z + bounds.max.z) / 2
+        );
+
+        // Position camera looking straight down
+        const dist = Math.max(
+            bounds.max.x - bounds.min.x,
+            bounds.max.z - bounds.min.z,
+            10
+        ) * 1.2;
+        this.camera.position.set(center.x, dist, center.z);
+        (this.controls as any).target.copy(center);
+        this.controls.enabled = false;
+        this.controls.update();
+        this.renderer.domElement.style.cursor = 'default';
+    }
+
+    /** Restore the camera to the last saved 3D perspective state. */
+    public switchTo3D(): void {
+        if (!this.savedCameraState || !this.camera || !this.controls) return;
+
+        this.camera.position.copy(this.savedCameraState.pos);
+        (this.controls as any).target.copy(this.savedCameraState.target);
+        this.controls.enabled = this.savedCameraState.controlsEnabled;
+        this.controls.update();
+        this.renderer.domElement.style.cursor = this.controls.enabled ? 'grab' : 'default';
+        this.savedCameraState = null;
     }
 
     public exportScene(): object {
@@ -366,6 +469,19 @@ export class ArchitectureVizService {
         this.deselect();
         this.cleanupParticles();
         this.allNodes.set([]);
+        // NOTE: Do NOT clear this.savedPositions — they must survive rebuilds
+    }
+
+    private static randomId(): string {
+        if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        // Fallback UUID v4
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
     }
 
     public addNode(
@@ -378,9 +494,13 @@ export class ArchitectureVizService {
     ): string {
         if (!this.scene) {
             console.error('ArchitectureVizService: addNode called before initialize()');
-            return idOverride || crypto.randomUUID();
+            return idOverride || ArchitectureVizService.randomId();
         }
-        const id = idOverride || crypto.randomUUID();
+        const id = idOverride || ArchitectureVizService.randomId();
+        // Use saved position if one exists for this node ID (survives clearScene rebuilts)
+        const saved = this.savedPositions.get(id);
+        const finalPos = saved ? { ...saved } : pos;
+
         const config = this.registry.getConfig(type);
 
         const colorHex = colorOverride ? parseInt(colorOverride.replace('#', ''), 16) : config.defaultColor;
@@ -408,7 +528,7 @@ export class ArchitectureVizService {
         });
 
         const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.set(pos.x, pos.y, pos.z);
+        mesh.position.set(finalPos.x, finalPos.y, finalPos.z);
         mesh.scale.setScalar(config.scale);
         mesh.userData = { id, type };
 
@@ -428,7 +548,7 @@ export class ArchitectureVizService {
         }
 
         const nodeData: NodeData = {
-            id, type, label, description, position: pos,
+            id, type, label, description, position: finalPos,
             color: '#' + new THREE.Color(colorHex).getHexString(),
             connectedTo: []
         };
@@ -486,6 +606,19 @@ export class ArchitectureVizService {
 
         if (this.selectedNodeId === id) this.deselect();
         this.updateAllNodesSignal();
+    }
+
+    public getNode(id: string): NodeData | undefined {
+        return this.nodes.get(id)?.data;
+    }
+
+    public updateAllLabels(): void {
+        this.nodes.forEach((node) => {
+            const labelDiv = node.labelObj?.element;
+            if (labelDiv) {
+                labelDiv.textContent = node.data.label;
+            }
+        });
     }
 
     // --- Connection Management ---
@@ -581,6 +714,22 @@ export class ArchitectureVizService {
     private onPointerDown(event: PointerEvent) {
         if (event.button !== 0) return; // Only Left Click
 
+        // Auto mode: click-to-toggle between 2D and 3D views
+        if (this.viewMode() === 'auto') {
+            const intersects = this.raycast(event);
+            if (intersects.length > 0) {
+                // Node clicked → select and switch to 2D
+                const id = intersects[0].object.userData['id'];
+                this.selectNode(id);
+                this.switchTo2D();
+            } else {
+                // Empty canvas clicked → switch back to 3D
+                this.deselect();
+                this.switchTo3D();
+            }
+            return;
+        }
+
         const intersects = this.raycast(event);
 
         if (intersects.length > 0) {
@@ -634,6 +783,8 @@ export class ArchitectureVizService {
                 if (node) {
                     node.mesh.position.copy(targetPoint);
                     node.data.position = { x: targetPoint.x, y: targetPoint.y, z: targetPoint.z };
+                    // Persist the adjusted position so it survives clearScene rebuilds
+                    this.savedPositions.set(node.data.id, { ...node.data.position });
 
                     this.selectionBox.update();
                     // Connections are updated in the animate loop now

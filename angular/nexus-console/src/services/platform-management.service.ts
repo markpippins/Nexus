@@ -150,21 +150,6 @@ export class PlatformManagementService {
         }
     }
 
-    async getStandaloneServices(baseUrl: string): Promise<ServiceInstance[]> {
-        this.loading.set(true);
-        this.error.set(null);
-        try {
-            const url = `${baseUrl}/api/v1/services/standalone`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<ServiceInstance>>(url));
-            return response.data;
-        } catch (e) {
-            this.error.set('Failed to fetch standalone services');
-            throw e;
-        } finally {
-            this.loading.set(false);
-        }
-    }
-
     // Frameworks CRUD
     async getFrameworks(baseUrl: string): Promise<Framework[]> {
         this.loading.set(true);
@@ -341,16 +326,7 @@ export class PlatformManagementService {
 
     // Lookup
     async getLookup(baseUrl: string, type: string): Promise<LookupItem[]> {
-        // Endpoint mapping
-        let endpoint = type;
-        if (type === 'service-types') endpoint = 'service-types';
-        else if (type === 'server-types') endpoint = 'server-types';
-        else if (type === 'framework-categories') endpoint = 'framework-categories';
-        else if (type === 'framework-languages') endpoint = 'framework-languages';
-        else if (type === 'library-categories') endpoint = 'library-categories';
-        else if (type === 'operating-systems') endpoint = 'operating-systems';
-        else if (type === 'environments') endpoint = 'environments';
-
+        const endpoint = this.getLookupEndpoint(type);
         try {
             const url = `${baseUrl}/api/v1/${endpoint}`;
             const response = await firstValueFrom(this.http.get<PagedResponse<LookupItem>>(url));
@@ -591,7 +567,7 @@ export interface LookupItem {
     version?: string;
     ltsFlag?: boolean;
     activeFlag?: boolean;
-    defaultComponentId?: number;
+    defaultComponentId?: number | null;
     defaultComponent?: ComponentConfig;
 }
 

@@ -21,6 +21,14 @@ export interface FileSystemNode {
   isVirtualFolder?: boolean;
 }
 
+export interface Mount {
+  id: string;
+  name: string;
+  type: string;
+  defaultMount: boolean;
+  rootPath: string[];
+}
+
 export interface SearchResultNode extends FileSystemNode {
   path: string[];
 }

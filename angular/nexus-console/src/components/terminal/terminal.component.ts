@@ -1,12 +1,16 @@
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   OnDestroy,
-  ViewChild,
+  QueryList,
+  ViewChildren,
   effect,
   inject,
+  output,
+  signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FitAddon } from '@xterm/addon-fit';
@@ -14,6 +18,20 @@ import { Terminal } from 'xterm';
 import 'xterm/css/xterm.css';
 import { Bash, type BashExecResult } from 'just-bash/browser';
 import { UiPreferencesService } from '../../services/ui-preferences.service.js';
+
+interface TerminalSession {
+  id: string;
+  label: string;
+  bash: Bash;
+  terminal: Terminal;
+  fitAddon: FitAddon;
+  currentCwd: string;
+  currentEnv: Record<string, string>;
+  commandHistory: string[];
+  inputBuffer: string;
+  historyIndex: number;
+  isExecuting: boolean;
+}
 
 @Component({
   selector: 'app-terminal',
@@ -28,91 +46,172 @@ import { UiPreferencesService } from '../../services/ui-preferences.service.js';
         height: 100%;
         min-height: 0;
       }
+      .tab-bar {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        background: rgb(var(--color-surface-base));
+        border-bottom: 1px solid rgb(var(--color-border-base));
+        padding: 2px 4px 0 4px;
+        overflow-x: auto;
+        min-height: 30px;
+      }
+      .tab {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 4px 4px 0 0;
+        cursor: pointer;
+        user-select: none;
+        font-size: 12px;
+        color: rgb(var(--color-text-muted));
+        border: 1px solid transparent;
+        border-bottom: none;
+        white-space: nowrap;
+      }
+      .tab:hover {
+        background: rgb(var(--color-surface-hover));
+      }
+      .tab.active {
+        background: rgb(var(--color-surface-muted));
+        color: rgb(var(--color-text-base));
+        border-color: rgb(var(--color-border-base));
+      }
+      .tab .tab-close {
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 3px;
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        padding: 0;
+      }
+      .tab .tab-close:hover {
+        background: rgb(var(--color-surface-hover));
+        color: rgb(var(--color-text-base));
+      }
+      .tab .tab-label {
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .tab .rename-input {
+        width: 100px;
+        background: rgb(var(--color-surface-elevated));
+        border: 1px solid rgb(var(--color-accent-ring));
+        border-radius: 2px;
+        color: rgb(var(--color-text-base));
+        font-size: 12px;
+        padding: 1px 4px;
+        outline: none;
+      }
+      .add-tab-btn {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 3px;
+        border: none;
+        background: transparent;
+        color: rgb(var(--color-text-muted));
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        padding: 0;
+        margin-left: 2px;
+        flex-shrink: 0;
+      }
+      .add-tab-btn:hover {
+        background: rgb(var(--color-surface-hover));
+        color: rgb(var(--color-text-base));
+      }
+      .terminal-area {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+        overflow: hidden;
+      }
+      .terminal-container {
+        width: 100%;
+        height: 100%;
+      }
+      .terminal-container.hidden {
+        display: none;
+      }
+      .collapse-btn {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 3px;
+        border: none;
+        background: transparent;
+        color: rgb(var(--color-text-muted));
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
+      }
+      .collapse-btn:hover {
+        background: rgb(var(--color-surface-hover));
+        color: rgb(var(--color-text-base));
+      }
     `,
   ],
 })
-export class TerminalComponent implements AfterViewInit, OnDestroy {
-  @ViewChild('terminal') terminalEl!: ElementRef<HTMLDivElement>;
+export class   TerminalComponent implements AfterViewInit, OnDestroy {
+  @ViewChildren('terminalContainer') terminals!: QueryList<ElementRef<HTMLDivElement>>;
+  collapse = output<void>();
 
   private readonly initialCwd = '/home/user';
-  private term: Terminal | null = null;
-  private fitAddon: FitAddon | null = null;
   private resizeObserver: ResizeObserver | null = null;
-  private bash = new Bash({
-    cwd: this.initialCwd,
-    env: {
-      TERM: 'xterm-256color',
-    },
-  });
-  private currentCwd = this.initialCwd;
-  private currentEnv: Record<string, string> = {
-    TERM: 'xterm-256color',
-  };
-  private inputBuffer = '';
-  private commandHistory: string[] = [];
-  private historyIndex = -1;
-  private isExecuting = false;
   private hostEl = inject(ElementRef);
   private uiPreferencesService = inject(UiPreferencesService);
-  // SSE log streaming for broker logs
+  private cdr = inject(ChangeDetectorRef);
   private logEventSource: EventSource | null = null;
 
-  private getLogStreamUrl(): string {
-    // try {
-    //   const origin = typeof window !== 'undefined' && window.location?.origin
-    //     ? window.location.origin
-    //     : '';
-    //   if (origin) {
-    //     return origin.replace(/\/+$/, '') + '/api/v1/broker/logs/stream';
-    //   }
-    // } catch {
-    //   // ignore and fallback below
-    // }
-    return 'http://localhost:8080/api/v1/broker/logs/stream';
-  }
+  sessions = signal<TerminalSession[]>([]);
+  activeIndex = signal(0);
+  editingIndex = signal<number | null>(null);
+  editLabelInput = signal('');
 
   constructor() {
     effect(() => {
       // Rerun this logic whenever the theme signal changes.
       this.uiPreferencesService.theme();
-
-      // The app.component effect which applies the class to the body will have already run.
-      // So we can now apply the new theme to the terminal if it exists.
-      if (this.term) {
-        this.applyTheme();
+      for (const session of this.sessions()) {
+        this.applyThemeToTerminal(session.terminal);
       }
     });
   }
 
   ngAfterViewInit(): void {
-    this.term = new Terminal({
-      cursorBlink: true,
-      convertEol: true,
-      fontFamily: `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`,
-      fontSize: 13,
-    });
+    const initialSession = this.createSession('Terminal 1');
+    this.sessions.set([initialSession]);
 
-    this.applyTheme(); // Apply initial theme
-
-    this.fitAddon = new FitAddon();
-    this.term.loadAddon(this.fitAddon);
-
-    this.term.open(this.terminalEl.nativeElement);
-
-    this.fitAddon.fit();
-
-    this.term.writeln('\x1B[1;3;34mWelcome to the Nexus Console!\x1B[0m');
-    this.term.writeln('Powered by xterm.js + just-bash');
-    this.term.writeln('----------------------------------');
-    this.writePrompt();
-
-    this.term.onData((data: string) => {
-      void this.handleTerminalInput(data);
-    });
+    setTimeout(() => {
+      const divs = this.terminals.toArray();
+      if (divs.length > 0) {
+        initialSession.terminal.open(divs[0].nativeElement);
+        initialSession.fitAddon.fit();
+        this.writeWelcomeAndPrompt(initialSession);
+      }
+    }, 0);
 
     this.resizeObserver = new ResizeObserver(() => {
       try {
-        setTimeout(() => this.fitAddon?.fit(), 0);
+        setTimeout(() => {
+          const session = this.activeSession();
+          if (session) session.fitAddon.fit();
+        }, 0);
       } catch (e) {
         console.warn('FitAddon resize failed. This can happen during rapid resizing.', e);
       }
@@ -121,37 +220,162 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
     this.resizeObserver.observe(this.hostEl.nativeElement);
   }
 
-  private async handleTerminalInput(data: string): Promise<void> {
-    if (!this.term) {
+  private createSession(label: string): TerminalSession {
+    const bash = new Bash({
+      cwd: this.initialCwd,
+      env: { TERM: 'xterm-256color' },
+    });
+    const terminal = new Terminal({
+      cursorBlink: true,
+      convertEol: true,
+      fontFamily: `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`,
+      fontSize: 13,
+    });
+    this.applyThemeToTerminal(terminal);
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+
+    const id = `term-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const session: TerminalSession = {
+      id,
+      label,
+      bash,
+      terminal,
+      fitAddon,
+      currentCwd: this.initialCwd,
+      currentEnv: { TERM: 'xterm-256color' },
+      commandHistory: [],
+      inputBuffer: '',
+      historyIndex: -1,
+      isExecuting: false,
+    };
+
+    terminal.onData((data: string) => {
+      void this.handleSessionInput(session, data);
+    });
+
+    return session;
+  }
+
+  addTab(): void {
+    const label = `Terminal ${this.sessions().length + 1}`;
+    const session = this.createSession(label);
+    const newIndex = this.sessions().length;
+    this.sessions.update(s => [...s, session]);
+    this.activeIndex.set(newIndex);
+
+    this.cdr.detectChanges();
+    setTimeout(() => {
+      const divs = this.terminals.toArray();
+      if (divs.length > newIndex) {
+        session.terminal.open(divs[newIndex].nativeElement);
+        session.fitAddon.fit();
+        this.writeWelcomeAndPrompt(session);
+      }
+    });
+  }
+
+  removeTab(index: number): void {
+    const currentSessions = this.sessions();
+    const session = currentSessions[index];
+
+    session.terminal.dispose();
+
+    if (currentSessions.length <= 1) {
+      const fresh = this.createSession('Terminal 1');
+      this.sessions.set([fresh]);
+      this.activeIndex.set(0);
+      this.cdr.detectChanges();
+      setTimeout(() => {
+        const divs = this.terminals.toArray();
+        if (divs.length > 0) {
+          fresh.terminal.open(divs[0].nativeElement);
+          fresh.fitAddon.fit();
+          this.writeWelcomeAndPrompt(fresh);
+        }
+      });
       return;
     }
 
-    if (this.isExecuting) {
+    this.sessions.update(s => s.filter((_, i) => i !== index));
+
+    const currentActive = this.activeIndex();
+    if (currentActive >= index) {
+      const newActive = Math.max(0, currentActive - 1);
+      if (newActive < this.sessions().length) {
+        this.activeIndex.set(newActive);
+      }
+    }
+    if (this.activeIndex() >= this.sessions().length) {
+      this.activeIndex.set(this.sessions().length - 1);
+    }
+  }
+
+  switchTab(index: number): void {
+    if (index === this.activeIndex()) return;
+    this.activeIndex.set(index);
+    setTimeout(() => {
+      const session = this.activeSession();
+      if (session) session.fitAddon.fit();
+    });
+  }
+
+  startRename(index: number): void {
+    this.editLabelInput.set(this.sessions()[index].label);
+    this.editingIndex.set(index);
+  }
+
+  commitRename(index: number): void {
+    const newLabel = this.editLabelInput().trim();
+    if (newLabel) {
+      this.sessions.update(s =>
+        s.map((sess, i) => (i === index ? { ...sess, label: newLabel } : sess)),
+      );
+    }
+    this.editingIndex.set(null);
+  }
+
+  cancelRename(): void {
+    this.editingIndex.set(null);
+  }
+
+  // ─── Active session helpers ───
+
+  private activeSession(): TerminalSession | undefined {
+    const idx = this.activeIndex();
+    const all = this.sessions();
+    return idx >= 0 && idx < all.length ? all[idx] : undefined;
+  }
+
+  // ─── Input handling ───
+
+  private async handleSessionInput(session: TerminalSession, data: string): Promise<void> {
+    if (session.isExecuting) {
       if (data === '\u0003') {
-        this.term.write('^C');
+        session.terminal.write('^C');
       }
       return;
     }
 
     switch (data) {
       case '\r':
-        await this.executeCurrentCommand();
+        await this.executeSessionCommand(session);
         return;
       case '\u007F':
-        this.handleBackspace();
+        this.handleSessionBackspace(session);
         return;
       case '\u0003':
-        this.handleInterrupt();
+        this.handleSessionInterrupt(session);
         return;
       case '\u000C':
-        this.term.clear();
-        this.writePrompt();
+        session.terminal.clear();
+        this.writeSessionPrompt(session);
         return;
       case '\u001b[A':
-        this.navigateHistory(-1);
+        this.navigateSessionHistory(session, -1);
         return;
       case '\u001b[B':
-        this.navigateHistory(1);
+        this.navigateSessionHistory(session, 1);
         return;
       case '\u001b[C':
       case '\u001b[D':
@@ -159,167 +383,155 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
         return;
       default:
         if (this.isPrintableInput(data)) {
-          this.inputBuffer += data;
-          this.term.write(data);
+          session.inputBuffer += data;
+          session.terminal.write(data);
         }
     }
   }
 
-  private async executeCurrentCommand(): Promise<void> {
-    if (!this.term) {
-      return;
-    }
-
-    const command = this.inputBuffer;
-    this.term.write('\r\n');
+  private async executeSessionCommand(session: TerminalSession): Promise<void> {
+    const command = session.inputBuffer;
+    session.terminal.write('\r\n');
 
     if (!command.trim()) {
-      this.inputBuffer = '';
-      this.historyIndex = -1;
-      this.writePrompt();
+      session.inputBuffer = '';
+      session.historyIndex = -1;
+      this.writeSessionPrompt(session);
       return;
     }
 
-    // Support lightweight client-side control commands
     const trimmedCmd = command.trim();
     if (trimmedCmd === 'start-logging') {
-      this.startLogging();
-      this.inputBuffer = '';
-      this.writePrompt();
+      this.startLogging(session);
+      session.inputBuffer = '';
+      this.writeSessionPrompt(session);
       return;
     }
     if (trimmedCmd === 'stop-logging') {
-      this.stopLogging();
-      this.inputBuffer = '';
-      this.writePrompt();
+      this.stopLogging(session);
+      session.inputBuffer = '';
+      this.writeSessionPrompt(session);
       return;
     }
 
     if (command.trim() === 'clear') {
-      this.term.clear();
-      this.inputBuffer = '';
-      this.historyIndex = -1;
-      this.writePrompt();
+      session.terminal.clear();
+      session.inputBuffer = '';
+      session.historyIndex = -1;
+      this.writeSessionPrompt(session);
       return;
     }
 
-    this.commandHistory.push(command);
-    this.historyIndex = -1;
-    this.inputBuffer = '';
-    this.isExecuting = true;
+    session.commandHistory.push(command);
+    session.historyIndex = -1;
+    session.inputBuffer = '';
+    session.isExecuting = true;
 
     try {
-      const result = await this.bash.exec(command, {
-        cwd: this.currentCwd,
-        env: this.currentEnv,
+      const result = await session.bash.exec(command, {
+        cwd: session.currentCwd,
+        env: session.currentEnv,
       });
 
-      this.applyExecutionState(result);
-      this.writeResult(result);
+      this.applySessionExecutionState(session, result);
+      this.writeSessionResult(session, result);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.term.writeln(`bash: ${message}`);
+      session.terminal.writeln(`bash: ${message}`);
     } finally {
-      this.isExecuting = false;
-      this.writePrompt();
+      session.isExecuting = false;
+      this.writeSessionPrompt(session);
     }
   }
 
-  private applyExecutionState(result: BashExecResult): void {
-    this.currentEnv = result.env;
-    this.currentCwd = result.env.PWD || this.currentCwd;
+  private applySessionExecutionState(session: TerminalSession, result: BashExecResult): void {
+    session.currentEnv = result.env;
+    session.currentCwd = result.env.PWD || session.currentCwd;
   }
 
-  private writeResult(result: BashExecResult): void {
-    if (!this.term) {
-      return;
-    }
-
+  private writeSessionResult(session: TerminalSession, result: BashExecResult): void {
     const stdout = this.normalizeOutput(result.stdout);
     const stderr = this.normalizeOutput(result.stderr);
 
     if (stdout) {
-      this.term.write(stdout);
+      session.terminal.write(stdout);
       if (!stdout.endsWith('\r\n')) {
-        this.term.write('\r\n');
+        session.terminal.write('\r\n');
       }
     }
 
     if (stderr) {
-      this.term.write(`\x1b[31m${stderr}\x1b[0m`);
+      session.terminal.write(`\x1b[31m${stderr}\x1b[0m`);
       if (!stderr.endsWith('\r\n')) {
-        this.term.write('\r\n');
+        session.terminal.write('\r\n');
       }
     }
   }
 
-  private handleBackspace(): void {
-    if (!this.term || this.inputBuffer.length === 0) {
+  private handleSessionBackspace(session: TerminalSession): void {
+    if (session.inputBuffer.length === 0) {
       return;
     }
-
-    this.inputBuffer = this.inputBuffer.slice(0, -1);
-    this.term.write('\b \b');
+    session.inputBuffer = session.inputBuffer.slice(0, -1);
+    session.terminal.write('\b \b');
   }
 
-  private handleInterrupt(): void {
-    if (!this.term) {
-      return;
-    }
-
-    this.inputBuffer = '';
-    this.historyIndex = -1;
-    this.term.write('^C\r\n');
-    this.writePrompt();
+  private handleSessionInterrupt(session: TerminalSession): void {
+    session.inputBuffer = '';
+    session.historyIndex = -1;
+    session.terminal.write('^C\r\n');
+    this.writeSessionPrompt(session);
   }
 
-  private navigateHistory(direction: -1 | 1): void {
-    if (!this.term || this.commandHistory.length === 0) {
+  private navigateSessionHistory(session: TerminalSession, direction: -1 | 1): void {
+    if (session.commandHistory.length === 0) {
       return;
     }
 
     if (direction === -1) {
-      this.historyIndex =
-        this.historyIndex === -1
-          ? this.commandHistory.length - 1
-          : Math.max(0, this.historyIndex - 1);
-    } else if (this.historyIndex !== -1) {
-      this.historyIndex += 1;
-      if (this.historyIndex >= this.commandHistory.length) {
-        this.historyIndex = -1;
+      session.historyIndex =
+        session.historyIndex === -1
+          ? session.commandHistory.length - 1
+          : Math.max(0, session.historyIndex - 1);
+    } else if (session.historyIndex !== -1) {
+      session.historyIndex += 1;
+      if (session.historyIndex >= session.commandHistory.length) {
+        session.historyIndex = -1;
       }
     } else {
       return;
     }
 
-    this.inputBuffer = this.historyIndex === -1 ? '' : this.commandHistory[this.historyIndex];
-    this.renderInputBuffer();
+    session.inputBuffer =
+      session.historyIndex === -1 ? '' : session.commandHistory[session.historyIndex];
+    this.renderSessionInputBuffer(session);
   }
 
-  private renderInputBuffer(): void {
-    if (!this.term) {
-      return;
-    }
-
-    this.term.write('\r\x1b[2K');
-    this.writePrompt(false);
-    this.term.write(this.inputBuffer);
+  private renderSessionInputBuffer(session: TerminalSession): void {
+    session.terminal.write('\r\x1b[2K');
+    this.writeSessionPrompt(session, false);
+    session.terminal.write(session.inputBuffer);
   }
 
-  private writePrompt(includeBuffer = true): void {
-    if (!this.term) {
-      return;
-    }
-
-    this.term.write(`\x1b[1;32m${this.getPrompt()}\x1b[0m`);
-    if (includeBuffer && this.inputBuffer) {
-      this.term.write(this.inputBuffer);
+  private writeSessionPrompt(session: TerminalSession, includeBuffer = true): void {
+    session.terminal.write(`\x1b[1;32m${this.getSessionPrompt(session)}\x1b[0m`);
+    if (includeBuffer && session.inputBuffer) {
+      session.terminal.write(session.inputBuffer);
     }
   }
 
-  private getPrompt(): string {
-    return `user@nexus:${this.formatPromptPath(this.currentCwd)}$ `;
+  private getSessionPrompt(session: TerminalSession): string {
+    return `user@nexus:${this.formatPromptPath(session.currentCwd)}$ `;
   }
+
+  private writeWelcomeAndPrompt(session: TerminalSession): void {
+    session.terminal.writeln('\x1B[1;3;34mWelcome to the Nexus Console!\x1B[0m');
+    session.terminal.writeln('Powered by xterm.js + just-bash');
+    session.terminal.writeln('----------------------------------');
+    this.writeSessionPrompt(session);
+  }
+
+  // ─── Shared utilities ───
 
   private formatPromptPath(path: string): string {
     return path === this.initialCwd ? '~' : path.replace(`${this.initialCwd}/`, '~/');
@@ -333,28 +545,28 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
     return data >= ' ' && data !== '\u007F' && !data.startsWith('\u001b');
   }
 
-  private applyTheme(): void {
+  // ─── Theme ───
+
+  private applyThemeToTerminal(term: Terminal): void {
     const computedStyle = getComputedStyle(document.body);
-    const newTheme = {
+    term.options.theme = {
       background: `rgb(${computedStyle.getPropertyValue('--color-surface-muted').trim()})`,
       foreground: `rgb(${computedStyle.getPropertyValue('--color-text-muted').trim()})`,
       cursor: `rgb(${computedStyle.getPropertyValue('--color-accent-text').trim()})`,
       selectionBackground: `rgba(${computedStyle.getPropertyValue('--color-accent-bg').trim()}, 0.5)`,
       selectionForeground: `rgb(${computedStyle.getPropertyValue('--color-text-base').trim()})`,
     };
-    if (this.term) {
-      this.term.options.theme = newTheme;
-    }
   }
+
+  // ─── Cleanup ───
 
   ngOnDestroy(): void {
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
-    if (this.term) {
-      this.term.dispose();
+    for (const session of this.sessions()) {
+      session.terminal.dispose();
     }
-    // Ensure SSE stream is cleaned up
     if (this.logEventSource) {
       try {
         this.logEventSource.close();
@@ -365,42 +577,57 @@ export class TerminalComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private startLogging(): void {
-    // Close any existing stream
+  // ─── Log streaming (active session) ───
+
+  private getLogStreamUrl(): string {
+    return 'http://localhost:8081/api/v1/broker/logs/stream';
+  }
+
+  private startLogging(session: TerminalSession): void {
     if (this.logEventSource) {
-      try { this.logEventSource.close(); } catch {}
+      try {
+        this.logEventSource.close();
+      } catch {
+        // ignore
+      }
       this.logEventSource = null;
     }
     const url = this.getLogStreamUrl();
     this.logEventSource = new EventSource(url);
-    // Broker traffic events are named via SSE "event:" header. Listen explicitly.
     this.logEventSource.addEventListener('broker-traffic', (ev: MessageEvent) => {
       const raw = ev.data ?? '';
-      // Try to parse JSON payload for nicer formatting; fall back to raw data
       try {
         const payload = JSON.parse(raw);
-        this.term?.writeln(`broker-traffic: ${JSON.stringify(payload)}\n`);
+        session.terminal.writeln(`broker-traffic: ${JSON.stringify(payload)}\n`);
       } catch {
-        this.term?.writeln(`broker-traffic: ${raw}\n`);
+        session.terminal.writeln(`broker-traffic: ${raw}\n`);
       }
     });
     this.logEventSource.addEventListener('ping', (ev: MessageEvent) => {
       const ts = ev.data ?? '';
-      this.term?.writeln(`ping: ${ts}`);
+      session.terminal.writeln(`ping: ${ts}`);
     });
     this.logEventSource.onerror = () => {
-      this.term?.writeln('[broker-stream-log-error]');
-      try { this.logEventSource?.close(); } catch {}
+      session.terminal.writeln('[broker-stream-log-error]');
+      try {
+        this.logEventSource?.close();
+      } catch {
+        // ignore
+      }
       this.logEventSource = null;
     };
-    this.term?.writeln('[broker-logs-stream] started');
+    session.terminal.writeln('[broker-logs-stream] started');
   }
 
-  private stopLogging(): void {
+  private stopLogging(session: TerminalSession): void {
     if (this.logEventSource) {
-      try { this.logEventSource.close(); } catch {}
+      try {
+        this.logEventSource.close();
+      } catch {
+        // ignore
+      }
       this.logEventSource = null;
-      this.term?.writeln('[broker-logs-stream] stopped');
+      session.terminal.writeln('[broker-logs-stream] stopped');
     }
   }
 }

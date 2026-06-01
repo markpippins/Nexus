@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal, inject, Renderer2, OnDestroy, input, output, HostListener, ElementRef, computed, ViewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, inject, Renderer2, NgZone, OnDestroy, input, output, HostListener, ElementRef, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ChatComponent } from '../chat/chat.component.js';
 import { FileSystemNode } from '../../models/file-system.model.js';
@@ -27,6 +27,7 @@ import { NodeType } from '../../models/component-config.js';
 })
 export class SidebarComponent implements OnDestroy {
   private renderer = inject(Renderer2);
+  private ngZone = inject(NgZone);
   private elementRef = inject(ElementRef);
   private uiPreferencesService = inject(UiPreferencesService);
   private serviceMeshService = inject(ServiceMeshService);
@@ -39,7 +40,7 @@ export class SidebarComponent implements OnDestroy {
   isTreeVisible = input(true);
   isChatVisible = input(true);
   isNotesVisible = input(true);
-  viewMode = input<'file-explorer' | 'service-mesh'>('file-explorer');
+  viewMode = input<'file-explorer' | 'service-mesh' | 'nexus-rms'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console'); // Sub-mode when in service-mesh
   graphSubView = input<'canvas' | 'creator'>('canvas'); // Sub-view when in graph mode
 
@@ -48,7 +49,7 @@ export class SidebarComponent implements OnDestroy {
   loadChildren = output<string[]>();
   itemsMoved = output<{ destPath: string[]; payload: DragDropPayload }>();
   bookmarkDropped = output<{ bookmark: NewBookmark, destPath: string[] }>();
-  viewModeChange = output<'file-explorer' | 'service-mesh'>();
+  viewModeChange = output<'file-explorer' | 'service-mesh' | 'nexus-rms'>();
   meshViewModeChange = output<'console' | 'graph'>(); // For toggling between console and graph
   refreshServices = output<void>(); // For refreshing service mesh data
   serversMenuClick = output<void>();
@@ -77,9 +78,6 @@ export class SidebarComponent implements OnDestroy {
   treeExpansionCommand = signal<{ command: 'expand' | 'collapse', id: number } | null>(null);
   isHamburgerMenuOpen = signal(false);
   showRunningOnly = signal(false); // Filter to show only running services
-
-  private unlistenMouseMove: (() => void) | null = null;
-  private unlistenMouseUp: (() => void) | null = null;
 
   // --- Vertical Resizing State for internal panes ---
   // We keep treePaneHeight around only if we want to refer to it, but now Tree will be flex-1
@@ -140,32 +138,31 @@ export class SidebarComponent implements OnDestroy {
 
     event.preventDefault();
 
-    this.unlistenMouseMove = this.renderer.listen('document', 'mousemove', (e: MouseEvent) => {
-      const dx = e.clientX - startX;
-      let newWidth = startWidth + dx;
+    this.ngZone.runOutsideAngular(() => {
+      const onMove = (e: MouseEvent) => {
+        const dx = e.clientX - startX;
+        let newWidth = startWidth + dx;
 
-      if (newWidth < 150) newWidth = 150;
-      if (newWidth > 500) newWidth = 500;
+        if (newWidth < 150) newWidth = 150;
+        if (newWidth > 500) newWidth = 500;
 
-      this.width.set(newWidth);
-    });
+        this.width.set(newWidth);
+      };
 
-    this.unlistenMouseUp = this.renderer.listen('document', 'mouseup', () => {
-      this.stopResize();
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        this.ngZone.run(() => this.stopResize());
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     });
   }
 
   private stopResize(): void {
     if (!this.isResizing()) return;
     this.isResizing.set(false);
-    if (this.unlistenMouseMove) {
-      this.unlistenMouseMove();
-      this.unlistenMouseMove = null;
-    }
-    if (this.unlistenMouseUp) {
-      this.unlistenMouseUp();
-      this.unlistenMouseUp = null;
-    }
     this.uiPreferencesService.setSidebarWidth(this.width());
   }
 
@@ -271,7 +268,7 @@ export class SidebarComponent implements OnDestroy {
     this.uiPreferencesService.toggleNotesPaneCollapse();
   }
 
-  onViewModeChange(mode: 'file-explorer' | 'service-mesh'): void {
+  onViewModeChange(mode: 'file-explorer' | 'service-mesh' | 'nexus-rms'): void {
     this.viewModeChange.emit(mode);
   }
 

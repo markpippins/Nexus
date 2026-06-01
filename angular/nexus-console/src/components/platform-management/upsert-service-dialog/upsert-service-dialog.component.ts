@@ -82,7 +82,7 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
                      <!-- Default Port -->
                      <div class="flex flex-col gap-1">
                         <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Default Port</label>
-                        <input type="number" formControlName="defaultPort" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="8080">
+                        <input type="number" formControlName="defaultPort" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="8081">
                      </div>
 
                      <!-- Status -->
@@ -191,17 +191,28 @@ export class UpsertServiceDialogComponent implements OnInit {
         const url = this.baseUrl();
         if (!url) return;
 
+        // Load each lookup independently so one failure doesn't empty all three
         try {
-            const [fw, types, parents] = await Promise.all([
-                this.platformService.getFrameworks(url),
-                this.platformService.getLookup(url, 'service-types'),
-                this.platformService.getStandaloneServices(url)
-            ]);
+            const fw = await this.platformService.getFrameworks(url);
             this.frameworks.set(fw);
-            this.serviceTypes.set(types);
-            this.parentServices.set(parents);
         } catch (e) {
-            console.error('Failed to load options', e);
+            console.error('Failed to load frameworks', e);
+        }
+        try {
+            const types = await this.platformService.getLookup(url, 'service-types');
+            this.serviceTypes.set(types);
+        } catch (e) {
+            console.error('Failed to load service types', e);
+        }
+        try {
+            const allServices = await this.platformService.getServices(url);
+            // Show all services as potential parents, excluding self when editing
+            const currentId = this.service()?.id;
+            this.parentServices.set(
+                allServices.filter(s => String(s.id) !== String(currentId))
+            );
+        } catch (e) {
+            console.error('Failed to load services for parent dropdown', e);
         }
     }
 

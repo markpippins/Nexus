@@ -44,6 +44,8 @@ export interface ServiceTypeEntity {
   name: string; // This corresponds to ServiceType (string union) values potentially
   description?: string;
   defaultComponentId?: number;
+  /** Nested object from backend (defaultComponentId is @Transient, never in JSON). */
+  defaultComponent?: { id: number | string };
 }
 
 export interface Framework {
