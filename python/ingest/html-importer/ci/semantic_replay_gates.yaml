@@ -1,0 +1,220 @@
+# ─────────────────────────────────────────────
+# Plan 0016: CI Gate Specification
+# ─────────────────────────────────────────────
+#
+# Encodes the closure-deletion safety system into machine-enforceable
+# rules.  Defines three CI phases (dual_oracle, projection_authority,
+# projection_only) with layered assertion rules, runtime tracing hooks,
+# artifact outputs, rollback triggers, and non-negotiable invariants.
+#
+# Phase transitions:
+#   dual_oracle           → projection_authority  (Plan 0013 Phase 2)
+#   projection_authority  → projection_only       (Plan 0013 Phase 3)
+#   projection_only       → closure_deleted       (Plan 0015 Phase 3)
+# ─────────────────────────────────────────────
+
+pipeline: semantic_replay_validation
+
+version: "1.0"
+
+mode:
+  phase: "dual_oracle"   # dual_oracle | projection_authority | projection_only
+  strictness: "high"     # low | medium | high
+
+# ─────────────────────────────────────────────
+# INPUT SPECIFICATION
+# ─────────────────────────────────────────────
+
+inputs:
+  event_source:
+    type: IR_EventEnvelope[]
+    deterministic_ordering: true
+
+  fixtures:
+    type: ReplayFixture[]
+    required: true
+    source: tests/replay_fixtures.py
+
+# ─────────────────────────────────────────────
+# EXECUTION TARGETS
+# ─────────────────────────────────────────────
+
+execution:
+  legacy_system:
+    enabled: true
+    entrypoint: replay_kernel.EnvelopeInterpreter_V1
+
+  projection_system:
+    enabled: true
+    entrypoint: semantic_projection.SemanticProjectionBuilder
+
+# ─────────────────────────────────────────────
+# NORMALIZATION LAYER
+# ─────────────────────────────────────────────
+
+normalization:
+  closure:
+    enabled: true
+    adapter: test_dual_replay._normalize_closures
+
+  projection:
+    enabled: true
+    adapter: test_dual_replay._normalize_projection
+
+  canonical_form:
+    type: NormalizedSemanticState
+    fields:
+      - resolved_concepts
+      - resolves_edges
+
+# ─────────────────────────────────────────────
+# CORE ASSERTION RULES
+# ─────────────────────────────────────────────
+
+assertions:
+
+  # ── Dual oracle equivalence ─────────────────
+  dual_oracle_equivalence:
+    enabled: true
+    rule: strict_set_equality
+    fields:
+      - resolved_concepts
+      - resolves_edges
+
+    failure_mode: fail_ci
+    allow_known_deltas: true
+    known_delta_fixtures:
+      - reintroduction       # legacy lacks reintroduced_nodes
+      - modified_nodes       # legacy lacks modified_nodes
+      - node_lifecycle_full  # legacy lacks both
+
+  # ── Projection determinism ──────────────────
+  projection_determinism:
+    enabled: true
+    rule: identical_runs_must_match
+
+  # ── Closure influence prohibition ───────────
+  closure_influence:
+    enabled: true
+
+    rules:
+      - no_closure_in_fsm_path: true
+      - no_closure_in_graph_reducer: true
+      - no_closure_in_context_assembler: true
+      - no_closure_in_projection_input: true
+
+    failure_mode: fail_ci
+
+  # ── Semantic drift detection ────────────────
+  semantic_drift:
+    enabled: true
+    rule: zero_difference_for_covered_fixtures
+
+    comparison:
+      missing_concepts: fail_if_nonempty_on_covered
+      extra_concepts: fail_unless_documented_gap
+      missing_edges: fail_if_nonempty
+      extra_edges: fail_if_nonempty
+
+# ─────────────────────────────────────────────
+# TRACE VALIDATION (RUNTIME INSTRUMENTATION)
+# ─────────────────────────────────────────────
+
+runtime_tracing:
+
+  closure_usage:
+    enabled: true
+
+    allowed:
+      - creation: true
+      - internal_access: true
+
+    forbidden:
+      - fsm_input: true
+      - graph_state_input: true
+      - semantic_projection_input: true
+
+    failure_mode: fail_ci
+
+# ─────────────────────────────────────────────
+# ARTIFACT OUTPUTS
+# ─────────────────────────────────────────────
+
+artifacts:
+
+  directory: artifacts/semantic_validation/
+
+  outputs:
+    - dual_oracle_diff.json
+    - projection_drift_report.json
+    - closure_usage_trace.json
+    - fixture_results.json
+
+  retention:
+    keep_last_n_runs: 50
+
+# ─────────────────────────────────────────────
+# GATING LOGIC BY PHASE
+# ─────────────────────────────────────────────
+
+gates:
+
+  - phase: dual_oracle
+    rules:
+      - require_closure_execution: true
+      - require_projection_execution: true
+      - require_exact_match_on_covered: true
+      - document_known_deltas: true
+
+  - phase: projection_authority
+    rules:
+      - require_projection_execution: true
+      - require_closure_execution: true   # shadow mode only
+      - closure_failures_are_warnings: true
+      - projection_failures_fail_ci: true
+      - no_closure_in_fsm_path: true      # Plan 0012 must be complete
+
+  - phase: projection_only
+    rules:
+      - require_projection_execution: true
+      - forbid_closure_execution: true
+      - enforce_no_closure_imports: true
+      - assert_golden_manifest_match: true
+
+# ─────────────────────────────────────────────
+# ROLLBACK CONDITIONS
+# ─────────────────────────────────────────────
+
+rollback:
+
+  triggers:
+    - unexpected_semantic_divergence_spike
+    - closure_influence_detected_in_execution_path
+    - projection_nondeterminism_detected
+    - golden_manifest_mismatch
+
+  action:
+    revert_to_phase: "dual_oracle"
+    preserve_artifacts: true
+
+# ─────────────────────────────────────────────
+# FINAL INVARIANTS (NON-NEGOTIABLE)
+# ─────────────────────────────────────────────
+
+invariants:
+  - "GraphState MUST NOT depend on closure artifacts"
+  - "FSM MUST NOT consume closure-derived data"
+  - "SemanticProjection MUST be deterministic over identical inputs"
+  - "Closure system MUST be removable without affecting outputs"
+
+# ─────────────────────────────────────────────
+# COMPLETION CRITERIA
+# ─────────────────────────────────────────────
+
+completion:
+
+  projection_only_ready_when:
+    - dual_oracle_runs_stable_for: "10+ CI cycles"
+    - semantic_drift_equals_zero_on_covered: true
+    - closure_usage_trace_allows_only_internal: true
+    - no_closure_in_fsm_path: true
