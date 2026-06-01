@@ -1060,12 +1060,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
 
 
-        // Find the "File Systems" node and add Local Session as its child
-        const fileSystemsNode = hostNodes.find(n => n.name === 'File Systems');
-        if (fileSystemsNode) {
-          fileSystemsNode.childrenLoaded = true;
-        }
-
         // Find the "Search & Discovery" node to move it to root level
         const searchDiscoveryNode = hostNodes.find(n => n.name === 'Search & Discovery');
 
@@ -1076,9 +1070,7 @@ export class AppComponent implements OnInit, OnDestroy {
         const otherHostNodes = hostNodes.filter((n: FileSystemNode) =>
           n.name !== 'Users' &&
           n.name !== 'Search & Discovery' &&
-          n.name !== 'Service Registries' &&
           n.id !== 'service-registries' &&
-          n.name !== 'File Systems' &&
           n.name !== 'Platform Management'
         );
 
@@ -1086,7 +1078,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
         const rootChildren = [
           ...otherHostNodes,
-          ...(fileSystemsNode ? [fileSystemsNode] : []),
           gatewaysNode,
           ...(platformNode ? [platformNode] : []),
           serviceRegistriesNode,
