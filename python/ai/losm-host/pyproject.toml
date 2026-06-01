@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "losm-host"
+version = "0.1.0"
+description = "LOSM Host — Layer 3 operational FastAPI server"
+requires-python = ">=3.11"
+dependencies = [
+    "losm-shell",
+    "losm-store",
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+]
+
+[tool.setuptools.packages.find]
+include = ["losm", "losm.*"]

@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: losm-shell
+Version: 0.1.0
+Summary: LOSM Shell — Layer 2 runtime execution coordinator
+Requires-Python: >=3.11
+Requires-Dist: losm-kernel
+Requires-Dist: losm-ir

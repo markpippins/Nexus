@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "losm-shell"
+version = "0.1.0"
+description = "LOSM Shell — Layer 2 runtime execution coordinator"
+requires-python = ">=3.11"
+dependencies = ["losm-kernel", "losm-ir"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
