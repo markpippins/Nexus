@@ -15,15 +15,14 @@ class ContextAssembler:
         
         for graph_id, graph in self.workspace.conversations.items():
             
-            # 1. Project WorkingSet -> ClosureSets Only (Deterministic Execution Substrate)
-            # Find the latest replayed run logic resolving directly explicitly over pure constraints natively decoupled
-            if graph.replay_views:
-                latest_run_id = list(graph.replay_views.keys())[-1]
-                if "v1" in graph.replay_views[latest_run_id]:
-                    latest_view = graph.replay_views[latest_run_id]["v1"]
-                    for closure in latest_view.closures.values():
-                        working_set.resolved_concepts.update(closure.resolved_concepts)
-                        working_set.resolves_edges.extend(closure.resolves_edges)
+            # 1. Project WorkingSet -> SemanticProjection (Deterministic Execution Substrate)
+            # Consume semantic projection (replaces closure-based replay)
+            if graph.semantic_results:
+                latest_run_id = list(graph.semantic_results.keys())[-1]
+                semantic_result = graph.semantic_results[latest_run_id]
+                projection = semantic_result.semantic_projection
+                working_set.resolved_concepts.update(projection.resolved_concepts)
+                working_set.resolves_edges.extend(projection.resolves_edges)
                     
             # 2. Project ConflictSet -> Observations and Questions Only (Epistemic Reasoning Substrate)
             for obs in graph.observations.values():

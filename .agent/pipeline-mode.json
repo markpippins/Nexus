@@ -1,16 +1,13 @@
 {
-  "mode": {
-    "status": "quarantined_CIR3",
-    "reason": "missing_execution_contract",
-    "original": {
-      "status": "quarantined_CIR3",
-      "reason": "missing_execution_contract",
-      "original": "legacy"
-    }
+  "mode": "compiled_only",
+  "pipeline_enabled": true,
+  "state_authority": "pgv.phase",
+  "execution_policy": {
+    "strict_validation": true,
+    "allow_partial_execution": false
   },
-  "note": {
-    "status": "blocked_by_CIR2",
-    "reason": "cross_layer_reference_detected",
-    "original": "CEGL/ADR system in go/wrp/ccnf-ref/ is authoritative. WorkRequest pipeline is not active. Intent-driven routing is not currently implemented; references to .pipeline/ are historical."
+  "routing": {
+    "use_cir_validation": true,
+    "use_transition_ledger": true
   }
 }

@@ -4,11 +4,7 @@
   "specification_pipeline": "./skill-pipeline.specification.json",
   "execution_pipeline": "./skill-pipeline.execution.json",
   "observation_pipeline": "./skill-pipeline.observation.json",
-  "cer_specification": {
-    "status": "blocked_by_CIR2",
-    "reason": "cross_layer_reference_detected",
-    "original": "./docs/CER_SPEC.md"
-  },
+  "cer_specification": "./docs/CER_SPEC.md",
   "cer_pipeline": "./skills/cer-pipeline/SKILL.md",
   "handoff_artifact": "WorkRequestGraph",
   "event_model": "EVENT_GRAMMAR.md",

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# CIR v2 Anti-Recursion Linter — pre-commit hook
+set -euo pipefail
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+PYTHON=$(command -v python3)
+
+echo "[CIR-ARL] Running Anti-Recursion Linter..."
+
+if ! "$PYTHON" "$REPO_ROOT/tools/arl_linter.py" "$REPO_ROOT"; then
+    echo ""
+    echo "[CIR-ARL] COMMIT BLOCKED"
+    echo "[CIR-ARL] CIR v2 invariants violated (see report above)"
+    echo "[CIR-ARL] Fix violations or force commit with --no-verify"
+    exit 1
+fi
+
+echo "[CIR-ARL] PASS — No CIR v2 violations detected"
+exit 0

@@ -241,6 +241,7 @@ def main() -> None:
             if run_id not in graph.replay_views:
                 graph.replay_views[run_id] = {}
             graph.replay_views[run_id]["v1"] = view
+            graph.semantic_results[run_id] = view
             
             workspace.conversations[graph.id] = graph
             

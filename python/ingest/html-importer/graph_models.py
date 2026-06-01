@@ -169,10 +169,17 @@ class ReconstructedClosureSet:
     completion_candidate: bool = False
 
 @dataclass
-class MaterializedReplayView:
+class SemanticReplayResult:
+    """Output of the semantic projection layer.
+
+    Carries the derived SemanticProjection plus optional metadata
+    from the replay kernel pass (trajectory states, run info).
+    This is NOT canonical replay state — it is semantic attribution only.
+    """
     run_id: str
     schema_version: str
-    closures: Dict[str, ReconstructedClosureSet] = field(default_factory=dict)
+    semantic_projection: Any  # SemanticProjection (lazy import to avoid circular)
+    trajectory_states: Dict[str, str] = field(default_factory=dict)
 
 @dataclass
 class ReconstructedTrajectory:
@@ -235,7 +242,8 @@ class ConversationGraph:
     concepts: Dict[str, Concept] = field(default_factory=dict)
     trajectories: Dict[str, Trajectory] = field(default_factory=dict)
     reconstructed_trajectories: Dict[str, ReconstructedTrajectory] = field(default_factory=dict)
-    replay_views: Dict[str, Dict[str, MaterializedReplayView]] = field(default_factory=dict) # run_id -> (schema_version -> view)
+    replay_views: Dict[str, Dict[str, "MaterializedReplayView"]] = field(default_factory=dict) # run_id -> (schema_version -> view)
+    semantic_results: Dict[str, "SemanticReplayResult"] = field(default_factory=dict)  # run_id -> semantic replay result
     interruptions: Dict[str, Interruption] = field(default_factory=dict)
     peos: Dict[str, PEO] = field(default_factory=dict)
     questions: Dict[str, QuestionNode] = field(default_factory=dict)
@@ -446,6 +454,47 @@ class GraphState:
     def compute_hash(self) -> str:
         import hashlib
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+    def ccnf_canonical_json(self) -> str:
+        """Produce canonical JSON matching Rust CCNF serialization.
+
+        Encodes GraphState as {"nodes": {...}, "edges": {...}} with
+        sorted keys, no whitespace, no trailing commas — byte-identical
+        to the output of Rust's canonical serializer.
+        """
+        import json
+
+        nodes = {}
+        for node_id in sorted(self.nodes.keys()):
+            props = self.nodes[node_id]
+            if isinstance(props, dict):
+                nodes[node_id] = dict(sorted(props.items()))
+            else:
+                nodes[node_id] = props
+
+        edges = {}
+        for edge_id in sorted(self.edges.keys()):
+            props = self.edges[edge_id]
+            if isinstance(props, dict):
+                edges[edge_id] = dict(sorted(props.items()))
+            else:
+                edges[edge_id] = props
+
+        return json.dumps(
+            {"nodes": nodes, "edges": edges},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+
+    def ccnf_hash(self) -> str:
+        """SHA256 over CCNF canonical JSON.
+
+        Must match Rust ccnf-verifier output for the same GraphState.
+        """
+        import hashlib
+        return hashlib.sha256(
+            self.ccnf_canonical_json().encode("utf-8")
+        ).hexdigest()
 
 @dataclass
 class KernelResultTraceEntry:

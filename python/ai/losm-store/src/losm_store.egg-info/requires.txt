@@ -1,0 +1,2 @@
+losm-ir
+sqlalchemy>=2.0
