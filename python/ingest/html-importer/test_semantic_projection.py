@@ -8,7 +8,7 @@ into SemanticProjection artifacts consumed by the context assembler.
 import unittest
 from graph_models import IR_EventEnvelope, SemanticReplayResult
 from semantic_projection import SemanticProjection, SemanticProjectionBuilder
-from replay_kernel import ReplayEngine, SchemaRegistry
+from replay_kernel import ReplayEngine
 
 
 class TestSemanticProjectionBuilder(unittest.TestCase):
