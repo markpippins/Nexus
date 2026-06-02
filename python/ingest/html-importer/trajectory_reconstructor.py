@@ -1,3 +1,4 @@
+import re
 from typing import List, Dict, Set
 from graph_models import ConversationGraph, ReconstructedTrajectory, TrajectorySnapshot
 
@@ -82,7 +83,7 @@ class TrajectoryReconstructor:
                 continue
                 
             # Interruption Pass (Structural + Keyword weight drop)
-            has_keywords = any(kw in msg.text.lower() for kw in ["nevermind", "anyway", "by the way", "hold on", "switching topics"])
+            has_keywords = any(bool(re.search(r'\b' + re.escape(kw) + r'\b', msg.text.lower())) for kw in ["nevermind", "anyway", "by the way", "hold on", "switching topics"])
             
             # Primary signal: Total void of concept overlap AND no structural return AND NOT just following a clean resume
             is_coherent_continuation = active_traj.state in ["resumed", "active", "stable"] and not has_keywords
@@ -100,11 +101,6 @@ class TrajectoryReconstructor:
             else:
                 # Normal Sequence Integration
                 active_traj.messages.append(msg.id)
-                active_traj.concepts_active.update(msg_concepts)
-                for cid in msg_concepts:
-                    c = self.graph.concepts[cid]
-                    if c.scope_id == self.graph.id:
-                        c.scope_id = active_traj.id
                 
                 # State Stability Transitions
                 if active_traj.state == "resumed":
@@ -112,6 +108,16 @@ class TrajectoryReconstructor:
                 
                 if active_traj.state == "active" and active_traj.has_interrupted:
                     active_traj.transition("stable", msg.id, "Interruption survival cycle completed")
+
+            # Always accumulate concepts_active regardless of state — interruptions track topic
+            # shifts but do not suppress concept accumulation. This ensures the DiffEngine
+            # receives complete concept history for the projection layer.
+            if msg_concepts:
+                active_traj.concepts_active.update(msg_concepts)
+                for cid in msg_concepts:
+                    c = self.graph.concepts[cid]
+                    if c.scope_id == self.graph.id:
+                        c.scope_id = active_traj.id
                     
             if active_traj:
                 scope_map = {}

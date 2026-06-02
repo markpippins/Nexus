@@ -188,7 +188,7 @@ class ReconstructedTrajectory:
     messages: List[str] = field(default_factory=list)
     interruptions: List[str] = field(default_factory=list)
     reattachments: List[str] = field(default_factory=list)
-    state: str = "ACTIVE"  # ACTIVE | BLOCKED | INTERMEDIATE | PAUSED | CLOSED | ABORTED
+    state: str = "active"  # active | interrupted | resumed | stable
     
     state_transitions: List[StateEvent] = field(default_factory=list)
     snapshots: List[TrajectorySnapshot] = field(default_factory=list)
