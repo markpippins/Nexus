@@ -161,14 +161,6 @@ class PartialResolution:
     candidate_subgraph_roots: List[str]
 
 @dataclass
-class ReconstructedClosureSet:
-    trajectory_id: str
-    resolved_concepts: Set[str] = field(default_factory=set)
-    resolves_edges: List[Any] = field(default_factory=list)
-    constraints: List[ConstraintNode] = field(default_factory=list)
-    completion_candidate: bool = False
-
-@dataclass
 class SemanticReplayResult:
     """Output of the semantic projection layer.
 

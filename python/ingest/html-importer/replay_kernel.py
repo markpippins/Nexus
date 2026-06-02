@@ -1,55 +1,16 @@
-from typing import List, Dict, Any
-from graph_models import IR_EventEnvelope, ReconstructedClosureSet, SemanticReplayResult
+from typing import Dict, List
+from graph_models import IR_EventEnvelope, SemanticReplayResult
 from transition_synthesizer import TransitionSynthesizer
 from execution_gate import ExecutionEligibilityGate
 from semantic_projection import SemanticProjectionBuilder
 from constraint_view import ConstraintExtractor
 
-class EnvelopeInterpreter_V1:
-    """Pure interpretation logic defining schema_v1 execution footprint natively safely decoupled."""
-    
-    def interpret(self, envelopes: List[IR_EventEnvelope]) -> Dict[str, ReconstructedClosureSet]:
-        closures: Dict[str, ReconstructedClosureSet] = {}
-        
-        for env in envelopes:
-            if env.schema_version != "v1":
-                continue 
-            
-            if env.trajectory_id not in closures:
-                closures[env.trajectory_id] = ReconstructedClosureSet(trajectory_id=env.trajectory_id)
-                
-            closure = closures[env.trajectory_id]
-            
-            for node in env.added_nodes:
-                closure.resolved_concepts.add(node)
-                
-            for node in env.removed_nodes:
-                if node in closure.resolved_concepts:
-                    closure.resolved_concepts.remove(node)
-                    
-            for edge in env.emitted_edges:
-                closure.resolves_edges.append(edge)
-                
-            for constraint in env.emitted_constraints:
-                closure.constraints.append(constraint)
-
-        return closures
-
-class SchemaRegistry:
-    def __init__(self):
-        self.interpreters = {
-            "v1": EnvelopeInterpreter_V1()
-        }
-        
-    def get_interpreter(self, schema_version: str):
-        if schema_version not in self.interpreters:
-             raise KeyError(f"No configured interpreter matches defined boundary {schema_version}")
-        return self.interpreters[schema_version]
+# NOTE: EnvelopeInterpreter_V1 removed in Phase 3 cleanup.
+# Only projection-based trajectory interpretation is retained.
 
 class ReplayEngine:
     """Orchestrates Chronological Kernel loops cleanly natively efficiently."""
-    def __init__(self, registry: SchemaRegistry = None):
-        self.registry = registry or SchemaRegistry()
+    def __init__(self):
         self.synthesizer = TransitionSynthesizer()
         self.gate = ExecutionEligibilityGate()
         
