@@ -1,5 +1,5 @@
 from typing import Dict, List
-from graph_models import ConversationGraph, IR_Diff, Observation, ObservationContent
+from graph_models import ConversationGraph, IR_EventEnvelope, Observation, ObservationContent
 
 class DiffEngine:
     """Phase 4.5: Extracts explicit Structural Deltas sequentially over Materialized IR Snapshots."""
@@ -11,23 +11,40 @@ class DiffEngine:
         """Derives IR_Diff records per-trajectory implicitly decoupling epistemology from inference."""
         
         for traj in self.graph.reconstructed_trajectories.values():
+            if len(traj.snapshots) < 1:
+                continue
+
+            historical_tracker = set()
+
+            # Emit initial envelope from first snapshot to capture starting concepts
+            initial_cids = set(traj.snapshots[0].concepts_active.keys())
+            if initial_cids:
+                delta = IR_EventEnvelope(
+                    trajectory_id=traj.id,
+                    timestep_msg_id=traj.snapshots[0].timestep_message_id,
+                    added_nodes=list(initial_cids),
+                    modified_nodes=[],
+                    removed_nodes=[],
+                    reintroduced_nodes=[]
+                )
+                traj.event_envelopes.append(delta)
+                historical_tracker.update(initial_cids)
+
             if len(traj.snapshots) < 2:
                 continue
-                
-            historical_tracker = set()
-                
+
             for i in range(1, len(traj.snapshots)):
                 prev = traj.snapshots[i-1]
                 curr = traj.snapshots[i]
-                
+
                 added = []
                 modified = []
                 deprecated = []
                 reintroduced = []
-                
+
                 prev_cids = set(prev.concepts_active.keys())
                 curr_cids = set(curr.concepts_active.keys())
-                
+
                 # Check Additions
                 for cid in curr_cids.difference(prev_cids):
                     if cid in historical_tracker:
@@ -35,16 +52,16 @@ class DiffEngine:
                     else:
                         added.append(cid)
                         historical_tracker.add(cid)
-                        
+
                 # Check Removals
                 for cid in prev_cids.difference(curr_cids):
                     deprecated.append(cid)
-                    
+
                 # Check Modifications (Scope drift)
                 for cid in prev_cids.intersection(curr_cids):
                     if prev.concepts_active[cid] != curr.concepts_active[cid]:
                         modified.append(cid)
-                        
+
                 if added or modified or deprecated or reintroduced:
                     delta = IR_EventEnvelope(
                         trajectory_id=traj.id,
