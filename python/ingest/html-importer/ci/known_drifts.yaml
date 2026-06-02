@@ -1,0 +1,37 @@
+# Documented Pipeline Drifts
+#
+# These are known, accepted divergences between pipeline layers.
+# The triage tool uses this to avoid false-positive divergence reports.
+#
+# Format:
+#   <layer>:
+#     - field: <fingerprint_key>
+#       expected: <value>
+#       description: "<human-readable justification>"
+#       reference: "<plan or issue reference>"
+
+graph_state:
+  - field: node_count
+    expected: 0
+    description: >
+      Legacy EnvelopeInterpreter_V1 does not track reintroduced_nodes or
+      modified_nodes. The projection builder is more complete. When running
+      dual-oracle comparisons, node_count differences from these fields
+      are expected where fixtures exercise reintroduction or modification.
+    reference: "Plan 0015 Phase 3 — deletion of EnvelopeInterpreter_V1"
+
+  - field: edge_count
+    expected: 0
+    description: >
+      Same gap as node_count — edges emitted alongside reintroduced or
+      modified nodes are not captured by the legacy interpreter.
+    reference: "Plan 0015 Phase 3"
+
+semantic_projection:
+  - field: resolved_concepts
+    expected: 0
+    description: >
+      Legacy interpreter projects a flat working set without concept
+      resolution. The projection builder computed resolved concepts
+      from combined graphs.
+    reference: "Plan 0016 — projection rebuild"
