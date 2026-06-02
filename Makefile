@@ -78,7 +78,6 @@ cir-arl:
 	@python3 tools/arl_linter.py
 
 cir-arl-json:
-	@echo "[CIR-ARL] running Anti-Recursion Linter (JSON output)..."
 	@python3 tools/arl_linter.py --json
 
 # ─── CIR v2: Full verification suite ─────────────────────────────────────────

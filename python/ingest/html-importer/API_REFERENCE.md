@@ -151,8 +151,6 @@ Each subclass must implement `can_handle`, `parse`, and `extract_metadata`.
 
 ### Class: `PartialResolution`
 
-### Class: `ReconstructedClosureSet`
-
 ### Class: `MaterializedReplayView`
 
 ### Class: `ReconstructedTrajectory`
@@ -536,19 +534,10 @@ Attributes:
 
 ## Module: `replay_kernel.py`
 
-### Class: `EnvelopeInterpreter_V1`
-> Pure interpretation logic defining schema_v1 execution footprint natively safely decoupled.
-
-- **Method**: `interpret(envelopes)`
-
-### Class: `SchemaRegistry`
-- **Method**: `__init__()`
-- **Method**: `get_interpreter(schema_version)`
-
 ### Class: `ReplayEngine`
 > Orchestrates Chronological Kernel loops cleanly natively efficiently.
 
-- **Method**: `__init__(registry)`
+- **Method**: `__init__()`
 - **Method**: `replay(run_id, target_schema, event_stream)`
 
 ## Module: `runtime_engine.py`

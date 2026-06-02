@@ -79,7 +79,7 @@ invariants:
     description: "P depends only on E, not on G, F, or closure"
     assert:
       P_only_depends_on: [E]
-    ci_check: "grep -R 'GraphState\|ReconstructedClosureSet' semantic_projection.py | grep -v docstring"
+    ci_check: "grep -R 'GraphState' semantic_projection.py | grep -v docstring"
     expected: empty
     status: PASSING
 
@@ -157,9 +157,9 @@ invariants:
     description: "Closure system must not influence FSM execution — Plan 0012 complete"
     assert:
       F_input_excludes: [closure]
-    ci_check: "grep 'closure\.\|ReconstructedClosureSet' replay_kernel.py | grep -v -E 'EnvelopeInterpreter|interpret|class Schema|SchemaRegistry|closures:'"
-    expected: empty
-    status: PASSING  # Plan 0012: ConstraintExtractor.from_stream replaces closure.constraints
+    ci_check: "grep -c 'closure' replay_kernel.py || true"
+    expected: "0"
+    status: PASSING  # Plan 0015 Phase 3: closure layer fully removed
 
   F4_transition_validity:
     description: "FSM transitions must respect GraphState constraints"
@@ -335,11 +335,15 @@ deletion_gate:
       - "trace_rules.closure.forbidden.semantic_input == true"
 
   action:
-    allow_delete:
+    deleted:
       - ReconstructedClosureSet
       - EnvelopeInterpreter_V1
       - SchemaRegistry
-      - "closure dict in ReplayEngine.replay()"
+      - dual_oracle_harness.py
+      - closure_adapter.py
+      - test_dual_oracle.py
+      - test_dual_replay.py
+      - tests/generate_golden_manifest.py
 
 ---
 

@@ -3,14 +3,12 @@
 # ─────────────────────────────────────────────
 #
 # Encodes the closure-deletion safety system into machine-enforceable
-# rules.  Defines three CI phases (dual_oracle, projection_authority,
-# projection_only) with layered assertion rules, runtime tracing hooks,
-# artifact outputs, rollback triggers, and non-negotiable invariants.
+# rules.  Phase transitions completed:
+#   dual_oracle → projection_authority → projection_only → closure_deleted
 #
-# Phase transitions:
-#   dual_oracle           → projection_authority  (Plan 0013 Phase 2)
-#   projection_authority  → projection_only       (Plan 0013 Phase 3)
-#   projection_only       → closure_deleted       (Plan 0015 Phase 3)
+# All closure artifacts (EnvelopeInterpreter_V1, ReconstructedClosureSet,
+# closure_adapter, dual_oracle_harness) have been removed in
+# Plan 0015 Phase 3. Only projection-based replay is active.
 # ─────────────────────────────────────────────
 
 pipeline: semantic_replay_validation
@@ -18,8 +16,8 @@ pipeline: semantic_replay_validation
 version: "1.0"
 
 mode:
-  phase: "dual_oracle"   # dual_oracle | projection_authority | projection_only
-  strictness: "high"     # low | medium | high
+  phase: "projection_only"   # closure_deleted — legacy removed
+  strictness: "high"
 
 # ─────────────────────────────────────────────
 # INPUT SPECIFICATION
@@ -40,10 +38,6 @@ inputs:
 # ─────────────────────────────────────────────
 
 execution:
-  legacy_system:
-    enabled: true
-    entrypoint: replay_kernel.EnvelopeInterpreter_V1
-
   projection_system:
     enabled: true
     entrypoint: semantic_projection.SemanticProjectionBuilder
@@ -53,16 +47,12 @@ execution:
 # ─────────────────────────────────────────────
 
 normalization:
-  closure:
-    enabled: true
-    adapter: test_dual_replay._normalize_closures
-
   projection:
     enabled: true
-    adapter: test_dual_replay._normalize_projection
+    adapter: semantic_projection.SemanticProjectionBuilder
 
   canonical_form:
-    type: NormalizedSemanticState
+    type: SemanticProjection
     fields:
       - resolved_concepts
       - resolves_edges
@@ -75,18 +65,8 @@ assertions:
 
   # ── Dual oracle equivalence ─────────────────
   dual_oracle_equivalence:
-    enabled: true
-    rule: strict_set_equality
-    fields:
-      - resolved_concepts
-      - resolves_edges
-
-    failure_mode: fail_ci
-    allow_known_deltas: true
-    known_delta_fixtures:
-      - reintroduction       # legacy lacks reintroduced_nodes
-      - modified_nodes       # legacy lacks modified_nodes
-      - node_lifecycle_full  # legacy lacks both
+    enabled: false
+    note: "Legacy interpreter removed in Plan 0015 Phase 3"
 
   # ── Projection determinism ──────────────────
   projection_determinism:
@@ -121,20 +101,8 @@ assertions:
 # ─────────────────────────────────────────────
 
 runtime_tracing:
-
-  closure_usage:
-    enabled: true
-
-    allowed:
-      - creation: true
-      - internal_access: true
-
-    forbidden:
-      - fsm_input: true
-      - graph_state_input: true
-      - semantic_projection_input: true
-
-    failure_mode: fail_ci
+  enabled: false
+  note: "Closure tracing no longer needed — Plan 0015 Phase 3 complete"
 
 # ─────────────────────────────────────────────
 # ARTIFACT OUTPUTS
@@ -145,10 +113,9 @@ artifacts:
   directory: artifacts/semantic_validation/
 
   outputs:
-    - dual_oracle_diff.json
     - projection_drift_report.json
-    - closure_usage_trace.json
     - fixture_results.json
+    - determinism_report.json
 
   retention:
     keep_last_n_runs: 50
@@ -159,27 +126,11 @@ artifacts:
 
 gates:
 
-  - phase: dual_oracle
-    rules:
-      - require_closure_execution: true
-      - require_projection_execution: true
-      - require_exact_match_on_covered: true
-      - document_known_deltas: true
-
-  - phase: projection_authority
-    rules:
-      - require_projection_execution: true
-      - require_closure_execution: true   # shadow mode only
-      - closure_failures_are_warnings: true
-      - projection_failures_fail_ci: true
-      - no_closure_in_fsm_path: true      # Plan 0012 must be complete
-
   - phase: projection_only
     rules:
       - require_projection_execution: true
-      - forbid_closure_execution: true
-      - enforce_no_closure_imports: true
-      - assert_golden_manifest_match: true
+      - forbid_closure_imports: true
+      - require_deterministic_2x_runs: true
 
 # ─────────────────────────────────────────────
 # ROLLBACK CONDITIONS
@@ -188,13 +139,11 @@ gates:
 rollback:
 
   triggers:
-    - unexpected_semantic_divergence_spike
-    - closure_influence_detected_in_execution_path
     - projection_nondeterminism_detected
-    - golden_manifest_mismatch
+    - resolved_concepts_regression > 15%
 
   action:
-    revert_to_phase: "dual_oracle"
+    revert_to_last_stable_tag
     preserve_artifacts: true
 
 # ─────────────────────────────────────────────
@@ -202,19 +151,17 @@ rollback:
 # ─────────────────────────────────────────────
 
 invariants:
-  - "GraphState MUST NOT depend on closure artifacts"
-  - "FSM MUST NOT consume closure-derived data"
   - "SemanticProjection MUST be deterministic over identical inputs"
-  - "Closure system MUST be removable without affecting outputs"
+  - "Pipeline MUST produce resolved_concepts > 0 for conversations with extracted concepts"
+  - "No closure-derived imports or types in replay pipeline"
 
 # ─────────────────────────────────────────────
 # COMPLETION CRITERIA
 # ─────────────────────────────────────────────
 
 completion:
-
-  projection_only_ready_when:
-    - dual_oracle_runs_stable_for: "10+ CI cycles"
-    - semantic_drift_equals_zero_on_covered: true
-    - closure_usage_trace_allows_only_internal: true
+  closure_deletion_verified:
+    - all_closure_modules_removed: true
+    - corpus_remains_deterministic: true
+    - resolved_concepts_unchanged: true
     - no_closure_in_fsm_path: true

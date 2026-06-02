@@ -18,8 +18,31 @@ use vectors::{load_vectors, extract_vector_inputs};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+
+    // --stdin mode: read JSON from stdin, canonicalize, hash, output.
+    if args.iter().any(|a| a == "--stdin") {
+        use std::io::Read;
+        let mut input = String::new();
+        if let Err(e) = std::io::stdin().read_to_string(&mut input) {
+            eprintln!("error: failed to read stdin: {}", e);
+            process::exit(1);
+        }
+        match crate::canonical::encoder::encode_canonical_str(&input) {
+            Ok(bytes) => {
+                let hash = crate::contract::hashing::sha256_hex(&bytes);
+                println!("ccnf_hash:{}", hash);
+            }
+            Err(e) => {
+                eprintln!("error: canonical encoding failed: {}", e);
+                process::exit(1);
+            }
+        }
+        return;
+    }
+
     if args.len() < 2 {
         eprintln!("Usage: ccnf-verifier <vectors-dir>");
+        eprintln!("       ccnf-verifier --stdin");
         process::exit(1);
     }
 

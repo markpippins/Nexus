@@ -1174,32 +1174,6 @@
             }
           }
         },
-        "ReconstructedClosureSet": {
-          "kind": "object",
-          "fields": {
-            "trajectory_id": {
-              "type": "string",
-              "required": true
-            },
-            "resolved_concepts": {
-              "type": "array<string>",
-              "storage_note": "Declared as Set[str] in code; persisted as a unique array if serialized to JSON.",
-              "required": true
-            },
-            "resolves_edges": {
-              "type": "array<any>",
-              "required": true
-            },
-            "constraints": {
-              "type": "array<ConstraintNode>",
-              "required": true
-            },
-            "completion_candidate": {
-              "type": "boolean",
-              "required": true
-            }
-          }
-        },
         "MaterializedReplayView": {
           "kind": "object",
           "fields": {
@@ -1211,8 +1185,8 @@
               "type": "string",
               "required": true
             },
-            "closures": {
-              "type": "map<string,ReconstructedClosureSet>",
+            "final_graph_state": {
+              "type": "GraphState",
               "required": true
             }
           }
