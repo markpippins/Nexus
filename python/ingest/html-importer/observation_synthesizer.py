@@ -44,7 +44,11 @@ class ObservationSynthesizer:
                     type="UNRESOLVED_QUERY",
                     source_trajectory_id=q.source_trajectory_id or "none",
                     scope_id=q.scope_id,
-                    content=q.id,
+                    content=ObservationContent(
+                        concept_ids=q.required_concept_ids.copy() if hasattr(q, 'required_concept_ids') else [],
+                        relation="UNRESOLVED",
+                        evidence_pointer=q.id,
+                    ),
                     polarity="neutral",
                     confidence=1.0
                 )
