@@ -5,21 +5,9 @@ from enum import Enum
 from sqlalchemy import Column, DateTime, Enum as SAEnum, Integer, String, Text, Float, JSON
 from sqlalchemy.orm import declarative_base
 
+from losm_ir.states import WorkStatus
+
 Base = declarative_base()
-
-
-class WorkStatus(str, Enum):
-    NEW = "NEW"
-    INTAKE = "INTAKE"
-    PLAN_GENERATION = "PLAN_GENERATION"
-    PLAN_REVIEW = "PLAN_REVIEW"
-    PLAN_APPROVAL_GATE = "PLAN_APPROVAL_GATE"
-    SPEC_GENERATION = "SPEC_GENERATION"
-    EXECUTION = "EXECUTION"
-    VALIDATION = "VALIDATION"
-    COMPLETION = "COMPLETION"
-    BLOCKED = "BLOCKED"
-    FAILED = "FAILED"
 
 
 class ArtifactType(str, Enum):

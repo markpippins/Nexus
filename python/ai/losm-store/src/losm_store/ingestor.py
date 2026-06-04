@@ -8,6 +8,14 @@ from sqlalchemy.orm import Session
 
 from losm_store.models import GovernanceEvent, PlanningTask, ReceiptIngestRecord, WorkStatus
 from losm_ir.execution_receipt import ExecutionReceipt
+from losm_ir.transition import validate_transition
+
+# Map receipt results to target lifecycle states.
+_RESULT_TO_STATE = {
+    "SUCCESS": "COMPLETION",
+    "FAILED": "FAILED",
+    "PARTIAL": "BLOCKED",
+}
 
 
 class ExecutionReceiptIngestor:
@@ -63,12 +71,20 @@ class ExecutionReceiptIngestor:
         context["receipt_results"] = (context.get("receipt_results") or []) + [receipt.result]
         planning_task.context_data = context
 
-        if receipt.result == "SUCCESS":
-            planning_task.status = WorkStatus.COMPLETION
-        elif receipt.result == "FAILED":
-            planning_task.status = WorkStatus.FAILED
-        else:
-            planning_task.status = WorkStatus.BLOCKED
+        # Resolve target state from receipt result, then validate the transition.
+        target_state = _RESULT_TO_STATE.get(receipt.result)
+        if target_state is None:
+            return self._reject(db, ingest_row, receipt, planning_task,
+                                f"Unknown receipt result: '{receipt.result}'")
+
+        current_state = planning_task.status.value
+        validation = validate_transition(current_state, target_state)
+        if not validation.allowed:
+            return self._reject(db, ingest_row, receipt, planning_task,
+                                f"Receipt result '{receipt.result}' invalid: "
+                                f"{current_state} → {target_state}. {validation.reason}")
+
+        planning_task.status = WorkStatus(target_state)
 
         db.add(
             GovernanceEvent(
@@ -90,6 +106,29 @@ class ExecutionReceiptIngestor:
             "receipt_id": ingest_row.receipt_id,
             "work_request_id": receipt.work_request_id,
             "event_type": "RECEIPT_INGESTED",
+        }
+
+    def _reject(self, db, ingest_row, receipt, planning_task, reason: str) -> dict:
+        """Record a rejection governance event. Does NOT mutate task status."""
+        db.add(GovernanceEvent(
+            event_type="RECEIPT_REJECTED",
+            work_request_id=receipt.work_request_id,
+            lineage_parent=receipt.lineage_parent,
+            payload={
+                "reason": reason,
+                "executor_id": receipt.executor_id,
+                "receipt_result": receipt.result,
+                "current_status": planning_task.status.value if planning_task else None,
+            },
+        ))
+        db.commit()
+        db.refresh(ingest_row)
+        return {
+            "status": "rejected",
+            "receipt_id": ingest_row.receipt_id,
+            "work_request_id": receipt.work_request_id,
+            "event_type": "RECEIPT_REJECTED",
+            "reason": reason,
         }
 
 

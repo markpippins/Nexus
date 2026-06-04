@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -9,7 +10,7 @@ from losm_store.models import PlanningTask, WorkStatus, LifecycleEvent as Lifecy
 from losm_store.repository import create_work_request, get_work_request, list_work_requests
 from losm_store.session import SessionLocal, get_db
 
-from losm_shell.lifecycle.transition import TransitionService
+from losm_ir.transition import validate_transition, TransitionError
 from losm_shell.lifecycle.orchestrator import PipelineCoordinator
 from losm_shell.planning.compiler import PlanCompiler
 
@@ -83,13 +84,17 @@ def list_wr(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 
 @router.post("/{wr_id}/orchestrate")
 def orchestrate_wr(wr_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    get_work_request(db, wr_id)
+    wr = get_work_request(db, wr_id)
+    current_state = wr.status.value if hasattr(wr.status, "value") else str(wr.status)
 
-    def run_orchestrator(execution_id: str):
+    async def run_orchestrator(execution_id: str, state: str):
         coordinator = PipelineCoordinator()
-        coordinator.coordinate(execution_id, {})
+        await coordinator.coordinate(execution_id, state, {})
 
-    background_tasks.add_task(run_orchestrator, str(wr_id))
+    def _run_async(execution_id: str, state: str):
+        asyncio.run(run_orchestrator(execution_id, state))
+
+    background_tasks.add_task(_run_async, str(wr_id), current_state)
     return {"message": "Orchestration started", "wr_id": str(wr_id)}
 
 
@@ -104,18 +109,9 @@ def transition_wr(wr_id: int, payload: TransitionRequest, db: Session = Depends(
     wr = get_work_request(db, wr_id)
     from_state = wr.status.value if hasattr(wr.status, "value") else wr.status
 
-    svc = TransitionService()
-    svc.register_execution(str(wr_id))
-
-    try:
-        svc.transition(
-            execution_id=str(wr_id),
-            to_state=payload.to_state,
-            actor=payload.actor,
-            reason=payload.reason,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    validation = validate_transition(from_state, payload.to_state)
+    if not validation.allowed:
+        raise HTTPException(status_code=400, detail=validation.reason)
 
     wr.status = WorkStatus(payload.to_state)
     db.add(LifecycleEventModel(

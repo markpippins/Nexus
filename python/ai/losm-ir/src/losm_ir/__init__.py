@@ -17,7 +17,13 @@ from losm_ir.validation import ValidationIR, ValidationStatus, ValidationIssue
 from losm_ir.critique import CritiqueIR, CritiqueIssue
 from losm_ir.constraints import ConstraintViolation
 from losm_ir.trace import TraceOutput, TraceFamily, trace_hash
-from losm_ir.states import WorkflowState
+from losm_ir.states import WorkflowState, WorkStatus, work_status_to_phase
+from losm_ir.transition import (
+    ValidationResult,
+    VALID_TRANSITIONS,
+    validate_transition,
+    TransitionError,
+)
 
 __all__ = [
     "Graph", "Node", "Edge",
@@ -37,5 +43,6 @@ __all__ = [
     "CritiqueIR", "CritiqueIssue",
     "ConstraintViolation",
     "TraceOutput", "TraceFamily", "trace_hash",
-    "WorkflowState",
+    "WorkflowState", "WorkStatus", "work_status_to_phase",
+    "ValidationResult", "VALID_TRANSITIONS", "validate_transition", "TransitionError",
 ]
