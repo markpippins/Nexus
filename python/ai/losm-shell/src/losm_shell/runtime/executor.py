@@ -1,6 +1,11 @@
+from __future__ import annotations
+
 import uuid
 from collections import defaultdict, deque
-from typing import List, Dict, Any
+from typing import Any, List
+
+from losm_ir.execution_receipt import ExecutionReceipt
+from losm_shell.runtime.handler import ExecutionContext, StepHandler
 
 
 class ExecutionStep:
@@ -26,8 +31,13 @@ class ExecutionResult:
 
 
 class DAGExecutor:
-    def execute(self, steps: List[ExecutionStep]) -> ExecutionResult:
-        execution_id = str(uuid.uuid4())
+    async def execute(
+        self,
+        steps: List[ExecutionStep],
+        handler: StepHandler,
+        context: ExecutionContext,
+    ) -> ExecutionResult:
+        execution_id = context.execution_id
         step_results = []
 
         in_degree = defaultdict(int)
@@ -55,19 +65,31 @@ class DAGExecutor:
                 execution_id=execution_id,
                 status="FAILED",
                 step_results=step_results,
-                failure_summary="Cycle detected in DAG dependencies"
+                failure_summary="Cycle detected in DAG dependencies",
             )
 
+        # Execute via handler
         for step in sorted_steps:
-            result = StepResult(
-                step_id=step.step_id,
-                status="SUCCESS",
-                logs=f"Dispatched step payload: {step.payload}"
-            )
-            step_results.append(result)
+            receipt = await handler.execute(step, context)
+            step_results.append(self._receipt_to_step_result(receipt))
+            if receipt.result == "FAILED":
+                return ExecutionResult(
+                    execution_id=execution_id,
+                    status="FAILED",
+                    step_results=step_results,
+                    failure_summary=f"Step {step.step_id} failed",
+                )
 
         return ExecutionResult(
             execution_id=execution_id,
             status="SUCCESS",
-            step_results=step_results
+            step_results=step_results,
+        )
+
+    @staticmethod
+    def _receipt_to_step_result(receipt: ExecutionReceipt) -> StepResult:
+        return StepResult(
+            step_id=receipt.executor_id,
+            status=receipt.result,
+            logs=f"Receipt: {receipt.model_dump_json()}",
         )

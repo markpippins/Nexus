@@ -12,3 +12,4 @@ src/losm_shell/planning/__init__.py
 src/losm_shell/planning/compiler.py
 src/losm_shell/runtime/__init__.py
 src/losm_shell/runtime/executor.py
+tests/test_transition_validator.py
