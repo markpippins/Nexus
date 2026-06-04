@@ -19,7 +19,7 @@ def get_kernel() -> LOSMKernel:
 @router.post("/validate-graph", response_model=dict)
 def validate_graph(graph: Graph, kernel: LOSMKernel = Depends(get_kernel)):
     try:
-        kernel.validate(graph)
+        kernel.validate_graph(graph)
         return {"valid": True, "graph": graph_to_dict(graph)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
