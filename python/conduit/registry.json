@@ -1,0 +1,20 @@
+{
+  "default_model": {
+    "harness": "opencode",
+    "model": "opencode/big-pickle"
+  },
+  "fallback_model": {
+    "harness": "ollama",
+    "model": "ollama/qwen2.5-coder"
+  },
+  "executors": [
+    {
+      "executor_id": "executor-cloud",
+      "supports": ["opencode", "ollama"],
+      "invocation_contract": {
+        "type": "cli",
+        "command": "executor_cloud.py"
+      }
+    }
+  ]
+}
