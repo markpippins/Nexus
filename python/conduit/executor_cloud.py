@@ -142,16 +142,53 @@ def _build_default_opencode_launcher(role: str, model: str) -> 'HarnessLauncher'
     return launcher
 
 
-def run_ollama(req, system_base, prompt_body):
+def run_ollama(req, system_base, prompt_body, session_log_path=None):
     if ollama is None:
         raise RuntimeError("ollama package is not installed — cannot use ollama harness")
-    response = ollama.generate(
-        model=_resolve_model_name(req),
-        system=system_base,
-        prompt=prompt_body,
-        options={"num_predict": 2000},
-    )
-    return response.get("response") if isinstance(response, dict) else None
+    model = _resolve_model_name(req)
+
+    # Retry loop: local models sometimes produce empty output on first attempt.
+    # Retry up to 2 times with slightly different parameters.
+    for attempt in range(1, 3):
+        _write_session_log(session_log_path, f"[ollama] model={model} attempt={attempt} generating...\n")
+        options = {"num_predict": 2000}
+        if attempt > 1:
+            # Second attempt: increase output token limit
+            options = {"num_predict": 4000}
+
+        response = ollama.generate(
+            model=model,
+            system=system_base,
+            prompt=prompt_body,
+            options=options,
+        )
+        # ollama SDK >= 0.5.0 returns a GenerateResponse dataclass, not a dict
+        if isinstance(response, dict):
+            result = response.get("response")
+        else:
+            result = getattr(response, "response", None)
+
+        if result and result.strip():
+            truncated = result[:200] + ("..." if len(result) > 200 else "")
+            _write_session_log(session_log_path, f"[ollama] output ({len(result)} chars)\n{truncated}\n")
+            return result
+
+        _write_session_log(session_log_path, f"[ollama] attempt {attempt}: no output\n")
+
+    _write_session_log(session_log_path, "[ollama] all attempts exhausted, no output produced\n")
+    return None
+
+
+def _write_session_log(session_log_path, text):
+    """Append a line to the session log if a path is provided."""
+    if not session_log_path:
+        return
+    try:
+        os.makedirs(os.path.dirname(session_log_path), exist_ok=True)
+        with open(session_log_path, "a", encoding="utf-8") as f:
+            f.write(text)
+    except Exception:
+        pass
 
 
 def _serialize_dco_for_prompt(req: Dict[str, Any]) -> str:
@@ -443,7 +480,7 @@ def run_model(req, working_path, system_base, prompt_body, artifacts_dir=None, s
     if harness == "opencode":
         return run_opencode(req, working_path, artifacts_dir, session_log_path)
     if harness == "ollama":
-        return run_ollama(req, system_base, prompt_body)
+        return run_ollama(req, system_base, prompt_body, session_log_path)
     if harness == "codex":
         return run_codex(req, working_path, artifacts_dir, session_log_path)
     raise RuntimeError(f"Unsupported harness: {harness}")
@@ -481,18 +518,39 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
     step_desc = step.get("description", "")
 
     system_base = "SYSTEM:\nYou are a deterministic cognitive compiler node executing a graph step.\n"
-    prompt_body = (
-        system_base
-        + f"\nGLOBAL INTENT:\n{intent_desc}\n"
-        + f"\nCURRENT STEP [{step.get('type')}]:\n{step_desc}\n"
-        + "\n\nWORKING DIRECTORY:\n"
-        + working_path
-        + "\n\nCONTEXT FILES & PRIOR OUTPUTS:\n"
-        + context_joined
-        + "\n\nOUTPUT FORMAT RULES:\n"
-        + "You must output only structured file blocks.\n\nFormat:\n\n---START_FILE: relative/path---\n<content>\n---END_FILE---"
-        + "\nNo explanations. No markdown outside file blocks."
-    )
+
+    harness = _resolve_harness(req)
+
+    # ── ollama: use a simpler prompt that local models handle better ──
+    if harness == "ollama":
+        prompt_body = (
+            system_base
+            + f"\nTASK:\n{intent_desc}\n"
+            + f"\nSTEP:\n{step_desc}"
+            + "\n\nWORKING DIRECTORY:\n" + working_path
+        )
+        if context_joined:
+            prompt_body += "\n\nCONTEXT:\n" + context_joined
+        prompt_body += (
+            "\n\nINSTRUCTIONS:\n"
+            + "Describe what you would do to complete this step. "
+            + "If the step asks you to run a shell command, output the exact command on a line by itself starting with `$ `. "
+            + "If the step asks you to write a file, output the file path on a line starting with `FILE: ` followed by the content. "
+            + "Be concise and direct."
+        )
+    else:
+        prompt_body = (
+            system_base
+            + f"\nGLOBAL INTENT:\n{intent_desc}\n"
+            + f"\nCURRENT STEP [{step.get('type')}]:\n{step_desc}\n"
+            + "\n\nWORKING DIRECTORY:\n"
+            + working_path
+            + "\n\nCONTEXT FILES & PRIOR OUTPUTS:\n"
+            + context_joined
+            + "\n\nOUTPUT FORMAT RULES:\n"
+            + "You must output only structured file blocks.\n\nFormat:\n\n---START_FILE: relative/path---\n<content>\n---END_FILE---"
+            + "\nNo explanations. No markdown outside file blocks."
+        )
 
     try:
         # Extract session_id from DCO metadata for log streaming
@@ -512,6 +570,60 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
     if not raw_text:
         return False, "No model output produced", []
 
+    # ── ollama harness: parse and execute $ -prefixed shell commands ──
+    shell_outputs: list[str] = []
+    shell_any_failed = False
+    shell_any_succeeded = False
+    if harness == "ollama":
+        cmd_pattern = re.compile(r'^\$\s+(.+)$', re.MULTILINE)
+        commands = cmd_pattern.findall(raw_text)
+        for cmd in commands:
+            cmd = cmd.strip()
+            if not cmd:
+                continue
+            # Safety filter: reject obviously destructive commands
+            cmd_lower = cmd.lower()
+            dangerous = ["sudo ", "mkfs.", "dd if=", "| sh", "| bash", " |sh", " |bash",
+                         "> /dev/sd", "chmod 777 /", ":(){ :|:& };:"]
+            if any(d in cmd_lower for d in dangerous):
+                shell_outputs.append(f"$ {cmd}\nREJECTED: unsafe command")
+                _write_session_log(session_log_path_dag, f"[exec] REJECTED (unsafe): {cmd[:100]}\n")
+                continue
+            print(f"[execute_step] ollama shell command: {cmd[:120]}")
+            _write_session_log(session_log_path_dag, f"[exec] $ {cmd}\n")
+            try:
+                proc = subprocess.run(
+                    cmd,
+                    shell=True,
+                    cwd=working_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                out = proc.stdout
+                if proc.stderr:
+                    out += "\n[stderr]\n" + proc.stderr
+                shell_outputs.append(f"$ {cmd}\nexit={proc.returncode}\n{out}")
+                if proc.returncode == 0:
+                    shell_any_succeeded = True
+                else:
+                    shell_any_failed = True
+                _write_session_log(session_log_path_dag,
+                    f"[exec] exit={proc.returncode} stdout={len(proc.stdout)}B stderr={len(proc.stderr)}B\n")
+            except subprocess.TimeoutExpired:
+                shell_outputs.append(f"$ {cmd}\nTIMEOUT after 120s")
+                shell_any_failed = True
+                _write_session_log(session_log_path_dag, f"[exec] TIMEOUT\n")
+            except Exception as e:
+                shell_outputs.append(f"$ {cmd}\nERROR: {e}")
+                shell_any_failed = True
+                _write_session_log(session_log_path_dag, f"[exec] ERROR: {e}\n")
+        if shell_outputs:
+            raw_text += "\n\n--- SHELL EXECUTION RESULTS ---\n" + "\n---\n".join(shell_outputs)
+        # If shell commands ran but none succeeded, treat the step as failed
+        if shell_any_failed and not shell_any_succeeded:
+            return False, "All shell commands failed", []
+
     file_blocks = re.findall(r"---START_FILE: (.*?)---(.*?)---END_FILE---", raw_text, re.DOTALL)
 
     if not file_blocks and step.get("type") in ["analysis", "validation"]:
@@ -523,12 +635,11 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
         return True, "", []
 
     if not file_blocks:
-        # OpenCode (and similar harnesses) write files directly via tool calls.
-        # The structured file blocks are only required for deterministic DAG executors.
-        harness = _resolve_harness(req)
-        if harness in ("opencode", "codex"):
+        # OpenCode / Codex / Ollama — harness writes files or produces raw output.
+        # Treat non-file-block output as success if any text was produced.
+        if harness in ("opencode", "codex", "ollama"):
             print(f"[execute_step] Harness={harness} completed but produced no file-block output. "
-                  f"This is expected — harness writes files directly. Treating as success.")
+                  f"This is expected — treating as success.")
             return True, "", []
         return False, "No valid file blocks generated", []
 

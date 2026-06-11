@@ -803,7 +803,11 @@ if __name__ == "__main__":
     elif args.run:
         run_role(args.db, args.run, registry)
     elif args.all:
-        for role in ["builder", "reviewer", "planner", "critic"]:
+        # Run reviewer first, then planner + builder back-to-back so
+        # planner-created builder tickets dispatch on the same cycle.
+        # Critic runs last so builder always precedes it on every cycle.
+        # Ticket chain: planner→builder+critic, builder→reviewer, critic→builder.
+        for role in ["reviewer", "planner", "builder", "critic"]:
             run_role(args.db, role, registry)
     else:
         parser.print_help()
