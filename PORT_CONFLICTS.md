@@ -26,6 +26,9 @@ All services now match the desired port configuration defined in `ARCHITECTURE.m
 | FS Crawler Backend | 8004 | OK |
 | FS Crawler UI | 3004 | OK |
 | Service Registry | 8085 | OK |
+| Conduit MCP Server | 3100 | OK |
+| Nebula Server | 3101 | OK |
+| Postgres (local Docker) | 5433 | OK |
 
 ## Outstanding Issues
 

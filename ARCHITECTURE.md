@@ -105,6 +105,8 @@
 | Unsplash Proxy | `typescript/unsplash/` | Node.js http | 8083 | `image-search.ts` (`UNSPLASH_SERVER_PORT`) |
 | Broker Client | `typescript/broker-client/` | Library | N/A | No server |
 | Utils | `typescript/utils/` | Library | N/A | No server |
+| Conduit MCP Server | `typescript/conduit-mcp/` | Express (systemd user) | 3100 | `.env` (`CONDUIT_PG_DSN`) |
+| Nebula Server | `typescript/nebula-srv/` | Express (systemd user) | 3101 | `src/index.ts` (hardcoded) |
 
 #### Moleculer Services
 
