@@ -234,7 +234,7 @@ def check_cir1(path, obj, violations, mode, domain):
     if isinstance(obj, dict):
         if "intent_source" in obj:
             v = obj["intent_source"]
-            if isinstance(v, str) and ".pipeline/" in v:
+            if isinstance(v, str) and "nexus/.conduit-data/" in v:
                 violations.append((str(path), "CIR-1", "PIPELINE_PHANTOM", v))
         for k, v in obj.items():
             check_cir1(path, v, violations, mode, domain)

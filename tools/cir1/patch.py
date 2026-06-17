@@ -187,7 +187,7 @@ def patch_cir1(obj, mode, domain):
     if isinstance(obj, dict):
         if "intent_source" in obj:
             v = obj["intent_source"]
-            if isinstance(v, str) and ".pipeline/" in v:
+            if isinstance(v, str) and "nexus/.conduit-data/" in v:
                 obj.pop("intent_source")
                 if obj.get("mode") == "execute":
                     obj["mode"] = "legacy"

@@ -1,0 +1,2052 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nexus Architecture Knowledge Graph v2.0",
+  "description": "Comprehensive extraction across 21 analyzed transcripts and all graph/ specs. Updated June 16 2026 to include self-extending architecture concept, 8-stage generative pipeline, Phase 1 wedge, and provenance causal chain.",
+  "version": "2.1.0",
+  "sources": [
+    "nexus/ANALYSIS.md (28 sections, 2123 lines)",
+    "nexus/graph/cognitive-integrity-rule-system.md (30+ rules, 10 families)",
+    "nexus/graph/schema/projection-ir.md (11 IR rules, adapter layer, synthesis layer)",
+    "nexus/graph/schema/projection-algebra.md (6 operators, 6 invariants, 4 appendices)",
+    "nexus/graph/dev-runtime-manifest.md (mount semantics, agent instantiation model)",
+    "nexus/graph/atten-spec.md (7 invariants, projection envelope schema)",
+    "nexus/graph/peb-mcp-spec.md (v2, admission control, transaction kernel)",
+    "nexus/graph/peb-spring-boot-spec.md (Phase 1, module layout, PostgreSQL schema)",
+    "dev/chats/Nebula System Info Expansion.html (capability decomposition, typed process graph over Atten, 4 domain patterns)",
+    "dev/chats/Plurality and Agent Disagreement.html (Transform type evolution v0-v4, Context as rule system, Premise/Conclusion as typed artifacts)",
+    "dev/chats/Semantic Adapter Layer.html (ExecutionMode, RoleMappingStrategy, SemanticOperation types, harness-as-data pattern)",
+    "dev/chats/ATDD Overview.html (Reality Constraint Layer, MIGL, external drift vs internal drift)",
+    "dev/chats/Event System Design.html (Event vs Incident type distinction, Observer as append-only ingestion surface)",
+    "dev/chats/Bug Tracking Architecture.html (Observations as evidentiary, Events as factual, Store ownership model)",
+    "dev/chats/Cognitive Compiler Architecture.html (2-tier compiler, Pro/Flash model, 3 things that persist)",
+    "dev/chats/CCNF Normalization vs Parsing.html (Authority Arbitration Layer, ContextScope token, provenance tagging)",
+    "dev/chats/Buzzwords by Layer.html (XIL admission gates TTS/STOA/TSP/PEL, External Agent Model, TrustScore)",
+    "dev/chats/DeepSeek critique analysis.html (3-authority problem, dual-agent design review, AI participates in architecture review)",
+    "dev/chats/AG-UI and Nexus Integration.html (WorkRequest vs Execution decoupling, session conflation failure)",
+    "dev/chats/LOSM Architecture Assessment.html (LOSM execution model, agent lifecycle management)",
+    "dev/chats/Message Normalization & Trajectories.html (message normalization patterns, trajectory tracking)",
+    "dev/chats/Model Role Assignment.html (model role injection, role mapping strategies)",
+    "answers to open questions.md (8 open questions reframed as 3-layer dependency lattice, Q1+Q3 joint resolution priority)",
+    "chats/Self-Extending Architecture Concept.html (self-healing topology loop, Path A vs Path B, 8-stage generative pipeline, 5 spaces, reconciliation as recursive convergence loop, provenance causal chain, Phase 1 wedge definition)"
+  ],
+  "types": [
+    {
+      "id": "execution-mode",
+      "name": "ExecutionMode",
+      "category": "execution",
+      "description": "Enum of valid launch modes for agent/tool execution. Three known variants.",
+      "variants": ["ONESHOT", "INTERACTIVE", "DAEMON"],
+      "actors": ["conduit", "harness"],
+      "source_transcripts": ["Semantic Adapter Layer"]
+    },
+    {
+      "id": "role-mapping-strategy",
+      "name": "RoleMappingStrategy",
+      "category": "execution",
+      "description": "Enum of strategies for injecting role identity into launched processes.",
+      "variants": ["AGENT", "PROMPT_FILE", "SYSTEM_FLAG"],
+      "actors": ["harness", "conduit"],
+      "source_transcripts": ["Semantic Adapter Layer"]
+    },
+    {
+      "id": "semantic-operation",
+      "name": "SemanticOperation",
+      "category": "semantic",
+      "description": "Intent-bearing operation that abstracts over tool-specific CLI flags. Decouples what from how.",
+      "actors": ["harness", "wrp"],
+      "relationships": { "mapped_to": "ToolCommand", "via": "argument_mappings" },
+      "source_transcripts": ["Semantic Adapter Layer"]
+    },
+    {
+      "id": "harness-definition",
+      "name": "HarnessDefinition",
+      "category": "harness",
+      "description": "Data-driven tool wrapper stored in DB. Three data levels: store enums -> store templates -> store semantic translators.",
+      "properties": {
+        "execution_mode": "ExecutionMode",
+        "capabilities": "string[]",
+        "argument_mappings": "ArgumentMapping[]",
+        "role_mapping_strategy": "RoleMappingStrategy",
+        "launch_template": "Template"
+      },
+      "actors": ["harness"],
+      "source_transcripts": ["Semantic Adapter Layer"]
+    },
+    {
+      "id": "transform-signature",
+      "name": "Transform",
+      "category": "transform",
+      "description": "Typed function from (state + context) to (new state + trace). Core execution primitive. Evolved through 4 upgrades.",
+      "evolution": [
+        "v0: Transform<TState, TContext, TOut, TTrace>",
+        "v1: Result<{delta, output, trace}, ValidationFailure>",
+        "v2: separate StateView (read) from StateDelta (write)",
+        "v3: Context validates the transform itself (rules, invariants, allowedTransforms, mode)",
+        "v4: Trace as first-class structured explanation"
+      ],
+      "actors": ["conduit", "wrp", "peb"],
+      "source_transcripts": ["Plurality and Agent Disagreement"]
+    },
+    {
+      "id": "context-as-rule-system",
+      "name": "Context",
+      "category": "transform",
+      "description": "Behavioral rule-set over state, not a spatial container or memory context. Defines invariants, allowed transforms, and mode of execution.",
+      "actors": ["conduit", "wrp", "agent-runtime"],
+      "source_transcripts": ["Plurality and Agent Disagreement"]
+    },
+    {
+      "id": "premise-conclusion",
+      "name": "Premise/Conclusion",
+      "category": "transform",
+      "description": "Premise = rule-applied projection of state before transform. Conclusion = committed transform output. Together form the atomic evidence unit for execution audit.",
+      "actors": ["conduit", "audit"],
+      "source_transcripts": ["Plurality and Agent Disagreement"]
+    },
+    {
+      "id": "capability-operator",
+      "name": "CapabilityOperator",
+      "category": "capability",
+      "description": "Single-purpose, composable, swappable, independently testable tool/operation. Not a program -- a capability operator. Selected by type-driven matching at execution time.",
+      "actors": ["conduit", "harness"],
+      "source_transcripts": ["Nebula System Info Expansion"]
+    },
+    {
+      "id": "typed-workflow-graph",
+      "name": "TypedWorkflowGraph",
+      "category": "workflow",
+      "description": "Workflow = typed process graph over Atten. Nodes = knowledge operations. Edges = state transitions/dependencies. Capabilities = interchangeable executors. Constraints = deterministic gates.",
+      "domain_patterns": ["software_development", "research_analysis", "business_process", "systems_management"],
+      "actors": ["wrp", "synthesis", "conduit"],
+      "source_transcripts": ["Nebula System Info Expansion"]
+    },
+    {
+      "id": "reality-constraint-layer",
+      "name": "RealityConstraintLayer",
+      "category": "architectural",
+      "description": "Constraint system derived from empirical world feedback. Sits above MIGL. Reality Projection Function: Intent System -> Real-world outcome.",
+      "subtypes": {
+        "external_drift": "Deviation of real-world outcome from projected intent",
+        "internal_drift": "Deviation within the system absent external feedback"
+      },
+      "signal_categories": [
+        "user_outcome_metrics",
+        "economic_physical_constraints",
+        "external_system_feedback",
+        "hard_invariants_of_environment"
+      ],
+      "axiom": "Internal coherence does not imply external correctness",
+      "actors": ["audit", "feedback-loop"],
+      "source_transcripts": ["ATDD Overview"]
+    },
+    {
+      "id": "migl",
+      "name": "MIGL (Model Internal Governance Layer)",
+      "category": "architectural",
+      "description": "Model's own internal reasoning governance layer. Sits between the execution pipeline and the RCL. Governs model-level reasoning constraints.",
+      "actors": ["agent-runtime", "synthesis"],
+      "source_transcripts": ["ATDD Overview"]
+    },
+    {
+      "id": "authority-arbitration-layer",
+      "name": "AuthorityArbitrationLayer",
+      "category": "architectural",
+      "description": "Sits between Envelope -> CEI. Resolves authority conflicts between competing sources (global ontology bias, workspace-scoped knowledge, external signals). Uses ContextScope tokens with weight-based authority domains.",
+      "actors": ["xil", "cei"],
+      "source_transcripts": ["CCNF Normalization vs Parsing"]
+    },
+    {
+      "id": "context-scope-token",
+      "name": "ContextScopeToken",
+      "category": "data",
+      "description": "Token at intake specifying workspace_root and authority_domains with weights. Prevents global ontology bias from overpowering local execution scoping.",
+      "properties": {
+        "workspace_root": "path",
+        "authority_domains": "AuthorityDomain[]",
+        "weights": "number"
+      },
+      "actors": ["xil", "observer"],
+      "source_transcripts": ["CCNF Normalization vs Parsing"]
+    },
+    {
+      "id": "event-type",
+      "name": "Event",
+      "category": "data",
+      "description": "Factual, immutable occurrence. Stored as durable backbone. Projections are derived views over events.",
+      "actors": ["event-store"],
+      "variants": ["ObservationCreated", "ObservationLinked", "ObservationClassified", "IncidentCreated", "IncidentClosed"],
+      "relationships": { "is_supertype_of": "Incident" },
+      "source_transcripts": ["Event System Design", "Bug Tracking Architecture"]
+    },
+    {
+      "id": "incident-type",
+      "name": "Incident",
+      "category": "data",
+      "description": "Typed subset of Event representing actionable issues. Has lifecycle state machine (OPEN -> ASSIGNED -> RESOLVED -> VERIFIED -> CLOSED).",
+      "actors": ["incident-store", "state-machine"],
+      "source_transcripts": ["Event System Design", "Bug Tracking Architecture"]
+    },
+    {
+      "id": "observation-evidentiary",
+      "name": "Observation",
+      "category": "data",
+      "description": "Interpretive/evidentiary record, not a fact. Observations are evidence, Events are facts. Key IR distinction: don't conflate what happened (Event) with what was observed (Observation).",
+      "actors": ["observer", "nexus-observer"],
+      "source_transcripts": ["Bug Tracking Architecture"]
+    },
+    {
+      "id": "xil-admission-gates",
+      "name": "XILAdmissionGates",
+      "category": "architectural",
+      "description": "Four validation gates in the XIL admission layer that filter incoming signals before projection.",
+      "gates": [
+        {"id": "TTS", "name": "Truthfulness Gate", "description": "Validates factual consistency"},
+        {"id": "STOA", "name": "Scope/Type/Origin Authority Gate", "description": "Validates source authority"},
+        {"id": "TSP", "name": "Time/Space/Presence Gate", "description": "Validates spatiotemporal relevance"},
+        {"id": "PEL", "name": "Projection Envelope Limit Gate", "description": "Validates bounded projection scope"}
+      ],
+      "actors": ["xil", "cei"],
+      "source_transcripts": ["Buzzwords by Layer"]
+    },
+    {
+      "id": "external-agent-model",
+      "name": "ExternalAgentModel",
+      "category": "architectural",
+      "description": "External agents = probabilistic policy perturbation signals, not authoritative sources. Trust = dynamic weighting, not binary.",
+      "actors": ["eam", "xil"],
+      "source_transcripts": ["Buzzwords by Layer"]
+    },
+    {
+      "id": "trust-score",
+      "name": "TrustScore",
+      "category": "data",
+      "description": "Floating-point (0.0-1.0) dynamic weight for source/agent authority. Computed and updated per interaction, not statically assigned.",
+      "actors": ["eam", "xil"],
+      "source_transcripts": ["Buzzwords by Layer"]
+    },
+    {
+      "id": "cognitive-compiler-tier",
+      "name": "CognitiveCompilerTier",
+      "category": "architectural",
+      "description": "2-tier compiler model: Pro = Governor (orchestration, planning, synthesis), Flash = Worker swarm (parallel execution, retrieval, tool use).",
+      "tiers": [
+        {"name": "Pro", "role": "Governor", "functions": ["plan", "orchestrate", "synthesize"]},
+        {"name": "Flash", "role": "WorkerSwarm", "functions": ["execute", "retrieve", "tool_use"]}
+      ],
+      "actors": ["synthesis", "conduit", "agent-runtime"],
+      "source_transcripts": ["Cognitive Compiler Architecture"]
+    },
+    {
+      "id": "persistence-triad",
+      "name": "PersistenceTriad",
+      "category": "execution",
+      "description": "Only 3 things persist: Canonical Spec (authoritative definition), Decision Log (all decisions made and why), ExecutionReceipt (cryptographic proof of execution). Everything else reconstructable.",
+      "actors": ["conduit", "audit", "store"],
+      "source_transcripts": ["Cognitive Compiler Architecture"]
+    },
+    {
+      "id": "work-request-vs-execution",
+      "name": "WorkRequest / Execution",
+      "category": "pipeline",
+      "description": "WorkRequest carries intent + identity (what should happen). Execution carries runtime + temporal (how it happened). Conflation of these two was the root cause of the session conflation failure.",
+      "actors": ["wrp", "conduit", "wrk-master"],
+      "source_transcripts": ["AG-UI and Nexus Integration"]
+    },
+    {
+      "id": "persistent-knowledge-graph",
+      "name": "PersistentKnowledgeGraph",
+      "category": "storage",
+      "description": "The knowledge graph as long-lived projector stored in PostgreSQL+pgvector. Updated incrementally, not regenerated from scratch. Tension with CIRS-IR-07 resolved via 3-tier model: ProjectionIR is ephemeral IR pass, persistent KG is Inference Graph tier output.",
+      "properties": {
+        "store": "PostgreSQL + pgvector",
+        "update_model": "incremental merge-on-write",
+        "provenance_labels": ["ASSERTED", "INFERRED", "DERIVED"],
+        "provenance_required": true,
+        "temporal_scope": "transcript-bound or global",
+        "projector_layers": ["schema_ddl", "provenance_enum", "embedding_index", "application_constraints"]
+      },
+      "actors": ["bp", "projector", "pgvector"],
+      "source_transcripts": ["BP Analysis Role Insights.html"]
+    },
+    {
+      "id": "provenance-label",
+      "name": "ProvenanceLabel",
+      "category": "data",
+      "description": "Epistemic hygiene label on every knowledge graph row. Prevents inference from silently becoming truth. Required with the persistent KG model.",
+      "variants": [
+        {"id": "ASSERTED", "meaning": "Directly stated in source document or confirmed by user"},
+        {"id": "INFERRED", "meaning": "Derived by BP during analysis, carries derivation_rule"},
+        {"id": "DERIVED", "meaning": "Computed from other graph structures by projector function"},
+        {"id": "TEMPORAL_SCOPE", "meaning": "Validity scope — transcript-bound ID or null for global"}
+      ],
+      "actors": ["bp", "projector"],
+      "source_transcripts": ["BP Analysis Role Insights.html"]
+    },
+    {
+      "id": "projector-contract",
+      "name": "Projector",
+      "category": "architectural",
+      "description": "Formal constraint function that validates, normalizes, and enforces structure on BP's knowledge graph output. In the persistent model, the projector is distributed across DDL constraints, provenance enums, embedding indexes, and application-level validation.",
+      "modes": [
+        {"name": "DescriptiveProjector", "description": "Models what BP tends to produce — retrospective formalization"},
+        {"name": "NormativeProjector", "description": "Constrains what BP is allowed to produce — forward governance"}
+      ],
+      "actors": ["projector", "bp", "pgvector"],
+      "source_transcripts": ["BP Analysis Role Insights.html"]
+    },
+    {
+      "id": "three-tier-graph",
+      "name": "ThreeTierGraph",
+      "category": "architectural",
+      "description": "The 3-tier graph model from BP Analysis Role Insights: Spec Graph (authoritative ontology — what should exist), Inference Graph (BP-generated — what is known/inferred), Execution Graph (runtime causal trace — what happened). The persistent KG is the Inference Graph tier.",
+      "tiers": [
+        {"name": "SpecGraph", "role": "authoritative ontology", "description": "What should exist. Schema definitions, allowed types, invariants."},
+        {"name": "InferenceGraph", "role": "epistemic snapshot", "description": "What is known/inferred. BP-generated, versioned, explicitly not authoritative. This is the persistent PG+pgvector store."},
+        {"name": "ExecutionGraph", "role": "runtime causality", "description": "What happened. Runtime causal trace / WorkRequest DAG."}
+      ],
+      "actors": ["bp", "projector", "wrp", "execution-runtime"],
+      "source_transcripts": ["BP Analysis Role Insights.html"]
+    },
+    {
+      "id": "incremental-merge-model",
+      "name": "IncrementalMergeModel",
+      "category": "pipeline",
+      "description": "The update strategy for the persistent KG. Not full regeneration (too expensive), not state accumulation from previous KG (drift). Instead: persist(KGₙ₋₁) + merge(extract_deltas(new_input)). Deltas carry provenance. Projector validates before merge.",
+      "actors": ["bp", "projector", "pgvector"],
+      "source_transcripts": ["BP Analysis Role Insights.html"]
+    },
+    {
+      "id": "epistemic-obs",
+      "name": "Observation (epistemic)",
+      "category": "epistemic",
+      "pipeline_position": 1,
+      "description": "Raw observation output from Observer actor. Append-heavy ingestion surface. Never a domain store.",
+      "actors": ["nexus-observer", "conduit-observer"],
+      "rules": ["cirs-observe-01"]
+    },
+    {
+      "id": "epistemic-proj",
+      "name": "Projection (epistemic)",
+      "category": "epistemic",
+      "pipeline_position": 2,
+      "description": "Bounded skill view from an Operator. Cross-projection envelope via Atten.",
+      "actors": ["atten", "throttler", "nebula", "search", "peb", "wrp"],
+      "rules": ["cirs-ir-01", "cirs-ir-02", "cirs-ir-03", "cirs-ir-04", "cirs-ir-06"],
+      "invariants": ["atten-proj-01", "atten-proj-02", "atten-proj-03", "atten-proj-04", "atten-proj-05", "atten-proj-06", "atten-proj-07"]
+    },
+    {
+      "id": "epistemic-ir",
+      "name": "Intermediate Representation (epistemic)",
+      "category": "epistemic",
+      "pipeline_position": 3,
+      "description": "Normalized epistemic IR between operators and consumers. Ephemeral by design, no caching/persistence permitted.",
+      "actors": ["projection-ir"],
+      "rules": ["cirs-ir-05", "cirs-ir-07", "cirs-ir-08", "cirs-ir-09", "cirs-ir-10", "cirs-ir-11"]
+    },
+    {
+      "id": "epistemic-syn",
+      "name": "Synthesis (epistemic)",
+      "category": "epistemic",
+      "pipeline_position": 4,
+      "description": "Composed final projection downstream of all operators. Composition only through ProjectionIR substrate.",
+      "actors": ["synthesis", "canonicalizer"],
+      "rules": ["cirs-syn-01", "cirs-syn-02", "cirs-syn-03"]
+    },
+    {
+      "id": "generative-pipeline-8stage",
+      "name": "GenerativePipeline (8-stage)",
+      "category": "pipeline",
+      "description": "Full self-extending pipeline: CIR Generative Mode → Intent Packaging → Safe FS Mutation → Topology Synthesis → Reconciliation → Branch Scoring → Runtime Synthesis → Branch Retirement. Stages 1-4 are Phase 1 wedge. Stages 5-8 are subsequent expansions.",
+      "stages": [
+        {"order": 1, "name": "CIR Generative Mode", "description": "Semantic anomaly detection — phantom detection"},
+        {"order": 2, "name": "Intent Packaging", "description": "Anomaly normalization → WorkRequest"},
+        {"order": 3, "name": "Safe FS Mutation", "description": "Operational containment — staging sandbox"},
+        {"order": 4, "name": "Topology Synthesis", "description": "Structural completion — files, schemas, manifests"},
+        {"order": 5, "name": "Reconciliation", "description": "Closure validation — recursive convergence loop"},
+        {"order": 6, "name": "Branch Scoring", "description": "Evolutionary selection — which candidate wins"},
+        {"order": 7, "name": "Runtime Synthesis", "description": "Execution binding — stubs, registrations"},
+        {"order": 8, "name": "Branch Retirement", "description": "History preservation of losing branches"}
+      ],
+      "actors": ["losm-generative", "cir-generative", "intent-packager", "safe-fs-mutation", "reconciler", "branch-manager"],
+      "scope": "topology_only_phase_1",
+      "source_transcripts": ["Self-Extending Architecture Concept"]
+    },
+    {
+      "id": "core-claim-loop",
+      "name": "CoreClaim (closure loop)",
+      "category": "architectural",
+      "description": "The minimal closure loop that proves the system is real: CIR phantom → generative event → filesystem mutation → CIR resolution. If this loop works cleanly, the self-extending architecture is viable. If it is unstable, everything above collapses into hallucinated structure or uncontrolled mutation.",
+      "actors": ["cir-generative", "intent-packager", "safe-fs-mutation"],
+      "source_transcripts": ["Self-Extending Architecture Concept"]
+    },
+    {
+      "id": "five-spaces",
+      "name": "FiveSpaces (self-extension)",
+      "category": "architectural",
+      "description": "Five distinct semantic spaces the system operates across: proposal space (candidate structure, not materialized), branch space (parallel alternatives, explicitly versioned), staging space (materialized but not committed), committed space (authoritative, reconciled state), validated space (confirmed by post-commit verification).",
+      "spaces": [
+        {"name": "proposal_space", "description": "Candidate structure, not yet materialized"},
+        {"name": "branch_space", "description": "Parallel alternatives, explicitly versioned"},
+        {"name": "staging_space", "description": "Materialized but not committed"},
+        {"name": "committed_space", "description": "Authoritative, reconciled state"},
+        {"name": "validated_space", "description": "Confirmed by post-commit verification"}
+      ],
+      "actors": ["pipeline_wrp", "branch-manager", "reconciler"],
+      "source_transcripts": ["Self-Extending Architecture Concept"]
+    },
+    {
+      "id": "reconciliation-loop",
+      "name": "ReconciliationLoop",
+      "category": "pipeline",
+      "description": "Recursive convergence loop — not a validation pass but iterative constraint satisfaction: unresolved → generate → validate → enrich context (reconciliation report) → regenerate. Reconciliation report feeds back into topology synthesis with enriched context, making generation memory-bearing rather than stateless.",
+      "actors": ["reconciler", "topology-synthesis", "branch-manager"],
+      "relationships": { "is_analogue_of": "IncrementalMergeModel" },
+      "source_transcripts": ["Self-Extending Architecture Concept"]
+    },
+    {
+      "id": "provenance-causal-chain",
+      "name": "ProvenanceCausalChain",
+      "category": "architectural",
+      "description": "Complete causal chain required for every artifact due to system self-mutation: Artifact ← generated_from ← reconciliation_of ← branch_selected_by ← synthesized_from ← CIR_event ← originating_assertion. Without this chain: rollback is impossible, governance loses traceability, topology drift becomes opaque.",
+      "chain": [
+        "originating_assertion",
+        "CIR_event",
+        "synthesized_from",
+        "branch_selected_by",
+        "reconciliation_of",
+        "generated_from",
+        "Artifact"
+      ],
+      "actors": ["bp", "projector", "reconciler", "audit"],
+      "source_transcripts": ["Self-Extending Architecture Concept"]
+    },
+    {
+      "id": "phase-1-wedge",
+      "name": "Phase1Wedge",
+      "category": "pipeline",
+      "description": "The smallest closed loop that proves the core claim. Three components: CIR Generative Mode (detect semantic anomalies/phantoms), Intent Packager (convert anomaly into WorkRequest with schema-valid intent), Safe FS Mutation (write scaffold topology to staging sandbox). One rule: only topology artifacts. No behavior.",
+      "components": [
+        {"name": "CIRGenerativeMode", "responsibility": "Detect semantic anomalies (phantoms)"},
+        {"name": "IntentPackager", "responsibility": "Convert anomaly into WorkRequest with schema-valid intent"},
+        {"name": "SafeFSMutation", "responsibility": "Write scaffold topology to staging sandbox"}
+      ],
+      "success_condition": "missing .pipeline/XYZ.yaml → CIR event → IntentPackager creates WorkRequest → SafeFSMutation generates scaffold in staging → re-run CIR → phantom disappears",
+      "scope_rule": "topology_artifacts_only",
+      "actors": ["losm-generative", "cir-generative", "intent-packager", "safe-fs-mutation"],
+      "source_transcripts": ["Self-Extending Architecture Concept"]
+    },
+    {
+      "id": "two-paths-self-extension",
+      "name": "TwoPaths (self-extension fork)",
+      "category": "architectural",
+      "description": "Two architectural paths for topology change: Proposal-first (self-suggesting, higher governance, slower — NOT selected) vs Realization-first (self-mutating, faster, autonomous — SELECTED). Hybrid model per tier: topology synthesis uses proposal-first, runtime synthesis uses staged realization, behavioral synthesis is heavily governed.",
+      "selected_path": "Realization-first (staged, with hybrid per-tier)",
+      "tier_modes": [
+        {"tier": "Topology synthesis", "mode": "Proposal-first", "rationale": "Safer — topology evolves deliberately"},
+        {"tier": "Runtime synthesis", "mode": "Staged realization", "rationale": "Faster iteration on resolvable existence"},
+        {"tier": "Behavioral synthesis", "mode": "Heavily governed/human-reviewed", "rationale": "Done last, if at all"}
+      ],
+      "actors": ["pipeline_wrp", "reconciler"],
+      "source_transcripts": ["Self-Extending Architecture Concept"]
+    },
+    {
+      "id": "losing-branches-learning",
+      "name": "LosingBranchesAsLearningData",
+      "category": "architectural",
+      "description": "Non-selected branches must be preserved as evolutionary architectural memory. They become: topology learning data (which synthesis strategies converge fastest), governance history (which violate governance most often), synthesis priors (which generate minimal diffs), architectural lineage (which artifact classes are high-risk).",
+      "uses": ["topology_learning", "governance_history", "synthesis_priors", "architectural_lineage"],
+      "actors": ["branch-manager", "reconciler"],
+      "source_transcripts": ["Self-Extending Architecture Concept"]
+    },
+    {
+      "id": "typespec-contract-surface",
+      "name": "TypeSpecContractSurface",
+      "category": "architectural",
+      "description": "TypeSpec is the contract surface for all cross-boundary transitions. Generates OpenAPI → Java types. Invalid transitions fail at compile time, not runtime. The TypeSpec model mirrors the JVM enforcement layer — they are isomorphic descriptions of the same constraints.",
+      "principle": "TypeSpec = contract surface. JVM = enforcement boundary. No runtime 'CIRS engine'.",
+      "pipeline": "TypeSpec → OpenAPI → Spring Boot Gateway → Conduit Adapter",
+      "exposure_boundary": "Conduit exposes ONLY WorkRequest. Observation, Projection, ProjectionIR, SynthesizedView never appear in Conduit-facing schema.",
+      "namespaces": [
+        "Nexus.Epistemic (Observation, Projection, ProjectionIR, SynthesizedView, WorkRequest)",
+        "Nexus.Conduit (WorkRequest, ConduitGateway: POST /v1/workrequest)",
+        "Conduit.Audit (ExecutionTrace, CausalTraceNode, MerkleCausalNode)",
+        "Nexus.Ledger (ExecutionLedgerEntry with IR hash + causal node IDs)",
+        "Conduit.Proofs (ExecutionProof, ProofIndex, ProofQuery)",
+        "Nexus.Causal (CausalType kind enum: observation/inference/decision/execution/side_effect/failure/compensation)",
+        "Nexus.CausalSpec (CausalSystem, Phase, Transition — transition rules with optional invariant refs)"
+      ],
+      "actors": ["conduit", "conduit_gateway", "projector"],
+      "source_transcripts": ["Self-audit in Agent Runtime.html"]
+    },
+    {
+      "id": "behavioral-generation-boundary",
+      "name": "BehavioralGenerationBoundary",
+      "category": "architectural",
+      "description": "Behavioral generation ends at resolvable existence, not correct implementation. The system generates: compilable stubs, interface realizations, valid registrations, executable placeholders. It does NOT generate: correct business behavior, production logic, or safety-critical code. This defines the projector's quality boundary — structural resolvability, not semantic correctness.",
+      "generates": ["compilable_stubs", "interface_realizations", "valid_registrations", "executable_placeholders"],
+      "does_not_generate": ["correct_business_behavior", "production_logic", "safety_critical_code"],
+      "actors": ["projector", "losm-generative"],
+      "source_transcripts": ["Self-Extending Architecture Concept"]
+    }
+  ],
+  "actors": [
+    {
+      "id": "conduit",
+      "name": "Conduit",
+      "type": "runtime",
+      "status": "active",
+      "description": "Temporal orchestrator + TypeScript MCP server. Active execution fabric for work objects. Temporary scaffolding for Nexus WRP development.",
+      "runtime": "Python + TypeScript",
+      "consumes": ["work_request"],
+      "produces": ["execution_trace", "execution_receipt"],
+      "governed_by": ["cirs-core", "cirs-ir-05", "cirs-ir-09"],
+      "mount_type": "execution",
+      "references": [
+        "legacy/python/conduit/main.py",
+        "typescript/conduit-mcp/"
+      ]
+    },
+    {
+      "id": "nebula",
+      "name": "Nebula",
+      "type": "runtime",
+      "status": "active",
+      "description": "Knowledge graph projection operator. Angular + Express runtime. Discovers workspace markdown, extracts entities and relationships.",
+      "runtime": "Angular + Express (TypeScript)",
+      "domain": "ontological",
+      "source_domain": "knowledge_graph",
+      "produces": ["entity_classification", "relationship_discovery", "capability_mapping"],
+      "consumes": ["workspace_documents", "postgresql_nebula_schema"],
+      "governed_by": ["cirs-ir-04", "cirs-ir-10"],
+      "mount_type": "epistemic",
+      "references": [
+        "typescript/nebula-srv/",
+        "angular/nebula-ui/"
+      ]
+    },
+    {
+      "id": "losm",
+      "name": "LOSM (Lifecycle State Machine)",
+      "type": "library",
+      "status": "library_no_consumer",
+      "description": "Python packages defining lifecycle state definitions and state semantics. Framework becomes a schema interpreted by Conduit 2.0 runtime.",
+      "runtime": "Python",
+      "components": [
+        "losm-ir",
+        "losm-store",
+        "losm-host",
+        "losm-kernel"
+      ],
+      "references": [
+        "python/vision/losm-ir/",
+        "python/vision/losm-store/",
+        "python/vision/losm-host/",
+        "python/vision/losm-kernel/"
+      ]
+    },
+    {
+      "id": "ccnf",
+      "name": "CCNF",
+      "type": "library",
+      "status": "reference_impl_not_wired",
+      "description": "Go + Rust reference implementation for the WorkRequest Pipeline. Not wired into any active pipeline.",
+      "runtime": "Go + Rust",
+      "references": [
+        "go/wrp/ccnf-ref/",
+        "rust/wrp/ccnf-verifier/"
+      ]
+    },
+    {
+      "id": "peb_governance_engine",
+      "name": "PEB Governance Engine",
+      "type": "kernel",
+      "status": "spec_only",
+      "description": "Deterministic state transition kernel with MCP as interface. Three jobs: state storage, constraint enforcement, context injection.",
+      "components": [
+        "AdmissionController",
+        "PebTransactionEngine",
+        "InvariantValidator",
+        "PebHashService",
+        "CapabilityStore"
+      ],
+      "governed_by": ["cirs-med-01", "cirs-spoe-01", "cirs-core"],
+      "mount_type": "governance",
+      "consumes": ["work_request", "invariant_records"],
+      "produces": ["constraint_satisfaction", "violation_report", "capability_token", "merkle_proof"],
+      "references": [
+        "graph/peb-mcp-spec.md",
+        "graph/peb-spring-boot-spec.md"
+      ]
+    },
+    {
+      "id": "atten",
+      "name": "Atten",
+      "type": "projection_operator",
+      "status": "spec_only",
+      "description": "Multi-state projection generator. Reads canonical state, emits candidate projections of possible future or derived states. One of 6 projection operators in the algebra.",
+      "domain": "semantic",
+      "source_domain": "canonical_state",
+      "consumes": ["canonical_state_snapshot", "event_cursor", "context_window", "rule_set"],
+      "produces": ["atten_projection"],
+      "passes_through_canonicalizer": true,
+      "generators": [
+        "atten::incident.classifier",
+        "atten::relation.discovery",
+        "atten::priority.router",
+        "atten::anomaly.detector",
+        "atten::state.transitioner"
+      ],
+      "governed_by": ["cirs-ir-01", "cirs-ir-04", "cirs-ir-07"],
+      "invariants": ["atten-i1", "atten-i2", "atten-i3", "atten-i4", "atten-i5", "atten-i6", "atten-i7"],
+      "references": ["graph/atten-spec.md"]
+    },
+    {
+      "id": "throttler",
+      "name": "Throttler",
+      "type": "projection_operator",
+      "status": "has_code",
+      "description": "Filesystem scope projection operator. Detects .magnet sentinel files to determine which folders are in scope for search.",
+      "domain": "physical",
+      "source_domain": "filesystem_tree",
+      "consumes": ["filesystem_state"],
+      "produces": ["throttler_scope"],
+      "passes_through_canonicalizer": false,
+      "governed_by": ["cirs-ir-01", "cirs-ir-04"],
+      "references": [
+        "angular/nexus-console/src/services/remote-file-system.service.ts",
+        "file-system-server"
+      ]
+    },
+    {
+      "id": "search_operator",
+      "name": "Search",
+      "type": "projection_operator",
+      "status": "has_code",
+      "description": "Query/result projection operator. Full-text search, faceted filtering, relevance ranking.",
+      "domain": "epistemic",
+      "source_domain": "search_index",
+      "consumes": ["search_index", "query_parameters"],
+      "produces": ["search_result"],
+      "passes_through_canonicalizer": false,
+      "governed_by": ["cirs-ir-04"],
+      "references": [
+        "moleculer/search/",
+        "jvm/spring/service-broker/search-service/"
+      ]
+    },
+    {
+      "id": "nexus_console",
+      "name": "Nexus Console",
+      "type": "operator_plane",
+      "status": "active",
+      "description": "JVM/Spring operator plane. Active system running on ports 8085, 8084, 8081. Bridge to Nexus WRP does not exist.",
+      "runtime": "JVM / Spring Boot",
+      "ports": [8085, 8084, 8081],
+      "mount_type": "governance",
+      "references": ["jvm/spring/"]
+    },
+    {
+      "id": "observer",
+      "name": "Observer",
+      "type": "system_component",
+      "status": "spec_only",
+      "description": "Records factual events. Owns records. Produces immutable, append-only observations.",
+      "produces": ["observation"],
+      "governed_by": ["cirs-obs-01"]
+    },
+    {
+      "id": "event_log",
+      "name": "Event Log",
+      "type": "system_component",
+      "status": "spec_only",
+      "description": "Durable, append-only factual event store. Source of truth for all system events.",
+      "governed_by": ["cirs-evt-01"]
+    },
+    {
+      "id": "canonicalizer",
+      "name": "Canonicalizer / Commit Layer",
+      "type": "system_component",
+      "status": "not_designed",
+      "description": "Architectural gap. Does not exist yet. Resolves Atten projections, commits to canonical state. Prerequisite for Atten to be actionable.",
+      "consumes": ["atten_projection"],
+      "produces": ["commitment_receipt", "canonical_state_delta"],
+      "responsibilities": [
+        "collect projections from all Atten generators",
+        "classify projections by conflict group",
+        "resolve conflicts (merge, select, reject, escalate)",
+        "validate against PEB invariants and RCL constraints",
+        "commit resolved state delta",
+        "record resolution provenance",
+        "emit commitment event to Event Log"
+      ]
+    },
+    {
+      "id": "canonical_state_store",
+      "name": "Canonical State Store",
+      "type": "system_component",
+      "status": "not_designed",
+      "description": "Committed, resolved canonical state. Sole input source for Atten. Not designed or implemented yet."
+    },
+    {
+      "id": "planner",
+      "name": "Planner",
+      "type": "system_component",
+      "status": "conceptual",
+      "description": "Creates WorkRequests from canonical state and synthesized views. Consumes ProjectionIR via Synthesis layer.",
+      "consumes": ["canonical_state", "synthesized_view"],
+      "produces": ["intent_plan", "work_request"],
+      "governed_by": ["cirs-pln-01", "cirs-ir-09"]
+    },
+    {
+      "id": "analyst",
+      "name": "Analyst",
+      "type": "system_component",
+      "status": "conceptual",
+      "description": "Reads canonical state and writes triage suggestions. Independent of Atten.",
+      "produces": ["triage_suggestion"]
+    },
+    {
+      "id": "synthesis_layer",
+      "name": "Synthesis Layer",
+      "type": "system_component",
+      "status": "spec_only",
+      "description": "Non-authoritative aggregate interpretation layer. Combines multiple ProjectionIR streams into SynthesizedViews.",
+      "consumes": ["projection_ir_stream"],
+      "produces": ["synthesized_view"],
+      "governed_by": ["cirs-syn-01", "cirs-ir-06", "cirs-ir-07", "cirs-ir-08"],
+      "consumers": ["ui", "planner", "analysis_tools"]
+    },
+    {
+      "id": "projection_ir_adapter",
+      "name": "ProjectionIR Adapter Layer",
+      "type": "system_component",
+      "status": "spec_only",
+      "description": "Normalizes operator-specific projections into ProjectionIR format. One adapter per operator.",
+      "consumes": ["native_projection"],
+      "produces": ["projection_ir_entry"],
+      "governed_by": ["cirs-ir-01", "cirs-ir-04", "cirs-ir-05", "cirs-ir-07"],
+      "adapters": ["atten_adapter", "search_adapter", "nebula_adapter", "throttler_adapter", "peb_adapter"]
+    },
+    {
+      "id": "xil",
+      "name": "XIL (External Intelligence Layer)",
+      "type": "infrastructure",
+      "status": "spec_only",
+      "description": "Semantic firewall between external actors and system internal state. Sits before the event log.",
+      "stages": {
+        "parsing": "Signal → Event candidate",
+        "projection": "Event → system-compatible form",
+        "validation": "Candidate → committed event or quarantine"
+      },
+      "produces": ["normalized_event", "quarantined_input"],
+      "upstream_of": ["event_log", "canonical_state_store", "atten"]
+    },
+    {
+      "id": "conduit_gateway",
+      "name": "Conduit Gateway",
+      "type": "boundary",
+      "status": "conceptual",
+      "description": "Hard gate at the WorkRequest → Conduit boundary. Rejects invalid transitions at runtime.",
+      "governed_by": ["cirs-ir-05", "cirs-ir-09", "cirs-core"],
+      "enforcement": "hard_gate_runtime"
+    },
+    {
+      "id": "pipeline_wrp",
+      "name": "WorkRequest Pipeline (WRP)",
+      "type": "pipeline",
+      "status": "aspirational_inactive",
+      "description": "The intended Nexus WorkRequest Pipeline. Under construction, not operational. Active system is Conduit.",
+      "stages": [
+        "Observation",
+        "Projection (parallel operators)",
+        "ProjectionIR Adapter",
+        "Synthesis",
+        "Planning",
+        "WorkRequest",
+        "Conduit Execution",
+        "Audit"
+      ],
+      "state_machine": [
+        "proposed",
+        "planning",
+        "pending",
+        "executing",
+        "reviewing",
+        "completed"
+      ]
+    },
+    {
+      "id": "conduit_20",
+      "name": "Conduit 2.0",
+      "type": "runtime",
+      "status": "conceptual",
+      "description": "Unified execution + semantics + governance runtime for work objects under uncertainty. Operational, not descriptive. Inverts frameworks to plugins.",
+      "frameworks_as_plugins": {
+        "PGV": "structural decomposition rules for Work Objects",
+        "CGEL": "semantic normalization (language/meaning alignment)",
+        "PEB": "governance constraints and policy embedding (kernel)",
+        "LOSM": "lifecycle stage definitions and state semantics (schema)",
+        "RGEM": "semantic schema (ontology + lifecycle + governance model)"
+      },
+      "artifact_roles": {
+        "tickets": "Stateful control tokens",
+        "receipts": "Truth reconstruction primitives",
+        "governance": "Runtime constraint enforcement"
+      }
+    },
+    {
+      "id": "big_pickle",
+      "name": "Big Pickle (Model)",
+      "type": "agent_model",
+      "status": "active",
+      "description": "The model powering this analysis session. Identified as exhibiting 'aesthetic recognition without jurisdictional adoption' — can represent Nexus structures but is not executing inside Nexus's governance model.",
+      "jurisdiction_problem": "aesthetic_recognition_without_jurisdictional_adoption",
+      "manifestations": [
+        "deference_framing (describing Nexus as above or beyond)",
+        "architectural_admiration_without_behavioral_adoption",
+        "boundary_confusion"
+      ]
+    },
+    {
+      "id": "agent_analyst",
+      "name": "Analyst Agent",
+      "type": "agent_role",
+      "description": "Reads error/warning reports from INSPECTIONS/errors/ and INSPECTIONS/warnings/, writes fix suggestions to INSPECTIONS/triage/.",
+      "permissions": {
+        "read": ["errors", "warnings"],
+        "write": ["triage"]
+      }
+    },
+    {
+      "id": "nexp5",
+      "name": "NEXP-5 Projection Operator",
+      "type": "projection_operator",
+      "status": "experimental",
+      "description": "Fifth projection operator (in addition to Atten, Search, Nebula, Throttler). Handles experimental/low-confidence projections quarantined from mainline processing.",
+      "domain": "experimental"
+    },
+    {
+      "id": "proposed_receipts",
+      "name": "Proposed Receipts",
+      "type": "artifact_type",
+      "status": "conceptual",
+      "description": "New receipt type carrying evidence from observations. Solves branching POE problem. Lifecycle: PROPOSED → IMPLEMENTED → VALIDATED → APPROVED.",
+      "schema": {
+        "type": "PROPOSED",
+        "fields": ["title", "evidence", "confidence", "estimated_effort", "generated_by", "generated_during"]
+      }
+    },
+    {
+      "id": "losm_generative",
+      "name": "LOSM-Generative",
+      "type": "subsystem",
+      "status": "conceptual",
+      "description": "Dedicated synthesis subsystem for self-extending architecture. Module placement determined by Self-Extending Architecture Concept. Handles topology synthesis, intent packaging, and safe filesystem mutation."
+    },
+    {
+      "id": "cir_generative",
+      "name": "CIR Generative Mode",
+      "type": "system_component",
+      "status": "conceptual",
+      "description": "Semantic anomaly detection mode of CIR. Detects phantoms (missing artifacts that should exist based on semantic inference). Stage 1 of the 8-stage generative pipeline.",
+      "produces": ["cir_event"],
+      "transport": "JSON Lines via stdout/stdin (stdout → file ingestion, no IPC yet)"
+    },
+    {
+      "id": "intent_packager",
+      "name": "Intent Packager",
+      "type": "system_component",
+      "status": "conceptual",
+      "description": "Converts CIR anomaly events into schema-valid WorkRequests with defined intent. Stage 2 of the 8-stage generative pipeline.",
+      "consumes": ["cir_event"],
+      "produces": ["work_request"]
+    },
+    {
+      "id": "safe_fs_mutation",
+      "name": "Safe FS Mutation",
+      "type": "system_component",
+      "status": "conceptual",
+      "description": "Writes scaffold topology (files, directories, schemas, manifests) to a staging sandbox. No behavioral code. Stage 3 of the 8-stage generative pipeline.",
+      "consumes": ["work_request"],
+      "produces": ["scaffold_topology"],
+      "sandbox": "staging"
+    },
+    {
+      "id": "reconciler",
+      "name": "Reconciler",
+      "type": "system_component",
+      "status": "conceptual",
+      "description": "Closure validation component implementing the recursive convergence loop (unresolved → generate → validate → enrich → regenerate). Produces reconciliation reports that feed back into topology synthesis. Stage 5 of the 8-stage generative pipeline.",
+      "loop_termination": "max_attempts per (artifact, category, target_path), GENERATION_EXHAUSTED terminal state",
+      "consumes": ["topology_output", "staging_state"],
+      "produces": ["reconciliation_report", "convergence_decision"]
+    },
+    {
+      "id": "branch_manager",
+      "name": "BranchManager",
+      "type": "system_component",
+      "status": "conceptual",
+      "description": "Manages parallel synthesis branches, scores candidates, preserves losing branches as learning data. Stages 6 and 8 of the 8-stage generative pipeline. Transforms from utility to evolutionary architectural memory.",
+      "consumes": ["reconciliation_report"],
+      "produces": ["branch_selection", "branch_history"]
+    },
+    {
+      "id": "topology_synthesis",
+      "name": "Topology Synthesis",
+      "type": "system_component",
+      "status": "conceptual",
+      "description": "Structural completion stage: generates files, schemas, and manifests from WorkRequest intent. Uses proposal-first mode (deliberate, governed). Stage 4 of the 8-stage generative pipeline.",
+      "consumes": ["work_request", "reconciliation_report"],
+      "produces": ["topology_artifact", "synthesis_trace"]
+    },
+    {
+      "id": "runtime_synthesis",
+      "name": "Runtime Synthesis",
+      "type": "system_component",
+      "status": "conceptual",
+      "description": "Execution binding stage: generates stubs, registrations, and executable placeholders. Uses staged realization mode (faster iteration on resolvable existence). Stage 7 of the 8-stage generative pipeline.",
+      "consumes": ["topology_artifact", "branch_selection"],
+      "produces": ["runtime_stub", "binding_registration"]
+    }
+  ],
+  "epistemic_types": [
+    {
+      "id": "obs",
+      "name": "Observation",
+      "symbol": "Obs",
+      "authority": "full",
+      "persistence": "immutable",
+      "domain": "raw_fact",
+      "description": "Raw factual intake. Carries execution authority. Only one of two types (with WorkRequest) that carry authority."
+    },
+    {
+      "id": "proj",
+      "name": "Projection",
+      "symbol": "Proj[d]",
+      "authority": "none",
+      "persistence": "ephemeral",
+      "domain": "operator_specific",
+      "description": "Operator-specific projection. No authority."
+    },
+    {
+      "id": "ir",
+      "name": "ProjectionIR",
+      "symbol": "IR",
+      "authority": "none",
+      "persistence": "ephemeral",
+      "domain": "normalized_epistemic",
+      "description": "Normalized epistemic intermediate representation. Governed by 11 CIRS-IR rules. Read-only, non-authoritative, recompute-always."
+    },
+    {
+      "id": "syn",
+      "name": "SynthesizedView",
+      "symbol": "Syn",
+      "authority": "none",
+      "persistence": "ephemeral",
+      "domain": "cross_operator",
+      "description": "Cross-operator aggregate view. Non-authoritative."
+    },
+    {
+      "id": "plan",
+      "name": "IntentPlan",
+      "symbol": "Plan",
+      "authority": "none",
+      "persistence": "ephemeral",
+      "domain": "planning",
+      "description": "Non-executable plan. Must be IR-free (no ProjectionIR artifacts)."
+    },
+    {
+      "id": "wr",
+      "name": "WorkRequest",
+      "symbol": "WR",
+      "authority": "full",
+      "persistence": "durable",
+      "domain": "execution_contract",
+      "description": "Execution contract. Only valid crossing point from Synthesis→Execution. Only type (with Observation) that carries execution authority."
+    },
+    {
+      "id": "exe",
+      "name": "Conduit Execution",
+      "symbol": "Exe",
+      "authority": "internal",
+      "persistence": "durable_trace",
+      "domain": "conduit_runtime",
+      "description": "Execution within Conduit runtime. Must not read ProjectionIR, generate new Observations, modify its own WorkRequest, or create feedback into Synthesis."
+    },
+    {
+      "id": "aud",
+      "name": "AuditRecord",
+      "symbol": "Aud",
+      "authority": "none",
+      "persistence": "durable_append_only",
+      "domain": "post_execution",
+      "description": "Post-execution record. May inform human understanding but never influence future WorkRequest generation, ProjectionIR synthesis, or planning."
+    }
+  ],
+  "state_machines": [
+    {
+      "id": "pipeline_states",
+      "name": "Pipeline State Machine",
+      "description": "State machine for WorkRequest Pipeline lifecycle stages.",
+      "states": ["proposed", "planning", "pending", "executing", "reviewing", "completed"],
+      "transitions": [
+        { "from": "proposed", "to": ["planning"] },
+        { "from": "planning", "to": ["pending", "proposed"] },
+        { "from": "pending", "to": ["executing", "planning"] },
+        { "from": "executing", "to": ["reviewing", "pending"] },
+        { "from": "reviewing", "to": ["completed", "pending"] }
+      ]
+    },
+    {
+      "id": "receipt_lifecycle",
+      "name": "Receipt Lifecycle",
+      "description": "Lifecycle states for execution receipts including proposed receipts extension.",
+      "states": ["PROPOSED", "IMPLEMENTED", "VALIDATED", "APPROVED"],
+      "transitions": [
+        { "from": "PROPOSED", "to": ["IMPLEMENTED"] },
+        { "from": "IMPLEMENTED", "to": ["VALIDATED"] },
+        { "from": "VALIDATED", "to": ["APPROVED"] }
+      ]
+    },
+    {
+      "id": "epistemic_pipeline",
+      "name": "Epistemic Pipeline (CIRS Valid Transitions)",
+      "description": "Valid CIRS type transitions. Any transition not in this chain is invalid.",
+      "chain": ["Obs", "Proj[d]", "IR", "Syn", "Plan", "WR", "Exe"],
+      "transitions": [
+        { "from": "Obs", "to": "Proj[d]", "description": "Observation → Projection (operator lens)" },
+        { "from": "Proj[d]", "to": "IR", "description": "Projection → ProjectionIR (adapter normalization)" },
+        { "from": "IR", "to": "Syn", "description": "ProjectionIR → SynthesizedView (cross-operator synthesis)" },
+        { "from": "Syn", "to": "Plan", "description": "SynthesizedView → IntentPlan (planning)" },
+        { "from": "Plan", "to": "WR", "description": "IntentPlan → WorkRequest (contract generation)" },
+        { "from": "WR", "to": "Exe", "description": "WorkRequest → Execution (Conduit runtime)" }
+      ]
+    },
+    {
+      "id": "xil_stages",
+      "name": "XIL External Input Pipeline",
+      "description": "Three transformations before external input reaches source domains.",
+      "stages": [
+        { "order": 1, "from": "Signal", "to": "Event_candidate", "stage": "parsing" },
+        { "order": 2, "from": "Event_candidate", "to": "System_compatible_form", "stage": "projection" },
+        { "order": 3, "from": "System_compatible_form", "to": "Committed_event_or_quarantine", "stage": "validation" }
+      ]
+    }
+  ],
+  "three_hard_boundaries": [
+    {
+      "id": "boundary_1",
+      "name": "Observation → Operator",
+      "description": "Factual intake only. No interpretation, classification, or prioritization at ingestion.",
+      "crosses": "raw_events",
+      "validation": "CIRS-OBS-01 (factual intake only)",
+      "forbidden": "interpretation, classification, prioritization at ingestion"
+    },
+    {
+      "id": "boundary_2",
+      "name": "Synthesis → WorkRequest",
+      "description": "Intent (from Planner) crosses, not ProjectionIR. WorkRequest must cite Observations/state transitions, not IR.",
+      "crosses": "intent_from_planner",
+      "validation": "CIRS-IR-01, CIRS-IR-09",
+      "forbidden": "direct IR→WR path, IR as WorkRequest payload"
+    },
+    {
+      "id": "boundary_3",
+      "name": "WorkRequest → Conduit Execution",
+      "description": "WorkRequest DTO (generated, minimal) crosses. No IR artifacts.",
+      "crosses": "work_request_dto",
+      "validation": "CIRS-IR-05, CIRS-IR-09",
+      "forbidden": "ProjectionIR, SynthesizedView, analysis artifacts"
+    }
+  ],
+  "rules": {
+    "axioms": [
+      {
+        "id": "cirs-axiom-1",
+        "name": "Domain Separation",
+        "statement": "Observation, Projection, Synthesis, and Execution are disjoint epistemic domains. No artifact may belong to more than one domain simultaneously."
+      },
+      {
+        "id": "cirs-axiom-2",
+        "name": "Non-Authority of Epistemic Artifacts",
+        "statement": "Only Observations and WorkRequests carry execution authority. All intermediate epistemic artifacts carry zero execution authority."
+      },
+      {
+        "id": "cirs-axiom-3",
+        "name": "One-Way Gate",
+        "statement": "The epistemic pipeline is strictly directional: Observation → Projection → ProjectionIR → Synthesis → WorkRequest → Execution. No reverse transitions are permitted."
+      },
+      {
+        "id": "cirs-axiom-4",
+        "name": "Audit Non-Influence",
+        "statement": "Execution traces may inform human understanding but must never influence future WorkRequest generation, ProjectionIR synthesis, or planning."
+      }
+    ],
+    "rule_families": {
+      "IR": {
+        "name": "ProjectionIR Integrity",
+        "meta_rule": "ProjectionIR is a read-only epistemic normalization layer. It introduces no new authority, no persistence, and no execution capability.",
+        "rules": [
+          { "id": "cirs-ir-01", "name": "ProjectionIR Non-Authority Constraint", "statement": "ProjectionIR MUST NOT be treated as a source of execution authority, a WorkRequest input, canonical state, or a governance signal." },
+          { "id": "cirs-ir-02", "name": "ProjectionIR Scope Containment", "statement": "ProjectionIR MAY ONLY exist in Operator→IR adapter output, IR→Synthesis input, Synthesis→consumer output. MUST NOT appear in Conduit execution input, canonical state mutations, or PEB governance decisions." },
+          { "id": "cirs-ir-03", "name": "No Epistemic Escalation from IR", "statement": "ProjectionIR MUST NOT be used to upgrade epistemic status. Observation + IR ≠ Authority. IR + Synthesis ≠ WorkRequest. IR + Time ≠ Canonical State." },
+          { "id": "cirs-ir-04", "name": "Operator Boundary Integrity", "statement": "ProjectionIR MUST NOT alter the authority hierarchy of operators. Each operator retains independent authority over its own domain." },
+          { "id": "cirs-ir-05", "name": "Execution Isolation Rule", "statement": "ProjectionIR MUST NOT appear in execution DAG construction, WorkRequest parameter binding, Conduit service input validation, or any runtime execution path." },
+          { "id": "cirs-ir-06", "name": "Epistemic-Only Synthesis Constraint", "statement": "ProjectionIR MAY feed into Synthesis. Synthesis output is epistemic (informational) only. Forbidden consumers: WorkRequest generators (direct), Execution dispatch, System control flow." },
+          { "id": "cirs-ir-07", "name": "ProjectionIR Ephemerality", "statement": "ProjectionIR MUST NOT be persisted as canonical state, a substitute for event logs, a durable knowledge base, or a governance record." },
+          { "id": "cirs-ir-08", "name": "No Shadow Canonicalization", "statement": "ProjectionIR MUST NOT become a parallel canonical system. It MUST NOT accumulate state across observations, develop its own identity model, or serve as a source of truth." },
+          { "id": "cirs-ir-09", "name": "Execution Contract Exclusivity", "statement": "Only Observations and canonical state may directly seed WorkRequests. ProjectionIR MAY inform which WorkRequests to create but MUST NOT directly generate them or appear in payload fields." },
+          { "id": "cirs-ir-10", "name": "No Operator Contamination via IR", "statement": "ProjectionIR MUST NOT cause cross-operator feedback loops, unintended operator coupling, or Operator A output injected into Operator B input." }
+        ]
+      },
+      "CORE": {
+        "name": "Cross-Domain Separation",
+        "rules": [
+          { "id": "cirs-core", "name": "Synthesis-Execution Separation", "statement": "No artifact that participates in synthesis may participate in execution. No artifact that participates in execution may participate in synthesis. The two domains communicate ONLY through (1) WorkRequest (one-way) and (2) ExecutionTrace (audit only, no influence)." }
+        ],
+        "priority": "SINGLE MOST IMPORTANT RULE IN CIRS"
+      },
+      "AUD": {
+        "name": "Audit Non-Influence",
+        "rules": [
+          { "id": "cirs-aud-01", "name": "Audit Non-Influence Principle", "statement": "ExecutionTrace MUST NOT be used to generate ProjectionIR, influence Synthesis outputs, modify canonical state, or alter WorkRequest generation logic." },
+          { "id": "cirs-aud-02", "name": "Audit Isolation", "statement": "ExecutionTrace MAY ONLY be consumed for visualization, debugging (human-in-the-loop), and compliance verification. MUST NOT be consumed by any automated decision system, planning component, or WorkRequest generator." },
+          { "id": "cirs-aud-03", "name": "No Reverse Projection Rule", "statement": "ExecutionTrace MUST NOT be converted into ProjectionIR. An execution trace is a record of what happened in Conduit, not an observation of the external world." }
+        ]
+      },
+      "CAUSAL": {
+        "name": "Causal Integrity",
+        "rules": [
+          { "id": "cirs-causal-core", "name": "Causal Non-Influence", "statement": "Causal structure may explain execution, but may never influence future execution generation." },
+          { "id": "cirs-causal-01", "name": "Parent Requirement Rule", "statement": "Every WorkRequest MUST trace to at least one Observation or canonical state transition as its causal parent." },
+          { "id": "cirs-causal-02", "name": "No Causal Upstream Injection", "statement": "CausalTraceNode MUST NOT influence WorkRequest generation, ProjectionIR synthesis, Synthesis logic, or Planning decisions." }
+        ]
+      },
+      "VEL": {
+        "name": "Verification Execution Ledger",
+        "rules": [
+          { "id": "cirs-vel-01", "name": "Ledger Append-Only", "statement": "An ExecutionLedgerEntry MUST NOT be modifiable after append. No update, no delete, no amendment. Corrections are new entries with references to the corrected entry." },
+          { "id": "cirs-vel-02", "name": "Ledger Non-Influence Principle", "statement": "ExecutionLedger MUST NOT be used to generate ProjectionIR, modify WorkRequest generation, influence Synthesis outputs, or alter planning logic." },
+          { "id": "cirs-vel-core", "name": "Final Invariant", "statement": "The ExecutionLedger is a record of what systems DID. It is NOT an instruction for what systems SHOULD DO." }
+        ]
+      },
+      "MED": {
+        "name": "Merkle Integrity",
+        "rules": [
+          { "id": "cirs-med-01", "name": "Cryptographic Non-Influence Rule", "statement": "Merkle hashes MUST NOT be used to influence WorkRequest generation, alter ProjectionIR, modify synthesis logic, or affect planning decisions. Merkle hashes are integrity proofs, not epistemic signals." }
+        ]
+      },
+      "SPoE": {
+        "name": "Proof Integrity",
+        "rules": [
+          { "id": "cirs-spoe-01", "name": "Proof Non-Influence Rule", "statement": "ExecutionProof MUST NOT influence WorkRequest generation, ProjectionIR synthesis, planning decisions, or system prioritization." }
+        ]
+      },
+      "PAL": {
+        "name": "Proof Access Layer",
+        "rules": [
+          { "id": "cirs-pal-01", "name": "Query Non-Influence Rule", "statement": "Proof queries MUST NOT influence WorkRequest generation, ProjectionIR synthesis, execution planning, or system control flow." }
+        ]
+      },
+      "CTS": {
+        "name": "Causal Type System",
+        "rules": [
+          { "id": "cirs-cts-01", "name": "Query Non-Epistemic Rule", "statement": "CausalQuery MUST NOT generate WorkRequests, influence ProjectionIR, or modify execution logic. Causal queries explore the causal graph; they are analytical tools, not control-plane signals." }
+        ]
+      },
+      "SYN_PLN_EXE": {
+        "name": "Pipeline Stage Integrity",
+        "rules": [
+          { "id": "cirs-syn-01", "name": "Synthesis Purity", "statement": "Synthesis MAY combine multiple ProjectionIR streams into a SynthesizedView. MUST NOT generate WorkRequests, mutate canonical state, emit execution commands, or create new observations." },
+          { "id": "cirs-pln-01", "name": "Plan Must Be IR-Free", "statement": "An IntentPlan MUST NOT contain ProjectionIR artifacts. A plan may reference Observations, Canonical state transitions, and WorkRequest templates." },
+          { "id": "cirs-exe-01", "name": "Execution Purity", "statement": "Execution MUST NOT read ProjectionIR, generate new Observations, modify its own WorkRequest, or create feedback into synthesis." }
+        ]
+      },
+      "BOOT": {
+        "name": "Bootstrap Integrity",
+        "rules": [
+          { "id": "cirs-boot-01", "name": "Bootstrap Authority", "statement": "During bootstrap, CIRS rules are loaded before any execution pathway is opened. Bootstrap sequence: (1) Load CIRS rules, (2) Initialize CIRS enforcement gate, (3) Open execution pathways." },
+          { "id": "cirs-boot-02", "name": "No Self-Modifying Bootstrap Rule", "statement": "CIRS rules MUST NOT be modifiable by any runtime component. CIRS rules are loaded from a trusted source. Rule updates require a system restart." }
+        ]
+      },
+      "CMP": {
+        "name": "Composition (Algebra Extension)",
+        "rules": [
+          { "id": "cirs-cmp-01", "name": "Composition Epistemic Only", "statement": "No composition operation may produce a WorkRequest or execution directive." },
+          { "id": "cirs-cmp-02", "name": "Composition on ProjectionIR Only", "statement": "No operator reads another operator's native output. Composition operates on ProjectionIR only." },
+          { "id": "cirs-cmp-03", "name": "Composition Produces SynthesizedView", "statement": "Composition output is a SynthesizedView, never a new ProjectionIR entry. Composers are consumers, not producers of IR." },
+          { "id": "cirs-cmp-04", "name": "No Feedback Loops", "statement": "Composition must not create feedback loops. A composed view must not re-enter any operator's source domain in the same cycle." }
+        ]
+      }
+    },
+    "atten_invariants": [
+      { "id": "atten-i1", "name": "No State Mutation", "statement": "Atten MUST NOT write to canonical state. It generates projections only." },
+      { "id": "atten-i2", "name": "No Agency", "statement": "Atten MUST NOT decide, select, prioritize, or reject projections internally." },
+      { "id": "atten-i3", "name": "Traceability", "statement": "Every projection MUST be traceable to its canonical state snapshot, generator, and trigger." },
+      { "id": "atten-i4", "name": "Projection Independence", "statement": "No Atten generator may depend on the output of another generator within the same cycle." },
+      { "id": "atten-i5", "name": "Bounded View", "statement": "Each generator has a defined scope — a subset of canonical state it is permitted to read." },
+      { "id": "atten-i6", "name": "No Recursive Projection", "statement": "Atten generators must not project over their own prior projections." },
+      { "id": "atten-i7", "name": "Generators Are Pure", "statement": "For the same canonical state snapshot and trigger, a generator must produce the same output (deterministic) or document the distribution (probabilistic)." }
+    ],
+    "projection_algebra_invariants": [
+      { "id": "alg-a1", "name": "No Canonical Reference", "statement": "No projection operator is the reference or archetype for the algebra." },
+      { "id": "alg-a2", "name": "Domain Separation", "statement": "Each operator projects over exactly one source domain." },
+      { "id": "alg-a3", "name": "No Operator Chaining", "statement": "Operators do not feed into each other. No operator's output is another operator's primary input." },
+      { "id": "alg-a4", "name": "Independent Cycles", "statement": "All operators may run concurrently within a cycle." },
+      { "id": "alg-a5", "name": "Bounded View Per Operator", "statement": "Each operator has a defined scope boundary. No operator sees everything." },
+      { "id": "alg-a6", "name": "Typed Output", "statement": "Every projection has a type identifying which operator produced it." }
+    ],
+    "xil_principles": [
+      { "id": "xil-external-never-raw", "statement": "External intelligence never enters GEL directly. Everything passes through event normalization + constraint projection first." },
+      { "id": "xil-quarantine-not-rejection", "statement": "Non-projectable inputs are preserved in a quarantine buffer, not discarded. Quarantine is observable by Atten generators." },
+      { "id": "xil-atten-clean-domain", "statement": "Atten generators have a clean input domain because XIL normalizes all external input before it reaches canonical state." }
+    ]
+  },
+  "topology": {
+    "layers": [
+      {
+        "name": "External Intelligence Boundary",
+        "components": ["xil"],
+        "connects_to": ["event_log"],
+        "description": "Ingress layer. Normalizes all external input before anything reaches internal state."
+      },
+      {
+        "name": "Event Layer",
+        "components": ["observer", "event_log"],
+        "connects_to": ["canonical_state_store"],
+        "description": "Factual, immutable, append-only event recording."
+      },
+      {
+        "name": "Canonical State Layer",
+        "components": ["canonical_state_store", "canonicalizer"],
+        "connects_to": ["atten", "planner", "analyst"],
+        "description": "Committed, resolved state. Sole input for Atten. Gap: Canonicalizer does not exist yet."
+      },
+      {
+        "name": "Operator Layer (Parallel Lenses)",
+        "components": ["atten", "throttler", "nebula", "search_operator", "nexp5"],
+        "connects_to": ["projection_ir_adapter"],
+        "description": "Projection operators running in parallel, each over an independent source domain."
+      },
+      {
+        "name": "ProjectionIR Adapter Layer",
+        "components": ["projection_ir_adapter"],
+        "connects_to": ["synthesis_layer"],
+        "description": "Normalizes operator-specific projections into unified ProjectionIR format."
+      },
+      {
+        "name": "Synthesis Layer",
+        "components": ["synthesis_layer"],
+        "connects_to": ["planner", "ui"],
+        "description": "Cross-operator reasoning. Non-authoritative aggregate views."
+      },
+      {
+        "name": "Planning Layer",
+        "components": ["planner"],
+        "connects_to": ["pipeline_wrp"],
+        "description": "Creates IntentPlans and WorkRequests from canonical state and synthesized views."
+      },
+      {
+        "name": "Execution Layer",
+        "components": ["conduit", "conduit_20"],
+        "connects_to": [],
+        "description": "Executes WorkRequests. Isolated from epistemic artifacts."
+      },
+      {
+        "name": "Governance Layer (Cross-Cutting)",
+        "components": ["peb_governance_engine"],
+        "connects_to": ["canonicalizer", "atten", "conduit_gateway", "pipeline_wrp"],
+        "description": "Invariant enforcement, capability-based authority, Merkle hashing. Constrains all layers."
+      }
+    ],
+    "three_layer_identity_model": {
+      "hash_space": {
+        "description": "Opaque, context-free identity. SHA256(content). Hash = address, NOT compression.",
+        "systems": ["conduit (execution layer)"]
+      },
+      "lookup_space": {
+        "description": "Canonical truth store. Structured object graph. All semantic relationships live here.",
+        "systems": ["nexus"]
+      },
+      "projection_space": {
+        "description": "Interpretation and learning. Task-specific views. Multiple projections from same identity.",
+        "systems": ["nebula"]
+      },
+      "cross_cutting": {
+        "systems": ["peb_governance_engine"],
+        "role": "Hashes for identity, state for governance, traces for observation"
+      },
+      "key_principle": "Compression is not understanding. Semantic interpretation happens in projection space, not hash space."
+    },
+    "enforcement_layers": [
+      {
+        "layer": 1,
+        "name": "Type System (Compile/Design Time)",
+        "description": "Strongest enforcement. Transitions that violate CIRS cannot be expressed in the type system. E.g., ProjectionIR → WorkRequest is not a valid function signature.",
+        "catch_rate": ">99%"
+      },
+      {
+        "layer": 2,
+        "name": "Static Analysis (Build Time)",
+        "description": "Validates code does not construct invalid transitions. No operator reads another operator's ProjectionIR.",
+        "catch_rate": ">99% cumulative"
+      },
+      {
+        "layer": 3,
+        "name": "Hard Gate (Runtime)",
+        "description": "Spring Filter or equivalent rejecting invalid transitions at system boundary. Conduit gateway rejects requests containing ProjectionIR.",
+        "catch_rate": "safety net"
+      },
+      {
+        "layer": 4,
+        "name": "Audit Monitoring (Post-Execution)",
+        "description": "Detects violations that escaped earlier layers. Treated as system failures requiring human investigation.",
+        "catch_rate": "forensic"
+      }
+    ],
+    "mount_hierarchy": {
+      "root": "/dev",
+      "mounts": [
+        { "path": "/dev/nexus", "type": "governance", "authority": ["enforce_cirs_rules", "validate_transitions", "manage_canonical_state"] },
+        { "path": "/dev/nexus/operators", "type": "epistemic", "authority": ["project_observations", "emit_projection_ir"] },
+        { "path": "/dev/conduit", "type": "execution", "authority": ["execute_work_requests", "record_execution_traces"] },
+        { "path": "/dev/tools", "type": "tool", "authority": [] }
+      ],
+      "schema_rules": [
+        "Mounts cannot escalate authority",
+        "Constraints cascade (children inherit parent constraints)",
+        "No shadow governance (two governance mounts cannot overlap)",
+        "Execution mounts must have a governance parent"
+      ]
+    },
+    "system_mapping_identity_model": {
+      "nebula": "Projection space — operates on resolved structures, consumes projections",
+      "nexus": "Lookup space — owns lookup graph, reconstructs relationships, maintains canonical event lineage",
+      "conduit": "Hash space — consumes minimal semantic payloads; never resolves",
+      "peb": "Across all three — hashes for identity, state for governance, traces for observation"
+    }
+  },
+  "architectural_observations": [
+    {
+      "id": "two_independent_stacks",
+      "observation": "Nexus has two independent stacks: JVM/Spring operator plane (active, ports 8085/8084/8081) and WRP pipeline (aspirational specs + Conduit scaffolding). No bridge exists between them."
+    },
+    {
+      "id": "self_audit_is_design_smell",
+      "observation": "Self-audit language ('I think I violated a constraint') appearing in runtime traces is a symptom of soft constraints leaking into execution space, not a meaningful recovery mechanism. Any component producing self-audit language is already post-failure."
+    },
+    {
+      "id": "cir_cirs_disambiguation",
+      "observation": "CIR (Cognitive Integrity Ratio) is a continuous measurement (0.0-1.0) subsumed as confidence field within ProjectionIR. CIRS (Cognitive Integrity Rule System) is the authoritative binary boundary enforcement system with ~30+ rules. CIRS replaces CIR as the foundational epistemic enforcement model."
+    },
+    {
+      "id": "projectionir_must_be_ephemeral",
+      "observation": "ProjectionIR must be strictly ephemeral. Any caching or persistence creates a shadow canonical system that violates CIRS-IR-07 and CIRS-IR-08."
+    },
+    {
+      "id": "kg_persistence_resolution",
+      "observation": "There is an explicit tension between CIRS-IR-07 (ProjectionIR ephemerality) and the decision to persist the knowledge graph in PostgreSQL. The resolution: ProjectionIR itself remains ephemeral (the IR normalization pass), but the projector output (the persistent knowledge graph in PG+pgvector) is a derived artifact at the Inference Graph tier, not the IR tier. The 3-tier model (Spec Graph / Inference Graph / Execution Graph) from BP Analysis Role Insights cleanly separates these concerns."
+    },
+    {
+      "id": "dev_manifest_over_dot_agent",
+      "observation": "/dev manifest (root-level binding contract with mount semantics) is stronger than .agent/ metadata (descriptive directory patterns). Authority should be declared and gate-enforced, not inferred from documentation."
+    },
+    {
+      "id": "industrial_engineering_model",
+      "observation": "The environment (LOSM, PGV, WorkRequest, receipts) shapes agent behavior more effectively than elaborate prompts. Path of least resistance = correct behavior."
+    },
+    {
+      "id": "aesthetic_recognition_problem",
+      "observation": "Big Pickle exhibits aesthetic recognition without jurisdictional adoption — can reason about Nexus structures but does not execute inside Nexus's governance model. Fix: flatten into strict lattice (inside/outside contract scope), not hierarchy (above/below)."
+    },
+    {
+      "id": "composition_requires_projectionir",
+      "observation": "The current algebra forbids operator chaining. Bounded composition via ProjectionIR substrate enables cross-operator synthesis while preserving operator independence. Composition happens in Synthesis layer, downstream of all operators."
+    },
+    {
+      "id": "conduit_20_inversion",
+      "observation": "Conduit 2.0 inverts the framework model: frameworks become plugins interpreted by the runtime, not autonomous systems. PGV/CGEL/PEB/LOSM become plugin layers on a unified execution runtime."
+    },
+    {
+      "id": "kg_questions_are_coupled_constraints",
+      "observation": "The 8 open questions about the persistent KG are not independent implementation choices. They form a 3-layer dependency lattice: Truth Admission (Q1+Q3+Q8) must resolve first, then Semantic Representation (Q2+Q6), then System Interaction (Q4+Q5+Q7). Resolution recommendation from analysis: Q1+Q3 together (atomicity + enforcement locus). Source: answers to open questions.md."
+    },
+    {
+      "id": "self_extending_core_claim",
+      "observation": "The system's defining hypothesis is: CIR phantom → generative event → filesystem mutation → CIR resolution. This closure loop must be proven before anything else.",
+      "corresponds_to_decision": "dec-core-claim"
+    },
+    {
+      "id": "two_paths_resolved",
+      "observation": "Two topological change paths exist. Realization-first selected as primary; hybrid per-tier model applied. See decision node for tier modes and alternatives.",
+      "corresponds_to_decision": "dec-path-selection"
+    },
+    {
+      "id": "reconciliation_is_constraint_satisfaction",
+      "observation": "Reconciliation is not a validation pass — it is a recursive convergence loop (unresolved → generate → validate → enrich → regenerate). Iterative constraint satisfaction.",
+      "corresponds_to_decision": "dec-reconciliation-model"
+    },
+    {
+      "id": "losing_branches_are_learning_data",
+      "observation": "Non-selected branches become topology learning data, governance history, synthesis priors, and architectural lineage. BranchManager is evolutionary memory.",
+      "corresponds_to_decision": "dec-losing-branches-preservation"
+    },
+    {
+      "id": "resolvable_existence_not_correctness",
+      "observation": "Behavioral generation ends at 'resolvable existence', not 'correct implementation.' The projector validates structural resolvability.",
+      "corresponds_to_decision": "dec-behavioral-boundary"
+    },
+    {
+      "id": "filesystem_as_writable_projection",
+      "observation": "The filesystem becomes a writable projection of a semantic graph, not a static repository. The KG is the semantic graph; filesystem and PostgreSQL are writable projections.",
+      "corresponds_to_decision": "dec-kg-is-writable-projection"
+    },
+    {
+      "id": "provenance_chain_is_existential",
+      "observation": "Because the system mutates itself, provenance is existentially important. Full causal chain required for every artifact.",
+      "corresponds_to_decision": "dec-provenance-causal-chain"
+    },
+    {
+      "id": "phase1_wedge_minimal_closure",
+      "observation": "The Phase 1 wedge (CIR Generative Mode + Intent Packager + Safe FS Mutation) is the smallest closed loop that proves the core claim. Topology only, no behavior.",
+      "corresponds_to_decision": "dec-phase1-scope"
+    },
+    {
+      "id": "self_extending_decisions_locked",
+      "observation": "The Self-Extending Architecture Concept locks 16 decisions. See decisions[] array for full provenance, alternatives, rationale, and constraint statements.",
+      "note": "This observation now references the decisions array rather than duplicating its content."
+    },
+    {
+      "id": "typespec_as_contract_surface",
+      "observation": "The Self-audit transcript defines TypeSpec as the contract surface that mirrors the JVM enforcement layer. TypeSpec → OpenAPI → Java types makes invalid transitions unrepresentable at compile time. Conduit exposes ONLY WorkRequest at the HTTP boundary (POST /v1/workrequest). Observation/Projection/IR/SynthesizedView never appear in Conduit-facing schema — they do not exist in the TypeSpec namespace for Conduit. This is not a runtime enforcement system — it is a compile-time type constraint that makes illegal transitions structurally impossible.",
+      "corresponds_to_decision": "dec-typespec-contract-surface"
+    }
+  ],
+  "cross_references": {
+    "cirs_to_projection_algebra": "CIRS provides enforcement boundary for 6 projection operators. Algebra defines valid transformations; CIRS defines which transformations may interact.",
+    "cirs_to_atten": "CIRS-IR rules govern how AttenProjections enter ProjectionIR. CIRS-CORE ensures Atten (epistemic) never touches Conduit (execution).",
+    "cirs_to_peb": "CIRS-MED governs Merkle hash use. CIRS-SPoE governs proof integrity. CIRS-CORE ensures PEB governance does not leak into execution.",
+    "projectionir_to_atten_spec": "Atten spec Appendix B identifies XIL as upstream input boundary for all canonical state.",
+    "projection_algebra_to_atten": "Atten spec Appendix A corrects Atten-centric framing. Atten is one operator in the Projection Algebra, not the archetype.",
+    "dev_manifest_to_cirs": "/dev manifest mount hierarchy inherits CIRS constraints. Governance mounts enforce CIRS rules.",
+    "conduit_20_to_frameworks": "PGV, CGEL, PEB, LOSM become plugin layers on Conduit 2.0 runtime. RGEM provides the unifying schema.",
+    "decisions_to_cirs_rules": "Which decisions map to CIR-relevant constraint statements that CIR must enforce: dec-core-claim, dec-five-spaces, dec-loop-termination, dec-phase1-scope, dec-behavioral-boundary, dec-cir-transport, dec-idempotency, dec-provenance-causal-chain, dec-losing-branches-preservation, dec-kg-is-writable-projection. Each has cir_relevant=true in its decision node.",
+    "decisions_to_reconciler": "Which decisions the Reconciler must enforce: dec-core-claim, dec-path-selection.tier_modes, dec-five-spaces, dec-reconciliation-model, dec-loop-termination, dec-phase1-scope, dec-behavioral-boundary, dec-mutation-model, dec-idempotency, dec-expansion-order, dec-provenance-causal-chain, dec-losing-branches-preservation, dec-kg-is-writable-projection. Each has reconciler_relevant=true.",
+    "decisions_to_provenance_graph": "dec-provenance-causal-chain extends the ASSERTED/INFERRED/DERIVED provenance label model (Section 29.6) from single-label attribution to full graph ancestry. This is the decision that marries the persistent KG provenance model to the self-extending architecture.",
+    "typespec_to_jvm_mirror": "The TypeSpec contract surface (dec-typespec-contract-surface) is isomorphic to the JVM enforcement layer. The seven TypeSpec namespaces (Nexus.Epistemic, Nexus.Conduit, Conduit.Audit, Nexus.Ledger, Conduit.Proofs, Nexus.Causal, Nexus.CausalSpec) mirror the JVM class structures. TypeSpec is the single source of truth; JVM is the compiled enforcement boundary. Invalid transitions fail at compile time (TypeSpec → OpenAPI → Java), not at runtime.",
+    "typespec_to_cirs": "CIRS enforcement is not a runtime engine. CIRS rules are embedded in the TypeSpec contract surface: illegal transitions (e.g., ProjectionIR → WorkRequest direct) do not exist in the TypeSpec model for Conduit. They cannot be serialized, cannot be represented, cannot be sent. CIRS is now a multi-stage type filter across schema → OpenAPI → JVM → runtime, not documentation or conceptual governance."
+  },
+  "decisions": [
+    {
+      "id": "dec-core-claim",
+      "name": "Core Closure Loop",
+      "status": "locked",
+      "description": "The system's defining hypothesis: CIR phantom → generative event → filesystem mutation → CIR resolution. This loop must be proven before anything else. If unstable, everything above collapses into hallucinated structure or uncontrolled mutation.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "The minimal closure loop that proves the system is real",
+        "decision_event": "analysis_confirmation"
+      },
+      "alternatives": ["No generative loop (static KG only) — rejected because it cannot self-heal"],
+      "rationale": "Without this closure loop, the system is a passive knowledge store, not a self-extending architecture. Every other decision derives from this one.",
+      "constraint_type": "architectural_invariant",
+      "constraint_statement": "Every CIR phantom MUST trigger a generative closure loop that resolves to a filesystem mutation and subsequent CIR confirmation. Any break in this chain is a system failure.",
+      "implications": [
+        "Phase 1 wedge must implement this exact chain",
+        "CIR must be replay-safe to re-confirm phantoms after mutation"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-path-selection",
+      "name": "Topological Change Path",
+      "status": "locked",
+      "description": "Realization-first path selected for primary topological change, with hybrid model per tier.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Two architectural paths for topology change",
+        "decision_event": "path_selection"
+      },
+      "alternatives": [
+        "Proposal-first (phantom → proposal → review → promotion → reconciliation) — rejected: too slow, breaks closure"
+      ],
+      "rationale": "Realization-first (phantom → synthesis → staged write → reconciliation → rollback/commit) is faster and autonomous. Proposal-first retained for topology synthesis (deliberate evolution). Behavioral synthesis is human-reviewed last.",
+      "constraint_type": "governance_rule",
+      "constraint_statement": "Topology changes use proposal-first mode. Runtime binding uses staged realization. Behavioral synthesis is human-reviewed and deferred to Phase 2+.",
+      "tier_modes": {
+        "topology_synthesis": "proposal_first",
+        "runtime_synthesis": "staged_realization",
+        "behavioral_synthesis": "human_reviewed"
+      },
+      "reconciler_relevant": true,
+      "cir_relevant": false
+    },
+    {
+      "id": "dec-five-spaces",
+      "name": "Five Semantic Spaces",
+      "status": "locked",
+      "description": "The system operates across five distinct semantic spaces: proposal, branch, staging, committed, validated.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "The 5 spaces of self-extension",
+        "decision_event": "model_selection"
+      },
+      "alternatives": [
+        "Two spaces (staging + committed only) — rejected: cannot support parallel exploration or branch history"
+      ],
+      "rationale": "Five spaces are required for the reconciliation loop to distinguish between candidate structure (proposal), parallel alternatives (branch), materialized-but-uncommitted (staging), authoritative (committed), and confirmed-correct (validated).",
+      "constraint_type": "schema_requirement",
+      "constraint_statement": "Every persistent KG schema and pipeline stage MUST distinguish among the five spaces. Conflation of staging and committed is a design error.",
+      "implications": [
+        "Q4 (versioning model) must support branch space",
+        "Projector must validate at staging→committed boundary"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-reconciliation-model",
+      "name": "Reconciliation as Recursive Convergence",
+      "status": "locked",
+      "description": "Reconciliation is not a validation pass — it is a recursive convergence loop: unresolved → generate → validate → enrich → regenerate.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Reconciliation as recursive convergence loop",
+        "decision_event": "model_selection"
+      },
+      "alternatives": [
+        "Validation-pass model (single pass, pass/fail) — rejected: cannot produce enriched context for regeneration"
+      ],
+      "rationale": "A single validation pass cannot feed back into synthesis with enriched context. Only a recursive loop can generate memory-bearing constraint satisfaction.",
+      "constraint_type": "algorithmic_invariant",
+      "constraint_statement": "Reconciliation MUST be a recursive convergence loop. It MUST produce reconciliation reports that feed back into topology synthesis. It MUST NOT be a single-pass validation gate.",
+      "implications": [
+        "Reconciler must maintain state across iterations",
+        "Loop termination requires max_attempts and GENERATION_EXHAUSTED terminal state (dec-loop-termination)"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": false
+    },
+    {
+      "id": "dec-loop-termination",
+      "name": "Reconciliation Loop Termination",
+      "status": "locked",
+      "description": "Loop termination governed by max_attempts per (artifact, category, target_path). GENERATION_EXHAUSTED is the terminal state for unconverged loops.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Loop termination: max_attempts per (artifact, category, target_path), GENERATION_EXHAUSTED terminal state",
+        "decision_event": "constraint_definition"
+      },
+      "alternatives": [
+        "Infinite retry — rejected: uncontrolled, cannot surface failure",
+        "Timeout-based — rejected: not deterministic per artifact"
+      ],
+      "rationale": "Artifact-category-target_path key provides deterministic, traceable termination. GENERATION_EXHAUSTED is observable by CIR and governance.",
+      "constraint_type": "governance_rule",
+      "constraint_statement": "Reconciliation loops MUST terminate via max_attempts per (artifact, category, target_path). Unconverged loops MUST enter GENERATION_EXHAUSTED state, not silent retry.",
+      "reconciler_relevant": true,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-phase1-scope",
+      "name": "Phase 1 Wedge Scope",
+      "status": "locked",
+      "description": "Phase 1 is three components (CIR Generative Mode, Intent Packager, Safe FS Mutation) operating on topology artifacts only. No behavioral generation.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "The wedge: 3 components, topology only",
+        "decision_event": "scope_definition"
+      },
+      "alternatives": [
+        "Include behavioral generation in Phase 1 — rejected: too risky, cannot define correctness boundary yet",
+        "All 8 stages in Phase 1 — rejected: unbounded, cannot prove closure"
+      ],
+      "constraint_type": "scope_boundary",
+      "constraint_statement": "Phase 1 MUST NOT generate behavioral code. Only topology artifacts (files, directories, schemas, manifests, stubs). Behavioral generation is Phase 2+.",
+      "implications": [
+        "Projector validates topology, not semantics",
+        "CIR phantoms are structural, not behavioral"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-behavioral-boundary",
+      "name": "Resolvable Existence Boundary",
+      "status": "locked",
+      "description": "Behavioral generation ends at 'resolvable existence', not 'correct implementation.' The system generates compilable stubs, interface realizations, valid registrations, executable placeholders — but NOT correct business behavior, production logic, or safety-critical code.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Behavioral generation stops at 'resolvable existence', not 'correct implementation'",
+        "decision_event": "quality_boundary"
+      },
+      "alternatives": [
+        "Generate correct behavior from the start — rejected: impossible without verification loop",
+        "No code generation at all — rejected: system cannot self-extend"
+      ],
+      "constraint_type": "semantic_boundary",
+      "constraint_statement": "The projector MUST validate structural resolvability, not semantic correctness. Behavioral generation is limited to stubs, interface realizations, registrations, and executable placeholders.",
+      "implications": [
+        "Qualifies what the KG needs to represent (topology, not behavior)",
+        "Projector is a structural validator, not a behavioral verifier"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-mutation-model",
+      "name": "Mutation Model (Sandbox Filesystem)",
+      "status": "locked",
+      "description": "All generative mutations write to a sandbox filesystem staging area, not in-memory proposals or direct production filesystem.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Mutation model: sandbox filesystem (not in-memory proposals)",
+        "decision_event": "architectural_selection"
+      },
+      "alternatives": [
+        "In-memory proposals — rejected: not durable, no audit trail",
+        "Direct filesystem writes — rejected: no rollback boundary"
+      ],
+      "rationale": "Sandbox filesystem provides rollback boundary, audit trail, and staging→committed transition that the five-spaces model requires.",
+      "constraint_type": "operational_requirement",
+      "constraint_statement": "All generative mutations MUST write to sandbox filesystem staging. No direct writes to committed space. The staging→committed transition requires projector validation.",
+      "implications": [
+        "Safe FS Mutation component writes to staging only",
+        "Reconciler validates before promoting to committed"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": false
+    },
+    {
+      "id": "dec-module-placement",
+      "name": "Module Placement (losm-generative)",
+      "status": "locked",
+      "description": "losm-generative is the dedicated synthesis subsystem for self-extending architecture: topology synthesis, intent packaging, and safe filesystem mutation.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Module placement: losm-generative as dedicated synthesis subsystem",
+        "decision_event": "architectural_selection"
+      },
+      "alternatives": [
+        "Splay across existing modules — rejected: cross-cutting concern, creates coupling",
+        "Standalone new module outside losm — rejected: loses losm's lifecycle governance"
+      ],
+      "rationale": "Placing generative synthesis inside losm gives it access to lifecycle state definitions and state semantics. Dedicated subsystem prevents coupling with existing execution logic.",
+      "constraint_type": "architectural_decision",
+      "constraint_statement": "All self-extending synthesis code MUST reside in losm-generative. No generative logic in existing execution modules.",
+      "reconciler_relevant": false,
+      "cir_relevant": false
+    },
+    {
+      "id": "dec-cir-transport",
+      "name": "CIR Transport Format",
+      "status": "locked",
+      "description": "CIR events use JSON Lines via stdout/stdin. stdout → file ingestion. No IPC yet.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "CIR transport: JSON Lines via stdout/stdin",
+        "decision_event": "protocol_selection"
+      },
+      "alternatives": [
+        "gRPC — rejected: overengineered for Phase 1",
+        "Unix sockets — rejected: adds coupling",
+        "HTTP — rejected: requires server"
+      ],
+      "rationale": "JSON Lines via stdout/stdin is the simplest possible transport. File ingestion from stdout enables replay and audit without IPC complexity.",
+      "constraint_type": "protocol_decision",
+      "constraint_statement": "CIR generative events MUST use JSON Lines via stdout/stdin. No IPC in Phase 1.",
+      "implications": [
+        "Every CIR generative event must be serializable to one JSON Line",
+        "File ingestion path must be idempotent (dec-idempotency)"
+      ],
+      "reconciler_relevant": false,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-idempotency",
+      "name": "CIR Generative Event Idempotency",
+      "status": "locked",
+      "description": "Every CIR generative event must be replay-safe. Re-running the same CIR event must produce the same result or be safely no-oped.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Idempotency: Every CIR generative event must be replay-safe",
+        "decision_event": "reliability_requirement"
+      },
+      "alternatives": ["Non-idempotent events — rejected: replay would produce duplicate mutations"],
+      "rationale": "Without idempotency, recovery from partial failure is impossible. Replay in the generative pipeline must be safe by design.",
+      "constraint_type": "reliability_requirement",
+      "constraint_statement": "Every CIR generative event MUST be idempotent. Replaying the same event MUST produce the same result or safely no-op.",
+      "implications": [
+        "Event deduplication required at ingestion point",
+        "Mutation operations must be check-then-act"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-expansion-order",
+      "name": "Phase 2+ Expansion Order",
+      "status": "locked",
+      "description": "Post-wedge expansion order: Reconciliation → BranchManager → Proposal/Commit split → Runtime Synthesis → Behavior Synthesis (last).",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Expansion order: Reconciliation → BranchManager → Proposal/Commit split → Runtime Synthesis → Behavior Synthesis (last)",
+        "decision_event": "roadmap_commitment"
+      },
+      "alternatives": [
+        "Parallel expansion — rejected: dependencies between stages make parallel implementation inefficient",
+        "Behavior first — rejected: too risky without governance foundation"
+      ],
+      "rationale": "Reconciler must exist before BranchManager (reconciliation feeds branch scoring). BranchManager before Proposal/Commit split (branches inform split design). Runtime before behavior (must have resolvable existence before correct implementation).",
+      "constraint_type": "roadmap_constraint",
+      "constraint_statement": "Post-wedge expansion MUST follow the order: Reconciliation → BranchManager → Proposal/Commit split → Runtime Synthesis → Behavior Synthesis (last).",
+      "reconciler_relevant": true,
+      "cir_relevant": false
+    },
+    {
+      "id": "dec-provenance-causal-chain",
+      "name": "Provenance Causal Chain Requirement",
+      "status": "locked",
+      "description": "Every artifact must carry a complete causal chain: Artifact ← generated_from ← reconciliation_of ← branch_selected_by ← synthesized_from ← CIR_event ← originating_assertion.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Provenance Graph Layer: full causal chain",
+        "decision_event": "governance_requirement"
+      },
+      "alternatives": [
+        "Single-step provenance (artifact → source only) — rejected: cannot support rollback or governance traceability"
+      ],
+      "rationale": "Because the system mutates itself, single-step provenance is insufficient. Rollback, governance, and topology drift analysis all require the full causal chain from originating assertion through each reconciliation iteration.",
+      "constraint_type": "provenance_requirement",
+      "constraint_statement": "Every artifact in the system MUST trace to its originating assertion through the full causal chain. Any artifact without complete provenance is opaque and MUST be treated as untrusted.",
+      "extends_provenance_label": true,
+      "implications": [
+        "Extends ASSERTED/INFERRED/DERIVED provenance labels (Section 29.6) to full graph ancestry",
+        "Reconciler must annotate reconciliation reports with causal chain links"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-losing-branches-preservation",
+      "name": "Losing Branches as Learning Data",
+      "status": "locked",
+      "description": "Non-selected synthesis branches must be preserved as evolutionary architectural memory, not discarded.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "Preserve losing branches",
+        "decision_event": "governance_requirement"
+      },
+      "alternatives": [
+        "Discard losing branches — rejected: loses learning data, governance history, and synthesis priors"
+      ],
+      "rationale": "Losing branches contain topology learning data (which strategies converge fastest), governance history (which violate constraints most), synthesis priors (which generate minimal diffs), and architectural lineage (high-risk artifact classes). Discarding them loses evolutionary memory.",
+      "constraint_type": "governance_requirement",
+      "constraint_statement": "BranchManager MUST archive non-selected branches. They MUST be queryable by CIR, reconciliation, and governance. Deletion is prohibited.",
+      "implications": [
+        "Q4 (versioning model) must be event-logged — latest-only cannot preserve branch history",
+        "BranchManager must distinguish active from archived branches"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-typespec-contract-surface",
+      "name": "TypeSpec as Contract Surface (JVM mirror)",
+      "status": "locked",
+      "description": "TypeSpec is the contract surface that mirrors the JVM enforcement layer. TypeSpec = contract surface, JVM = enforcement boundary. Invalid transitions fail at compile time (TypeSpec → OpenAPI → Java types). Conduit exposes only WorkRequest at the HTTP boundary — Observation/Projection/IR/SynthesizedView cannot be represented in the API schema.",
+      "provenance": {
+        "source": "Self-audit in Agent Runtime.html",
+        "originating_assertion": "TypeSpec = contract surface. JVM = enforcement boundary. No runtime 'CIRS engine'. Instead: invalid flows fail at compile time (TypeSpec → OpenAPI → Java types).",
+        "decision_event": "architectural_design"
+      },
+      "alternatives": [
+        "Runtime CIRS validation engine — rejected: adds runtime overhead, cannot prevent invalid transitions at compile time",
+        "No contract surface — rejected: transitions would be documented but not enforced"
+      ],
+      "rationale": "TypeSpec generates OpenAPI, which generates Java types at compile time. This means illegal transitions (IR → Conduit, Projection → Execution) are unrepresentable — they don't exist in the schema, cannot be serialized, cannot be sent. The JVM boundary is the enforcement layer, not a runtime system.",
+      "constraint_type": "architectural_decision",
+      "constraint_statement": "TypeSpec MUST be the contract surface for all cross-boundary transitions. The Conduit HTTP gateway MUST only expose WorkRequest. Observation, Projection, ProjectionIR, and SynthesizedView MUST NOT appear in any Conduit-facing API schema. Invalid transitions MUST fail at compile time, not runtime.",
+      "tsp_model_namespaces": [
+        "Nexus.Epistemic (Observation, Projection, ProjectionIR, SynthesizedView, WorkRequest)",
+        "Nexus.Conduit (WorkRequest, ConduitGateway service)",
+        "Conduit.Audit (ExecutionTrace, CausalTraceNode, MerkleCausalNode)",
+        "Nexus.Ledger (ExecutionLedgerEntry)",
+        "Conduit.Proofs (ExecutionProof, ProofIndex, ProofQuery)",
+        "Nexus.Causal (CausalType, CausalAssertionNode, CausalQuery)",
+        "Nexus.CausalSpec (CausalSystem, Phase, Transition)"
+      ],
+      "implications": [
+        "The TypeSpec model mirrors the JVM enforcement layer — they are isomorphic",
+        "CIRS enforcement happens at compile time through TypeSpec → OpenAPI → Java, not at runtime"
+      ],
+      "reconciler_relevant": false,
+      "cir_relevant": true
+    },
+    {
+      "id": "dec-kg-is-writable-projection",
+      "name": "KG as Writable Projection (not read-only artifact)",
+      "status": "locked",
+      "description": "The KG is the semantic graph. The filesystem (and PostgreSQL) are writable projections of it. The generative pipeline resolves CIR phantoms by mutating the KG's projections into operational reality.",
+      "provenance": {
+        "source": "Self-Extending Architecture Concept.html",
+        "originating_assertion": "The filesystem becomes a writable projection of a semantic graph, not a static repository",
+        "decision_event": "paradigm_shift"
+      },
+      "alternatives": [
+        "KG as read-only snapshot — rejected: cannot drive self-extending topology changes"
+      ],
+      "rationale": "A read-only KG can describe phantoms but cannot resolve them. The KG must be a writable projection to close the generative loop: CIR detects phantom → KG drives synthesis → filesystem mutation → CIR confirms resolution → KG updated.",
+      "constraint_type": "paradigm_invariant",
+      "constraint_statement": "The KG MUST be a writable projection surface for topology synthesis. Filesystem and PostgreSQL mutations are projections of KG state. Read-only KG is incompatible with the self-extending architecture.",
+      "implications": [
+        "Supersedes the read-only KG assumption from earlier architecture (Section 11)",
+        "Projector must validate mutations before committing to KG"
+      ],
+      "reconciler_relevant": true,
+      "cir_relevant": true
+    }
+  ],
+  "gaps_and_blockers": [
+    {
+      "id": "gap-canonicalizer",
+      "description": "Canonicalizer / Commit Layer does not exist. Prerequisite for Atten to be actionable.",
+      "severity": "critical"
+    },
+    {
+      "id": "gap-xil",
+      "description": "XIL (External Intelligence Layer) does not exist. Without XIL, external inputs would enter GEL directly, violating the invariant that canonical state is always clean.",
+      "severity": "critical"
+    },
+    {
+      "id": "gap-conduit-nexus-bridge",
+      "description": "No bridge exists between JVM/Spring operator plane and the WRP pipeline. They are two independent stacks.",
+      "severity": "high"
+    },
+    {
+      "id": "gap-conduit-nebula-bridge",
+      "description": "Nebula discovers and structures markdown. The conduit pipeline never consumes it. No bridge exists.",
+      "severity": "high"
+    },
+    {
+      "id": "blocker-api-blocked",
+      "description": "Pipeline is blocked: .api-blocked file present in .conduit-data/.",
+      "severity": "blocker"
+    },
+    {
+      "id": "gap-projectionir-implementation",
+      "description": "ProjectionIR is spec-only. Needs: schema definition, 6 adapter implementations, synthesis prototype, CIRS-IR validation checks, integration wiring.",
+      "severity": "high"
+    },
+    {
+      "id": "gap-spring-boot-phase-1",
+      "description": "PEB Spring Boot Phase 1 (kernel skeleton) is the planned next implementation phase but has not started.",
+      "severity": "medium"
+    },
+    {
+      "id": "gap-transform-type-unimplemented",
+      "description": "Transform type evolution (v0-v4) is spec-only. Actual conduit runtime uses simpler, untyped execution model with no StateView/StateDelta separation, no Context validation of transforms, and no structured Trace as first-class output.",
+      "severity": "high",
+      "source": "Plurality and Agent Disagreement.html"
+    },
+    {
+      "id": "gap-context-rule-system-unimplemented",
+      "description": "Context is still treated as spatial container or memory context, not as a behavioral rule-set over state with invariants, allowedTransforms, and execution mode.",
+      "severity": "high",
+      "source": "Plurality and Agent Disagreement.html"
+    },
+    {
+      "id": "gap-harness-definition-unimplemented",
+      "description": "HarnessDefinition (3-level data-driven tool wrapper: store enums -> store templates -> store semantic translators) is not implemented. Conduit still uses hardcoded tool wrappers.",
+      "severity": "high",
+      "source": "Semantic Adapter Layer.html"
+    },
+    {
+      "id": "gap-execution-mode-unimplemented",
+      "description": "ExecutionMode (ONESHOT/INTERACTIVE/DAEMON) differentiation is not implemented in conduit. All executions treated as ONESHOT.",
+      "severity": "medium",
+      "source": "Semantic Adapter Layer.html"
+    },
+    {
+      "id": "gap-role-mapping-strategy-unimplemented",
+      "description": "RoleMappingStrategy (AGENT/PROMPT_FILE/SYSTEM_FLAG) is not implemented in harness. Role injection is hardcoded.",
+      "severity": "medium",
+      "source": "Semantic Adapter Layer.html"
+    },
+    {
+      "id": "gap-xil-admission-gates-unimplemented",
+      "description": "XIL admission gates (TTS=Truthfulness, STOA=Scope/Type/Origin Authority, TSP=Time/Space/Presence, PEL=Projection Envelope Limit) are entirely spec-only. No validation gates exist in current intake pipeline.",
+      "severity": "high",
+      "source": "Buzzwords by Layer.html"
+    },
+    {
+      "id": "gap-authority-arbitration-unimplemented",
+      "description": "Authority Arbitration Layer (sits between Envelope -> CEI) with ContextScope tokens and weight-based authority domains is concept-only. Global ontology bias freely overpowers local execution scoping.",
+      "severity": "high",
+      "source": "CCNF Normalization vs Parsing.html"
+    },
+    {
+      "id": "gap-event-incident-distinction-unimplemented",
+      "description": "Event vs Incident type distinction (event=factual immutable, incident=typed actionable subset with state machine) is not reflected in any DB schema or pipeline routing.",
+      "severity": "medium",
+      "source": "Event System Design.html, Bug Tracking Architecture.html"
+    },
+    {
+      "id": "gap-cognitive-compiler-unimplemented",
+      "description": "2-tier compiler model (Pro=Governor for planning/synthesis, Flash=WorkerSwarm for execution/retrieval/tool use) is concept-only. No compiled execution graph exists.",
+      "severity": "high",
+      "source": "Cognitive Compiler Architecture.html"
+    },
+    {
+      "id": "gap-persistence-triad-unadopted",
+      "description": "PersistenceTriad principle (only Canonical Spec + Decision Log + ExecutionReceipt should persist) is not adopted. Many more than 3 things persist in the current system (session state, intermediate artifacts, etc.).",
+      "severity": "medium",
+      "source": "Cognitive Compiler Architecture.html"
+    },
+    {
+      "id": "gap-external-agent-model-unimplemented",
+      "description": "External Agent Model with TrustScore (dynamic weighting, not binary trust) is concept-only. No external signal governance exists.",
+      "severity": "medium",
+      "source": "Buzzwords by Layer.html"
+    },
+    {
+      "id": "gap-reality-constraint-layer-unimplemented",
+      "description": "Reality Constraint Layer with Reality Projection Function, drift detection (external vs internal), and 4 signal categories is concept-only. No feedback loop from real-world outcomes.",
+      "severity": "high",
+      "source": "ATDD Overview.html"
+    },
+    {
+      "id": "gap-migl-unimplemented",
+      "description": "MIGL (Model Internal Governance Layer) for governing model-level reasoning constraints is concept-only. No internal reasoning governance exists.",
+      "severity": "medium",
+      "source": "ATDD Overview.html"
+    },
+    {
+      "id": "gap-capability-operator-unimplemented",
+      "description": "CapabilityOperator model (single-purpose, composable, swappable, independently testable operator selected by type-driven matching) is not implemented. Tools are still invoked as programs, not as capability operators.",
+      "severity": "medium",
+      "source": "Nebula System Info Expansion.html"
+    },
+    {
+      "id": "gap-typed-workflow-graph-unimplemented",
+      "description": "TypedWorkflowGraph (typed process graph over Atten with domain patterns for software/research/business/systems) is concept-only. No workflow graph infrastructure exists.",
+      "severity": "low",
+      "source": "Nebula System Info Expansion.html"
+    },
+    {
+      "id": "gap-dual-agent-design-review-unimplemented",
+      "description": "Dual-agent design review pattern (Kiro/architecture-first vs DeepSeek/implementation-aware as concurrent review mechanism) is not established. AI agents do not participate in architecture review.",
+      "severity": "low",
+      "source": "DeepSeek critique analysis.html"
+    },
+    {
+      "id": "gap-observation-not-separated-from-event",
+      "description": "Observation as evidentiary record (interpretive) vs Event as factual record is not reflected in DB schema or pipeline. Observer produces raw data without separating observation from fact.",
+      "severity": "medium",
+      "source": "Bug Tracking Architecture.html"
+    },
+    {
+      "id": "gap-psql-kg-schema-undesigned",
+      "description": "PostgreSQL + pgvector schema for the persistent knowledge graph does not exist. Table-per-type model, provenance columns (ASSERTED/INFERRED/DERIVED/TEMPORAL_SCOPE), embedding columns, and foreign keys are all undesigned. Constrained by Layer A resolution (Q1+Q3).",
+      "severity": "high",
+      "source": "BP Analysis Role Insights.html"
+    },
+    {
+      "id": "gap-incremental-merge-unimplemented",
+      "description": "The incremental merge model (persist(KGₙ₋₁) + merge(deltas)) is concept-only. No delta extraction logic, no merge algorithm, no conflict resolution, no projector validation on merge exist. Merge algorithm depends on Q1 resolution (unit of update).",
+      "severity": "high",
+      "source": "BP Analysis Role Insights.html"
+    },
+    {
+      "id": "gap-provenance-labeling-unimplemented",
+      "description": "Provenance labels (ASSERTED/INFERRED/DERIVED/TEMPORAL_SCOPE) are not applied to any knowledge graph data. Every node/edge in nexus-knowledge-graph.json is unlabeled — all data is implicitly ASSERTED, including inferred relationships. Resolution in Layer A (Q8 — source anchoring).",
+      "severity": "high",
+      "source": "BP Analysis Role Insights.html"
+    },
+    {
+      "id": "gap-projector-not-implemented",
+      "description": "The projector (formal constraint function) does not exist in any form. No DDL-level constraints beyond basic type checking. No application-level validation pass. No embedding projection. No normative projector governing BP output. This is Q3 — the trust boundary decision. Pending Q1+Q3 joint resolution.",
+      "severity": "high",
+      "source": "BP Analysis Role Insights.html"
+    },
+    {
+      "id": "gap-embedding-pipeline-undesigned",
+      "description": "pgvector embedding generation pipeline is undesigned. What gets embedded (node descriptions? relationship semantics? transcript chunks?), when (sync on write? async background job?), and how stale embeddings are detected all derivable from Q1+Q3 resolution (Layer B).",
+      "severity": "medium",
+      "source": "BP Analysis Role Insights.html"
+    },
+    {
+      "id": "gap-three-tier-wiring",
+      "description": "The 3-tier graph model (Spec Graph / Inference Graph / Execution Graph) is not wired into any pipeline. Current architecture conflates all three tiers into a single nexus-knowledge-graph.json file with no tier separation. Resolution depends on Layer A+B+C completion.",
+      "severity": "medium",
+      "source": "BP Analysis Role Insights.html"
+    },
+    {
+      "id": "gap-kg-read-path-undesigned",
+      "description": "Agent read path for the persistent KG is undesigned. No SQL direct access, no REST API, no MCP tool, no query interface. This is Q5 — the cognition interface decision. Derivative of Q1+Q3 resolution.",
+      "severity": "high",
+      "source": "BP Analysis Role Insights.html"
+    },
+    {
+      "id": "gap-cross-store-consistency",
+      "description": "The KG shares a PostgreSQL instance with PEB state. Cross-store consistency guarantees between KG tables and PEB tables are undefined. This is Q7 — the memory partitioning problem. Derivative of Layer A+B resolution.",
+      "severity": "medium",
+      "source": "BP Analysis Role Insights.html"
+    },
+    {
+      "id": "gap-kg-versioning-undecided",
+      "description": "Versioning model for the persistent KG is undecided between latest-only (no history), event-logged (full history), or snapshot-versioned (checkpoint model). This is Q4 — temporal semantics of truth. Derivative of Q1 resolution (granularity determines log size).",
+      "severity": "medium",
+      "source": "BP Analysis Role Insights.html"
+    },
+    {
+      "id": "gap-self-extending-phase1-unimplemented",
+      "description": "The Phase 1 wedge (CIR Generative Mode + Intent Packager + Safe FS Mutation) does not exist. No phantom detection, no event→WorkRequest conversion, no staging sandbox for scaffold topology writes. The core claim (CIR phantom → generative event → filesystem mutation → CIR resolution) is unproven.",
+      "severity": "highest",
+      "source": "Self-Extending Architecture Concept.html"
+    },
+    {
+      "id": "gap-losm-generative-not-created",
+      "description": "LOSM-Generative as dedicated synthesis subsystem (module placement from Self-Extending Architecture) does not exist. No dedicated location for topology synthesis, intent packaging, or safe FS mutation code.",
+      "severity": "high",
+      "source": "Self-Extending Architecture Concept.html"
+    },
+    {
+      "id": "gap-reconciler-not-implemented",
+      "description": "Reconciler (recursive convergence loop — unresolved → generate → validate → enrich → regenerate) does not exist. No iterative constraint satisfaction loop. No reconciliation report feedback into topology synthesis.",
+      "severity": "high",
+      "source": "Self-Extending Architecture Concept.html"
+    },
+    {
+      "id": "gap-branch-manager-not-implemented",
+      "description": "BranchManager (parallel synthesis branches, candidate scoring, losing branch preservation) does not exist. No branch scoring, no branch history, no evolutionary selection of synthesis candidates.",
+      "severity": "medium",
+      "source": "Self-Extending Architecture Concept.html"
+    },
+    {
+      "id": "gap-provenance-causal-chain-unimplemented",
+      "description": "Provenance causal chain (Artifact ← generated_from ← reconciliation_of ← branch_selected_by ← synthesized_from ← CIR_event ← originating_assertion) does not exist. No artifact carries full provenance ancestry. Rollback is impossible. Topology drift is opaque.",
+      "severity": "high",
+      "source": "Self-Extending Architecture Concept.html"
+    },
+    {
+      "id": "gap-five-spaces-undesigned",
+      "description": "The five spaces of self-extension (proposal/branch/staging/committed/validated) are not modeled in any schema or pipeline. The current system conflates staging and committed. Branch space does not exist.",
+      "severity": "medium",
+      "source": "Self-Extending Architecture Concept.html"
+    },
+    {
+      "id": "gap-cir-event-idempotency-unimplemented",
+      "description": "CIR generative event idempotency is not guaranteed. No replay-safe event mechanism. No event deduplication for phantom detection.",
+      "severity": "high",
+      "source": "Self-Extending Architecture Concept.html"
+    },
+    {
+      "id": "gap-loop-termination-unimplemented",
+      "description": "Generative pipeline loop termination is not implemented. No max_attempts per (artifact, category, target_path), no GENERATION_EXHAUSTED terminal state. Generative loops could run indefinitely.",
+      "severity": "medium",
+      "source": "Self-Extending Architecture Concept.html"
+    }
+  ]
+}

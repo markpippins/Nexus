@@ -1,5 +1,5 @@
 {
-  "mode": "plan",
+  "mode": "execute",
   "pipeline_enabled": true,
   "state_authority": "pgv.phase",
   "execution_policy": {

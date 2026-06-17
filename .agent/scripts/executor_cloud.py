@@ -185,7 +185,7 @@ def run_worker(request_path):
         exit(2)
 
     working_path = os.path.abspath(req.get("path", "."))
-    artifacts_dir = os.path.join(working_path, ".pipeline", "WORK_REQUESTS", "artifacts", wr_id) if wr_id else None
+    artifacts_dir = os.path.join(working_path, "nexus", ".conduit-data", "WORK_REQUESTS", "artifacts", wr_id) if wr_id else None
 
     if artifacts_dir:
         os.makedirs(artifacts_dir, exist_ok=True)

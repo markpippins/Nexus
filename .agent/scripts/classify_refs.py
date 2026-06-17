@@ -8,9 +8,9 @@ import re
 import sys
 
 def classify(line: str) -> str:
-    if "intent_source" in line and ".pipeline/" in line:
+    if "intent_source" in line and "nexus/.conduit-data/" in line:
         return "PIPELINE_PHANTOM"
-    if ".pipeline/" in line:
+    if "nexus/.conduit-data/" in line:
         return "PIPELINE_PHANTOM"
     if "PIPELINE_" in line:
         return "DERIVATION_CONTRACT"

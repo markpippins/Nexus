@@ -1,0 +1,56 @@
+{
+  "id": "514abe5c-ec4c-4ffc-a707-8c22f8258064",
+  "type": "WorkflowPlanned",
+  "timestamp": "2026-06-16T19:11:52.201454+00:00",
+  "source": "agent",
+  "payload": {
+    "idea_id": "evt-fresh-1781637104",
+    "idea": "Test NATS end-to-end with fresh event",
+    "vocabulary_path": "artifacts/evt-fresh-1781637104/workflow_vocabulary.json",
+    "auto_advance": true,
+    "steps": [
+      {
+        "step": "vocabulary",
+        "event_type": "VocabularyDrafted",
+        "state": "draft",
+        "next_action": "formalize_spec",
+        "status": "pending"
+      },
+      {
+        "step": "requirements",
+        "event_type": "RequirementsFormalized",
+        "state": "specified",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "typespec",
+        "event_type": "TypeSpecDrafted",
+        "state": "specified",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "compile",
+        "event_type": "SpecCompiled",
+        "state": "compiled",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "refactor",
+        "event_type": "RefactorDrafted",
+        "state": "integrated",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "integrate",
+        "event_type": "Integrated",
+        "state": "integrated",
+        "next_action": null,
+        "status": "pending"
+      }
+    ]
+  }
+}

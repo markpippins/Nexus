@@ -12,7 +12,7 @@ from pathlib import Path
 
 PATTERNS = (
     "intent_source|"
-    "\\.pipeline/|"
+    "nexus/\.conduit-data/|"
     "PIPELINE_|"
     "normalize-intent|"
     "ExecutionState|"
@@ -59,7 +59,7 @@ classifications = {
 for line in lines.split("\n"):
     if not line:
         continue
-    if ".pipeline/" in line:
+    if "nexus/.conduit-data/" in line:
         classifications["PIPELINE_PHANTOM"] += 1
     elif "PIPELINE_" in line:
         classifications["DERIVATION_CONTRACT"] += 1

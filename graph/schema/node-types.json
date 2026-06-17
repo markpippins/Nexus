@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nexus Node Types",
+  "description": "The three universal node types for capability decomposition. Every capability in the system is one of these types.",
+  "definitions": {
+    "InferenceNode": {
+      "type": "object",
+      "description": "Proposes reality from uncertain inputs. Probabilistic — output must be validated by a downstream deterministic node. Typically LLM-driven.",
+      "required": ["id", "type", "input_schema", "output_schema"],
+      "properties": {
+        "id": { "type": "string", "description": "Unique capability identifier" },
+        "type": { "const": "inference" },
+        "input_schema": { "$ref": "#/definitions/SchemaRef" },
+        "output_schema": { "$ref": "#/definitions/SchemaRef" },
+        "model_hint": {
+          "type": "string",
+          "description": "Preferred model class for this inference (e.g. 'pro', 'flash', 'reasoning')"
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum confidence required before output is accepted"
+        },
+        "validation_strategy": {
+          "type": "string",
+          "enum": ["deterministic_guard", "cross_model", "human_review", "none"],
+          "description": "How this node's output is validated"
+        }
+      }
+    },
+    "DeterministicNode": {
+      "type": "object",
+      "description": "Stabilizes reality — a pure function or rule engine with guaranteed behavior. No uncertainty. Fails or succeeds.",
+      "required": ["id", "type", "input_schema", "output_schema", "implementation"],
+      "properties": {
+        "id": { "type": "string", "description": "Unique capability identifier" },
+        "type": { "const": "deterministic" },
+        "input_schema": { "$ref": "#/definitions/SchemaRef" },
+        "output_schema": { "$ref": "#/definitions/SchemaRef" },
+        "implementation": {
+          "type": "string",
+          "description": "Reference to the implementation (file path, function name, or MCP tool URI)"
+        },
+        "invariants": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Invariant rules this node enforces (references PEB invariants)"
+        }
+      }
+    },
+    "ExternalToolNode": {
+      "type": "object",
+      "description": "Delegates computation to an external system — database, API, filesystem, specialized solver. Network boundary.",
+      "required": ["id", "type", "input_schema", "output_schema", "interface"],
+      "properties": {
+        "id": { "type": "string", "description": "Unique capability identifier" },
+        "type": { "const": "external_tool" },
+        "input_schema": { "$ref": "#/definitions/SchemaRef" },
+        "output_schema": { "$ref": "#/definitions/SchemaRef" },
+        "interface": {
+          "type": "object",
+          "description": "How to invoke this tool",
+          "properties": {
+            "protocol": { "type": "string", "enum": ["mcp", "http", "grpc", "shell", "temporal_activity"] },
+            "endpoint": { "type": "string" },
+            "auth": { "type": "string", "enum": ["none", "managed_identity", "api_key", "oauth2"] }
+          },
+          "required": ["protocol"]
+        },
+        "retry_policy": {
+          "type": "object",
+          "properties": {
+            "max_retries": { "type": "integer", "minimum": 0 },
+            "backoff_seconds": { "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "Edge": {
+      "type": "object",
+      "description": "A directed connection between two nodes in a workflow graph",
+      "required": ["source", "target"],
+      "properties": {
+        "source": { "type": "string", "description": "Source node id" },
+        "target": { "type": "string", "description": "Target node id" },
+        "semantics": {
+          "type": "string",
+          "enum": ["data_flow", "control_flow", "validation", "error_handler"],
+          "description": "What this edge represents"
+        }
+      }
+    },
+    "Workflow": {
+      "type": "object",
+      "description": "A typed directed acyclic graph over capabilities. Defines structure, not intelligence.",
+      "required": ["id", "nodes", "edges"],
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "domain": {
+          "type": "string",
+          "description": "Optional domain tag. Workflows are domain-agnostic — this is metadata only."
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/definitions/InferenceNode" },
+              { "$ref": "#/definitions/DeterministicNode" },
+              { "$ref": "#/definitions/ExternalToolNode" }
+            ]
+          },
+          "minItems": 1
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Edge" }
+        },
+        "entry_point": { "type": "string", "description": "Node id of the first node to execute" },
+        "output_node": { "type": "string", "description": "Node id whose output is the workflow result" }
+      }
+    },
+    "SchemaRef": {
+      "type": "object",
+      "description": "Reference to a JSON Schema for node input/output validation",
+      "properties": {
+        "$ref": { "type": "string" },
+        "type": { "type": "string" },
+        "properties": { "type": "object" }
+      }
+    }
+  }
+}

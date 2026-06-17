@@ -111,11 +111,11 @@ def process_queue():
 
 def main():
     parser = argparse.ArgumentParser(description="Nexus WRP Daemon")
-    parser.add_argument("--watch-project", required=True, help="Absolute path to the project root containing .pipeline")
+    parser.add_argument("--watch-project", required=True, help="Absolute path to the project root containing nexus/.conduit-data")
     args = parser.parse_args()
 
     project_path = Path(args.watch_project).resolve()
-    pipeline_dir = project_path / ".pipeline"
+    pipeline_dir = project_path / "nexus/.conduit-data"
     
     if not pipeline_dir.exists():
         print(f"Error: Pipeline directory not found at {pipeline_dir}")

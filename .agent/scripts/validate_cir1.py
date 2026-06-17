@@ -26,7 +26,7 @@ for path in sorted(ROOT.rglob("*.json")):
         if isinstance(obj, dict):
             if "intent_source" in obj:
                 v = obj["intent_source"]
-                if isinstance(v, str) and (".pipeline/" in v or "PIPELINE_" in v):
+                if isinstance(v, str) and ("nexus/.conduit-data/" in v or "PIPELINE_" in v):
                     violations.append((str(path), ctx, str(v)))
             for k, v in obj.items():
                 check(v, f"{ctx}.{k}" if ctx else k)

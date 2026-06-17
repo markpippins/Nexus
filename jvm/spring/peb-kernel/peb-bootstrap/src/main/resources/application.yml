@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: peb-kernel
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/peb
+    username: ${DB_USER:peb_user}
+    password: ${DB_PASS:peb_pass}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080

@@ -2,7 +2,7 @@
 """Stage 2 — Deterministic JSON Patch (AST-safe).
 
 Applies CIR-1 enforcement:
-- Removes intent_source pointing to non-existent .pipeline/ paths
+- Removes intent_source pointing to non-existent nexus/.conduit-data/ paths
 - Downgrades mode from "execute" to "legacy" when intent_source removed
 - Adds CIR-1 annotation note
 - Only modifies JSON semantics — never changes data types or structure
@@ -26,7 +26,7 @@ def patch_obj(obj, path_str=""):
     # Check for intent_source violations
     if "intent_source" in obj:
         v = obj["intent_source"]
-        if isinstance(v, str) and (".pipeline/" in v or "PIPELINE_" in v):
+        if isinstance(v, str) and ("nexus/.conduit-data/" in v or "PIPELINE_" in v):
             obj.pop("intent_source")
             if obj.get("mode") == "execute":
                 obj["mode"] = "legacy"
