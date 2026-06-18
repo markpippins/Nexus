@@ -42,11 +42,6 @@
           "type": "string",
           "description": "Reference to the implementation (file path, function name, or MCP tool URI)"
         },
-        "invariants": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Invariant rules this node enforces (references PEB invariants)"
-        }
       }
     },
     "ExternalToolNode": {
