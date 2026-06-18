@@ -2,8 +2,19 @@ import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { GoogleGenAI, Chat } from '@google/genai';
 
-// We assume the build process exposes API_KEY from .env as process.env.API_KEY
 declare const process: any;
+
+interface SlashCommand {
+  command: string;
+  description: string;
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  { command: '/help', description: 'Show available commands' },
+  { command: '/clear', description: 'Clear the conversation' },
+  { command: '/summarize', description: 'Summarize the conversation' },
+  { command: '/feedback', description: 'Provide feedback' },
+];
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -19,10 +30,12 @@ interface ChatMessage {
 })
 export class ChatComponent {
   isLoading = signal(false);
-  
   messages = signal<ChatMessage[]>([]);
-  
   newMessage = signal('');
+
+  slashVisible = signal(false);
+  slashFiltered = signal<SlashCommand[]>([]);
+  slashSelectedIndex = signal(0);
 
   private chat: Chat | null = null;
 
@@ -65,11 +78,17 @@ export class ChatComponent {
       return;
     }
 
+    const slashCmd = SLASH_COMMANDS.find(c => messageText.startsWith(c.command));
+    if (slashCmd) {
+      this.executeCommand(slashCmd.command);
+      return;
+    }
+
     this.isLoading.set(true);
-    
-    // Add user message to chat
+
     this.messages.update(msgs => [...msgs, { role: 'user', text: messageText }]);
     this.newMessage.set('');
+    this.slashVisible.set(false);
 
     // If there is no real chat session, run in demo/echo mode.
     if (!this.chat) {
@@ -117,7 +136,79 @@ export class ChatComponent {
     }
   }
 
+  private executeCommand(command: string): void {
+    this.slashVisible.set(false);
+    this.newMessage.set('');
+
+    switch (command) {
+      case '/clear':
+        this.messages.set([]);
+        break;
+      case '/help':
+        const helpLines = SLASH_COMMANDS.map(c => `  ${c.command} - ${c.description}`).join('\n');
+        this.messages.update(msgs => [...msgs, { role: 'user', text: command }, { role: 'model', text: `Available commands:\n${helpLines}` }]);
+        break;
+      case '/summarize':
+        this.messages.update(msgs => [...msgs, { role: 'user', text: command }, { role: 'model', text: 'Summarize feature coming soon.' }]);
+        break;
+      case '/feedback':
+        this.messages.update(msgs => [...msgs, { role: 'user', text: command }, { role: 'model', text: 'Feedback feature coming soon.' }]);
+        break;
+    }
+  }
+
   onInput(event: Event): void {
-    this.newMessage.set((event.target as HTMLTextAreaElement).value);
+    const value = (event.target as HTMLTextAreaElement).value;
+    this.newMessage.set(value);
+    this.updateSlashState(value);
+  }
+
+  onKeydown(event: KeyboardEvent): void {
+    if (this.slashVisible()) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        this.slashSelectedIndex.update(i => Math.min(i + 1, this.slashFiltered().length - 1));
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        this.slashSelectedIndex.update(i => Math.max(i - 1, 0));
+        return;
+      }
+      if ((event.key === 'Enter' && !event.shiftKey) || event.key === 'Tab') {
+        event.preventDefault();
+        const filtered = this.slashFiltered();
+        if (filtered.length > 0) {
+          this.selectSlashCommand(filtered[this.slashSelectedIndex()]);
+        }
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.slashVisible.set(false);
+        return;
+      }
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.sendMessage();
+    }
+  }
+
+  selectSlashCommand(cmd: SlashCommand): void {
+    this.newMessage.set(cmd.command);
+    this.slashVisible.set(false);
+    this.sendMessage();
+  }
+
+  private updateSlashState(value: string): void {
+    if (value.startsWith('/') && !value.includes(' ')) {
+      const query = value.slice(1).toLowerCase();
+      this.slashFiltered.set(SLASH_COMMANDS.filter(c => c.command.toLowerCase().includes(query)));
+      this.slashVisible.set(true);
+      this.slashSelectedIndex.set(0);
+    } else {
+      this.slashVisible.set(false);
+    }
   }
 }

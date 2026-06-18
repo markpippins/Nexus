@@ -1,3 +1,9 @@
+>**Nexus WRP aspirational architecture (inactive).** This document describes
+> the intended design of the Nexus Work Request Pipeline, which is under
+> construction and not yet operational. The active system is **Conduit**
+> (see `nexus/python/conduit/` and `nexus/typescript/conduit-mcp/`). The
+> only shared concept between Nexus and Conduit is the `WorkRequest` type.
+> 
 ---
 name: mode-router
 description: CRITICAL SYSTEM INSTRUCTION — Routes agent execution mode based on canonical ExecutionState from normalize-intent. Pure router — does not interpret raw pipeline intent.
@@ -73,11 +79,11 @@ function route(state: ExecutionState): ExecutionMode {
 - **CONSTRAINT**: Strictly FORBIDDEN from generating source code, terminal commands for implementation, or direct file edits to the codebase.
 - **ACTION**: Trigger the WorkRequest Compiler Pipeline.
 - **SEQUENCE**: 
-  1. Use `archive-prompt` to save the user's intent to `.pipeline/PROMPT_RECORDS`.
-  2. Use `requirements-capture` to capture requirements from the prompt.
-  3. Create/update the implementation plan and use `archive-implementation` to record it.
-  4. Use `work-request-emission` to generate strict, executable WorkRequests.
-- **RESPONSE**: Inform the user the intent has been compiled into WorkRequests.
+  1. Use `save_prompt` to save the user's intent to the audit catalog.
+  2. Use `create_proposed_plan` or `create_plan` via the MCP server (http://localhost:3100/tools/call) to create the plan. The MCP server handles file creation, numbering, and receipt issuance automatically.
+  3. Use `update_plan` to write elucidation metadata (filesAffected, acceptanceCriteria, dependencies).
+  4. Use `issue_receipt` with type `PLAN_CREATE` to finalize the plan into pending.
+- **RESPONSE**: Inform the user the intent has been compiled into a plan and is ready for implementation.
 
 #### EXECUTION_PIPELINE (from CODE_EXECUTION)
 

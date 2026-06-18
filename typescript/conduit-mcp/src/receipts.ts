@@ -1,52 +1,56 @@
-import { getLatestReceiptType } from './db';
+import { getLatestReceiptType } from "./db";
 
 // Allowed transitions: from → to (v067: added PROPOSED, PLANNING)
 const ALLOWED: Record<string, string[]> = {
   // Anything can be created or proposed:
-  '': ['PLAN_CREATE', 'BLOCK', 'PROPOSED'],
+  "": ["PLAN_CREATE", "BLOCK", "PROPOSED"],
   // After creation, builder can implement or block:
-  'PLAN_CREATE': ['IMPLEMENTATION', 'BLOCK', 'CRITIQUE'],
+  PLAN_CREATE: ["IMPLEMENTATION", "BLOCK", "CRITIQUE"],
   // After implementation, reviewer can pass or reject:
-  'IMPLEMENTATION': ['REVIEW_PASS', 'REVIEW_REJECT', 'REVIEW'],
+  IMPLEMENTATION: ["REVIEW_PASS", "REVIEW_REJECT", "REVIEW"],
   // Rejection → builder re-implements:
-  'REVIEW_REJECT': ['IMPLEMENTATION'],
+  REVIEW_REJECT: ["IMPLEMENTATION"],
   // After pass, plan is done. Block from any state:
-  'BLOCK': ['IMPLEMENTATION'],  // unblock by implementing
+  BLOCK: ["IMPLEMENTATION"], // unblock by implementing
   // REVIEW_PASS is terminal — no further receipts for THIS plan.
   // But a revision creates a NEW plan with a PLANNING receipt.
-  'REVIEW_PASS': [],
+  REVIEW_PASS: [],
   // Proposed plans can be promoted to planning:
-  'PROPOSED': ['PLANNING'],
+  PROPOSED: ["PLANNING"],
   // Planning plans can be finalized (pending) or sent back to proposed:
-  'PLANNING': ['PLAN_CREATE', 'PROPOSED', 'PLAN_BLOCK'],
+  PLANNING: ["PLAN_CREATE", "PROPOSED", "PLAN_BLOCK"],
   // Reviewer starts reviewing after implementation:
-  'REVIEW': ['REVIEW_PASS', 'REVIEW_REJECT'],
+  REVIEW: ["REVIEW_PASS", "REVIEW_REJECT"],
   // Critic starts critique after plan creation:
-  'CRITIQUE': ['CRITIQUE_PASS', 'CRITIQUE_REJECT'],
+  CRITIQUE: ["CRITIQUE_PASS", "CRITIQUE_REJECT"],
   // Critic outcomes:
-  'CRITIQUE_PASS': ['IMPLEMENTATION'],  // critique passed → builder can implement
-  'CRITIQUE_REJECT': ['PLAN_CREATE'],   // critique failed → back to planning
+  CRITIQUE_PASS: ["IMPLEMENTATION"], // critique passed → builder can implement
+  CRITIQUE_REJECT: ["PLAN_CREATE"], // critique failed → back to planning
   // Planner block:
-  'PLAN_BLOCK': ['IMPLEMENTATION'],     // unblock via implementation
+  PLAN_BLOCK: ["IMPLEMENTATION"], // unblock via implementation
+  // Cancelled / abandoned plans can be resurrected:
+  CANCELLED: ["PLAN_CREATE"],
+  ABANDONED: ["PLAN_CREATE"],
 };
 
-export function validateReceipt(
-  planId: string, newType: string
-): { valid: boolean; error?: string } {
-  if (newType === 'BLOCK' || newType === 'API_LIMIT') {
+export async function validateReceipt(
+  planId: string,
+  newType: string,
+): Promise<{ valid: boolean; error?: string }> {
+  if (newType === "BLOCK" || newType === "API_LIMIT" || newType === "CANCELLED" || newType === "ABANDONED") {
     // BLOCK and API_LIMIT are always allowed (override any state)
     return { valid: true };
   }
-  
-  const currentType = getLatestReceiptType(planId) || '';
+
+  const currentType = await getLatestReceiptType(planId) || "";
   const allowed = ALLOWED[currentType] || [];
-  
+
   if (!allowed.includes(newType)) {
     return {
       valid: false,
-      error: `Cannot issue ${newType} receipt: current state is ${currentType || 'none'}. Allowed: ${allowed.join(', ') || 'none (terminal state)'}`,
+      error: `Cannot issue ${newType} receipt: current state is ${currentType || "none"}. Allowed: ${allowed.join(", ") || "none (terminal state)"}`,
     };
   }
-  
+
   return { valid: true };
 }

@@ -17,7 +17,7 @@ export async function initDb(_conduitDataDir?: string): Promise<Pool> {
   pool = new Pool({
     connectionString: dsn,
     // Default search_path for all connections from this pool
-    options: `-c search_path=${PG_SCHEMA}`,
+    options: `-c search_path=${PG_SCHEMA},${VECTOR_SCHEMA}`,
     max: 10,
     idleTimeoutMillis: 30000,
   });
@@ -213,7 +213,7 @@ async function withTransaction<T>(
   cb: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await pool.connect();
-  await client.query(`SET search_path TO ${PG_SCHEMA}`);
+  await client.query(`SET search_path TO ${PG_SCHEMA},${VECTOR_SCHEMA}`);
   try {
     await client.query("BEGIN");
     const result = await cb(client);
@@ -369,6 +369,18 @@ async function createSchema(
 
     INSERT INTO circuit_breaker (id, tripped) VALUES (1, 0)
     ON CONFLICT (id) DO NOTHING;
+
+    ALTER TABLE circuit_breaker ADD COLUMN IF NOT EXISTS wake_requested_at TEXT;
+
+    CREATE TABLE IF NOT EXISTS role_circuit_breaker (
+      role            TEXT PRIMARY KEY,
+      tripped         INTEGER DEFAULT 0,
+      tripped_at      TEXT,
+      retry_after     INTEGER DEFAULT 1800,
+      error           TEXT,
+      failure_count   INTEGER DEFAULT 0,
+      updated_at      TEXT
+    );
 
     -- AI config tables (moved to vector schema, renamed without ai_ prefix)
     CREATE TABLE IF NOT EXISTS ${VECTOR_SCHEMA}.providers (
@@ -1067,6 +1079,69 @@ export async function isBreakerTripped(): Promise<boolean> {
   return row?.tripped === 1;
 }
 
+// ── Scheduler Wake ──────────────────────────────────────────────────
+
+export async function requestSchedulerWake(): Promise<void> {
+  const now = new Date().toISOString();
+  await qRun(
+    `UPDATE circuit_breaker SET wake_requested_at = @wake_requested_at, updated_at = @updated_at WHERE id = 1`,
+    { wake_requested_at: now, updated_at: now }
+  );
+}
+
+/** Returns true and clears wake_requested_at if a wake was requested since the
+ *  given timestamp. Used by the scheduler to shorten idle backoff on config change. */
+export async function consumeSchedulerWake(since: string): Promise<boolean> {
+  const row = await qOne(
+    `SELECT wake_requested_at FROM circuit_breaker WHERE id = 1
+     AND wake_requested_at IS NOT NULL AND wake_requested_at > @since`,
+    { since }
+  );
+  if (row?.wake_requested_at) {
+    await qRun(
+      `UPDATE circuit_breaker SET wake_requested_at = NULL, updated_at = @updated_at WHERE id = 1`,
+      { updated_at: new Date().toISOString() }
+    );
+    return true;
+  }
+  return false;
+}
+
+// ── Role Circuit Breaker ────────────────────────────────────────────
+
+export async function isRoleBreakerTripped(role: string): Promise<boolean> {
+  const row = await qOne(
+    "SELECT tripped FROM role_circuit_breaker WHERE role = @role",
+    { role }
+  );
+  return row?.tripped === 1;
+}
+
+export async function tripRoleBreaker(
+  role: string,
+  error: string,
+  retryAfter: number = 1800,
+): Promise<void> {
+  const now = new Date().toISOString();
+  await qRun(
+    `INSERT INTO role_circuit_breaker (role, tripped, tripped_at, retry_after, error, failure_count, updated_at)
+     VALUES (@role, 1, @tripped_at, @retry_after, @error, 1, @updated_at)
+     ON CONFLICT (role) DO UPDATE SET
+       tripped = 1, tripped_at = @tripped_at, retry_after = @retry_after,
+       error = @error, failure_count = role_circuit_breaker.failure_count + 1,
+       updated_at = @updated_at`,
+    { role, tripped_at: now, retry_after: retryAfter, error, updated_at: now }
+  );
+}
+
+export async function resetRoleBreaker(role: string): Promise<void> {
+  const now = new Date().toISOString();
+  await qRun(
+    `DELETE FROM role_circuit_breaker WHERE role = @role`,
+    { role }
+  );
+}
+
 // ── Tickets ─────────────────────────────────────────────────────────
 
 export interface TicketRow {
@@ -1560,7 +1635,93 @@ export async function upsertRoleModels(
           provider_id: p.provider_id ?? null, harness_id: p.harness_id ?? null }
       );
     }
+    // Reset role circuit breaker so scheduler can re-dispatch immediately
+    await tRun(client, "DELETE FROM role_circuit_breaker WHERE role = @role", { role });
+    // Signal scheduler to wake from idle backoff
+    await tRun(client,
+      `UPDATE circuit_breaker SET wake_requested_at = @wake_at, updated_at = @wake_at WHERE id = 1`,
+      { wake_at: new Date().toISOString() }
+    );
   });
+}
+
+/** Import a full AI config snapshot: clear existing data and bulk-insert.
+ *  Runs inside a transaction so partial imports are rolled back on error. */
+export async function importAIConfig(
+  data: AIConfigSnapshot & { role_models?: { role: string; model_id: string; priority: number; provider_id?: string | null; harness_id?: string | null }[] },
+): Promise<{ providers: number; harnesses: number; models: number; roles: number; role_models: number }> {
+  let pCount = 0, hCount = 0, mCount = 0, rCount = 0, rmCount = 0;
+  const now = new Date().toISOString();
+
+  await withTransaction(async (client) => {
+    // Clear existing data in dependency order
+    await tRun(client, "DELETE FROM role_models");
+    await tRun(client, "DELETE FROM role_config");
+    await tRun(client, "DELETE FROM models");
+    await tRun(client, "DELETE FROM harnesses");
+    await tRun(client, "DELETE FROM providers");
+
+    // Insert providers
+    for (const p of data.providers || []) {
+      await tRun(client,
+        `INSERT INTO providers (id, name, type, endpoint_url, api_key, config_json, created_at, updated_at)
+         VALUES (@id, @name, @type, @endpoint_url, @api_key, @config_json, @created_at, @updated_at)`,
+        { id: p.id, name: p.name, type: p.type, endpoint_url: p.endpoint_url ?? null,
+          api_key: p.api_key ?? null, config_json: p.config_json ?? "{}",
+          created_at: p.created_at || now, updated_at: now }
+      );
+      pCount++;
+    }
+
+    // Insert harnesses
+    for (const h of data.harnesses || []) {
+      await tRun(client,
+        `INSERT INTO harnesses (id, name, invocation_semantics, created_at, updated_at)
+         VALUES (@id, @name, @invocation_semantics, @created_at, @updated_at)`,
+        { id: h.id, name: h.name, invocation_semantics: h.invocation_semantics ?? "{}",
+          created_at: h.created_at || now, updated_at: now }
+      );
+      hCount++;
+    }
+
+    // Insert models
+    for (const m of data.models || []) {
+      await tRun(client,
+        `INSERT INTO models (id, name, harness_id, provider_id, model_identifier, created_at, updated_at)
+         VALUES (@id, @name, @harness_id, @provider_id, @model_identifier, @created_at, @updated_at)`,
+        { id: m.id, name: m.name, harness_id: m.harness_id, provider_id: m.provider_id ?? null,
+          model_identifier: m.model_identifier, created_at: m.created_at || now, updated_at: now }
+      );
+      mCount++;
+    }
+
+    // Insert role_configs
+    for (const r of data.roles || []) {
+      await tRun(client,
+        `INSERT INTO role_config (id, role, provider_id, harness_id, model_id, extra_params, created_at, updated_at)
+         VALUES (@id, @role, @provider_id, @harness_id, @model_id, @extra_params, @created_at, @updated_at)`,
+        { id: r.id, role: r.role, provider_id: r.provider_id, harness_id: r.harness_id,
+          model_id: r.model_id, extra_params: r.extra_params ?? "{}",
+          created_at: r.created_at || now, updated_at: now }
+      );
+      rCount++;
+    }
+
+    // Insert role_models
+    for (const rm of data.role_models || []) {
+      const rmId = `rm-${rm.role}-${rm.model_id}`;
+      await tRun(client,
+        `INSERT INTO role_models (id, role, model_id, priority, provider_id, harness_id)
+         VALUES (@id, @role, @model_id, @priority, @provider_id, @harness_id)`,
+        { id: rmId, role: rm.role, model_id: rm.model_id,
+          priority: rm.priority ?? 0, provider_id: rm.provider_id ?? null, harness_id: rm.harness_id ?? null }
+      );
+      rmCount++;
+    }
+  });
+
+  console.log(`[import-ai-config] Imported ${pCount} providers, ${hCount} harnesses, ${mCount} models, ${rCount} roles, ${rmCount} role_models.`);
+  return { providers: pCount, harnesses: hCount, models: mCount, roles: rCount, role_models: rmCount };
 }
 
 export async function getAIConfigSnapshot(): Promise<AIConfigSnapshot & { role_models: AIRoleModelRow[] }> {
@@ -1571,6 +1732,126 @@ export async function getAIConfigSnapshot(): Promise<AIConfigSnapshot & { role_m
     roles: await getAIRoleConfigs(),
     role_models: await getAllRoleModels(),
   };
+}
+
+export interface ConfigValidationWarning {
+  role: string;
+  field: string;
+  message: string;
+  severity: "error" | "warning";
+}
+
+export async function validateAIConfig(): Promise<ConfigValidationWarning[]> {
+  const cfg = await getAIConfigSnapshot();
+  const warnings: ConfigValidationWarning[] = [];
+
+  const harnessMap = new Map(cfg.harnesses.map(h => [h.id, h]));
+  const modelMap = new Map(cfg.models.map(m => [m.id, m]));
+  const providerMap = new Map(cfg.providers.map(p => [p.id, p]));
+  const roleModelsMap = new Map<string, AIRoleModelRow[]>();
+  for (const rm of cfg.role_models) {
+    const list = roleModelsMap.get(rm.role) || [];
+    list.push(rm);
+    roleModelsMap.set(rm.role, list);
+  }
+
+  for (const rc of cfg.roles) {
+    // Check primary model exists
+    if (!modelMap.has(rc.model_id)) {
+      warnings.push({
+        role: rc.role, field: "model_id",
+        message: `Primary model '${rc.model_id}' not found in models table.`,
+        severity: "error",
+      });
+    } else {
+      const model = modelMap.get(rc.model_id)!;
+      // Check primary model's harness
+      const harness = harnessMap.get(model.harness_id);
+      if (!harness) {
+        warnings.push({
+          role: rc.role, field: "harness_id",
+          message: `Primary model '${rc.model_id}' references harness '${model.harness_id}' which does not exist.`,
+          severity: "error",
+        });
+      } else {
+        const sem = parseJsonSafe(harness.invocation_semantics, {});
+        const binary = sem?.binary ?? "";
+        if (!binary) {
+          warnings.push({
+            role: rc.role, field: "invocation_semantics.binary",
+            message: `Harness '${harness.name}' for primary model '${model.name}' has no 'binary' in invocation_semantics. Model will be skipped in the execution chain.`,
+            severity: "error",
+          });
+        }
+      }
+
+      // Check primary model's provider
+      if (model.provider_id && !providerMap.has(model.provider_id)) {
+        warnings.push({
+          role: rc.role, field: "provider_id",
+          message: `Primary model '${rc.model_id}' references provider '${model.provider_id}' which does not exist.`,
+          severity: "warning",
+        });
+      }
+    }
+
+    // Check fallback models (role_models)
+    const rms = roleModelsMap.get(rc.role) || [];
+    for (const rm of rms) {
+      if (!modelMap.has(rm.model_id)) {
+        warnings.push({
+          role: rc.role, field: "model_id",
+          message: `Fallback model '${rm.model_id}' not found in models table.`,
+          severity: "error",
+        });
+        continue;
+      }
+      const model = modelMap.get(rm.model_id)!;
+      const harnessId = rm.harness_id || model.harness_id;
+      const harness = harnessMap.get(harnessId);
+      if (!harness) {
+        warnings.push({
+          role: rc.role, field: "harness_id",
+          message: `Fallback model '${rm.model_id}' references harness '${harnessId}' which does not exist.`,
+          severity: "error",
+        });
+      } else {
+        const sem = parseJsonSafe(harness.invocation_semantics, {});
+        const binary = sem?.binary ?? "";
+        if (!binary) {
+          warnings.push({
+            role: rc.role, field: "invocation_semantics.binary",
+            message: `Harness '${harness.name}' for fallback model '${model.name}' has no 'binary' in invocation_semantics. This model will be skipped in the execution chain.`,
+            severity: "warning",
+          });
+        }
+      }
+
+      const providerId = rm.provider_id || model.provider_id;
+      if (providerId && !providerMap.has(providerId)) {
+        warnings.push({
+          role: rc.role, field: "provider_id",
+          message: `Fallback model '${rm.model_id}' references provider '${providerId}' which does not exist.`,
+          severity: "warning",
+        });
+      }
+    }
+
+    // Warn if role has no fallback models
+    if (rms.length === 0) {
+      warnings.push({
+        role: rc.role, field: "model_priorities",
+        message: `Role '${rc.role}' has no fallback models configured. If the primary model fails, execution will halt.`,
+        severity: "warning",
+      });
+    }
+  }
+
+  return warnings;
+}
+
+function parseJsonSafe(text: string, fallback: any): any {
+  try { return JSON.parse(text); } catch { return fallback; }
 }
 
 // ── Seed defaults ───────────────────────────────────────────────────

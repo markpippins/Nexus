@@ -15,6 +15,10 @@ export interface PlanCard {
   acceptanceCriteria?: string[];
   dependencies?: string[];
   promptRef?: string;  // prompt number this plan was spawned from
+  /** Per-role ticket detail: role → { status, id, created_at, expires_at, objective } */
+  ticketStatuses?: Record<string, { status: string; id: string; created_at: string; expires_at?: string; objective?: string }>;
+  /** Derived status from the receipt chain (PLAN_CREATE, IMPLEMENTATION, REVIEW_PASS, etc.) */
+  derivedStatus?: string;
 }
 
 export interface BuilderStatus {
@@ -49,6 +53,15 @@ export interface ConduitState {
   receiptStats?: { type: string; count: number }[];
   prompts: PromptEntry[];
   lastUpdated: string;
+  temporal?: TemporalState;
+}
+
+export interface TemporalState {
+  connected: boolean;
+  address: string;
+  namespace: string;
+  schedulerIntervalMs: number;
+  workflowCounts: { running: number; completed: number; failed: number; cancelled: number; total: number };
 }
 
 // Receipt types (v061)
@@ -160,7 +173,7 @@ export interface DepNode { type: 'prompt' | 'plan'; planNumber: string; title: s
 export interface DepEdge { from: string; to: string }
 
 // Toast types (v041)
-export type ToastType = 'builder_stale' | 'builder_killed' | 'circuit_tripped' | 'circuit_resolved' | 'blocker_filed' | 'agent_stale' | 'agent_gone' | 'sse_disconnected' | 'sse_reconnected';
+export type ToastType = 'builder_stale' | 'builder_killed' | 'circuit_tripped' | 'circuit_resolved' | 'blocker_filed' | 'agent_stale' | 'agent_gone' | 'sse_disconnected' | 'sse_reconnected' | 'run_started' | 'hard_deleted' | 'role_saved';
 export interface ToastEntry { id: string; type: ToastType; title: string; message: string; icon: string; timestamp: string; priority: 'high' | 'normal'; }
 
 // SSE event types (v032)
@@ -195,9 +208,19 @@ export interface ConduitEvent {
   timestamp?: string;
 }
 
+// Cron schedule config (v092 — exposed by GET /config/cron)
+export interface CronConfig {
+  cron: string;
+  intervalMinutes: number;
+  description: string;
+  timestamp: string;
+}
+
 // Session log event (v071 — streaming live builder output)
 export interface SessionLogEvent {
   sessionId: string;
   line: string;
   timestamp: string;
+  /** Event type: 'stdout' (default), 'stderr' (error output), 'error' (crash/exit) */
+  logType?: 'stdout' | 'stderr' | 'error';
 }

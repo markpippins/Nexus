@@ -1,4 +1,3 @@
-import chokidar from "chokidar";
 import path from "path";
 import fs from "fs";
 import { BaseWatcher } from "./base";
@@ -6,7 +5,6 @@ import { PlanCard, PlanStatus } from "../types";
 import { parsePlanFile } from "../parser";
 import {
   upsertPlan,
-  getLatestReceiptType,
   getPlansGroupedByStatus,
   planRowToPlanCard,
   getPlanById,
@@ -30,7 +28,6 @@ export class PlanWatcher extends BaseWatcher {
     proposed: [],
     planning: [],
   };
-  private watcher: ReturnType<typeof chokidar.watch> | null = null;
   private planDir: string;
 
   constructor(baseDir: string, emit: (event: any) => void) {
@@ -39,14 +36,17 @@ export class PlanWatcher extends BaseWatcher {
   }
 
   async initialize(): Promise<void> {
+    // Startup scan: upsert filesystem plans into DB for content mirroring.
+    // Operational state is DB-primary — the plan_status view is authoritative.
     await this.readAllDirectories();
-    // Fallback: populate from DB if filesystem plans are sparse
+    // Merge DB-backed plans into in-memory cache (catches DB-only plans).
     await this.loadFromDb();
-    this.startWatching();
+    // DB-primary mode: no chokidar watch. State changes come from
+    // receipt issuance via MCP tool handlers, not file placement.
   }
 
   destroy(): void {
-    if (this.watcher) this.watcher.close();
+    // No resources to clean up (chokidar removed).
   }
 
   private async readAllDirectories() {
@@ -55,13 +55,11 @@ export class PlanWatcher extends BaseWatcher {
       const fullPath = path.join(this.planDir, dir);
       this.plans[dir] = await this.readPlanDir(fullPath, dir);
     }
-    // Read proposed and planning (v067)
     for (const dir of ["proposed", "planning"] as const) {
       const fullPath = path.join(this.planDir, dir);
       const cards = await this.readPlanDir(fullPath, dir);
       this.plans[dir] = cards;
     }
-    // Read archived from .bak/completed-plans/
     const archivedDir = path.join(this.baseDir, ".bak", "completed-plans");
     this.plans.archived = await this.readPlanDir(archivedDir, "archived");
   }
@@ -100,20 +98,17 @@ export class PlanWatcher extends BaseWatcher {
               card.blockReason = firstLine.replace("# ", "").trim();
             }
           }
-          // Guard: skip if plan is soft-deleted in DB (prevents orphaned files
-          // from being re-added to in-memory state after server restart)
+          // Guard: skip soft-deleted plans in DB
           try {
-            const dbPlan = getPlanById(card.planNumber);
-            if (dbPlan?.deleted) {
-              continue; // skip — plan is soft-deleted
-            }
+            const dbPlan = await getPlanById(card.planNumber);
+            if (dbPlan?.deleted) continue;
           } catch {
             // DB might not be initialized yet — proceed
           }
 
-          // Upsert plan into SQLite database
+          // Upsert plan into the database for content mirroring
           try {
-            upsertPlan({
+            await upsertPlan({
               id: card.planNumber,
               file_name: card.fileName,
               title: card.title,
@@ -126,6 +121,8 @@ export class PlanWatcher extends BaseWatcher {
               ),
               dependencies: JSON.stringify(card.dependencies || []),
               prompt_ref: "",
+              notes: "",
+              priority: 0,
               created_at: card.createdAt,
               updated_at: new Date().toISOString(),
             });
@@ -145,10 +142,8 @@ export class PlanWatcher extends BaseWatcher {
   }
 
   private async loadFromDb() {
-    // Merge DB-backed plans into the in-memory cache so /state works
-    // even when IMPLEMENTATION_PLANS/ is empty (conduit-manager is DB-primary).
     try {
-      const grouped = getPlansGroupedByStatus();
+      const grouped = await getPlansGroupedByStatus();
       for (const dir of [
         "pending",
         "active",
@@ -172,116 +167,5 @@ export class PlanWatcher extends BaseWatcher {
         err,
       );
     }
-  }
-
-  private startWatching() {
-    // If IMPLEMENTATION_PLANS doesn't exist, skip filesystem watch entirely
-    if (!fs.existsSync(this.planDir)) {
-      console.log(
-        "plan-watcher: IMPLEMENTATION_PLANS not found — filesystem watch disabled (DB-primary mode).",
-      );
-      return;
-    }
-
-    this.watcher = chokidar.watch(
-      [
-        path.join(this.planDir, "pending", "*.md"),
-        path.join(this.planDir, "active", "*.md"),
-        path.join(this.planDir, "completed", "*.md"),
-        path.join(this.planDir, "blocked", "*.md"),
-        path.join(this.planDir, "proposed", "*.md"),
-        path.join(this.planDir, "planning", "*.md"),
-      ],
-      { persistent: true, ignoreInitial: true },
-    );
-
-    this.watcher.on("add", async (filePath: string) => {
-      // Content sync only — filesystem event is NOT a state transition.
-      // Upsert into SQLite so the file's content is available for queries,
-      // but do NOT emit a state-change SSE event. State changes come from
-      // receipt issuance, not file placement.
-      const dir = path.basename(path.dirname(filePath)) as PlanStatus;
-      const cards = await this.readPlanDir(path.dirname(filePath), dir);
-      const card = cards[0];
-      if (card) {
-        // Guard: if the plan was soft-deleted in the DB, don't re-add it
-        // to in-memory state. This prevents deleted plans from reappearing
-        // when an external process writes a .md file to IMPLEMENTATION_PLANS.
-        try {
-          const dbPlan = getPlanById(card.planNumber);
-          if (dbPlan?.deleted) {
-            return; // skip — plan is soft-deleted
-          }
-        } catch {
-          // DB might not be initialized yet — proceed with filesystem state
-        }
-        this.plans[dir].push(card);
-        // Emit a content event (informational, not state-changing)
-        this.emit({
-          type: "plan_file_added",
-          data: { plan: card, directory: dir },
-        });
-
-        // Reconciliation check: does the file's directory match receipt state?
-        try {
-          const receiptType = getLatestReceiptType(card.planNumber);
-          const expectedDirs: Record<string, PlanStatus[]> = {
-            PLAN_CREATE: ["pending"],
-            IMPLEMENTATION: ["active"],
-            REVIEW_PASS: ["completed"],
-            REVIEW_REJECT: ["active"],
-            BLOCK: ["blocked"],
-            PROPOSED: ["proposed"],
-            PLANNING: ["planning"],
-          };
-          const expected = expectedDirs[receiptType || "PLAN_CREATE"] || [
-            "pending",
-          ];
-          if (!expected.includes(dir) && receiptType) {
-            console.warn(
-              `Reconciliation mismatch: plan ${card.planNumber} ` +
-                `found in ${dir}/ but receipt chain says ${receiptType} ` +
-                `(expected directory: ${expected.join(" or ")})`,
-            );
-          }
-        } catch (err) {
-          // DB might not be initialized yet — skip reconciliation
-        }
-      }
-    });
-
-    this.watcher.on("unlink", (filePath: string) => {
-      // File deletion is NOT a state transition. Plans are receipts, not files.
-      // If a plan file disappears, it may have been archived or cleaned up.
-      // The receipt chain in SQLite is still authoritative.
-      const fileName = path.basename(filePath);
-      const dirs = [
-        "pending",
-        "active",
-        "completed",
-        "blocked",
-        "proposed",
-        "planning",
-      ] as const;
-      let removed: PlanCard | undefined;
-      let fromDir: string | undefined;
-      for (const key of dirs) {
-        const idx = this.plans[key].findIndex(
-          (p: PlanCard) => p.fileName === fileName,
-        );
-        if (idx !== -1) {
-          [removed] = this.plans[key].splice(idx, 1);
-          fromDir = key;
-          break;
-        }
-      }
-      if (removed && fromDir) {
-        // Emit a content event — "a file went away" — not a state event
-        this.emit({
-          type: "plan_file_removed",
-          data: { plan: removed, from: fromDir },
-        });
-      }
-    });
   }
 }

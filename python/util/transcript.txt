@@ -1,1275 +1,391 @@
-Codex is no longer really a coding tool
 0:00
-OpenAI revamped Codeex completely and I
-0:02
-am blown away by how useful that new app
-0:05
-is. On April 16th, OpenAI turned Codeex
+There is a massive problem right now
+0:01
+with how people are using AI. Let's just
+0:04
+take for example GStack from Gary Tan.
+0:07
+These are a bunch of skills that people
 0:08
-into a desktop agent that operates every
+are utilizing inside of their
 0:10
-single app on your Mac. Clicking,
+development environments to give AI
 0:12
-typing, running in the background while
+certain functionalities. And if we take
 0:14
-you work. It's faster and more reliable
+a look at some of these skills, for
+0:15
+example, this one is for converting a
 0:16
-than Claw's version of computer use, and
-0:17
-it's by a much bigger margin than I
+markdown file into a PDF. You'll see
 0:19
-expected. That matters because most
+that these skills are pretty much just
 0:21
-enterprise software doesn't have modern
+code instructions written rather in code
 0:23
-APIs, and Codeex doesn't need them. I'm
+or in English to tell the AI what to do.
 0:25
-going to walk you through what Codeex is
+So you can see here this is just a giant
 0:27
-now, how it got this good, what OpenAI
+wall of code that it's saying hey if the
 0:29
-is really building, and where both labs
-0:31
-are going, and of course, what you
+user asks for a PDF run this and then
+0:32
+here we have more code to run if they
 0:33
-should do about it. The reason to pay
-0:34
-attention goes deeper than the
+ask for a PDF. Then finally we have
 0:36
-capability gap. In a recent interview
+these kind of interesting things where
 0:37
-with Ashley Vance, Greg Brockman said,
+it's like here's an if statement written
 0:39
-"Models have gone from being the product
+out in English that the AI should be
 0:41
-to being part of the product." I think
-0:43
-he's correct. The brain is effectively
-0:45
-built. The work now from the
-0:47
-hyperscalers is on the body. Both labs
-0:49
-have decided the body is priority one,
+able to read to tell the user what to
+0:42
+do. So depending on the output of this
+0:44
+code here's some English if statements
+0:46
+to run to tell the AI how to understand
+0:48
+what to happen and then some more stuff.
+0:50
+And if we even go further inside this
 0:52
-but they're building very different
+section you can see more of those human
 0:53
-approaches. And Codex's April release
-0:56
-shows that split really cleanly. Let me
+readable if statements. It's just
+0:55
+English if statements. And then if we go
+0:57
+even further, there's a bunch of other
 0:58
-start with what Codex is now. When
-0:59
-OpenAI launched the original Codeex
+stuff about code to run. And finally, at
+1:00
+the bottom, we get even more code that
 1:01
-command line in April 2025, it was a
+should be run by the user down here for
 1:03
-command line tool for developers. You
+various different things. So
 1:05
-typed prompts. It wrote code. That was
-1:08
-essentially the whole product. A year
+essentially, what this skill is doing is
+1:07
+instead of telling the AI, hey, here's
 1:09
-later, Codeex has become a full desktop
-1:12
-application that can see your screen,
+some certain things to know and to
+1:11
+understand, it's instead a program
+1:13
+written from top to bottom telling
 1:14
-click and type across the Mac, generate
+exactly what should happen. Here's code
 1:16
-images, browse the web in its own
-1:17
-built-in browser, remember what you've
+to run. If this, then do this. If this,
 1:18
-been working on, schedule itself to wake
+then do this. Do you know what that
 1:20
-up on longunning tasks, and run multiple
-1:23
-agents in parallel without hijacking
-1:25
-what you're doing. The transformation
+sounds like? It sounds like a program to
+1:22
+me. It sounds like code. It sounds like
+1:24
+something that should run
+1:24
+deterministically the exact same way
 1:26
-has happened in stages, but you can see
-1:28
-the direction. February 2, the Mac OS
+every single time. And instead, what
+1:29
+we're doing is we're taking something
 1:30
-desktop app launched. March 4, Windows
+that is deterministic. We have written
 1:32
-support. March 5, GPT 5.4 for folded C
+out deterministic code and we've even
+1:33
+written out deterministic instructions
 1:35
-codeex's coding capability into the
+on what to do and we're feeding it into
 1:37
-general purpose model line. In March 19,
+a non-deterministic machine that can
 1:39
-OpenAI confirmed the super app
+sometimes hallucinate or make mistakes
 1:41
-consolidation plan. April 16, the
+or does not always do the same thing
 1:43
-release that made Codex what it is now
+every time. Instead of generating a
 1:45
-was all about computer use, inapp
+skill like this, it would be much
 1:47
-browser, image generation, memory, and
-1:48
-90 plus new plugins in one app. The
+smarter to generate a single command
+1:49
+line tool that you can then let your AI
 1:51
-heart of that transformation is computer
+use. But that command line tool will
 1:53
-use. Codex can operate any Mac OS
-1:55
-application by just seeing your screen
+encompass all of this code, all of these
+1:56
+if statements, and handle everything
 1:57
-and just clicking and typing like a
+properly inside of a command line
 1:59
-person. It does this in the background,
+instead of handling it inside of some
 2:01
-which means multiple agents can run in
+type of agent. Now, I know there are
 2:03
-parallel while you work on something
+certain situations where it's better to
 2:05
-else. That's not a feature update.
-2:07
-That's actually codec shifting the
+let an agent determine what to run
+2:06
+because you maybe have somewhat
 2:08
-category. Codeex is no longer really a
-2:11
-coding tool. It's a desktop agent that
+ambiguous things that you want this
+2:09
+thing to do, but instead of giving all
+2:12
+of the instructions in here for how to
 2:13
-can do anything a person can do through
+actually run and build a PDF, it'd be
 2:15
-a graphical interface. And yes, it still
+much better to create really small
 2:17
-codes too. Does it actually work? Yes,
-2:20
-and in two specific ways that matter.
+little files and things that can run and
+2:19
+then the AI just calls out to those
 2:21
-I've been running Codeex and Claude side
+different things for the user based on
 2:23
-by side on the same workflows for the
-2:25
-last week or so. And what I see is this.
+different things. So instead of having
+2:24
+this giant skill that has a bunch of if
+2:26
+checks inside of it, instead you give
 2:27
-Codeex is fast. It moves through a
-2:29
-workflow at something close to the speed
-The brain is built, the work is on the body
+tools to the AI and then the AI itself
+2:30
+can just determine which tools to call
 2:31
-of a person who already knows that
+based on what you said. And this isn't
 2:33
-software. Claude's version is slower,
+just a problem with these particular
 2:35
-like the cursor hesitates, the agent
+skills or skills in general. This is
 2:36
-rethinks and sometimes retries. Tasks
-2:39
-that finish in 2 minutes on Codeex can
+something that's more of a trend I'm
+2:38
+seeing everywhere where developers are
 2:40
-take five or six on Claude. And Claude
-2:43
-is limited in where it can go. Claude
-2:45
-prefers Chrome. Codeex can touch
+essentially using their AI to do
+2:42
+deterministic things, but they are using
+2:44
+a non-deterministic tool all the time. I
+2:46
+see developers telling their AI, "Hey,
 2:48
-anything on the desktop. So, the gap
-2:49
-isn't subtle. Codeex is also reliable.
+get and get commit this and then push it
+2:50
+to GitHub or something along those lines
 2:52
-The failure mode of computer use
+where it'd be much easier just to use a
 2:53
-products for the last year plus has been
+command line tool directly to do those
 2:55
-really specific. The agent gets partway
+different things or they're asking their
 2:57
-through the task, hits an unexpected
+AI to do this really complicated, you
+2:59
+know, thing with a bunch of different if
 3:00
-modal dialogue or some other issue,
+checks and so on when in reality it'd be
 3:02
-fumbles, and you have to take over and
-3:03
-restart, and then why do it at all?
+much better for you to just have your AI
 3:04
-Codeex's implementation, generally
-3:06
-speaking, doesn't fumble. It backs up
+write a program that does that thing
+3:05
+deterministically and then you could
+3:07
+just call that program instead of
 3:08
-when it needs to. It finishes, and it
+wasting tokens having the AI redo this
 3:10
-does so quickly. That's what moves the
+every single time." Because again,
 3:12
-capability from impressive for demos to,
+whenever you call these skills or use
 3:14
-I could actually use this. Sam said
+these skills, the AI must read all of
 3:16
-something in a recent Ashley Vance
-3:18
-interview that lines up with what I've
+that text, which is costing you money on
+3:17
+tokens, and then must output and think a
+3:19
+bunch, which is costing you money on
 3:20
-been seeing. Asked about Codeex versus
-3:21
-Claude today, his read was, "Our product
+tokens. So, it'd be much better to spend
+3:22
+your time generating all of this code
 3:24
-is ahead in many ways." Of course, he
-3:25
-said that. But on computer use
-3:27
-specifically, I do agree with him. Some
-3:29
-of that gap comes from the model. GPT
+one time and then call that code on your
+3:26
+computer to do this particular thing.
+3:28
+Think about it. We have learned that
+3:30
+caching is an incredibly important thing
 3:32
-5.4 is the first general purpose model
+to do as you want to scale out your
 3:34
-OpenAI has shipped with native computer
-3:36
-use capabilities baked in. It benchmarks
-3:38
-in the mid70s on OS World, which puts it
-3:41
-above the human baseline for graphical
-3:43
-user interface control. That's right,
+application. If you cache your
+3:35
+application, it'll be much quicker
+3:37
+because instead of generating the HTML
+3:39
+every time someone accesses your page,
+3:40
+you generate it once and you give the
+3:42
+same HTML every single time, making it
 3:44
-better than humans. But the model isn't
+much quicker and your server runs much
 3:46
-the whole story. Alexander Emiricos who
+less because it generates all the code
 3:48
-works on the codeex team at OpenAI
-3:50
-called the background computer use
-3:52
-implementation basically deep OS level
-3:54
-wizardry. I feel it when I use it. The
-3:56
-specific architectural choice he was
-3:58
-pointing at is that background agents
-4:00
-don't hijack your cursor or steal focus
-4:02
-from the app you're working in. You can
+one time and then it continually serves
+3:49
+that same thing to the user. We've
+3:51
+essentially completely forgotten that
+3:53
+when it comes to AI, instead of creating
+3:55
+a program which does what we want to do,
+3:57
+the caching portion, we're instead
+3:59
+forcing the AI to burn tokens and energy
+4:01
+and power every time we want to do
 4:03
-keep typing in one window while an agent
-4:05
-is clicking around in another. That's
-4:07
-what makes parallel agents actually
-4:09
-usable instead of theoretical. Three
-4:11
-codeex agents on three unrelated tasks.
+something. instead of writing a program
+4:04
+one time that'll do it for us every
+4:06
+single time that we want to do this. I
+4:08
+have a video editor program that I
+4:10
+created and that video editor program
+4:12
+does have some AI related things that
 4:13
-You can walk away. You can come back 20
+happen inside of it. But I've
 4:15
-minutes later. The three tasks are just
+essentially taken that AI portion and
 4:17
-done. And that's changed how I schedule
+I've broken it out entirely and the rest
 4:19
-my day. It's not just me. Since the
-4:20
-release, early users on X have been
-4:22
-posting their first real workflows with
-4:24
-Codeex. And the range of what's working
+of my application is entirely
+4:21
+deterministic. For example, I use an AI
+4:23
+to create a transcript of all of my
+4:25
+text. That way I can edit my videos
 4:26
-is wider than I would have expected.
+based on the transcript of the text. I
 4:28
-Stuff like mass clearing Slack, right?
-Computer use side by side: Codex vs Claude
+can then stitch together those clips
 4:30
-Reading and triaging hundreds of unread
+using ffmpeg and I can do various other
 4:32
-bot messages and daily digest so the
+things with that as well. But the key is
 4:34
-inbox starts clean. Or building a
+I don't tell the AI, hey, give me the
 4:36
-Spotify playlist by driving the desktop
-4:38
-app from a verbal description. Or
+transcript and then stitch together my
+4:37
+ffmpeg videos together. I instead say
 4:40
-walking through a front-end app to catch
+generate the transcript and put it in a
 4:42
-visual regressions while the developer
+JSON file. That JSON file is then read
 4:44
-keeps shipping the next feature. or
-4:45
-reproducing a browser bug,
+by my running program written in
 4:46
-screenshotting the reproduction, pasting
+JavaScript and it reads that transcript,
 4:48
-the images straight into a pull request
+renders that out as a screen. I then can
 4:50
-description, or running end-to-end tests
-4:52
-on the app you just built, and then
+edit my video. I can then send a program
 4:53
-self-fixing the issues it finds, or
-4:55
-driving a legacy internal dashboard that
+to ffmpeg through my application, no AI
+4:56
+at all, and it renders out the video. So
 4:58
-never had an API, exactly the software
-5:00
-category automation has given up on for
-5:02
-years. One person wired up a daily recap
+I'm able to use the AI for one small
+4:59
+portion and I'm able to then take the
+5:01
+output of the AI and run it in the rest
+5:03
+of my program so everything else works
 5:04
-that pulls get commits, issue tracker
-5:06
-updates, and calendar events, writes the
+like I expect it to. This is how AI
+5:07
+should be used for these type of
 5:08
-meeting minutes to notion, and then
+deterministic tasks. Because if I
 5:10
-drops prioritized to-dos into Apple
+instead told the AI, generate the
 5:12
-reminders. Another one has Codex play
-5:14
-daily login routines in the background
-5:15
-so they don't have to. Another detects
+transcript, cut the video, render the
+5:13
+ffmpeg stuff, I guarantee you at some
+5:16
+point along that chain, it's going to
 5:17
-when the user is slouching on their
-5:18
-webcam and pops open a stretching video.
+make a single mistake. And if it does,
+5:19
+everything in that chain is essentially
 5:21
-None of those are demos. They're
+broken cuz now my output no longer works
 5:23
-actually workflows people ran and then
+and I need to rerun the entire chain
 5:25
-decided to keep running. And that's the
+from the absolute beginning. Instead, if
 5:27
-tell. Computer use stops being a novelty
+I do a deterministic step-by-step
 5:29
-when you reach for it the second time.
-5:31
-And that's really the line codeex
-5:33
-crossed. A desktop agent that can drive
-5:35
-any Mac app runs in the background and
-5:37
-actually finishes the work is the dream.
-5:39
-Which brings us to the next piece. What
-5:41
-is OpenAI really building with this
-5:43
-launch? And why does it look so
+process, generate the transcripts, and
+5:30
+then let my program do everything else.
+5:32
+If my transcripts fail, that's fine. I
+5:34
+just rerun the transcripts. But, for
+5:36
+example, everything else will still work
+5:38
+perfectly fine because it's all inside
+5:40
+of this deterministic package. So, I
+5:42
+think using AI to write the code for
+5:44
+these deterministic things, that's a
 5:45
-different from what Enthropic is doing?
-5:47
-Enthropic pivoted out of the coding box
-5:49
-first. In January, they shipped co-work
+great thing. Do that 100%. But having
+5:48
+the AI do essentially deterministic
+5:50
+tasks, but by sending it English to do
 5:52
-inside the existing clawed desktop app.
+that, that is just a waste of money, a
+5:54
+waste of tokens, a waste of time, and
 5:55
-Co-work is claude code for people who
+it's going to give you worse results
 5:57
-don't write code. You point the agent at
-5:58
-a folder on your Mac, describe what you
-6:00
-want done, and it does multi-step
-6:02
-knowledge work for you. From there, it
-6:04
-was compound moves, right? adding
-6:06
-plugins, scheduled tasks, computer use,
-6:08
-and research preview on Mac. And then on
-6:10
-Windows, dispatch that lets you assign
-6:11
-tasks from your phone. And by April, the
-6:14
-Claw Desktop app holds three modes on
-6:16
-one surface, right? It has chat for
-6:17
-discussion, co-work knowledge work, and
-6:19
-code for software, plus a plug-in layer
-6:22
-for specialized capabilities like claw
-6:23
-design. Both labs made the same
-6:26
-high-level move. Both got out of the
-6:28
-coding box. Both built desktop apps, but
-GPT 5.4 benchmarks above human baseline on GUI control
-6:30
-they did not move in the same direction.
-6:32
-Anthropic pivoted toward knowledge work
-6:34
-toward synthesis, research, writing,
-6:36
-analysis, the kind of work where you
-6:38
-define an outcome and the agent does the
-6:40
-intellectual labor. Open AI pivoted
-6:42
-towards something broader. Sam Alman
-6:43
-admitted in the Vance interview that
-6:45
-OpenAI started the year behind Anthropic
-6:47
-on real world coding data. He gave
-6:49
-Anthropic real credit for being earlier
-6:50
-and said OpenAI only appreciated the gap
-6:52
-in hindsight. But when OpenAI made their
-6:55
-move, they moved wider. In the same
-6:57
-interview, Brockman described OpenAI
-6:59
-strategic vectors, the Agentic platform,
-7:01
-computer work specifically, and personal
-7:02
-AGI that does things for you in the real
-7:04
-world. And he drew a line between
-7:06
-knowledge work and computer work.
-7:08
-Computer work is broader. It's anything
-7:10
-that happens on a computer, whether or
-7:12
-not it requires deep knowledge. Ops
-7:13
-work, creative work, research,
-7:15
-automation. Knowledge work sits inside
-7:18
-that surface, but the surface is
-7:20
-actually bigger. That aperture
-7:22
-difference maps directly to the
-7:23
-mechanism each lab chose. If the model
-7:26
-is the brain and the work is the body,
-7:28
-what is the body made of is the question
-7:30
-here. For Enthropic, it's structured
-7:32
-interfaces, file operations and co-work,
-7:35
-MCPU servers, connectors, the 30,000
-7:37
-plus integrations already in the cloud
-7:39
-ecosystem. And Conway, the always on
-7:41
-agent environment that leaked in early
-7:43
-April with its own sidebar UI, its own
-7:45
-extension format, web hook triggers,
-7:47
-browser control, etc. All of that is
-7:49
-excellent architecture. It really is.
-7:51
-But it also depends on the ecosystem
-7:53
-cooperating. Every MCP server has to be
-7:56
-built by someone. Every connector has to
-7:57
-be maintained. Every web hook has to be
-7:59
-configured. How far the body can reach
-8:02
-depends entirely on how fast the world
-8:04
-ships agent ready interfaces. Open AAI
-8:07
-is building a different kind of body.
-8:09
-OpenAI's body is computer use. The agent
-8:11
-drives the same graphical interface that
-8:13
-you drive. And that changes the math
-8:15
-completely because the body's reach is
-8:17
-now bounded by how much software has a
-8:19
-graphical interface which is effectively
-8:20
-all of it. Legacy enterprise software
-8:22
-works. Internal tools works. SAS that
-8:24
-will never build an MCP server works.
-8:26
-The vendor portal your ops team
-8:27
-tolerates works. The app your company
-8:29
-built in 2019 and never touched again
-Deep OS-level wizardry and parallel background agents
-8:31
-works. Open AAI doesn't need the
-8:33
-software industry to build for agents.
-8:35
-The body just uses whatever is already
-8:37
-there. The two products look similar on
-8:39
-a feature matrix, but the bodies
-8:41
-underneath the way the agents are hooked
-8:42
-into harnesses. It's not the same. And
-8:44
-you can see this in how the two apps are
-8:46
-shaped. Anthropics Claude app is built
-8:48
-like a tool that assumes you know the
-8:49
-work you're in. Every mode has a scope
-8:52
-permission model and when you open
-8:53
-co-work it asks you to point at a folder
-8:56
-before it does anything. That friction
-8:58
-is the product choice. It communicates
-9:00
-what's about to happen so you can be
-9:02
-deliberate. The whole app is explicit in
-9:04
-the way the rest of anthropic strategy
-9:06
-is. Explicit scopes, explicit
-9:08
-permissions, explicit interfaces.
-9:10
-OpenAI's codeex app is the opposite.
-9:12
-It's built like a tool that assumes you
-9:14
-don't want to think about modes. You
-9:16
-describe the outcome. The agent decides
-9:19
-whether to open files, whether to drive
-9:20
-a graphical user interface, run a
-9:22
-plugin, browse the web, or write code.
-9:24
-Computer use is the escape hatch when
-9:26
-nothing else works. Plugins are
-9:28
-opinionated bundles invoked without
-9:30
-explicit selection. Memory keeps context
-9:32
-flowing between tasks, and the app is
-9:34
-implicit in the same way the rest of
-9:36
-codeex is. The agent figures out what to
-9:38
-do because you shouldn't have to tell it
-9:40
-which interface to use. That's what
-9:41
-OpenAI is actually building. A body that
-9:44
-doesn't need the world to cooperate. A
-9:46
-product that doesn't ask you to think in
-9:48
-modes. A road map where the model is the
-9:50
-input and the body is the whole product.
-9:52
-Which leaves the question, how did
-9:54
-Codeex get here? Codex's computer use
-9:56
-didn't come from nowhere. It came from a
-9:58
-team OpenAI bought 6 months before the
-10:00
-April release. In October 2025, OpenAI
-10:03
-acquired a 12person company called
-10:05
-Software Applications Incorporated. The
-10:07
-company was the team behind Sky, an
-10:09
-unreleased Mac OS native AI interface
-10:11
-that was doing essentially what Codex's
-10:13
-computer use does now. All 12 members
-10:16
-joined OpenAI. One of the co-founders,
-10:18
-Ariestein, is now a designer at OpenAI.
-10:20
-And when Codeex shipped, he publicly
-10:22
-credited his team by name for the cursor
-10:24
-motion work. The specific detail that
-10:26
-makes background computer use feel like
-10:27
-a co-work instead of malware. What makes
-Anthropic's body vs OpenAI's body
-10:30
-this team one of one? Weinstein and his
-10:33
-co-founder Conrad Kramer previously
-10:34
-built Workflow, the iOS automation app
-10:37
-Apple acquired in 2017 and turned into
-10:39
-Shortcuts. Shortcuts is now the system
-10:41
-level automation layer across iOS, iPad
-10:44
-OS, and Mac OS. Skye's third co-founder,
-10:46
-Kim Bever, spent 10 years at Apple as a
-10:49
-senior program manager working on
-10:50
-Safari, WebKit, Privacy, Messages, Mail,
-10:53
-Phone, FaceTime, and SharePlay. That's a
-10:55
-decade plus build of exactly the skill
-10:58
-set that makes Codeex's computer use
-11:00
-work the way it does. deep Mac OS
-11:02
-integration, accessibility and screen
-11:03
-recording, permission handling, motion
-11:05
-paths that don't feel robotic, the kind
-11:07
-of OS level work that takes years of
-11:09
-Apple experience to do well. The line
-11:11
-from workflow to shortcuts to sky to
-11:13
-codecs, it only exists in one place with
-11:16
-this team. OpenAI paid for it and the
-11:18
-payoff is in the April 16 release. The
-11:20
-deep OS level wizardry embaros described
-11:23
-that's not a metaphor. It's a specific
-11:25
-team's specific accumulated knowledge
-11:28
-now applied to a product where it
-11:30
-matters commercially. The same pattern
-11:32
-shows up elsewhere. Anthropic Recept
-11:34
-acquisition earlier this year, the team
-11:35
-that shipped Claude's Windows desktop
-11:37
-control within 4 weeks of joining. It's
-11:39
-a parallel move on their side. Then
-11:41
-there's IO Johnny Ives hardware startup
-11:43
-OpenAI bought for several billion
-11:44
-dollars, which is the larger version of
-11:46
-the same thing. The labs are essentially
-11:48
-spending on narrow, hard to replicate
-11:50
-human expertise, not for the
-11:52
-intellectual property, often not for the
-11:54
-product, for the team. That's a
-11:56
-consistent pattern. Models are starting
-11:58
-to converge. Capabilities that used to
-12:00
-take 2 years can now be replicated in 6
-12:02
-months or less. What isn't being
-12:04
-commoditized is a specific team with a
-12:06
-specific history. Those teams are a very
-12:09
-scarce resource in the valley right now.
-12:11
-If you're watching the lab-to-lab
-12:12
-competition, the acquisition pattern is
-12:15
-telling you as much about where
-12:17
-advantage will live as benchmark scores
-12:19
-might. So, we know what Codeex is. We
-12:21
-know what OpenAI is really building and
-12:23
-we know how Codeex got this good. The
-12:25
-last big question is this. Where are
-12:28
-both labs going from here? Both labs are
-12:31
-converging on the same destination. an
-12:34
-agent that's persistent, ambient, event
-12:36
-driven, and works across all of your
-12:38
-surfaces, and that does things on your
-12:40
-behalf without you prompting it every
-12:42
-time. The two clearest signals of how
-12:44
-each lab plans to get there are
-12:46
-Chronicle and Conway. Chronicle is
-12:48
-OpenAI's latest step. They shipped it on
-12:50
-April 20th, 4 days after the main
-12:52
-release, as a research preview for Chat
-12:54
-GPT Pro users on Mac OS. Chronicle
-12:56
-captures your screen periodically and
-12:58
-processes the images on OpenAI servers
-The Workflow to Shortcuts to Sky acquisition
-13:01
-and writes local markdown memory files
-13:03
-that Codex pulls into future sessions as
-13:05
-context. Tibo, who heads Codex, called
-13:07
-it early and token hungry, but said it
-13:09
-had changed how he and many people at
-13:10
-OpenAI work. Altman described it as
-13:12
-telepathy like what's Chronicle actually
-13:15
-doing here? The shallow read is that
-13:17
-it's an ambient memory feature. The
-13:19
-deeper read is that it's the training
-13:21
-signal for computer use. If your agent
-13:23
-is going to drive the same graphical
-13:25
-interface you drive, it sure benefits
-13:27
-enormously from watching how you drive
-13:29
-it. Chronicle is the layer that makes
-13:31
-driving your software smarter over time.
-13:33
-So your workflows, your app preferences,
-13:36
-your muscle memory patterns, they all
-13:38
-become context the agent inherits. The
-13:40
-privacy trade-off is that the screen
-13:42
-captures are sent to OpenAI servers.
-13:44
-They have unencrypted local memories and
-13:46
-they're not available for that reason in
-13:48
-the EU, UK, or Switzerland. And that's a
-13:50
-cost OpenAI accepted because the feature
-13:52
-works better with it and because the
-13:54
-data makes the agent better at driving
-13:56
-your software over time. Conway is a
-13:58
-different kind of signal. On April 1st,
-13:59
-Anthropic accidentally published the
-14:02
-Clawed Code source code, roughly 500,000
-14:04
-lines of TypeScript when a packaging
-14:06
-error pushed it to a public registry.
-14:07
-Buried inside that was Conway, an always
-14:10
-on event-driven agent environment with
-14:12
-its own sidebar UI, three panels called
-14:15
-search, chat, and system, web hook,
-14:17
-triggered invocation, a proprietary
-14:19
-extension format, browser control via
-14:21
-cloud and Chrome, and deep connector
-14:22
-integration. I've written about this at
-14:24
-length separately, so I'll keep it short
-14:25
-here. Conway assumes the world is going
-14:27
-to build for agents with structured
-14:29
-triggers, explicit extensions, event-
-14:31
-driven execution. It's designed to plug
-14:33
-into agent native interfaces that other
-14:35
-companies will build over the coming
-14:36
-year or two. Does that assumption hold?
-14:38
-Anthropic wins this bet if MCP adoption
-14:41
-accelerates, if enterprise software
-14:43
-ships clean integrations, if the
-14:44
-standards mature quickly enough for
-14:46
-Conway to have a rich substrate to act
-14:48
-on. It's a good bet in many ways. MCP is
-14:50
-already spreading very fast. It's become
-14:52
-a deacto standard. Anthropic is the
-14:53
-company pushing it the hardest. The
-14:55
-developer ecosystem around cloud code
-14:57
-has tremendous momentum, but it requires
-14:59
-the ecosystem to move and enterprise
-Chronicle and the training signal for computer use
-15:01
-software ecosystems tend to move slowly.
-15:03
-The long tale of internal tools is not
-15:06
-getting agent interfaces on a timeline
-15:07
-that matters. Open AI does not need
-15:10
-that. The agent drives whatever software
-15:12
-you use yourself. No vendor has to
-15:14
-cooperate. No integration has to get
-15:16
-built. Anthropic needs the whole
-15:18
-software industry to show up and build
-15:19
-and OpenAI does not. So my read is the
-15:22
-second scenario is more likely on the
-15:25
-time scale that matters. But it's a
-15:27
-hypothesis. If enterprise software moves
-15:29
-faster than I think that picture could
-15:31
-change in Claude's favor. One more piece
-15:33
-worth laying out because it tells you
-15:34
-how serious OpenAI is about this
-15:36
-specific direction. In the Vance
-15:38
-interview, Brockman and Altman described
-15:40
-three strategic vectors. The Agentic
-15:42
-platform itself, computer work
-15:44
-specifically, and personal AGI that does
-15:45
-things for you in the real world. That's
-15:47
-what they say their whole road map is,
-15:49
-those three things. The clearest signal
-15:51
-of how serious they are is in what they
-15:53
-cut. Sora got shut down. A drug
-15:55
-discovery effort got pulled. Not because
-15:57
-the work wasn't interesting or
-15:58
-important, but because the use cases
-16:00
-didn't ladder up to those three vectors.
-16:02
-That's an unusually disciplined cut for
-16:04
-a company that's been accused of sprawl
-16:05
-for a while, and it tells you leadership
-16:07
-is willing to kill popular products to
-16:09
-stay focused. One more nugget here.
-16:10
-Compute is explicitly a profit center
-16:13
-now, not just a constraint. Open AAI is
-16:15
-monetizing the scarcity, which means the
-16:17
-super app consolidation plan. Chad GPT
-16:19
-is a conversation hub. Codeex is an
-16:20
-agent. Atlas is a browser. That's not
-16:22
-just a product bet. It's a bet on
-16:24
-routing users into a platform where
-16:26
-compute gets built at margins OpenAI
-16:28
-chooses. And that changes the financial
-16:30
-shape of what they're building. So
-16:32
-that's where both labs are going. Two
-16:33
-paths, two bets, and two road maps that
-16:36
-are really quite different. Which leaves
-16:37
-the last question. What do you do with
-16:39
-all this if you're using these tools or
-16:42
-making decisions about them? Computer
-16:43
-use is the one capability where the gap
-16:46
-between codeex and claude is wide enough
-16:49
-to change what you actually use. If your
-16:51
-work involves driving software that
-16:53
-doesn't have good APIs, and for most
-16:55
-operators, a lot of it does, Codeex is a
-16:58
-product that's ready today. Claude will
-16:59
-probably get there. The research preview
-Conway: Anthropic's event-driven agent environment
-17:01
-is improving visibly, and I know that
-17:03
-they like to close these competitive
-17:05
-gaps. But today, Codex wins on this
-17:07
-specific capability by a wide enough
-17:09
-margin to matter. If you're tackling
-17:11
-dashboards, if you're tackling front-end
-17:13
-visual testing, if you're dealing with
-17:15
-Slack and email at the same time, with
-17:17
-bug reproduction, with cross- app
-17:18
-workflows that you'd otherwise be
-17:20
-copying and pasting between tools,
-17:22
-anything where the bottleneck is the
-17:23
-friction of the interface rather than
-17:25
-the reasoning, Codeex feels like a good
-17:27
-fit. Now, on scoped and bounded work,
-17:29
-Claude is often still tighter and more
-17:31
-efficient. co-works point in a folder
-17:33
-and describe the outcome ergonomics are
-17:35
-cleaner than Codeex's one agent figures
-17:37
-it out for tasks where you want that
-17:40
-explicit control over what the agent
-17:41
-touches. Claude Code remains rightly
-17:44
-loved for its developer friendly
-17:46
-ergonomics and its recent focus on
-17:48
-deploying multi-agent workflows for
-17:49
-coding. Codex retains an advantage in
-17:51
-refactoring very complex code bases and
-17:53
-going after longrunning tasks. Although
-17:55
-that gap has narrowed with the release
-17:57
-of Opus 4.7, those parameters are kind
-17:59
-of set and they're not changing super
-18:00
-quickly. The difference to me still
-18:02
-boils down to the value for computer use
-18:05
-and the differing design philosophy of
-18:07
-codeex versus claude on cross tool
-18:09
-triage on longrunning parallel agents on
-18:12
-ambient work that doesn't fit into a
-18:13
-single mode. Codeex is the default now.
-18:16
-Chronicle actually accelerates that gap
-18:18
-for anyone on pro who's willing to turn
-18:19
-it on. Parallel background agents work
-18:22
-reliably enough that queuing three or
-18:24
-four tasks in codecs before stepping out
-18:26
-has become a real workflow instead of a
-18:27
-party trick. So use both. Which one
-18:29
-should you lean on? It depends on where
-18:31
-your work lives. If it lives in
-18:33
-knowledge work that's going to get
-18:34
-proper agent integrations over the next
-18:36
-year or so or has them already, Claude's
-18:38
-architecture will get cleaner and more
-18:40
-reliable. If it lives in computer work
-18:42
-more broadly, the longtail, the legacy
-18:43
-tools, the internal systems nobody
-18:45
-maintains, Codex is the one that reaches
-18:48
-that long tail. So, what do you watch
-18:50
-for over the next few months to see
-18:52
-which way all of this trends? Two
-18:54
-things. First, Conway. If Enthropic
-18:56
-announces it publicly, event-driven
-18:58
-agents become a real category alongside
-What to watch: MCP adoption velocity
-19:00
-ambient context agents and the two paths
-19:03
-framing starts to really crystallize. If
-19:05
-Enthropic delays it or maybe even kills
-19:07
-it, it tells you they've lost confidence
-19:09
-in the ecosystem cooperates bet on a
-19:11
-time scale that matters and more of the
-19:13
-category converges on computer use plus
-19:16
-ambient context by default. Second,
-19:17
-watch for MCP adoption velocity.
-19:19
-Anthropic's bet on the ecosystem only
-19:21
-pays off if MCP spreads faster than it
-19:24
-currently does. If a major wave of
-19:26
-enterprise vendors ships on MCP servers
-19:29
-in the second half of the year and
-19:30
-Salesforce was a good hint in that
-19:32
-direction, Enthropic's architecture
-19:34
-looks better and better and better. If
-19:36
-they don't or if they ship thin wrappers
-19:38
-that don't work as well as the actual
-19:39
-UIs, driving the UI directly stays the
-19:42
-better path. What's the one thing to
-19:44
-take away from all of this? Look, I'll
-19:46
-keep it simple. 6 months ago, any piece
-19:49
-of software that did not have an API was
-19:51
-effectively outside the automation
-19:53
-conversation. You could not get an agent
-19:55
-into it. You had to wait for the vendor
-19:57
-to ship hooks or you had to build the
-19:59
-integration yourself. That's just not
-20:00
-the state of things anymore. Codeex's
-20:02
-computer use means that if the software
-20:04
-has a screen, an agent can effectively
-20:06
-drive it. That widens what's automatable
-20:08
-by a much, much bigger margin than most
-20:10
-people are really budgeting for. For
-20:12
-anyone thinking about automating
-20:14
-operations, the surface of what's
-20:15
-possible is so much larger today than it
-20:17
-was at the end of last year or even a
-20:19
-month ago. And the reason it's possible,
-20:21
-the reason Codeex can actually drive
-20:23
-your software well enough to deploy,
-20:25
-that's not the model per se. The model's
-20:27
-the brain. Codex is the harness around
-20:29
-it. It's the body. And OpenAI built that
-If software has a screen, an agent can drive it
-20:31
-body specifically by buying a team with
-20:33
-a very clear, specific history of
-20:36
-expertise. Keep an eye on that
-20:37
-acquisition pattern. It's going to tell
-20:39
-you as much about who wins the next
-20:41
-phase of this as any benchmark chart is
-20:43
-going to give you. Now, if you want to
-20:44
-lay this all out and get into the
-20:45
-details of how to use codeex today to
-20:48
-drive your workflows, if you want to
-20:50
-dive deeper on the Conway leak details,
-20:52
-on the full comparison with Claude, I
-20:53
-wrote that all up on Substack link is in
-20:55
-the description. Hit subscribe if you
-20:57
-want these the moment they drop.
+than if you just had a program that did
+5:59
+that exact same thing for you.
+

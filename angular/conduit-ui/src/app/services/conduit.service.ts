@@ -11,6 +11,7 @@ import {
   PromptEntry,
   ChangeReportEntry,
   SessionLogEvent,
+  CronConfig,
 } from './types';
 import { API_BASE_URL } from './api-config';
 
@@ -38,6 +39,9 @@ export class ConduitService {
 
   /** Whether conduit orchestration is paused (v073 — workflow control) */
   readonly conduitPaused = signal(false);
+
+  /** Cron schedule config (v092 — exposed by GET /config/cron) */
+  readonly cronConfig = signal<CronConfig | null>(null);
 
   private eventSource: EventSource | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -165,6 +169,10 @@ export class ConduitService {
     });
 
     this.eventSource.addEventListener('change_archived', (event: any) => {
+      this.zone.run(() => this.handleSSEEvent(JSON.parse(event.data)));
+    });
+
+    this.eventSource.addEventListener('plan_state_changed', (event: any) => {
       this.zone.run(() => this.handleSSEEvent(JSON.parse(event.data)));
     });
 
@@ -395,6 +403,26 @@ export class ConduitService {
         break;
       }
 
+      case 'plan_state_changed': {
+        // Receipt was issued — fetch full state to pick up group changes
+        this.http.get<ConduitState>(`${this.apiBase}/state`).subscribe({
+          next: (state) => {
+            this.state.set(state);
+            this.builder.set(state.builder);
+            this.circuitBreaker.set(state.circuitBreaker);
+            this.conduitPaused.set(state.circuitBreaker.paused);
+          },
+        });
+        const planNumber = event.data?.planNumber as string;
+        this.addActivity(
+          'plan_state_changed',
+          `Plan #${planNumber}: ${event.data?.receiptType} by ${event.data?.agentRole}`,
+          timestamp,
+          planNumber,
+        );
+        break;
+      }
+
       case 'plan_deleted': {
         const planNumber = event.data?.planNumber as string;
         const current = this.state();
@@ -502,7 +530,12 @@ export class ConduitService {
         try {
           const parsed = JSON.parse(event.data);
           if (parsed.type === 'session_log' && parsed.data) {
-            const entry: SessionLogEvent = parsed.data;
+            const entry: SessionLogEvent = {
+              sessionId: parsed.data.sessionId,
+              line: parsed.data.line,
+              timestamp: parsed.data.timestamp,
+              logType: parsed.data.logType || 'stdout',
+            };
             this.sessionLog.update((lines) => [...lines.slice(-4999), entry]);
           } else if (parsed.type === 'session_log_meta' && parsed.data) {
             this.sessionLogFileExists.set(parsed.data.logFileExists === true);
@@ -577,6 +610,14 @@ export class ConduitService {
     );
   }
 
+  /** Fetch the cron schedule config from the MCP server (v092). */
+  fetchCronConfig(): void {
+    this.http.get<CronConfig>(`${this.apiBase}/config/cron`).subscribe({
+      next: (config) => this.cronConfig.set(config),
+      error: () => { /* use default */ },
+    });
+  }
+
   /** Restart builder for a specific plan (v074 — user-triggered, bypasses cursor/pause).
    *  If the circuit breaker is tripped, returns { blocked: true, breaker: {...} }
    *  so the UI can show a confirmation dialog. Pass force=true to override. */
@@ -593,6 +634,28 @@ export class ConduitService {
     }>(
       `${this.apiBase}/plans/${planId}/restart-builder${params}`,
       {},
+    );
+  }
+
+  /** Hard-delete a plan and all associated tickets/receipts (irreversible).
+   *  Requires confirmPlanTitle to match exactly for safety. */
+  hardDeletePlan(planNumber: string, confirmPlanTitle: string) {
+    return this.http.post<{
+      result: {
+        hardDeleted: boolean;
+        planNumber: string;
+        ticketsDeleted: number;
+        receiptsDeleted: number;
+        cleanedPaths: string[];
+        timestamp: string;
+      };
+      requestId: string;
+    }>(
+      `${this.apiBase}/tools/call`,
+      {
+        name: 'hard_delete_plan',
+        arguments: { planNumber, confirmPlanTitle },
+      },
     );
   }
 }

@@ -24,6 +24,7 @@ Domain model
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from typing import Any
@@ -36,6 +37,10 @@ from harness_enums import (
     parse_execution_mode,
     parse_role_mapping_strategy,
 )
+
+
+# ── Module-level logger ─────────────────────────────────────────────
+_log = logging.getLogger("conduit.harness_launcher")
 
 
 # ── Schema keys (match the JSON shape stored in invocation_semantics) ──
@@ -97,6 +102,9 @@ class HarnessLauncher:
         self._prompt: str | None = None
         self._prompt_file_path: str | None = None
 
+        _log.debug("HarnessLauncher.__init__: binary=%s mode=%s role_mapping=%s",
+                    binary, execution_mode.value, role_mapping_strategy.value)
+
     # ── Factory ──────────────────────────────────────────────────────
 
     @classmethod
@@ -119,9 +127,11 @@ class HarnessLauncher:
             semantics_data = semantics_raw
 
         name = row.get("name") or row.get("id", "opencode")
+        _log.debug("HarnessLauncher.from_harness_row: name=%s", name)
 
         # □ Backward compatibility: detect old flat-flag format (has "flags" key, missing "semantics")
         if CAPABILITIES_KEY not in semantics_data and "flags" in semantics_data:
+            _log.warning("HarnessLauncher.from_harness_row: old flat-flag format detected name=%s, falling back to defaults", name)
             # Fall back to a fresh opencode default so old DB data doesn't silently break.
             # Uses a factory (not a singleton) so concurrent callers get separate instances.
             return _default_opencode_launcher()
@@ -144,6 +154,8 @@ class HarnessLauncher:
         role_section = semantics_data.get(ROLE_MAPPING_KEY) or {}
         role_strategy = parse_role_mapping_strategy(role_section.get("strategy"))
 
+        _log.debug("HarnessLauncher.from_harness_row: constructed name=%s binary=%s capabilities=%s",
+                    name, binary, capabilities)
         return cls(
             binary=binary,
             capabilities=capabilities,
@@ -159,6 +171,7 @@ class HarnessLauncher:
         """Set the model identifier to pass to the harness."""
         if self._capabilities.get("model", False):
             self._model = model_id
+            _log.debug("HarnessLauncher.set_model: model=%s", model_id)
 
     def set_agent(self, role: str) -> None:
         """Set the agent role for the harness.
@@ -169,11 +182,13 @@ class HarnessLauncher:
         ``agent`` capability is enabled.
         """
         self._agent = role
+        _log.debug("HarnessLauncher.set_agent: role=%s", role)
 
     def set_working_directory(self, path: str) -> None:
         """Set the working directory for the harness."""
         if self._capabilities.get("working_directory", False):
             self._working_directory = path
+            _log.debug("HarnessLauncher.set_working_directory: path=%s", path)
 
     def set_system_prompt(self, prompt: str) -> None:
         """Set the system prompt for the harness.
@@ -183,10 +198,12 @@ class HarnessLauncher:
         ``--system-prompt`` as a CLI flag.
         """
         self._system_prompt = prompt
+        _log.debug("HarnessLauncher.set_system_prompt: len=%d", len(prompt) if prompt else 0)
 
     def set_prompt(self, prompt: str) -> None:
         """Set the main task prompt (always stored, no capability check)."""
         self._prompt = prompt
+        _log.debug("HarnessLauncher.set_prompt: len=%d", len(prompt) if prompt else 0)
 
     # ── Private: argument construction ───────────────────────────────
 
@@ -287,6 +304,7 @@ class HarnessLauncher:
         elif self._prompt:
             cmd.append(self._prompt)
 
+        _log.debug("HarnessLauncher.build: cmd=%s", ' '.join(cmd))
         return cmd
 
     # ── Prompt file writer (for PROMPT_FILE strategy) ────────────────
@@ -328,6 +346,7 @@ class HarnessLauncher:
             f.write(self._prompt)
 
         self._prompt_file_path = file_path
+        _log.info("HarnessLauncher.prepare_role_prompt_file: role=%s path=%s", role, file_path)
         print(f"[harness-launcher] Wrote prompt file for role={role}: {file_path}", flush=True)
         return file_path
 
@@ -367,6 +386,7 @@ def _default_opencode_launcher() -> HarnessLauncher:
     Always returns a new instance — callers mutate it via ``set_model()`` etc.
     Matches the seed defaults in ``nexus/typescript/conduit-mcp/src/db.ts``.
     """
+    _log.debug("_default_opencode_launcher: constructing default opencode launcher")
     return HarnessLauncher(
         binary=DEFAULT_BINARIES["opencode"],
         capabilities={"model": True, "agent": True, "working_directory": True},
@@ -394,6 +414,7 @@ def build_launcher_for_role(role_cfg: dict[str, Any] | None) -> HarnessLauncher:
     """
     if not role_cfg:
         # No DB config — build a default opencode launcher
+        _log.debug("build_launcher_for_role: no role_cfg, using default opencode launcher")
         return HarnessLauncher(
             binary=DEFAULT_BINARIES.get("opencode", "opencode"),
             capabilities={"model": True, "agent": True},
@@ -405,15 +426,18 @@ def build_launcher_for_role(role_cfg: dict[str, Any] | None) -> HarnessLauncher:
             role_mapping_strategy=RoleMappingStrategy.AGENT,
         )
 
+    harness_name = role_cfg.get("harness_name", "opencode")
+    _log.debug("build_launcher_for_role: harness=%s", harness_name)
     semantics_raw = role_cfg.get("invocation_semantics") or {}
     launcher = HarnessLauncher.from_harness_row({
-        "name": role_cfg.get("harness_name", "opencode"),
+        "name": harness_name,
         "invocation_semantics": semantics_raw,
     })
 
     model_id = role_cfg.get("model_identifier", "")
     if model_id:
         launcher.set_model(model_id)
+        _log.debug("build_launcher_for_role: model set to %s", model_id)
 
     return launcher
 

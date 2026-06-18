@@ -1,3 +1,9 @@
+>**Nexus WRP aspirational architecture (inactive).** This document describes
+> the intended design of the Nexus Work Request Pipeline, which is under
+> construction and not yet operational. The active system is **Conduit**
+> (see `nexus/python/conduit/` and `nexus/typescript/conduit-mcp/`). The
+> only shared concept between Nexus and Conduit is the `WorkRequest` type.
+> 
 ---
 name: decompose-task
 description: PASS 3 (Expansion Semantics) of the Nexus Kernel Compiler. Generates a strict Directed Acyclic Graph (DAG) representing cognitive execution steps.

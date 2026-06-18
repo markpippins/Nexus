@@ -10,7 +10,7 @@ export class CircuitBreakerWatcher extends BaseWatcher {
   private previousTripped: boolean = false;
 
   async initialize(): Promise<void> {
-    this.status = this.readCircuitBreaker();
+    this.status = await this.readCircuitBreaker();
     this.startPolling();
   }
 
@@ -18,19 +18,23 @@ export class CircuitBreakerWatcher extends BaseWatcher {
     if (this.interval) clearInterval(this.interval);
   }
 
-  private readCircuitBreaker(): CircuitBreaker {
-    const row = getBreaker();
+  private async readCircuitBreaker(): Promise<CircuitBreaker> {
+    const row = await getBreaker();
     return breakerRowToStatus(row);
   }
 
   private startPolling() {
-    this.interval = setInterval(() => {
-      const cb = this.readCircuitBreaker();
-      const changed = this.previousTripped !== cb.tripped;
-      this.previousTripped = cb.tripped;
-      this.status = cb;
-      if (changed) {
-        this.emit({ type: "circuit_breaker_update", data: cb });
+    this.interval = setInterval(async () => {
+      try {
+        const cb = await this.readCircuitBreaker();
+        const changed = this.previousTripped !== cb.tripped;
+        this.previousTripped = cb.tripped;
+        this.status = cb;
+        if (changed) {
+          this.emit({ type: "circuit_breaker_update", data: cb });
+        }
+      } catch (e: any) {
+        console.error(`[cb-watcher] Poll failed: ${e.message}`);
       }
     }, CB_POLL_INTERVAL);
   }

@@ -1,3 +1,9 @@
+>**Nexus WRP aspirational architecture (inactive).** This document describes
+> the intended design of the Nexus Work Request Pipeline, which is under
+> construction and not yet operational. The active system is **Conduit**
+> (see `nexus/python/conduit/` and `nexus/typescript/conduit-mcp/`). The
+> only shared concept between Nexus and Conduit is the `WorkRequest` type.
+> 
 ---
 name: peb-merge-recomposition
 description: PASS 3.6 (Reduction Semantics) of the Nexus Kernel Compiler. Computes a deterministic graph reduction over frozen execution snapshots.

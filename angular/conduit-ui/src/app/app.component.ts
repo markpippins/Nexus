@@ -66,6 +66,8 @@ import { MessageBoxService } from './services/message-box.service';
         <a class="nav-tab" routerLink="/graph" routerLinkActive="active">🔗 Graph</a>
         <a class="nav-tab" routerLink="/sessions" routerLinkActive="active">📊 Sessions</a>
         <div class="nav-actions">
+          <a class="nav-tool-btn" href="http://localhost:8233" target="_blank" rel="noopener noreferrer"
+            title="Temporal Web UI — workflow history, stack traces, event timelines">🔄</a>
           <button class="nav-tool-btn" (click)="openChat()" title="New chat">💬</button>
           <button class="nav-tool-btn" (click)="openConfig()" title="AI configuration">⚙</button>
           <button class="nav-tool-btn" (click)="toggleTheme()"
@@ -92,7 +94,7 @@ import { MessageBoxService } from './services/message-box.service';
     `.nav-tab{background:none;border:none;color:var(--text-muted);padding:6px 12px;font-size:13px;cursor:pointer;border-radius:6px;text-decoration:none;white-space:nowrap;transition:background .15s}`,
     `.nav-tab:hover{background:var(--bg-secondary)}.nav-tab.active{background:var(--accent-blue-bg);color:var(--accent-blue-text)}`,
     `.nav-actions{margin-left:auto;display:flex;gap:6px;flex-shrink:0}`,
-    `.nav-tool-btn{background:none;border:1px solid var(--border-subtle);color:var(--text-muted);padding:4px 8px;border-radius:6px;cursor:pointer;font-size:14px;transition:background .15s}`,
+    `.nav-tool-btn{background:none;border:1px solid var(--border-subtle);color:var(--text-muted);padding:4px 8px;border-radius:6px;cursor:pointer;font-size:14px;transition:background .15s;text-decoration:none}`,
     `.nav-tool-btn:hover{background:var(--bg-secondary)}`,
     `.offline-banner{background:var(--tag-amber-bg);color:var(--tag-amber-text);text-align:center;padding:6px;font-size:12px;flex-shrink:0}`,
     `@media(max-width:1024px){.nav-tabs{flex-wrap:wrap;gap:3px;padding:4px 8px}}`,

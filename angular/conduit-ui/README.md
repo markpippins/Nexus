@@ -95,7 +95,7 @@ src/
 
 ## Related Projects
 
-- **nexus/python/conduit/** — Cron-driven orchestrator (dispatches work to executors)
+- **nexus/legacy/python/conduit/** — Cron-driven orchestrator (dispatches work to executors)
 - **nexus/typescript/conduit-mcp/** — MCP server (API + SSE event bus, port 3100)
 
-For the full architecture, see [Conduit ARCHITECTURE.md](../nexus/python/conduit/ARCHITECTURE.md).
+For the full architecture, see [Conduit ARCHITECTURE.md](../nexus/legacy/python/conduit/ARCHITECTURE.md).

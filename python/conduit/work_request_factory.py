@@ -1,7 +1,10 @@
 import json
+import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from executor_registry import ModelConfig
+
+_log = logging.getLogger("conduit.work_request_factory")
 from work_request import (
     CompletionCondition,
     ProducedFile,
@@ -27,7 +30,8 @@ def _parse_json(val):
         try:
             parsed = json.loads(val)
             return parsed if isinstance(parsed, list) else [parsed]
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError) as exc:
+            _log.debug("_parse_json: parse failed val=%r error=%s", val[:80], exc)
             return [val] if val.strip() else []
     if isinstance(val, list):
         return val
@@ -38,38 +42,44 @@ def _infer_priority(plan: Dict[str, Any]) -> str:
     """Heuristic priority from plan metadata."""
     title = (plan.get("title") or "").lower()
     if any(kw in title for kw in ("critical", "urgent", "fix", "blocker")):
-        return "high"
-    if any(kw in title for kw in ("clean", "refactor", "polish")):
-        return "low"
-    return "medium"
+        priority = "high"
+    elif any(kw in title for kw in ("clean", "refactor", "polish")):
+        priority = "low"
+    else:
+        priority = "medium"
+    _log.debug("_infer_priority: plan=%s priority=%s", plan.get("id", "?"), priority)
+    return priority
 
 
 def _infer_abstraction(plan: Dict[str, Any]) -> str:
     """Infer abstraction level from plan size / acceptance criteria count."""
     n_criteria = len(_parse_json(plan.get("acceptance_criteria")))
     n_files = len(_parse_json(plan.get("files_affected")))
-    if n_criteria >= 4 or n_files >= 4:
-        return "system"
-    return "task"
+    level = "system" if (n_criteria >= 4 or n_files >= 4) else "task"
+    _log.debug("_infer_abstraction: plan=%s criteria=%d files=%d level=%s", plan.get("id", "?"), n_criteria, n_files, level)
+    return level
 
 
 def _build_completion_conditions(
     acceptance_criteria: List[str],
 ) -> List[CompletionCondition]:
-    return [
+    conditions = [
         CompletionCondition(
             condition=ac,
             evaluator="code-reviewer",
         )
         for ac in acceptance_criteria
     ]
+    _log.debug("_build_completion_conditions: built %d conditions", len(conditions))
+    return conditions
 
 
 def _build_files_affected(plan: Dict[str, Any]) -> List[ProducedFile]:
     files = _parse_json(plan.get("files_affected"))
     if not files:
+        _log.debug("_build_files_affected: no files affected for plan %s", plan.get("id", "?"))
         return []
-    return [
+    result = [
         ProducedFile(
             path=str(f),
             type="code",
@@ -77,15 +87,19 @@ def _build_files_affected(plan: Dict[str, Any]) -> List[ProducedFile]:
         )
         for f in files
     ]
+    _log.debug("_build_files_affected: plan=%s files=%d", plan.get("id", "?"), len(result))
+    return result
 
 
 def _build_safety_constraints() -> List[str]:
-    return [
+    constraints = [
         "Do not delete or overwrite historical plan artifacts",
         "Do not modify .conduit-data/ directory structure",
         "Preserve existing receipt and audit records",
         "Follow existing project conventions when editing code",
     ]
+    _log.debug("_build_safety_constraints: %d constraints", len(constraints))
+    return constraints
 
 
 class WorkRequestFactory:
@@ -97,6 +111,9 @@ class WorkRequestFactory:
         working_path: str = ".",
         session_id: str = "",
     ) -> WorkRequestDCO:
+        plan_id = plan.get("id", "?")
+        _log.info("create_from_plan: plan=%s role=%s model=%s",
+                  plan_id, role, model_cfg.model if model_cfg else "default")
         wr_id = f"wr-{plan['id']}-{int(datetime.utcnow().timestamp())}"
         now = datetime.utcnow().isoformat() + "Z"
 
@@ -201,7 +218,7 @@ class WorkRequestFactory:
             session_id=session_id,
         )
 
-        return WorkRequestDCO(
+        wr = WorkRequestDCO(
             id=wr_id,
             version=1,
             path=working_path,  # executor_cloud.py uses this for artifact placement
@@ -215,3 +232,5 @@ class WorkRequestFactory:
             artifacts=artifacts,
             metadata=metadata,
         )
+        _log.info("create_from_plan: created %s for plan=%s role=%s", wr_id, plan_id, role)
+        return wr

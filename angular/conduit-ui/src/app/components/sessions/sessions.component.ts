@@ -1,9 +1,10 @@
-import { Component, signal, OnInit, OnDestroy, Inject, ViewChild, ElementRef, AfterViewChecked, HostListener } from '@angular/core';
+import { Component, signal, computed, effect, OnInit, OnDestroy, Inject, ViewChild, ElementRef, AfterViewChecked, HostListener } from '@angular/core';
 import { NgFor, NgIf, DatePipe, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ConduitService } from '../../services/conduit.service';
 import { SessionLogEvent } from '../../services/types';
+import { ToastService } from '../../services/toast.service';
 import { API_BASE_URL } from '../../services/api-config';
 
 interface SessionRow {
@@ -21,7 +22,27 @@ interface SessionRow {
   model: string | null;
   fallback_used: number;
   cost_usd: number | null;
+  workflow_id: string | null;
+  run_id: string | null;
+  workflow_start_time: string | null;
+  workflow_close_time: string | null;
+  workflow_run_time_ms: number | null;
+  workflow_result: string | null;
   created_at: string;
+}
+
+interface RunAnalytics {
+  /** Time between consecutive session starts, in minutes. */
+  avgGapMinutes: number;
+  medianGapMinutes: number;
+  minGapMinutes: number;
+  maxGapMinutes: number;
+  /** Session count used for gap calculations. */
+  sessionCount: number;
+  /** Hour of day (0-23) → session start count. */
+  hourlyDistribution: number[];
+  /** Day of week (Mon=0..Sun=6) → session start count. */
+  dailyDistribution: number[];
 }
 
 const SPLIT_STORAGE_KEY = 'sessions-log-split';
@@ -43,9 +64,94 @@ const MAX_SPLIT = 0.65;
           <span class="session-cost-total" *ngIf="recentCost() !== null" [class.high]="(recentCost() ?? 0) > 10">
             💰 {{ recentCost() | currency:'USD' }} / 24h
           </span>
+          <span class="next-run-chip" *ngIf="schedulerLabel()" [class.pulse-green]="pulseGreen()">
+            ⏱️ <span class="next-run-value">{{ schedulerLabel() }}</span>
+            <span class="next-run-label">Temporal Scheduler</span>
+            <a class="temporal-link" href="http://localhost:8233/namespaces/conduit/workflows" target="_blank" rel="noopener noreferrer" title="Open Temporal Web UI — workflow history">↗</a>
+          </span>
+          <span class="next-run-chip next-run-paused" *ngIf="pipeline.circuitBreaker().tripped">
+            ⛔ <span class="next-run-value">Paused</span>
+            <span class="next-run-label">circuit breaker tripped</span>
+          </span>
           <button class="btn-refresh" (click)="fetchSessions()" [disabled]="loading()">
             {{ loading() ? 'Loading...' : '↻ Refresh' }}
           </button>
+        </div>
+
+        <!-- Analytics panel -->
+        <div class="analytics-area">
+          <button class="analytics-toggle" (click)="toggleAnalytics()">
+            <span class="analytics-toggle-icon">{{ showAnalytics() ? '▾' : '▸' }}</span>
+            📊 Analytics
+            <span class="analytics-badge" *ngIf="analytics() as a">
+              {{ a.sessionCount }} sessions
+            </span>
+          </button>
+          <div class="analytics-panel" *ngIf="showAnalytics()" [class.visible]="showAnalytics()">
+            <ng-container *ngIf="analytics() as a; else analyticsEmpty">
+              <!-- Summary stats -->
+              <div class="analytics-summary">
+                <div class="analytics-stat">
+                  <span class="stat-value">{{ formatDuration(a.avgGapMinutes) }}</span>
+                  <span class="stat-label">avg gap</span>
+                </div>
+                <div class="analytics-stat">
+                  <span class="stat-value">{{ formatDuration(a.medianGapMinutes) }}</span>
+                  <span class="stat-label">median</span>
+                </div>
+                <div class="analytics-stat">
+                  <span class="stat-value">{{ formatDuration(a.minGapMinutes) }}</span>
+                  <span class="stat-label">min</span>
+                </div>
+                <div class="analytics-stat">
+                  <span class="stat-value">{{ formatDuration(a.maxGapMinutes) }}</span>
+                  <span class="stat-label">max</span>
+                </div>
+              </div>
+
+              <!-- Hourly distribution bar chart -->
+              <div class="analytics-chart-section">
+                <div class="chart-title">Sessions by hour of day</div>
+                <div class="bar-chart">
+                  <div class="bar-row" *ngFor="let count of a.hourlyDistribution; let hour = index">
+                    <span class="bar-label">{{ hour.toString().padStart(2, '0') }}</span>
+                    <span class="bar-track">
+                      <span
+                        class="bar-fill"
+                        [style.width.%]="barPercent(count, a.hourlyDistribution)"
+                        [style.background]="barColor(hour, 23)">
+                      </span>
+                    </span>
+                    <span class="bar-count">{{ count }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Daily distribution bar chart -->
+              <div class="analytics-chart-section">
+                <div class="chart-title">Sessions by day of week</div>
+                <div class="bar-chart bar-chart-daily">
+                  <div class="bar-row" *ngFor="let count of a.dailyDistribution; let day = index">
+                    <span class="bar-label">{{ dayLabel(day) }}</span>
+                    <span class="bar-track">
+                      <span
+                        class="bar-fill"
+                        [style.width.%]="barPercent(count, a.dailyDistribution)"
+                        [style.background]="barColor(day, 6)">
+                      </span>
+                    </span>
+                    <span class="bar-count">{{ count }}</span>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+            <ng-template #analyticsEmpty>
+              <div class="analytics-empty">
+                <p>Not enough session data to compute analytics.</p>
+                <p class="analytics-empty-hint">At least 2 sessions are needed for gap analysis.</p>
+              </div>
+            </ng-template>
+          </div>
         </div>
 
         <div class="table-wrap">
@@ -62,6 +168,7 @@ const MAX_SPLIT = 0.65;
                 <th>Retries</th>
                 <th>Model</th>
                 <th>Status</th>
+                <th>Workflow</th>
                 <th></th>
               </tr>
             </thead>
@@ -104,9 +211,25 @@ const MAX_SPLIT = 0.65;
                   <span class="fallback-tag" *ngIf="s.fallback_used === 1">FALLBACK</span>
                 </td>
                 <td class="cell-status">
-                  <span class="status-badge" [class.running]="s.is_running === 1" [class.paused]="s.is_running === 2" [class.ended]="s.is_running === 0">
+                  <span class="status-badge" [class.running]="s.is_running === 1" [class.paused]="s.is_running === 2" [class.ended]="s.is_running === 0" [class.pulse-running]="pulsingSessions().has(s.id)">
                     {{ statusLabel(s.is_running) }}
                   </span>
+                </td>
+                <td class="cell-workflow">
+                  <span class="workflow-row" *ngIf="s.workflow_id; else noWorkflow">
+                    <a class="workflow-link" [href]="'http://localhost:8233/namespaces/conduit/workflows/' + s.workflow_id + '/' + (s.run_id || '')" target="_blank" rel="noopener noreferrer" [title]="s.workflow_id">
+                      {{ shortWfId(s.workflow_id) }}
+                    </a>
+                    <span class="workflow-result" *ngIf="s.workflow_result" [class.wf-ok]="s.workflow_result === 'completed'" [class.wf-fail]="s.workflow_result === 'failed'" [class.wf-skip]="s.workflow_result === 'skipped'">
+                      {{ s.workflow_result }}
+                    </span>
+                    <span class="workflow-runtime" *ngIf="s.workflow_run_time_ms !== null">
+                      {{ formatMs(s.workflow_run_time_ms) }}
+                    </span>
+                  </span>
+                  <ng-template #noWorkflow>
+                    <span class="no-workflow">—</span>
+                  </ng-template>
                 </td>
                 <td class="cell-actions" (click)="$event.stopPropagation()">
                   <button
@@ -202,9 +325,15 @@ const MAX_SPLIT = 0.65;
             <ng-container *ngIf="pipeline.sessionLog().length > 0 || pipeline.sessionLogActive(); else logPlaceholder">
               <div
                 class="log-line"
+                [class.log-line-stderr]="entry.logType === 'stderr' || entry.logType === 'error'"
                 *ngFor="let entry of pipeline.sessionLog(); trackBy: trackByTimestamp"
               >
                 <span class="log-timestamp">{{ entry.timestamp | date:'HH:mm:ss' }}</span>
+                <span class="log-icon-type" *ngIf="entry.logType === 'stderr' || entry.logType === 'error'">
+                  <svg class="log-error-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                  </svg>
+                </span>
                 <span class="log-text" [innerHTML]="renderAnsi(entry.line)"></span>
               </div>
               <div class="log-spacer" *ngIf="pipeline.sessionLogActive()">
@@ -238,9 +367,47 @@ const MAX_SPLIT = 0.65;
     `.session-count{font-size:12px;color:var(--text-muted);background:var(--bg-secondary);padding:2px 8px;border-radius:10px}`,
     `.session-cost-total{font-size:12px;font-weight:600;color:var(--tag-green-text);background:var(--tag-green-bg);padding:2px 8px;border-radius:10px}`,
     `.session-cost-total.high{color:var(--tag-red-text);background:var(--tag-red-bg)}`,
+    `.next-run-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--accent-blue-text);background:var(--accent-blue-bg);padding:2px 8px;border-radius:10px;font-variant-numeric:tabular-nums}`,
+    `.next-run-chip.overdue{color:var(--tag-amber-text);background:var(--tag-amber-bg)}`,
+    `.next-run-chip.pulse-green{animation:pulseGreen .6s ease-in-out 2;color:var(--tag-green-text);background:var(--tag-green-bg)}`,
+    `.next-run-chip.next-run-paused{color:var(--tag-red-text);background:var(--tag-red-bg)}`,
+    `@keyframes pulseGreen{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(63,185,80,.4)}50%{transform:scale(1.08);box-shadow:0 0 8px 2px rgba(63,185,80,.3)}100%{transform:scale(1);box-shadow:0 0 0 0 rgba(63,185,80,0)}}`,
+    `.next-run-value{font-family:monospace;font-size:12px}`,
+    `.next-run-label{font-weight:400;font-size:10px;opacity:.75}.next-run-chip .temporal-link{color:inherit;text-decoration:none;font-size:13px;margin-left:2px;padding:0 2px;border-radius:3px;line-height:1;opacity:.6;transition:opacity .15s,background .15s}.next-run-chip .temporal-link:hover{opacity:1;background:rgba(255,255,255,.15)}`,
     `.btn-refresh{margin-left:auto;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-default);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;transition:background .15s}`,
     `.btn-refresh:hover{background:var(--bg-tertiary)}`,
     `.btn-refresh:disabled{opacity:.5;cursor:not-allowed}`,
+
+    // Analytics toggler and panel
+    `.analytics-area{flex-shrink:0;border-bottom:1px solid var(--border-subtle)}`,
+    `.analytics-toggle{display:flex;align-items:center;gap:6px;width:100%;padding:6px 16px;background:none;border:none;color:var(--text-primary);font-size:12px;cursor:pointer;text-align:left;transition:background .12s}`,
+    `.analytics-toggle:hover{background:var(--bg-secondary)}`,
+    `.analytics-toggle-icon{font-size:10px;color:var(--text-muted);width:10px;flex-shrink:0}`,
+    `.analytics-badge{margin-left:auto;font-size:10px;color:var(--text-muted);background:var(--bg-secondary);padding:1px 8px;border-radius:8px}`,
+    `.analytics-panel{padding:8px 16px 12px;background:var(--bg-secondary);border-top:1px solid var(--border-subtle)}`,
+    `.analytics-panel.visible{animation:fadeIn .15s}`,
+
+    // Summary stat cards
+    `.analytics-summary{display:flex;gap:6px;margin-bottom:10px}`,
+    `.analytics-stat{flex:1;display:flex;flex-direction:column;align-items:center;background:var(--bg-primary);border:1px solid var(--border-subtle);border-radius:8px;padding:6px 4px;min-width:0}`,
+    `.stat-value{font-size:14px;font-weight:700;color:var(--text-primary);font-family:monospace;font-variant-numeric:tabular-nums}`,
+    `.stat-label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-top:2px}`,
+
+    // Bar chart sections
+    `.analytics-chart-section{margin-top:8px}`,
+    `.chart-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:4px}`,
+    `.bar-chart{display:flex;flex-direction:column;gap:2px;max-height:148px;overflow-y:auto;padding-right:4px}`,
+    `.bar-chart-daily{max-height:none}`,
+    `.bar-row{display:flex;align-items:center;gap:6px;height:14px;font-size:11px}`,
+    `.bar-label{width:22px;flex-shrink:0;text-align:right;color:var(--text-muted);font-family:monospace;font-size:10px}`,
+    `.bar-track{flex:1;height:8px;background:var(--bg-primary);border-radius:4px;overflow:hidden;min-width:40px}`,
+    `.bar-fill{display:block;height:100%;border-radius:4px;transition:width .3s ease;min-width:0}`,
+    `.bar-count{width:24px;flex-shrink:0;text-align:right;color:var(--text-primary);font-family:monospace;font-size:10px;font-variant-numeric:tabular-nums}`,
+
+    // Analytics empty state
+    `.analytics-empty{padding:16px;text-align:center;color:var(--text-muted)}`,
+    `.analytics-empty p{margin:2px 0;font-size:12px}`,
+    `.analytics-empty-hint{font-size:10px;opacity:.7}`,
 
     `.table-wrap{flex:1;overflow:auto}`,
     `table{width:100%;border-collapse:collapse;font-size:12px}`,
@@ -277,6 +444,19 @@ const MAX_SPLIT = 0.65;
     `.status-badge.running{background:var(--tag-green-bg);color:var(--tag-green-text)}`,
     `.status-badge.paused{background:var(--tag-amber-bg);color:var(--tag-amber-text)}`,
     `.status-badge.ended{background:var(--bg-secondary);color:var(--text-muted)}`,
+    `.status-badge.pulse-running{animation:pulseGreen .6s ease-in-out 2}`,
+
+    // Workflow column
+    `.cell-workflow{font-size:10px;max-width:180px}`,
+    `.workflow-row{display:flex;align-items:center;gap:4px;flex-wrap:wrap}`,
+    `.workflow-link{font-family:monospace;font-size:10px;color:var(--accent-blue-text);text-decoration:none;background:var(--accent-blue-bg);padding:1px 6px;border-radius:8px;transition:background .15s}`,
+    `.workflow-link:hover{background:var(--accent-blue-text);color:var(--bg-primary)}`,
+    `.workflow-result{font-size:9px;font-weight:600;text-transform:uppercase;padding:1px 4px;border-radius:4px}`,
+    `.workflow-result.wf-ok{background:var(--tag-green-bg);color:var(--tag-green-text)}`,
+    `.workflow-result.wf-fail{background:var(--tag-red-bg);color:var(--tag-red-text)}`,
+    `.workflow-result.wf-skip{background:var(--tag-amber-bg);color:var(--tag-amber-text)}`,
+    `.workflow-runtime{font-size:9px;color:var(--text-muted);font-family:monospace}`,
+    `.no-workflow{color:var(--text-muted)}`,
 
     // Kill / restart buttons in session actions column
     `.cell-actions{text-align:center;width:72px;padding:4px;display:flex;gap:4px;justify-content:center}`,
@@ -340,7 +520,16 @@ const MAX_SPLIT = 0.65;
     `.log-terminal.empty{display:flex;align-items:center;justify-content:center}`,
     `.log-line{display:flex;padding:0 12px;min-height:1.55em;transition:background .1s}`,
     `.log-line:hover{background:rgba(255,255,255,.03)}`,
+
+    // Stderr / error lines — red background with left accent and tinted text
+    `.log-line-stderr{background:rgba(248,81,73,.08);border-left:3px solid #f85149;padding-left:9px;color:#ffb0a5}`,
+    `.log-line-stderr:hover{background:rgba(248,81,73,.14)}`,
+    `.log-line-stderr .log-timestamp{color:#f0514b}`,
+    `.log-line-stderr .log-text ::ng-deep .ansi-37{color:#ffb0a5}`,
+    `.log-line-stderr .log-text ::ng-deep .ansi-97{color:#ffcfc0}`,
     `.log-timestamp{flex-shrink:0;color:#484f58;margin-right:10px;font-size:11px;user-select:none}`,
+    `.log-icon-type{flex-shrink:0;display:flex;align-items:center;margin-right:6px}`,
+    `.log-error-icon{width:14px;height:14px;color:#f85149;flex-shrink:0}`,
     `.log-text{white-space:pre-wrap;word-break:break-all;flex:1}`,
 
     // ANSI color classes
@@ -385,6 +574,41 @@ export class SessionsComponent implements OnInit, OnDestroy {
   loading = signal(false);
   selectedSessionId = signal<string>('');
 
+  /** Display label for the Temporal Scheduler chip (e.g. &#34;polling every 30s&#34;). */
+  readonly schedulerLabel = computed(() => {
+    const t = this.pipeline.state()?.temporal;
+    if (!t?.connected) return null;
+    const ms = t.schedulerIntervalMs || 30000;
+    const sec = Math.round(ms / 1000);
+    return sec < 60 ? `every ${sec}s` : `every ${Math.round(sec / 60)}m`;
+  });
+
+  /** Analytics panel toggle and computed stats. */
+  readonly showAnalytics = signal(false);
+  readonly analytics = signal<RunAnalytics | null>(null);
+
+  /** Set of session IDs whose status badges are currently pulsing. */
+  readonly pulsingSessions = signal<Set<string>>(new Set());
+  private _pulsingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  /** Green pulse animation on the next-run chip when a run starts. */
+  readonly pulseGreen = signal(false);
+  private _lastBuilderStatus = 'idle';
+  private _pulseTimer: ReturnType<typeof setTimeout> | null = null;
+  private _refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+  private _pulseEffectRef = effect(() => {
+    const status = this.pipeline.builder().status;
+    if (status === 'running' && this._lastBuilderStatus !== 'running') {
+      this.pulseGreen.set(true);
+      this._pulseTimer = setTimeout(() => {
+        this.pulseGreen.set(false);
+        this._pulseTimer = null;
+      }, 1400);
+    }
+    this._lastBuilderStatus = status;
+  });
+
   @ViewChild('logTerminal') logTerminal!: ElementRef;
   @ViewChild('container') container!: ElementRef<HTMLElement>;
   private autoScroll = true;
@@ -404,15 +628,29 @@ export class SessionsComponent implements OnInit, OnDestroy {
   constructor(
     private http: HttpClient,
     public pipeline: ConduitService,
+    private toastService: ToastService,
     @Inject(API_BASE_URL) private api: string,
   ) {}
 
   ngOnInit(): void {
     this.fetchSessions();
+    this._refreshTimer = setInterval(() => this.fetchSessions(true), 30_000);
   }
 
   ngOnDestroy(): void {
     this.pipeline.unsubscribeSessionLog();
+    if (this._refreshTimer) {
+      clearInterval(this._refreshTimer);
+      this._refreshTimer = null;
+    }
+    // Clean up effects, pulses, and session-pulse timers
+    if (this._pulseTimer) {
+      clearTimeout(this._pulseTimer);
+      this._pulseTimer = null;
+    }
+    for (const [, timer] of this._pulsingTimers) clearTimeout(timer);
+    this._pulsingTimers.clear();
+    this._pulseEffectRef.destroy();
   }
 
   // ── Resize drag handle ────────────────────────────────────────────
@@ -473,15 +711,65 @@ export class SessionsComponent implements OnInit, OnDestroy {
 
   // ── Data ──────────────────────────────────────────────────────────
 
-  fetchSessions(): void {
-    this.loading.set(true);
+  fetchSessions(silent?: boolean): void {
+    if (!silent) { this.loading.set(true); }
     this.http.get<SessionRow[]>(`${this.api}/sessions`).subscribe({
       next: (data) => {
+        // Detect newly-running sessions before overwriting
+        const oldSessions = this.sessions();
+        const oldMap = new Map(oldSessions.map(s => [s.id, s.is_running]));
+        const newRunningIds: string[] = [];
+        for (const s of data) {
+          if (s.is_running === 1 && oldMap.get(s.id) !== 1) {
+            newRunningIds.push(s.id);
+          }
+        }
+
         this.sessions.set(data);
-        this.loading.set(false);
+        if (!silent) { this.loading.set(false); }
+        this.analytics.set(this._computeAnalytics(data));
+
+        // Pulse status badges and show toasts for newly-running sessions
+        // (skip on initial load so already-running sessions don't false-trigger)
+        if (newRunningIds.length > 0 && oldSessions.length > 0) {
+          this.pulsingSessions.update(set => {
+            const ns = new Set(set);
+            for (const id of newRunningIds) ns.add(id);
+            return ns;
+          });
+          for (const id of newRunningIds) {
+            if (this._pulsingTimers.has(id)) {
+              clearTimeout(this._pulsingTimers.get(id)!);
+            }
+            this._pulsingTimers.set(id, setTimeout(() => {
+              this.pulsingSessions.update(set => {
+                const ns = new Set(set);
+                ns.delete(id);
+                return ns;
+              });
+              this._pulsingTimers.delete(id);
+            }, 1400));
+          }
+
+          // Push enriched toast with session role and short ID
+          const now = new Date().toISOString();
+          for (const id of newRunningIds) {
+            const s = data.find(x => x.id === id);
+            if (!s) continue;
+            this.toastService.push({
+              id: `run-started-${id}`,
+              type: 'run_started',
+              title: '▶ Run Started',
+              message: `${s.agent_role} session ${this.shortId(s.id)} is now running`,
+              icon: '🚀',
+              timestamp: now,
+              priority: 'normal' as const,
+            });
+          }
+        }
       },
       error: () => {
-        this.loading.set(false);
+        if (!silent) { this.loading.set(false); }
         this.sessions.set([]);
       },
     });
@@ -639,6 +927,106 @@ export class SessionsComponent implements OnInit, OnDestroy {
     return index;
   }
 
+  // ── Temporal Scheduler display ────────────────────────────────────
+
+
+  // ── Analytics ─────────────────────────────────────────────────────
+
+  toggleAnalytics(): void {
+    this.showAnalytics.update(v => !v);
+  }
+
+  /** Compute run frequency analytics from session data. */
+  private _computeAnalytics(sessions: SessionRow[]): RunAnalytics | null {
+    // Need at least 2 sessions with start_iso for gap analysis
+    const sorted = sessions
+      .filter(s => !!s.start_iso)
+      .map(s => new Date(s.start_iso!).getTime())
+      .filter(t => !isNaN(t))
+      .sort((a, b) => a - b);
+
+    if (sorted.length < 2) return null;
+
+    // Gaps between consecutive session starts (in minutes)
+    const gaps: number[] = [];
+    for (let i = 1; i < sorted.length; i++) {
+      gaps.push((sorted[i] - sorted[i - 1]) / 60000);
+    }
+
+    const avg = gaps.reduce((s, g) => s + g, 0) / gaps.length;
+    const sortedGaps = [...gaps].sort((a, b) => a - b);
+    const mid = Math.floor(sortedGaps.length / 2);
+    const median = sortedGaps.length % 2 === 0
+      ? (sortedGaps[mid - 1] + sortedGaps[mid]) / 2
+      : sortedGaps[mid];
+
+    // Hourly distribution: count sessions per hour of day (0-23)
+    const hourly = new Array(24).fill(0);
+    for (const row of sessions) {
+      if (!row.start_iso) continue;
+      const d = new Date(row.start_iso);
+      if (isNaN(d.getTime())) continue;
+      const h = d.getHours();
+      hourly[h]++;
+    }
+
+    // Daily distribution: count sessions per day of week (Mon=0..Sun=6)
+    const daily = new Array(7).fill(0);
+    for (const row of sessions) {
+      if (!row.start_iso) continue;
+      const d = new Date(row.start_iso);
+      if (isNaN(d.getTime())) continue;
+      // getDay() returns Sun=0..Sat=6 — shift to Mon=0..Sun=6
+      const day = (d.getDay() + 6) % 7;
+      daily[day]++;
+    }
+
+    return {
+      avgGapMinutes: Math.round(avg * 10) / 10,
+      medianGapMinutes: Math.round(median * 10) / 10,
+      minGapMinutes: Math.round(sortedGaps[0] * 10) / 10,
+      maxGapMinutes: Math.round(sortedGaps[sortedGaps.length - 1] * 10) / 10,
+      sessionCount: sessions.length,
+      hourlyDistribution: hourly,
+      dailyDistribution: daily,
+    };
+  }
+
+  /** Format minutes as a human-friendly duration string. */
+  formatDuration(minutes: number): string {
+    if (minutes < 1) {
+      return `${Math.round(minutes * 60)}s`;
+    } else if (minutes < 60) {
+      return `${Math.floor(minutes)}m`;
+    } else {
+      const h = Math.floor(minutes / 60);
+      const m = Math.round(minutes % 60);
+      return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    }
+  }
+
+  /** Compute bar width as a percentage of the maximum in the distribution. */
+  barPercent(count: number, dist: number[]): number {
+    const max = Math.max(...dist, 1);
+    return count > 0 ? (count / max) * 100 : 0;
+  }
+
+  /** Generate a colour for a bar based on its position in the range. */
+  barColor(index: number, maxIndex: number): string {
+    // Gradient from cool blue (low) to warm amber (peak)
+    const t = maxIndex > 0 ? index / maxIndex : 0;
+    const r = Math.round(58 + t * (210 - 58));
+    const g = Math.round(166 + t * (153 - 166));
+    const b = Math.round(255 + t * (77 - 255));
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  /** Human-readable day-of-week label (Mon = index 0). */
+  dayLabel(day: number): string {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return labels[day] || '';
+  }
+
   // ── Display helpers ───────────────────────────────────────────────
 
   shortId(id: string): string {
@@ -651,6 +1039,18 @@ export class SessionsComponent implements OnInit, OnDestroy {
     if (!model) return '—';
     const parts = model.split('/');
     return parts[parts.length - 1] || model;
+  }
+
+  shortWfId(wfId: string): string {
+    // plan-0115-builder → 0115-builder
+    const idx = wfId.indexOf('-');
+    return idx >= 0 ? wfId.slice(idx + 1) : wfId;
+  }
+
+  formatMs(ms: number): string {
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 60000).toFixed(1)}m`;
   }
 
   duration(s: SessionRow): string {
@@ -685,13 +1085,22 @@ export class SessionsComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Sum of costs from sessions that started in the last 24 hours. */
   recentCost(): number | null {
     const sessions = this.sessions();
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    let total = 0;
+    let hasCost = false;
     for (const s of sessions) {
-      if (s.cost_usd !== null && s.cost_usd !== undefined) {
-        return s.cost_usd;
+      if (s.start_iso) {
+        const t = new Date(s.start_iso).getTime();
+        if (!isNaN(t) && t >= cutoff) {
+          const cost = s.cost_usd ?? 0;
+          total += cost;
+          if (s.cost_usd != null) hasCost = true;
+        }
       }
     }
-    return null;
+    return hasCost ? total : null;
   }
 }

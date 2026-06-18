@@ -58,7 +58,7 @@
             <artifactId>broker-service-spi</artifactId>
         </dependency>
         <!-- user-service removed - deprecated social media functionality -->
-        <!-- User authentication now handled by user-access-service (MySQL) + login-service (Redis) -->
+        <!-- User authentication now handled by user-access-service (PostgreSQL) + login-service (Redis) -->
 
         <dependency>
             <groupId>com.aibizarchitect.nexus</groupId>
@@ -106,10 +106,10 @@
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <!-- MySQL Connector -->
+        <!-- PostgreSQL Connector -->
         <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
         <!-- Test dependencies -->

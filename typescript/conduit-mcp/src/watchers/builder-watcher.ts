@@ -14,7 +14,7 @@ export class BuilderWatcher extends BaseWatcher {
   private startedAt: number | null = null;
 
   async initialize(): Promise<void> {
-    this.status = this.readBuilderStatus();
+    this.status = await this.readBuilderStatus();
     this.startHealthCheck();
   }
 
@@ -22,9 +22,9 @@ export class BuilderWatcher extends BaseWatcher {
     if (this.interval) clearInterval(this.interval);
   }
 
-  private readBuilderStatus(): BuilderStatus {
+  private async readBuilderStatus(): Promise<BuilderStatus> {
     // Read from sessions table — the authoritative source for builder state
-    const running = getRunningSessions();
+    const running = await getRunningSessions();
     const builderSession = running.find(
       (s) => s.agent_role === "builder" && s.is_running === 1,
     );
@@ -101,8 +101,8 @@ export class BuilderWatcher extends BaseWatcher {
   }
 
   private startHealthCheck() {
-    this.interval = setInterval(() => {
-      const newStatus = this.readBuilderStatus();
+    this.interval = setInterval(async () => {
+      const newStatus = await this.readBuilderStatus();
       if (newStatus.status === "running" && this.status.status !== "running") {
         this.startedAt = Math.floor(Date.now() / 1000);
       }

@@ -10,7 +10,10 @@ Rule of thumb:
   - Instances of those concepts           → database.
 """
 
+import logging
 from enum import Enum
+
+_log = logging.getLogger("conduit.harness_enums")
 
 
 class ExecutionMode(Enum):
@@ -82,28 +85,40 @@ class HarnessCapability(Enum):
 def parse_execution_mode(value: str | None) -> ExecutionMode:
     """Parse an execution mode string from the database into an enum."""
     if not value:
+        _log.debug("parse_execution_mode: None/empty, returning INTERACTIVE")
         return ExecutionMode.INTERACTIVE  # safe default
     try:
-        return ExecutionMode(value.lower())
+        mode = ExecutionMode(value.lower())
+        _log.debug("parse_execution_mode: %s → %s", value, mode)
+        return mode
     except ValueError:
+        _log.warning("parse_execution_mode: unknown value '%s', returning INTERACTIVE", value)
         return ExecutionMode.INTERACTIVE
 
 
 def parse_role_mapping_strategy(value: str | None) -> RoleMappingStrategy:
     """Parse a role mapping strategy string from the database into an enum."""
     if not value:
+        _log.debug("parse_role_mapping_strategy: None/empty, returning AGENT")
         return RoleMappingStrategy.AGENT  # safe default
     try:
-        return RoleMappingStrategy(value.lower())
+        strategy = RoleMappingStrategy(value.lower())
+        _log.debug("parse_role_mapping_strategy: %s → %s", value, strategy)
+        return strategy
     except ValueError:
+        _log.warning("parse_role_mapping_strategy: unknown value '%s', returning AGENT", value)
         return RoleMappingStrategy.AGENT
 
 
 def parse_argument_type(value: str | None) -> ArgumentType:
     """Parse an argument type string from the database into an enum."""
     if not value:
+        _log.debug("parse_argument_type: None/empty, returning FLAG")
         return ArgumentType.FLAG  # safe default
     try:
-        return ArgumentType(value.lower())
+        arg_type = ArgumentType(value.lower())
+        _log.debug("parse_argument_type: %s → %s", value, arg_type)
+        return arg_type
     except ValueError:
+        _log.warning("parse_argument_type: unknown value '%s', returning FLAG", value)
         return ArgumentType.FLAG

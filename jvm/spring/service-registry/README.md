@@ -74,7 +74,7 @@ The service will start on port **8085**.
 
 The application uses MySQL database for persistence:
 
-- **JDBC URL**: `jdbc:mysql://localhost:3306/services_console`
+- **JDBC URL**: `jdbc:postgresql://localhost:5433/nexus?currentSchema=service_registry`
 - **Username**: `root`
 - **Password**: `rootpass`
 
@@ -853,7 +853,7 @@ spring.jpa.show-sql=false
 
 ```properties
 # MySQL Configuration
-spring.datasource.url=jdbc:mysql://localhost:3306/hostserver?useSSL=true&serverTimezone=UTC
+spring.datasource.url=jdbc:postgresql://localhost:5433/nexus?currentSchema=service_registry
 spring.datasource.username=hostserver_user
 spring.datasource.password=${DB_PASSWORD}
 spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
@@ -1069,7 +1069,7 @@ netstat -ano | findstr :8085
 
 # Check database connection
 # The application uses MySQL:
-# JDBC URL: jdbc:mysql://localhost:3306/services_console
+# JDBC URL: jdbc:postgresql://localhost:5433/nexus?currentSchema=service_registry
 # Username: root
 # Password: rootpass
 ```

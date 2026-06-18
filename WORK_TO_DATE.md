@@ -1,6 +1,6 @@
 # WORK TO DATE
 
-- **Intent**: Set up the Work Request Pipeline control plane in `nexus/python/ai/losm`.
+- **Intent**: Set up the Work Request Pipeline control plane in `nexus/python/vision/losm`.
 - **Status**: Backend control plane and end-to-end orchestration are now fully complete.
 
 ## Active WorkRequests:

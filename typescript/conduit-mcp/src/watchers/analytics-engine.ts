@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { PipelineMetrics, PlanCard, ArchiveEntry } from "../types";
+import { PipelineMetrics, PlanCard } from "../types";
 
 export class AnalyticsEngine {
   compute(
@@ -10,7 +10,7 @@ export class AnalyticsEngine {
       active: PlanCard[];
       blocked: PlanCard[];
     },
-    archiveEntries: ArchiveEntry[],
+    archiveEntries: any[],
     baseDir: string,
   ): PipelineMetrics {
     const now = Date.now();

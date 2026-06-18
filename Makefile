@@ -1,7 +1,9 @@
 .PHONY: cir1 cir1-scan cir1-lint cir1-fix cir1-validate \
         cir2-lint cir2-validate cir3-lint cir3-validate cir4-lint cir4-validate \
         cir5-lint cir5-validate \
-        cir-arl cir-verify install-hooks
+        cir-arl cir-verify install-hooks \
+        test-db-setup test-db-reset test \
+        mcp-start mcp-stop mcp-restart mcp-status mcp-watch
 
 # ─── CIR-1: Full pipeline (read-only) ─────────────────────────────────────────
 
@@ -99,6 +101,57 @@ cir-validate:
 	@$(MAKE) cir4-validate
 	@$(MAKE) cir5-validate
 	@$(MAKE) cir-arl
+
+# ─── Test database ────────────────────────────────────────────────────────────
+
+test-db-setup:
+	@echo "Setting up conduit test database..."
+	@CONDUIT_PG_DSN="$$(grep '^CONDUIT_PG_DSN=' legacy/python/conduit/.env | cut -d= -f2-)" ; \
+		export CONDUIT_PG_DSN ; \
+		cd legacy/python/conduit && python3 setup_test_db.py
+
+test-db-reset:
+	@echo "Resetting conduit test database..."
+	@CONDUIT_PG_DSN="$$(grep '^CONDUIT_PG_DSN=' legacy/python/conduit/.env | cut -d= -f2-)" ; \
+		export CONDUIT_PG_DSN ; \
+		cd legacy/python/conduit && python3 setup_test_db.py --drop
+
+test:
+	@echo "Running conduit tests..."
+	@cd legacy/python/conduit && \
+		test -f .env.test && \
+			CONDUIT_PG_DSN="$$(grep '^CONDUIT_PG_DSN=' .env.test | cut -d= -f2-)" \
+			CONDUIT_PG_SCHEMA="$$(grep '^CONDUIT_PG_SCHEMA=' .env.test | cut -d= -f2-)" \
+		|| CONDUIT_PG_DSN="$$(grep '^CONDUIT_PG_DSN=' .env | cut -d= -f2-)" \
+			CONDUIT_PG_SCHEMA="$$(grep '^CONDUIT_PG_SCHEMA=' .env | cut -d= -f2-)" ; \
+		export CONDUIT_PG_DSN CONDUIT_PG_SCHEMA ; \
+		python3 -m pytest test_guard.py tests/test_lifecycle.py \
+			tests/test_dispatch_integration.py tests/test_db_adapter_pg_init.py \
+			tests/test_e2e_pipeline.py tests/test_e2e_pipeline_v2.py -v
+
+# ─── MCP Server Management ───────────────────────────────────────────────────
+# The daemon auto-restarts the server on crash.  Use `mcp-restart` after
+# making code changes to pick up the new build.  Use `mcp-watch` during
+# development to auto-restart on every file save.
+
+MCP_DAEMON := typescript/conduit-mcp/scripts/mcp-daemon.sh
+
+mcp-start:
+	@bash $(MCP_DAEMON) start
+
+mcp-stop:
+	@bash $(MCP_DAEMON) stop
+
+mcp-restart:
+	@bash $(MCP_DAEMON) restart
+
+mcp-status:
+	@bash $(MCP_DAEMON) status
+
+mcp-watch:
+	@echo "Starting MCP server in watch mode — auto-restarts on file changes."
+	@echo "Kill with Ctrl-C."
+	@cd typescript/conduit-mcp && npx tsx watch src/index.ts
 
 # ─── Git hooks ────────────────────────────────────────────────────────────────
 

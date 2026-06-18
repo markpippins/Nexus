@@ -8,12 +8,58 @@
       {{ plan.planNumber }}
     </span>
     <span class="plan-age">{{ age() }}</span>
+    <button
+      class="hard-delete-btn"
+      [class.hard-delete-btn--visible]="showHardDeleteConfirm()"
+      (click)="openHardDeleteConfirm($event)"
+      title="Permanently delete this plan and all associated data"
+    >
+      🗑
+    </button>
   </div>
   <div class="card-title">{{ plan.title }}</div>
   <div *ngIf="plan.blockReason" class="block-reason">
     ⚠ {{ getBlockReasonLabel(plan.blockReason) }}
   </div>
   <div *ngIf="status === 'completed'" class="completed-check">✓</div>
+
+  <!-- Hard-delete confirmation overlay -->
+  <div *ngIf="showHardDeleteConfirm()" class="hard-delete-overlay" (click)="$event.stopPropagation()">
+    <div class="hard-delete-dialog">
+      <div class="hard-delete-icon">⚠️</div>
+      <h4>Permanently Delete Plan?</h4>
+      <p class="hard-delete-warning">
+        This will remove plan <strong>#{{ plan.planNumber }}</strong> and all associated
+        tickets and receipts from the database. This action is <strong>irreversible</strong>.
+      </p>
+      <p class="hard-delete-instruction">
+        Type the plan title to confirm:
+      </p>
+      <code class="hard-delete-title-ref">{{ plan.title }}</code>
+      <input
+        class="hard-delete-input"
+        type="text"
+        [ngModel]="hardDeleteTitleInput()"
+        (ngModelChange)="hardDeleteTitleInput.set($event); hardDeleteError.set('')"
+        placeholder="Type the plan title exactly..."
+        (keydown.enter)="confirmHardDelete()"
+        [disabled]="hardDeleting()"
+      />
+      <div *ngIf="hardDeleteError()" class="hard-delete-error">{{ hardDeleteError() }}</div>
+      <div class="hard-delete-actions">
+        <button class="btn-cancel" (click)="cancelHardDelete()" [disabled]="hardDeleting()">
+          Cancel
+        </button>
+        <button
+          class="btn-confirm"
+          (click)="confirmHardDelete()"
+          [disabled]="hardDeleting() || hardDeleteTitleInput().trim() !== plan.title"
+        >
+          {{ hardDeleting() ? 'Deleting...' : '🗑 Delete Forever' }}
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Expanded detail panel -->
   <div *ngIf="expanded() && hasDetails()" class="card-detail" (click)="$event.stopPropagation()">

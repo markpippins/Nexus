@@ -46,6 +46,15 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
             >
               <span class="plan-num">#{{ plan.planNumber }}</span>
               <span class="plan-title">{{ plan.title || plan.fileName }}</span>
+              <div class="plan-tickets" *ngIf="plan.ticketStatuses">
+                <span class="ticket-badge"
+                  *ngFor="let role of roleOrder"
+                  [class]="'ticket-' + ((plan.ticketStatuses[role].status) || 'none')"
+                  [title]="role + ': ' + ((plan.ticketStatuses[role].status) || 'no ticket')"
+                  (click)="openTicketPopover($event, plan, role)">
+                  {{ roleLabel(role) }}
+                </span>
+              </div>
               <span class="plan-project">{{ plan.project }}</span>
             </div>
           </ng-container>
@@ -132,10 +141,16 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
           <h3>
             {{ editable() ? 'Edit' : 'View' }} Plan #{{ selectedPlan()?.planNumber }}
             <span class="readonly-badge" *ngIf="!editable()">Read-only</span>
+            <button class="btn-close" (click)="cancelEdit()">✕</button>
           </h3>
 
           <div class="readonly-banner" *ngIf="!editable()">
-            ⓘ This plan is {{ currentGroup() }} — save is disabled. Use <strong>Revise</strong> to create an editable copy, or <strong>Promote</strong> to move a proposed plan to planning.
+            <ng-container *ngIf="currentGroup() !== 'REVIEW_PASS'">
+              ⓘ This plan is {{ groupLabel(currentGroup()) }} — save is disabled. Use <strong>Revise</strong> to create an editable copy, or <strong>Promote</strong> to move a PROPOSED plan to PLANNING.
+            </ng-container>
+            <ng-container *ngIf="currentGroup() === 'REVIEW_PASS'">
+              ⓘ This plan is REVIEW_PASS — no further actions available.
+            </ng-container>
           </div>
 
           <div class="form-group">
@@ -163,8 +178,7 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
             <input [(ngModel)]="form.depsText" [disabled]="!fieldsEnabled()" />
           </div>
 
-          <div class="form-actions">
-            <button class="btn-cancel" (click)="cancelEdit()">Cancel</button>
+          <div class="form-actions">            <button class="btn-cancel" (click)="cancelEdit()">Cancel</button>
             <button
               *ngIf="editable()"
               class="btn-submit" (click)="submitUpdate()" [disabled]="submitting()">
@@ -181,11 +195,17 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
               {{ submitting() ? 'Unblocking...' : '→ Move to Pending' }}
             </button>
             <button
+              *ngIf="canMoveToPending()"
+              class="btn-move-pending" (click)="submitMoveToPending()" [disabled]="submitting()">
+              {{ submitting() ? 'Moving...' : '→ Move to Pending' }}
+            </button>
+            <button
               *ngIf="canPromote()"
               class="btn-promote" (click)="submitPromote()" [disabled]="submitting()">
               {{ submitting() ? 'Promoting...' : '↑ Promote' }}
             </button>
             <button
+              *ngIf="currentGroup() !== 'REVIEW_PASS'"
               class="btn-delete" (click)="confirmDelete()" [disabled]="submitting()">
               🗑 Delete
             </button>
@@ -205,6 +225,7 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
           <div class="form-feedback success" *ngIf="feedback() === 'updated'">Plan updated!</div>
           <div class="form-feedback success" *ngIf="feedback() === 'revised'">Revision created in Planning!</div>
           <div class="form-feedback success" *ngIf="feedback() === 'unblocked'">Plan moved back to Pending!</div>
+          <div class="form-feedback success" *ngIf="feedback() === 'pending'">Plan moved to Pending!</div>
           <div class="form-feedback success" *ngIf="feedback() === 'promoted'">Plan promoted to Planning!</div>
           <div class="form-feedback success" *ngIf="feedback() === 'deleted'">Plan deleted.</div>
           <div class="form-feedback error" *ngIf="feedback() === 'error'">Operation failed. Check the server connection.</div>
@@ -254,6 +275,16 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
           <p>or click <strong>+ New Plan</strong> to create one.</p>
         </div>
       </div>
+
+      <!-- Ticket detail popover -->
+      <div class="ticket-popover" *ngIf="ticketPopover() as tp" [style.left.px]="tp.x" [style.top.px]="tp.y" (click)="closeTicketPopover()">
+        <div class="tp-role">{{ tp.role }}</div>
+        <div class="tp-row"><span class="tp-label">Status</span><span class="tp-value">{{ selectedTicketDetail(tp)?.status || '—' }}</span></div>
+        <div class="tp-row"><span class="tp-label">Ticket ID</span><span class="tp-value">{{ selectedTicketDetail(tp)?.id || '—' }}</span></div>
+        <div class="tp-row"><span class="tp-label">Created</span><span class="tp-value">{{ (selectedTicketDetail(tp)?.created_at | date:'short') || '—' }}</span></div>
+        <div class="tp-row"><span class="tp-label">Expires</span><span class="tp-value">{{ (selectedTicketDetail(tp)?.expires_at | date:'short') || '—' }}</span></div>
+        <div class="tp-row"><span class="tp-label">Objective</span><span class="tp-value">{{ selectedTicketDetail(tp)?.objective || '—' }}</span></div>
+      </div>
     </div>
   `,
   styles: [
@@ -282,9 +313,25 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
     `.plan-item:hover{background:var(--bg-secondary)}`,
     `.plan-item.selected{background:var(--accent-blue-bg);border-left-color:var(--accent-blue-text)}`,
     `.plan-item.readonly{border-left-color:var(--text-muted)}`,
+    `.ticket-popover{position:fixed;z-index:1000;background:var(--bg-primary);border:1px solid var(--border-default);border-radius:8px;padding:10px 14px;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,.15);max-width:280px}`,
+    `.ticket-popover .tp-role{font-weight:700;font-size:11px;text-transform:uppercase;margin-bottom:6px;color:var(--text-muted)}`,
+    `.ticket-popover .tp-row{display:flex;gap:8px;margin-bottom:3px}`,
+    `.ticket-popover .tp-label{color:var(--text-muted);min-width:65px;font-size:11px}`,
+    `.ticket-popover .tp-value{color:var(--text-primary);font-family:monospace;font-size:11px;word-break:break-all}`,
     `.plan-num{font-size:11px;color:var(--text-muted);font-family:monospace}`,
     `.plan-title{font-size:13px;color:var(--text-primary);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
     `.plan-project{font-size:11px;color:var(--text-muted);margin-top:1px}`,
+    `.plan-tickets{display:flex;gap:3px;margin-top:3px;flex-wrap:wrap}`,
+    `.ticket-badge{display:inline-block;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:700;font-family:monospace;letter-spacing:.5px;text-transform:uppercase;line-height:1.4}`,
+    `.ticket-open{background:var(--accent-blue-bg);color:var(--accent-blue-text)}`,
+    `.ticket-claimed{background:var(--tag-amber-bg,#fef3c7);color:var(--tag-amber-text,#b45309)}`,
+    `.ticket-completed{background:var(--tag-green-bg);color:var(--tag-green-text)}`,
+    `.ticket-failed{background:var(--tag-red-bg);color:var(--tag-red-text)}`,
+    `.ticket-expired{background:var(--bg-tertiary);color:var(--text-muted);text-decoration:line-through}`,
+    `.ticket-stale{background:var(--bg-secondary);color:var(--text-muted)}`,
+    `.ticket-cancelled{background:var(--bg-secondary);color:var(--text-muted);text-decoration:line-through}`,
+    `.ticket-abandoned{background:var(--tag-red-bg);color:var(--tag-red-text);opacity:.5}`,
+    `.ticket-none{background:transparent;color:var(--text-muted);opacity:.4}`,
     `.list-empty{padding:24px 12px;font-size:13px;color:var(--text-muted);text-align:center}`,
     `.loading-spinner{width:24px;height:24px;border:3px solid var(--border-subtle);border-top-color:var(--accent-blue-text);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}`,
     `@keyframes spin{to{transform:rotate(360deg)}}`,
@@ -312,6 +359,9 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
     `.btn-promote{background:var(--tag-green-bg);color:var(--tag-green-text);border:1px solid var(--accent-green, #16a34a);padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s}`,
     `.btn-promote:hover{opacity:.8}`,
     `.btn-promote:disabled{opacity:.5;cursor:not-allowed}`,
+    `.btn-move-pending{background:var(--accent-blue-bg);color:var(--accent-blue-text);border:1px solid var(--accent-blue-text);padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s}`,
+    `.btn-move-pending:hover{opacity:.8}`,
+    `.btn-move-pending:disabled{opacity:.5;cursor:not-allowed}`,
     `.btn-delete{background:var(--tag-red-bg);color:var(--tag-red-text);border:1px solid var(--accent-red, #dc2626);padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .15s}`,
     `.btn-delete:hover{background:var(--accent-red, #dc2626);color:#fff}`,
     `.btn-delete:disabled{opacity:.5;cursor:not-allowed}`,
@@ -340,6 +390,13 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
     `.receipt-type.REVIEW_PASS{color:var(--tag-green-text)}`,
     `.receipt-type.REVIEW_REJECT{color:var(--tag-red-text)}`,
     `.receipt-type.BLOCK{color:var(--tag-red-text)}`,
+    `.receipt-type.PLAN_BLOCK{color:var(--tag-red-text)}`,
+    `.receipt-type.API_LIMIT{color:var(--tag-amber-text, #b45309)}`,
+    `.receipt-type.CANCELLED{color:var(--text-muted);text-decoration:line-through}`,
+    `.receipt-type.ABANDONED{color:var(--tag-red-text);opacity:.6}`,
+    `.receipt-type.CRITIQUE_PASS{color:var(--tag-green-text)}`,
+    `.receipt-type.CRITIQUE_REJECT{color:var(--tag-red-text)}`,
+    `.receipt-type.REVIEW{color:var(--accent-blue-text)}`,
     `.receipt-type.PROPOSED{color:var(--tag-purple-text, #6d28d9)}`,
     `.receipt-type.PLANNING{color:var(--tag-amber-text, #b45309)}`,
     `.receipt-agent{color:var(--text-muted);min-width:60px}`,
@@ -369,7 +426,16 @@ export class PlannerComponent implements OnInit, OnDestroy {
   submitting = signal(false);
   feedback = signal<string | null>(null);
 
+  /** Human-readable label for a derived status. Collapses blocked variants into "Blocked". */
+  groupLabel(status: string): string {
+    if (this.BLOCKED_STATUSES.includes(status)) return 'Blocked';
+    return status;
+  }
+
   /** Index into the flat plan list for j/k navigation */
+  /** Statuses that should be grouped under "Blocked" in the plan list. */
+  private readonly BLOCKED_STATUSES: readonly string[] = ['BLOCK', 'PLAN_BLOCK', 'API_LIMIT', 'CANCELLED', 'ABANDONED'];
+
   readonly focusedIndex = signal(0);
 
   readonly receipts = signal<ReceiptEntry[]>([]);
@@ -377,6 +443,31 @@ export class PlannerComponent implements OnInit, OnDestroy {
   /** Source prompt fetched when a plan has a promptRef */
   readonly sourcePrompt = signal<any>(null);
   readonly promptExpanded = signal(false);
+
+  /** Ticket popover state */
+  readonly ticketPopover = signal<{ planNumber: string; role: string; x: number; y: number } | null>(null);
+
+  openTicketPopover(event: MouseEvent, plan: PlanCard, role: string) {
+    event.stopPropagation();
+    const t = plan.ticketStatuses?.[role];
+    if (!t) return;
+    this.ticketPopover.set({ planNumber: plan.planNumber, role, x: event.clientX + 10, y: event.clientY - 10 });
+    // Dismiss on next outside click
+    setTimeout(() => {
+      const handler = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (!target.closest('.ticket-popover') && !target.closest('.ticket-badge')) {
+          this.closeTicketPopover();
+          document.removeEventListener('click', handler);
+        }
+      };
+      document.addEventListener('click', handler);
+    });
+  }
+
+  closeTicketPopover() {
+    this.ticketPopover.set(null);
+  }
 
   /** Unblock result feedback */
   readonly unblockFeedback = signal<string | null>(null);
@@ -399,6 +490,21 @@ export class PlannerComponent implements OnInit, OnDestroy {
     private kb: KeyboardShortcutService,
     @Inject(API_BASE_URL) private api: string,
   ) {}
+
+  /** Role display order for ticket badges */
+  readonly roleOrder = ['planner', 'builder', 'critic', 'reviewer'];
+
+  /** Single-letter role abbreviations */
+  roleLabel(role: string): string {
+    const map: Record<string, string> = { planner: 'P', builder: 'B', critic: 'C', reviewer: 'R' };
+    return map[role] || role[0].toUpperCase();
+  }
+
+  /** Get the ticket detail for the currently open popover */
+  selectedTicketDetail(tp: { planNumber: string; role: string }) {
+    const plan = this.allPlanCards().find(p => p.planNumber === tp.planNumber);
+    return plan?.ticketStatuses?.[tp.role];
+  }
 
   /** Flat list of all plans across groups for keyboard navigation */
   allPlanCards(): PlanCard[] {
@@ -492,13 +598,26 @@ export class PlannerComponent implements OnInit, OnDestroy {
     if (this.viewMode() === 'proposals') {
       return [{ label: 'Proposed', plans: state.plans.proposed || [] }];
     }
-    return [
-      { label: 'Planning', plans: state.plans.planning || [] },
-      { label: 'Pending', plans: state.plans.pending },
-      { label: 'Active', plans: state.plans.active },
-      { label: 'Blocked', plans: state.plans.blocked },
-      { label: 'Completed', plans: state.plans.completed },
+    // Collect all non-proposed plans and group by derivedStatus
+    const allPlans: PlanCard[] = [
+      ...(state.plans.planning || []),
+      ...state.plans.pending,
+      ...state.plans.active,
+      ...state.plans.blocked,
+      ...state.plans.completed,
     ];
+    // Statuses that should be grouped as "Blocked"
+    const BLOCKED_SET = new Set(this.BLOCKED_STATUSES);
+    const groups = new Map<string, PlanCard[]>();
+    for (const plan of allPlans) {
+      const rawStatus = plan.derivedStatus || 'Unknown';
+      const status = BLOCKED_SET.has(rawStatus) ? 'Blocked' : rawStatus;
+      if (!groups.has(status)) groups.set(status, []);
+      groups.get(status)!.push(plan);
+    }
+    return Array.from(groups.entries())
+      .map(([label, plans]) => ({ label, plans }))
+      .sort((a, b) => a.label.localeCompare(b.label));
   }
 
   totalPlans(): number {
@@ -513,34 +632,39 @@ export class PlannerComponent implements OnInit, OnDestroy {
     return plan.planNumber;
   }
 
-  /** Only Pending and Planning plans are editable in-place */
-  isEditable(plan: PlanCard, groupLabel: string): boolean {
-    return groupLabel === 'Pending' || groupLabel === 'Planning';
+  /** Plans in PLAN_CREATE, PLANNING, or PROPOSED are editable in-place */
+  isEditable(_plan: PlanCard, groupLabel: string): boolean {
+    return groupLabel === 'PLAN_CREATE' || groupLabel === 'PLANNING' || groupLabel === 'PROPOSED';
   }
 
-  /** True when the selected plan is in pending or planning (inline editable) */
+  /** True when the selected plan is in-plan editable */
   editable(): boolean {
-    const group = this.currentGroup();
-    return group === 'Pending' || group === 'Planning';
+    const g = this.currentGroup();
+    return g === 'PLAN_CREATE' || g === 'PLANNING' || g === 'PROPOSED';
   }
 
   /** True when fields should be enabled (editable OR promotable) */
   fieldsEnabled(): boolean {
     return this.editable() || this.canPromote();
-  }      /** Completed or blocked plans can be revised */
+  }
+  /** Blocked plans can be revised */
   canRevise(): boolean {
-    const group = this.currentGroup();
-    return group === 'Completed' || group === 'Blocked';
+    return this.BLOCKED_STATUSES.includes(this.currentGroup());
   }
 
-  /** Blocked plans can be unblocked (moved back to pending) */
+  /** Blocked plans can be unblocked */
   canUnblock(): boolean {
-    return this.currentGroup() === 'Blocked';
+    return this.canRevise();
+  }
+
+  /** Planning plans can be moved to pending */
+  canMoveToPending(): boolean {
+    return this.currentGroup() === 'PLANNING';
   }
 
   /** Proposed plans can be promoted */
   canPromote(): boolean {
-    return this.currentGroup() === 'Proposed';
+    return this.currentGroup() === 'PROPOSED';
   }
 
   selectPlan(plan: PlanCard) {
@@ -551,14 +675,14 @@ export class PlannerComponent implements OnInit, OnDestroy {
     this.form.project = plan.project || '';
     this.form.goal = plan.goal || '';
     this.form.filesAffectedText = (plan.filesAffected || []).join('\n');
+    this.form.acceptanceText = (plan.acceptanceCriteria || []).join('\n');
+    this.form.depsText = (plan.dependencies || []).join(', ');
+    // Store the plan's derived status as its current group
+    this.currentGroup.set(plan.derivedStatus || 'Unknown');
     // Clear filesAffected for revise mode — revisions strip this field
     if (this.canRevise()) {
       this.form.filesAffectedText = '';
     }
-    this.form.acceptanceText = (plan.acceptanceCriteria || []).join('\n');
-    this.form.depsText = (plan.dependencies || []).join(', ');
-    // Determine which group the plan is in
-    this.currentGroup.set(this.findGroup(plan.planNumber));
     this.fetchReceipts(plan.planNumber);
     // Fetch source prompt if the plan has one
     this.sourcePrompt.set(null);
@@ -568,22 +692,7 @@ export class PlannerComponent implements OnInit, OnDestroy {
     }
   }
 
-  private findGroup(planNumber: string): string {
-    const state = this.pipeline.state();
-    if (!state) return 'Unknown';
-    const cols: [string, PlanCard[]][] = [
-      ['Proposed', state.plans.proposed || []],
-      ['Planning', state.plans.planning || []],
-      ['Pending', state.plans.pending],
-      ['Active', state.plans.active],
-      ['Blocked', state.plans.blocked],
-      ['Completed', state.plans.completed],
-    ];
-    for (const [label, plans] of cols) {
-      if (plans.some((p) => p.planNumber === planNumber)) return label;
-    }
-    return 'Unknown';
-  }
+
 
   receiptLabel(type: string): string {
     switch (type) {
@@ -594,6 +703,9 @@ export class PlannerComponent implements OnInit, OnDestroy {
       case 'BLOCK': return 'Blocked';
       case 'PROPOSED': return 'Proposed';
       case 'PLANNING': return 'Planning';
+      case 'CANCELLED': return 'Cancelled';
+      case 'ABANDONED': return 'Abandoned';
+      case 'API_LIMIT': return 'Rate Limited';
       default: return type;
     }
   }
@@ -745,6 +857,39 @@ export class PlannerComponent implements OnInit, OnDestroy {
         const newNum = res?.result?.planNumber;
         this.feedback.set('revised');
         this.submitting.set(false);
+        setTimeout(() => {
+          this.mode.set('empty');
+          this.feedback.set(null);
+          this.selectedPlan.set(null);
+        }, 2500);
+      },
+      error: () => {
+        this.feedback.set('error');
+        this.submitting.set(false);
+      },
+    });
+  }
+
+  /** Move a planning plan to pending by issuing a PLAN_CREATE receipt */
+  submitMoveToPending() {
+    const plan = this.selectedPlan();
+    if (!plan) return;
+    this.submitting.set(true);
+    this.feedback.set(null);
+
+    this.http.post(`${this.api}/tools/call`, {
+      name: 'issue_receipt',
+      arguments: {
+        plan_id: plan.planNumber,
+        type: 'PLAN_CREATE',
+        agent_role: 'planner',
+        summary: 'Promoted from Planning to Pending via Planner UI',
+      },
+    }).subscribe({
+      next: () => {
+        this.feedback.set('pending');
+        this.submitting.set(false);
+        this.pipeline.refresh();
         setTimeout(() => {
           this.mode.set('empty');
           this.feedback.set(null);

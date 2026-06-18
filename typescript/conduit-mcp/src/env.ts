@@ -4,19 +4,19 @@
  * ``dotenv``).  Does **not** override variables already in process.env.
  */
 
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 
 export function loadEnv(envPath?: string): Record<string, string> {
-  const filePath = envPath || path.resolve(__dirname, '..', '.env');
+  const filePath = envPath || path.resolve(__dirname, "..", ".env");
   const parsed: Record<string, string> = {};
 
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
-    for (const raw of content.split('\n')) {
+    const content = fs.readFileSync(filePath, "utf-8");
+    for (const raw of content.split("\n")) {
       const line = raw.trim();
-      if (!line || line.startsWith('#')) continue;
-      const eq = line.indexOf('=');
+      if (!line || line.startsWith("#")) continue;
+      const eq = line.indexOf("=");
       if (eq === -1) continue;
       const key = line.slice(0, eq).trim();
       let val = line.slice(eq + 1).trim();

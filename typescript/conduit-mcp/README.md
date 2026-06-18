@@ -4,7 +4,7 @@ MCP server and SSE event bus for the pipeline system. Runs on port 3100
 and provides the API surface for `conduit-ui` and `conduit`.
 
 **Receipt-first authority:** Every plan operation goes through an MCP tool that
-issues a receipt. Writing `.md` files directly to `IMPLEMENTATION_PLANS/` is
+issues a receipt. Writing `.md` files directly to `nexus/graph/IMPLEMENTATION_PLANS/` is
 an anti-pattern — the plan will have no `derived_status` and will be invisible.
 
 The MCP server is the sole schema authority for the shared SQLite database.
@@ -102,7 +102,7 @@ src/
 ├── parser.ts         # .md plan file parser
 ├── types.ts          # Shared TypeScript types (PipelineState, PlanCard, etc.)
 └── watchers/
-    ├── plan-watcher.ts          # Watches IMPLEMENTATION_PLANS/ dirs via chokidar
+    ├── plan-watcher.ts          # Watches nexus/graph/IMPLEMENTATION_PLANS/ dirs via chokidar
     ├── builder-watcher.ts       # Monitors builder output and result files
     ├── cb-watcher.ts            # Circuit breaker state monitoring & auto-reset
     ├── archive-watcher.ts       # Archives old plans to .bak/
@@ -113,4 +113,4 @@ src/
     └── analytics-engine.ts      # Pipeline metrics (throughput, tokens, cycle times)
 ```
 
-For the full architecture, see the [Conduit ARCHITECTURE.md](../nexus/python/conduit/ARCHITECTURE.md).
+For the full architecture, see the [Conduit ARCHITECTURE.md](../nexus/legacy/python/conduit/ARCHITECTURE.md).
