@@ -60,3 +60,14 @@ scripts/sql/nebula_backup_*.sql
 # Archive directories — excluded from ARL scanning
 graph/HISTORY/
 docs/HISTORY/
+
+# Temp / test files
+test.txt
+diff.txt
+WRDCO-prompt.md
+conduit-ai-config-*.json
+.kiro/
+python/voyager/fs-crawler-v2_files/
+legacy/python/conduit/
+WORK_TO_DATE.md
+**/__pycache__/
