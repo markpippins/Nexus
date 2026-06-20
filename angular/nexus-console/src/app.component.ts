@@ -63,7 +63,8 @@ import { GatewayEditorComponent } from './components/gateway-editor/gateway-edit
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
 import { GatewayManagementComponent } from './components/gateway-management/gateway-management.component.js';
 import { HostServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
-import { RmsIframeComponent } from './components/rms-iframe/rms-iframe.component.js';
+import { ViewModeToolbarComponent } from './components/view-mode-toolbar/view-mode-toolbar.component.js';
+import { IframeViewComponent } from './components/iframe-view/iframe-view.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 
 interface PanePath {
@@ -113,7 +114,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, RmsIframeComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, ViewModeToolbarComponent, IframeViewComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -170,10 +171,19 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'nexus-rms'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
+
+  viewModeUrls: Record<string, string> = {
+    'conduit-ui': 'http://localhost:4201',
+    'duality': 'http://localhost:3002',
+    'plurality': 'http://localhost:3001',
+    'nebula-rms': 'http://localhost:3000',
+  };
+
+  isIframeMode = computed(() => this.currentViewMode() === 'conduit-ui' || this.currentViewMode() === 'duality' || this.currentViewMode() === 'plurality' || this.currentViewMode() === 'nebula-rms');
 
   // --- Pane Visibility State (from service) ---
   isSidebarVisible = this.uiPreferencesService.isSidebarVisible;

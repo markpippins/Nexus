@@ -1,0 +1,89 @@
+<header
+  class="h-12 flex-shrink-0 flex items-center px-4 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface))]"
+>
+  <h1 class="font-semibold text-lg text-[rgb(var(--color-text-base))] mr-4">
+    Nexus Console
+  </h1>
+  <div
+    class="flex items-center bg-[rgb(var(--color-background))] rounded-lg p-1 border border-[rgb(var(--color-border-muted))]"
+  >
+    <button
+      (click)="viewModeChange.emit('file-explorer')"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200"
+      [class.bg-[rgb(var(--color-accent-solid-bg))]]="viewMode() === 'file-explorer'"
+      [class.text-white]="viewMode() === 'file-explorer'"
+      [class.text-[rgb(var(--color-text-muted))]]="viewMode() !== 'file-explorer'"
+      title="Nexus Explorer"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+      </svg>
+      Explorer
+    </button>
+    <button
+      (click)="viewModeChange.emit('conduit-ui')"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200"
+      [class.bg-[rgb(var(--color-accent-solid-bg))]]="viewMode() === 'conduit-ui'"
+      [class.text-white]="viewMode() === 'conduit-ui'"
+      [class.text-[rgb(var(--color-text-muted))]]="viewMode() !== 'conduit-ui'"
+      title="Conduit Pipeline Dashboard"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+      </svg>
+      Conduit
+    </button>
+    <button
+      (click)="viewModeChange.emit('duality')"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200"
+      [class.bg-[rgb(var(--color-accent-solid-bg))]]="viewMode() === 'duality'"
+      [class.text-white]="viewMode() === 'duality'"
+      [class.text-[rgb(var(--color-text-muted))]]="viewMode() !== 'duality'"
+      title="Duality Dual-Pane Interface"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm11 0H6v10h8V5z" clip-rule="evenodd" />
+      </svg>
+      Duality
+    </button>
+    <button
+      (click)="viewModeChange.emit('plurality')"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200"
+      [class.bg-[rgb(var(--color-accent-solid-bg))]]="viewMode() === 'plurality'"
+      [class.text-white]="viewMode() === 'plurality'"
+      [class.text-[rgb(var(--color-text-muted))]]="viewMode() !== 'plurality'"
+      title="Plurality Multi-Agent View"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+      </svg>
+      Plurality
+    </button>
+    <button
+      (click)="viewModeChange.emit('nebula-rms')"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200"
+      [class.bg-[rgb(var(--color-accent-solid-bg))]]="viewMode() === 'nebula-rms'"
+      [class.text-white]="viewMode() === 'nebula-rms'"
+      [class.text-[rgb(var(--color-text-muted))]]="viewMode() !== 'nebula-rms'"
+      title="Nebula Requirements Management System"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2zm0 6a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2z"/>
+      </svg>
+      RMS
+    </button>
+    <button
+      (click)="viewModeChange.emit('service-mesh')"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-all duration-200"
+      [class.bg-[rgb(var(--color-accent-solid-bg))]]="viewMode() === 'service-mesh'"
+      [class.text-white]="viewMode() === 'service-mesh'"
+      [class.text-[rgb(var(--color-text-muted))]]="viewMode() !== 'service-mesh'"
+      title="Service Mesh"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd" />
+      </svg>
+      Service Mesh
+    </button>
+  </div>
+</header>

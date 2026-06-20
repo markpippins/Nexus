@@ -40,7 +40,7 @@ export class SidebarComponent implements OnDestroy {
   isTreeVisible = input(true);
   isChatVisible = input(true);
   isNotesVisible = input(true);
-  viewMode = input<'file-explorer' | 'service-mesh' | 'nexus-rms'>('file-explorer');
+  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console'); // Sub-mode when in service-mesh
   graphSubView = input<'canvas' | 'creator'>('canvas'); // Sub-view when in graph mode
 
@@ -49,7 +49,7 @@ export class SidebarComponent implements OnDestroy {
   loadChildren = output<string[]>();
   itemsMoved = output<{ destPath: string[]; payload: DragDropPayload }>();
   bookmarkDropped = output<{ bookmark: NewBookmark, destPath: string[] }>();
-  viewModeChange = output<'file-explorer' | 'service-mesh' | 'nexus-rms'>();
+
   meshViewModeChange = output<'console' | 'graph'>(); // For toggling between console and graph
   refreshServices = output<void>(); // For refreshing service mesh data
   serversMenuClick = output<void>();
@@ -72,6 +72,7 @@ export class SidebarComponent implements OnDestroy {
   dependencies = computed(() => this.serviceMeshService.dependencies());
   deployments = computed(() => this.serviceMeshService.deployments());
   selectedService = this.serviceMeshService.selectedService;
+  isIframeMode = computed(() => this.viewMode() === 'conduit-ui' || this.viewMode() === 'duality' || this.viewMode() === 'plurality' || this.viewMode() === 'nebula-rms');
 
   width = signal(this.uiPreferencesService.sidebarWidth() ?? 288);
   isResizing = signal(false);
@@ -266,10 +267,6 @@ export class SidebarComponent implements OnDestroy {
 
   toggleNotesPaneCollapse(): void {
     this.uiPreferencesService.toggleNotesPaneCollapse();
-  }
-
-  onViewModeChange(mode: 'file-explorer' | 'service-mesh' | 'nexus-rms'): void {
-    this.viewModeChange.emit(mode);
   }
 
   onServiceSelected(service: ServiceInstance): void {

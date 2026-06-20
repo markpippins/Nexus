@@ -30,7 +30,7 @@ export class ToolbarComponent {
   isColorPickerOpen = signal(false);
 
   // View mode inputs
-  viewMode = input<'file-explorer' | 'service-mesh' | 'nexus-rms'>('file-explorer');
+  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console');
 
   // Inputs for button states (file explorer)
