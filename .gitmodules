@@ -17,3 +17,7 @@
 [submodule "angular/prompt-architect"]
 	path = angular/prompt-architect
 	url = https://www.github.com/markpippins/prompt-architect.git
+
+[submodule "python/vision/losm-kernel"]
+	path = python/vision/losm-kernel
+	url = https://github.com/markpippins/nexus-losm-kernel-python.git
