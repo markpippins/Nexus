@@ -1,0 +1,50 @@
+[
+  {
+    "name": "conduit-mcp",
+    "port": 3100,
+    "workspacePath": "typescript/conduit-mcp",
+    "serviceTypeId": 1,
+    "healthCheckUrl": "http://localhost:3100/health",
+    "status": "ONLINE",
+    "transportType": "sse",
+    "version": "1.0.0",
+    "description": "MCP server and SSE event bus for the pipeline system. Central authority for pipeline state.",
+    "repositoryUrl": "typescript/conduit-mcp",
+    "startup": "npm run dev",
+    "health": "/health",
+    "notes": "Central pipeline authority — receipt-first state machine",
+    "isInternal": true
+  },
+  {
+    "name": "nebula-mcp",
+    "port": 3102,
+    "workspacePath": "typescript/nebula-mcp",
+    "serviceTypeId": 1,
+    "healthCheckUrl": "http://localhost:3102/health",
+    "status": "ONLINE",
+    "transportType": "sse",
+    "version": "1.0.0",
+    "description": "MCP Server for Nebula RMS — exposes systems, subsystems, features, and requirements via MCP tools",
+    "repositoryUrl": "typescript/nebula-mcp",
+    "startup": "npm run dev",
+    "health": "/health",
+    "notes": "RMS requirements management MCP interface",
+    "isInternal": true
+  },
+  {
+    "name": "terrain-mcp",
+    "port": null,
+    "workspacePath": "typescript/terrain-mcp",
+    "serviceTypeId": 1,
+    "healthCheckUrl": null,
+    "status": "ONLINE",
+    "transportType": "stdio",
+    "version": "1.0.0",
+    "description": "MCP server for infrastructure topology — queries the terrain PostgreSQL schema to report on services, servers, MCP servers, and CLI tools. Provides tools: terrain_list_servers, terrain_list_mcp_servers, terrain_list_runnable_services, terrain_list_cli_tools, terrain_get_service_status, terrain_is_running, terrain_infrastructure_summary, terrain_list_dependencies.",
+    "repositoryUrl": "typescript/terrain-mcp",
+    "startup": "npm run dev",
+    "health": "direct PG query — no HTTP health endpoint",
+    "notes": "Infrastructure MCP — answers service status questions without inference overhead",
+    "isInternal": true
+  }
+]

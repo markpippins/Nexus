@@ -1,0 +1,9 @@
+[
+  { "name": "MCP" },
+  { "name": "Microservice" },
+  { "name": "Express" },
+  { "name": "Proxy" },
+  { "name": "Bun" },
+  { "name": "Spring Boot" },
+  { "name": "CLI Tool" }
+]

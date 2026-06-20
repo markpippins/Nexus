@@ -1,0 +1,63 @@
+[
+  {
+    "name": "nebula-srv",
+    "port": 3101,
+    "workspacePath": "typescript/nebula-srv",
+    "serviceTypeId": 2,
+    "healthCheckUrl": "http://localhost:3101/health",
+    "status": "ONLINE",
+    "version": "1.0.0",
+    "description": "Express API server for Nexus RMS — PostgreSQL backend for Nebula UI",
+    "repositoryUrl": "typescript/nebula-srv",
+    "activeFlag": true,
+    "startup": "npm run dev",
+    "health": "/health",
+    "notes": "Primary RMS API server for requirements management",
+    "isInternal": true
+  },
+  {
+    "name": "image-server",
+    "port": 8083,
+    "workspacePath": "typescript/image-server",
+    "serviceTypeId": 4,
+    "healthCheckUrl": "http://localhost:8083/health",
+    "status": "OFFLINE",
+    "version": "1.0.0",
+    "description": "Image serving proxy for the Nexus ecosystem",
+    "repositoryUrl": "typescript/image-server",
+    "activeFlag": true,
+    "startup": "npm start",
+    "health": "/health",
+    "isInternal": true
+  },
+  {
+    "name": "file-system-server",
+    "port": 4040,
+    "workspacePath": "typescript/file-system-server",
+    "serviceTypeId": 5,
+    "healthCheckUrl": "http://localhost:4040/health",
+    "status": "OFFLINE",
+    "version": "1.0.0",
+    "description": "Node.js file system proxy server",
+    "repositoryUrl": "typescript/file-system-server",
+    "activeFlag": true,
+    "startup": "npm run dev",
+    "health": "/health",
+    "isInternal": true
+  },
+  {
+    "name": "broker-service-proxy",
+    "port": 8082,
+    "workspacePath": "typescript/broker-service-proxy",
+    "serviceTypeId": 4,
+    "healthCheckUrl": "http://localhost:8082/health",
+    "status": "OFFLINE",
+    "version": "1.0.0",
+    "description": "Proxy server for the broker service that forwards requests to the broker gateway",
+    "repositoryUrl": "typescript/broker-service-proxy",
+    "activeFlag": true,
+    "startup": "npm run dev",
+    "health": "/health",
+    "isInternal": true
+  }
+]

@@ -219,8 +219,8 @@ JVM_ID=$(create_system "JVM Services" '"Java/Kotlin service broker and registry 
   create_subsystem "$JVM_ID" "Spring PEB Kernel" '"PEB kernel implementation"' "jvm/spring/peb-kernel/README.md"
   create_workspace "$JVM_ID" "" "jvm/spring/peb-kernel"
 
-  create_subsystem "$JVM_ID" "Spring Topology Server" '"Topology service for service mesh"' "jvm/spring/topology-server/README.md"
-  create_workspace "$JVM_ID" "" "jvm/spring/topology-server"
+  create_subsystem "$JVM_ID" "Terrain Server" '"Infrastructure topology registry"' "jvm/spring/terrain/README.md"
+  create_workspace "$JVM_ID" "" "jvm/spring/terrain"
 
   create_subsystem "$JVM_ID" "Helidon" '"Helidon microservice stack"' "jvm/helidon/README.md"
   create_workspace "$JVM_ID" "" "jvm/helidon"
