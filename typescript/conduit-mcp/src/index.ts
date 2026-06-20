@@ -1431,6 +1431,31 @@ app.get("/chat/config", async (_req, res) => {
         label: "Critic",
         description: "Critiques plans for gaps and improvements",
       },
+      {
+        role: "analyst",
+        label: "Analyst",
+        description: "Analyzes inspection reports and triages issues",
+      },
+      {
+        role: "architect",
+        label: "Architect",
+        description: "Designs architecture and writes specifications",
+      },
+      {
+        role: "inspector",
+        label: "Inspector",
+        description: "Inspects codebase for errors and issues",
+      },
+      {
+        role: "engineer",
+        label: "Engineer",
+        description: "Reports on backlog and identifies priority work",
+      },
+      {
+        role: "rover",
+        label: "Rover",
+        description: "Processes chat transcripts through harvesting pipeline",
+      },
     ],
   });
 });

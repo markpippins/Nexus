@@ -12,7 +12,7 @@ let pool: Pool;
 export async function initDb(_conduitDataDir?: string): Promise<Pool> {
   const dsn =
     process.env.CONDUIT_PG_DSN ||
-    "postgresql://pguser:pgpass@localhost:5433/nexus";
+    "postgresql://pguser:pgpass@localhost:5432/nexus";
 
   pool = new Pool({
     connectionString: dsn,
@@ -418,7 +418,9 @@ async function createSchema(
     CREATE TABLE IF NOT EXISTS ${VECTOR_SCHEMA}.role_config (
       id            TEXT PRIMARY KEY,
       role          TEXT NOT NULL UNIQUE CHECK(role IN (
-                       'planner','builder','reviewer','critic'
+                       'planner','builder','reviewer','critic',
+                       'analyst','architect','inspector','engineer',
+                       'rover'
                      )),
       provider_id   TEXT NOT NULL REFERENCES ${VECTOR_SCHEMA}.providers(id),
       harness_id    TEXT NOT NULL REFERENCES ${VECTOR_SCHEMA}.harnesses(id),
@@ -565,6 +567,63 @@ const migrations: Migration[] = [
     description: "Add deadline TEXT column to tickets for target completion date",
     up: async (exec) => {
       await exec(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS deadline TEXT`);
+    },
+  },
+  {
+    version: 7,
+    description: "Expand role_config CHECK constraint to include all 8 agent roles (analyst, architect, inspector, engineer)",
+    up: async (exec) => {
+      // Drop the old CHECK constraint on vector.role_config.role (auto-generated name)
+      // and recreate it with the expanded role list.
+      await exec(`
+        DO $MIGRATE$
+        DECLARE
+          v_conname text;
+        BEGIN
+          SELECT conname INTO v_conname
+          FROM pg_constraint
+          WHERE conrelid = 'vector.role_config'::regclass AND contype = 'c';
+
+          IF v_conname IS NOT NULL THEN
+            EXECUTE format('ALTER TABLE vector.role_config DROP CONSTRAINT %I', v_conname);
+          END IF;
+
+          ALTER TABLE vector.role_config ADD CONSTRAINT role_config_role_check
+            CHECK (role IN (
+              'planner','builder','reviewer','critic',
+              'analyst','architect','inspector','engineer'
+            ));
+        END;
+        $MIGRATE$
+      `);
+    },
+  },
+  {
+    version: 8,
+    description: "Add 'rover' role to role_config CHECK constraint for rover-mcp audit folder routing",
+    up: async (exec) => {
+      await exec(`
+        DO $MIGRATE$
+        DECLARE
+          v_conname text;
+        BEGIN
+          SELECT conname INTO v_conname
+          FROM pg_constraint
+          WHERE conrelid = 'vector.role_config'::regclass AND contype = 'c';
+
+          IF v_conname IS NOT NULL THEN
+            EXECUTE format('ALTER TABLE vector.role_config DROP CONSTRAINT %I', v_conname);
+          END IF;
+
+          ALTER TABLE vector.role_config ADD CONSTRAINT role_config_role_check
+            CHECK (role IN (
+              'planner','builder','reviewer','critic',
+              'analyst','architect','inspector','engineer',
+              'rover'
+            ));
+        END;
+        $MIGRATE$
+      `);
     },
   },
 ];
@@ -1481,7 +1540,7 @@ export interface AIModelRow {
 }
 
 export interface AIRoleConfigRow {
-  id: string; role: "planner" | "builder" | "reviewer" | "critic";
+  id: string; role: "planner" | "builder" | "reviewer" | "critic" | "analyst" | "architect" | "inspector" | "engineer" | "rover";
   provider_id: string; harness_id: string; model_id: string;
   extra_params: string; created_at: string; updated_at: string;
 }
@@ -1872,7 +1931,7 @@ const DEFAULT_MODELS: Array<{ id: string; name: string; harnessId: string; provi
   { id: "mod-codex-gpt4o", name: "GPT-4o (via Codex)", harnessId: "harn-codex-cli", providerId: "prov-codex", modelId: "gpt-4o" },
 ];
 
-const ALL_ROLES = ["planner", "builder", "reviewer", "critic"] as const;
+const ALL_ROLES = ["planner", "builder", "reviewer", "critic", "analyst", "architect", "inspector", "engineer", "rover"] as const;
 
 export async function seedDefaultAIConfig(force?: boolean): Promise<{
   seeded: boolean; providers: number; harnesses: number; models: number; roles: number; message: string;
