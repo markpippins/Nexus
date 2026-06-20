@@ -315,7 +315,8 @@ def _serialize_dco_for_prompt(req: Dict[str, Any]) -> str:
 def _resolve_role(req: Dict[str, Any]) -> str:
     """Extract the agent role from DCO metadata (defaults to 'builder')."""
     role = (req.get("metadata") or {}).get("role", "")
-    resolved = role if role in ("builder", "reviewer", "planner", "critic") else "builder"
+    ALL_ROLES = {"builder", "reviewer", "planner", "critic", "analyst", "architect", "inspector", "engineer", "rover"}
+    resolved = role if role in ALL_ROLES else "builder"
     _log.debug("_resolve_role: raw=%s resolved=%s", role, resolved)
     return resolved
 
