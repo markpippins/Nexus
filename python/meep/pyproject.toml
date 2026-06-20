@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "meep"
+version = "0.1.0"
+description = "Minimal End-to-End Pipeline — deterministic prompt → CER log → replay"
+requires-python = ">=3.12"
+dependencies = [
+    "dataclasses-json>=0.6",
+]
+
+[project.scripts]
+meep = "meep.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["meep*"]
