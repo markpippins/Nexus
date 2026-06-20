@@ -1,0 +1,4 @@
+docling
+ollama
+langchain-text-splitters
+pydantic
