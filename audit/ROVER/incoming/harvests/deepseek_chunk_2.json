@@ -1,0 +1,204 @@
+{
+  "agenda_items": [
+    {
+      "title": "Dual-Meaning Outcome Model — Realized History vs Intended Structure",
+      "status": "Agreed",
+      "intent_description": "Formally separate 'outcome' into two distinct concepts: Outcome_realized (post-event ground-truth trace in the event spine, e.g., LOSM state transitions, CIR-observed results, Eval judgments) and Outcome_intended (pre-event projected future state manifold, e.g., acceptance criteria, plan compilation graph, tactic expectation models, cluster-conditioned priors). These must never be merged into a single concept — collapsing them causes the system to treat intended structure as if it were observed truth, which is the failure mode in most agentic systems.",
+      "requirements": [
+        "Outcome_realized and Outcome_intended must be stored in separate schemas/tables",
+        "CIR must compute: CIR = distance(Outcome_realized, Outcome_intended)",
+        "The system must reject any code path that reads Outcome_intended as if it were Outcome_realized",
+        "Every execution receipt must link its realized outcome back to its originating intended outcome for traceability"
+      ],
+      "implementation_notes": [
+        "Outcome_realized lives in the event spine (Cascade/LOSM)",
+        "Outcome_intended lives in the planning layer (Plurality/Sequencer)",
+        "The 'distance' measurement is where all learning lives — CIR, Eval, and ConflictEvents all compute variants of this distance",
+        "This distinction prevents circular reinforcement loops and model bias locking into bad heuristics"
+      ],
+      "code_snippets": [
+        {
+          "language": "text",
+          "purpose": "Formal definition of the outcome model and CIR computation",
+          "raw_code": "Outcome_realized ≠ Outcome_intended\n\nCIR = distance(Outcome_realized, Outcome_intended)\n\nProjected Outcome Manifold  (intent space)\nObserved Outcome Trace     (reality space)\n\nLearning = improving the mapping, not the outcomes themselves"
+        }
+      ],
+      "open_questions": [
+        "What is the distance function — cosine similarity, structural diff, or a composite metric?",
+        "How are partial matches handled when only some acceptance criteria are met?"
+      ]
+    },
+    {
+      "title": "Three-Space Architecture — Intent, Execution, and Learning Spaces",
+      "status": "Agreed",
+      "intent_description": "Formalize the system architecture into three distinct semantic spaces, not just abstraction levels. Intent Space (planning) contains strategies, tactics, acceptance criteria, ContextCluster priors, and projected outcome manifolds — it answers 'What state do we want to move toward?' Execution Space (reality) contains Conduit, LOSM kernel, state transitions, and execution receipts — it answers 'What actually happened?' Learning Space (mapping) contains CIR, Eval, Voyager, ConflictEvents, and losm-store aggregation — it answers 'How wrong or right was our intent relative to reality?' Planning is not 'above' implementation — it is a different coordinate system operating at coarser resolution.",
+      "requirements": [
+        "Each space must have its own persistence schema with clear boundaries",
+        "Intent Space operates at coarse-grained state transformations (cluster-level)",
+        "Execution Space operates at fine-grained transitions (event-level)",
+        "Learning Space operates at statistical alignment between the two",
+        "Intent must never directly mutate execution state — it can only propose, constrain, and define expected outcomes",
+        "All execution must be mediated through Conduit + LOSM"
+      ],
+      "implementation_notes": [
+        "This separation is the key architectural invariant that prevents system collapse",
+        "Intent Space = Plurality + Sequencer + AcceptanceCriteria + ContextCluster priors",
+        "Execution Space = Conduit + LOSM kernel + state transitions + execution receipts",
+        "Learning Space = CIR + Eval + Voyager + ConflictEvents + losm-store aggregation",
+        "The spaces communicate through well-defined interfaces, not shared mutable state"
+      ],
+      "code_snippets": [
+        {
+          "language": "typescript",
+          "purpose": "Three-space architecture type definitions",
+          "raw_code": "// Intent Space — coarse-grained state transformations\nIntentSpace {\n  strategies: Strategy[]\n  tactics: Tactic[]\n  acceptance_criteria: AcceptanceCriteria[]\n  context_cluster_priors: ContextClusterPrior[]\n  projected_outcome_manifolds: ProjectedOutcomeManifold[]\n}\n\n// Execution Space — fine-grained transitions\nExecutionSpace {\n  state_transitions: StateTransition[]\n  execution_receipts: ExecutionReceipt[]\n}\n\n// Learning Space — statistical alignment\nLearningSpace {\n  cir_measurements: CIRMeasurement[]\n  eval_judgments: EvalJudgment[]\n  compressed_observations: CompressedObservation[]\n  conflict_events: ConflictEvent[]\n}"
+        }
+      ],
+      "open_questions": [
+        "How does Voyager's compression interact with the three-space model — does it compress across spaces or within them?",
+        "What are the synchronization guarantees between spaces — eventual consistency or transactional?"
+      ]
+    },
+    {
+      "title": "IntentGraph — Persistent, Versioned, Replayable Multi-Step Intent Structure",
+      "status": "Proposed",
+      "intent_description": "Create IntentGraph as a first-class persistent artifact in losm-store that encodes multi-step intent (strategy → tactic → sub-tactic) as a typed directed acyclic graph of decision commitments. Currently strategies, tactics, and execution steps are temporally generated but not structurally persisted, causing loss of intent structure after execution, weak comparability between runs, and CIR learning without full causal graph context. IntentGraph turns planning from a transient artifact into a versioned, inspectable, replayable data structure.",
+      "requirements": [
+        "IntentGraph must be stored in losm-store with versioning support",
+        "Must support status transitions: DRAFT → EXECUTED → REPLAYABLE → INVALIDATED",
+        "Must link to ContextSignature and ContextCluster for region-of-validity tracking",
+        "Must include an acceptance_schema (AcceptanceCriteria) at the graph level",
+        "Must support replay: re-running the same IntentGraph under different models and comparing outcomes",
+        "Must support diffing: comparing intent versions across runs"
+      ],
+      "implementation_notes": [
+        "IntentGraph is the missing anchor for ContextClusters, tactics, acceptance criteria, CIR, Eval, and conflict events",
+        "Everything attaches to a graph — ContextClusters anchor to graph regions, Tactics are nodes, CIR attaches to node/edge deviations",
+        "This moves the system from procedural cognition to graph-compiled intent with execution projection and feedback loops",
+        "The system thinks in structures that get executed, not in steps"
+      ],
+      "code_snippets": [
+        {
+          "language": "typescript",
+          "purpose": "IntentGraph core type definition with node and edge types",
+          "raw_code": "IntentGraph {\n  graph_id: string\n  context_signature_id: string\n  context_cluster_id: string\n  nodes: IntentNode[]\n  edges: IntentEdge[]\n  root_strategy_id: string\n  acceptance_schema: AcceptanceCriteria\n  version: number\n  status: \"DRAFT\" | \"EXECUTED\" | \"REPLAYABLE\" | \"INVALIDATED\"\n}\n\nIntentNode =\n  | StrategyNode\n  | TacticNode\n  | SubTacticNode\n  | ConstraintNode\n  | ExpectedOutcomeNode\n\nIntentEdge {\n  from: IntentNode\n  to: IntentNode\n  relation:\n    | \"refines\"\n    | \"depends_on\"\n    | \"constrains\"\n    | \"decomposes\"\n    | \"expects\"\n}"
+        }
+      ],
+      "open_questions": [
+        "How do IntentGraphs evolve — merge, split, and mutate safely without breaking replayability?",
+        "What is the storage format — JSON in losm-store or a native graph database?",
+        "How are circular dependencies detected and prevented in the DAG?",
+        "What happens when a node in an executed IntentGraph is invalidated — does the entire graph become INVALIDATED?"
+      ]
+    },
+    {
+      "title": "IntentGraph Edge Semantics — Structured Decomposition of Intent",
+      "status": "Proposed",
+      "intent_description": "Define five edge relation types for IntentGraph that encode intent semantics, not just execution flow. 'refines' indicates a child node adds detail to a parent strategy. 'depends_on' indicates execution ordering — the target must complete before the source can proceed. 'constrains' indicates the target node limits the valid state space of the source. 'decomposes' indicates the source is broken into sub-components represented by the target. 'expects' links a node to its ExpectedOutcomeNode, defining what successful execution looks like. Together these make the graph a structured decomposition of intent into enforceable transformations.",
+      "requirements": [
+        "Each edge must have exactly one relation type from the defined set",
+        "'refines' edges must point from more specific to more general nodes",
+        "'depends_on' edges define partial ordering for execution traversal",
+        "'constrains' edges must reference enforceable constraint definitions",
+        "'expects' edges must link to ExpectedOutcomeNode instances with measurable criteria",
+        "The graph must be validated for semantic consistency (no contradictory edges) before execution"
+      ],
+      "implementation_notes": [
+        "Edge semantics are what differentiate IntentGraph from a simple workflow DAG",
+        "The relation types enable CIR to localize failures to specific nodes and edges",
+        "Example CIR output: { failed_node: SubTacticNode, violated_edge: 'expects', deviation: high }",
+        "This enables graph-localized learning rather than global statistical learning"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "Can edges have weights or confidence scores?",
+        "How are edge semantics validated — static analysis, runtime checks, or both?",
+        "What happens when an 'expects' edge is violated — rollback, retry, or record-and-continue?"
+      ]
+    },
+    {
+      "title": "Execution as IntentGraph Traversal — Plan Compiler to LOSM Projection",
+      "status": "Proposed",
+      "intent_description": "Define execution as a traversal of IntentGraph rather than a translation. A Plan Compiler projects the IntentGraph into a LOSM-compatible Execution Graph, which Conduit then executes. This means execution is a projection of intent graph into a runnable state machine — not a rewrite of intent. The key capability this unlocks is replayability: the same IntentGraph can be re-run under different models, with outcomes compared. Intent versions can be diffed, and the same intent graph can be tested in different ContextClusters to measure cluster-specific performance.",
+      "requirements": [
+        "Plan Compiler must produce deterministic Execution Graphs from a given IntentGraph",
+        "Execution Graphs must be LOSM-compatible (consumable by Conduit without translation)",
+        "The projection must preserve IntentGraph node/edge identity for CIR attribution",
+        "Replay must be semantically identical — same IntentGraph, same inputs → comparable execution traces",
+        "Diffing must identify structural changes (added/removed/modified nodes and edges) between IntentGraph versions"
+      ],
+      "implementation_notes": [
+        "The pipeline: IntentGraph → Plan Compiler → Execution Graph (LOSM-compatible) → Conduit execution",
+        "Replay capability: re-run same IntentGraph under different models and compare outcomes",
+        "Diff capability: compare how strategy evolved between runs",
+        "Cross-cluster comparison: same IntentGraph in different ContextClusters",
+        "This is where learning becomes structural, not statistical"
+      ],
+      "code_snippets": [
+        {
+          "language": "typescript",
+          "purpose": "Execution Graph type — LOSM-compatible projection of IntentGraph",
+          "raw_code": "ExecutionGraph {\n  intent_graph_id: string\n  intent_graph_version: number\n  nodes: ExecutionNode[]\n  edges: ExecutionEdge[]\n  projected_at: timestamp\n  compiler_version: string\n}\n\nExecutionNode {\n  intent_node_id: string\n  losm_transition: LOSMTransition\n  preconditions: Constraint[]\n  expected_outcomes: ExpectedOutcome[]\n}\n\nExecutionEdge {\n  from: ExecutionNode\n  to: ExecutionNode\n  ordering: \"sequential\" | \"parallel\" | \"conditional\"\n}"
+        }
+      ],
+      "open_questions": [
+        "How does the Plan Compiler handle nodes with unmet dependencies at compilation time?",
+        "What is the failure mode if a LOSM transition fails mid-graph — partial rollback or full abort?",
+        "How are conditional branches in the IntentGraph (via 'constrains' edges) resolved at execution time?"
+      ]
+    },
+    {
+      "title": "Voyager as Intent Pattern Miner — Compressing Historical IntentGraph Executions",
+      "status": "Proposed",
+      "intent_description": "Reposition Voyager from a general state compressor to a specialized compressor over historical IntentGraph executions. It produces recurring intent structures, identifies unstable subgraphs, and surfaces high-success graph motifs. This transforms Voyager from state compression into intent pattern mining over time — it discovers which intent structures work reliably and which don't, feeding back into ContextCluster and tactic weight updates.",
+      "requirements": [
+        "Voyager must ingest executed IntentGraphs with their associated CIR scores",
+        "Must produce recurring intent structures (common subgraph patterns across successful executions)",
+        "Must identify unstable subgraphs (patterns with high CIR deviation across runs)",
+        "Must surface high-success graph motifs for reuse in future planning",
+        "Compression output must be queryable by ContextCluster to update cluster-specific tactic weights"
+      ],
+      "implementation_notes": [
+        "This connects Voyager directly to the learning loop: IntentGraph execution → CIR → Voyager compression → cluster weight updates",
+        "Recurring structures become reusable planning templates",
+        "Unstable subgraphs become targets for architectural refactoring or tactic replacement",
+        "High-success motifs become default suggestions for similar ContextClusters"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the compression algorithm — subgraph isomorphism detection, embedding similarity, or frequency analysis?",
+        "How does Voyager distinguish between 'this subgraph is unstable' and 'this ContextCluster is inherently unpredictable'?",
+        "What is the minimum number of executions needed before Voyager can produce meaningful pattern insights?"
+      ]
+    },
+    {
+      "title": "Graph-Localized CIR — Node and Edge-Level Deviation Attribution",
+      "status": "Proposed",
+      "intent_description": "Evolve CIR from a global 'did the tactic work?' measurement into a graph-localized attribution system. CIR attaches to specific IntentGraph nodes, edges, and subgraphs to identify which part of the intent graph failed to map correctly to execution reality. This enables precise learning feedback: instead of knowing a strategy failed, the system knows exactly which tactic node and which edge relation caused the deviation.",
+      "requirements": [
+        "CIR must produce attribution records referencing IntentGraph node IDs and edge IDs",
+        "Failed node attribution must identify the specific IntentNode that deviated from expected outcome",
+        "Violated edge attribution must identify the edge relation (e.g., 'expects') that was broken",
+        "Deviation magnitude must be quantified for prioritization",
+        "Attribution data must feed back into ContextCluster weight updates and Voyager pattern mining"
+      ],
+      "implementation_notes": [
+        "Example CIR output: { failed_node: SubTacticNode, violated_edge: 'expects', deviation: high }",
+        "This replaces 'tactic X has 70% success rate' with 'tactic X fails 90% of the time when its 'expects' edge targets Outcome Y'",
+        "Graph-localized CIR enables targeted fixes — change the failing node, not the entire strategy"
+      ],
+      "code_snippets": [
+        {
+          "language": "typescript",
+          "purpose": "Graph-localized CIR attribution record",
+          "raw_code": "CIRAttribution {\n  intent_graph_id: string\n  intent_graph_version: number\n  failed_node?: {\n    node_id: string\n    node_type: \"StrategyNode\" | \"TacticNode\" | \"SubTacticNode\" | \"ConstraintNode\" | \"ExpectedOutcomeNode\"\n  }\n  violated_edge?: {\n    edge_id: string\n    relation: \"refines\" | \"depends_on\" | \"constrains\" | \"decomposes\" | \"expects\"\n  }\n  deviation: \"low\" | \"medium\" | \"high\" | \"critical\"\n  subgraph_affected?: string[]\n  recommended_action?: string\n}"
+        }
+      ],
+      "open_questions": [
+        "How are cascading failures attributed — if node A fails causing node B to fail, does B get its own CIR record?",
+        "What is the threshold for 'deviation: critical' vs 'deviation: high'?",
+        "How are subgraph boundaries determined for subgraph_affected attribution?"
+      ]
+    }
+  ]
+}

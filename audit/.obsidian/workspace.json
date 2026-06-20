@@ -1,20 +1,24 @@
 {
   "main": {
-    "id": "7408c8e29a8cfb82",
+    "id": "6b5ddb7353c8e37a",
     "type": "split",
     "children": [
       {
-        "id": "55cc871074b7eaea",
+        "id": "2a6c9c9e589df466",
         "type": "tabs",
         "children": [
           {
-            "id": "26b426dd8839cc0a",
+            "id": "692bff87fcd16c8d",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "CROSS_REFERENCES.md",
+                "mode": "source",
+                "source": false
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "CROSS_REFERENCES"
             }
           }
         ]
@@ -23,15 +27,15 @@
     "direction": "vertical"
   },
   "left": {
-    "id": "486b564698bca5ab",
+    "id": "1127ee4e70202134",
     "type": "split",
     "children": [
       {
-        "id": "80c3d4b97ac76e4f",
+        "id": "bc9f653b1c5f160e",
         "type": "tabs",
         "children": [
           {
-            "id": "5e63cb874aa2f451",
+            "id": "8df62fd4054cbe09",
             "type": "leaf",
             "state": {
               "type": "file-explorer",
@@ -44,12 +48,12 @@
             }
           },
           {
-            "id": "cf7a80a29a0f82b7",
+            "id": "5615642a8418838d",
             "type": "leaf",
             "state": {
               "type": "search",
               "state": {
-                "query": "",
+                "query": "replay engine",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -61,7 +65,7 @@
             }
           },
           {
-            "id": "5b201db2150c202f",
+            "id": "7743255b6c26cc63",
             "type": "leaf",
             "state": {
               "type": "bookmarks",
@@ -70,27 +74,28 @@
               "title": "Bookmarks"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "horizontal",
     "width": 300
   },
   "right": {
-    "id": "4d1d27abbeec61d3",
+    "id": "abad141395ed7f09",
     "type": "split",
     "children": [
       {
-        "id": "6c40359d3702922f",
+        "id": "0847aa28711138c6",
         "type": "tabs",
         "children": [
           {
-            "id": "c75c61dd23cf0588",
+            "id": "750641ed7e4677a6",
             "type": "leaf",
             "state": {
               "type": "backlink",
               "state": {
-                "file": "REQUIREMENTS/v2-builder-contract.md",
+                "file": "CHANGES/committed/builder-20260607-0006-tests-refactored-pipeline.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -100,25 +105,25 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for v2-builder-contract"
+              "title": "Backlinks for builder-20260607-0006-tests-refactored-pipeline"
             }
           },
           {
-            "id": "b37f89a158cbf661",
+            "id": "d65f826ab86f59cd",
             "type": "leaf",
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "REQUIREMENTS/v2-builder-contract.md",
+                "file": "CHANGES/committed/builder-20260607-0006-tests-refactored-pipeline.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from v2-builder-contract"
+              "title": "Outgoing links from builder-20260607-0006-tests-refactored-pipeline"
             }
           },
           {
-            "id": "b6ebca2aafb4fa5c",
+            "id": "1826e769f6b5d34c",
             "type": "leaf",
             "state": {
               "type": "tag",
@@ -133,7 +138,7 @@
             }
           },
           {
-            "id": "ff28a8af4411b029",
+            "id": "243e0a0f977722e3",
             "type": "leaf",
             "state": {
               "type": "all-properties",
@@ -147,18 +152,18 @@
             }
           },
           {
-            "id": "41966634faab2a96",
+            "id": "6e6a339afb4c3a54",
             "type": "leaf",
             "state": {
               "type": "outline",
               "state": {
-                "file": "REQUIREMENTS/v2-builder-contract.md",
+                "file": "CHANGES/committed/builder-20260607-0006-tests-refactored-pipeline.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of v2-builder-contract"
+              "title": "Outline of builder-20260607-0006-tests-refactored-pipeline"
             }
           }
         ]
@@ -179,29 +184,37 @@
       "bases:Create new base": false
     }
   },
-  "active": "26b426dd8839cc0a",
+  "active": "692bff87fcd16c8d",
   "lastOpenFiles": [
-    "AGENT_ARCHITECTURE_README.md",
-    "WORKREQUEST_SPEC.md",
-    "VALIDATOR_SPEC.md",
-    "REQUIREMENTS_CAPTURE_BOUNDARY.md",
-    "REPLAY_ENGINE.md",
-    "PIPELINE_INTENT_SPEC.md",
-    "PHASE2_EXECUTION_RUNTIME.md",
-    "PHASE1_SPECIFICATION_COMPILER.md",
-    "OBSERVATION_MODEL.md",
-    "LOWERING_PASS.md",
-    "EXECUTION_GRAPH_SCHEMA.md",
-    "EVENT_GRAMMAR.md",
-    "DISTRIBUTED_SCHEDULER.md",
-    "COMPILER_ARCHITECTURE.md",
-    "CER_SPEC.md",
-    "CER_SNAPSHOT_ENGINE.md",
-    "CER_CCNF.md",
-    "CCNF_FAILURE_MODES.md",
-    "AUTHORITY_GRAPH_IR.md",
-    "REQUIREMENTS/v2-builder-contract.md",
-    "PLANS/completed/0082-nebula-localstorage-to-postgres-migration.md",
-    "INSPECTIONS/REGISTRY.md"
+    "IMPLEMENTATION_PLANS/pending/test-qwen-pipeline-v0123.md",
+    "CROSS_REFERENCES.md",
+    "CHANGES/committed/builder-20260607-0006-tests-refactored-pipeline.md",
+    "ENGINEERING/terminology-audit.md",
+    "ENGINEERING/mildred-datamodel-critique.md",
+    "ENGINEERING/Understanding Nexus PEB Structure.md",
+    "ENGINEERING/DUALITY_UI_TODO.txt",
+    "ENGINEERING/DAEMON_README.md",
+    "ENGINEERING/conduit-code-assessment.md",
+    "ENGINEERING/MODEL_VERIFICATION.md",
+    "ENGINEERING/file-ingest-v2.md",
+    "ENGINEERING/PORT_CONFLICTS.md",
+    "ENGINEERING/pipeline-manager-acceptance-checklist.md",
+    "ENGINEERING/pipe-line-manager-acceptance-checklist.md",
+    "ENGINEERING/codex-session-refactors.md",
+    "ENGINEERING/codex-session-next-steps.md",
+    "ENGINEERING/codex-session-ingest-findings.md",
+    "ENGINEERING/WORK_TO_DATE.md",
+    "ENGINEERING/TYPESPEC_STATUS.md",
+    "ENGINEERING/TOPOLOGY.md",
+    "ENGINEERING/CONDUIT_STATUS.md",
+    "ANALYSIS/nexus_irl_taxonomy.md",
+    "ANALYSIS/nexus_interaction_taxonomy.md",
+    "SPECS/WORKREQUEST_SPEC.md",
+    "SPECS/VALIDATOR_SPEC.md",
+    "SPECS/REQUIREMENTS_CAPTURE_BOUNDARY.md",
+    "SPECS/REPLAY_ENGINE.md",
+    "SPECS",
+    "HISTORY",
+    "PLANS/candidate"
   ]
 }

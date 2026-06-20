@@ -1,0 +1,442 @@
+DUALITY UI TODO — Mock-to-Real Service Conversion Plan
+======================================================
+Date: 2026-05-17
+Scope: nexus-duality (LOSM backend) ↔ nexus-duality-ui (React/Angular frontend)
+
+----------------------------------------------------------------------
+1.  CURRENT STATE
+----------------------------------------------------------------------
+
+Backend (nexus-duality):
+  - Working: FastAPI app, /health, WorkRequest CRUD (create/get/list),
+            SQLite persistence, Alembic migration applied.
+  - Phase 1 bootstrap complete. Phases 2-15 (PlanIR, SpecIR, ExecutionIR,
+    ValidationIR, CritiqueIR, actors, services, runtime, DAG, LangGraph,
+    WebSocket, trace engine, branching, MCTS) are NOT implemented.
+  - Existing IR schemas (SpecIR, ExecutionIR, ValidationIR) are minimal
+    stubs that will need significant expansion per the implementation plan.
+
+Frontend (nexus-duality-ui):
+  - Directory exists but is EMPTY. No code, no mocks, no scaffolding.
+
+----------------------------------------------------------------------
+2.  LOSM TYPE REFERENCE — FULL SPEC
+----------------------------------------------------------------------
+
+Below are the complete type definitions as specified in the implementation
+plan and detailed-design-doc.txt. These are the TARGET types the UI must
+eventually consume. Mock services should mirror these shapes.
+
+2.1 WorkRequest
+    {
+      "id": int,                           // PK from DB
+      "intent": string,                    // natural language user intent
+      "context_data": dict | null,         // JSON metadata blob
+      "status": "pending" | "in_progress" | "completed" | "failed",
+      "created_at": string (ISO-8601),
+      // FUTURE: constraints, priority, wr_id (string UUID)
+    }
+
+2.2 PlanIR  (Phase 2 — NOT YET IMPLEMENTED)
+    {
+      "plan_id": string,
+      "wr_id": string,
+      "goal_interpretation": string,
+      "constraints": string[],
+      "assumptions": string[],
+      "unknowns": string[],
+      "decomposition_strategy": string,
+      "execution_steps": [
+        {
+          "step_id": string,
+          "description": string,
+          "risk": "low" | "medium" | "high",
+          "validation_strategy": string
+        }
+      ],
+      "template_id": string,               // Phase 7
+      "template_version": string,
+      "parent_artifact_ids": string[],     // Phase 13 lineage
+      "created_at": string (ISO-8601)
+    }
+
+2.3 CritiqueIR  (Phase 6 — NOT YET IMPLEMENTED)
+    {
+      "critique_id": string,
+      "plan_id": string,
+      "issues": [
+        {
+          "severity": "high" | "med" | "low",
+          "description": string,
+          "affected_step_id": string | null
+        }
+      ],
+      "missing_requirements": string[],
+      "risk_score": float (0-1),
+      "execution_feasibility": string,
+      "recommendation": "approve" | "revise" | "reject",
+      "parent_artifact_ids": string[],
+      "created_at": string (ISO-8601)
+    }
+
+2.4 SpecIR  (Phase 5 — CURRENT STUB EXISTS, NEEDS EXPANSION)
+    Current stub:
+      intent: str
+      steps: [{ command: str, description: str | null }]
+    Target:
+    {
+      "spec_id": string,
+      "plan_id": string,
+      "steps": [
+        {
+          "step_id": string,
+          "type": "LLM_CALL" | "TOOL" | "TRANSFORM",
+          "description": string,
+          "input_refs": string[],
+          "output_contract": dict,
+          "failure_policy": "retry" | "fallback" | "abort",
+          "execution_policy": string
+        }
+      ],
+      "template_id": string,
+      "template_version": string,
+      "parent_artifact_ids": string[],
+      "created_at": string (ISO-8601)
+    }
+    FUTURE Phase 9 upgrade (DAG SpecIR):
+      "nodes": [...], "edges": [...], "entry_point": string, "exit_points": [...]
+
+2.5 ExecutionIR  (Phase 3 — CURRENT STUB EXISTS, NEEDS EXPANSION)
+    Current stub:
+      spec: SpecIR, status: "pending"|"running"|"success"|"failure", logs: str|null
+    Target:
+    {
+      "execution_id": string,
+      "spec_id": string,
+      "status": "pending" | "running" | "success" | "failure" | "partial",
+      "step_results": [
+        {
+          "step_id": string,
+          "status": "pending" | "running" | "success" | "failure",
+          "output": any,
+          "logs": string[],
+          "duration_ms": number
+        }
+      ],
+      "trace": [
+        {
+          "event": "enter" | "exit" | "error" | "retry",
+          "step_id": string,
+          "timestamp": string (ISO-8601),
+          "message": string
+        }
+      ],
+      "failure_summary": string | null,
+      "metrics": {
+        "total_duration_ms": number,
+        "step_count": number,
+        "retry_count": number
+      },
+      "parent_artifact_ids": string[],
+      "created_at": string (ISO-8601)
+    }
+
+2.6 ValidationIR  (Phase 4 — CURRENT STUB EXISTS, NEEDS EXPANSION)
+    Current stub:
+      intent: str, status: "success"|"failure", logs: str|null
+    Target:
+    {
+      "validation_id": string,
+      "execution_id": string,
+      "status": "success" | "partial" | "failure",
+      "intent_alignment_score": float (0-1),
+      "spec_compliance_score": float (0-1),
+      "execution_correctness_score": float (0-1),
+      "issues": [
+        {
+          "severity": "high" | "med" | "low",
+          "description": string,
+          "step_id": string | null
+        }
+      ],
+      "deviations": string[],
+      "missing_outputs": string[],
+      "success_criteria_results": [{"criterion": string, "passed": bool}],
+      "final_assessment": string,
+      "recommendation": "complete" | "retry_execution" | "replan" | "abort",
+      "parent_artifact_ids": string[],
+      "created_at": string (ISO-8601)
+    }
+
+2.7 State Machine (Phase 8 — NOT YET IMPLEMENTED)
+    States:
+      NEW -> INTAKE -> PLAN_GENERATION -> PLAN_REVIEW -> PLAN_APPROVAL_GATE
+      -> SPEC_GENERATION -> EXECUTION -> VALIDATION -> COMPLETION
+      Side loops: PLAN_REVIEW -> PLAN_GENERATION (revision)
+                 EXECUTION -> PATCH -> EXECUTION
+                 VALIDATION -> EXECUTION or PLAN_GENERATION (on failure)
+      Global: any -> BLOCKED
+    Current backend status enum: pending, in_progress, completed, failed
+    Target transition events:
+    {
+      "event_id": string,
+      "wr_id": string,
+      "from_state": string,
+      "to_state": string,
+      "trigger": "auto" | "manual" | "force",
+      "reason": string | null,
+      "timestamp": string (ISO-8601)
+    }
+
+2.8 WebSocket Protocol (Phase 12 — NOT YET IMPLEMENTED)
+    Envelope: { type, session_id, wr_id, timestamp, payload }
+    Client commands:
+      INIT_WR, ADVANCE, RUN_CURRENT, FORCE_TRANSITION,
+      INJECT_FEEDBACK, REPLAY_FROM, APPLY_PATCH, PAUSE, RESUME,
+      TRACE_ARTIFACT, FORK_STATE, START_MCTS, EXPAND_NODE, GET_BEST_PATH
+    Server events:
+      STATE_CHANGED, ARTIFACT_CREATED, NODE_COMPLETE, EXECUTION_LOG,
+      LLM_STREAM, VALIDATION_RESULT, REPLAY_STARTED, ERROR
+
+----------------------------------------------------------------------
+3.  MOCK SERVICE INTERFACES — INITIAL DEFINITION
+----------------------------------------------------------------------
+
+Since nexus-duality-ui is empty, the first step is to define mock services
+that mirror the target types above so the UI can be developed in parallel
+with the backend. Below are the mock service interfaces the UI should
+implement initially, with gradual replacement as backend phases complete.
+
+3.1 MockService interface (TypeScript)
+    interface MockService {
+      // WorkRequest
+      createWorkRequest(intent: string, metadata?: dict): Promise<WorkRequest>;
+      getWorkRequest(id: number): Promise<WorkRequest>;
+      listWorkRequests(): Promise<WorkRequest[]>;
+
+      // Plan — mock: returns hardcoded PlanIR from intent
+      generatePlan(wrId: number): Promise<PlanIR>;
+      getPlan(planId: string): Promise<PlanIR>;
+
+      // Critique — mock: returns approval recommendation
+      critiquePlan(planId: string): Promise<CritiqueIR>;
+      getCritique(critiqueId: string): Promise<CritiqueIR>;
+
+      // Spec — mock: converts plan steps to spec steps
+      generateSpec(planId: string): Promise<SpecIR>;
+      getSpec(specId: string): Promise<SpecIR>;
+
+      // Execution — mock: simulates step execution with delays
+      execute(specId: string): Promise<ExecutionIR>;
+      getExecution(executionId: string): Promise<ExecutionIR>;
+      getExecutionTrace(executionId: string): Promise<TraceEvent[]>;
+
+      // Validation — mock: simple pass/fail based on execution status
+      validate(executionId: string): Promise<ValidationIR>;
+      getValidation(validationId: string): Promise<ValidationIR>;
+
+      // State
+      getCurrentState(wrId: number): Promise<string>;
+      getTransitionHistory(wrId: number): Promise<TransitionEvent[]>;
+    }
+
+3.2 Mock data seeding
+    Mocks should seed realistic-looking data for each type so the UI can
+    be developed without any backend dependencies. Each mock function must:
+      - Accept the same parameters as the real API
+      - Return the same type shape as the real API
+      - Include realistic dummy data (not empty objects)
+      - Simulate realistic latency (200-800ms random delay)
+      - Simulate occasional failures (10% chance of rejection)
+
+----------------------------------------------------------------------
+4.  DATA TYPE DIFFERENCES — CURRENT BACKEND vs. MOCK/UI NEEDS
+----------------------------------------------------------------------
+
+| Area                | Backend Now                           | UI Needs (Full Spec)          | Gap |
+|---------------------|---------------------------------------|-------------------------------|-----|
+| WorkRequest.id      | int (auto-increment)                  | int or string                 | OK  |
+| WorkRequest.status  | pending/in_progress/completed/failed  | NEW/ACTIVE/BLOCKED/COMPLETE   | MISMATCH — backend uses 4 states, spec defines 10+ |
+| WorkRequest fields  | id, intent, status, created_at,       | +constraints, priority,       | MISSING — constraints, priority, context |
+|                     | context_data                          | context, wr_id (UUID)         |        |
+| PlanIR              | DOES NOT EXIST                        | goal_interpretation, steps,   | MISSING — entire type |
+|                     |                                       | assumptions, unknowns, risks  |        |
+| CritiqueIR          | DOES NOT EXIST                        | issues, risk_score,           | MISSING — entire type |
+|                     |                                       | recommendation                |        |
+| SpecIR              | Stub: intent + [{command, desc}]      | step_id, type, input_refs,    | MAJOR — needs full redesign |
+|                     |                                       | output_contract, policies     |        |
+| ExecutionIR         | Stub: spec + status + logs            | step_results, trace, metrics, | MAJOR — needs full redesign |
+|                     |                                       | failure_summary               |        |
+| ValidationIR        | Stub: intent + status + logs          | scores, issues, deviations,   | MAJOR — needs full redesign |
+|                     |                                       | recommendation                |        |
+| State Machine       | Simple enum on WorkRequest            | 10+ states, transition        | MISSING — entire system |
+|                     |                                       | matrix, event log, retries    |        |
+| REST Endpoints      | GET/POST /work-requests, /health      | /plan, /critique, /spec,     | MISSING — 10+ endpoints |
+|                     |                                       | /execute, /validate, /trace   |        |
+| WebSocket           | DOES NOT EXIST                        | Full command/event protocol   | MISSING — entire protocol |
+| Auth                | NONE                                  | Session-based (future)        | DEFERRED |
+
+----------------------------------------------------------------------
+5.  CONVERSION PLAN — From Mocks to Real Service Integration
+----------------------------------------------------------------------
+
+The plan follows the same phased approach as the backend implementation
+plan. Each phase builds on the previous one.
+
+Phase 0 — UI Scaffold (IMMEDIATE)
+  GOAL: Create a minimal Angular/React app that can display the duality
+        interface with mock data.
+  - [ ] Initialize project in /home/codex/dev/nexus-duality-ui/
+  - [ ] Define TypeScript interfaces for ALL LOSM types (see §2)
+  - [ ] Implement MockService with realistic seeded data
+  - [ ] Build work request list/create view
+  - [ ] Build artifact inspector (expandable JSON tree for any IR type)
+  - [ ] Build state timeline bar (clickable state sequence)
+  DELIVERABLE: Running UI with mock data, no backend dependency.
+
+Phase 1 — Bootstrap Sync (matches backend Phase 1)
+  BACKEND: Phase 1 complete (currently works after fixes)
+  UI ACTION:
+  - [ ] Connect WorkRequestService to real backend API
+  - [ ] Replace mock createWorkRequest/getWorkRequest/listWorkRequests
+        with HTTP calls
+  - [ ] Add error handling for network failures
+  - [ ] Add loading states
+  VERIFICATION: UI creates and lists real work requests from SQLite.
+
+Phase 2 — PlanIR Integration (matches backend Phase 2)
+  BACKEND: Implement PlanIR model, PlannerActor, PlanningService
+  UI ACTION:
+  - [ ] Add plan view component (collapsible tree for goal_decomposition,
+        execution_steps, assumptions, unknowns)
+  - [ ] Add "Generate Plan" button on work request detail
+  - [ ] Replace mock generatePlan() with real API call
+  - [ ] Show plan step risk indicators (low/med/high)
+  VERIFICATION: UI displays real PlanIR from backend.
+
+Phase 3 — ExecutionIR Integration (matches backend Phase 3)
+  BACKEND: Expand ExecutionIR, add LinearExecutor, ExecutionService
+  UI ACTION:
+  - [ ] Add execution view component (step-by-step results, trace log)
+  - [ ] Add "Execute" button
+  - [ ] Add execution status badges
+  - [ ] Replace mock execute() with real API call
+  VERIFICATION: UI shows real execution trace from backend.
+
+Phase 4 — ValidationIR Integration (matches backend Phase 4)
+  BACKEND: Expand ValidationIR, add ValidatorActor, ValidationService
+  UI ACTION:
+  - [ ] Add validation panel (scores, issues, deviations, recommendation)
+  - [ ] Add "Validate" button
+  - [ ] Show recommendation as actionable button (e.g., "Retry", "Complete")
+  - [ ] Replace mock validate() with real API call
+  VERIFICATION: Complete lifecycle works end-to-end in UI.
+
+Phase 5 — SpecIR + Critique Integration (matches backend Phases 5-6)
+  BACKEND: Add SpecIR compiler, CritiqueIR, CriticActor
+  UI ACTION:
+  - [ ] Add spec view (graph/step list with type badges)
+  - [ ] Add critique overlay (heatmap on plan steps)
+  - [ ] Add approval controls (Approve / Revise buttons)
+  - [ ] Replace mock critiquePlan() and generateSpec()
+  VERIFICATION: Approval gate flow works in UI.
+
+Phase 6 — State Machine UI (matches backend Phase 8)
+  BACKEND: Add TransitionService, decision/event log
+  UI ACTION:
+  - [ ] Upgrade state timeline to reflect real state machine
+  - [ ] Show valid vs. invalid transitions (gray out impossible moves)
+  - [ ] Add transition event log viewer
+  - [ ] Show retry count and block state
+  VERIFICATION: State timeline accurately reflects persisted transitions.
+
+Phase 7 — WebSocket Control Protocol (matches backend Phase 12)
+  BACKEND: Add WebSocket endpoint
+  UI ACTION:
+  - [ ] Replace all REST polling with WebSocket subscription
+  - [ ] Add live LLM token streaming in execution view
+  - [ ] Add force transition button (break-glass)
+  - [ ] Add replay from state controls
+  - [ ] Add inject feedback textarea
+  VERIFICATION: UI drives backend state machine via WebSocket.
+
+Phase 8 — Trace & Diff (matches backend Phase 13)
+  BACKEND: Add lineage, diff, trace engine
+  UI ACTION:
+  - [ ] Add artifact lineage graph view (React Flow / D3)
+  - [ ] Add diff viewer (structural + semantic)
+  - [ ] Add "Explain This Output" button per artifact
+  VERIFICATION: UI shows causal trace from any artifact back to intent.
+
+Phase 9 — Branch Explorer (matches backend Phase 14)
+  BACKEND: Add branch manager
+  UI ACTION:
+  - [ ] Add branch tree visualization
+  - [ ] Add fork controls
+  - [ ] Add branch comparison view
+  VERIFICATION: UI can fork, execute, and compare branches.
+
+Phase 10 — MCTS Visualization (matches backend Phase 15)
+  BACKEND: Add MCTS controller
+  UI ACTION:
+  - [ ] Add MCTS tree view
+  - [ ] Show visit counts, values, best path
+  VERIFICATION: UI visualizes MCTS exploration.
+
+----------------------------------------------------------------------
+6.  TYPE ALIGNMENT CHECKLIST — Per Phase
+----------------------------------------------------------------------
+
+Use this checklist when implementing each phase to verify type alignment
+between mock → real backend:
+
+[ ] TypeScript interfaces match backend Pydantic models field-for-field
+[ ] Nullable/optional fields are consistent (null vs undefined vs omitted)
+[ ] Enum values match exactly (string values, not positions)
+[ ] Date format is ISO-8601 (not timestamps, not locale strings)
+[ ] IDs are strings (UUIDs) once backend moves beyond int PKs
+[ ] Error shapes match: { detail: string } for REST, { type: "error", ... } for WS
+[ ] Pagination params/meta match (skip/limit or cursor-based)
+[ ] HTTP status codes match FastAPI conventions (201 for create, etc.)
+
+----------------------------------------------------------------------
+7.  MOCK-TO-REAL SERVICE REPLACEMENT ORDER
+----------------------------------------------------------------------
+
+Each backend phase should be preceded by mock services in the UI. When
+the backend phase completes, replace the mock with an HTTP/WebSocket
+adapter. Adapter interface pattern:
+
+    interface WorkRequestService {
+      create(intent: string, metadata?: dict): Promise<WorkRequest>;
+      get(id: number): Promise<WorkRequest>;
+      list(): Promise<WorkRequest[]>;
+    }
+
+    // Mock implementation (Phase 0)
+    class MockWorkRequestService implements WorkRequestService { ... }
+
+    // Real implementation (Phase 1+)
+    class ApiWorkRequestService implements WorkRequestService { ... }
+
+    // Inject via dependency injection or service locator:
+    const service: WorkRequestService =
+      useMock ? new MockWorkRequestService() : new ApiWorkRequestService();
+
+This pattern allows both implementations to coexist during transition,
+enabling frontend development independent of backend progress.
+
+----------------------------------------------------------------------
+8.  CURRENT IMMEDIATE NEXT STEPS
+----------------------------------------------------------------------
+
+1. Choose UI framework: React (as spec'd in implementation plan Ph.11)
+   or Angular (matching other nexus projects)
+2. Scaffold project in /home/codex/dev/nexus-duality-ui/
+3. Define all TypeScript type interfaces (copy from §2 above)
+4. Implement MockWorkRequestService with seeded data
+5. Build WorkRequest list + create + detail views
+6. Build generic artifact inspector (renders any IR type as JSON tree)
+7. Build state timeline bar component (clickable states)
+8. Verify backend /health and /work-requests/ endpoints work from UI
+9. Begin Phase 1 integration: replace WorkRequest mocks with API calls

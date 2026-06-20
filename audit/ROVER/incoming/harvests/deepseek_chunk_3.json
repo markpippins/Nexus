@@ -1,0 +1,112 @@
+{
+  "agenda_items": [
+    {
+      "title": "IntentGraph Versioning and Safe Mutation — Merge, Split, and Evolve Without Breaking Replayability",
+      "status": "Proposed",
+      "intent_description": "Define how IntentGraphs evolve safely over time. Graphs must support merging (combining two related intent structures), splitting (extracting a subgraph into a standalone reusable component), and mutation (replacing nodes/edges with improved versions). All mutations must preserve replayability — any previously executed version must remain replayable against its original execution traces. This turns the system into a versioned cognition system rather than just a structured planner.",
+      "requirements": [
+        "IntentGraph versions must be immutable once executed — mutations create new versions",
+        "Merge must produce a new IntentGraph with combined nodes/edges and a new version number",
+        "Split must extract a subgraph into a standalone IntentGraph while preserving the original",
+        "Previously executed versions must remain replayable indefinitely",
+        "CIR consistency must be maintained across versions — version N+1's CIR must be comparable to version N's",
+        "Version lineage must be tracked (which graph was derived from which)"
+      ],
+      "implementation_notes": [
+        "This is where IntentGraph becomes a versioned cognition system",
+        "Immutable executed versions enable A/B testing of intent strategies",
+        "Split enables extraction of proven subgraphs as reusable planning templates",
+        "Merge enables composition of smaller proven graphs into larger strategies"
+      ],
+      "code_snippets": [
+        {
+          "language": "typescript",
+          "purpose": "IntentGraph versioning and lineage tracking types",
+          "raw_code": "IntentGraphVersion {\n  graph_id: string\n  version: number\n  parent_version?: number\n  derived_from?: string[]  // graph IDs that were merged\n  extracted_from?: { graph_id: string, version: number }  // if split\n  mutation_type: \"create\" | \"merge\" | \"split\" | \"mutate\"\n  created_at: timestamp\n  status: \"DRAFT\" | \"EXECUTED\" | \"REPLAYABLE\" | \"INVALIDATED\" | \"SUPERSEDED\"\n}\n\n// Safe mutation operations:\n// merge(graphA, graphB) → new IntentGraph with combined DAG\n// split(graph, subgraphRootId) → extracted IntentGraph + pruned original\n// mutate(graph, nodeReplacements[], edgeReplacements[]) → new version"
+        }
+      ],
+      "open_questions": [
+        "How are merge conflicts resolved when two graphs have contradictory 'constrains' edges?",
+        "What makes a subgraph 'extractable' — must it be a connected component?",
+        "How many versions are retained before archival/compression?"
+      ]
+    },
+    {
+      "title": "IntentGraph as Universal Anchor — All System Concepts Attach to Graph Elements",
+      "status": "Agreed",
+      "intent_description": "Establish IntentGraph as the universal anchoring point for all system concepts. ContextClusters anchor to IntentGraph regions, Tactics are nodes in the graph, Acceptance Criteria are graph-level constraints, CIR attaches to node/edge deviations, Eval scores entire graph executions, and ConflictEvents represent inconsistent graph interpretations. This is the 'missing anchor' that makes the entire architecture coherent — everything ties back to a versioned, inspectable, replayable graph structure.",
+      "requirements": [
+        "Every ContextCluster must reference the IntentGraph region(s) it was derived from",
+        "Every Tactic must be instantiated as a node within a specific IntentGraph",
+        "Acceptance Criteria must be defined at the graph level and inherited by all nodes",
+        "CIR attributions must link to specific nodes and edges",
+        "Eval scores must reference the IntentGraph version they evaluated",
+        "ConflictEvents must identify the inconsistent graph interpretation(s)"
+      ],
+      "implementation_notes": [
+        "This is the conceptual keystone — without it, the system has fragments that can't be compared or replayed",
+        "The anchoring table:\n          ContextCluster → IntentGraph regions\n          Tactics → Nodes in graph\n          Acceptance Criteria → graph-level constraints\n          CIR → node/edge deviations\n          Eval → graph execution scoring\n          ConflictEvents → inconsistent graph interpretations",
+        "Once anchored, cross-cutting analysis becomes possible: 'show me all CIR failures for this tactic across all IntentGraphs'"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "How are ContextCluster-to-graph-region mappings maintained as graphs evolve?",
+        "What happens to Eval scores when an IntentGraph is superseded — are they archived or carried forward?"
+      ]
+    },
+    {
+      "title": "Three-Space System Final Form — Intent, Execution, and Learning as a Mapping System",
+      "status": "Agreed",
+      "intent_description": "The final architectural model: a three-space system where Intent Space (IntentGraph) defines what we mean to do, Execution Space (LOSM) records what actually happens, and Learning Space (CIR/Eval/Voyager) measures how we map intent to execution over time. Learning is geometric correction of intent-to-reality mapping per region of decision space. The system does not work with 'outcomes' as a single thing — it works with a mapping system between two structured spaces with CIR as the metric over that mapping.",
+      "requirements": [
+        "Intent Space must maintain structured, versioned IntentGraphs with full node/edge semantics",
+        "Execution Space must produce immutable, timestamped traces of all state transitions",
+        "Learning Space must continuously compute the divergence between intent projections and execution traces",
+        "The mapping must be cluster-conditioned — different ContextClusters may have different mapping accuracy",
+        "All three spaces must be independently queryable and cross-referenceable"
+      ],
+      "implementation_notes": [
+        "The system is fundamentally: improving the mapping, not the outcomes themselves",
+        "ContextSignatures define structure in intent space",
+        "CIR defines error between spaces",
+        "Clusters define locality of validity",
+        "This is the final synthesis of all prior architectural discussions"
+      ],
+      "code_snippets": [
+        {
+          "language": "text",
+          "purpose": "Final three-space mapping architecture",
+          "raw_code": "Intent Space (IntentGraph)\n  → what we *mean to do*\n  \nExecution Space (LOSM)\n  → what *actually happens*\n  \nLearning Space (CIR/Eval/Voyager)\n  → how we *map intent to execution over time*\n\nThe system operates over multiple representations of\nstate evolution, each with different resolution and time horizon.\n\nLearning = geometric correction of intent-to-reality mapping\nper region of decision space."
+        }
+      ],
+      "open_questions": [
+        "How does the Learning Space handle systemic drift — when the entire intent-to-reality mapping degrades across all clusters?",
+        "What triggers a full re-evaluation of all IntentGraphs vs incremental CIR updates?"
+      ]
+    },
+    {
+      "title": "Intent as First-Class Geometric Object — Predictive Geometry Over Future State Space",
+      "status": "Agreed",
+      "intent_description": "Elevate intent from a transient planning artifact to a first-class geometric object with structure, comparability, and measurability. Intent has structure (clusters, tactics, constraints), can be compared across time (version diff), and can be measured against reality (CIR). This makes intent a predictive geometry over future state space — it defines the expected shape of the system after applying a tactic, which can then be compared against the actual shape that resulted.",
+      "requirements": [
+        "Intent structures must be serializable and versionable in losm-store",
+        "Intent comparison must support structural diff (which nodes/edges changed) and semantic diff (did the meaning change?)",
+        "Intent measurement must produce quantitative CIR scores per node, edge, and graph",
+        "Intent must survive execution — it persists as a versioned artifact, not a transient decision",
+        "The predictive geometry must be cluster-conditioned: predictions are only valid within their ContextCluster"
+      ],
+      "implementation_notes": [
+        "This is the core insight: intent is a predictive geometry over future state space",
+        "It has structure (clusters, tactics, constraints)",
+        "It can be compared across time (version-to-version diff)",
+        "It can be measured against reality (CIR)",
+        "This enables the next level: intent manifolds encoded inside losm-store so they can be versioned, compared, and evolved just like execution history"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the mathematical representation of the predictive geometry — vector embeddings, graph embeddings, or something else?",
+        "How is 'distance' between intent manifold and outcome trace computed in practice?"
+      ]
+    }
+  ]
+}
