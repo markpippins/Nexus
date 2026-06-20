@@ -9,6 +9,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.nexus.peb.domain.enums.DecisionStatus;
 import org.nexus.peb.domain.enums.EntropyClass;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.JoinColumn;
@@ -18,7 +20,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "peb_decisions")
+@Table(schema = "peb", name = "decisions")
 public class PebDecision {
 
     @Id
@@ -38,21 +40,22 @@ public class PebDecision {
     @Column(nullable = false, length = 32)
     private DecisionStatus status;         // DRAFT, ACCEPTED, SUPERSEDED, REJECTED
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private JsonNode summary;              // Structured rationale
 
     @Column(columnDefinition = "text[]")
-    private List<String> affectedKeys;     // Which peb_state keys changed
+    private List<String> affectedKeys;     // Which peb.state keys changed
 
     @Enumerated(EnumType.STRING)
     @Column(length = 32)
     private EntropyClass entropyClass;     // COLLAPSER, SHAPER, NEUTRAL
 
     @Column(length = 64)
-    private String beforeHash;             // peb_state_hash at transaction start
+    private String beforeHash;             // peb.state hash at transaction start
 
     @Column(length = 64)
-    private String afterHash;              // peb_state_hash after commit
+    private String afterHash;              // peb.state hash after commit
 
     @Column(nullable = false, length = 128)
     private String authorId;
@@ -63,7 +66,7 @@ public class PebDecision {
     @Column(name = "rollback_of")
     private UUID rollbackOf;               // If this rolls back a prior decision
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "timestamp with time zone")
     private Instant createdAt;
 
     // Getters and Setters omitted for brevity

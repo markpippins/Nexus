@@ -5,12 +5,14 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "peb_traces")
+@Table(schema = "peb", name = "traces")
 public class PebTrace {
 
     @Id
@@ -28,12 +30,15 @@ public class PebTrace {
     @Column(nullable = false, length = 64)
     private String stage;                  // Cognitive role or skill
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private JsonNode inputs;               // State summary at entry
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private JsonNode causalEntries;        // Why transformation occurred
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private JsonNode rejectedAlternatives; // Branch points considered
 

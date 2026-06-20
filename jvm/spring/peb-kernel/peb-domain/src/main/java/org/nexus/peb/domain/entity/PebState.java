@@ -6,12 +6,14 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "peb_state")
+@Table(schema = "peb", name = "state")
 public class PebState {
 
     @Id
@@ -20,9 +22,11 @@ public class PebState {
     @Column(unique = true, nullable = false, length = 64)
     private String key;                    // "invariants", "architecture", "trajectory", "intent"
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb", nullable = false)
     private JsonNode content;              // Structured state
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private JsonNode metadata;             // { "version", "author", "updatedAt" }
 
@@ -32,10 +36,10 @@ public class PebState {
     @Version
     private Long version;                  // Optimistic lock — monotonic counter
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "timestamp with time zone")
     private Instant createdAt;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "timestamp with time zone")
     private Instant updatedAt;
 
     // Getters and Setters

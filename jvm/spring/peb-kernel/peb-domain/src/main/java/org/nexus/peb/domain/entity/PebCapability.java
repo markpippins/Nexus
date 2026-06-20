@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "peb_capabilities")
+@Table(schema = "peb", name = "capabilities")
 public class PebCapability {
 
     @Id

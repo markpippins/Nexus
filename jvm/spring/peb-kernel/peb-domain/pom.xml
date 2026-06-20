@@ -29,5 +29,30 @@
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
         </dependency>
+
+        <!--
+            Hibernate ORM core at provided scope: required so @JdbcTypeCode(SqlTypes.JSON)
+            resolves at compile time against the JsonNode fields. At runtime, hibernate-core
+            is pulled in by spring-boot-starter-data-jpa in downstream modules
+            (peb-store, peb-bootstrap); provided scope prevents transitive reinjection here.
+        -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            Test scope: brings in JUnit Jupiter, AssertJ, MockK, Mockito, etc. so
+            pure-Java enum parser unit tests (e.g. ViolationBridgeShapeTest) can
+            run under `mvn -pl pebble-domain test` without dragging in Spring
+            Boot's full integration-test stack. Version is managed by the
+            Spring Boot starter parent.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

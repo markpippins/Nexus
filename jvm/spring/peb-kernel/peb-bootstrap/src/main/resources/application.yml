@@ -2,6 +2,17 @@ spring:
   application:
     name: peb-kernel
 
+  # Jackson visibility: domain entities use private fields with no setters
+  # (see comment "Getters and Setters omitted for brevity" on PebTransaction).
+  # Default Jackson visibility is PUBLIC_ONLY which would skip these fields;
+  # we widen to ANY so request bodies deserialize into private fields directly.
+  jackson:
+    visibility:
+      field: any
+      setter: any
+      getter: any
+      creator: any
+
   datasource:
     url: jdbc:postgresql://localhost:5432/peb
     username: ${DB_USER:peb_user}
