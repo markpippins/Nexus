@@ -1,3 +1,19 @@
 [submodule "go/wrp/ccnf-ref"]
 	path = go/wrp/ccnf-ref
 	url = https://github.com/markpippins/nexus-go-ccnf-ref.git
+
+[submodule "angular/duality-ui"]
+	path = angular/duality-ui
+	url = http://www.github.com/markpippins/nexus-duality-ui.git
+
+[submodule "angular/nebula-ui"]
+	path = angular/nebula-ui
+	url = https://www.github.com/markpippins/nexus-rms.git
+
+[submodule "angular/plurality-ui"]
+	path = angular/plurality-ui
+	url = https://www.github.com/markpippins/nexus-plurality.git
+
+[submodule "angular/prompt-architect"]
+	path = angular/prompt-architect
+	url = https://www.github.com/markpippins/prompt-architect.git
