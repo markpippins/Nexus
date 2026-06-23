@@ -1,4 +1,3 @@
-import fs from "fs";
 import path from "path";
 import {
   PipelineState,
@@ -10,7 +9,6 @@ import {
   AgentState,
   PipelineMetrics,
 } from "./types";
-import { parsePlanFile } from "./parser";
 import { PlanWatcher } from "./watchers/plan-watcher";
 import { BuilderWatcher } from "./watchers/builder-watcher";
 import { CircuitBreakerWatcher } from "./watchers/cb-watcher";
@@ -27,6 +25,7 @@ import {
   upsertPlan,
   qOne,
   qAll,
+  qRun,
 } from "./db";
 import { breakerRowToStatus } from "./watchers/cb-watcher";
 
@@ -278,12 +277,17 @@ export class PipelineWatcher {
     }, 10000);
   }
 
-  computeAnalytics(): PipelineMetrics {
-    return this.analytics.compute(
-      this.planWatcher.plans,
-      [],
-      this.baseDir,
+  async computeAnalytics(): Promise<PipelineMetrics> {
+    const receiptStats = await getReceiptCount();
+    const implCount = receiptStats.find((r) => r.type === "IMPLEMENTATION")?.count ?? 0;
+    const killedRow = await qOne(
+      "SELECT COUNT(*) as count FROM tickets WHERE status IN ('failed', 'abandoned')",
     );
+    const killedCount = killedRow?.count ?? 0;
+    return this.analytics.compute(this.planWatcher.plans, {
+      totalBuildersLaunched: implCount,
+      totalBuildersKilled: killedCount,
+    });
   }
 
   async createPlan(meta: {
@@ -295,8 +299,6 @@ export class PipelineWatcher {
     dependencies: string[];
     promptRef?: string;
   }): Promise<{ planNumber: string; fileName: string; filePath: string }> {
-    // Allocate plan number from the database (authoritative) to prevent
-    // collisions across restarts and watcher-array gaps.
     const row = await qOne("SELECT MAX(CAST(id AS INTEGER)) as max_id FROM plans");
     const maxId = row?.max_id ?? 0;
     const nextNum = String(maxId + 1).padStart(4, "0");
@@ -307,57 +309,7 @@ export class PipelineWatcher {
       .replace(/\s+/g, "-")
       .slice(0, 50);
     const fileName = `${slug}-v${nextNum}.md`;
-    const pendingDir = path.join(
-      this.graphDir,
-      "IMPLEMENTATION_PLANS",
-      "pending",
-    );
-    const filePath = path.join(pendingDir, fileName);
-    const lines: string[] = [];
-    lines.push(
-      `# ${meta.title}`,
-      "",
-      `**Project:** ${meta.project || "conduit-ui"}`,
-      `**Plan Number:** ${nextNum}`,
-      `**Status:** pending`,
-    );
-    if (meta.promptRef) lines.push(`**Prompt:** ${meta.promptRef}`);
-    lines.push(
-      "",
-      "## Goal",
-      "",
-      meta.goal || "TBD",
-      "",
-      "## Files Affected",
-      "",
-    );
-    if (meta.filesAffected.length > 0) {
-      for (const f of meta.filesAffected) lines.push(`- ${f}`);
-    } else {
-      lines.push("- none");
-    }
-    lines.push("", "## Acceptance Criteria", "");
-    if (meta.acceptanceCriteria.length > 0) {
-      meta.acceptanceCriteria.forEach((c, i) =>
-        lines.push(`### ${i + 1}. ${c}`),
-      );
-    } else {
-      lines.push("- [ ] TBD");
-    }
-    lines.push("", "## Dependencies", "");
-    if (meta.dependencies.length > 0) {
-      for (const d of meta.dependencies) lines.push(`- ${d}`);
-    } else {
-      lines.push("- none");
-    }
-    lines.push("");
-    // Only write plan file if IMPLEMENTATION_PLANS exists (filesystem mirror).
-    // When missing, conduit-manager is DB-primary — no filesystem side-effect.
-    if (fs.existsSync(path.join(this.graphDir, "IMPLEMENTATION_PLANS"))) {
-      if (!fs.existsSync(pendingDir))
-        fs.mkdirSync(pendingDir, { recursive: true });
-      fs.writeFileSync(filePath, lines.join("\n"), "utf-8");
-    }
+    const filePath = "";
     return { planNumber: nextNum, fileName, filePath };
   }
 
@@ -371,7 +323,7 @@ export class PipelineWatcher {
       acceptanceCriteria?: string[];
       dependencies?: string[];
     },
-  ): Promise<{ found: boolean; filePath?: string }> {        // DB-primary: update the database FIRST, then mirror to filesystem
+  ): Promise<{ found: boolean; filePath?: string }> {
     const now = new Date().toISOString();
     const dbPlan = await getPlanById(planNumber);
     if (dbPlan) {
@@ -401,92 +353,6 @@ export class PipelineWatcher {
         updated_at: now,
       });
     }
-
-    const dirs: Array<
-      "pending" | "active" | "completed" | "blocked" | "proposed" | "planning"
-    > = ["pending", "active", "completed", "blocked", "proposed", "planning"];
-    const planDir = path.join(this.graphDir, "IMPLEMENTATION_PLANS");
-    for (const dir of dirs) {
-      const dirPath = path.join(planDir, dir);
-      if (!fs.existsSync(dirPath)) continue;
-      for (const file of fs.readdirSync(dirPath)) {
-        if (!file.endsWith(".md") || file === ".gitkeep") continue;
-        const filePath2 = path.join(dirPath, file);
-        const parsed = parsePlanFile(filePath2);
-        if (!parsed || parsed.planNumber !== planNumber) continue;
-        let content = fs.readFileSync(filePath2, "utf-8");
-        if (updates.title !== undefined)
-          content = content.replace(/^# .+$/m, `# ${updates.title}`);
-        if (updates.project !== undefined)
-          content = content.replace(
-            /\*\*Project:\*\* .+/m,
-            `**Project:** ${updates.project}`,
-          );
-        if (updates.goal !== undefined)
-          content = content.replace(
-            /## Goal\s*\n([\s\S]*?)(?=\n## |$)/,
-            `## Goal\n\n${updates.goal}`,
-          );
-        if (updates.filesAffected !== undefined) {
-          const fb =
-            updates.filesAffected.length > 0
-              ? updates.filesAffected.map((f) => `- ${f}`).join("\n")
-              : "- none";
-          content = content.replace(
-            /## Files Affected\s*\n([\s\S]*?)(?=\n## |$)/,
-            `## Files Affected\n\n${fb}`,
-          );
-        }
-        if (updates.acceptanceCriteria !== undefined) {
-          const cb =
-            updates.acceptanceCriteria.length > 0
-              ? updates.acceptanceCriteria
-                  .map((c, i) => `### ${i + 1}. ${c}`)
-                  .join("\n")
-              : "- [ ] TBD";
-          content = content.replace(
-            /## Acceptance Criteria\s*\n([\s\S]*?)(?=\n## |$)/,
-            `## Acceptance Criteria\n\n${cb}`,
-          );
-        }
-        if (updates.dependencies !== undefined) {
-          const db =
-            updates.dependencies.length > 0
-              ? updates.dependencies.map((d) => `- ${d}`).join("\n")
-              : "- none";
-          content = content.replace(
-            /## Dependencies\s*\n([\s\S]*?)(?=\n## |$)/,
-            `## Dependencies\n\n${db}`,
-          );
-        }
-        fs.writeFileSync(filePath2, content, "utf-8");
-        const reparsed = parsePlanFile(filePath2);
-        if (reparsed) {
-          const idx = this.planWatcher.plans[dir].findIndex(
-            (p: PlanCard) => p.planNumber === planNumber,
-          );
-          if (idx !== -1) {
-            const stats = fs.statSync(filePath2);
-            this.planWatcher.plans[dir][idx] = {
-              ...this.planWatcher.plans[dir][idx],
-              title: reparsed.title,
-              project: reparsed.project,
-              goal: reparsed.goal,
-              filesAffected: reparsed.filesAffected,
-              acceptanceCriteria: reparsed.acceptanceCriteria,
-              dependencies: reparsed.dependencies,
-            };
-            this.emit({
-              type: "plan_created",
-              data: { plan: this.planWatcher.plans[dir][idx], status: dir },
-            });
-          }
-        }
-        return { found: true, filePath: filePath2 };
-      }
-    }
-
-    // No filesystem match — DB already updated above, confirm the plan exists
     return { found: dbPlan !== undefined };
   }
 

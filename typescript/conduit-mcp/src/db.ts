@@ -1,11 +1,12 @@
+import crypto from "crypto";
 import { Pool, PoolClient } from "pg";
-import path from "path";
-import fs from "fs";
 
 // ── Connection ──────────────────────────────────────────────────────
 
 const PG_SCHEMA = process.env.CONDUIT_PG_SCHEMA || "conduit";
-const VECTOR_SCHEMA = "vector";
+const TACKLE_SCHEMA = "tackle";
+const VISION_SCHEMA = "vision";
+const PEB_SCHEMA = "peb";
 
 let pool: Pool;
 
@@ -17,7 +18,7 @@ export async function initDb(_conduitDataDir?: string): Promise<Pool> {
   pool = new Pool({
     connectionString: dsn,
     // Default search_path for all connections from this pool
-    options: `-c search_path=${PG_SCHEMA},${VECTOR_SCHEMA}`,
+    options: `-c search_path=${PG_SCHEMA},${VISION_SCHEMA},${PEB_SCHEMA},${TACKLE_SCHEMA}`,
     max: 10,
     idleTimeoutMillis: 30000,
   });
@@ -25,7 +26,7 @@ export async function initDb(_conduitDataDir?: string): Promise<Pool> {
   // Acquire a dedicated client so all DDL runs with the same search_path
   const client = await pool.connect();
   try {
-    await client.query(`SET search_path TO ${PG_SCHEMA},${VECTOR_SCHEMA}`);
+    await client.query(`SET search_path TO ${PG_SCHEMA},${VISION_SCHEMA},${PEB_SCHEMA},${TACKLE_SCHEMA}`);
     const exec = (sql: string, params?: any[]) => client.query(sql, params);
     await createSchema(exec);
     await runMigrations(exec);
@@ -213,7 +214,7 @@ async function withTransaction<T>(
   cb: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await pool.connect();
-  await client.query(`SET search_path TO ${PG_SCHEMA},${VECTOR_SCHEMA}`);
+  await client.query(`SET search_path TO ${PG_SCHEMA},${TACKLE_SCHEMA}`);
   try {
     await client.query("BEGIN");
     const result = await cb(client);
@@ -233,9 +234,11 @@ async function withTransaction<T>(
 async function createSchema(
   exec: (sql: string, params?: any[]) => Promise<any> = (sql, params) => pool.query(sql, params)
 ): Promise<void> {
-  // Ensure both schemas exist before creating any tables
+  // Ensure all schemas exist before creating any tables
   await exec(`CREATE SCHEMA IF NOT EXISTS ${PG_SCHEMA}`);
-  await exec(`CREATE SCHEMA IF NOT EXISTS ${VECTOR_SCHEMA}`);
+  await exec(`CREATE SCHEMA IF NOT EXISTS ${VISION_SCHEMA}`);
+  await exec(`CREATE SCHEMA IF NOT EXISTS ${PEB_SCHEMA}`);
+  await exec(`CREATE SCHEMA IF NOT EXISTS ${TACKLE_SCHEMA}`);
 
   await exec(`
     CREATE TABLE IF NOT EXISTS plans (
@@ -267,15 +270,15 @@ async function createSchema(
 
   // role_models.provider_id / harness_id intentionally NOT in migrations.
   // These columns are already in the CREATE TABLE IF NOT EXISTS
-  // vector.role_models DDL below. Adding ALTER TABLE entries here would
+  // tackle.role_models DDL below. Adding ALTER TABLE entries here would
   // run before the CREATE TABLE executes, causing "relation does not exist"
   // errors on fresh databases. The DDL is the source of truth for these columns.
 
   await exec(`
-    -- tickets must be created before receipts because receipts.ticket_id REFERENCES tickets(id)
-    CREATE TABLE IF NOT EXISTS tickets (
+    -- tickets live in vision schema (FK references stay in conduit for plans)
+    CREATE TABLE IF NOT EXISTS ${VISION_SCHEMA}.tickets (
       id                  TEXT PRIMARY KEY,
-      plan_id             TEXT NOT NULL REFERENCES plans(id),
+      plan_id             TEXT NOT NULL,
       role                TEXT NOT NULL,
       status              TEXT NOT NULL DEFAULT 'open'
                           CHECK(status IN (
@@ -293,21 +296,22 @@ async function createSchema(
       objective           TEXT,
       completion_criteria TEXT,
       owner               TEXT NOT NULL DEFAULT '',
-      parent_ticket_id    TEXT REFERENCES tickets(id),
+      parent_ticket_id    TEXT REFERENCES ${VISION_SCHEMA}.tickets(id),
       spawn_reason        TEXT,
       last_activity       TEXT,      expires_at          TEXT,
           deadline            TEXT,
           confidence          REAL,
           closure_reason      TEXT,
-      replacement_of      TEXT REFERENCES tickets(id)
+      replacement_of      TEXT REFERENCES ${VISION_SCHEMA}.tickets(id)
     );
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_open
-      ON tickets(plan_id, role) WHERE status = 'open';
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_vision_tickets_open
+      ON ${VISION_SCHEMA}.tickets(plan_id, role) WHERE status = 'open';
 
-    CREATE TABLE IF NOT EXISTS receipts (
+    -- receipts live in vision schema
+    CREATE TABLE IF NOT EXISTS ${VISION_SCHEMA}.receipts (
       id            TEXT PRIMARY KEY,
-      plan_id       TEXT NOT NULL REFERENCES plans(id),
+      plan_id       TEXT NOT NULL,
       type          TEXT NOT NULL CHECK(type IN (
                       'PLAN_CREATE','IMPLEMENTATION','REVIEW_PASS','REVIEW_REJECT','BLOCK',
                       'PROPOSED','PLANNING',
@@ -321,7 +325,7 @@ async function createSchema(
       summary       TEXT NOT NULL DEFAULT '',
       metadata_json TEXT NOT NULL DEFAULT '{}',
       created_at    TEXT NOT NULL,
-      ticket_id     TEXT REFERENCES tickets(id),
+      ticket_id     TEXT REFERENCES ${VISION_SCHEMA}.tickets(id),
       tokens_used   INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS sessions (
@@ -350,6 +354,17 @@ async function createSchema(
       tags            TEXT NOT NULL DEFAULT '[]'
     );
 
+    -- session_logs live in tackle schema (model fitness / agent op-logs)
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.session_logs (
+      id          BIGSERIAL PRIMARY KEY,
+      session_id  TEXT NOT NULL,
+      timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      level       TEXT NOT NULL DEFAULT 'INFO',
+      line        TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_tackle_session_logs_session_id ON ${TACKLE_SCHEMA}.session_logs(session_id);
+
     CREATE TABLE IF NOT EXISTS circuit_breaker (
       id                     INTEGER PRIMARY KEY DEFAULT 1 CHECK(id = 1),
       tripped                INTEGER DEFAULT 0,
@@ -372,7 +387,8 @@ async function createSchema(
 
     ALTER TABLE circuit_breaker ADD COLUMN IF NOT EXISTS wake_requested_at TEXT;
 
-    CREATE TABLE IF NOT EXISTS role_circuit_breaker (
+    -- role_circuit_breaker lives in peb schema (governance engine)
+    CREATE TABLE IF NOT EXISTS ${PEB_SCHEMA}.role_circuit_breaker (
       role            TEXT PRIMARY KEY,
       tripped         INTEGER DEFAULT 0,
       tripped_at      TEXT,
@@ -382,8 +398,73 @@ async function createSchema(
       updated_at      TEXT
     );
 
-    -- AI config tables (moved to vector schema, renamed without ai_ prefix)
-    CREATE TABLE IF NOT EXISTS ${VECTOR_SCHEMA}.providers (
+    -- governance_events: observability spine from vision → peb
+    -- receipt_id is UNIQUE for idempotency: exactly one governance event per receipt.
+    -- This is an event sink, not a decision engine. No blocking, no synchronous
+    -- governance. Enforcement happens in the bridge layer (Phase B).
+    CREATE TABLE IF NOT EXISTS ${PEB_SCHEMA}.governance_events (
+      id              BIGSERIAL PRIMARY KEY,
+      receipt_id      TEXT NOT NULL UNIQUE,
+      event_type      TEXT NOT NULL,
+      work_request_id TEXT,
+      plan_id         TEXT NOT NULL,
+      agent_role      TEXT NOT NULL,
+      payload         JSONB NOT NULL DEFAULT '{}',
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      replayed_at     TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS idx_peb_governance_events_plan_id ON ${PEB_SCHEMA}.governance_events(plan_id);
+    CREATE INDEX IF NOT EXISTS idx_peb_governance_events_event_type ON ${PEB_SCHEMA}.governance_events(event_type);
+    CREATE INDEX IF NOT EXISTS idx_peb_governance_events_created_at ON ${PEB_SCHEMA}.governance_events(created_at);
+
+    -- AFTER INSERT trigger: fire-and-forget event emission from vision → peb.
+    -- No coupling to decision engine yet. This is eventual consistency only —
+    -- governance is observable before it becomes authoritative.
+    CREATE OR REPLACE FUNCTION vision.receipt_governance_trigger()
+    RETURNS TRIGGER AS $TRIG$
+    BEGIN
+      INSERT INTO ${PEB_SCHEMA}.governance_events (receipt_id, event_type, work_request_id, plan_id, agent_role, payload)
+      VALUES (
+        NEW.id,
+        'receipt:' || NEW.type,
+        NULL,
+        NEW.plan_id,
+        NEW.agent_role,
+        jsonb_build_object(
+          'session_id', NEW.session_id,
+          'artifact_path', NEW.artifact_path,
+          'summary', NEW.summary,
+          'ticket_id', NEW.ticket_id,
+          'tokens_used', NEW.tokens_used
+        )
+      )
+      ON CONFLICT (receipt_id) DO NOTHING;
+      RETURN NEW;
+    END;
+    $TRIG$ LANGUAGE plpgsql;
+
+    DROP TRIGGER IF EXISTS trg_receipt_governance ON ${VISION_SCHEMA}.receipts;
+    CREATE TRIGGER trg_receipt_governance
+    AFTER INSERT ON ${VISION_SCHEMA}.receipts
+    FOR EACH ROW
+    EXECUTE FUNCTION vision.receipt_governance_trigger();
+
+    -- work_requests: canonical store for decomposition objects
+    -- Note: INDEX creation is handled in migrations (v12/v13) to avoid
+    -- conflict with legacy DBs where this relation exists as a view.
+    CREATE TABLE IF NOT EXISTS ${VISION_SCHEMA}.work_requests (
+      id              BIGSERIAL PRIMARY KEY,
+      wr_id           TEXT UNIQUE,
+      dco_json        TEXT NOT NULL DEFAULT '{}',
+      context         JSONB NOT NULL DEFAULT '{}',
+      status          TEXT NOT NULL DEFAULT 'pending',
+      step_outputs    TEXT NOT NULL DEFAULT '{}',
+      recorded_on_dt      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      recorded_until_dt   TIMESTAMPTZ
+    );
+
+    -- AI config tables (moved to tackle schema, renamed without ai_ prefix)
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.providers (
       id           TEXT PRIMARY KEY,
       name         TEXT NOT NULL,
       type         TEXT NOT NULL CHECK(type IN (
@@ -397,7 +478,7 @@ async function createSchema(
       updated_at   TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS ${VECTOR_SCHEMA}.harnesses (
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.harnesses (
       id                   TEXT PRIMARY KEY,
       name                 TEXT NOT NULL,
       invocation_semantics TEXT NOT NULL DEFAULT '{}',
@@ -405,45 +486,44 @@ async function createSchema(
       updated_at           TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS ${VECTOR_SCHEMA}.models (
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.models (
       id               TEXT PRIMARY KEY,
       name             TEXT NOT NULL,
-      harness_id       TEXT NOT NULL REFERENCES ${VECTOR_SCHEMA}.harnesses(id) ON DELETE CASCADE,
-      provider_id      TEXT REFERENCES ${VECTOR_SCHEMA}.providers(id),
+      harness_id       TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.harnesses(id) ON DELETE CASCADE,
+      provider_id      TEXT REFERENCES ${TACKLE_SCHEMA}.providers(id),
       model_identifier TEXT NOT NULL,
       created_at       TEXT NOT NULL,
       updated_at       TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS ${VECTOR_SCHEMA}.role_config (
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.role_config (
       id            TEXT PRIMARY KEY,
       role          TEXT NOT NULL UNIQUE CHECK(role IN (
                        'planner','builder','reviewer','critic',
                        'analyst','architect','inspector','engineer',
                        'rover'
                      )),
-      provider_id   TEXT NOT NULL REFERENCES ${VECTOR_SCHEMA}.providers(id),
-      harness_id    TEXT NOT NULL REFERENCES ${VECTOR_SCHEMA}.harnesses(id),
-      model_id      TEXT NOT NULL REFERENCES ${VECTOR_SCHEMA}.models(id),
+      provider_id   TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.providers(id),
+      harness_id    TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.harnesses(id),
+      model_id      TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.models(id),
       extra_params  TEXT NOT NULL DEFAULT '{}',
       created_at    TEXT NOT NULL,
       updated_at    TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS ${VECTOR_SCHEMA}.role_models (
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.role_models (
       id          TEXT PRIMARY KEY,
-      role        TEXT NOT NULL REFERENCES ${VECTOR_SCHEMA}.role_config(role) ON DELETE CASCADE,
-      model_id    TEXT NOT NULL REFERENCES ${VECTOR_SCHEMA}.models(id),
+      role        TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.role_config(role) ON DELETE CASCADE,
+      model_id    TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.models(id),
       priority    INTEGER NOT NULL DEFAULT 0,
-      provider_id TEXT REFERENCES ${VECTOR_SCHEMA}.providers(id),
-      harness_id  TEXT REFERENCES ${VECTOR_SCHEMA}.harnesses(id),
+      provider_id TEXT REFERENCES ${TACKLE_SCHEMA}.providers(id),
+      harness_id  TEXT REFERENCES ${TACKLE_SCHEMA}.harnesses(id),
       UNIQUE(role, model_id)
     );
 
-    -- Derived status view (v105: added REQUEUED support for circuit breaker requeue)
-    DROP VIEW IF EXISTS plans_by_status;
-    DROP VIEW IF EXISTS plan_status CASCADE;
-    CREATE VIEW plan_status AS
+    DROP VIEW IF EXISTS ${PG_SCHEMA}.plans_by_status;
+    DROP VIEW IF EXISTS ${PG_SCHEMA}.plan_status CASCADE;
+    CREATE VIEW ${PG_SCHEMA}.plan_status AS
     SELECT 
       p.*,
       CASE
@@ -452,16 +532,16 @@ async function createSchema(
         -- Uses "latest meaningful receipt" guard so stale REQUEUED receipts from
         -- a previous breaker trip don't override later IMPLEMENTATION/REVIEW_PASS.
         WHEN (
-          SELECT r.type FROM receipts r
+          SELECT r.type FROM ${VISION_SCHEMA}.receipts r
           WHERE r.plan_id = p.id
           AND r.type NOT IN ('PROPOSED', 'PLANNING')
           ORDER BY r.created_at DESC LIMIT 1
         ) = 'REQUEUED' THEN 'PLAN_CREATE'
         -- REVIEW_PASS — terminal success, unless overridden by later BLOCK/PLAN_BLOCK
         WHEN EXISTS (
-          SELECT 1 FROM receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_PASS'
+          SELECT 1 FROM ${VISION_SCHEMA}.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_PASS'
           AND NOT EXISTS (
-            SELECT 1 FROM receipts r2
+            SELECT 1 FROM ${VISION_SCHEMA}.receipts r2
             WHERE r2.plan_id = p.id
             AND r2.type IN ('BLOCK', 'PLAN_BLOCK', 'CANCELLED', 'ABANDONED')
             AND r2.created_at > r.created_at
@@ -469,33 +549,33 @@ async function createSchema(
         ) THEN 'REVIEW_PASS'
         -- REVIEW_REJECT — show latest non-BLOCK receipt or fallback to PLAN_CREATE
         WHEN EXISTS (
-          SELECT 1 FROM receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_REJECT'
+          SELECT 1 FROM ${VISION_SCHEMA}.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_REJECT'
         ) THEN COALESCE(
-          (SELECT r.type FROM receipts r 
+          (SELECT r.type FROM ${VISION_SCHEMA}.receipts r 
            WHERE r.plan_id = p.id 
            AND r.type != 'BLOCK'
            ORDER BY r.created_at DESC LIMIT 1),
           'PLAN_CREATE'
         )
         ELSE COALESCE(
-          (SELECT r.type FROM receipts r 
+          (SELECT r.type FROM ${VISION_SCHEMA}.receipts r 
            WHERE r.plan_id = p.id 
            AND r.type NOT IN ('PROPOSED', 'PLANNING')
            ORDER BY r.created_at DESC LIMIT 1),
-          (SELECT r.type FROM receipts r 
+          (SELECT r.type FROM ${VISION_SCHEMA}.receipts r 
            WHERE r.plan_id = p.id 
            ORDER BY r.created_at DESC LIMIT 1),
           NULL
         )
       END AS derived_status
-    FROM plans p
+    FROM ${PG_SCHEMA}.plans p
     WHERE p.deleted = 0;
 
-    CREATE VIEW plans_by_status AS
+    CREATE VIEW ${PG_SCHEMA}.plans_by_status AS
     SELECT 
       ps.derived_status AS status,
       ps.*
-    FROM plan_status ps;
+    FROM ${PG_SCHEMA}.plan_status ps;
   `);
 
   console.log(`Schema initialized in PG ${PG_SCHEMA} schema.`);
@@ -529,7 +609,7 @@ export interface Migration {
 const migrations: Migration[] = [
   {
     version: 1,
-    description: "Baseline — all core tables (plans, tickets, receipts, sessions, circuit_breaker, vector AI config)",
+    description: "Baseline — all core tables (plans, tickets, receipts, sessions, circuit_breaker, tackle AI config)",
     up: async () => {
       // No-op: the DDL in createSchema() is the source of truth for v1.
     },
@@ -573,7 +653,7 @@ const migrations: Migration[] = [
     version: 7,
     description: "Expand role_config CHECK constraint to include all 8 agent roles (analyst, architect, inspector, engineer)",
     up: async (exec) => {
-      // Drop the old CHECK constraint on vector.role_config.role (auto-generated name)
+      // Drop the old CHECK constraint on tackle.role_config.role (auto-generated name)
       // and recreate it with the expanded role list.
       await exec(`
         DO $MIGRATE$
@@ -582,13 +662,13 @@ const migrations: Migration[] = [
         BEGIN
           SELECT conname INTO v_conname
           FROM pg_constraint
-          WHERE conrelid = 'vector.role_config'::regclass AND contype = 'c';
+          WHERE conrelid = 'tackle.role_config'::regclass AND contype = 'c';
 
           IF v_conname IS NOT NULL THEN
-            EXECUTE format('ALTER TABLE vector.role_config DROP CONSTRAINT %I', v_conname);
+            EXECUTE format('ALTER TABLE tackle.role_config DROP CONSTRAINT %I', v_conname);
           END IF;
 
-          ALTER TABLE vector.role_config ADD CONSTRAINT role_config_role_check
+          ALTER TABLE tackle.role_config ADD CONSTRAINT role_config_role_check
             CHECK (role IN (
               'planner','builder','reviewer','critic',
               'analyst','architect','inspector','engineer'
@@ -609,13 +689,13 @@ const migrations: Migration[] = [
         BEGIN
           SELECT conname INTO v_conname
           FROM pg_constraint
-          WHERE conrelid = 'vector.role_config'::regclass AND contype = 'c';
+          WHERE conrelid = 'tackle.role_config'::regclass AND contype = 'c';
 
           IF v_conname IS NOT NULL THEN
-            EXECUTE format('ALTER TABLE vector.role_config DROP CONSTRAINT %I', v_conname);
+            EXECUTE format('ALTER TABLE tackle.role_config DROP CONSTRAINT %I', v_conname);
           END IF;
 
-          ALTER TABLE vector.role_config ADD CONSTRAINT role_config_role_check
+          ALTER TABLE tackle.role_config ADD CONSTRAINT role_config_role_check
             CHECK (role IN (
               'planner','builder','reviewer','critic',
               'analyst','architect','inspector','engineer',
@@ -624,6 +704,263 @@ const migrations: Migration[] = [
         END;
         $MIGRATE$
       `);
+    },
+  },
+  {
+    version: 9,
+    description: "Add step_outputs JSONB column to work_requests for DB-only artifact storage",
+    up: async (exec) => {
+      // Guard: only apply if conduit.work_requests still exists (legacy DB upgrade path)
+      await exec(`
+        DO $$ BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'conduit' AND table_name = 'work_requests') THEN
+            ALTER TABLE conduit.work_requests ADD COLUMN IF NOT EXISTS step_outputs TEXT NOT NULL DEFAULT '{}';
+          END IF;
+        END $$;
+      `);
+    },
+  },
+  {
+    version: 10,
+    description: "Add session_logs table for DB-backed log streaming",
+    up: async (exec) => {
+      // session_logs now lives in tackle schema — created by createSchema.
+      // This migration is a no-op guard for legacy DBs where the table
+      // was originally created in conduit. On fresh DBs, createSchema
+      // handles it.
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.session_logs (
+          id          BIGSERIAL PRIMARY KEY,
+          session_id  TEXT NOT NULL,
+          timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          level       TEXT NOT NULL DEFAULT 'INFO',
+          line        TEXT NOT NULL
+        )
+      `);
+      await exec(`CREATE INDEX IF NOT EXISTS idx_tackle_session_logs_session_id ON ${TACKLE_SCHEMA}.session_logs(session_id)`);
+    },
+  },
+  {
+    version: 11,
+    description: "Add peb.governance_events table and receipt→governance trigger for observability spine",
+    up: async (exec) => {
+      // On legacy DBs where createSchema() has already run, the DDL in createSchema
+      // handles fresh tables. This migration is a no-op guard — in the unlikely event
+      // createSchema missed the table (legacy DB with search_path edge case), the
+      // IF NOT EXISTS protects us.
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${PEB_SCHEMA}.governance_events (
+          id              BIGSERIAL PRIMARY KEY,
+          receipt_id      TEXT NOT NULL UNIQUE,
+          event_type      TEXT NOT NULL,
+          work_request_id TEXT,
+          plan_id         TEXT NOT NULL,
+          agent_role      TEXT NOT NULL,
+          payload         JSONB NOT NULL DEFAULT '{}',
+          created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          replayed_at     TIMESTAMPTZ
+        )
+      `);
+      await exec(`CREATE INDEX IF NOT EXISTS idx_peb_governance_events_plan_id ON ${PEB_SCHEMA}.governance_events(plan_id)`);
+      await exec(`CREATE INDEX IF NOT EXISTS idx_peb_governance_events_event_type ON ${PEB_SCHEMA}.governance_events(event_type)`);
+      await exec(`CREATE INDEX IF NOT EXISTS idx_peb_governance_events_created_at ON ${PEB_SCHEMA}.governance_events(created_at)`);
+
+      // Trigger function and trigger
+      await exec(`
+        CREATE OR REPLACE FUNCTION vision.receipt_governance_trigger()
+        RETURNS TRIGGER AS $TRIG$
+        BEGIN
+          INSERT INTO ${PEB_SCHEMA}.governance_events (receipt_id, event_type, work_request_id, plan_id, agent_role, payload)
+          VALUES (
+            NEW.id,
+            'receipt:' || NEW.type,
+            NULL,
+            NEW.plan_id,
+            NEW.agent_role,
+            jsonb_build_object(
+              'session_id', NEW.session_id,
+              'artifact_path', NEW.artifact_path,
+              'summary', NEW.summary,
+              'ticket_id', NEW.ticket_id,
+              'tokens_used', NEW.tokens_used
+            )
+          )
+          ON CONFLICT (receipt_id) DO NOTHING;
+          RETURN NEW;
+        END;
+        $TRIG$ LANGUAGE plpgsql
+      `);
+      await exec(`
+        DROP TRIGGER IF EXISTS trg_receipt_governance ON ${VISION_SCHEMA}.receipts;
+        CREATE TRIGGER trg_receipt_governance
+        AFTER INSERT ON ${VISION_SCHEMA}.receipts
+        FOR EACH ROW
+        EXECUTE FUNCTION vision.receipt_governance_trigger()
+      `);
+
+      // Backfill: emit governance events for all existing receipts that don't have one yet
+      await exec(`
+        INSERT INTO ${PEB_SCHEMA}.governance_events (receipt_id, event_type, plan_id, agent_role, payload, created_at)
+        SELECT
+          r.id,
+          'receipt:' || r.type,
+          r.plan_id,
+          r.agent_role,
+          jsonb_build_object(
+            'session_id', r.session_id,
+            'artifact_path', r.artifact_path,
+            'summary', r.summary,
+            'ticket_id', r.ticket_id,
+            'tokens_used', r.tokens_used
+          ),
+          r.created_at::timestamptz
+        FROM ${VISION_SCHEMA}.receipts r
+        WHERE NOT EXISTS (
+          SELECT 1 FROM ${PEB_SCHEMA}.governance_events g WHERE g.receipt_id = r.id
+        )
+      `);
+    },
+  },
+  {
+    version: 12,
+    description: "Add dco_json and wr_id columns to vision.work_requests for LOSM bridge compatibility",
+    up: async (exec) => {
+      // The work_requests table was created manually during the conduit→vision
+      // schema split with a BIGSERIAL id. This migration adds the columns
+      // that the typed bridge requires.
+      // The existing vision.work_requests was created as a VIEW during the
+      // manual schema split (pointing at the old conduit.work_requests which
+      // was later dropped). Replace it with a proper BASE TABLE.
+      await exec(`DROP VIEW IF EXISTS ${VISION_SCHEMA}.work_requests CASCADE`);
+      await exec(`
+        CREATE TABLE ${VISION_SCHEMA}.work_requests (
+          id              BIGSERIAL PRIMARY KEY,
+          wr_id           TEXT UNIQUE,
+          dco_json        TEXT NOT NULL DEFAULT '{}',
+          context         JSONB NOT NULL DEFAULT '{}',
+          status          TEXT NOT NULL DEFAULT 'pending',
+          step_outputs    TEXT NOT NULL DEFAULT '{}',
+          recorded_on_dt      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          recorded_until_dt   TIMESTAMPTZ
+        )
+      `);
+      await exec(`CREATE INDEX IF NOT EXISTS idx_vision_work_requests_status ON ${VISION_SCHEMA}.work_requests(status)`);
+    },
+  },
+  {
+    version: 13,
+    description: "Replace vision.work_requests view with proper BASE TABLE (v12 was a no-op on legacy DBs)",
+    up: async (exec) => {
+      // Check if work_requests is still a view (v12 may have been recorded as
+      // applied without doing the replacement due to the earlier check)
+      const checkResult = await exec(`
+        SELECT table_type FROM information_schema.tables
+        WHERE table_schema = '${VISION_SCHEMA}' AND table_name = 'work_requests'
+      `);
+      const tableType = checkResult?.rows?.[0]?.table_type;
+      if (tableType === 'BASE TABLE') {
+        console.log("[migrations] v13: vision.work_requests is already a BASE TABLE — skipping");
+        return;
+      }
+      // Drop the view and create a proper table
+      await exec(`DROP VIEW IF EXISTS ${VISION_SCHEMA}.work_requests CASCADE`);
+      await exec(`
+        CREATE TABLE ${VISION_SCHEMA}.work_requests (
+          id              BIGSERIAL PRIMARY KEY,
+          wr_id           TEXT UNIQUE,
+          dco_json        TEXT NOT NULL DEFAULT '{}',
+          context         JSONB NOT NULL DEFAULT '{}',
+          status          TEXT NOT NULL DEFAULT 'pending',
+          step_outputs    TEXT NOT NULL DEFAULT '{}',
+          recorded_on_dt      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          recorded_until_dt   TIMESTAMPTZ
+        )
+      `);
+      await exec(`CREATE INDEX IF NOT EXISTS idx_vision_work_requests_status ON ${VISION_SCHEMA}.work_requests(status)`);
+      console.log("[migrations] v13: Replaced vision.work_requests view with BASE TABLE");
+    },
+  },
+  {
+    version: 14,
+    description: "Cross-system identity contract: add work_request_uuid to vision.work_requests, propagate to governance events",
+    up: async (exec) => {
+      // Step 1: Add work_request_uuid column (nullable initially for backfill)
+      await exec(`
+        ALTER TABLE ${VISION_SCHEMA}.work_requests
+        ADD COLUMN IF NOT EXISTS work_request_uuid TEXT
+      `);
+
+      // Step 2: Backfill existing rows with generated UUIDs
+      await exec(`
+        UPDATE ${VISION_SCHEMA}.work_requests
+        SET work_request_uuid = gen_random_uuid()::text
+        WHERE work_request_uuid IS NULL
+      `);
+
+      // Step 3: Create unique index (UNIQUE constraint can't be added
+      // with IF NOT EXISTS, so we use a unique index instead)
+      await exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_vision_work_requests_uuid
+        ON ${VISION_SCHEMA}.work_requests(work_request_uuid)
+      `);
+
+      // Step 4: Add NOT NULL constraint to work_request_uuid
+      await exec(`
+        ALTER TABLE ${VISION_SCHEMA}.work_requests
+        ALTER COLUMN work_request_uuid SET NOT NULL
+      `);
+
+      // Step 5: Update the governance trigger to propagate work_request_uuid.
+      // When a receipt is inserted and its plan_id matches a work_request's
+      // wr_id, the work_request_uuid is copied into the governance event.
+      await exec(`
+        CREATE OR REPLACE FUNCTION vision.receipt_governance_trigger()
+        RETURNS TRIGGER AS $TRIG$
+        DECLARE
+          v_wr_uuid TEXT;
+        BEGIN
+          -- Look up the work_request_uuid from vision.work_requests
+          -- using NEW.plan_id as the wr_id lookup key
+          SELECT wr.work_request_uuid INTO v_wr_uuid
+          FROM ${VISION_SCHEMA}.work_requests wr
+          WHERE wr.wr_id = NEW.plan_id
+          LIMIT 1;
+
+          INSERT INTO ${PEB_SCHEMA}.governance_events (
+            receipt_id, event_type, work_request_id, plan_id, agent_role, payload
+          ) VALUES (
+            NEW.id,
+            'receipt:' || NEW.type,
+            v_wr_uuid,
+            NEW.plan_id,
+            NEW.agent_role,
+            jsonb_build_object(
+              'session_id', NEW.session_id,
+              'artifact_path', NEW.artifact_path,
+              'summary', NEW.summary,
+              'ticket_id', NEW.ticket_id,
+              'tokens_used', NEW.tokens_used
+            )
+          )
+          ON CONFLICT (receipt_id) DO NOTHING;
+          RETURN NEW;
+        END;
+        $TRIG$ LANGUAGE plpgsql
+      `);
+
+      // Step 6: Backfill existing governance events with work_request_uuid
+      // for receipts that have a matching work request
+      await exec(`
+        UPDATE ${PEB_SCHEMA}.governance_events g
+        SET work_request_id = wr.work_request_uuid
+        FROM ${VISION_SCHEMA}.work_requests wr
+        WHERE g.plan_id = wr.wr_id
+        AND g.work_request_id IS NULL
+      `);
+
+      console.log("[migrations] v14: Cross-system identity contract applied");
+      console.log("  - Added work_request_uuid to vision.work_requests");
+      console.log("  - Updated governance trigger to propagate UUID");
     },
   },
 ];
@@ -757,10 +1094,10 @@ export async function hardDeletePlan(planId: string): Promise<{
 }> {
   return withTransaction(async (client) => {
     const receiptsDeleted = await tRun(
-      client, "DELETE FROM receipts WHERE plan_id = @planId", { planId }
+      client, `DELETE FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId`, { planId }
     );
     const ticketsDeleted = await tRun(
-      client, "DELETE FROM tickets WHERE plan_id = @planId", { planId }
+      client, `DELETE FROM ${VISION_SCHEMA}.tickets WHERE plan_id = @planId`, { planId }
     );
     const changes = await tRun(
       client, "DELETE FROM plans WHERE id = @planId", { planId }
@@ -791,7 +1128,7 @@ export interface ReceiptRow {
 
 export async function insertReceipt(r: ReceiptRow): Promise<void> {
   await qRun(
-    `INSERT INTO receipts
+    `INSERT INTO ${VISION_SCHEMA}.receipts
       (id, plan_id, type, agent_role, session_id, ticket_id, artifact_path, summary, metadata_json, tokens_used, created_at)
     VALUES (@id, @plan_id, @type, @agent_role, @session_id, @ticket_id, @artifact_path, @summary, @metadata_json, @tokens_used, @created_at)`,
     { ...r, tokens_used: r.tokens_used ?? 0 }
@@ -800,7 +1137,7 @@ export async function insertReceipt(r: ReceiptRow): Promise<void> {
 
 export async function getReceiptsForPlan(planId: string): Promise<ReceiptRow[]> {
   return qAll(
-    "SELECT * FROM receipts WHERE plan_id = @planId ORDER BY created_at ASC",
+    `SELECT * FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId ORDER BY created_at ASC`,
     { planId }
   );
 }
@@ -832,7 +1169,7 @@ export async function getPlanReceipts(planId: string): Promise<Array<{
 
 export async function getLatestReceiptType(planId: string): Promise<string | null> {
   const row = await qOne(
-    "SELECT type FROM receipts WHERE plan_id = @planId ORDER BY created_at DESC LIMIT 1",
+    `SELECT type FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId ORDER BY created_at DESC LIMIT 1`,
     { planId }
   );
   return row?.type ?? null;
@@ -840,7 +1177,7 @@ export async function getLatestReceiptType(planId: string): Promise<string | nul
 
 export async function getReceiptCount(): Promise<{ type: string; count: number }[]> {
   return qAll(
-    "SELECT type, COUNT(*) as count FROM receipts GROUP BY type"
+    `SELECT type, COUNT(*) as count FROM ${VISION_SCHEMA}.receipts GROUP BY type`
   );
 }
 
@@ -854,7 +1191,7 @@ export async function deleteReceiptsByPlanAndType(
   types.forEach((t, i) => (params[`type${i}`] = t));
   
   const changes = await qRun(
-    `DELETE FROM receipts WHERE plan_id = @planId AND type IN (${placeholders})`,
+    `DELETE FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId AND type IN (${placeholders})`,
     params
   );
   return changes;
@@ -1061,6 +1398,34 @@ export async function updateSessionCost(id: string, costUsd: number): Promise<vo
   );
 }
 
+// ── Session Logs ─────────────────────────────────────────────────────
+
+export interface SessionLogRow {
+  id: string;
+  session_id: string;
+  timestamp: string;
+  level: string;
+  line: string;
+}
+
+export async function appendSessionLog(
+  sessionId: string,
+  line: string,
+  level: string = "INFO",
+): Promise<void> {
+  await qRun(
+    `INSERT INTO ${TACKLE_SCHEMA}.session_logs (session_id, level, line) VALUES (@session_id, @level, @line)`,
+    { session_id: sessionId, level, line },
+  );
+}
+
+export async function getSessionLogs(sessionId: string): Promise<SessionLogRow[]> {
+  return qAll(
+    `SELECT * FROM ${TACKLE_SCHEMA}.session_logs WHERE session_id = @session_id ORDER BY id ASC`,
+    { session_id: sessionId },
+  );
+}
+
 // ── Circuit breaker ─────────────────────────────────────────────────
 
 export interface BreakerRow {
@@ -1170,7 +1535,7 @@ export async function consumeSchedulerWake(since: string): Promise<boolean> {
 
 export async function isRoleBreakerTripped(role: string): Promise<boolean> {
   const row = await qOne(
-    "SELECT tripped FROM role_circuit_breaker WHERE role = @role",
+    `SELECT tripped FROM ${PEB_SCHEMA}.role_circuit_breaker WHERE role = @role`,
     { role }
   );
   return row?.tripped === 1;
@@ -1183,11 +1548,11 @@ export async function tripRoleBreaker(
 ): Promise<void> {
   const now = new Date().toISOString();
   await qRun(
-    `INSERT INTO role_circuit_breaker (role, tripped, tripped_at, retry_after, error, failure_count, updated_at)
+    `INSERT INTO ${PEB_SCHEMA}.role_circuit_breaker (role, tripped, tripped_at, retry_after, error, failure_count, updated_at)
      VALUES (@role, 1, @tripped_at, @retry_after, @error, 1, @updated_at)
      ON CONFLICT (role) DO UPDATE SET
        tripped = 1, tripped_at = @tripped_at, retry_after = @retry_after,
-       error = @error, failure_count = role_circuit_breaker.failure_count + 1,
+       error = @error, failure_count = ${PEB_SCHEMA}.role_circuit_breaker.failure_count + 1,
        updated_at = @updated_at`,
     { role, tripped_at: now, retry_after: retryAfter, error, updated_at: now }
   );
@@ -1196,9 +1561,12 @@ export async function tripRoleBreaker(
 export async function resetRoleBreaker(role: string): Promise<void> {
   const now = new Date().toISOString();
   await qRun(
-    `DELETE FROM role_circuit_breaker WHERE role = @role`,
+    `DELETE FROM ${PEB_SCHEMA}.role_circuit_breaker WHERE role = @role`,
     { role }
   );
+  // Wake the Python scheduler so it re-polls immediately instead of
+  // waiting out the idle backoff (SCHEDULER_IDLE_BACKOFF, 60s).
+  await requestSchedulerWake();
 }
 
 // ── Tickets ─────────────────────────────────────────────────────────
@@ -1219,7 +1587,7 @@ export interface TicketRow {
 
 async function _isPlanTerminal(planId: string): Promise<boolean> {
   const row = await qOne(
-    `SELECT type FROM receipts WHERE plan_id = @planId
+    `SELECT type FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId
      ORDER BY created_at DESC LIMIT 1`,
     { planId }
   );
@@ -1254,7 +1622,7 @@ export async function createNextTickets(
   for (const role of nextRoles) {
     const spawnReason = `${ticketRole} ${terminalStatus} → ${role}`;
     const changes = await qRun(
-      `INSERT OR IGNORE INTO tickets
+      `INSERT OR IGNORE INTO ${VISION_SCHEMA}.tickets
         (id, plan_id, role, status, created_at,
          objective, completion_criteria, owner,
          parent_ticket_id, spawn_reason,
@@ -1286,7 +1654,7 @@ export async function createTicketIfMissing(
   const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
   const ticketId = `ticket-${planId}-${role}-${createdByReceipt}`;
   const changes = await qRun(
-    `INSERT OR IGNORE INTO tickets
+    `INSERT OR IGNORE INTO ${VISION_SCHEMA}.tickets
       (id, plan_id, role, status, created_by_receipt, created_at,
        objective, completion_criteria, owner,
        parent_ticket_id, spawn_reason,
@@ -1307,7 +1675,7 @@ export async function createTicketIfMissing(
   if (changes > 0) return ticketId;
 
   const existing = await qOne(
-    "SELECT id FROM tickets WHERE plan_id = @planId AND role = @role AND status = 'open'",
+    `SELECT id FROM ${VISION_SCHEMA}.tickets WHERE plan_id = @planId AND role = @role AND status = 'open'`,
     { planId, role }
   );
   return existing?.id ?? null;
@@ -1316,7 +1684,7 @@ export async function createTicketIfMissing(
 export async function releaseSessionTickets(sessionId: string): Promise<number> {
   const now = new Date().toISOString();
   return qRun(
-    `UPDATE tickets SET status = 'open', session_id = NULL,
+    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', session_id = NULL,
       claimed_at = NULL, last_activity = @now
     WHERE session_id = @sessionId AND status = 'claimed'`,
     { sessionId, now }
@@ -1326,7 +1694,7 @@ export async function releaseSessionTickets(sessionId: string): Promise<number> 
 export async function resetAbandonedTickets(): Promise<number> {
   const now = new Date().toISOString();
   return qRun(
-    `UPDATE tickets SET status = 'open', closed_at = NULL, last_activity = @now
+    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', closed_at = NULL, last_activity = @now
     WHERE status = 'abandoned'`,
     { now }
   );
@@ -1339,7 +1707,7 @@ const DEFAULT_STALE_SECONDS = 6 * 3600;
 export async function detectStaleTickets(): Promise<number> {
   const threshold = new Date(Date.now() - DEFAULT_STALE_SECONDS * 1000).toISOString();
   return qRun(
-    `UPDATE tickets SET status = 'stale'
+    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'stale'
     WHERE status = 'claimed' AND last_activity IS NOT NULL AND last_activity < @threshold`,
     { threshold }
   );
@@ -1348,7 +1716,7 @@ export async function detectStaleTickets(): Promise<number> {
 export async function detectExpiredTickets(): Promise<number> {
   const now = new Date().toISOString();
   return qRun(
-    `UPDATE tickets SET status = 'expired'
+    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'expired'
     WHERE status IN ('open', 'claimed', 'stale') AND expires_at IS NOT NULL AND expires_at < @now`,
     { now }
   );
@@ -1365,14 +1733,14 @@ export async function supersedeTicket(
 }> {
   const now = new Date().toISOString();
   const old = await qOne(
-    `SELECT plan_id, role, objective, owner FROM tickets
+    `SELECT plan_id, role, objective, owner FROM ${VISION_SCHEMA}.tickets
      WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
     { ticketId }
   );
   if (!old) return { superseded: false };
 
   await qRun(
-    `UPDATE tickets SET status = 'superseded', closed_at = @now,
+    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'superseded', closed_at = @now,
       last_activity = @now, closure_reason = @reason
     WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
     { ticketId, now, reason }
@@ -1383,7 +1751,7 @@ export async function supersedeTicket(
     const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
     replacementId = `ticket-${old.plan_id}-${old.role}-${Date.now()}`;
     await qRun(
-      `INSERT INTO tickets
+      `INSERT INTO ${VISION_SCHEMA}.tickets
         (id, plan_id, role, status, created_at,
          objective, owner,
          spawn_reason, last_activity, expires_at, replacement_of)
@@ -1404,21 +1772,169 @@ export async function supersedeTicket(
 
 export async function cancelTicket(ticketId: string, reason: string): Promise<number> {
   const now = new Date().toISOString();
-  return qRun(
-    `UPDATE tickets SET status = 'cancelled', closed_at = @now,
+
+  // Look up the plan_id so we can cascade to work_requests/sessions
+  const ticket = await qOne(
+    `SELECT plan_id FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
+    { ticketId }
+  );
+
+  const cancelled = await qRun(
+    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
       last_activity = @now, closure_reason = @reason
     WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
     { ticketId, now, reason }
   );
+
+  // Cascade: if we cancelled the ticket, clean up work_requests and
+  // sessions for the plan to prevent orphaned state.
+  if (cancelled > 0 && ticket) {
+    await _cancelWorkRequestsAndSessions(ticket.plan_id, now);
+  }
+
+  return cancelled;
+}
+
+/**
+ * Cascade cleanup helper: cancels pending work_requests for a plan and
+ * closes any running sessions linked to those work requests.
+ *
+ * Work requests reference sessions via dco_json.metadata.session_id.
+ * When tickets are cancelled, the corresponding work requests and
+ * harness sessions become orphans unless explicitly cleaned up here.
+ */
+async function _cancelWorkRequestsAndSessions(planId: string, now: string): Promise<void> {
+  const wrCancelled = await qRun(
+    `UPDATE ${VISION_SCHEMA}.work_requests SET status = 'cancelled', recorded_until_dt = NOW()
+     WHERE context->>'plan_id' = @planId AND status = 'pending'`,
+    { planId, now }
+  );
+  if (wrCancelled > 0) {
+    console.log(
+      `[${now}] cancelled ${wrCancelled} pending work_request(s) for plan ${planId}`,
+    );
+  }
+
+  // Note: sessions stay in conduit — not being migrated
+  const sessionsClosed = await qRun(
+    `UPDATE ${PG_SCHEMA}.sessions SET is_running = 0, end_iso = @now
+     WHERE is_running = 1 AND id IN (
+       SELECT context->>'session_id'
+       FROM ${VISION_SCHEMA}.work_requests
+       WHERE context->>'plan_id' = @planId
+         AND context->>'session_id' IS NOT NULL
+     )`,
+    { planId, now }
+  );
+  if (sessionsClosed > 0) {
+    console.log(
+      `[${now}] closed ${sessionsClosed} running session(s) for plan ${planId}`,
+    );
+  }
 }
 
 export async function cancelTicketsByPlan(planId: string, reason: string): Promise<number> {
   const now = new Date().toISOString();
+
+  // Cascade: cancel pending work_requests and close linked running sessions.
+  // Without this, cancelled tickets leave orphaned work_requests (stuck in
+  // 'pending') and sessions (stuck with is_running=1).
+  await _cancelWorkRequestsAndSessions(planId, now);
+
   return qRun(
-    `UPDATE tickets SET status = 'cancelled', closed_at = @now,
+    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
       last_activity = @now, closure_reason = @reason
     WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
     { planId, now, reason }
+  );
+}
+
+// ── Work Request CRUD (vision schema) ───────────────────────────────
+
+export interface WorkRequestRow {
+  id: number;        // BIGSERIAL internal PK
+  wr_id: string;     // logical key (plan_id or work_request_uuid)
+  work_request_uuid: string;  // cross-system immutable identifier
+  dco_json: string;
+  context: any;
+  status: string;
+  step_outputs: string;
+  recorded_on_dt: string;
+  recorded_until_dt: string | null;
+}
+
+export async function createWorkRequest(wr: {
+  id: string;
+  work_request_uuid?: string;
+  dco_json: string;
+  context?: any;
+  status?: string;
+}): Promise<{ ok: boolean; id: string; work_request_uuid: string }> {
+  const now = new Date().toISOString();
+  const ctx = wr.context ?? {};
+  // Ensure plan_id is in context for backwards-compatible lookups
+  if (!ctx.plan_id) ctx.plan_id = wr.id;
+  const uuid = wr.work_request_uuid || crypto.randomUUID();
+  if (!ctx.work_request_uuid) ctx.work_request_uuid = uuid;
+  await qRun(
+    `INSERT INTO ${VISION_SCHEMA}.work_requests (wr_id, work_request_uuid, dco_json, context, status, recorded_on_dt)
+     VALUES (@wr_id, @work_request_uuid, @dco_json, @context::jsonb, @status, @now)
+     ON CONFLICT (wr_id) DO UPDATE SET
+       dco_json = EXCLUDED.dco_json,
+       context = EXCLUDED.context,
+       status = EXCLUDED.status`,
+    {
+      wr_id: wr.id,
+      work_request_uuid: uuid,
+      dco_json: wr.dco_json,
+      context: JSON.stringify(ctx),
+      status: wr.status ?? "pending",
+      now,
+    }
+  );
+  return { ok: true, id: wr.id, work_request_uuid: uuid };
+}
+
+export async function getWorkRequest(id: string): Promise<WorkRequestRow | undefined> {
+  return qOne(
+    `SELECT * FROM ${VISION_SCHEMA}.work_requests WHERE wr_id = @wr_id`,
+    { wr_id: id }
+  );
+}
+
+export async function listWorkRequests(filters: {
+  planId?: string;
+  status?: string;
+  limit?: number;
+}): Promise<WorkRequestRow[]> {
+  const conditions: string[] = [];
+  const params: any = {};
+  if (filters.planId) {
+    conditions.push("context->>'plan_id' = @planId");
+    params.planId = filters.planId;
+  }
+  if (filters.status) {
+    conditions.push("status = @status");
+    params.status = filters.status;
+  }
+  const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+  const limit = filters.limit ?? 50;
+  return qAll(
+    `SELECT * FROM ${VISION_SCHEMA}.work_requests ${where} ORDER BY recorded_on_dt DESC LIMIT ${limit}`,
+    params
+  );
+}
+
+export async function listReceiptsByPlan(planId: string, asOf?: string): Promise<any[]> {
+  if (asOf) {
+    return qAll(
+      `SELECT * FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId AND created_at <= @asOf ORDER BY created_at ASC`,
+      { planId, asOf }
+    );
+  }
+  return qAll(
+    `SELECT * FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId ORDER BY created_at ASC`,
+    { planId }
   );
 }
 
@@ -1429,7 +1945,7 @@ export async function getTokenUsageByPlan(planId: string): Promise<{
 }> {
   const row = await qOne(
     `SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-    FROM receipts WHERE plan_id = @planId`,
+    FROM ${VISION_SCHEMA}.receipts WHERE plan_id = @planId`,
     { planId }
   );
   return { plan_id: planId, total_tokens: row?.total_tokens ?? 0, receipts: row?.receipts ?? 0 };
@@ -1440,7 +1956,7 @@ export async function getTokenUsageByRole(role: string): Promise<{
 }> {
   const row = await qOne(
     `SELECT COALESCE(SUM(tokens_used), 0) as total_tokens, COUNT(*) as receipts
-    FROM receipts WHERE agent_role = @role`,
+    FROM ${VISION_SCHEMA}.receipts WHERE agent_role = @role`,
     { role }
   );
   return { role, total_tokens: row?.total_tokens ?? 0, receipts: row?.receipts ?? 0 };
@@ -1450,59 +1966,13 @@ export async function getTokenUsageByTicket(ticketId: string): Promise<{
   ticket_id: string; tokens_used: number;
 }> {
   const row = await qOne(
-    "SELECT COALESCE(tokens_used, 0) as tokens_used FROM tickets WHERE id = @ticketId",
+    `SELECT COALESCE(tokens_used, 0) as tokens_used FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
     { ticketId }
   );
   return { ticket_id: ticketId, tokens_used: row?.tokens_used ?? 0 };
 }
 
-// ── Orphan scan ─────────────────────────────────────────────────────
 
-export interface OrphanScanResult {
-  deletedWithStaleFiles: Array<{ planId: string; title: string; filePath: string }>;
-  filesWithNoDbRow: Array<{ planId: string; filePath: string }>;
-  summary: { deletedInDb: number; filesOnDisk: number; orphanedFiles: number; missingDbRows: number };
-}
-
-export async function scanOrphanedPlans(baseDir: string): Promise<OrphanScanResult> {
-  const result: OrphanScanResult = {
-    deletedWithStaleFiles: [], filesWithNoDbRow: [],
-    summary: { deletedInDb: 0, filesOnDisk: 0, orphanedFiles: 0, missingDbRows: 0 },
-  };
-
-  const deletedPlans = await qAll("SELECT id, title FROM plans WHERE deleted = 1") as { id: string; title: string }[];
-  result.summary.deletedInDb = deletedPlans.length;
-
-  const activeIds = new Set(
-    ((await qAll("SELECT id FROM plans")) as { id: string }[]).map((r) => r.id)
-  );
-
-  const deletedSet = new Map(deletedPlans.map((p) => [p.id, p.title]));
-  const IMPL_DIR = path.join(baseDir, "IMPLEMENTATION_PLANS");
-
-  for (const subdir of ["pending", "planning", "proposed", "active", "completed", "blocked"]) {
-    const dirPath = path.join(IMPL_DIR, subdir);
-    if (!fs.existsSync(dirPath)) continue;
-    for (const file of fs.readdirSync(dirPath)) {
-      if (!file.endsWith(".md") || file === ".gitkeep") continue;
-      const filePath = path.join(dirPath, file);
-      const match = file.match(/v(\d+)/) || file.match(/^(\d{4})-/);
-      if (!match) continue;
-      const planId = match[1].padStart(4, "0");
-
-      if (deletedSet.has(planId)) {
-        result.deletedWithStaleFiles.push({ planId, title: deletedSet.get(planId)!, filePath });
-        result.summary.orphanedFiles++;
-      }
-      if (!activeIds.has(planId)) {
-        result.filesWithNoDbRow.push({ planId, filePath });
-        result.summary.missingDbRows++;
-      }
-      result.summary.filesOnDisk++;
-    }
-  }
-  return result;
-}
 
 export async function getTicketLineage(planId: string): Promise<Array<{
   id: string; role: string; status: string; tokens_used: number | null;
@@ -1514,7 +1984,7 @@ export async function getTicketLineage(planId: string): Promise<Array<{
     `SELECT id, role, status, tokens_used,
        parent_ticket_id, spawn_reason, replacement_of, closure_reason,
        created_at, closed_at
-    FROM tickets WHERE plan_id = @planId ORDER BY created_at ASC`,
+    FROM ${VISION_SCHEMA}.tickets WHERE plan_id = @planId ORDER BY created_at ASC`,
     { planId }
   );
 }
@@ -1695,7 +2165,7 @@ export async function upsertRoleModels(
       );
     }
     // Reset role circuit breaker so scheduler can re-dispatch immediately
-    await tRun(client, "DELETE FROM role_circuit_breaker WHERE role = @role", { role });
+    await tRun(client, `DELETE FROM ${PEB_SCHEMA}.role_circuit_breaker WHERE role = @role`, { role });
     // Signal scheduler to wake from idle backoff
     await tRun(client,
       `UPDATE circuit_breaker SET wake_requested_at = @wake_at, updated_at = @wake_at WHERE id = 1`,
@@ -1911,6 +2381,84 @@ export async function validateAIConfig(): Promise<ConfigValidationWarning[]> {
 
 function parseJsonSafe(text: string, fallback: any): any {
   try { return JSON.parse(text); } catch { return fallback; }
+}
+
+// ── Governance Events ────────────────────────────────────────────────
+
+/**
+ * Replay governance events for receipts that don't have one yet.
+ * Idempotent — safe to call multiple times.
+ * Returns the count of newly emitted events.
+ */
+export async function replayGovernanceEvents(): Promise<{ replayed: number }> {
+  const result = await qRun(`
+    INSERT INTO ${PEB_SCHEMA}.governance_events (receipt_id, event_type, plan_id, agent_role, payload, created_at)
+    SELECT
+      r.id,
+      'receipt:' || r.type,
+      r.plan_id,
+      r.agent_role,
+      jsonb_build_object(
+        'session_id', r.session_id,
+        'artifact_path', r.artifact_path,
+        'summary', r.summary,
+        'ticket_id', r.ticket_id,
+        'tokens_used', r.tokens_used
+      ),
+      r.created_at::timestamptz
+    FROM ${VISION_SCHEMA}.receipts r
+    WHERE NOT EXISTS (
+      SELECT 1 FROM ${PEB_SCHEMA}.governance_events g WHERE g.receipt_id = r.id
+    )
+    ON CONFLICT (receipt_id) DO NOTHING
+  `);
+  const replayed = result ?? 0;
+
+  // Mark replayed events with replayed_at = NOW()
+  if (replayed > 0) {
+    await qRun(`
+      UPDATE ${PEB_SCHEMA}.governance_events
+      SET replayed_at = NOW()
+      WHERE replayed_at IS NULL
+      AND receipt_id IN (
+        SELECT r.id FROM ${VISION_SCHEMA}.receipts r
+        WHERE r.created_at::timestamptz < NOW() - INTERVAL '1 second'
+      )
+    `);
+  }
+
+  return { replayed };
+}
+
+/**
+ * List recent governance events, optionally filtered by plan_id or event_type.
+ */
+export async function listGovernanceEvents(filters: {
+  planId?: string;
+  eventType?: string;
+  asOf?: string;
+  limit?: number;
+}): Promise<any[]> {
+  const conditions: string[] = [];
+  const params: any = {};
+  if (filters.planId) {
+    conditions.push("plan_id = @planId");
+    params.planId = filters.planId;
+  }
+  if (filters.eventType) {
+    conditions.push("event_type = @eventType");
+    params.eventType = filters.eventType;
+  }
+  if (filters.asOf) {
+    conditions.push("created_at <= @asOf");
+    params.asOf = filters.asOf;
+  }
+  const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+  const limit = filters.limit ?? 50;
+  return qAll(
+    `SELECT * FROM ${PEB_SCHEMA}.governance_events ${where} ORDER BY created_at DESC LIMIT ${limit}`,
+    params
+  );
 }
 
 // ── Seed defaults ───────────────────────────────────────────────────

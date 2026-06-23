@@ -1,6 +1,10 @@
 -- V1: Initial schema for Persistent Engineering Brain (PEB)
+-- Tables created in the 'peb' schema with corrected names (no peb_ prefix).
 
-CREATE TABLE peb_state (
+CREATE SCHEMA IF NOT EXISTS peb;
+SET search_path TO peb;
+
+CREATE TABLE state (
     id UUID PRIMARY KEY,
     key VARCHAR(64) UNIQUE NOT NULL,
     content JSONB NOT NULL,
@@ -11,7 +15,7 @@ CREATE TABLE peb_state (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
-CREATE TABLE peb_transactions (
+CREATE TABLE transactions (
     id UUID PRIMARY KEY,
     idempotency_key VARCHAR(128) UNIQUE NOT NULL,
     entity_id VARCHAR(128) NOT NULL,
@@ -26,9 +30,9 @@ CREATE TABLE peb_transactions (
     committed_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE TABLE peb_decisions (
+CREATE TABLE decisions (
     id UUID PRIMARY KEY,
-    transaction_id UUID NOT NULL REFERENCES peb_transactions(id),
+    transaction_id UUID NOT NULL REFERENCES peb.transactions(id),
     adr_number VARCHAR(32),
     title VARCHAR(256) NOT NULL,
     status VARCHAR(32) NOT NULL,
@@ -38,16 +42,16 @@ CREATE TABLE peb_decisions (
     before_hash VARCHAR(64),
     after_hash VARCHAR(64),
     author_id VARCHAR(128) NOT NULL,
-    parent_decision_id UUID REFERENCES peb_decisions(id),
-    rollback_of UUID REFERENCES peb_decisions(id),
+    parent_decision_id UUID REFERENCES peb.decisions(id),
+    rollback_of UUID REFERENCES peb.decisions(id),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
-CREATE TABLE peb_traces (
+CREATE TABLE traces (
     id UUID PRIMARY KEY,
     transaction_id UUID NOT NULL,
     work_request_id VARCHAR(128) NOT NULL,
-    parent_trace_id UUID REFERENCES peb_traces(id),
+    parent_trace_id UUID REFERENCES peb.traces(id),
     stage VARCHAR(64) NOT NULL,
     inputs JSONB,
     causal_entries JSONB,
@@ -57,9 +61,9 @@ CREATE TABLE peb_traces (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
-CREATE TABLE peb_violations (
+CREATE TABLE violations (
     id UUID PRIMARY KEY,
-    transaction_id UUID REFERENCES peb_transactions(id),
+    transaction_id UUID REFERENCES peb.transactions(id),
     violation_type VARCHAR(32) NOT NULL,
     severity VARCHAR(8) NOT NULL,
     entity_id VARCHAR(128),
@@ -69,7 +73,7 @@ CREATE TABLE peb_violations (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
-CREATE TABLE peb_capabilities (
+CREATE TABLE capabilities (
     id UUID PRIMARY KEY,
     entity_id VARCHAR(128) NOT NULL,
     capability VARCHAR(128) NOT NULL,
@@ -78,3 +82,12 @@ CREATE TABLE peb_capabilities (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     active BOOLEAN NOT NULL DEFAULT TRUE
 );
+
+-- Recreate indexes with corrected table names
+CREATE INDEX idx_decisions_parent ON peb.decisions(parent_decision_id);
+CREATE INDEX idx_decisions_created ON peb.decisions(created_at DESC);
+CREATE INDEX idx_capabilities_entity ON peb.capabilities(entity_id, active);
+CREATE INDEX idx_traces_wr ON peb.traces(work_request_id);
+CREATE INDEX idx_traces_parent ON peb.traces(parent_trace_id);
+CREATE INDEX idx_violations_severity ON peb.violations(severity, created_at);
+CREATE INDEX idx_transactions_idempotency ON peb.transactions(idempotency_key);

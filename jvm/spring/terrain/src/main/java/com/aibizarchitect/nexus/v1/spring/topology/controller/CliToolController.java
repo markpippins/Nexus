@@ -55,7 +55,7 @@ public class CliToolController {
                     existing.setBuildCommand(details.getBuildCommand());
                     existing.setHealth(details.getHealth());
                     existing.setSysUser(details.getSysUser());
-                    existing.setSystemPass(details.getSystemPass());
+                    existing.setSysPass(details.getSysPass());
                     existing.setNotes(details.getNotes());
                     existing.setIsInternal(details.getIsInternal());
                     existing.setActiveFlag(details.getActiveFlag());

@@ -27,7 +27,6 @@ import {
   getTokenUsageByRole,
   getTokenUsageByTicket,
   getTicketLineage,
-  scanOrphanedPlans,
   getAIConfigSnapshot,
   getAIProviders,
   getAIHarnesses,
@@ -47,6 +46,13 @@ import {
   requestSchedulerWake,
   startSession,
   updateSessionPid,
+  replayGovernanceEvents,
+  listGovernanceEvents,
+  createWorkRequest,
+  getWorkRequest,
+  listWorkRequests,
+  listReceiptsByPlan,
+  insertReceipt,
 } from "./db";
 import http from "http";
 import { loadEnv } from "./env"; // shared .env loader (no dotenv dependency)
@@ -297,12 +303,10 @@ app.get("/tools", async (_req, res) => {
 
 // Health check (read-only)
 app.get("/health", async (_req, res) => {
-  const orphanScan = await scanOrphanedPlans(GRAPH_DIR);
   res.json({
     status: "ok",
     port: PORT,
     pid: process.pid,
-    orphanScan,
     timestamp: new Date().toISOString(),
   });
 });
@@ -633,6 +637,10 @@ app.post("/circuit-breaker/trip", async (req, res) => {
 app.post("/circuit-breaker/reset", async (_req, res) => {
   try {
     await clearBreaker();
+
+    // Wake the Python scheduler so it re-polls immediately instead of
+    // waiting out the idle backoff (SCHEDULER_IDLE_BACKOFF, 60s).
+    await requestSchedulerWake();
 
     // v078: Reset abandoned Tickets to open so work can resume
     const ticketsReset = await resetAbandonedTickets();
@@ -1574,6 +1582,128 @@ app.get("/log/:sessionId", async (req, res) => {
     if (pollTimer) clearInterval(pollTimer);
     clearInterval(keepAlive);
   });
+});
+
+// ── Governance Events ───────────────────────────────────────────────
+// Observability spine: replay historical receipts into peb.governance_events
+// and list events for debugging/monitoring.
+
+app.post("/governance/replay", async (_req, res) => {
+  try {
+    const result = await replayGovernanceEvents();
+    res.json({ ok: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/governance/events", async (req, res) => {
+  try {
+    const events = await listGovernanceEvents({
+      planId: req.query.planId as string | undefined,
+      eventType: req.query.eventType as string | undefined,
+      asOf: req.query.asOf as string | undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+    });
+    res.json({ ok: true, events });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── Vision HTTP API (for the Python vision_bridge module) ──────────
+// These endpoints are consumed by the LOSM bridge
+// (python/tackle/vision_bridge.py) which is the canonical typed writer.
+
+app.post("/vision/work-requests", async (req, res) => {
+  try {
+    const { id, work_request_uuid, dco_json, context, status } = req.body;
+    if (!id) {
+      res.status(400).json({ ok: false, error: "Missing required field: id" });
+      return;
+    }
+    const result = await createWorkRequest({
+      id,
+      work_request_uuid: work_request_uuid || undefined,
+      dco_json: dco_json || "{}",
+      context: context || {},
+      status: status || "pending",
+    });
+    res.json({ ...result });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/vision/work-requests", async (req, res) => {
+  try {
+    const wrs = await listWorkRequests({
+      planId: req.query.planId as string | undefined,
+      status: req.query.status as string | undefined,
+      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
+    });
+    res.json({ ok: true, work_requests: wrs });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/vision/work-requests/:id", async (req, res) => {
+  try {
+    const wr = await getWorkRequest(req.params.id);
+    if (!wr) {
+      res.status(404).json({ ok: false, error: "Not found" });
+      return;
+    }
+    res.json({ ok: true, work_request: wr });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/vision/receipts", async (req, res) => {
+  try {
+    const planId = req.query.planId as string;
+    const asOf = req.query.asOf as string | undefined;
+    if (!planId) {
+      res.status(400).json({ ok: false, error: "Missing required query: planId" });
+      return;
+    }
+    const receipts = await listReceiptsByPlan(planId, asOf);
+    res.json({ ok: true, receipts });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /vision/receipts — Direct receipt insertion (no state machine).
+ * Used by the Python LOSM bridge for standalone work requests
+ * that don't have a matching conduit plan. Skips the state machine
+ * validation in tools.ts so the typed bridge can issue LOSM-native
+ * ExecutionReceipts without creating dummy plans.
+ */
+app.post("/vision/receipts", async (req, res) => {
+  try {
+    const { id, plan_id, type, agent_role, session_id, artifact_path, summary, metadata_json, tokens_used, created_at } = req.body;
+    if (!id || !plan_id || !type || !agent_role || !created_at) {
+      res.status(400).json({ ok: false, error: "Missing required fields: id, plan_id, type, agent_role, created_at" });
+      return;
+    }
+    await insertReceipt({
+      id, plan_id, type, agent_role,
+      session_id: session_id || '',
+      ticket_id: req.body.ticket_id || null,
+      artifact_path: artifact_path || null,
+      summary: summary || '',
+      metadata_json: metadata_json || '{}',
+      tokens_used: tokens_used ?? 0,
+      created_at,
+    });
+    res.json({ ok: true, id, plan_id });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // ── PID file for reliable restarts ───────────────────────────────

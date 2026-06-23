@@ -66,7 +66,7 @@ describe("createSchema on fresh database", () => {
       // ── VECTOR SCHEMA: verify all AI config tables exist ──
       const vectorTablesResult = await pool.query(
         `SELECT table_name FROM information_schema.tables
-         WHERE table_schema = 'vector' ORDER BY table_name`
+         WHERE table_schema = 'tackle' ORDER BY table_name`
       );
       const vectorTables = vectorTablesResult.rows.map((r: any) => r.table_name);
 
@@ -81,7 +81,7 @@ describe("createSchema on fresh database", () => {
       const rmColsResult = await pool.query(
         `SELECT column_name, data_type, is_nullable
          FROM information_schema.columns
-         WHERE table_schema = 'vector' AND table_name = 'role_models'
+         WHERE table_schema = 'tackle' AND table_name = 'role_models'
          ORDER BY ordinal_position`
       );
       const rmCols = rmColsResult.rows.map((r: any) => r.column_name);
@@ -253,7 +253,7 @@ describe("createSchema on fresh database", () => {
     // Also drop v7's constraint change so we can re-test v6 isolation.
     const adminClient = await adminPool.connect();
     try {
-      await adminClient.query(`SET search_path TO ${testSchema},vector`);
+      await adminClient.query(`SET search_path TO ${testSchema},tackle`);
       await adminClient.query(`ALTER TABLE tickets DROP COLUMN IF EXISTS deadline`);
       // Restore the old 4-role CHECK constraint (undo v7)
       await adminClient.query(`
@@ -262,11 +262,11 @@ describe("createSchema on fresh database", () => {
         BEGIN
           SELECT conname INTO v_conname
           FROM pg_constraint
-          WHERE conrelid = 'vector.role_config'::regclass AND contype = 'c';
+          WHERE conrelid = 'tackle.role_config'::regclass AND contype = 'c';
           IF v_conname IS NOT NULL THEN
-            EXECUTE format('ALTER TABLE vector.role_config DROP CONSTRAINT %I', v_conname);
+            EXECUTE format('ALTER TABLE tackle.role_config DROP CONSTRAINT %I', v_conname);
           END IF;
-          ALTER TABLE vector.role_config ADD CONSTRAINT role_config_role_check
+          ALTER TABLE tackle.role_config ADD CONSTRAINT role_config_role_check
             CHECK (role IN ('planner','builder','reviewer','critic'));
         END;
         $MIGRATE$
@@ -404,8 +404,8 @@ describe("createSchema on fresh database", () => {
     const adminClient = await adminPool.connect();
     try {
       await adminClient.query(`CREATE SCHEMA IF NOT EXISTS ${testSchema}`);
-      await adminClient.query(`CREATE SCHEMA IF NOT EXISTS vector`);
-      await adminClient.query(`SET search_path TO ${testSchema},vector`);
+      await adminClient.query(`CREATE SCHEMA IF NOT EXISTS tackle`);
+      await adminClient.query(`SET search_path TO ${testSchema},tackle`);
 
       // Strip all migration artifacts left by tests 1 and 2 so we start from
       // a pure legacy state. Dependencies must be dropped in order:
@@ -537,9 +537,9 @@ describe("createSchema on fresh database", () => {
         ON CONFLICT (id) DO NOTHING;
       `);
 
-      // Legacy vector schema tables
+      // Legacy tackle schema tables
       await adminClient.query(`
-        CREATE TABLE IF NOT EXISTS vector.providers (
+        CREATE TABLE IF NOT EXISTS tackle.providers (
           id           TEXT PRIMARY KEY,
           name         TEXT NOT NULL,
           type         TEXT NOT NULL CHECK(type IN (
@@ -553,7 +553,7 @@ describe("createSchema on fresh database", () => {
           updated_at   TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS vector.harnesses (
+        CREATE TABLE IF NOT EXISTS tackle.harnesses (
           id                   TEXT PRIMARY KEY,
           name                 TEXT NOT NULL,
           invocation_semantics TEXT NOT NULL DEFAULT '{}',
@@ -561,36 +561,36 @@ describe("createSchema on fresh database", () => {
           updated_at           TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS vector.models (
+        CREATE TABLE IF NOT EXISTS tackle.models (
           id               TEXT PRIMARY KEY,
           name             TEXT NOT NULL,
-          harness_id       TEXT NOT NULL REFERENCES vector.harnesses(id) ON DELETE CASCADE,
-          provider_id      TEXT REFERENCES vector.providers(id),
+          harness_id       TEXT NOT NULL REFERENCES tackle.harnesses(id) ON DELETE CASCADE,
+          provider_id      TEXT REFERENCES tackle.providers(id),
           model_identifier TEXT NOT NULL,
           created_at       TEXT NOT NULL,
           updated_at       TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS vector.role_config (
+        CREATE TABLE IF NOT EXISTS tackle.role_config (
           id            TEXT PRIMARY KEY,
           role          TEXT NOT NULL UNIQUE CHECK(role IN (
                            'planner','builder','reviewer','critic'
                          )),
-          provider_id   TEXT NOT NULL REFERENCES vector.providers(id),
-          harness_id    TEXT NOT NULL REFERENCES vector.harnesses(id),
-          model_id      TEXT NOT NULL REFERENCES vector.models(id),
+          provider_id   TEXT NOT NULL REFERENCES tackle.providers(id),
+          harness_id    TEXT NOT NULL REFERENCES tackle.harnesses(id),
+          model_id      TEXT NOT NULL REFERENCES tackle.models(id),
           extra_params  TEXT NOT NULL DEFAULT '{}',
           created_at    TEXT NOT NULL,
           updated_at    TEXT NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS vector.role_models (
+        CREATE TABLE IF NOT EXISTS tackle.role_models (
           id          TEXT PRIMARY KEY,
-          role        TEXT NOT NULL REFERENCES vector.role_config(role) ON DELETE CASCADE,
-          model_id    TEXT NOT NULL REFERENCES vector.models(id),
+          role        TEXT NOT NULL REFERENCES tackle.role_config(role) ON DELETE CASCADE,
+          model_id    TEXT NOT NULL REFERENCES tackle.models(id),
           priority    INTEGER NOT NULL DEFAULT 0,
-          provider_id TEXT REFERENCES vector.providers(id),
-          harness_id  TEXT REFERENCES vector.harnesses(id),
+          provider_id TEXT REFERENCES tackle.providers(id),
+          harness_id  TEXT REFERENCES tackle.harnesses(id),
           UNIQUE(role, model_id)
         );
       `);
@@ -697,7 +697,7 @@ describe("createSchema on fresh database", () => {
       const rcConstraint = await pool.query(
         `SELECT pg_get_constraintdef(oid) AS constraint_def
          FROM pg_constraint
-         WHERE conrelid = 'vector.role_config'::regclass AND contype = 'c'`
+         WHERE conrelid = 'tackle.role_config'::regclass AND contype = 'c'`
       );
       expect(rcConstraint.rows.length).toBe(1);
       const def = rcConstraint.rows[0].constraint_def;

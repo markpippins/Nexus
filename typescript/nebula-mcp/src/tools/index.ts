@@ -639,6 +639,325 @@ export function registerTools(server: McpServer) {
   );
 
   // ════════════════════════════════════════════════════════════════
+  //  HARVESTS
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_list_harvests",
+    "List harvest pipeline outputs, optionally filtered by model.",
+    {
+      model: z.string().optional().describe("Filter by model name (e.g. 'DeepSeek V4')"),
+      limit: z.number().optional().describe("Max results (default 100, max 500)"),
+      offset: z.number().optional().describe("Offset for pagination"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listHarvests({
+        model: args.model,
+        limit: args.limit,
+        offset: args.offset,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_harvest",
+    "Get a single harvest with full candidate data.",
+    {
+      id: z.string().describe("Harvest UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getHarvest(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_create_harvest",
+    "Record a new harvest pipeline output in the database.",
+    {
+      sourcePath: z.string().describe("Path to the source chat transcript"),
+      sourceFilename: z.string().optional().describe("Display filename for the source"),
+      model: z.string().optional().describe("Model used for harvest (e.g. 'DeepSeek V4')"),
+      totalCandidates: z.number().optional().describe("Total number of candidates extracted"),
+      candidates: z.array(z.any()).optional().describe("Array of candidate objects"),
+      sourceText: z.string().optional().describe("Raw markdown text of the harvest file"),
+      tags: z.array(z.string()).optional().describe("Tags for filtering"),
+      metadata: z.any().optional().describe("Optional metadata object"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createHarvest({
+        sourcePath: args.sourcePath,
+        sourceFilename: args.sourceFilename,
+        model: args.model,
+        totalCandidates: args.totalCandidates,
+        candidates: args.candidates,
+        sourceText: args.sourceText,
+        tags: args.tags,
+        metadata: args.metadata,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_delete_harvest",
+    "Delete a harvest record.",
+    {
+      id: z.string().describe("Harvest UUID to delete"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deleteHarvest(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  AGENT RECORDS
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_list_agent_records",
+    "List agent audit records, optionally filtered by type (report|analysis|assessment|inspection|prompt|response|engineering_log|architecture_note|decision), role, system, or plan.",
+    {
+      type: z.string().optional().describe("Filter by record type (report, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision)"),
+      role: z.string().optional().describe("Filter by agent role (architect, planner, builder, reviewer, critic, analyst, inspector, engineer)"),
+      systemId: z.string().optional().describe("Filter by associated system UUID"),
+      planRef: z.string().optional().describe("Filter by conduit plan reference (e.g. '0136')"),
+      tag: z.string().optional().describe("Filter by tag"),
+      limit: z.number().optional().describe("Max results (default 100, max 500)"),
+      offset: z.number().optional().describe("Offset for pagination"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listAgentRecords({
+        type: args.type,
+        role: args.role,
+        systemId: args.systemId,
+        planRef: args.planRef,
+        tag: args.tag,
+        limit: args.limit,
+        offset: args.offset,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_agent_record",
+    "Get a single agent record with full content.",
+    {
+      id: z.string().describe("Agent record UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getAgentRecord(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_create_agent_record",
+    "Create a new agent record in the database (canonical write path for all agent audit artifacts). Use this instead of writing to the filesystem.",
+    {
+      recordType: z.enum([
+        "report", "analysis", "assessment", "inspection",
+        "prompt", "response", "engineering_log",
+        "architecture_note", "decision",
+      ]).describe("Type of record"),
+      role: z.string().optional().describe("Agent role (architect, planner, builder, reviewer, critic, analyst, inspector, engineer)"),
+      title: z.string().optional().describe("Record title"),
+      content: z.string().optional().describe("Markdown content body"),
+      sourcePath: z.string().optional().describe("Original filesystem path if migrating from audit/"),
+      metadata: z.any().optional().describe("Flexible JSON metadata"),
+      tags: z.array(z.string()).optional().describe("Tags for filtering"),
+      systemId: z.string().optional().describe("Associated system UUID"),
+      subsystemId: z.string().optional().describe("Associated subsystem UUID"),
+      featureId: z.string().optional().describe("Associated feature UUID"),
+      planRef: z.string().optional().describe("Conduit plan reference (e.g. '0136')"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createAgentRecord({
+        recordType: args.recordType,
+        role: args.role,
+        title: args.title,
+        content: args.content,
+        sourcePath: args.sourcePath,
+        metadata: args.metadata,
+        tags: args.tags,
+        systemId: args.systemId,
+        subsystemId: args.subsystemId,
+        featureId: args.featureId,
+        planRef: args.planRef,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_update_agent_record",
+    "Update an existing agent record's fields.",
+    {
+      id: z.string().describe("Agent record UUID"),
+      title: z.string().optional().describe("New title"),
+      content: z.string().optional().describe("New markdown content"),
+      metadata: z.any().optional().describe("New JSON metadata"),
+      tags: z.array(z.string()).optional().describe("New tags array"),
+      systemId: z.string().nullable().optional().describe("Associated system UUID"),
+      subsystemId: z.string().nullable().optional().describe("Associated subsystem UUID"),
+      featureId: z.string().nullable().optional().describe("Associated feature UUID"),
+      planRef: z.string().nullable().optional().describe("Conduit plan reference"),
+    },
+    async (args) => {
+      const { id, ...body } = args;
+      const result = await NebulaClient.updateAgentRecord(id, body);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_delete_agent_record",
+    "Delete an agent record from the database.",
+    {
+      id: z.string().describe("Agent record UUID to delete"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deleteAgentRecord(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  PROJECTIONS
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_list_projections",
+    "List all on-demand markdown folder generation configs.",
+    {},
+    async () => {
+      const result = await NebulaClient.listProjections();
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_create_projection",
+    "Create a new projection config for on-demand markdown folder generation.",
+    {
+      name: z.string().describe("Unique projection name"),
+      type: z.enum(["deterministic", "inference"]).describe("deterministic (SQL+template) or inference (LLM)"),
+      description: z.string().optional().describe("Description of what this projection generates"),
+      sourceQuery: z.string().optional().describe("SQL SELECT query that feeds the template (deterministic only)"),
+      template: z.string().optional().describe("Markdown template with {{placeholder}} syntax"),
+      targetPath: z.string().optional().describe("Relative output path under audit/ (e.g. 'ARCHITECTURE/reports/{{id}}.md')"),
+      model: z.string().optional().describe("LLM model for inference type projections"),
+      schedule: z.string().optional().describe("Optional cron expression for auto-regeneration"),
+      metadata: z.any().optional().describe("Optional metadata"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createProjection(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_render_projection",
+    "Execute a projection and write output markdown files to the audit/ folder.",
+    {
+      id: z.string().describe("Projection UUID to render"),
+    },
+    async (args) => {
+      const result = await NebulaClient.renderProjection(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_delete_projection",
+    "Delete a projection config.",
+    {
+      id: z.string().describe("Projection UUID to delete"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deleteProjection(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  CROSS-REFERENCES
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_list_cross_references",
+    "List cross-references between entities, optionally filtered by source/target type/id or relation type.",
+    {
+      sourceType: z.string().optional().describe("Filter by source entity type (e.g. 'requirement', 'system')"),
+      sourceId: z.string().optional().describe("Filter by source entity UUID"),
+      targetType: z.string().optional().describe("Filter by target entity type"),
+      targetId: z.string().optional().describe("Filter by target entity UUID"),
+      relType: z.string().optional().describe("Filter by relation type (e.g. 'depends_on', 'implements', 'duplicates')"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listCrossReferences({
+        sourceType: args.sourceType,
+        sourceId: args.sourceId,
+        targetType: args.targetType,
+        targetId: args.targetId,
+        relType: args.relType,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_cross_reference",
+    "Get a single cross-reference by ID.",
+    {
+      id: z.string().describe("Cross-reference UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getCrossReference(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_create_cross_reference",
+    "Create a cross-reference link between two entities.",
+    {
+      sourceType: z.string().describe("Source entity type (e.g. 'requirement', 'system')"),
+      sourceId: z.string().describe("Source entity UUID"),
+      targetType: z.string().describe("Target entity type"),
+      targetId: z.string().describe("Target entity UUID"),
+      relType: z.string().describe("Relation type (e.g. 'depends_on', 'implements', 'duplicates')"),
+      metadata: z.any().optional().describe("Optional JSON metadata for the link"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createCrossReference({
+        sourceType: args.sourceType,
+        sourceId: args.sourceId,
+        targetType: args.targetType,
+        targetId: args.targetId,
+        relType: args.relType,
+        metadata: args.metadata,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_delete_cross_reference",
+    "Delete a cross-reference link.",
+    {
+      id: z.string().describe("Cross-reference UUID to delete"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deleteCrossReference(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
   //  COMPLEX OPERATIONS
   // ════════════════════════════════════════════════════════════════
 
@@ -687,6 +1006,87 @@ export function registerTools(server: McpServer) {
     {},
     async () => {
       const result = await NebulaClient.seedData();
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  CONDUIT HISTORY — plan history & point-in-time queries
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_query_conduit_plans",
+    "List conduit pipeline plans. Optionally include soft-deleted plans or query state as-of a past timestamp. " +
+    "Use this to answer 'what plans exist?' or 'what plans existed yesterday?'.",
+    {
+      includeDeleted: z.boolean().optional()
+        .describe("Include soft-deleted plans (deleted=1). Default false (only active plans)."),
+      asOf: z.string().optional()
+        .describe("ISO 8601 timestamp to query historical plan state. Returns state derived from receipts up to that time."),
+      status: z.string().optional()
+        .describe("Filter by derived status (e.g. PLAN_CREATE, IMPLEMENTATION, BLOCK, REVIEW_PASS)."),
+      limit: z.number().optional().describe("Max results (default 100, max 500)"),
+      offset: z.number().optional().describe("Offset for pagination"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listConduitPlans({
+        includeDeleted: args.includeDeleted,
+        asOf: args.asOf,
+        status: args.status,
+        limit: args.limit,
+        offset: args.offset,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_query_conduit_plan_history",
+    "Get the full lifecycle history of a single conduit plan — plan metadata, all receipts, all tickets, " +
+    "linked sessions, and token usage. Use this to answer 'what happened to plan X?'.",
+    {
+      planId: z.string().describe("The plan number or ID (e.g. '0169', '0075')"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getConduitPlanHistory(args.planId);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_query_conduit_plan_receipts",
+    "Get all receipts (state transitions) for a specific conduit plan.",
+    {
+      planId: z.string().describe("The plan number or ID (e.g. '0169')"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getConduitPlanReceipts(args.planId);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_query_conduit_as_of",
+    "Get a point-in-time snapshot of all plan states. Use this to answer 'what was in conduit yesterday?' " +
+    "or 'what was the pipeline state last Tuesday?'.",
+    {
+      timestamp: z.string().describe("ISO 8601 timestamp (e.g. '2026-06-21T12:00:00Z' or '2026-06-21')"),
+      includeDeleted: z.boolean().optional()
+        .describe("Include plans that were soft-deleted as of that time."),
+    },
+    async (args) => {
+      const result = await NebulaClient.getConduitPlansAsOf(args.timestamp, args.includeDeleted);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_list_deleted_conduit_plans",
+    "Find all soft-deleted conduit plans that are no longer visible in the live pipeline. " +
+    "Use this to recover plans that were deleted but still have data in the database.",
+    {},
+    async () => {
+      const result = await NebulaClient.listDeletedConduitPlans();
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );

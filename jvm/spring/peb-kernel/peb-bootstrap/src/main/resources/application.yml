@@ -14,9 +14,9 @@ spring:
       creator: any
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/peb
-    username: ${DB_USER:peb_user}
-    password: ${DB_PASS:peb_pass}
+    url: jdbc:postgresql://localhost:5432/nexus?currentSchema=peb
+    username: ${DB_USER:pguser}
+    password: ${DB_PASS:pgpass}
 
   jpa:
     hibernate:
@@ -27,7 +27,12 @@ spring:
         format_sql: true
 
   flyway:
-    enabled: true
+    # Flyway disabled — V3 migration (public→peb schema, strip peb_ prefix)
+    # was applied manually. V1__init_peb_schema.sql has been updated to match
+    # the corrected table names (no peb_ prefix) in the peb schema.
+    # Hibernate ddl-auto=validate handles schema verification.
+    enabled: false
+    validate-on-migrate: false
     locations: classpath:db/migration
 
 server:

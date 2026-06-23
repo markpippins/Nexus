@@ -31,7 +31,7 @@ public class TopologyDataInitializer implements CommandLineRunner {
     private static final String SERVICE_DEPENDENCIES_PATH = "config/service-dependencies.json";
     private static final String CLI_TOOLS_PATH = "config/cli-tools.json";
 
-    private static boolean reInitialize = true;
+    private static boolean reInitialize = false;
 
     public TopologyDataInitializer(BrokerProfileRepository brokerProfileRepository,
                                     RegistryServerProfileRepository registryServerProfileRepository,

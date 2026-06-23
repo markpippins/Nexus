@@ -1,6 +1,9 @@
-import path from "path";
-import fs from "fs";
 import { PipelineMetrics, PlanCard } from "../types";
+
+export interface AnalyticsDbStats {
+  totalBuildersLaunched: number;
+  totalBuildersKilled: number;
+}
 
 export class AnalyticsEngine {
   compute(
@@ -10,8 +13,7 @@ export class AnalyticsEngine {
       active: PlanCard[];
       blocked: PlanCard[];
     },
-    archiveEntries: any[],
-    baseDir: string,
+    dbStats: AnalyticsDbStats,
   ): PipelineMetrics {
     const now = Date.now();
     const completed = plans.completed;
@@ -19,19 +21,6 @@ export class AnalyticsEngine {
     const active = plans.active;
     const blocked = plans.blocked;
     const allPlans = [...completed, ...pending, ...active, ...blocked];
-
-    const builderLogs = archiveEntries.filter(
-      (e) => e.category === "build-logs",
-    );
-    const buildersLaunched = builderLogs.length;
-    let buildersKilled = 0;
-    try {
-      const wdLog = path.join(baseDir, "builder-watchdog.log");
-      if (fs.existsSync(wdLog)) {
-        const content = fs.readFileSync(wdLog, "utf-8");
-        buildersKilled = (content.match(/(STALE:|TIMEOUT:)/g) || []).length;
-      }
-    } catch {}
 
     let totalLifetime = 0;
     let lifetimeCount = 0;
@@ -73,11 +62,13 @@ export class AnalyticsEngine {
       totalPlansPending: pending.length,
       totalPlansActive: active.length,
       totalPlansBlocked: blocked.length,
-      totalBuildersLaunched: buildersLaunched,
-      totalBuildersKilled: buildersKilled,
+      totalBuildersLaunched: dbStats.totalBuildersLaunched,
+      totalBuildersKilled: dbStats.totalBuildersKilled,
       averagePlanLifetimeSeconds: Math.round(avgLifetime),
       builderStalenessRate:
-        buildersLaunched > 0 ? buildersKilled / buildersLaunched : 0,
+        dbStats.totalBuildersLaunched > 0
+          ? dbStats.totalBuildersKilled / dbStats.totalBuildersLaunched
+          : 0,
       circuitBreakerTrips: 0,
       throughputSparkline: sparkline,
       throughputAvg: sparkline.reduce((a: number, b: number) => a + b, 0) / 7,

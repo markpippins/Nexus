@@ -8,8 +8,8 @@ const ALLOWED: Record<string, string[]> = {
   PLAN_CREATE: ["IMPLEMENTATION", "BLOCK", "CRITIQUE"],
   // After implementation, reviewer can pass or reject:
   IMPLEMENTATION: ["REVIEW_PASS", "REVIEW_REJECT", "REVIEW"],
-  // Rejection → builder re-implements:
-  REVIEW_REJECT: ["IMPLEMENTATION"],
+  // Rejection → builder re-implements, or manual REVIEW_PASS override
+  REVIEW_REJECT: ["IMPLEMENTATION", "REVIEW_PASS"],
   // After pass, plan is done. Block from any state:
   BLOCK: ["IMPLEMENTATION"], // unblock by implementing
   // REVIEW_PASS is terminal — no further receipts for THIS plan.
@@ -28,6 +28,8 @@ const ALLOWED: Record<string, string[]> = {
   CRITIQUE_REJECT: ["PLAN_CREATE"], // critique failed → back to planning
   // Planner block:
   PLAN_BLOCK: ["IMPLEMENTATION"], // unblock via implementation
+  // Requeued plans can be re-dispatched:
+  REQUEUED: ["PLAN_CREATE", "IMPLEMENTATION"],
   // Cancelled / abandoned plans can be resurrected:
   CANCELLED: ["PLAN_CREATE"],
   ABANDONED: ["PLAN_CREATE"],

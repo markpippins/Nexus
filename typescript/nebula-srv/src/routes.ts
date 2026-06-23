@@ -351,7 +351,7 @@ export function createRoutes(pool: Pool): Router {
         vals
       );
       res.json(rows.map((r: any) => ({
-        ...toEpochMs(r, 'created_at', 'updated_at'),
+        ...toEpochMs(r, 'created_at'),
         systemId: r.system_id,
         subsystemId: r.subsystem_id,
         featureId: r.feature_id,
@@ -376,7 +376,7 @@ export function createRoutes(pool: Pool): Router {
         [systemId, subsystemId, featureId, title, description, normalizedStatus, priority, startDate, completionDate]
       );
       res.status(201).json({
-        ...toEpochMs(reqt, 'created_at', 'updated_at'),
+        ...toEpochMs(reqt, 'created_at'),
         systemId: reqt.system_id,
         subsystemId: reqt.subsystem_id,
         featureId: reqt.feature_id,
@@ -434,7 +434,7 @@ export function createRoutes(pool: Pool): Router {
       );
       if (!reqt) return res.status(404).json({ error: 'Requirement not found' });
       res.json({
-        ...toEpochMs(reqt, 'created_at', 'updated_at'),
+        ...toEpochMs(reqt, 'created_at'),
         systemId: reqt.system_id, subsystemId: reqt.subsystem_id, featureId: reqt.feature_id,
         startDate: reqt.start_date, completionDate: reqt.completion_date,
       });
@@ -478,7 +478,7 @@ export function createRoutes(pool: Pool): Router {
       await client.query('BEGIN');
       // Lock the row to detect concurrent moves
       const { rows: [currentRow] } = await client.query(
-        'SELECT id, status FROM requirements WHERE id = $1 FOR UPDATE',
+        'SELECT id, status FROM nebula.requirements_history WHERE id = $1 AND recorded_until_dt = \'9999-12-31 23:59:59+00\' FOR UPDATE',
         [id]
       );
       if (!currentRow) {
@@ -499,7 +499,7 @@ export function createRoutes(pool: Pool): Router {
       );
       await client.query('COMMIT');
       res.json({
-        ...toEpochMs(reqt, 'created_at', 'updated_at'),
+        ...toEpochMs(reqt, 'created_at'),
         systemId: reqt.system_id, subsystemId: reqt.subsystem_id, featureId: reqt.feature_id,
         startDate: reqt.start_date, completionDate: reqt.completion_date,
       });
@@ -551,7 +551,7 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { rows } = await pool.query('SELECT * FROM work_sessions ORDER BY created_at DESC');
       res.json(rows.map((r: any) => ({
-        ...toEpochMs(r, 'created_at', 'updated_at'),
+        ...toEpochMs(r, 'created_at'),
         parentId: r.parent_id,
         parentType: r.parent_type,
         parentName: r.parent_name,
@@ -574,7 +574,7 @@ export function createRoutes(pool: Pool): Router {
         [parentId, normalizedParentType, parentName, context, platform, model, outcome, status]
       );
       res.status(201).json({
-        ...toEpochMs(sess, 'created_at', 'updated_at'),
+        ...toEpochMs(sess, 'created_at'),
         parentId: sess.parent_id, parentType: sess.parent_type, parentName: sess.parent_name,
       });
     } catch (err: any) {
@@ -600,7 +600,7 @@ export function createRoutes(pool: Pool): Router {
       );
       if (!sess) return res.status(404).json({ error: 'Session not found' });
       res.json({
-        ...toEpochMs(sess, 'created_at', 'updated_at'),
+        ...toEpochMs(sess, 'created_at'),
         parentId: sess.parent_id, parentType: sess.parent_type, parentName: sess.parent_name,
       });
     } catch (err: any) {
@@ -988,7 +988,7 @@ export function createRoutes(pool: Pool): Router {
   }
 
   // ── Helper: upsert audit files into DB (bulk, with stale cleanup) ──
-  async function syncAuditFilesToDb(): Promise<{ id: string; filePath: string; content: string; sizeBytes: number; updatedAt: string }[]> {
+  async function syncAuditFilesToDb(): Promise<{ id: string; filePath: string; content: string; sizeBytes: number; recordedOn: string }[]> {
     const scanned = scanAuditDir(AUDIT_ROOT, AUDIT_ROOT);
     const scannedPaths = new Set(scanned.map(f => f.filePath));
     const client = await pool.connect();
@@ -1006,22 +1006,28 @@ export function createRoutes(pool: Pool): Router {
       }
 
       // Upsert each file
-      const results: { id: string; filePath: string; content: string; sizeBytes: number; updatedAt: string }[] = [];
+      const results: { id: string; filePath: string; content: string; sizeBytes: number; recordedOn: string }[] = [];
       for (const file of scanned) {
         const content = fs.readFileSync(file.absPath, 'utf-8');
-        const { rows: [row] } = await client.query(
-          `INSERT INTO audit_files (file_path, content, size_bytes)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (file_path) DO UPDATE SET content = $2, size_bytes = $3, updated_at = NOW()
-           RETURNING id, file_path, content, size_bytes, updated_at`,
-          [file.filePath, content, file.sizeBytes]
-        );
+      await client.query(
+        `UPDATE nebula.audit_files_history
+         SET recorded_until_dt = NOW()
+         WHERE file_path = $1
+           AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+        [file.filePath]
+      );
+      const { rows: [row] } = await client.query(
+        `INSERT INTO nebula.audit_files_history (file_path, content, size_bytes, recorded_on_dt, recorded_until_dt)
+         VALUES ($1, $2, $3, NOW(), '9999-12-31 23:59:59+00')
+         RETURNING id, file_path, content, size_bytes, recorded_on_dt`,
+        [file.filePath, content, file.sizeBytes]
+      );
         results.push({
           id: row.id,
           filePath: row.file_path,
           content: row.content,
           sizeBytes: row.size_bytes,
-          updatedAt: row.updated_at,
+          recordedOn: row.recorded_on_dt,
         });
       }
 
@@ -1039,7 +1045,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/audit', async (_req: Request, res: Response) => {
     try {
       const { rows } = await pool.query(
-        'SELECT id, file_path, size_bytes, updated_at FROM audit_files ORDER BY file_path'
+        'SELECT id, file_path, size_bytes, recorded_on_dt FROM audit_files ORDER BY file_path'
       );
       res.json({
         files: rows.map((r: any) => ({
@@ -1047,7 +1053,7 @@ export function createRoutes(pool: Pool): Router {
           filePath: r.file_path,
           content: '',
           sizeBytes: r.size_bytes,
-          updatedAt: new Date(r.updated_at).getTime(),
+          updatedAt: new Date(r.recorded_on_dt).getTime(),
         })),
         count: rows.length,
       });
@@ -1061,7 +1067,7 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id } = req.params;
       const { rows: [row] } = await pool.query(
-        'SELECT id, file_path, content, size_bytes, updated_at FROM audit_files WHERE id = $1',
+        'SELECT id, file_path, content, size_bytes, recorded_on_dt FROM audit_files WHERE id = $1',
         [id]
       );
       if (!row) return res.status(404).json({ error: 'Audit file not found' });
@@ -1070,7 +1076,7 @@ export function createRoutes(pool: Pool): Router {
         filePath: row.file_path,
         content: row.content,
         sizeBytes: row.size_bytes,
-        updatedAt: new Date(row.updated_at).getTime(),
+        updatedAt: new Date(row.recorded_on_dt).getTime(),
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1087,7 +1093,7 @@ export function createRoutes(pool: Pool): Router {
           filePath: f.filePath,
           content: '',
           sizeBytes: f.sizeBytes,
-          updatedAt: new Date(f.updatedAt).getTime(),
+          recordedOn: new Date(f.recordedOn).getTime(),
         })),
         count: files.length,
       });
@@ -1115,7 +1121,7 @@ export function createRoutes(pool: Pool): Router {
       const content = fs.readFileSync(absPath, 'utf-8');
       const st = fs.statSync(absPath);
       const { rows: [updated] } = await pool.query(
-        'UPDATE audit_files SET content = $1, size_bytes = $2, updated_at = NOW() WHERE id = $3 RETURNING id, file_path, content, size_bytes, updated_at',
+        'UPDATE audit_files SET content = $1, size_bytes = $2 WHERE id = $3 RETURNING id, file_path, content, size_bytes, recorded_on_dt',
         [content, st.size, id]
       );
       res.json({
@@ -1123,7 +1129,7 @@ export function createRoutes(pool: Pool): Router {
         filePath: updated.file_path,
         content: updated.content,
         sizeBytes: updated.size_bytes,
-        updatedAt: new Date(updated.updated_at).getTime(),
+        updatedAt: new Date(updated.recorded_on_dt).getTime(),
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1156,9 +1162,15 @@ export function createRoutes(pool: Pool): Router {
       const { value } = req.body;
       if (value === undefined) return res.status(400).json({ error: 'value is required' });
       await pool.query(
-        `INSERT INTO user_preferences (user_id, key, value)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (user_id, key) DO UPDATE SET value = $3, updated_at = NOW()`,
+        `UPDATE nebula.user_preferences_history
+         SET recorded_until_dt = NOW()
+         WHERE user_id = $1 AND key = $2
+           AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+        ['default', key]
+      );
+      await pool.query(
+        `INSERT INTO nebula.user_preferences_history (user_id, key, value, recorded_on_dt, recorded_until_dt)
+         VALUES ($1, $2, $3, NOW(), '9999-12-31 23:59:59+00')`,
         ['default', key, JSON.stringify(value)]
       );
       res.json({ ok: true });
@@ -1206,9 +1218,15 @@ export function createRoutes(pool: Pool): Router {
       const { id, tabId } = req.params;
       const { content } = req.body;
       await pool.query(
-        `INSERT INTO system_info_tabs (system_id, tab_id, content)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (system_id, tab_id) DO UPDATE SET content = $3, updated_at = NOW()`,
+        `UPDATE nebula.system_info_tabs_history
+         SET recorded_until_dt = NOW()
+         WHERE system_id = $1 AND tab_id = $2
+           AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+        [id, tabId]
+      );
+      await pool.query(
+        `INSERT INTO nebula.system_info_tabs_history (system_id, tab_id, content, recorded_on_dt, recorded_until_dt)
+         VALUES ($1, $2, $3, NOW(), '9999-12-31 23:59:59+00')`,
         [id, tabId, content || '']
       );
       res.json({ ok: true });
@@ -1231,13 +1249,13 @@ export function createRoutes(pool: Pool): Router {
       if (systems && Array.isArray(systems)) {
         for (const sys of systems) {
           await client.query(
-            'INSERT INTO systems (id, name, description, readme) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
+            'INSERT INTO systems (id, name, description, readme) SELECT $1, $2, $3, $4 WHERE NOT EXISTS (SELECT 1 FROM nebula.systems_history WHERE id = $1 AND recorded_until_dt = \'9999-12-31 23:59:59+00\')',
             [sys.id, sys.name, sys.description || '', sys.readme || null]
           );
           if (sys.folders) {
             for (const f of sys.folders) {
               await client.query(
-                'INSERT INTO system_folders (id, system_id, name, category, note) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING',
+                'INSERT INTO system_folders (id, system_id, name, category, note) SELECT $1, $2, $3, $4, $5 WHERE NOT EXISTS (SELECT 1 FROM nebula.system_folders_history WHERE id = $1 AND recorded_until_dt = \'9999-12-31 23:59:59+00\')',
                 [f.id, sys.id, f.name, f.category, f.note || '']
               );
             }
@@ -1245,13 +1263,13 @@ export function createRoutes(pool: Pool): Router {
           if (sys.subsystems) {
             for (const sub of sys.subsystems) {
               await client.query(
-                'INSERT INTO subsystems (id, system_id, name, description, readme, color) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING',
+                'INSERT INTO subsystems (id, system_id, name, description, readme, color) SELECT $1, $2, $3, $4, $5, $6 WHERE NOT EXISTS (SELECT 1 FROM nebula.subsystems_history WHERE id = $1 AND recorded_until_dt = \'9999-12-31 23:59:59+00\')',
                 [sub.id, sys.id, sub.name, sub.description || '', sub.readme || null, sub.color || '#3B82F6']
               );
               if (sub.features) {
                 for (const feat of sub.features) {
                   await client.query(
-                    'INSERT INTO features (id, subsystem_id, name, description, readme) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING',
+                    'INSERT INTO features (id, subsystem_id, name, description, readme) SELECT $1, $2, $3, $4, $5 WHERE NOT EXISTS (SELECT 1 FROM nebula.features_history WHERE id = $1 AND recorded_until_dt = \'9999-12-31 23:59:59+00\')',
                     [feat.id, sub.id, feat.name, feat.description || '', feat.readme || null]
                   );
                 }
@@ -1265,7 +1283,8 @@ export function createRoutes(pool: Pool): Router {
         for (const r of requirements) {
           await client.query(
             `INSERT INTO requirements (id, system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (id) DO NOTHING`,
+             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+             WHERE NOT EXISTS (SELECT 1 FROM nebula.requirements_history WHERE id = $1 AND recorded_until_dt = '9999-12-31 23:59:59+00')`,
             [r.id, r.systemId, r.subsystemId, r.featureId || null, r.title, r.description || '', r.status || 'Backlog', r.priority || 'Medium', r.startDate || null, r.completionDate || null]
           );
         }
@@ -1274,7 +1293,8 @@ export function createRoutes(pool: Pool): Router {
         for (const ws of workSessions) {
           await client.query(
             `INSERT INTO work_sessions (id, parent_id, parent_type, parent_name, context, platform, model, outcome, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING`,
+             SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9
+             WHERE NOT EXISTS (SELECT 1 FROM nebula.work_sessions_history WHERE id = $1 AND recorded_until_dt = '9999-12-31 23:59:59+00')`,
             [ws.id, ws.parentId, ws.parentType, ws.parentName || '', ws.context || '', ws.platform || '', ws.model || '', ws.outcome || null, ws.status || 'Pending']
           );
         }
@@ -1283,9 +1303,15 @@ export function createRoutes(pool: Pool): Router {
       if (preferences && typeof preferences === 'object') {
         for (const [key, value] of Object.entries(preferences)) {
           await client.query(
-            `INSERT INTO user_preferences (user_id, key, value)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (user_id, key) DO UPDATE SET value = $3`,
+            `UPDATE nebula.user_preferences_history
+             SET recorded_until_dt = NOW()
+             WHERE user_id = $1 AND key = $2
+               AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+            ['default', key]
+          );
+          await client.query(
+            `INSERT INTO nebula.user_preferences_history (user_id, key, value, recorded_on_dt, recorded_until_dt)
+             VALUES ($1, $2, $3, NOW(), '9999-12-31 23:59:59+00')`,
             ['default', key, JSON.stringify(value)]
           );
         }
@@ -1296,9 +1322,15 @@ export function createRoutes(pool: Pool): Router {
           if (typeof tabs === 'object' && tabs !== null) {
             for (const [tabId, content] of Object.entries(tabs as Record<string, string>)) {
               await client.query(
-                `INSERT INTO system_info_tabs (system_id, tab_id, content)
-                 VALUES ($1, $2, $3)
-                 ON CONFLICT (system_id, tab_id) DO UPDATE SET content = $3`,
+                `UPDATE nebula.system_info_tabs_history
+                 SET recorded_until_dt = NOW()
+                 WHERE system_id = $1 AND tab_id = $2
+                   AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+                [systemId, tabId]
+              );
+              await client.query(
+                `INSERT INTO nebula.system_info_tabs_history (system_id, tab_id, content, recorded_on_dt, recorded_until_dt)
+                 VALUES ($1, $2, $3, NOW(), '9999-12-31 23:59:59+00')`,
                 [systemId, tabId, content]
               );
             }
@@ -1358,6 +1390,534 @@ export function createRoutes(pool: Pool): Router {
       res.status(500).json({ error: err.message });
     } finally {
       client.release();
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  HARVESTS — database-first harvest pipeline output
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/harvests — list all harvests, sorted newest first
+  router.get('/harvests', async (req: Request, res: Response) => {
+    try {
+      const model = req.query.model as string | undefined;
+      const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      let query = 'SELECT id, source_path, source_filename, model, total_candidates, tags, metadata, created_at FROM nebula.harvests';
+      const params: any[] = [];
+      if (model) {
+        query += ' WHERE model = $1';
+        params.push(model);
+      }
+      query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+      params.push(limit, offset);
+
+      const { rows } = await pool.query(query, params);
+      res.json({ harvests: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/harvests/:id — full harvest with candidates
+  router.get('/harvests/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        'SELECT * FROM nebula.harvests WHERE id = $1', [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Harvest not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/harvests — create a new harvest record
+  router.post('/harvests', async (req: Request, res: Response) => {
+    try {
+      const { sourcePath, sourceFilename, model, totalCandidates, candidates, sourceText, tags, metadata } = req.body;
+      if (!sourcePath) return res.status(400).json({ error: 'sourcePath is required' });
+      const { rows: [row] } = await pool.query(
+        `INSERT INTO nebula.harvests (source_path, source_filename, model, total_candidates, candidates, source_text, tags, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [
+          sourcePath,
+          sourceFilename || '',
+          model || '',
+          totalCandidates || 0,
+          JSON.stringify(candidates || []),
+          sourceText || null,
+          tags || [],
+          metadata || {},
+        ]
+      );
+      res.status(201).json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/harvests/:id
+  router.delete('/harvests/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rowCount } = await pool.query('DELETE FROM nebula.harvests WHERE id = $1', [id]);
+      if (rowCount === 0) return res.status(404).json({ error: 'Harvest not found' });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  AGENT RECORDS — database-first audit trail
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/agent-records — list records with optional filters
+  router.get('/agent-records', async (req: Request, res: Response) => {
+    try {
+      const { type, role, systemId, planRef, tag, limit: qLimit, offset: qOffset } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 100, 500);
+      const offset = parseInt(qOffset as string) || 0;
+
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+
+      if (type) { clauses.push(`record_type = $${i++}`); vals.push(type); }
+      if (role) { clauses.push(`role = $${i++}`); vals.push(role); }
+      if (systemId) { clauses.push(`system_id = $${i++}`); vals.push(systemId); }
+      if (planRef) { clauses.push(`plan_ref = $${i++}`); vals.push(planRef); }
+      if (tag) { clauses.push(`$$${i} = ANY(tags)`); vals.push(tag); i++; }
+
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+      const { rows } = await pool.query(
+        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, plan_ref, created_at, recorded_on_dt
+         FROM nebula.agent_records ${where}
+         ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+        [...vals, limit, offset]
+      );
+      res.json({ records: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/agent-records/:id — full record with content
+  router.get('/agent-records/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        'SELECT * FROM nebula.agent_records WHERE id = $1', [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Agent record not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/agent-records — create a new agent record (canonical write path)
+  router.post('/agent-records', async (req: Request, res: Response) => {
+    try {
+      const { recordType, role, title, content, sourcePath, metadata, tags, systemId, subsystemId, featureId, planRef } = req.body;
+
+      const validTypes = ['report', 'analysis', 'assessment', 'inspection', 'prompt', 'response', 'engineering_log', 'architecture_note', 'decision'];
+      if (!recordType || !validTypes.includes(recordType)) {
+        return res.status(400).json({ error: `recordType must be one of: ${validTypes.join(', ')}` });
+      }
+
+      const { rows: [row] } = await pool.query(
+        `INSERT INTO nebula.agent_records (record_type, role, title, content, source_path, metadata, tags, system_id, subsystem_id, feature_id, plan_ref)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [
+          recordType, role || '', title || '', content || '',
+          sourcePath || null, metadata || {}, tags || [],
+          systemId || null, subsystemId || null, featureId || null, planRef || null,
+        ]
+      );
+      res.status(201).json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/agent-records/:id — update record fields
+  router.patch('/agent-records/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { title, content, metadata, tags, systemId, subsystemId, featureId, planRef } = req.body;
+      const sets: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (title !== undefined) { sets.push(`title = $${i++}`); vals.push(title); }
+      if (content !== undefined) { sets.push(`content = $${i++}`); vals.push(content); }
+      if (metadata !== undefined) { sets.push(`metadata = $${i++}`); vals.push(metadata); }
+      if (tags !== undefined) { sets.push(`tags = $${i++}`); vals.push(tags); }
+      if (systemId !== undefined) { sets.push(`system_id = $${i++}`); vals.push(systemId); }
+      if (subsystemId !== undefined) { sets.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
+      if (featureId !== undefined) { sets.push(`feature_id = $${i++}`); vals.push(featureId); }
+      if (planRef !== undefined) { sets.push(`plan_ref = $${i++}`); vals.push(planRef); }
+      if (sets.length === 0) return res.json({ ok: true });
+      vals.push(id);
+      const { rows: [row] } = await pool.query(
+        `UPDATE nebula.agent_records SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
+        vals
+      );
+      if (!row) return res.status(404).json({ error: 'Agent record not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/agent-records/:id
+  router.delete('/agent-records/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rowCount } = await pool.query('DELETE FROM nebula.agent_records WHERE id = $1', [id]);
+      if (rowCount === 0) return res.status(404).json({ error: 'Agent record not found' });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  PROJECTIONS — on-demand markdown folder generation
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/projections — list all projection configs
+  router.get('/projections', async (_req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        'SELECT id, name, type, description, target_path, model, schedule, created_at, recorded_on_dt FROM nebula.projections ORDER BY name'
+      );
+      res.json({ projections: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/projections — create a projection config
+  router.post('/projections', async (req: Request, res: Response) => {
+    try {
+      const { name, type, description, sourceQuery, template, targetPath, model, schedule, metadata } = req.body;
+      if (!name || !type) return res.status(400).json({ error: 'name and type are required' });
+      if (!['deterministic', 'inference'].includes(type)) return res.status(400).json({ error: 'type must be deterministic or inference' });
+      const { rows: [row] } = await pool.query(
+        `INSERT INTO nebula.projections (name, type, description, source_query, template, target_path, model, schedule, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [name, type, description || '', sourceQuery || '', template || '', targetPath || '', model || '', schedule || '', metadata || {}]
+      );
+      res.status(201).json(row);
+    } catch (err: any) {
+      if (err.code === '23505') return res.status(409).json({ error: `Projection '${req.body.name}' already exists` });
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/projections/:id/render — execute a projection and write output files
+  router.post('/projections/:id/render', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [proj] } = await pool.query('SELECT * FROM nebula.projections WHERE id = $1', [id]);
+      if (!proj) return res.status(404).json({ error: 'Projection not found' });
+
+      if (proj.type === 'deterministic') {
+        // Execute the source SQL, then render each row through the template
+        const { rows: data } = await pool.query(proj.source_query);
+        const rendered: { path: string; content: string }[] = [];
+
+        for (const row of data) {
+          let content = proj.template;
+          // Replace all {{key}} placeholders with values from the row
+          for (const [key, value] of Object.entries(row)) {
+            const val = value === null ? '' : String(value);
+            content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), val);
+          }
+          const targetPath = proj.target_path
+            .replace(/\{\{id\}\}/g, row.id || '')
+            .replace(/\{\{name\}\}/g, row.name || row.title || 'unknown');
+
+          const absPath = path.resolve(AUDIT_ROOT, targetPath);
+          if (!absPath.startsWith(AUDIT_ROOT)) {
+            return res.status(403).json({ error: `Target path traversal denied: ${targetPath}` });
+          }
+          const dir = path.dirname(absPath);
+          fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(absPath, content, 'utf-8');
+          rendered.push({ path: targetPath, content: content.slice(0, 200) + '...' });
+        }
+
+        res.json({ ok: true, type: 'deterministic', rendered: rendered.length, files: rendered });
+      } else {
+        // Inference mode — placeholder; will invoke LLM in future version
+        res.json({ ok: true, type: 'inference', note: 'Inference projection not yet implemented' });
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/projections/:id
+  router.delete('/projections/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rowCount } = await pool.query('DELETE FROM nebula.projections WHERE id = $1', [id]);
+      if (rowCount === 0) return res.status(404).json({ error: 'Projection not found' });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  CROSS-REFERENCES
+  // ═══════════════════════════════════════════════════════════════════
+
+  // POST /api/cross-references
+  router.post('/cross-references', async (req: Request, res: Response) => {
+    try {
+      const { sourceType, sourceId, targetType, targetId, relType, metadata } = req.body;
+      if (!sourceType || !sourceId || !targetType || !targetId || !relType) {
+        return res.status(400).json({ error: 'sourceType, sourceId, targetType, targetId, and relType are required' });
+      }
+      const { rows: [row] } = await pool.query(
+        `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [sourceType, sourceId, targetType, targetId, relType, JSON.stringify(metadata || {})]
+      );
+      res.status(201).json(toEpochMs(row, 'created_at'));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/cross-references
+  router.get('/cross-references', async (req: Request, res: Response) => {
+    try {
+      const { sourceType, sourceId, targetType, targetId, relType } = req.query;
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (sourceType) { clauses.push(`source_type = $${i++}`); vals.push(sourceType); }
+      if (sourceId) { clauses.push(`source_id = $${i++}`); vals.push(sourceId); }
+      if (targetType) { clauses.push(`target_type = $${i++}`); vals.push(targetType); }
+      if (targetId) { clauses.push(`target_id = $${i++}`); vals.push(targetId); }
+      if (relType) { clauses.push(`rel_type = $${i++}`); vals.push(relType); }
+      const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+      const { rows } = await pool.query(
+        `SELECT * FROM nebula.cross_references ${where} ORDER BY created_at DESC`,
+        vals
+      );
+      res.json(rows.map((r: any) => toEpochMs(r, 'created_at')));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/cross-references/:id
+  router.get('/cross-references/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query('SELECT * FROM nebula.cross_references WHERE id = $1', [id]);
+      if (!row) return res.status(404).json({ error: 'Cross-reference not found' });
+      res.json(toEpochMs(row, 'created_at'));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/cross-references/:id
+  router.delete('/cross-references/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rowCount } = await pool.query('DELETE FROM nebula.cross_references WHERE id = $1', [id]);
+      if (rowCount === 0) return res.status(404).json({ error: 'Cross-reference not found' });
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  CONDUIT — plan history & point-in-time queries (conduit + vision schemas)
+  //  Reads from conduit.plans, vision.receipts, vision.tickets
+  //  via fully qualified table names (pool search_path=nebula).
+  // ═══════════════════════════════════════════════════════════════════
+
+  // GET /api/conduit/plans — list all conduit plans, option to include soft-deleted
+  // Query params: includeDeleted (bool), asOf (ISO timestamp), status (filter by derived status)
+  router.get('/conduit/plans', async (req: Request, res: Response) => {
+    try {
+      const includeDeleted = req.query.includeDeleted === 'true';
+      const asOf = req.query.asOf as string | undefined;
+      const statusFilter = req.query.status as string | undefined;
+      const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      let sql: string;
+      const params: any[] = [];
+      let i = 1;
+
+      if (asOf) {
+        // Point-in-time: use plan_status view + receipts up to asOf
+        // We query the plans table and join with receipts to derive historical state
+        sql = `SELECT p.*,
+          (
+            SELECT r.type FROM vision.receipts r
+            WHERE r.plan_id = p.id
+              AND r.created_at <= $${i}
+            ORDER BY r.created_at DESC LIMIT 1
+          ) AS derived_status_at_time
+          FROM conduit.plans p
+          WHERE 1=1`;
+        i++;
+        params.push(asOf);
+
+        if (!includeDeleted) {
+          sql += ` AND p.deleted = 0`;
+        }
+        if (statusFilter) {
+          sql += ` AND (SELECT r.type FROM vision.receipts r
+            WHERE r.plan_id = p.id
+              AND r.created_at <= $1    -- $1 is asOf
+            ORDER BY r.created_at DESC LIMIT 1) = $${i}`;
+          i++;
+          params.push(statusFilter);
+        }
+        sql += ` ORDER BY p.created_at DESC LIMIT $${i} OFFSET $${i+1}`;
+        params.push(limit, offset);
+      } else {
+        // Current state: use plan_status view
+        sql = `SELECT * FROM conduit.plan_status ps WHERE 1=1`;
+
+        if (!includeDeleted) {
+          sql += ` AND ps.deleted = 0`;
+        }
+        if (statusFilter) {
+          sql += ` AND ps.derived_status = $${i}`;
+          i++;
+          params.push(statusFilter);
+        }
+        sql += ` ORDER BY ps.created_at DESC LIMIT $${i} OFFSET $${i+1}`;
+        params.push(limit, offset);
+      }
+
+      const { rows } = await pool.query(sql, params);
+      res.json({ plans: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/conduit/plans/as-of — point-in-time snapshot of plan states
+  // Query params: timestamp (ISO 8601, required), includeDeleted
+  router.get('/conduit/plans/as-of', async (req: Request, res: Response) => {
+    try {
+      const timestamp = req.query.timestamp as string;
+      if (!timestamp) return res.status(400).json({ error: 'timestamp query parameter is required (ISO 8601)' });
+      const includeDeleted = req.query.includeDeleted === 'true';
+
+      const { rows } = await pool.query(
+        `SELECT p.*,
+          (
+            SELECT r.type FROM vision.receipts r
+            WHERE r.plan_id = p.id AND r.created_at <= $1
+            ORDER BY r.created_at DESC LIMIT 1
+          ) AS derived_status_at_time,
+          (
+            SELECT r.created_at FROM vision.receipts r
+            WHERE r.plan_id = p.id AND r.created_at <= $1
+            ORDER BY r.created_at DESC LIMIT 1
+          ) AS last_receipt_at_time
+          FROM conduit.plans p
+          WHERE (p.created_at <= $1 OR p.updated_at <= $1)
+          ${includeDeleted ? '' : 'AND p.deleted = 0'}
+          ORDER BY p.created_at DESC`,
+        [timestamp]
+      );
+      res.json({ timestamp, plans: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/conduit/plans/:id/history — full lifecycle history for one plan
+  // Returns plan metadata (even if deleted), all receipts, all tickets, linked sessions, token usage
+  router.get('/conduit/plans/:id/history', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Plan row (even if deleted)
+      const { rows: [plan] } = await pool.query(
+        'SELECT * FROM conduit.plans WHERE id = $1',
+        [id]
+      );
+      if (!plan) return res.status(404).json({ error: `Plan ${id} not found` });
+
+      // All receipts in chronological order
+      const { rows: receipts } = await pool.query(
+        'SELECT * FROM vision.receipts WHERE plan_id = $1 ORDER BY created_at ASC',
+        [id]
+      );
+
+      // All tickets in chronological order
+      const { rows: tickets } = await pool.query(
+        'SELECT * FROM vision.tickets WHERE plan_id = $1 ORDER BY created_at ASC',
+        [id]
+      );
+
+      // Token usage summary
+      const { rows: [tokenUsage] } = await pool.query(
+        'SELECT COALESCE(SUM(tokens_used), 0) AS total_tokens, COUNT(*) AS receipt_count FROM vision.receipts WHERE plan_id = $1',
+        [id]
+      );
+
+      // Sessions that worked on this plan
+      const { rows: sessions } = await pool.query(
+        'SELECT s.id, s.agent_role, s.start_iso, s.end_iso, s.model, s.exit_code, s.workflow_id FROM conduit.sessions s WHERE s.id IN (SELECT DISTINCT r.session_id FROM vision.receipts r WHERE r.plan_id = $1 AND r.session_id IS NOT NULL) ORDER BY s.start_iso ASC',
+        [id]
+      );
+
+      res.json({
+        plan,
+        receipts,
+        tickets,
+        sessions,
+        tokenUsage: { totalTokens: tokenUsage?.total_tokens ?? 0, receiptCount: tokenUsage?.receipt_count ?? 0 },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/conduit/plans/:id/receipts — receipts for a specific plan
+  router.get('/conduit/plans/:id/receipts', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        'SELECT * FROM vision.receipts WHERE plan_id = $1 ORDER BY created_at ASC',
+        [id]
+      );
+      res.json({ planId: id, receipts: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/conduit/deleted-plans — shortcut to find all soft-deleted plans
+  router.get('/conduit/deleted-plans', async (req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        'SELECT * FROM conduit.plans WHERE deleted = 1 ORDER BY updated_at DESC'
+      );
+      res.json({ plans: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 

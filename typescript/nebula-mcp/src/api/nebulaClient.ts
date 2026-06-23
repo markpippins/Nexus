@@ -208,6 +208,130 @@ export const NebulaClient = {
   demoteSystem: (sourceSystemId: string, targetSystemId: string) =>
     httpRequest("POST", `/api/systems/demote/${sourceSystemId}`, { targetSystemId }),
 
+  // ── Harvests ───────────────────────────────────────────────
+  /** GET /api/harvests?model=&limit=&offset= */
+  listHarvests: (query?: { model?: string; limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    if (query?.model) params.set("model", query.model);
+    if (query?.limit) params.set("limit", String(query.limit));
+    if (query?.offset) params.set("offset", String(query.offset));
+    const qs = params.toString();
+    return httpGet(`/api/harvests${qs ? `?${qs}` : ""}`);
+  },
+  /** GET /api/harvests/:id */
+  getHarvest: (id: string) => httpGet(`/api/harvests/${encodeURIComponent(id)}`),
+  /** POST /api/harvests */
+  createHarvest: (body: {
+    sourcePath: string; sourceFilename?: string; model?: string;
+    totalCandidates?: number; candidates?: any[]; sourceText?: string;
+    tags?: string[]; metadata?: any;
+  }) => httpRequest("POST", "/api/harvests", body),
+  /** DELETE /api/harvests/:id */
+  deleteHarvest: (id: string) => httpRequest("DELETE", `/api/harvests/${encodeURIComponent(id)}`),
+
+  // ── Agent Records ──────────────────────────────────────────
+  /** GET /api/agent-records?type=&role=&systemId=&planRef=&tag=&limit=&offset= */
+  listAgentRecords: (query?: {
+    type?: string; role?: string; systemId?: string; planRef?: string;
+    tag?: string; limit?: number; offset?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (query?.type) params.set("type", query.type);
+    if (query?.role) params.set("role", query.role);
+    if (query?.systemId) params.set("systemId", query.systemId);
+    if (query?.planRef) params.set("planRef", query.planRef);
+    if (query?.tag) params.set("tag", query.tag);
+    if (query?.limit) params.set("limit", String(query.limit));
+    if (query?.offset) params.set("offset", String(query.offset));
+    const qs = params.toString();
+    return httpGet(`/api/agent-records${qs ? `?${qs}` : ""}`);
+  },
+  /** GET /api/agent-records/:id */
+  getAgentRecord: (id: string) => httpGet(`/api/agent-records/${encodeURIComponent(id)}`),
+  /** POST /api/agent-records */
+  createAgentRecord: (body: {
+    recordType: string; role?: string; title?: string; content?: string;
+    sourcePath?: string; metadata?: any; tags?: string[];
+    systemId?: string; subsystemId?: string; featureId?: string; planRef?: string;
+  }) => httpRequest("POST", "/api/agent-records", body),
+  /** PATCH /api/agent-records/:id */
+  updateAgentRecord: (id: string, body: {
+    title?: string; content?: string; metadata?: any; tags?: string[];
+    systemId?: string | null; subsystemId?: string | null; featureId?: string | null; planRef?: string | null;
+  }) => httpRequest("PATCH", `/api/agent-records/${encodeURIComponent(id)}`, body),
+  /** DELETE /api/agent-records/:id */
+  deleteAgentRecord: (id: string) => httpRequest("DELETE", `/api/agent-records/${encodeURIComponent(id)}`),
+
+  // ── Projections ────────────────────────────────────────────
+  /** GET /api/projections */
+  listProjections: () => httpGet("/api/projections"),
+  /** POST /api/projections */
+  createProjection: (body: {
+    name: string; type: 'deterministic' | 'inference'; description?: string;
+    sourceQuery?: string; template?: string; targetPath?: string;
+    model?: string; schedule?: string; metadata?: any;
+  }) => httpRequest("POST", "/api/projections", body),
+  /** POST /api/projections/:id/render */
+  renderProjection: (id: string) => httpRequest("POST", `/api/projections/${encodeURIComponent(id)}/render`),
+  /** DELETE /api/projections/:id */
+  deleteProjection: (id: string) => httpRequest("DELETE", `/api/projections/${encodeURIComponent(id)}`),
+
+  // ── Cross-References ───────────────────────────────────────
+  /** GET /api/cross-references?sourceType=&sourceId=&targetType=&targetId=&relType= */
+  listCrossReferences: (query?: {
+    sourceType?: string; sourceId?: string;
+    targetType?: string; targetId?: string; relType?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (query?.sourceType) params.set("sourceType", query.sourceType);
+    if (query?.sourceId) params.set("sourceId", query.sourceId);
+    if (query?.targetType) params.set("targetType", query.targetType);
+    if (query?.targetId) params.set("targetId", query.targetId);
+    if (query?.relType) params.set("relType", query.relType);
+    const qs = params.toString();
+    return httpGet(`/api/cross-references${qs ? `?${qs}` : ""}`);
+  },
+  /** GET /api/cross-references/:id */
+  getCrossReference: (id: string) => httpGet(`/api/cross-references/${encodeURIComponent(id)}`),
+  /** POST /api/cross-references */
+  createCrossReference: (body: {
+    sourceType: string; sourceId: string;
+    targetType: string; targetId: string; relType: string; metadata?: any;
+  }) => httpRequest("POST", "/api/cross-references", body),
+  /** DELETE /api/cross-references/:id */
+  deleteCrossReference: (id: string) => httpRequest("DELETE", `/api/cross-references/${encodeURIComponent(id)}`),
+
+  // ── Conduit History (Plan 0169 recovery queries) ──────────
+  /** GET /api/conduit/plans?includeDeleted=&asOf=&status=&limit=&offset= */
+  listConduitPlans: (query?: {
+    includeDeleted?: boolean; asOf?: string; status?: string;
+    limit?: number; offset?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (query?.includeDeleted) params.set("includeDeleted", "true");
+    if (query?.asOf) params.set("asOf", query.asOf);
+    if (query?.status) params.set("status", query.status);
+    if (query?.limit) params.set("limit", String(query.limit));
+    if (query?.offset) params.set("offset", String(query.offset));
+    const qs = params.toString();
+    return httpGet(`/api/conduit/plans${qs ? `?${qs}` : ""}`);
+  },
+  /** GET /api/conduit/plans/as-of?timestamp=&includeDeleted= */
+  getConduitPlansAsOf: (timestamp: string, includeDeleted?: boolean) => {
+    const params = new URLSearchParams();
+    params.set("timestamp", timestamp);
+    if (includeDeleted) params.set("includeDeleted", "true");
+    return httpGet(`/api/conduit/plans/as-of?${params.toString()}`);
+  },
+  /** GET /api/conduit/plans/:id/history */
+  getConduitPlanHistory: (planId: string) =>
+    httpGet(`/api/conduit/plans/${encodeURIComponent(planId)}/history`),
+  /** GET /api/conduit/plans/:id/receipts */
+  getConduitPlanReceipts: (planId: string) =>
+    httpGet(`/api/conduit/plans/${encodeURIComponent(planId)}/receipts`),
+  /** GET /api/conduit/deleted-plans */
+  listDeletedConduitPlans: () => httpGet("/api/conduit/deleted-plans"),
+
   // ── Import / Seed ──────────────────────────────────────────
   /** POST /api/import */
   importData: (body: {

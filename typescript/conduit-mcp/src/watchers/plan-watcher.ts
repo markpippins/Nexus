@@ -1,13 +1,8 @@
-import path from "path";
-import fs from "fs";
 import { BaseWatcher } from "./base";
-import { PlanCard, PlanStatus } from "../types";
-import { parsePlanFile } from "../parser";
+import { PlanCard } from "../types";
 import {
-  upsertPlan,
   getPlansGroupedByStatus,
   planRowToPlanCard,
-  getPlanById,
 } from "../db";
 
 export class PlanWatcher extends BaseWatcher {
@@ -28,144 +23,68 @@ export class PlanWatcher extends BaseWatcher {
     proposed: [],
     planning: [],
   };
-  private planDir: string;
+
+  /** Interval handle for periodic DB refresh. Null if not yet started. */
+  private refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Guard flag to prevent overlapping async reloads. */
+  private loading = false;
+
+  /** How often (in ms) to re-query the DB for plan changes. */
+  private readonly REFRESH_INTERVAL_MS = 30_000;
 
   constructor(baseDir: string, emit: (event: any) => void) {
     super(baseDir, emit);
-    this.planDir = path.join(this.baseDir, "IMPLEMENTATION_PLANS");
   }
 
   async initialize(): Promise<void> {
-    // Startup scan: upsert filesystem plans into DB for content mirroring.
-    // Operational state is DB-primary — the plan_status view is authoritative.
-    await this.readAllDirectories();
-    // Merge DB-backed plans into in-memory cache (catches DB-only plans).
     await this.loadFromDb();
-    // DB-primary mode: no chokidar watch. State changes come from
-    // receipt issuance via MCP tool handlers, not file placement.
+    // Periodically reload from DB so in-memory cache stays current
+    // when plans are created/updated outside of SSE events (direct DB writes,
+    // nebula-mcp integration, etc.).
+    this.refreshTimer = setInterval(() => this.loadFromDb(), this.REFRESH_INTERVAL_MS);
   }
 
   destroy(): void {
-    // No resources to clean up (chokidar removed).
+    if (this.refreshTimer !== null) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 
-  private async readAllDirectories() {
-    const dirs: PlanStatus[] = ["pending", "active", "completed", "blocked"];
-    for (const dir of dirs) {
-      const fullPath = path.join(this.planDir, dir);
-      this.plans[dir] = await this.readPlanDir(fullPath, dir);
-    }
-    for (const dir of ["proposed", "planning"] as const) {
-      const fullPath = path.join(this.planDir, dir);
-      const cards = await this.readPlanDir(fullPath, dir);
-      this.plans[dir] = cards;
-    }
-    const archivedDir = path.join(this.baseDir, ".bak", "completed-plans");
-    this.plans.archived = await this.readPlanDir(archivedDir, "archived");
-  }
-
-  private async readPlanDir(
-    dirPath: string,
-    status: string,
-  ): Promise<PlanCard[]> {
-    const cards: PlanCard[] = [];
-    try {
-      if (!fs.existsSync(dirPath)) return cards;
-      const files = fs
-        .readdirSync(dirPath)
-        .filter((f) => f.endsWith(".md") && f !== ".gitkeep");
-      for (const file of files) {
-        const filePath = path.join(dirPath, file);
-        const parsed = parsePlanFile(filePath);
-        if (parsed) {
-          const stats = fs.statSync(filePath);
-          const card: PlanCard = {
-            fileName: parsed.fileName,
-            planNumber: parsed.planNumber,
-            baseName: parsed.baseName,
-            title: parsed.title,
-            project: parsed.project,
-            createdAt: stats.birthtime.toISOString(),
-            goal: parsed.goal,
-            filesAffected: parsed.filesAffected,
-            acceptanceCriteria: parsed.acceptanceCriteria,
-            dependencies: parsed.dependencies,
-          };
-          if (status === "blocked") {
-            const content = fs.readFileSync(filePath, "utf-8");
-            const firstLine = content.split("\n")[0];
-            if (firstLine?.startsWith("# ")) {
-              card.blockReason = firstLine.replace("# ", "").trim();
-            }
-          }
-          // Guard: skip soft-deleted plans in DB
-          try {
-            const dbPlan = await getPlanById(card.planNumber);
-            if (dbPlan?.deleted) continue;
-          } catch {
-            // DB might not be initialized yet — proceed
-          }
-
-          // Upsert plan into the database for content mirroring
-          try {
-            await upsertPlan({
-              id: card.planNumber,
-              file_name: card.fileName,
-              title: card.title,
-              project: card.project,
-              goal: card.goal || "",
-              content: "",
-              files_affected: JSON.stringify(card.filesAffected || []),
-              acceptance_criteria: JSON.stringify(
-                card.acceptanceCriteria || [],
-              ),
-              dependencies: JSON.stringify(card.dependencies || []),
-              prompt_ref: "",
-              notes: "",
-              priority: 0,
-              created_at: card.createdAt,
-              updated_at: new Date().toISOString(),
-            });
-          } catch (err) {
-            console.error(
-              `Error upserting plan ${card.planNumber} into DB:`,
-              err,
-            );
-          }
-          cards.push(card);
-        }
-      }
-    } catch (err) {
-      console.error(`Error reading ${dirPath}:`, err);
-    }
-    return cards;
-  }
-
-  private async loadFromDb() {
+  /** Reload all plan groups from the database. Clears existing arrays first. */
+  async loadFromDb(): Promise<void> {
+    if (this.loading) return; // skip overlapping refreshes
+    this.loading = true;
     try {
       const grouped = await getPlansGroupedByStatus();
-      for (const dir of [
+      const ALL_DIRS = [
         "pending",
         "active",
         "completed",
         "blocked",
         "proposed",
         "planning",
-      ] as const) {
+      ] as const;
+      // Clear all arrays first, then repopulate — prevents stale entries and
+      // duplicates when plans move between statuses between refresh cycles.
+      for (const dir of ALL_DIRS) {
+        this.plans[dir] = [];
+      }
+      for (const dir of ALL_DIRS) {
         const rows = grouped[dir] || [];
         for (const row of rows) {
-          const existing = this.plans[dir].find((p) => p.planNumber === row.id);
-          if (!existing) {
-            const card = planRowToPlanCard(row);
-            this.plans[dir].push(card);
-          }
+          const card = planRowToPlanCard(row);
+          this.plans[dir].push(card);
         }
       }
     } catch (err) {
       console.warn(
-        "plan-watcher: DB fallback failed — plans may be incomplete.",
+        "plan-watcher: DB reload failed — plans may be stale.",
         err,
       );
+    } finally {
+      this.loading = false;
     }
   }
 }

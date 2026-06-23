@@ -33,12 +33,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * with the full application context on the classpath.
  *
  * <p>The datasource connects directly to the running pgvector PostgreSQL
- * container on {@code localhost:5432} (database {@code nexus}). Flyway
- * runs V1 and V2 migrations against this database during context
- * initialization, matching the production schema management strategy.
- * Existing migrations (already recorded in flyway_schema_history) are
- * skipped. Hibernate's {@code ddl-auto: validate} (from application.yml)
- * confirms entity annotations align with the Flyway-managed schema.
+ * container on {@code localhost:5432} (database {@code nexus},
+ * {@code currentSchema=peb}). Hibernate's {@code ddl-auto: validate}
+ * confirms entity annotations align with the {@code peb} schema tables.
+ * The {@code PebGovernanceEngine} is mocked, so no DB writes occur.
  */
 @SpringBootTest(
     classes = PebApplication.class,
@@ -50,12 +48,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     "spring.jackson.visibility.getter=any",
     "spring.jackson.visibility.setter=any",
     "spring.jackson.visibility.creator=any",
-    // Isolated test database in the running pgvector container.
-    // Created by: CREATE DATABASE peb_test; CREATE USER peb_test_user ...
-    "spring.datasource.url=jdbc:postgresql://localhost:5432/peb_test",
-    "spring.datasource.username=peb_test_user",
-    "spring.datasource.password=peb_test_pass",
-    // Flyway runs V1+V2 migrations; already-applied migrations are skipped.
+    // Shared nexus database in the running pgvector container.
+    // Schema is validated (not managed) by Hibernate ddl-auto=validate.
+    "spring.datasource.url=jdbc:postgresql://localhost:5432/nexus?currentSchema=peb",
+    "spring.datasource.username=pguser",
+    "spring.datasource.password=pgpass",
+    // Schema validation only — Flyway is disabled; V1 SQL is canonical reference.
     "spring.jpa.hibernate.ddl-auto=validate",
 })
 class AdmissionControllerFacadeTest {

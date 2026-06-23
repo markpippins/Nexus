@@ -1,5 +1,3 @@
-import path from "path";
-import fs from "fs";
 import { BaseWatcher } from "./base";
 import { BuilderStatus } from "../types";
 import { getRunningSessions } from "../db";
@@ -30,23 +28,6 @@ export class BuilderWatcher extends BaseWatcher {
     );
 
     if (!builderSession) {
-      // Also check the PID file for legacy sessions not yet migrated
-      try {
-        if (fs.existsSync("/tmp/builder-session.pid")) {
-          const pid = parseInt(
-            fs.readFileSync("/tmp/builder-session.pid", "utf-8").trim(),
-            10,
-          );
-          try {
-            process.kill(pid, 0);
-            return { pid, status: "running" };
-          } catch {
-            return { pid, status: "killed" };
-          }
-        }
-      } catch {
-        /* no legacy builder */
-      }
       return { pid: null, status: "idle" };
     }
 
@@ -65,28 +46,21 @@ export class BuilderWatcher extends BaseWatcher {
         let status: BuilderStatus["status"] = "running";
         if (secondsSinceActivity > BUILDER_STALE_DEAD) status = "stale";
 
-        // Read last log line from legacy log file (watchdog still writes there)
-        let lastLogLine = "";
-        const watchdogLog = path.join(this.baseDir, "builder-watchdog.log");
-        if (fs.existsSync(watchdogLog)) {
-          const logContent = fs.readFileSync(watchdogLog, "utf-8");
-          const lines = logContent.trim().split("\n");
-          lastLogLine = lines[lines.length - 1] || "";
-        }
-
         return {
           pid,
           status,
           startedAt: builderSession.start_iso,
           lastActivity: builderSession.last_activity ?? undefined,
           elapsedSeconds: this.startedAt ? now - this.startedAt : undefined,
-          lastLogLine: lastLogLine || undefined,
+          workflowId: builderSession.workflow_id ?? undefined,
+          runId: builderSession.run_id ?? undefined,
         };
       } catch {
         return {
           pid,
           status: "killed",
-          lastLogLine: undefined,
+          workflowId: builderSession.workflow_id ?? undefined,
+          runId: builderSession.run_id ?? undefined,
         };
       }
     }
@@ -97,6 +71,8 @@ export class BuilderWatcher extends BaseWatcher {
       status: "running",
       startedAt: builderSession.start_iso,
       lastActivity: builderSession.last_activity ?? undefined,
+      workflowId: builderSession.workflow_id ?? undefined,
+      runId: builderSession.run_id ?? undefined,
     };
   }
 

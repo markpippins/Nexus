@@ -136,7 +136,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "create_plan",
     description:
-      "Create a new implementation plan file in the pending directory",
+      "Create a new pending implementation plan in the database",
     inputSchema: {
       type: "object",
       properties: {
@@ -175,7 +175,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
   },
   {
     name: "update_plan",
-    description: "Update metadata for an existing plan file",
+    description: "Update metadata for an existing plan",
     inputSchema: {
       type: "object",
       properties: {
@@ -318,7 +318,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "delete_plan",
     description:
-      "Soft-delete a plan: marks it deleted in the database so it disappears from all views. If the plan is blocked, block artifacts outside the database (plan files, block-related files) are removed. Receipts and audit trail are preserved.",
+      "Soft-delete a plan: marks it deleted in the database so it disappears from all views. Receipts and audit trail are preserved.",
     inputSchema: {
       type: "object",
       properties: {
@@ -352,7 +352,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "create_proposed_plan",
     description:
-      "Create a new proposed plan in the proposed/ directory with a PROPOSED receipt. Simplified form — only title, project, and goal are accepted. Files affected and acceptance criteria are deferred to planning.",
+      "Create a new proposed plan with a PROPOSED receipt. Simplified form — only title, project, and goal are accepted. Files affected and acceptance criteria are deferred to planning.",
     inputSchema: {
       type: "object",
       properties: {
@@ -399,6 +399,73 @@ export const toolDefinitions: MCPToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {},
+    },
+  },
+  {
+    name: "query_prompts",
+    description:
+      "Search captured prompts with lineage. Scans the PROMPTS directory for markdown files with YAML frontmatter and returns them as PromptEntry objects with support for search and location filters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        search: {
+          type: "string",
+          description: "Optional search term to filter by title, summary, or prompt number",
+        },
+        location: {
+          type: "string",
+          description: 'Optional location filter: "active" or "archived"',
+        },
+        project: {
+          type: "string",
+          description: "Optional project name filter",
+        },
+      },
+    },
+  },
+  {
+    name: "query_archive",
+    description:
+      "Search archived pipeline artifacts. Scans the audit/ARCHIVES directory for markdown files and returns them as ArchiveEntry objects with pagination, category, and date range filters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: { type: "string", description: "Filter by category: completed-plans, build-logs, prompts, changes" },
+        search: { type: "string", description: "Free-text search across titles and summaries" },
+        dateFrom: { type: "string", description: "Filter entries modified after this ISO date" },
+        dateTo: { type: "string", description: "Filter entries modified before this ISO date" },
+        page: { type: "number", description: "Page number (1-based), default 1" },
+        pageSize: { type: "number", description: "Items per page, default 50" },
+      },
+    },
+  },
+  {
+    name: "query_inspections",
+    description:
+      "Search inspection records. Scans the audit/INSPECTIONS directory for markdown files and returns them as InspectionEntry objects with category, status, and date range filters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: { type: "string", description: "Filter by category: report, error, warning, blocker-report, todo, triage" },
+        status: { type: "string", description: "Filter by status: resolved, unresolved, pending" },
+        search: { type: "string", description: "Free-text search across titles and summaries" },
+        planRef: { type: "string", description: "Filter by associated plan number" },
+        dateFrom: { type: "string", description: "Filter entries modified after this ISO date" },
+        dateTo: { type: "string", description: "Filter entries modified before this ISO date" },
+        page: { type: "number", description: "Page number (1-based), default 1" },
+        pageSize: { type: "number", description: "Items per page, default 50" },
+      },
+    },
+  },
+  {
+    name: "query_changes",
+    description:
+      "Search change reports. Scans the audit/CHANGES directory for markdown files and returns them as ChangeReportEntry objects with category filters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: { type: "string", description: "Filter by category: committed, flagged, reviewed" },
+      },
     },
   },
 ];
@@ -697,26 +764,8 @@ export function registerToolHandlers(
 
       checkpointWal();
 
-      // For PLAN_CREATE, move plan file from planning/ to pending/
-      // and force watcher to re-evaluate plan grouping from DB receipts.
+      // Force watcher to re-evaluate from DB receipts (not filesystem cache)
       if (args.type === "PLAN_CREATE") {
-        const implDir = path.join(watcher.baseDir, "IMPLEMENTATION_PLANS");
-        const planningDir = path.join(implDir, "planning");
-        const pendingDir = path.join(implDir, "pending");
-        if (fs.existsSync(planningDir)) {
-          for (const file of fs.readdirSync(planningDir)) {
-            if (!file.endsWith(".md") || file === ".gitkeep") continue;
-            const planMatch = file.match(/v(\d+)/) || file.match(/^(\d{4})-/);
-            if (planMatch && (planMatch[1] === args.plan_id || planMatch[1].padStart(4, "0") === args.plan_id)) {
-              const srcPath = path.join(planningDir, file);
-              if (!fs.existsSync(pendingDir)) fs.mkdirSync(pendingDir, { recursive: true });
-              fs.renameSync(srcPath, path.join(pendingDir, file));
-              console.log(`[${now}] issue_receipt: moved ${file} from planning/ to pending/`);
-              break;
-            }
-          }
-        }
-        // Force watcher to re-evaluate from DB receipts (not filesystem cache)
         watcher.removePlanFromMemory(args.plan_id);
       }
 
@@ -808,30 +857,6 @@ export function registerToolHandlers(
         promptRef: original.promptRef, // carry forward the original prompt reference
       });
 
-      // Move from pending/ to planning/
-      const pendingPath = path.join(
-        watcher.baseDir,
-        "IMPLEMENTATION_PLANS",
-        "pending",
-        revised.fileName,
-      );
-      const planningPath = path.join(
-        watcher.baseDir,
-        "IMPLEMENTATION_PLANS",
-        "planning",
-        revised.fileName,
-      );
-      if (fs.existsSync(pendingPath)) {
-        const planningDir = path.join(
-          watcher.baseDir,
-          "IMPLEMENTATION_PLANS",
-          "planning",
-        );
-        if (!fs.existsSync(planningDir))
-          fs.mkdirSync(planningDir, { recursive: true });
-        fs.renameSync(pendingPath, planningPath);
-      }
-
       // Upsert plan into DB so it's durable
       const now = new Date().toISOString();
       await upsertPlan({
@@ -910,7 +935,7 @@ export function registerToolHandlers(
       if (errs.length > 0)
         throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
 
-      // Create the plan file in proposed/ directory
+      // Create the plan in the database
       const result = await watcher.createPlan({
         title: args.title,
         project: args.project || "conduit-ui",
@@ -920,30 +945,6 @@ export function registerToolHandlers(
         dependencies: [],
         promptRef: args.promptRef,
       });
-
-      // Move from pending/ to proposed/
-      const pendingPath = path.join(
-        watcher.baseDir,
-        "IMPLEMENTATION_PLANS",
-        "pending",
-        result.fileName,
-      );
-      const proposedPath = path.join(
-        watcher.baseDir,
-        "IMPLEMENTATION_PLANS",
-        "proposed",
-        result.fileName,
-      );
-      if (fs.existsSync(pendingPath)) {
-        const proposedDir = path.join(
-          watcher.baseDir,
-          "IMPLEMENTATION_PLANS",
-          "proposed",
-        );
-        if (!fs.existsSync(proposedDir))
-          fs.mkdirSync(proposedDir, { recursive: true });
-        fs.renameSync(pendingPath, proposedPath);
-      }
 
       // Upsert plan into DB immediately so the FK constraint on receipts is satisfied
       const now = new Date().toISOString();
@@ -1202,68 +1203,9 @@ export function registerToolHandlers(
         "plan_deleted",
       );
 
-      // Delete the .md file from ALL IMPLEMENTATION_PLANS subdirectories.
-      // Without this, the plan-watcher re-adds the plan to in-memory state
-      // on next rescan even though the DB row is deleted=1.
       const cleanedPaths: string[] = [];
-      const planDirs = [
-        "proposed",
-        "planning",
-        "pending",
-        "active",
-        "completed",
-        "blocked",
-      ] as const;
-      for (const dir of planDirs) {
-        const dirPath = path.join(watcher.baseDir, "IMPLEMENTATION_PLANS", dir);
-        if (!fs.existsSync(dirPath)) continue;
-        for (const file of fs.readdirSync(dirPath)) {
-          if (!file.endsWith(".md") || file === ".gitkeep") continue;
-          const filePath = path.join(dirPath, file);
-          // Match by plan number in the filename (e.g., "some-plan-v0001.md")
-          const planMatch = file.match(/v(\d+)/) || file.match(/^(\d+)-/);
-          if (planMatch) {
-            const filePlanNumber = planMatch[1];
-            if (
-              filePlanNumber === args.planNumber ||
-              filePlanNumber.padStart(4, "0") === args.planNumber
-            ) {
-              try {
-                fs.unlinkSync(filePath);
-                cleanedPaths.push(filePath);
-              } catch {
-                // best-effort cleanup
-              }
-            }
-          }
-        }
-      }
 
-      // Also clean up block artifacts if blocked
-      if (isBlocked) {
-        const blockedDir = path.join(
-          watcher.baseDir,
-          "IMPLEMENTATION_PLANS",
-          "blocked",
-        );
-        if (fs.existsSync(blockedDir)) {
-          for (const file of fs.readdirSync(blockedDir)) {
-            if (!file.endsWith(".md") || file === ".gitkeep") continue;
-            const filePath = path.join(blockedDir, file);
-            try {
-              const content = fs.readFileSync(filePath, "utf-8");
-              if (content.includes(`**Plan Number:** ${args.planNumber}`)) {
-                fs.unlinkSync(filePath);
-                cleanedPaths.push(filePath);
-              }
-            } catch {
-              // best-effort cleanup
-            }
-          }
-        }
-      }
-
-      // Also remove from in-memory plan-watcher state immediately
+      // Remove from in-memory plan-watcher state immediately
       watcher.removePlanFromMemory(args.planNumber);
 
       const now = new Date().toISOString();
@@ -1325,37 +1267,7 @@ export function registerToolHandlers(
 
       const now = new Date().toISOString();
 
-      // Clean up .md files from all IMPLEMENTATION_PLANS subdirectories
       const cleanedPaths: string[] = [];
-      const planDirs = [
-        "proposed",
-        "planning",
-        "pending",
-        "active",
-        "completed",
-        "blocked",
-      ] as const;
-      for (const dir of planDirs) {
-        const dirPath = path.join(watcher.baseDir, "IMPLEMENTATION_PLANS", dir);
-        if (!fs.existsSync(dirPath)) continue;
-        for (const file of fs.readdirSync(dirPath)) {
-          if (!file.endsWith(".md") || file === ".gitkeep") continue;
-          const filePath = path.join(dirPath, file);
-          const planMatch = file.match(/v(\d+)/) || file.match(/^(\d{4})-/);
-          if (
-            planMatch &&
-            (planMatch[1] === args.planNumber ||
-              planMatch[1].padStart(4, "0") === args.planNumber)
-          ) {
-            try {
-              fs.unlinkSync(filePath);
-              cleanedPaths.push(filePath);
-            } catch {
-              // best-effort cleanup
-            }
-          }
-        }
-      }
 
       // Remove from watcher's in-memory cache
       watcher.removePlanFromMemory(args.planNumber);
@@ -1417,45 +1329,6 @@ export function registerToolHandlers(
       const newTitle = args.title?.trim() || plan.title;
       const newGoal = args.goal?.trim() || plan.goal;
 
-      // Move file from proposed/ to planning/ — apply edits before moving
-      const proposedPath = path.join(
-        watcher.baseDir,
-        "IMPLEMENTATION_PLANS",
-        "proposed",
-      );
-      let movedFile = false;
-      if (fs.existsSync(proposedPath)) {
-        for (const file of fs.readdirSync(proposedPath)) {
-          if (!file.endsWith(".md") || file === ".gitkeep") continue;
-          const filePath = path.join(proposedPath, file);
-          if (tryParsePlanFile(filePath) === args.planNumber) {
-            // Apply title/goal edits to the file before moving
-            if (args.title?.trim() || args.goal?.trim()) {
-              let content = fs.readFileSync(filePath, "utf-8");
-              if (args.title?.trim())
-                content = content.replace(/^# .+$/m, `# ${args.title.trim()}`);
-              if (args.goal?.trim()) {
-                content = content.replace(
-                  /## Goal\s*\n([\s\S]*?)(?=\n## |$)/,
-                  `## Goal\n\n${args.goal.trim()}`,
-                );
-              }
-              fs.writeFileSync(filePath, content, "utf-8");
-            }
-            const planningDir = path.join(
-              watcher.baseDir,
-              "IMPLEMENTATION_PLANS",
-              "planning",
-            );
-            if (!fs.existsSync(planningDir))
-              fs.mkdirSync(planningDir, { recursive: true });
-            fs.renameSync(filePath, path.join(planningDir, file));
-            movedFile = true;
-            break;
-          }
-        }
-      }
-
       // Issue PLANNING receipt to promote from PROPOSED → PLANNING
       const now = new Date().toISOString();
       await upsertPlan({
@@ -1509,7 +1382,6 @@ export function registerToolHandlers(
         promoted: true,
         planNumber: args.planNumber,
         newStatus: "planning",
-        fileMoved: movedFile,
         timestamp: now,
       };
     },
@@ -1552,6 +1424,327 @@ export function registerToolHandlers(
         });
       });
     },
+    query_prompts: async (args: { search?: string; location?: string; project?: string }) => {
+      const promptsDir = path.join(watcher.baseDir, "PROMPTS");
+
+      // Return empty results if the directory doesn't exist yet
+      if (!fs.existsSync(promptsDir)) {
+        return { results: [], count: 0 };
+      }
+
+      const files = fs.readdirSync(promptsDir).filter((f) => f.endsWith(".md"));
+      const results: any[] = [];
+
+      for (const fileName of files) {
+        const filePath = path.join(promptsDir, fileName);
+        const content = fs.readFileSync(filePath, "utf-8");
+        const stat = fs.statSync(filePath);
+        const mtime = stat.mtime.toISOString();
+
+        // Parse YAML frontmatter
+        let project = "";
+        let session = "";
+        let body = content;
+
+        const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+        if (frontmatterMatch) {
+          const frontmatter = frontmatterMatch[1];
+          body = frontmatterMatch[2];
+
+          const projectMatch = frontmatter.match(/^project:\s*(.*)$/m);
+          if (projectMatch) project = projectMatch[1].trim();
+
+          const sessionMatch = frontmatter.match(/^session:\s*(.*)$/m);
+          if (sessionMatch) session = sessionMatch[1].trim();
+        }
+
+        // Extract prompt number from filename (NNNN-*.md format)
+        const numMatch = fileName.match(/^(\d{4})/);
+        const promptNumber = numMatch ? numMatch[1] : "";
+
+        // Extract title from # Prompt NNNN: Title
+        let title = "";
+        const titleMatch = body.match(/^#\s+Prompt\s+\d+[.:]\s*(.*)$/m);
+        if (titleMatch) {
+          title = titleMatch[1].trim();
+        }
+
+        // Extract summary from ## Summary section
+        let summary = "";
+        const summaryMatch = body.match(/^##\s+Summary\n+([\s\S]*?)(?:\n##|$)/m);
+        if (summaryMatch) {
+          summary = summaryMatch[1].trim();
+        }
+
+        // Extract response from ## Response section
+        let response = "";
+        const responseMatch = body.match(/^##\s+Response\n+([\s\S]*?)(?:\n---|$)/m);
+        if (responseMatch) {
+          response = responseMatch[1].trim();
+        }
+
+        // Determine location: anything in subdirs like 'archived/' or 'bak/' is archived
+        const location: "active" | "archived" =
+          fileName.includes("/archived/") ||
+          fileName.includes("/bak/")
+            ? "archived"
+            : "active";
+
+        // Build planRefs from content (links to plans)
+        const planRefs: {
+          planNumber: string;
+          wrLabel?: string;
+          title?: string;
+          status?: string;
+        }[] = [];
+        const planRefPattern = /plan\s+#(\d{4,})/gi;
+        let refMatch;
+        while ((refMatch = planRefPattern.exec(content)) !== null) {
+          const pn = refMatch[1];
+          if (!planRefs.find((r) => r.planNumber === pn)) {
+            planRefs.push({ planNumber: pn });
+          }
+        }
+
+        // Build invocationOrder from ## Invocation Order section (if present)
+        const invocationOrder: string[] = [];
+        const invocationMatch = body.match(/^##\s+Invocation\s+Order\n+([\s\S]*?)(?:\n##|$)/m);
+        if (invocationMatch) {
+          const lines = invocationMatch[1]
+            .split("\n")
+            .map((l) => l.replace(/^-\s*/, "").trim())
+            .filter(Boolean);
+          invocationOrder.push(...lines);
+        }
+
+        results.push({
+          path: filePath,
+          fileName,
+          promptNumber,
+          project,
+          session,
+          title,
+          summary,
+          response,
+          location,
+          mtime,
+          planRefs,
+          invocationOrder,
+          fullContent: content,
+        });
+      }
+
+      // Sort by prompt number descending (newest first)
+      results.sort((a, b) => {
+        const na = parseInt(a.promptNumber, 10);
+        const nb = parseInt(b.promptNumber, 10);
+        if (isNaN(na) && isNaN(nb)) return 0;
+        if (isNaN(na)) return 1;
+        if (isNaN(nb)) return -1;
+        return nb - na;
+      });
+
+      // Apply filters
+      let filtered = results;
+
+      if (args.search) {
+        const q = args.search.toLowerCase();
+        filtered = filtered.filter(
+          (p) =>
+            p.title.toLowerCase().includes(q) ||
+            p.summary.toLowerCase().includes(q) ||
+            p.promptNumber.includes(q) ||
+            p.project.toLowerCase().includes(q),
+        );
+      }
+
+      if (args.location) {
+        filtered = filtered.filter((p) => p.location === args.location);
+      }
+
+      if (args.project) {
+        filtered = filtered.filter(
+          (p) => p.project.toLowerCase() === args.project!.toLowerCase(),
+        );
+      }
+
+      return { results: filtered, count: filtered.length };
+    },
+
+    query_archive: async (args: {
+      category?: string;
+      search?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      page?: number;
+      pageSize?: number;
+    }) => {
+      const archiveDir = path.join(watcher.baseDir, 'ARCHIVES');
+      if (!fs.existsSync(archiveDir)) {
+        return { results: [], total: 0, page: args.page || 1, pageSize: args.pageSize || 50 };
+      }
+      const files = fs.readdirSync(archiveDir).filter((f) => f.endsWith('.md'));
+      const results: any[] = [];
+      for (const fileName of files) {
+        const filePath = path.join(archiveDir, fileName);
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const stat = fs.statSync(filePath);
+        const mtime = stat.mtime.toISOString();
+        let title = '';
+        const titleMatch = content.match(/^#\s+(.+?)\s*$/m);
+        if (titleMatch) title = titleMatch[1].trim();
+        // Simple category detection from subdirectory or filename pattern
+        let category = 'build-logs';
+        if (fileName.includes('plan') || fileName.includes('completed')) category = 'completed-plans';
+        else if (fileName.includes('prompt')) category = 'prompts';
+        else if (fileName.includes('change')) category = 'changes';
+        results.push({
+          path: filePath,
+          fileName,
+          category,
+          mtime,
+          size: stat.size,
+          title,
+          summary: content.slice(0, 300),
+        });
+      }
+      results.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
+      let filtered = results;
+      if (args.category && args.category !== 'all') {
+        filtered = filtered.filter((r) => r.category === args.category);
+      }
+      if (args.search) {
+        const q = args.search.toLowerCase();
+        filtered = filtered.filter((r) => r.title.toLowerCase().includes(q) || r.summary.toLowerCase().includes(q));
+      }
+      if (args.dateFrom) {
+        filtered = filtered.filter((r) => r.mtime >= args.dateFrom!);
+      }
+      if (args.dateTo) {
+        filtered = filtered.filter((r) => r.mtime <= args.dateTo!);
+      }
+      const page = args.page || 1;
+      const pageSize = args.pageSize || 50;
+      const start = (page - 1) * pageSize;
+      const paged = filtered.slice(start, start + pageSize);
+      return { results: paged, total: filtered.length, page, pageSize };
+    },
+
+    query_inspections: async (args: {
+      category?: string;
+      status?: string;
+      search?: string;
+      planRef?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      page?: number;
+      pageSize?: number;
+    }) => {
+      const inspectionsDir = path.join(watcher.baseDir, 'INSPECTIONS');
+      if (!fs.existsSync(inspectionsDir)) {
+        return { results: [], total: 0, page: args.page || 1, pageSize: args.pageSize || 50 };
+      }
+      // Recursively scan subdirs (errors, warnings, triage, etc.)
+      const results: any[] = [];
+      const scanDir = (dir: string, prefix: string) => {
+        if (!fs.existsSync(dir)) return;
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            scanDir(fullPath, path.join(prefix, entry.name));
+          } else if (entry.name.endsWith('.md')) {
+            const content = fs.readFileSync(fullPath, 'utf-8');
+            const stat = fs.statSync(fullPath);
+            let title = '';
+            const titleMatch = content.match(/^#\s+(.+?)\s*$/m);
+            if (titleMatch) title = titleMatch[1].trim();
+            let severity: string = prefix.includes('error') ? 'error' : prefix.includes('warning') ? 'warning' : 'info';
+            let status = prefix.includes('resolved') ? 'resolved' : prefix.includes('unresolved') ? 'unresolved' : 'pending';
+            results.push({
+              path: fullPath,
+              fileName: entry.name,
+              category: prefix.split(path.sep)[0] || 'report',
+              mtime: stat.mtime.toISOString(),
+              status,
+              severity,
+              title,
+              planRefs: [],
+              summary: content.slice(0, 300),
+              fullContent: content,
+            });
+          }
+        }
+      };
+      scanDir(inspectionsDir, '');
+      let filtered = results;
+      if (args.category && args.category !== 'all') {
+        filtered = filtered.filter((r) => r.category === args.category);
+      }
+      if (args.status) {
+        filtered = filtered.filter((r) => r.status === args.status);
+      }
+      if (args.search) {
+        const q = args.search.toLowerCase();
+        filtered = filtered.filter((r) => r.title.toLowerCase().includes(q) || r.summary.toLowerCase().includes(q));
+      }
+      if (args.planRef) {
+        filtered = filtered.filter((r) => r.fullContent.includes(args.planRef!));
+      }
+      const page = args.page || 1;
+      const pageSize = args.pageSize || 50;
+      const start = (page - 1) * pageSize;
+      const paged = filtered.slice(start, start + pageSize);
+      return { results: paged, total: filtered.length, page, pageSize };
+    },
+
+    query_changes: async (args: { category?: string }) => {
+      const changesDir = path.join(watcher.baseDir, 'CHANGES');
+      if (!fs.existsSync(changesDir)) {
+        return { results: [], count: 0 };
+      }
+      const results: any[] = [];
+      const scanDir = (dir: string, prefix: string) => {
+        if (!fs.existsSync(dir)) return;
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            scanDir(fullPath, path.join(prefix, entry.name));
+          } else if (entry.name.endsWith('.md')) {
+            const content = fs.readFileSync(fullPath, 'utf-8');
+            const stat = fs.statSync(fullPath);
+            let title = '';
+            const titleMatch = content.match(/^#\s+(.+?)\s*$/m);
+            if (titleMatch) title = titleMatch[1].trim();
+            results.push({
+              path: fullPath,
+              fileName: entry.name,
+              category: prefix.split(path.sep)[0] || 'committed',
+              location: 'active',
+              mtime: stat.mtime.toISOString(),
+              title,
+              agent: '',
+              sessionId: null,
+              plansProcessed: 0,
+              planRefs: [],
+              summary: content.slice(0, 300),
+              totalTests: null,
+              testsPassing: null,
+              allAcceptancePassing: false,
+              fullContent: content,
+              newFiles: 0,
+              modifyFiles: 0,
+            });
+          }
+        }
+      };
+      scanDir(changesDir, '');
+      let filtered = results;
+      if (args.category && args.category !== 'all') {
+        filtered = filtered.filter((r) => r.category === args.category);
+      }
+      return { results: filtered, count: filtered.length };
+    },
+
     query_nebula_systems: async (_args: any) => {
       return new Promise((resolve, reject) => {
         http.get("http://localhost:3101/api/systems", (res) => {
@@ -1672,35 +1865,6 @@ export function registerToolHandlers(
       // Remove from watcher's in-memory cache so it rescans
       watcher.removePlanFromMemory(args.planNumber);
 
-      // ── Move plan file from blocked/ to pending/ on disk ──
-      // DB-primary: without this the startup scan would re-add the plan
-      // from the blocked/ directory, causing a reconciliation mismatch.
-      const implDir = path.join(watcher.baseDir, "IMPLEMENTATION_PLANS");
-      const blockedDir = path.join(implDir, "blocked");
-      const pendingDir = path.join(implDir, "pending");
-      let fileMoved = false;
-      if (fs.existsSync(blockedDir)) {
-        for (const file of fs.readdirSync(blockedDir)) {
-          if (!file.endsWith(".md") || file === ".gitkeep") continue;
-          const filePath = path.join(blockedDir, file);
-          const planMatch = file.match(/v(\d+)/) || file.match(/^(\d{4})-/);
-          if (
-            planMatch &&
-            (planMatch[1] === args.planNumber ||
-              planMatch[1].padStart(4, "0") === args.planNumber)
-          ) {
-            if (!fs.existsSync(pendingDir))
-              fs.mkdirSync(pendingDir, { recursive: true });
-            fs.renameSync(filePath, path.join(pendingDir, file));
-            fileMoved = true;
-            console.log(
-              `[${now}] unblock_plan: moved ${file} from blocked/ to pending/`,
-            );
-            break;
-          }
-        }
-      }
-
       // SSE: notify clients
       if (emitter) {
         emitter({
@@ -1720,7 +1884,6 @@ export function registerToolHandlers(
         unblocked: true,
         planNumber: args.planNumber,
         deletedBlockReceipts: deleted,
-        fileMoved,
         ticketsCancelled,
         newStatus: "pending",
         timestamp: now,
@@ -1729,16 +1892,4 @@ export function registerToolHandlers(
   };
 }
 
-/** Parse a plan file to extract just the plan number (lightweight). */
-function tryParsePlanFile(filePath: string): string | null {
-  try {
-    const content = fs.readFileSync(filePath, "utf-8");
-    const match = content.match(/\*\*Plan Number:\*\*\s*(\S+)/);
-    if (match) return match[1];
-    const nameMatch = filePath.match(/(?:^|\/)(\d{4})-/);
-    if (nameMatch) return nameMatch[1];
-  } catch {
-    /* skip */
-  }
-  return null;
-}
+

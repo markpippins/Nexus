@@ -60,7 +60,7 @@ public class McpServerController {
                     existing.setBuildCommand(details.getBuildCommand());
                     existing.setHealth(details.getHealth());
                     existing.setSysUser(details.getSysUser());
-                    existing.setSystemPass(details.getSystemPass());
+                    existing.setSysPass(details.getSysPass());
                     existing.setNotes(details.getNotes());
                     existing.setIsInternal(details.getIsInternal());
                     return ResponseEntity.ok(repository.save(existing));

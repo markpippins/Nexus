@@ -52,9 +52,9 @@ echo "  port 8080 check: $(ss -tlnp 2>&1 | grep ':8080\b' || echo 'free')"
 echo
 echo "=== STEP 4: clean DB rows from prior MCP smoke runs ==="
 docker exec pgvector_db psql -U pguser -d nexus -c \
-  "DELETE FROM peb_violations WHERE entity_id IN ('mcp-smoke-agent','agent-mcp');" 2>&1
+  "DELETE FROM peb.violations WHERE entity_id IN ('mcp-smoke-agent','agent-mcp');" 2>&1
 docker exec pgvector_db psql -U pguser -d nexus -c \
-  "DELETE FROM peb_transactions WHERE entity_id IN ('mcp-smoke-agent','agent-mcp');" 2>&1
+  "DELETE FROM peb.transactions WHERE entity_id IN ('mcp-smoke-agent','agent-mcp');" 2>&1
 
 echo
 echo "=== STEP 5: run PebApiClient smoke.ts (real TS MCP client code) ==="
@@ -75,15 +75,15 @@ echo
 echo "=== STEP 6: DB verification ==="
 echo "--- peb_transactions rows from MCP smoke ---"
 docker exec pgvector_db psql -U pguser -d nexus -c \
-  "SELECT id, tool_name, admission_result, entity_id, idempotency_key FROM peb_transactions WHERE entity_id IN ('mcp-smoke-agent','agent-mcp') ORDER BY created_at;"
+  "SELECT id, tool_name, admission_result, entity_id, idempotency_key FROM peb.transactions WHERE entity_id IN ('mcp-smoke-agent','agent-mcp') ORDER BY created_at;"
 echo
 echo "--- peb_violations rows from MCP smoke ---"
 docker exec pgvector_db psql -U pguser -d nexus -c \
-  "SELECT id, transaction_id, violation_type, severity, entity_id, capability_attempted, resolution FROM peb_violations WHERE entity_id IN ('mcp-smoke-agent','agent-mcp') ORDER BY created_at;"
+  "SELECT id, transaction_id, violation_type, severity, entity_id, capability_attempted, resolution FROM peb.violations WHERE entity_id IN ('mcp-smoke-agent','agent-mcp') ORDER BY created_at;"
 echo
 echo "--- counts ---"
 docker exec pgvector_db psql -U pguser -d nexus -c \
-  "SELECT (SELECT count(*) FROM peb_transactions WHERE entity_id IN ('mcp-smoke-agent','agent-mcp')) AS audit_rows, (SELECT count(*) FROM peb_violations WHERE entity_id IN ('mcp-smoke-agent','agent-mcp')) AS violation_rows;"
+  "SELECT (SELECT count(*) FROM peb.transactions WHERE entity_id IN ('mcp-smoke-agent','agent-mcp')) AS audit_rows, (SELECT count(*) FROM peb.violations WHERE entity_id IN ('mcp-smoke-agent','agent-mcp')) AS violation_rows;"
 
 echo
 echo "=== STEP 7: kill kernel ==="
