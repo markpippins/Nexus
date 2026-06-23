@@ -510,7 +510,7 @@ WorkflowPlanned → StepRequested → ...
 ```
 
 ### Location
-- Schema: `nexus/.agent/schema/workflow_intent.schema.json`
+- Schema: `nexus/.agents/schema/workflow_intent.schema.json`
 - Python: `nexus/python/cascade/workflow_intent.py` (Pydantic model)
 - Bridge: `nexus/python/ingest/html-importer/workflow_intent_bridge.py`
 
