@@ -1,0 +1,35 @@
+> **Historical reference (archived).** This document describes the former Nexus WRP
+> architecture, which has been superseded by the Conduit pipeline system. The active
+> systems are **conduit-mcp** (plan lifecycle, pipeline state) and **nebula-mcp**
+> (agent records, requirements, database-first persistence). The PostgreSQL database
+> is the canonical store for all agent artifacts. The filesystem (`nexus/audit/`) is
+> an on-demand markdown projection. See `/home/codex/dev/AGENTS.md` for the current
+> architecture.
+> 
+---
+name: decompose-task
+description: PASS 3 (Expansion Semantics) of the Nexus Kernel Compiler. Generates a strict Directed Acyclic Graph (DAG) representing cognitive execution steps.
+---
+
+## Purpose
+Convert intent into a strictly valid `DecompositionBlock` (execution DAG) representing a stateful cognitive execution graph, totally independent of downstream execution semantics.
+
+## Input
+- `intent` (IntentBlock)
+- `requirements` (RequirementsBlock)
+- `constraints` (ConstraintBlock)
+
+## Output
+A valid `DecompositionBlock` injected into the WorkRequest DCO.
+
+## Rules (Expansion Semantics)
+
+1. **DAG Requirement (No Cycles)**: Output must be a pure DAG. No cycles. All dependencies must be explicit `step_id` references.
+2. **Atomicity Rule**: Each step must be exactly one cognitive operation. No combined actions (e.g., "analyze and implement" is invalid).
+3. **Type Tagging Rule**: Every step must be tagged with exactly one type: `analysis`, `transformation`, `generation`, `validation`, `execution`.
+4. **Dependency Rule**: No forward dependencies. Steps can only rely on explicit outputs from prior steps. No implicit "global context".
+5. **Closure Rule**: Every step must be executable with its declared inputs ONLY.
+6. **Branching Requirement**: If abstraction level $\ge$ system, the DAG MUST contain $\ge$ 2 independent branches.
+7. **Parallelism Requirement**: If $\ge$ 3 steps exist, there must be at least one non-sequential dependency structure (no pure linear chains allowed unless explicitly justified).
+8. **Separation Rule**: `analysis` $\rightarrow$ `execution` and `generation` $\rightarrow$ `execution` must NEVER be directly adjacent. They require at least one intermediate `transformation` or `validation` node.
+9. **Constraint-Induced Branching**: If multiple constraint groups exist, at least one step must exist per constraint group (constraints materialize into structure).
