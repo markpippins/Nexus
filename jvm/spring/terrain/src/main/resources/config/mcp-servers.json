@@ -46,5 +46,53 @@
     "health": "direct PG query — no HTTP health endpoint",
     "notes": "Infrastructure MCP — answers service status questions without inference overhead",
     "isInternal": true
+  },
+  {
+    "name": "tackle-mcp",
+    "port": 3400,
+    "workspacePath": "typescript/tackle-mcp",
+    "serviceTypeId": 1,
+    "healthCheckUrl": "http://localhost:3400/health",
+    "status": "ONLINE",
+    "transportType": "sse",
+    "version": "1.0.0",
+    "description": "MCP server for the tackle AI configuration registry (providers, harnesses, models, role configs)",
+    "repositoryUrl": "typescript/tackle-mcp",
+    "startup": "npm run dev",
+    "health": "/health",
+    "notes": "AI config registry — standalone from conduit-mcp",
+    "isInternal": true
+  },
+  {
+    "name": "peb-mcp",
+    "port": null,
+    "workspacePath": "typescript/peb-mcp",
+    "serviceTypeId": 1,
+    "healthCheckUrl": null,
+    "status": "ONLINE",
+    "transportType": "stdio",
+    "version": "1.0.0",
+    "description": "MCP facade for PEB Spring Boot Kernel — governance, state management, and orchestration backend (Merkle-tree state ledger)",
+    "repositoryUrl": "typescript/peb-mcp",
+    "startup": "npm run build && node dist/index.js",
+    "health": "direct kernel query — no HTTP health endpoint",
+    "notes": "PEB kernel MCP interface — stdio transport, proxies to :8080 kernel",
+    "isInternal": true
+  },
+  {
+    "name": "knowledge-mcp",
+    "port": null,
+    "workspacePath": "typescript/knowledge-mcp",
+    "serviceTypeId": 1,
+    "healthCheckUrl": null,
+    "status": "ONLINE",
+    "transportType": "stdio",
+    "version": "1.0.0",
+    "description": "MCP server for the knowledge schema — exposes graph_entities, graph_edges, graph_cross_references, and graph_migrations via MCP tools (knowledge_list_entities, knowledge_get_entity, knowledge_list_edges, knowledge_get_entity_relations, knowledge_list_cross_references, knowledge_list_migrations, knowledge_semantic_search, knowledge_graph_summary)",
+    "repositoryUrl": "typescript/knowledge-mcp",
+    "startup": "npm run dev",
+    "health": "direct PG query — no HTTP health endpoint",
+    "notes": "Knowledge graph MCP interface — stdio transport, direct PostgreSQL to knowledge schema",
+    "isInternal": true
   }
 ]
