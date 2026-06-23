@@ -1,0 +1,41 @@
+{
+  "agenda_items": [
+    {
+      "title": "Nexus as Declarative Policy Management System",
+      "status": "Agreed",
+      "intent_description": "Position Nexus as a declarative policy management platform that translates organizational intent into automated action. Core components: Policy Engine (declarative rules), Sequencers (Euclidean/Stochastic for workflow timing), Infrastructure Generator (TypeSpec-to-infrastructure), Local AI Tools (OpenClaw, OpenCode, Ollama), and Frontier Modules (experimental/advanced). Roadmap spans Phases 0-5.",
+      "requirements": [
+        "Policy Engine: declarative rules for system behavior",
+        "Organization Compiler: translates policy to action",
+        "Sequencers: workflow timing and orchestration",
+        "Infrastructure Generator: TypeSpec-driven IaC",
+        "Local AI: OpenClaw, OpenCode, Ollama integration",
+        "Phased roadmap from 0 to 5"
+      ]
+    },
+    {
+      "title": "Nexus Concept Graph \u2014 Nodes and Edges for System Knowledge",
+      "status": "Proposed",
+      "intent_description": "Define Nexus as a concept graph where nodes represent concepts/modules and edges represent relationships (dependencies, triggers, constraints). This enables graph-based reasoning about the system. The concept graph serves as the navigable knowledge structure linking capabilities, agents, and infrastructure. Mermaid visualization planned for documentation.",
+      "requirements": [
+        "Nodes: concepts, modules, capabilities in the system",
+        "Edges: relationships \u2014 depends_on, triggers, constrains",
+        "Graph-based navigation and reasoning",
+        "Mermaid visualization for documentation",
+        "Bridges reference patterns (execution, sequencer, modeling, task) into the graph"
+      ]
+    },
+    {
+      "title": "Single Source of Truth Repository \u2014 Canonical Knowledge Hub",
+      "status": "Agreed",
+      "intent_description": "Define the Nexus repository as the canonical single source of truth for system knowledge \u2014 policies, models, infrastructure specs, and reference patterns. All downstream artifacts (code, infrastructure, documentation) are generated or projected from this canonical source. The repository structure mirrors the organizational knowledge topology.",
+      "requirements": [
+        "Canonical repository as single source of truth",
+        "Code, infrastructure, and docs projected from canonical source",
+        "Repository structure mirrors organizational knowledge topology",
+        "Reference patterns and notes indexed and navigable",
+        "To-do/next steps tracked within the repository"
+      ]
+    }
+  ]
+}

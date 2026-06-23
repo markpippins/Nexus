@@ -1,0 +1,35 @@
+{
+  "agenda_items": [
+    {
+      "title": "Three-Layer Token Cost Strategy \u2014 Estimate, Control, Optimize",
+      "status": "Observed",
+      "intent_description": "Token cost management operates at three layers: Estimate (predict before sending \u2014 1 token \u2248 4 chars, use model-specific tokenizers like tiktoken), Control (design prompts + data flow \u2014 budget-first allocation, sliding window history, summarization layers, retrieval instead of context, structured prompts, tool calls over reasoning text), Optimize (system-level architecture \u2014 model tiering, spec\u2192prompt compilation, token simulation, incremental context, reasoning delegation). Most systems accidentally pay for conversation history, system prompts, JSON schemas, tool descriptions, retries, and chain-of-thought scaffolding.",
+      "requirements": [
+        "Estimate: 1 token \u2248 4 chars, use model-specific tokenizers",
+        "Control: budget allocation, sliding windows, summarization layers",
+        "Optimize: model tiering, prompt compilation, incremental context",
+        "Hidden cost drivers: history, schemas, tools, retries, CoT scaffolding",
+        "Real cost = input + output + system prompt + history + tools"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    },
+    {
+      "title": "Token Cost as Information Architecture Problem \u2014 Not Pricing Problem",
+      "status": "Agreed",
+      "intent_description": "Token cost is fundamentally an information architecture problem, not a pricing problem. Winning systems minimize repeated information, move from text to structure, and treat context as a memory hierarchy (CPU cache \u2192 RAM \u2192 Disk \u2192 Archive). Context windows are just memory tiers. Naive agent loops explode token cost geometrically. Nexus should own token simulation \u2014 build prompt, tokenize locally, estimate cost, reject or compress before sending \u2014 enabling hard cost ceilings, per-agent budgets, and per-user pricing.",
+      "requirements": [
+        "Token cost = information architecture problem, not pricing",
+        "Memory hierarchy: cache \u2192 RAM \u2192 disk \u2192 archive",
+        "Context windows = memory tiers, not static buffers",
+        "Token simulation before send: build \u2192 tokenize \u2192 estimate \u2192 reject/compress",
+        "Per-agent budgets, per-user pricing, hard cost ceilings",
+        "Spec\u2192prompt compilation: TypeSpec \u2192 prompt template \u2192 validator \u2192 structured output"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    }
+  ]
+}

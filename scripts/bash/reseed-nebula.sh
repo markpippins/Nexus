@@ -283,11 +283,11 @@ TOOLS_ID=$(create_system "Tools & Scripts" '"Utility scripts, tools, and agent c
   create_subsystem "$TOOLS_ID" "PowerShell Scripts" '"PowerShell automation scripts"' "scripts/pwsh/README.md"
   create_workspace "$TOOLS_ID" "" "scripts/pwsh"
 
-  create_subsystem "$TOOLS_ID" "Agent Docs" '"Agent architecture and operating model docs"' ".agent/docs/README.md"
-  create_workspace "$TOOLS_ID" "" ".agent/docs"
+  create_subsystem "$TOOLS_ID" "Agent Docs" '"Agent architecture and operating model docs"' ".agents/docs/README.md"
+  create_workspace "$TOOLS_ID" "" ".agents/docs"
 
-  create_subsystem "$TOOLS_ID" "CER/CCNF Conformance Tests" '"Conformance test suite for CCNF"' ".agent/tests/cer-ccnf-conformance/README.md"
-  create_workspace "$TOOLS_ID" "" ".agent/tests/cer-ccnf-conformance"
+  create_subsystem "$TOOLS_ID" "CER/CCNF Conformance Tests" '"Conformance test suite for CCNF"' ".agents/tests/cer-ccnf-conformance/README.md"
+  create_workspace "$TOOLS_ID" "" ".agents/tests/cer-ccnf-conformance"
 }
 
 # ── Root-level Nexus docs ──────────────────────────────────────────

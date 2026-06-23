@@ -1,0 +1,43 @@
+{
+  "agenda_items": [
+    {
+      "title": "Multi-Agent System Design \u2014 Six Specialized Agents for Polymath Programming",
+      "status": "Specified",
+      "intent_description": "Define a multi-agent system with six specialized roles: (1) Conversation Conductor \u2014 translates talk\u2192structured JSON, maintains context, (2) Spec Architect \u2014 formalizes specs in TypeSpec/CUE/TLA+, validates constraints, (3) Prompt Engineer \u2014 converts specs to optimized prompts, tests variants, maintains prompt library, (4) Implementation Agent \u2014 writes code, generates tests, (5) Orchestration Agent \u2014 coordinates agents, manages queues/errors, (6) Domain Specialist \u2014 injects domain expertise. This replaces the manual talk\u2192JSON\u2192TypeSpec\u2192prompt\u2192wait loop with parallelized agent-driven workflow.",
+      "requirements": [
+        "Six specialized agent roles with clear responsibilities",
+        "Conversation Conductor: talk\u2192structured JSON",
+        "Spec Architect: JSON\u2192TypeSpec/CUE formalization",
+        "Prompt Engineer: spec\u2192optimized prompt generation",
+        "Implementation Agent: prompt\u2192working code + tests",
+        "Orchestration Agent: sequencing, error handling, dashboards",
+        "Domain Specialist: domain knowledge injection"
+      ]
+    },
+    {
+      "title": "OpenCode + Ollama as Practical Implementation Stack",
+      "status": "Implemented",
+      "intent_description": "Implement the multi-agent loop using OpenCode as the glue layer and Ollama as the creative engine. OpenCode handles orchestration, transformation, and file generation. Ollama generates prompt variants, tests outputs, and produces implementation stubs. The minimal repeatable loop: talk\u2192JSON\u2192prompt\u2192Ollama\u2192output, with each step handled by an OpenCode script. OpenCode replaces the manual wait-and-reprompt cycle with structured agent pipeline.",
+      "requirements": [
+        "OpenCode: orchestration, transformation, file generation",
+        "Ollama: text generation, prompt testing, code generation",
+        "Minimal loop: talk\u2192JSON\u2192prompt\u2192Ollama\u2192output",
+        "OpenCode scripts sequence tasks and handle errors",
+        "Feedback loop: scoring outputs, auto-refining prompts",
+        "Persistent state: JSON + outputs stored in repo for tracking"
+      ]
+    },
+    {
+      "title": "Cognitive Alignment \u2014 AI Tooling as Meta-Workflow, Not Shallow Productivity",
+      "status": "Observed",
+      "intent_description": "Frame the current AI tooling landscape as a cognitive alignment problem: most users expect AI to replace friction, but are disappointed when it exposes shallow mental models. True leverage comes from designing meta-workflows and multi-agent ecosystems that reason about themselves. The 'axe vs chainsaw' analogy: the axe is more satisfying moment-to-moment, but the chainsaw lets you shape the forest if you know what forest you want. Strategic patience and deep tool investment are rewarded over shallow productivity chasing.",
+      "requirements": [
+        "Meta-workflow design over shallow task automation",
+        "Strategic patience: invest while others burn out on hype",
+        "Polymath programming: deep domain expertise + tool mastery",
+        "AI agents enable parallel creative and productive modes",
+        "Wait times are productive cycles when agents work in parallel"
+      ]
+    }
+  ]
+}

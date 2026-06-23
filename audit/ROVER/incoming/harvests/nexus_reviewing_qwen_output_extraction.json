@@ -1,0 +1,44 @@
+{
+  "agenda_items": [
+    {
+      "title": "TypeSpec for Service Broker \u2014 API/SPI/Service Separation with IBroker Contract",
+      "status": "Implemented",
+      "intent_description": "Define TypeSpec contracts for the service broker with three-layer separation: api (external contract \u2014 /api/v1/submitRequest), spi (internal extension point \u2014 BrokerHandler interface), service (orchestration/core broker logic). Focused on submitRequest/ServiceRequest/ServiceResponse/IBroker contracts only, excluding service discovery and registry. Qwen generated scaffolding from Spring canonical implementation. Key refinements: remove extends IBroker (Java artifact), replace ServiceResponse<unknown> with typed ServiceResponseBody union, convert BrokerOperation/BrokerParam from scalars to structured models.",
+      "requirements": [
+        "Three layers: api (external), spi (extension), service (orchestration)",
+        "Core models: IBroker, ServiceRequest, ServiceResponse, BrokerOperation, BrokerParam",
+        "Endpoint: /api/v1/submitRequest",
+        "No service discovery or registry in scope",
+        "Spring = canonical implementation for codegen",
+        "Quarkus adapter layer can be added later",
+        "Generic core + platform-specific layers pattern"
+      ]
+    },
+    {
+      "title": "Legacy Versioning Strategy \u2014 V0 Frozen Reference, V1 TypeSpec-Aligned Playground",
+      "status": "Implemented",
+      "intent_description": "Implement a versioning strategy that treats legacy V0 code as a frozen reference implementation (not ongoing spec). BrokerControllerV0.java marked deprecated with original /api/broker path preserved. BrokerController.java uses /api/v1/broker with TypeSpec-aligned models and converts between V1 and legacy types via ServiceResponseBody.fromLegacy()/toLegacy(). The V0 code serves as a behavior reference for generated V1 code \u2014 'hey we left that out' detection. V1 is the playground for new generated code; V0 preserves existing client compatibility.",
+      "requirements": [
+        "V0: frozen reference implementation, deprecated",
+        "V1: TypeSpec-aligned, new /v1/broker path",
+        "ServiceResponseBody: fromLegacy()/toLegacy() bridge methods",
+        "V0 as behavior reference \u2014 check for missing V1 features",
+        "No V0 changes \u2014 preserves existing client compatibility",
+        "Test harness validates V1 against V0 behavior"
+      ]
+    },
+    {
+      "title": "Generic Core + Platform-Specific TypeSpec Layers",
+      "status": "Proposed",
+      "intent_description": "Define a two-layer TypeSpec structure: Generic/Canonical Layer (pure broker contract \u2014 operations, models, unions \u2014 no framework assumptions) and Platform-Specific Layer (Spring/Quarkus/etc. \u2014 references generic layer, adds routing/REST annotations, serialization tweaks, DI hooks). Core never changes; platform layers are thin adapters. Enables safe regeneration, avoids duplication/drift, and future-proofs for MCP or other platforms.",
+      "requirements": [
+        "Generic core: pure contracts, no framework assumptions",
+        "Platform layer: Spring/Quarkus-specific annotations and mapping",
+        "Core never changes \u2014 source of truth",
+        "Platform layers are thin adapters",
+        "Safe regeneration: platform layers can be regenerated independently",
+        "Future-proof: new platforms add a folder, not refactor core"
+      ]
+    }
+  ]
+}

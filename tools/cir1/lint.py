@@ -95,7 +95,7 @@ def classify(path: str):
         return ("GOVERNANCE", "STATEFUL")
     if p.startswith("go/wrp/ccnf-ref/") and not any(x in p for x in ["/vectors/", "/tests/"]):
         return ("GOVERNANCE", "CANONICAL")
-    if p.startswith(".agent/"):
+    if p.startswith(".agents/"):
         return ("GOVERNANCE", "ASPIRATIONAL")
     if p.startswith(".tools/") or p.startswith(".github/"):
         return ("GOVERNANCE", "CANONICAL")

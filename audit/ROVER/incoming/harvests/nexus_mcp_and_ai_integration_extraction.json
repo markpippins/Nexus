@@ -1,0 +1,34 @@
+{
+  "agenda_items": [
+    {
+      "title": "MCP as Agent Protocol \u2014 Products Must Be Agent-Addressable",
+      "status": "Observed",
+      "intent_description": "MCP (Model Context Protocol) defines a standard way for AI systems to discover capabilities, understand schemas, call tools safely, maintain shared context, and stream structured results. It's the first broadly adopted universal contract between AI systems and software \u2014 USB for AI capabilities, HTTP for reasoning systems, POSIX for agent tooling. The industry is shifting from UI-first (humans use apps) to context-first (agents use tools). Products that don't become agent-addressable risk becoming legacy software. MCP isn't a feature \u2014 it's a distribution channel.",
+      "requirements": [
+        "MCP: discover capabilities, understand schemas, call tools, share context",
+        "Shift: UI-first \u2192 context-first, humans \u2192 agents as users",
+        "MCP = new API layer: semantics, intent, capability description, reasoning loops",
+        "Products as MCP servers \u2014 any compliant agent can use them",
+        "Evolution: TCP/IP (1990s) \u2192 HTTP (2000s) \u2192 REST (2010s) \u2192 MCP (2020s)"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    },
+    {
+      "title": "Nexus Alignment with MCP \u2014 Pre-MCP Architectural Moves",
+      "status": "Observed",
+      "intent_description": "Nexus is converging toward MCP-style architecture independently: TypeSpec exploration, Nexus UI abstraction, JSON-driven rendering, service orchestration, and semantic modeling instincts are pre-MCP architectural moves. Nexus is thinking in systems that describe themselves. MCP + TypeSpec + Semantic Kernel is quietly forming an AI operating system layer. Nexus provides capabilities (via broker orchestrating services and TypeSpec contracts) that an MCP server can interface with \u2014 MCP inversion: Nexus as capability provider, not passive MCP consumer.",
+      "requirements": [
+        "Nexus already trending toward MCP: TypeSpec, orchestration, semantic modeling",
+        "TypeSpec = contract layer, MCP = agent protocol, Nexus = orchestration",
+        "Nexus provides capabilities MCP servers interface with \u2014 not passive consumer",
+        "AI-agnostic infrastructure: AI capabilities as pluggable layers",
+        "Editor-agnostic: Zed for editing, Nexus for orchestration"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    }
+  ]
+}

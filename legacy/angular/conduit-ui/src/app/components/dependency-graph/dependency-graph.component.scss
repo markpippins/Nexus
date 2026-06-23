@@ -1,0 +1,21 @@
+.graph-container { height: calc(100vh - 60px); overflow: auto; background: var(--bg-primary); position: relative; }
+svg { min-width: 100%; min-height: 100%; }
+text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; user-select: none; }
+line { transition: stroke 200ms, opacity 200ms; }
+rect { transition: opacity 200ms; }
+.legend { position: absolute; bottom: 16px; right: 16px; display: flex; gap: 12px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 8px 12px; font-size: 11px; color: var(--text-secondary); }
+.leg-item { display: flex; align-items: center; gap: 4px; }
+.leg-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.zoom-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: var(--text-dim); font-size: 14px; }
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+  .graph-container { height: calc(100vh - 120px); }
+  svg { touch-action: manipulation; }
+  text { font-size: 11px; }
+  .legend { bottom: 8px; right: 8px; font-size: 10px; padding: 6px 10px; flex-wrap: wrap; gap: 6px; }
+}
+@media (max-width: 480px) {
+  .graph-container { height: calc(100vh - 140px); }
+  .legend { left: 8px; right: 8px; bottom: 4px; justify-content: center; }
+}

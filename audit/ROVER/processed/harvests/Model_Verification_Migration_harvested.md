@@ -1,0 +1,65 @@
+# Harvested Specification & Code Repository
+**Source:** /home/codex/dev/chats/Model Verification Migration.html
+**Model:** DeepSeek V4
+**Total candidates:** 4
+---
+## 1. Vector Three-Gate Admission Control — Shape Gate, Execution Gate, Verification Gate
+**Status:** `Specified`
+
+### Architectural Intent
+Define Vector as the admission control system for model cognition, composed of three sequential gates: (1) Shape Gate — determines representation compatibility (AST/prompt structure, does the model need structured IR or flat prompts, staged decomposition), (2) Execution Gate — determines runtime affinity (CLI params, temperature sensitivity, context handling, determinism stability), (3) Verification Gate — determines canonical test suite pass/fail (BP deterministic WorkRequest suite, reproducibility, regression consistency). Models that pass all three gates are admitted into the cognition system.
+
+### Requirements & Acceptance Criteria
+- [ ] Shape Gate: AST/prompt structure compatibility per model family
+- [ ] Execution Gate: CLI/runtime parameter profiling and stability testing
+- [ ] Verification Gate: BP canonical WorkRequest suite pass/fail
+- [ ] Three gates form a sequential pipeline — model must pass each to advance
+- [ ] Each gate produces a Vector Admission Record (VAR) for the model
+
+---
+
+## 2. Vector Five-Subspace State Model — S(t) = (World, Cognition, Execution, Models, Provenance)
+**Status:** `Specified`
+
+### Architectural Intent
+Define the Vector State Model as five coupled subspaces evolving together: S(t) = (World, Cognition, Execution, Models, Provenance). (1) WorldState: facts, entities, active truths, contradictions, commit policy — 'what counts as reality and how often to save it'. (2) CognitionState: active tasks, WorkRequests, reasoning stacks, hypotheses, unresolved intents. (3) ExecutionState: running jobs, model calls, step results, failure modes — transient and disposable. (4) ModelState: model registry, execution profiles, IR adapters, verification status, capability embeddings. (5) ProvenanceState: append-only event log, state snapshots, derivation graph, BP records, audit traces.
+
+### Requirements & Acceptance Criteria
+- [ ] WorldState: facts, entities, active truths, contradictions, commit policy
+- [ ] CognitionState: active tasks DAG, WorkRequests, hypotheses, unresolved intents
+- [ ] ExecutionState: running jobs, model calls, step results, failure event log
+- [ ] ModelState: registry, execution profiles, IR adapters, capability embeddings
+- [ ] ProvenanceState: append-only event log, snapshots, derivation graph
+- [ ] All five subspaces evolve via VectorFrame reducer
+
+---
+
+## 3. VectorFrame — Deterministic Reducer over Coupled State Subspaces
+**Status:** `Specified`
+
+### Architectural Intent
+Define Vector as a reducer over VectorFrame: VectorFrame(t+1) = reduce(VectorFrame(t), Events, WorkRequests, ModelOutputs). VectorFrame is the unified snapshot of all five state subspaces at a given timestamp. The reduction function applies events, work requests, and model outputs to produce the next state. This makes Vector a deterministic state-transition engine where models are pluggable compilers for cognition and BP is the formal verifier of those transitions.
+
+### Requirements & Acceptance Criteria
+- [ ] VectorFrame unifies all five subspaces at a timestamp
+- [ ] reduce(): (VectorFrame, Events, WorkRequests, ModelOutputs) → VectorFrame
+- [ ] Models are pluggable transition function candidates
+- [ ] BP is formal verifier of transitions
+- [ ] CommitPolicy determines snapshot frequency (time, event, BP-pass, threshold)
+
+---
+
+## 4. Three-Application Architectural Split — Model/Harness, Vector Runtime, Conduit Orchestration
+**Status:** `Agreed`
+
+### Architectural Intent
+Acknowledge the inevitable three-way split: (1) Model/Harness/Provider/Role Config system — manages model state, execution profiles, IR adapters, capability vectors, admission records. (2) Vector Runtime — execution + world + cognition kernel, the state reducer. (3) Conduit Orchestration — routing, UI, control surface, work request distribution. Each evolves at different velocity and has different operational requirements.
+
+### Requirements & Acceptance Criteria
+- [ ] Model/Harness application: model registry, IR adapters, admission, capability vectors
+- [ ] Vector Runtime: World/Cognition/Execution state reducer
+- [ ] Conduit Orchestration: routing, UI, work request distribution
+- [ ] Each application independently deployable with own release cadence
+- [ ] Interfaces between the three must be stable and versioned
+
+---

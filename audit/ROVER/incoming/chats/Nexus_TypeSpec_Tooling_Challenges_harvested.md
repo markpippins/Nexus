@@ -1,0 +1,35 @@
+# Harvested Specification & Code Repository
+**Source:** /home/codex/dev/chats/Nexus - TypeSpec Tooling Challenges.html
+**Model:** DeepSeek V4
+**Total candidates:** 2
+---
+## 1. TypeSpec Tooling Gap — Compiler-First Ecosystem Without Authoring Tools
+**Status:** `Observed`
+
+### Architectural Intent
+TypeSpec ecosystem is compiler-first, not authoring-first — Microsoft shipped compiler, language server, VS Code support, and emitters but no modeling tool. No 'Rational Rose for TypeSpec' exists. Current best workflow: JSON/OpenAPI → TypeSpec → Everything else. The meta-model of TypeSpec itself is accessible via @typespec/compiler (parser, AST, semantic model). A lightweight domain vocabulary editor that emits TypeSpec is the missing tool. TypeSpec syntax is extremely regular — a minimal JSON→TypeSpec generator requires only ~200-400 lines of code.
+
+### Requirements & Acceptance Criteria
+- [ ] TypeSpec ecosystem is compiler-first, not authoring-first
+- [ ] No modeling tool exists — 'Rational Rose for TypeSpec' is missing
+- [ ] Meta-model accessible via @typespec/compiler
+- [ ] Best workflow: JSON/OpenAPI → TypeSpec → Everything
+- [ ] Minimal JSON→TypeSpec generator: ~200-400 lines
+- [ ] Structural editing (projectional editor) is the eventual path
+
+---
+
+## 2. Hexagonal Architecture Inversion — From Code-First to Capability Graph-First
+**Status:** `Agreed`
+
+### Architectural Intent
+Invert the traditional architectural direction: instead of Code → Modules → Services → Applications → Organization, the direction becomes Organization Intent → Capability Models → Graph Representation → Generated Systems/Code (last). The capability graph has nodes (organizational capabilities) and edges (relationships: triggers, dependencies, constraints). TypeSpec defines the capability contracts. This structural inversion mirrors the evolution from 'fighting chaos' (layers/patterns) → 'fighting framework gravity' (hexagonal architecture) → 'domain/capability thinking' (semantic core).
+
+### Requirements & Acceptance Criteria
+- [ ] Structural inversion: Intent → Capabilities → Graph → Code (last)
+- [ ] Capability Graph: nodes = capabilities, edges = triggers/dependencies/constraints
+- [ ] TypeSpec defines capability contracts at the graph level
+- [ ] Semantic core (capabilities, contracts, policy) independent of implementation
+- [ ] Generated code is a projection of the capability graph
+
+---

@@ -1,0 +1,57 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+
+    "ks": "https://nexus.local/schema/core/knowledge-steward/",
+    "kg": "https://nexus.local/schema/core/knowledge-graph/",
+    "ag": "https://nexus.local/schema/core/agent-role/",
+
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"}
+  },
+
+  "@graph": [
+    {
+      "@id": "ks:KnowledgeSteward",
+      "comment": "The Knowledge Steward is the sole writer to the knowledge graph. All other agents read through it — they never write directly.",
+      "produces": {"@id": "kg:GraphSnapshot"},
+      "consumes": {"@id": "kg:GraphEntity"},
+      "governed_by": {"@id": "ks:steward-boundaries"}
+    },
+    {
+      "@id": "ks:steward-boundaries",
+      "comment": "Knowledge Steward Boundary Rules — these are the enforceable terms of what the Steward can and cannot do.",
+
+      "allowed": [
+        "Ingest a graph snapshot file into Postgres (graph_entities, graph_edges, graph_cross_references)",
+        "Generate and store embeddings for any entity's description text",
+        "Answer queries against the graph — semantic, structural, or cross-sectional",
+        "Report graph summary statistics (entity counts per section, migration history)",
+        "Add manual edges between entities when explicitly instructed",
+        "Update entity properties when a new snapshot supersedes the current one"
+      ],
+
+      "forbidden": [
+        "Modify the properties of an entity outside of a full snapshot ingest (no piecemeal field edits)",
+        "Delete entities or edges individually (always a full snapshot replacement)",
+        "Write to any Postgres table outside the graph_* namespace",
+        "Write to the filesystem (the graph file is consumed but never modified)",
+        "Execute arbitrary SQL (all access is through parameterized query tools)"
+      ],
+
+      "authority": [
+        "Exclusive write access to: graph_entities, graph_edges, graph_cross_references, graph_migrations",
+        "Read-only access to all other Nexus Postgres tables (for cross-referencing)",
+        "Must report all write operations to the audit trail"
+      ]
+    },
+    {
+      "@id": "ag:AgentRole",
+      "comment": "Every AgentRole can read the knowledge graph via the Knowlege Steward's query interface. No agent (including the Steward) may depend on the graph being in a specific state — it is a snapshot, not a transactional system.",
+      "references": {"@id": "ks:KnowledgeStewardQuery"},
+      "dependsOn": {"@id": "kg:GraphSnapshot"}
+    }
+  ]
+}
