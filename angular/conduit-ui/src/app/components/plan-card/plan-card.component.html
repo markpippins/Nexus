@@ -1,7 +1,7 @@
 <div
   class="plan-card"
   [ngClass]="'border-' + getStatusColor()"
-  (click)="toggleExpanded()"
+  (click)="toggleExpanded(); select.emit()"
 >
   <div class="card-header">
     <span class="plan-number" [ngClass]="'badge-' + getStatusColor()">

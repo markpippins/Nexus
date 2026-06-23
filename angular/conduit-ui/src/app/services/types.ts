@@ -28,6 +28,8 @@ export interface BuilderStatus {
   lastActivity?: string;
   elapsedSeconds?: number;
   lastLogLine?: string;
+  workflowId?: string;
+  runId?: string;
 }
 
 export interface CircuitBreaker {

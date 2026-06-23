@@ -1,0 +1,45 @@
+<div class="bottom-bar">
+  <!-- Left: Status info -->
+  <div class="bottom-bar-left">
+    <span class="status-text">{{ statusInfo() }}</span>
+    @if (statusCounts(); as counts) {
+      <span class="status-separator">|</span>
+      <span class="status-text text-subtle">{{ counts }}</span>
+    }
+  </div>
+
+  <!-- Center: Navigation buttons -->
+  <div class="bottom-bar-center">
+    @for (item of navItems; track item.key) {
+      <button
+        class="nav-btn"
+        [class.active]="viewMode() === item.key"
+        [title]="item.title"
+        (click)="viewModeChange.emit(item.key)"
+      >
+        {{ item.label }}
+      </button>
+    }
+  </div>
+
+  <!-- Right: External site buttons with icons -->
+  <div class="bottom-bar-right">
+    @for (site of externalSites; track site.url) {
+      <button
+        class="external-btn"
+        [title]="site.url"
+        (click)="openExternal(site.url)"
+      >
+        @if (imageBaseUrl(); as baseUrl) {
+          <img
+            [src]="getSiteIconUrl(site.shortName)"
+            [alt]="site.name"
+            class="external-btn-img"
+            loading="lazy"
+            (error)="onImageError($event)"
+          />
+        }
+      </button>
+    }
+  </div>
+</div>

@@ -1,5 +1,6 @@
 import { Injectable, signal, NgZone, Inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
+import { SILENT_REQUEST } from '../interceptors/request-context';
 import {
   ConduitState,
   ConduitEvent,
@@ -198,8 +199,9 @@ export class ConduitService {
 
   private startPollingFallback() {
     if (this.pollTimer) return;
+    const silentContext = new HttpContext().set(SILENT_REQUEST, true);
     this.pollTimer = setInterval(() => {
-      this.http.get<ConduitState>(`${this.apiBase}/state`).subscribe({
+      this.http.get<ConduitState>(`${this.apiBase}/state`, { context: silentContext }).subscribe({
         next: (state) => {
           this.state.set(state);
           this.builder.set(state.builder);
@@ -294,11 +296,11 @@ export class ConduitService {
         }
         const label =
           builderData.status === 'running'
-            ? `Builder running · PID ${builderData.pid}`
+            ? `Builder running · ${builderData.workflowId ?? `PID ${builderData.pid}`}`
             : builderData.status === 'stale'
-              ? `Builder stale · PID ${builderData.pid}`
+              ? `Builder stale · ${builderData.workflowId ?? `PID ${builderData.pid}`}`
               : builderData.status === 'killed'
-                ? `Builder killed · PID ${builderData.pid}`
+                ? `Builder killed · ${builderData.workflowId ?? `PID ${builderData.pid}`}`
                 : 'Builder idle';
         this.addActivity('builder_update', label, timestamp);
         break;
@@ -405,7 +407,9 @@ export class ConduitService {
 
       case 'plan_state_changed': {
         // Receipt was issued — fetch full state to pick up group changes
-        this.http.get<ConduitState>(`${this.apiBase}/state`).subscribe({
+        this.http.get<ConduitState>(`${this.apiBase}/state`, {
+          context: new HttpContext().set(SILENT_REQUEST, true),
+        }).subscribe({
           next: (state) => {
             this.state.set(state);
             this.builder.set(state.builder);
@@ -450,7 +454,9 @@ export class ConduitService {
           ? `Agent ${event.data.role} killed`
           : `Session ${event.data?.sessionId || ''} killed`;
         this.addActivity('agent_killed', label, timestamp);
-        this.http.get<ConduitState>(`${this.apiBase}/state`).subscribe({
+        this.http.get<ConduitState>(`${this.apiBase}/state`, {
+          context: new HttpContext().set(SILENT_REQUEST, true),
+        }).subscribe({
           next: (state) => {
             this.state.set(state);
             this.builder.set(state.builder);
@@ -498,12 +504,13 @@ export class ConduitService {
 
   /** Periodically probe MCP and Chat server health (v081) */
   private startServerHealthProbe(): void {
+    const silentContext = new HttpContext().set(SILENT_REQUEST, true);
     const probe = () => {
-      this.http.get<any>(`${this.apiBase}/health`).subscribe({
+      this.http.get<any>(`${this.apiBase}/health`, { context: silentContext }).subscribe({
         next: () => this.mcpOnline.set(true),
         error: () => this.mcpOnline.set(false),
       });
-      this.http.get('/chat/config', { responseType: 'json' }).subscribe({
+      this.http.get('/chat/config', { context: silentContext, responseType: 'json' }).subscribe({
         next: () => this.chatOnline.set(true),
         error: () => this.chatOnline.set(false),
       });
@@ -612,7 +619,9 @@ export class ConduitService {
 
   /** Fetch the cron schedule config from the MCP server (v092). */
   fetchCronConfig(): void {
-    this.http.get<CronConfig>(`${this.apiBase}/config/cron`).subscribe({
+    this.http.get<CronConfig>(`${this.apiBase}/config/cron`, {
+      context: new HttpContext().set(SILENT_REQUEST, true),
+    }).subscribe({
       next: (config) => this.cronConfig.set(config),
       error: () => { /* use default */ },
     });

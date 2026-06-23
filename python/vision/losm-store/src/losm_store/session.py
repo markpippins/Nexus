@@ -7,14 +7,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 DEFAULT_DATABASE_URL = os.environ.get(
     "LOSM_DATABASE_URL",
-    "sqlite:///losm_store.db"
+    "postgresql://pguser:pgpass@localhost:5432/nexus"
 )
 
-_connect_args = {}
-if DEFAULT_DATABASE_URL.startswith("sqlite"):
-    _connect_args = {"check_same_thread": False}
-
-engine = create_engine(DEFAULT_DATABASE_URL, echo=False, connect_args=_connect_args)
+engine = create_engine(DEFAULT_DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 

@@ -14,6 +14,7 @@ the Conduit schema in PostgreSQL (configured via CONDUIT_PG_SCHEMA, defaults to 
 import argparse
 import asyncio
 import os
+import signal
 import sys
 from pathlib import Path
 
@@ -52,6 +53,7 @@ from temporal.activities.db_operations import (
     detect_stale_tickets_activity,
     detect_expired_tickets_activity,
     increment_ticket_tokens_activity,
+    get_requeue_count_activity,
     release_ticket_activity,
 )
 from temporal.activities.execute_model import execute_with_model
@@ -90,6 +92,7 @@ ALL_ACTIVITIES = [
     detect_stale_tickets_activity,
     detect_expired_tickets_activity,
     increment_ticket_tokens_activity,
+    get_requeue_count_activity,
     release_ticket_activity,
     execute_with_model,
     build_work_request_dco_activity,
@@ -106,8 +109,53 @@ ALL_WORKFLOWS = [
 ROLE_TASK_QUEUES = ["builder", "reviewer", "planner", "critic", "default", "test"]
 
 
+def _kill_orphaned_opencode():
+    """Find and kill orphaned opencode run processes (ppid==1).
+
+    After a worker crash (OOM, SIGKILL), opencode subprocesses get
+    reparented to init (PID 1).  On startup, reap them so they don't
+    consume memory and CPU alongside fresh activities.
+    """
+    killed = 0
+    try:
+        for entry in os.listdir("/proc"):
+            if not entry.isdigit():
+                continue
+            pid = int(entry)
+            try:
+                stat_path = f"/proc/{pid}/stat"
+                cmdline_path = f"/proc/{pid}/cmdline"
+                # Skip if we can't read (process already gone)
+                with open(stat_path, "rb") as f:
+                    stat = f.read().decode("utf-8", errors="replace")
+                # ppid is field 4 in /proc/<pid>/stat
+                parts = stat.rsplit(")", 1)
+                if len(parts) < 2:
+                    continue
+                ppid_str = parts[1].strip().split()[0]
+                if ppid_str != "1":
+                    continue
+                # Check cmdline for "opencode run"
+                with open(cmdline_path, "rb") as f:
+                    cmdline = f.read().decode("utf-8", errors="replace")
+                if "opencode" not in cmdline or "run" not in cmdline:
+                    continue
+                os.kill(pid, signal.SIGKILL)
+                killed += 1
+            except (OSError, FileNotFoundError, ValueError, IndexError):
+                continue
+    except OSError:
+        pass  # /proc not available (non-Linux)
+    if killed:
+        print(f"Cleaned up {killed} orphaned opencode process(es)")
+    return killed
+
+
 async def main(role: str = "default"):
     """Start the Temporal Worker."""
+
+    # Reap orphaned opencode processes from previous worker crashes
+    _kill_orphaned_opencode()
 
     client = await Client.connect(
         TEMPORAL_ADDRESS,

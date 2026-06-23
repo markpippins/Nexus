@@ -1,3 +1,13 @@
+from losm_ir.compiler import (
+    compile_dag, find_shortest_path, get_subtree,
+    pass_normalize, pass_tenant_bind, pass_dag_construct,
+    pass_structural_validate, pass_execution_compatibility, pass_policy_annotate,
+)
+from losm_ir.dag import (
+    EventEnvelope, EdgeType, WorkRequestNode, DAGEdge,
+    WorkRequestDAG, CompilationPass, CompilationResult,
+    StructuralValidationIssue, CycleInfo, DAGPath,
+)
 from losm_ir.graph import Graph, Node, Edge
 from losm_ir.work_request import (
     WorkRequestDCO, WorkRequestIntent, WorkRequestStep,
@@ -26,6 +36,12 @@ from losm_ir.transition import (
 )
 
 __all__ = [
+    "compile_dag", "find_shortest_path", "get_subtree",
+    "pass_normalize", "pass_tenant_bind", "pass_dag_construct",
+    "pass_structural_validate", "pass_execution_compatibility", "pass_policy_annotate",
+    "EventEnvelope", "EdgeType", "WorkRequestNode", "DAGEdge",
+    "WorkRequestDAG", "CompilationPass", "CompilationResult",
+    "StructuralValidationIssue", "CycleInfo", "DAGPath",
     "Graph", "Node", "Edge",
     "WorkRequestDCO", "WorkRequestIntent", "WorkRequestStep",
     "WorkRequestDecomposition", "WorkRequestRequirements",

@@ -138,7 +138,7 @@ def register_models(
 
     conn = psycopg2.connect(PG_DSN)
     cur = conn.cursor()
-    cur.execute("SET search_path TO conduit,vector")
+    cur.execute("SET search_path TO conduit,tackle")
     now = datetime.now(timezone.utc).isoformat()
 
     # Determine starting priority

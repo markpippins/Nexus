@@ -3,7 +3,6 @@ import logging
 import os
 import re
 import select
-import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -15,8 +14,7 @@ try:
 except ImportError:
     from urllib2 import Request, urlopen, URLError  # type: ignore[no-redef]
 
-from env_config import load_env  # shared .env loader; load_env() fires at import time
-from work_request import WorkResultEvent
+from .prompt_renderer import build_opencode_prompt
 
 
 # ── Module-level logger ─────────────────────────────────────────────
@@ -182,7 +180,7 @@ def _build_default_opencode_launcher(role: str, model: str) -> 'HarnessLauncher'
     return launcher
 
 
-def run_ollama(req, system_base, prompt_body, session_log_path=None):
+def run_ollama(req, system_base, prompt_body, session_id=None):
     if ollama is None:
         _log.error("run_ollama: ollama package not installed")
         raise RuntimeError("ollama package is not installed — cannot use ollama harness")
@@ -192,7 +190,7 @@ def run_ollama(req, system_base, prompt_body, session_log_path=None):
     # Retry loop: local models sometimes produce empty output on first attempt.
     # Retry up to 2 times with slightly different parameters.
     for attempt in range(1, 3):
-        _write_session_log(session_log_path, f"[ollama] model={model} attempt={attempt} generating...\n")
+        _write_session_log(session_id, f"[ollama] model={model} attempt={attempt} generating...\n")
         _log.debug("run_ollama: attempt=%d model=%s", attempt, model)
         options = {"num_predict": 2000}
         if attempt > 1:
@@ -213,28 +211,42 @@ def run_ollama(req, system_base, prompt_body, session_log_path=None):
 
         if result and result.strip():
             truncated = result[:200] + ("..." if len(result) > 200 else "")
-            _write_session_log(session_log_path, f"[ollama] output ({len(result)} chars)\n{truncated}\n")
+            _write_session_log(session_id, f"[ollama] output ({len(result)} chars)\n{truncated}\n")
             _log.info("run_ollama: success model=%s chars=%d attempt=%d", model, len(result), attempt)
             return result
 
-        _write_session_log(session_log_path, f"[ollama] attempt {attempt}: no output\n")
+        _write_session_log(session_id, f"[ollama] attempt {attempt}: no output\n")
         _log.warning("run_ollama: empty output model=%s attempt=%d", model, attempt)
 
-    _write_session_log(session_log_path, "[ollama] all attempts exhausted, no output produced\n")
+    _write_session_log(session_id, "[ollama] all attempts exhausted, no output produced\n")
     _log.warning("run_ollama: all attempts exhausted model=%s", model)
     return None
 
 
-def _write_session_log(session_log_path, text):
-    """Append a line to the session log if a path is provided."""
-    if not session_log_path:
+_session_db = None
+
+def _get_session_db():
+    global _session_db
+    if _session_db is None:
+        try:
+            from db_adapter import DBAdapter
+            _session_db = DBAdapter()
+        except Exception as exc:
+            _log.warning("_get_session_db: failed to init DB adapter: %s", exc)
+    return _session_db
+
+
+def _write_session_log(session_id, text, level="INFO"):
+    """Append a line to the session_logs DB table if a session_id is provided."""
+    if not session_id:
+        return
+    db = _get_session_db()
+    if not db:
         return
     try:
-        os.makedirs(os.path.dirname(session_log_path), exist_ok=True)
-        with open(session_log_path, "a", encoding="utf-8") as f:
-            f.write(text)
+        db.append_session_log(session_id, text, level)
     except Exception as exc:
-        _log.warning("_write_session_log: write failed path=%s error=%s", session_log_path, exc)
+        _log.warning("_write_session_log: DB write failed session=%s error=%s", session_id, exc)
 
 
 def _serialize_dco_for_prompt(req: Dict[str, Any]) -> str:
@@ -321,60 +333,11 @@ def _resolve_role(req: Dict[str, Any]) -> str:
     return resolved
 
 
-def _build_opencode_prompt(
-    req: Dict[str, Any],
-    working_path: str,
-    artifacts_dir: str | None = None,
-) -> str:
-    """Build a structured prompt for opencode from the full WorkRequest DCO."""
-    role = _resolve_role(req)
-    dco_text = _serialize_dco_for_prompt(req)
-    lines = [dco_text, f"\n## Working directory\n{working_path}"]
-
-    if artifacts_dir:
-        lines.append(
-            f"\n## Full DCO\nThe complete WorkRequest DCO is on disk at "
-            f"{artifacts_dir}/request.json. Read it for full detail."
-        )
-
-    # ── role-specific instructions ──
-    if role == "builder":
-        lines.extend([
-            "\n## Instructions",
-            "Execute this WorkRequest. Implement the plan, modifying only "
-            "the files listed in Target Files. Satisfy all acceptance criteria "
-            "and completion conditions. Respect all safety constraints.",
-        ])
-    elif role == "reviewer":
-        lines.extend([
-            "\n## Instructions",
-            "Review the implementation described in this WorkRequest. "
-            "Compare the change report in CHANGES/committed/ against the plan. "
-            "If changes match the acceptance criteria, issue a REVIEW_PASS receipt. "
-            "If they don't match, issue a REVIEW_REJECT receipt with explanation.",
-        ])
-    elif role == "planner":
-        lines.extend([
-            "\n## Instructions",
-            "Elucidate the proposed plan in this WorkRequest. "
-            "Define acceptance criteria, identify files affected, and note dependencies. "
-            "When the plan is fully defined, issue a PLAN_CREATE receipt.",
-        ])
-    elif role == "critic":
-        lines.extend([
-            "\n## Instructions",
-            "Critique the plan in this WorkRequest. "
-            "Evaluate the acceptance criteria, identify gaps, suggest improvements. "
-            "Issue a CRITIQUE_PASS or CRITIQUE_REJECT receipt.",
-        ])
-
-    lines.append("\nDo NOT issue receipts — the conduit manager handles the audit trail.")
-    return "\n".join(lines)
 
 
 def _run_harness_subprocess(
     cmd: list[str],
-    session_log_path: str | None,
+    session_id: str | None,
     timeout: int,
     tool_name: str,
 ) -> str:
@@ -383,18 +346,18 @@ def _run_harness_subprocess(
     Shared helper for ``run_opencode``, ``run_codex``, and future harness
     functions.  Handles the full subprocess lifecycle:
 
-    - Opens a session log file if ``session_log_path`` is provided
+    - Batches log output and flushes to the ``session_logs`` DB table
     - Launches ``cmd`` via ``subprocess.Popen`` with **separate stderr**
     - Reads stdout with a ``select.select()`` polling loop (1s tick)
     - Enforces ``timeout`` as a last-resort safety valve
-    - Writes every output line to the log file in real time
-    - On non-zero exit, writes stderr to the log file with ``[ERROR]`` prefix
+    - Writes every output line to the log table in near-real-time batches
+    - On non-zero exit, writes stderr to the log with ``WARN`` level
     - Raises ``RuntimeError`` on launch failure, timeout, or non-zero exit
       with structured error info that includes stderr for diagnostics
 
     Args:
         cmd: The full CLI command list (binary + args).
-        session_log_path: Optional path to append stdout to a log file.
+        session_id: Optional session ID for DB log streaming.
         timeout: Maximum wall-clock seconds before the process is killed.
         tool_name: Human-readable name used in error messages (e.g., "opencode", "Codex").
 
@@ -403,10 +366,19 @@ def _run_harness_subprocess(
     """
     _log.info("_run_harness_subprocess: entry tool=%s cmd=%s timeout=%ds",
               tool_name, ' '.join(cmd), timeout)
-    log_fh = None
-    if session_log_path:
-        os.makedirs(os.path.dirname(session_log_path), exist_ok=True)
-        log_fh = open(session_log_path, "a", encoding="utf-8")
+
+    log_buffer: list[tuple[str, str]] = []
+
+    def _flush_log():
+        if not session_id or not log_buffer:
+            return
+        try:
+            from db_adapter import DBAdapter
+            db = DBAdapter()
+            db.append_session_logs(session_id, log_buffer)
+        except Exception as exc:
+            _log.warning("_run_harness_subprocess: log flush failed session=%s error=%s", session_id, exc)
+        log_buffer.clear()
 
     try:
         proc = subprocess.Popen(
@@ -419,25 +391,21 @@ def _run_harness_subprocess(
     except FileNotFoundError as e:
         err_msg = f"{tool_name} binary not found: {cmd[0] if cmd else '(empty cmd)'}"
         _log.error("_run_harness_subprocess: %s", err_msg)
-        if log_fh:
-            log_fh.write(f"[ERROR] {err_msg}\n")
-            log_fh.flush()
-            log_fh.close()
+        log_buffer.append(("ERROR", err_msg))
+        _flush_log()
         raise RuntimeError(err_msg)
     except Exception as e:
         err_msg = f"Failed to launch {tool_name}: {type(e).__name__}: {e}"
         _log.error("_run_harness_subprocess: %s", err_msg)
-        if log_fh:
-            log_fh.write(f"[ERROR] {err_msg}\n")
-            log_fh.flush()
-            log_fh.close()
+        log_buffer.append(("ERROR", err_msg))
+        _flush_log()
         raise RuntimeError(err_msg)
 
     stdout_lines: list[str] = []
     start_time = datetime.utcnow()
+    lines_since_flush = 0
 
     try:
-        # Read stdout + stderr in parallel via select to avoid deadlocks
         fds = [proc.stdout, proc.stderr]
         while True:
             ready, _, _ = select.select(fds, [], [], 1.0)
@@ -445,6 +413,7 @@ def _run_harness_subprocess(
                 elapsed = (datetime.utcnow() - start_time).total_seconds()
                 if elapsed > timeout:
                     _log.warning("_run_harness_subprocess: timeout tool=%s elapsed=%ds", tool_name, timeout)
+                    _flush_log()
                     proc.kill()
                     proc.wait()
                     raise subprocess.TimeoutExpired(cmd, timeout)
@@ -461,22 +430,22 @@ def _run_harness_subprocess(
 
                 if stream is proc.stdout:
                     stdout_lines.append(line)
-                    if log_fh:
-                        log_fh.write(line)
-                        log_fh.flush()
+                    log_buffer.append(("INFO", line))
+                    lines_since_flush += 1
                 elif stream is proc.stderr:
-                    # Write stderr to session log with [stderr] prefix so
-                    # it's visible in the UI and never silently lost.
-                    if log_fh:
-                        log_fh.write(f"[stderr] {line}")
-                        log_fh.flush()
+                    log_buffer.append(("WARN", f"[stderr] {line}"))
+                    lines_since_flush += 1
 
-            # Break when process is dead AND pipes are at EOF (no data)
+            if lines_since_flush >= 50:
+                _flush_log()
+                lines_since_flush = 0
+
             if not got_data and proc.poll() is not None:
                 break
 
         proc.wait(timeout=10)
     except subprocess.TimeoutExpired:
+        _flush_log()
         proc.kill()
         proc.wait()
         _log.error("_run_harness_subprocess: timed out tool=%s timeout=%ds", tool_name, timeout)
@@ -485,10 +454,8 @@ def _run_harness_subprocess(
             f"The conduit watchdog will clean up orphaned processes."
         )
     finally:
-        if log_fh:
-            log_fh.close()
+        _flush_log()
 
-    # Read any remaining stderr after process exit
     stderr_text = ""
     try:
         stderr_text = proc.stderr.read()
@@ -501,7 +468,6 @@ def _run_harness_subprocess(
         if stderr_text:
             error_detail += f"\n[stderr]: {stderr_text.strip()}"
 
-        # Detect common crash patterns in stderr for better diagnostics
         crash_hint = ""
         if stderr_text:
             stderr_lower = stderr_text.lower()
@@ -525,23 +491,20 @@ def _run_harness_subprocess(
     return "".join(stdout_lines)
 
 
-def run_opencode(req, working_path, artifacts_dir=None, session_log_path=None):
+def run_opencode(req, working_path, session_id=None):
     role = _resolve_role(req)
-    prompt = _build_opencode_prompt(req, working_path, artifacts_dir)
+    prompt = build_opencode_prompt(req, working_path)
     model = _resolve_model_name(req)
     _log.info("run_opencode: entry role=%s model=%s working_path=%s", role, model or "(none)", working_path)
 
-    # Build command via HarnessLauncher — no hardcoded flags
     launcher = _build_default_opencode_launcher(role, model)
     launcher.set_working_directory(working_path)
     launcher.set_prompt(prompt)
 
-    # For PROMPT_FILE strategy (e.g., Codex), write the role prompt to a file
     launcher.prepare_role_prompt_file()
 
     cmd = launcher.build()
 
-    # Inject opencode-specific debug flags (harness-internal, not semantic)
     insert_pos = 2 if len(cmd) > 1 and cmd[1] == "run" else 1
     debug_flags = ["--print-logs", "--log-level", "DEBUG"]
     for f in debug_flags:
@@ -549,12 +512,12 @@ def run_opencode(req, working_path, artifacts_dir=None, session_log_path=None):
         insert_pos += 1
 
     _log.debug("run_opencode: cmd=%s", ' '.join(cmd))
-    result = _run_harness_subprocess(cmd, session_log_path, OPENCODE_TIMEOUT_SECONDS, "opencode")
+    result = _run_harness_subprocess(cmd, session_id, OPENCODE_TIMEOUT_SECONDS, "opencode")
     _log.info("run_opencode: exit role=%s chars=%d", role, len(result))
     return result
 
 
-def run_codex(req, working_path, artifacts_dir=None, session_log_path=None):
+def run_codex(req, working_path, session_id=None):
     """Run Codex CLI with prompt_file role injection strategy.
 
     Builds a HarnessLauncher with the codex semantic schema, writes the
@@ -564,11 +527,10 @@ def run_codex(req, working_path, artifacts_dir=None, session_log_path=None):
     from harness_enums import ExecutionMode, RoleMappingStrategy
 
     role = _resolve_role(req)
-    prompt = _build_opencode_prompt(req, working_path, artifacts_dir)
+    prompt = build_opencode_prompt(req, working_path)
     model = _resolve_model_name(req)
     _log.info("run_codex: entry role=%s model=%s working_path=%s", role, model or "(none)", working_path)
 
-    # Codex semantics: oneshot, prompt_file, no model/agent CLI flags
     launcher = HarnessLauncher(
         binary=DEFAULT_BINARIES.get("codex", "codex"),
         capabilities={"model": False, "agent": False,
@@ -587,26 +549,26 @@ def run_codex(req, working_path, artifacts_dir=None, session_log_path=None):
 
     cmd = launcher.build()
     _log.debug("run_codex: cmd=%s", ' '.join(cmd))
-    result = _run_harness_subprocess(cmd, session_log_path, OPENCODE_TIMEOUT_SECONDS, "Codex")
+    result = _run_harness_subprocess(cmd, session_id, OPENCODE_TIMEOUT_SECONDS, "Codex")
     _log.info("run_codex: exit role=%s chars=%d", role, len(result))
     return result
 
 
-def run_model(req, working_path, system_base, prompt_body, artifacts_dir=None, session_log_path=None):
+def run_model(req, working_path, system_base, prompt_body, session_id=None):
     harness = _resolve_harness(req)
     _log.info("run_model: entry harness=%s working_path=%s", harness, working_path)
     if harness == "opencode":
-        return run_opencode(req, working_path, artifacts_dir, session_log_path)
+        return run_opencode(req, working_path, session_id)
     if harness == "ollama":
-        return run_ollama(req, system_base, prompt_body, session_log_path)
+        return run_ollama(req, system_base, prompt_body, session_id)
     if harness == "codex":
-        return run_codex(req, working_path, artifacts_dir, session_log_path)
+        return run_codex(req, working_path, session_id)
     _log.error("run_model: unsupported harness=%s", harness)
     raise RuntimeError(f"Unsupported harness: {harness}")
 
 
-def execute_step(step, req, working_path, artifacts_dir, wr_id):
-    """Executes a single step using the selected backend and writes its output."""
+def execute_step(step, req, working_path, wr_id, step_outputs):
+    """Executes a single step using the selected backend and stores its output."""
     step_id = step['step_id']
     harness = _resolve_harness(req)
     _log.info("execute_step: entry step=%s type=%s harness=%s", step_id, step.get('type', '?'), harness)
@@ -629,10 +591,10 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
                 pass
 
     for dep in step.get("dependencies", []):
-        dep_artifact = os.path.join(artifacts_dir, f"{dep}_output.txt")
-        if os.path.isfile(dep_artifact):
-            with open(dep_artifact, "r", encoding="utf-8") as f:
-                context_contents.append(f"[DEP OUTPUT: {dep}]\n{f.read()}")
+        dep_output = step_outputs.get(dep, {})
+        dep_text = dep_output.get("output") or dep_output.get("raw", "")
+        if dep_text:
+            context_contents.append(f"[DEP OUTPUT: {dep}]\n{dep_text}")
 
     context_joined = "\n---\n".join(context_contents)
 
@@ -673,20 +635,14 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
         )
 
     try:
-        # Extract session_id from DCO metadata for log streaming
         dag_session_id = (req.get("metadata") or {}).get("session_id", "")
-        session_log_path_dag = os.path.join(working_path, ".conduit-data", "sessions", f"{dag_session_id}.log") if dag_session_id else None
-        raw_text = run_model(req, working_path, system_base, prompt_body, artifacts_dir, session_log_path_dag)
+        raw_text = run_model(req, working_path, system_base, prompt_body, dag_session_id)
     except Exception as e:
         _log.warning("execute_step: run_model failed step=%s error=%s", step_id, e)
         return False, str(e), []
 
-    try:
-        if artifacts_dir and raw_text:
-            with open(os.path.join(artifacts_dir, f"{step_id}_raw.txt"), "w", encoding="utf-8") as rf:
-                rf.write(raw_text)
-    except Exception as exc:
-        _log.warning("execute_step: failed to write raw output step=%s error=%s", step_id, exc)
+    if raw_text:
+        step_outputs[step_id] = {"raw": raw_text}
 
     if not raw_text:
         _log.warning("execute_step: no model output step=%s", step_id)
@@ -697,12 +653,8 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
 
     # ── Analysis/validation: write raw output, no shell commands expected ──
     if not file_blocks and step.get("type") in ["analysis", "validation"]:
-        try:
-            with open(os.path.join(artifacts_dir, f"{step_id}_output.txt"), "w", encoding="utf-8") as wf:
-                wf.write(raw_text.strip())
-        except Exception:
-            pass
         _log.info("execute_step: analysis/validation step=%s completed", step_id)
+        step_outputs[step_id] = {"raw": raw_text.strip()}
         return True, "", []
 
     # ── Write file blocks to disk FIRST (files exist for $ commands below) ──
@@ -722,8 +674,10 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
                 with open(dest_path, "w", encoding="utf-8") as wf:
                     wf.write(content)
                 files_written.append(rel)
-                with open(os.path.join(artifacts_dir, f"{step_id}_output.txt"), "w", encoding="utf-8") as wf:
-                    wf.write(f"File updated: {rel}\n\n{content}")
+                step_outputs[step_id] = {
+                    "output": f"File updated: {rel}\n\n{content}",
+                    "files_written": files_written,
+                }
             except Exception as e:
                 _log.warning("execute_step: file write failed step=%s path=%s error=%s", step_id, rel, e)
                 return False, f"Filesystem write failed: {e}", files_written
@@ -745,12 +699,12 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
                          "> /dev/sd", "chmod 777 /", ":(){ :|:& };:"]
             if any(d in cmd_lower for d in dangerous):
                 shell_outputs.append(f"$ {cmd}\nREJECTED: unsafe command")
-                _write_session_log(session_log_path_dag, f"[exec] REJECTED (unsafe): {cmd[:100]}\n")
+                _write_session_log(dag_session_id, f"[exec] REJECTED (unsafe): {cmd[:100]}\n", level="WARN")
                 _log.warning("execute_step: rejected unsafe command step=%s cmd=%s", step_id, cmd[:100])
                 continue
             print(f"[execute_step] ollama shell command: {cmd[:120]}")
             _log.debug("execute_step: shell command step=%s cmd=%s", step_id, cmd[:120])
-            _write_session_log(session_log_path_dag, f"[exec] $ {cmd}\n")
+            _write_session_log(dag_session_id, f"[exec] $ {cmd}\n")
             try:
                 proc = subprocess.run(
                     cmd,
@@ -768,18 +722,18 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
                     shell_any_succeeded = True
                 else:
                     shell_any_failed = True
-                _write_session_log(session_log_path_dag,
+                _write_session_log(dag_session_id,
                     f"[exec] exit={proc.returncode} stdout={len(proc.stdout)}B stderr={len(proc.stderr)}B\n")
                 _log.debug("execute_step: shell result step=%s exit=%d", step_id, proc.returncode)
             except subprocess.TimeoutExpired:
                 shell_outputs.append(f"$ {cmd}\nTIMEOUT after 120s")
                 shell_any_failed = True
-                _write_session_log(session_log_path_dag, f"[exec] TIMEOUT\n")
+                _write_session_log(dag_session_id, f"[exec] TIMEOUT\n", level="WARN")
                 _log.warning("execute_step: shell timeout step=%s cmd=%s", step_id, cmd[:80])
             except Exception as e:
                 shell_outputs.append(f"$ {cmd}\nERROR: {e}")
                 shell_any_failed = True
-                _write_session_log(session_log_path_dag, f"[exec] ERROR: {e}\n")
+                _write_session_log(dag_session_id, f"[exec] ERROR: {e}\n", level="ERROR")
                 _log.warning("execute_step: shell error step=%s error=%s", step_id, e)
         if shell_outputs:
             raw_text += "\n\n--- SHELL EXECUTION RESULTS ---\n" + "\n---\n".join(shell_outputs)
@@ -804,10 +758,29 @@ def execute_step(step, req, working_path, artifacts_dir, wr_id):
     return False, "No valid file blocks generated", []
 
 
-def run_worker(request_path):
-    _log.info("run_worker: entry request_path=%s", request_path)
+def run_worker(wr_id: str):
+    _log.info("run_worker: entry wr_id=%s", wr_id)
+
+    # Read DCO from DB
+    try:
+        from db_adapter import DBAdapter
+        db = DBAdapter()
+        wr = db.get_work_request(wr_id)
+    except Exception as e:
+        _log.error("run_worker: DB lookup failed wr_id=%s error=%s", wr_id, e)
+        exit(2)
+
+    if not wr:
+        _log.error("run_worker: work_request %s not found", wr_id)
+        exit(2)
+
+    req = wr["dco_json"]
+    if not isinstance(req, dict):
+        _log.error("run_worker: invalid dco_json for wr_id=%s", wr_id)
+        exit(2)
+
     result = {
-        "workRequestId": "",
+        "workRequestId": wr_id,
         "status": "failure",
         "files_written": [],
         "outputs": [],
@@ -815,22 +788,9 @@ def run_worker(request_path):
         "error": "",
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "executor_id": "executor-cloud",
-        "harness": "",
-        "model": "",
+        "harness": _resolve_harness(req),
+        "model": _resolve_model_name(req),
     }
-
-    try:
-        with open(request_path, "r", encoding="utf-8") as f:
-            req = json.load(f)
-    except Exception as e:
-        _log.error("run_worker: invalid JSON path=%s error=%s", request_path, e)
-        result["error"] = f"Invalid JSON: {e}"
-        exit(2)
-
-    wr_id = req.get("id")
-    result["workRequestId"] = wr_id or "unknown"
-    result["harness"] = _resolve_harness(req)
-    result["model"] = _resolve_model_name(req)
 
     if "decomposition" not in req or "steps" not in req["decomposition"]:
         _log.error("run_worker: missing decomposition wr_id=%s", wr_id)
@@ -838,16 +798,10 @@ def run_worker(request_path):
         exit(2)
 
     working_path = os.path.abspath(req.get("path", "."))
-    artifacts_dir = os.path.join(working_path, ".conduit-data", "WORK_REQUESTS", "artifacts", wr_id) if wr_id else None
-
-    if artifacts_dir:
-        os.makedirs(artifacts_dir, exist_ok=True)
-        shutil.copyfile(request_path, os.path.join(artifacts_dir, "request.json"))
 
     # ── Non-builder fast-path: skip DAG, just call opencode ──
     role = _resolve_role(req)
     session_id = (req.get("metadata") or {}).get("session_id", "")
-    session_log_path = os.path.join(working_path, ".conduit-data", "sessions", f"{session_id}.log") if session_id else None
 
     _log.info("run_worker: wr_id=%s role=%s working_path=%s", wr_id, role, working_path)
 
@@ -864,28 +818,23 @@ def run_worker(request_path):
                 + "\n\nWORKING DIRECTORY:\n" + working_path
                 + "\n\nExecute this task."
             )
-            raw_text = run_model(req, working_path, system_base, prompt_body,
-                                 artifacts_dir, session_log_path)
+            raw_text = run_model(req, working_path, system_base, prompt_body, session_id)
             result["status"] = "success"
             result["timestamp"] = datetime.utcnow().isoformat() + "Z"
-            if artifacts_dir and raw_text:
-                out_path = os.path.join(artifacts_dir, "output.txt")
-                with open(out_path, "w", encoding="utf-8") as wf:
-                    wf.write(raw_text)
         except Exception as e:
             result["status"] = "failure"
             result["error"] = str(e)
             _log.error("run_worker: fast-path failure role=%s wr_id=%s error=%s", role, wr_id, e)
 
         _capture_session_cost(session_id, OPENCODE_BIN)
-        if artifacts_dir:
-            _write_result_event(result, artifacts_dir)
+        _store_result_in_db(db, wr_id, result, {})
         _log.info("run_worker: fast-path exit wr_id=%s status=%s", wr_id, result["status"])
         exit(0 if result["status"] == "success" else 3)
 
     steps = req["decomposition"]["steps"]
     step_status = {s["step_id"]: "pending" for s in steps}
     all_files_written = []
+    step_outputs: Dict[str, Any] = {}
 
     while True:
         ready_set = []
@@ -909,15 +858,14 @@ def run_worker(request_path):
             result["error"] = "DAG deadlock detected. Unmet dependencies."
             _log.error("run_worker: DAG deadlock wr_id=%s steps=%s", wr_id, step_status)
             _capture_session_cost(session_id, OPENCODE_BIN)
-            if artifacts_dir:
-                _write_result_event(result, artifacts_dir)
+            _store_result_in_db(db, wr_id, result, step_outputs)
             exit(3)
 
         for step in ready_set:
             step_id = step["step_id"]
             step_status[step_id] = "in_progress"
             _log.debug("run_worker: executing step=%s wr_id=%s", step_id, wr_id)
-            success, err, written = execute_step(step, req, working_path, artifacts_dir, wr_id)
+            success, err, written = execute_step(step, req, working_path, wr_id, step_outputs)
 
             if success:
                 step_status[step_id] = "completed"
@@ -929,8 +877,7 @@ def run_worker(request_path):
                 result["error"] = f"Step {step_id} failed: {err}"
                 _log.error("run_worker: step=%s failed wr_id=%s error=%s", step_id, wr_id, err)
                 _capture_session_cost(session_id, OPENCODE_BIN)
-                if artifacts_dir:
-                    _write_result_event(result, artifacts_dir)
+                _store_result_in_db(db, wr_id, result, step_outputs)
                 exit(3)
 
     result["status"] = "success"
@@ -938,35 +885,26 @@ def run_worker(request_path):
     result["timestamp"] = datetime.utcnow().isoformat() + "Z"
     _log.info("run_worker: success wr_id=%s files=%d", wr_id, len(all_files_written))
     _capture_session_cost(session_id, OPENCODE_BIN)
-    if artifacts_dir:
-        _write_result_event(result, artifacts_dir)
+    _store_result_in_db(db, wr_id, result, step_outputs)
     exit(0)
 
 
-def _write_result_event(result: Dict[str, Any], artifacts_dir: str) -> None:
-    """Serialize the result as a schema-validated WorkResultEvent."""
-    _log.debug("_write_result_event: wr_id=%s status=%s artifacts_dir=%s",
-               result.get("workRequestId", ""), result.get("status"), artifacts_dir)
-    event = WorkResultEvent(
-        work_request_id=result.get("workRequestId", ""),
-        status=result["status"],
-        outputs=result.get("outputs", []),
-        artifacts=result.get("artifacts", []),
-        error=result.get("error") or None,
-        timestamp=result["timestamp"],
-        executor_id=result.get("executor_id"),
-        harness=result.get("harness"),
-        model=result.get("model"),
-        files_written=result.get("files_written", []),
-    )
-    out_path = os.path.join(artifacts_dir, "result.json")
-    with open(out_path, "w", encoding="utf-8") as jf:
-        jf.write(event.model_dump_json(indent=2))
-    _log.debug("_write_result_event: written path=%s", out_path)
+def _store_result_in_db(
+    db: Any, wr_id: str, result: Dict[str, Any], step_outputs: Dict[str, Any]
+) -> None:
+    """Persist step outputs and update work request status."""
+    _log.debug("_store_result_in_db: wr_id=%s status=%s outputs=%d",
+               wr_id, result["status"], len(step_outputs))
+    try:
+        if step_outputs:
+            db.update_work_request_step_outputs(wr_id, step_outputs)
+        db.update_work_request_status(wr_id, result["status"])
+    except Exception as exc:
+        _log.warning("_store_result_in_db: failed wr_id=%s error=%s", wr_id, exc)
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: executor_cloud.py <path_to_dco_json>")
+        print("Usage: executor_cloud.py <work_request_id>")
         sys.exit(1)
     run_worker(sys.argv[1])

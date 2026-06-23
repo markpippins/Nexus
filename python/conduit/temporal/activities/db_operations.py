@@ -246,6 +246,13 @@ async def increment_ticket_tokens_activity(ticket_id: str, tokens: int) -> None:
 
 
 @activity.defn
+async def get_requeue_count_activity(plan_id: str) -> int:
+    """Count how many times this plan has been requeued (REQUEUED receipts)."""
+    db = DBAdapter()
+    return db.get_requeue_count(plan_id)
+
+
+@activity.defn
 async def release_ticket_activity(plan_id: str, role: str, session_id: str) -> bool:
     """Release a claimed Ticket back to open."""
     db = DBAdapter()

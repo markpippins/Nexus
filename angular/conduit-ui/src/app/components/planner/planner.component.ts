@@ -1,7 +1,8 @@
 import { Component, signal, computed, Inject, OnInit, OnDestroy } from '@angular/core';
 import { NgFor, NgIf, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
+import { SILENT_REQUEST } from '../../interceptors/request-context';
 import { ConduitService } from '../../services/conduit.service';
 import { PlanCard, ReceiptEntry } from '../../services/types';
 import { API_BASE_URL } from '../../services/api-config';
@@ -598,8 +599,10 @@ export class PlannerComponent implements OnInit, OnDestroy {
     if (this.viewMode() === 'proposals') {
       return [{ label: 'Proposed', plans: state.plans.proposed || [] }];
     }
-    // Collect all non-proposed plans and group by derivedStatus
+    // Collect all plans and group by derivedStatus
+    // Proposed and planning are included so they appear in the main list alongside pending/active/completed
     const allPlans: PlanCard[] = [
+      ...(state.plans.proposed || []),
       ...(state.plans.planning || []),
       ...state.plans.pending,
       ...state.plans.active,
@@ -715,6 +718,8 @@ export class PlannerComponent implements OnInit, OnDestroy {
     this.http.post(`${this.api}/tools/call`, {
       name: 'get_plan_receipts',
       arguments: { plan_id: planNumber },
+    }, {
+      context: new HttpContext().set(SILENT_REQUEST, true),
     }).subscribe({
       next: (res: any) => {
         if (res?.result?.receipts) {
@@ -732,6 +737,8 @@ export class PlannerComponent implements OnInit, OnDestroy {
     this.http.post(`${this.api}/tools/call`, {
       name: 'query_prompts',
       arguments: { search: promptNumber },
+    }, {
+      context: new HttpContext().set(SILENT_REQUEST, true),
     }).subscribe({
       next: (res: any) => {
         const results = res?.result?.results || [];

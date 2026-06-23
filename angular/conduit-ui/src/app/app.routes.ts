@@ -9,13 +9,6 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'planner',
-    loadComponent: () =>
-      import('./components/planner/planner.component').then(
-        (m) => m.PlannerComponent,
-      ),
-  },
-  {
     path: 'kanban',
     loadComponent: () =>
       import('./components/kanban-board/kanban-board.component').then(

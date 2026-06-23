@@ -7,6 +7,7 @@ adapted for Temporal with heartbeat-based progress reporting and stderr capture.
 import asyncio
 import os
 import select
+import signal
 import subprocess
 import sys
 from datetime import datetime
@@ -20,7 +21,7 @@ sys.path.insert(0, str(_PARENT))
 
 from harness_launcher import HarnessLauncher, DEFAULT_BINARIES
 from harness_enums import ExecutionMode, RoleMappingStrategy
-import logging
+from ..prompt_renderer import build_opencode_prompt
 
 _log = logging.getLogger("conduit.temporal")
 
@@ -194,10 +195,11 @@ def _extract_tokens(output: str) -> int:
 async def execute_with_model(
     model_cfg: Dict[str, Any],
     dco: Dict[str, Any],
-    dco_path: str,
+    wr_id: str,
     executor_cmd: str,
     ticket_id: str = "",
     working_path: str = "",
+    session_id: str = "",
 ) -> Dict[str, Any]:
     """Execute an AI harness subprocess with the given model configuration.
 
@@ -219,7 +221,7 @@ async def execute_with_model(
 
     # Debug log for ollama prompt debugging
     if harness == "ollama":
-        prompt = _build_opencode_prompt(dco, working_path)
+        prompt = build_opencode_prompt(dco, working_path)
         activity.logger.info(
             f"ollama prompt length={len(prompt)} first_100={prompt[:100]!r}"
         )
@@ -232,19 +234,21 @@ async def execute_with_model(
         cmd = _build_codex_cmd(role, dco, working_path)
     elif harness == "ollama":
         # Build prompt inline and pipe via stdin (more reliable than positional arg)
-        prompt = _build_opencode_prompt(dco, working_path)
+        prompt = build_opencode_prompt(dco, working_path)
         cmd = _build_ollama_cmd(model)
     else:
-        # Fallback: use executor_cloud.py directly
-        cmd = [sys.executable, executor_cmd, dco_path]
+        # Fallback: use executor_cloud.py directly with wr_id
+        cmd = [sys.executable, executor_cmd, wr_id]
 
-    # Launch subprocess
+    # Launch subprocess in its own process group so we can kill the entire
+    # tree (harness + child opencode) on timeout or cancellation.
     stdin_kw = {"stdin": asyncio.subprocess.PIPE} if harness == "ollama" else {}
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
             **stdin_kw,
         )
     except FileNotFoundError:
@@ -308,12 +312,24 @@ async def execute_with_model(
 
     # Timeout / heartbeat coroutine — runs alongside the readers
     async def _timer_and_heartbeat():
+        # Send an immediate heartbeat so Temporal doesn't time us out
+        # before the first 5-second interval elapses.
+        activity.heartbeat({
+            "session_id": session_id,
+            "pid": proc.pid,
+            "lines": 0,
+            "stderr_lines": 0,
+            "tokens": 0,
+        })
         last_heartbeat = datetime.utcnow()
         while proc.returncode is None:
             await asyncio.sleep(1.0)
             elapsed = (datetime.utcnow() - start_time).total_seconds()
             if elapsed > EXECUTOR_TIMEOUT:
-                proc.kill()
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except (ProcessLookupError, OSError):
+                    pass
                 await proc.wait()
                 raise HarnessError(f"Harness timed out after {EXECUTOR_TIMEOUT}s")
             # Heartbeat every 5 seconds
@@ -353,13 +369,19 @@ async def execute_with_model(
             # Ensure the process has fully exited before reading returncode
             await proc.wait()
     except asyncio.CancelledError:
-        # Temporal cancellation — kill the process gracefully
+        # Temporal cancellation — kill the entire process group
         activity.logger.warning(f"execute_with_model: cancelled session={session_id}")
-        proc.terminate()
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except (ProcessLookupError, OSError):
+            pass
         try:
             await asyncio.wait_for(proc.wait(), timeout=5)
         except asyncio.TimeoutError:
-            proc.kill()
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, OSError):
+                pass
             await proc.wait()
         raise
 
@@ -434,7 +456,7 @@ def _build_opencode_cmd(
     (e.g. ``ollama/qwen2.5-coder:latest``), so the model is prefixed
     with the provider type when available.
     """
-    prompt = _build_opencode_prompt(dco, working_path)
+    prompt = build_opencode_prompt(dco, working_path)
 
     # Prefix model with provider type for opencode (e.g., ollama/qwen2.5-coder:latest)
     qualified_model = model
@@ -466,7 +488,7 @@ def _build_codex_cmd(
     working_path: str,
 ) -> list:
     """Build a Codex CLI command from the DCO."""
-    prompt = _build_opencode_prompt(dco, working_path)
+    prompt = build_opencode_prompt(dco, working_path)
 
     launcher = HarnessLauncher(
         binary=DEFAULT_BINARIES.get("codex", "codex"),

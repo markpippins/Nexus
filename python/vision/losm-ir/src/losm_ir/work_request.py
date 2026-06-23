@@ -111,6 +111,7 @@ class WorkRequestMetadata(BaseModel):
 class WorkRequestDCO(BaseModel):
     id: str
     version: int
+    parent_request_id: Optional[str] = None
     intent: WorkRequestIntent
     decomposition: WorkRequestDecomposition
     requirements: WorkRequestRequirements

@@ -1,6 +1,6 @@
 """Canonical WorkRequest DCO model.
 
-Mirrors /home/codex/dev/nexus/.agent/schema/work_request.schema.json.
+Mirrors /home/codex/dev/nexus/.agents/schema/work_request.schema.json.
 """
 
 from __future__ import annotations

@@ -1,7 +1,9 @@
 pyproject.toml
 src/losm_ir/__init__.py
+src/losm_ir/compiler.py
 src/losm_ir/constraints.py
 src/losm_ir/critique.py
+src/losm_ir/dag.py
 src/losm_ir/execution.py
 src/losm_ir/execution_receipt.py
 src/losm_ir/executor_registry.py
@@ -10,6 +12,7 @@ src/losm_ir/plan.py
 src/losm_ir/spec.py
 src/losm_ir/states.py
 src/losm_ir/trace.py
+src/losm_ir/transition.py
 src/losm_ir/validation.py
 src/losm_ir/work_request.py
 src/losm_ir.egg-info/PKG-INFO

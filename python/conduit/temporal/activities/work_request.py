@@ -1,9 +1,7 @@
 """Temporal Activity for building WorkRequest DCOs from plans."""
 
-import json
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -13,12 +11,8 @@ _PARENT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_PARENT))
 
 from work_request_factory import WorkRequestFactory
-from executor_registry import ModelConfig, RegistryConfig, load_registry, resolve_executor
-
-DCO_DIR = os.environ.get(
-    "PIPELINE_DCO_DIR",
-    "/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS",
-)
+from executor_registry import ModelConfig
+from db_adapter import DBAdapter
 
 
 @activity.defn
@@ -29,9 +23,9 @@ async def build_work_request_dco_activity(
     working_path: str = "",
     session_id: str = "",
 ) -> Dict[str, Any]:
-    """Build a WorkRequest DCO from a plan and write it to disk.
+    """Build a WorkRequest DCO from a plan.
 
-    Returns a dict with 'dco' (the WorkRequestDCO as dict), 'dco_path' (file path),
+    Returns a dict with 'dco' (the WorkRequestDCO as dict), 'wr_id',
     and 'executor_cmd' (the executor invocation command).
     """
     if not working_path:
@@ -52,24 +46,23 @@ async def build_work_request_dco_activity(
         session_id=session_id,
     )
 
-    # Write DCO to disk
-    os.makedirs(DCO_DIR, exist_ok=True)
-    dco_path = os.path.join(DCO_DIR, f"{dco_obj.id}.json")
-    with open(dco_path, "w") as f:
-        json.dump(dco_obj.model_dump(by_alias=True), f, indent=2)
-
-    # Resolve executor
-    registry = load_registry()
-    executor = resolve_executor(registry, model_cfg["harness"] if model_cfg else "opencode")
+    # Resolve executor from DB
+    db = DBAdapter()
+    cfg = db.get_role_model_config(role)
+    if cfg:
+        executor_cmd = cfg.get("harness", "opencode")
+        executor_id = f"executor-{cfg.get('harness', 'unknown')}"
+    else:
+        executor_cmd = "opencode"
+        executor_id = "executor-opencode"
 
     dco_dict = dco_obj.model_dump(by_alias=True)
 
     return {
         "dco": dco_dict,
-        "dco_path": dco_path,
         "wr_id": dco_obj.id,
-        "executor_cmd": executor.invocation_contract.command,
-        "executor_id": executor.executor_id,
+        "executor_cmd": executor_cmd,
+        "executor_id": executor_id,
     }
 
 

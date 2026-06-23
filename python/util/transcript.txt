@@ -1,391 +1,1652 @@
 0:00
-There is a massive problem right now
+This is one of those videos I really
 0:01
-with how people are using AI. Let's just
+don't want to make, but I've been having
+0:02
+a lot of experiences that I wanted to
 0:04
-take for example GStack from Gary Tan.
-0:07
-These are a bunch of skills that people
+share. As you've probably seen, I've
+0:05
+been using Fable a lot. Sadly, Anthropic
 0:08
-are utilizing inside of their
+restricts the hell out of your
+0:09
+subscriptions, so you kind of have to
 0:10
-development environments to give AI
+use it through their interfaces. In this
 0:12
-certain functionalities. And if we take
+case, Claude Code. I've been using
 0:14
-a look at some of these skills, for
-0:15
-example, this one is for converting a
-0:16
-markdown file into a PDF. You'll see
+Claude Code a lot the last couple days,
+0:17
+probably as much as I used it back in
 0:19
-that these skills are pretty much just
+December and January when I first got
 0:21
-code instructions written rather in code
+addicted to Opus 4.5. I've been through
 0:23
-or in English to tell the AI what to do.
-0:25
-So you can see here this is just a giant
-0:27
-wall of code that it's saying hey if the
-0:29
-user asks for a PDF run this and then
+it with Claude Code, to put it lightly.
+0:26
+And while there are lots of things I do
+0:28
+not like about it, especially the
+0:30
+desktop app, I have come around to a
 0:32
-here we have more code to run if they
-0:33
-ask for a PDF. Then finally we have
+handful. And I've even found a bunch of
+0:34
+small things that I think Claude Code
 0:36
-these kind of interesting things where
-0:37
-it's like here's an if statement written
-0:39
-out in English that the AI should be
+does better than every other harness and
+0:38
+CLI for doing agentic coding. I can't
 0:41
-able to read to tell the user what to
-0:42
-do. So depending on the output of this
-0:44
-code here's some English if statements
-0:46
-to run to tell the AI how to understand
+believe I'm doing this, but I think I
+0:43
+have to. We're going to do a video about
+0:45
+the good parts of Cloud Code. Think I
 0:48
-what to happen and then some more stuff.
-0:50
-And if we even go further inside this
+need a hat for this one.
 0:52
-section you can see more of those human
-0:53
-readable if statements. It's just
+Let's do this. And as a reminder, just
 0:55
-English if statements. And then if we go
+because I have a hat and I have
 0:57
-even further, there's a bunch of other
+convinced a lot of people to spend a lot
 0:58
-stuff about code to run. And finally, at
+of money on Anthropic, they are not a
 1:00
-the bottom, we get even more code that
-1:01
-should be run by the user down here for
+sponsor. I don't think they ever would
+1:02
+be considering some of the things I've
 1:03
-various different things. So
+said about this company in the past. But
 1:05
-essentially, what this skill is doing is
-1:07
-instead of telling the AI, hey, here's
+I do need to get paid, especially after
+1:06
+the seven subscriptions that I've
+1:08
+activated for myself and my team over
 1:09
-some certain things to know and to
-1:11
-understand, it's instead a program
+the last few days. I'm $1,400 down, so
+1:12
+please pardon me for getting a little
 1:13
-written from top to bottom telling
-1:14
-exactly what should happen. Here's code
+bit of money from today's sponsor. Hey
+1:15
+you, you're probably a real dev, right?
 1:16
-to run. If this, then do this. If this,
+Like the type that uses Docker. Well, if
 1:18
-then do this. Do you know what that
+you are, you're wasting a ton of time.
 1:20
-sounds like? It sounds like a program to
+Almost all Docker users are. At least
 1:22
-me. It sounds like code. It sounds like
+all of the ones that aren't already
 1:24
-something that should run
-1:24
-deterministically the exact same way
+using today's sponsor, Depot. These guys
 1:26
-every single time. And instead, what
-1:29
-we're doing is we're taking something
+are the kings of Docker. They made it so
+1:28
+much faster that it feels unbelievable.
 1:30
-that is deterministic. We have written
+Up to 40 times faster for real world use
 1:32
-out deterministic code and we've even
-1:33
-written out deterministic instructions
-1:35
-on what to do and we're feeding it into
-1:37
-a non-deterministic machine that can
-1:39
-sometimes hallucinate or make mistakes
-1:41
-or does not always do the same thing
+cases. Their infrastructure builds
+1:34
+containers remotely, works for Intel and
+1:36
+ARM CPU, so you Mac people are going to
+1:38
+be more than set. And they also built
+1:40
+their own fine grained caching for the
+1:42
+layers for your Docker images on their
 1:43
-every time. Instead of generating a
+own CDN. What this means is that after
 1:45
-skill like this, it would be much
-1:47
-smarter to generate a single command
+one dev runs the build, everyone else
+1:48
+just pulls the cache instead, making
 1:49
-line tool that you can then let your AI
-1:51
-use. But that command line tool will
+everything absurdly fast. And this isn't
+1:52
+just good for running builds on your
 1:53
-encompass all of this code, all of these
+machine. This is incredible for agents
+1:55
+that are doing work in the cloud, but
 1:56
-if statements, and handle everything
-1:57
-properly inside of a command line
-1:59
-instead of handling it inside of some
-2:01
-type of agent. Now, I know there are
-2:03
-certain situations where it's better to
+more realistically, it's incredible for
+1:58
+CI, which is why they provide GitHub CI
+2:00
+that's up to 10 times faster than GitHub
+2:02
+actions. If you're willing to move to
+2:04
+something a little different from GitHub
 2:05
-let an agent determine what to run
-2:06
-because you maybe have somewhat
+actions, their CI engine is so much
 2:08
-ambiguous things that you want this
+better. Not only does it handle actual
 2:09
-thing to do, but instead of giving all
-2:12
-of the instructions in here for how to
+parallelism where it does one step like
+2:11
+installs and then has three things
 2:13
-actually run and build a PDF, it'd be
+running at the same time, which is
+2:14
+unbelievably useful when you're doing
 2:15
-much better to create really small
-2:17
-little files and things that can run and
-2:19
-then the AI just calls out to those
-2:21
-different things for the user based on
-2:23
-different things. So instead of having
+real CI work, it also runs way faster on
+2:18
+much better infrastructure. And most
+2:20
+importantly, it's accessible via API and
+2:22
+CLI. So your agents are able to run your
 2:24
-this giant skill that has a bunch of if
+CI in a loop without having to push up
 2:26
-checks inside of it, instead you give
-2:27
-tools to the AI and then the AI itself
+the changes. No more filing PRs just to
+2:29
+trigger CI to see what works and then
 2:30
-can just determine which tools to call
-2:31
-based on what you said. And this isn't
+copy pasting the errors back to your
+2:32
+agent. Just let the agent run. If this
 2:33
-just a problem with these particular
+ad was longer than your Docker builds,
 2:35
-skills or skills in general. This is
-2:36
-something that's more of a trend I'm
-2:38
-seeing everywhere where developers are
-2:40
-essentially using their AI to do
-2:42
-deterministic things, but they are using
+get that fixed at soyv.link/devo.
+2:37
+So what the hell am I doing making a
+2:39
+video about good parts of Cloud Code?
+2:41
+Well, as I hinted at the start, I've
+2:43
+been using it a ton, and I've noticed a
 2:44
-a non-deterministic tool all the time. I
+handful of things I actually really
 2:46
-see developers telling their AI, "Hey,
-2:48
-get and get commit this and then push it
-2:50
-to GitHub or something along those lines
-2:52
-where it'd be much easier just to use a
+like. from cool UI touches to nice
+2:49
+features that only exist in Cloud Code
+2:51
+to deep integrations with things like
 2:53
-command line tool directly to do those
-2:55
-different things or they're asking their
+their skill management that are actually
+2:54
+quite good. And I'm mostly making this
 2:57
-AI to do this really complicated, you
-2:59
-know, thing with a bunch of different if
+video not to glaze Claude Code and
+2:58
+convince everybody to go use it. I'll be
 3:00
-checks and so on when in reality it'd be
+transparent with my goal here. I want
 3:02
-much better for you to just have your AI
+every other harness to steal all of
 3:04
-write a program that does that thing
-3:05
-deterministically and then you could
+these things. I am making this video not
+3:06
+because Cloud Code is better and I want
 3:07
-just call that program instead of
-3:08
-wasting tokens having the AI redo this
+everyone to appreciate how great it is,
+3:09
+but because I want everything else to
 3:10
-every single time." Because again,
+take the good parts so that I don't miss
 3:12
-whenever you call these skills or use
+Cloud Code when I use other things. So
 3:14
-these skills, the AI must read all of
-3:16
-that text, which is costing you money on
+knowing that, what are those things?
 3:17
-tokens, and then must output and think a
+First and foremost, I want to talk about
 3:19
-bunch, which is costing you money on
-3:20
-tokens. So, it'd be much better to spend
-3:22
-your time generating all of this code
+skills. You might be confused because
+3:21
+skills are a feature in pretty much
+3:23
+every one of these harnesses now. And
 3:24
-one time and then call that code on your
+they are. They're just markdown files,
 3:26
-computer to do this particular thing.
-3:28
-Think about it. We have learned that
+right? Mostly, yes. But this is where I
 3:30
-caching is an incredibly important thing
+start to really like what Claude Code
 3:32
-to do as you want to scale out your
+does differently. One of the things
 3:34
-application. If you cache your
-3:35
-application, it'll be much quicker
-3:37
-because instead of generating the HTML
-3:39
-every time someone accesses your page,
+Claude Code does really differently with
+3:36
+their skills is the ability to execute
+3:38
+scripts in them. This might sound
 3:40
-you generate it once and you give the
+insane, right? Like just tell the model
 3:42
-same HTML every single time, making it
+to go execute the script. But hear me
 3:44
-much quicker and your server runs much
-3:46
-less because it generates all the code
+out. There's a lot of use cases where
+3:47
+it's nice for the model to know things
 3:48
-one time and then it continually serves
-3:49
-that same thing to the user. We've
-3:51
-essentially completely forgotten that
-3:53
-when it comes to AI, instead of creating
-3:55
-a program which does what we want to do,
-3:57
-the caching portion, we're instead
-3:59
-forcing the AI to burn tokens and energy
-4:01
-and power every time we want to do
+when it loads the skill instead of
+3:50
+having to load the skill and then do
+3:52
+things and then do the next step. Here's
+3:54
+an example of a real skill I made that I
+3:56
+use all the time. It's repo explorer.
+3:58
+This is my markdown file that replaced
+4:00
+Ben's whole product that he was building
 4:03
-something. instead of writing a program
+that I was trying to convince him he
 4:04
-one time that'll do it for us every
-4:06
-single time that we want to do this. I
+doesn't need to build that product.
+4:07
+Now he is convinced he understands, but
 4:08
-have a video editor program that I
+at the time this was originally a demo
 4:10
-created and that video editor program
+and I've actually found myself using it
 4:12
-does have some AI related things that
-4:13
-happen inside of it. But I've
-4:15
-essentially taken that AI portion and
-4:17
-I've broken it out entirely and the rest
-4:19
-of my application is entirely
+all the time. The point of this skill is
+4:14
+to allow agents to explore
+4:16
+implementations of dependencies. Like if
+4:18
+I'm using effect or react or some weird
 4:21
-deterministic. For example, I use an AI
+open- source project that the model
 4:23
-to create a transcript of all of my
-4:25
-text. That way I can edit my videos
+doesn't know that much about, instead of
+4:24
+just hunting through the docs and hoping
 4:26
-based on the transcript of the text. I
+it finds the right thing, this skill
 4:28
-can then stitch together those clips
-4:30
-using ffmpeg and I can do various other
-4:32
-things with that as well. But the key is
+allows the model to clone the open
+4:29
+source repo into a specific directory
+4:31
+and then explore that specifically. It
 4:34
-I don't tell the AI, hey, give me the
-4:36
-transcript and then stitch together my
+has a pretty simple description. Clone
+4:35
+and inspect external repositories in a
 4:37
-ffmpeg videos together. I instead say
-4:40
-generate the transcript and put it in a
-4:42
-JSON file. That JSON file is then read
+reusable local exploration cache. Use
+4:39
+the skill when the user asks to explore,
+4:41
+inspect, investigate, compare, or answer
+4:43
+questions about a repo that may not
 4:44
-by my running program written in
+already be in the current workspace. The
 4:46
-JavaScript and it reads that transcript,
+actual skill itself is pretty simple.
 4:48
-renders that out as a screen. I then can
+Use this skill to explore repos without
 4:50
-edit my video. I can then send a program
+cluttering the active workspace. I have
+4:52
+the specific directory on my computer.
 4:53
-to ffmpeg through my application, no AI
-4:56
-at all, and it renders out the video. So
-4:58
-I'm able to use the AI for one small
+In my home path, I haveexplore/repos,
+4:55
+which is the local cache for repos that
+4:57
+I can explore. You can see the cache
 4:59
-portion and I'm able to then take the
+contents by running this command. It
 5:01
-output of the AI and run it in the rest
-5:03
-of my program so everything else works
+tells you to list the current
+5:02
+repositories before deciding which to
 5:04
-like I expect it to. This is how AI
-5:07
-should be used for these type of
+use. I even call out that certain host
+5:06
+support skill injection here. Otherwise,
 5:08
-deterministic tasks. Because if I
+it should run this script to find what's
 5:10
-instead told the AI, generate the
+there. Then it says check whether the
 5:12
-transcript, cut the video, render the
+repo is already there. If it's not
 5:13
-ffmpeg stuff, I guarantee you at some
+present, clone it, then explore it.
 5:16
-point along that chain, it's going to
-5:17
-make a single mistake. And if it does,
-5:19
-everything in that chain is essentially
+Relatively simple. You might be seeing
+5:18
+the first thing that cloud code does
+5:20
+that every other harness doesn't. That's
 5:21
-broken cuz now my output no longer works
-5:23
-and I need to rerun the entire chain
-5:25
-from the absolute beginning. Instead, if
-5:27
-I do a deterministic step-by-step
-5:29
-process, generate the transcripts, and
+really nice. The current cache contents
+5:24
+section. If the harness is capable, it
+5:26
+will immediately make this directory if
+5:28
+it doesn't already exist and then list
 5:30
-then let my program do everything else.
-5:32
-If my transcripts fail, that's fine. I
-5:34
-just rerun the transcripts. But, for
-5:36
-example, everything else will still work
+its contents. This skips a whole step
+5:33
+that the model has to do. And if every
+5:35
+other harness supported this, I would be
 5:38
-perfectly fine because it's all inside
+able to write the skill entirely
 5:40
-of this deterministic package. So, I
+differently. I would just open with the
 5:42
-think using AI to write the code for
+listing of the content. And then I would
 5:44
-these deterministic things, that's a
-5:45
-great thing. Do that 100%. But having
-5:48
-the AI do essentially deterministic
-5:50
-tasks, but by sending it English to do
-5:52
-that, that is just a waste of money, a
+say right below, if the repo you want is
+5:47
+in this directory, just go there. If
+5:49
+not, clone it there. It would make this
+5:51
+skill half the length and it would be
 5:54
-waste of tokens, a waste of time, and
+meaningfully more reliable and
 5:55
-it's going to give you worse results
+resilient. But instead, I have to write
 5:57
-than if you just had a program that did
+it in two different ways. one where
 5:59
-that exact same thing for you.
-
+claude code gets these cool features and
+6:01
+one where every other harness including
+6:03
+codecs, pi and more don't. Thankfully,
+6:05
+there's a pi extension that does this
+6:07
+and I think open code is starting to
+6:08
+introduce this as well. But this is a
+6:10
+feature that quad code does really well
+6:12
+that I think people are too hesitant to
+6:14
+introduce. There are real risks with how
+6:16
+much people just arbitrarily install
+6:18
+skills that the skill could just
+6:20
+arbitrarily execute code. We already
+6:22
+deal with that with npm guys. Get over
+6:23
+your [ __ ] selves. This is totally
+6:24
+fine. If anything, it's better cuz the
+6:26
+code is in here to be audited by an LLM.
+6:29
+It doesn't actually [ __ ] auto run.
+6:31
+It's okay. It does kind of auto run once
+6:33
+it's installed, but like you get the
+6:34
+idea. This is not as unsafe as half the
+6:36
+[ __ ] we do with npm. It's totally fine
+6:39
+and this is not a new thing for me to
+6:40
+call out. Two months ago, I already did
+6:42
+call this out and I said that I want
+6:44
+other things to be supportive of it like
+6:46
+codec cli, pi, cursor, etc. I like this
+6:49
+pattern a lot. It is genuinely really
+6:51
+good and it's one of those things that
+6:53
+should be part of the skills standard
+6:55
+but apparently just isn't. Some part of
+6:57
+me that's frustrated about anthropic
+6:59
+wants to complain that they are moving
+7:01
+too far away from the standard but I'm
+7:03
+not going to because the standard should
+7:04
+move. The standard should improve. We
+7:06
+should take opportunities to do things
+7:08
+better. And this is a thing that cla
+7:10
+does better than every other harness
+7:12
+right now. So we should all go embrace
+7:13
+that. If for those looking for the pi
+7:15
+skill, Joel made it. Joel hook/ pi skill
+7:17
+interpolation. Joel's a legend.
+7:20
+Apparently, our friend Mario did not
+7:22
+like it though because it was not
+7:23
+secure. So, know that as well going in,
+7:25
+but that is the nature of this. It's
+7:27
+arbitrary execution, but like it's it's
+7:28
+not that big a deal. I think people are
+7:30
+overreacting. And to their credit,
+7:31
+Anthropic did also invent skills. So, I
+7:34
+think it's totally fair for them to do
+7:35
+stuff like this. I wish other harnesses
+7:38
+would embrace the flexibility that
+7:40
+Claude code skills have. Next, I want to
+7:42
+talk about the Claude MD for a bit. I
+7:44
+have issues here in particular that the
+7:46
+Claude MD and agent MD are competing
+7:48
+standards where everything uses the
+7:50
+agent MD except for Claude which insists
+7:52
+that it has a special file. I've come
+7:54
+around to that a bit because Claude
+7:56
+needs different instructions than other
+7:58
+things do. It's annoying when I'm using
+7:59
+Claude models in open code or pi but I
+8:02
+have come around to some of the cool
+8:03
+things you could do in the cloud MD. I
+8:05
+will highly recommend that you don't run
+8:07
+their/init command. It's pretty bad.
+8:10
+They have a new interactive version, but
+8:13
+your Claude MD should be handwritten.
+8:15
+The thing I want to call out that I
+8:16
+think is genuinely really cool is
+8:18
+importing additional files. Markdown
+8:20
+doesn't have an import standard cuz
+8:22
+Markdown's not really a standard. It's a
+8:25
+vague vibe at best. So, Claude has a
+8:28
+solution. Claude MD files can import
+8:30
+additional files using at path/impport
+8:33
+syntax. Imported files are expanded and
+8:36
+loaded into context at launch alongside
+8:38
+the Claude MD that references them. Both
+8:40
+relative and absolute paths are allowed.
+8:42
+Relative paths resolve relative to the
+8:44
+file containing the import, not the
+8:46
+working directory. Imported files can
+8:48
+recursively import other files with a
+8:50
+maximum depth of four hops. So if you
+8:52
+want to intentionally include things
+8:53
+like the readme package, JSON, etc., you
+8:56
+can just tag them in. This also means
+8:58
+you can do a very convenient thing for
+9:00
+those of us who are annoyed that the
+9:01
+agent MD and cloudmd are different.
+9:04
+Watch this. At agents.mmd.
+9:07
+Now, my Claude MD is my agents MD. Not
+9:10
+with a sim link, not with some weird
+9:12
+[ __ ] It just is. But more
+9:14
+importantly, if I do notice Claude doing
+9:16
+some [ __ ] that my other models
+9:17
+aren't, I can put additional stuff here
+9:21
+just for Claude. So now I have the full
+9:23
+content of my agent MD as well as my
+9:25
+special Claude stuff just in the Cloud
+9:27
+file without having to do any weird sim
+9:29
+linking or managing two different files.
+9:31
+It just it works. It's good. And if you
+9:34
+have other docs in your repo that are
+9:36
+useful to the model, you can tag that in
+9:38
+here as well. This is a really nice
+9:40
+pattern, especially because it works
+9:41
+with things other than markdown. And I
+9:43
+wish more things would copy it. The
+9:45
+problem is that agents MD has become the
+9:47
+standard. It's the thing everything
+9:49
+uses. So if I do this in agents and it's
+9:52
+supported by codecs, it might not be
+9:54
+supported by five other things I use. So
+9:57
+by having the cloudmom dbanthropic
+9:59
+special thing, they're able to do stuff
+10:01
+like this. They also have a nice
+10:03
+override pattern that I actually quite
+10:05
+like with claude.local.md.
+10:08
+If you add this to your global git
+10:09
+ignore, which I would recommend. I'm
+10:11
+probably going to go do that myself. It
+10:12
+allows you to have specific instructions
+10:14
+for how you want to work that will not
+10:16
+affect the rest of your team. I do love
+10:18
+that they have this as a separate thing
+10:20
+that allows me to add my preferences
+10:22
+without affecting you and how you work.
+10:24
+Gets kind of rough in this way where
+10:26
+when one person wants one cloud and
+10:28
+somebody else wants another, git doesn't
+10:30
+resolve that well. This does. This is a
+10:32
+good thing that Anthropic has that as
+10:34
+far as I know, none of the other
+10:35
+harnesses do. I like this. While I was
+10:38
+reading these docs to get this
+10:39
+information, I found another really cool
+10:41
+feature I didn't know about, which is
+10:42
+launching sessions from links. They
+10:44
+actually have their own HTTP code here,
+10:47
+cloud- CLI slash, that allows you to
+10:50
+open things in cloud CLI. So, you can
+10:53
+have a page that someone makes that has
+10:55
+a bunch of links in it to trigger cloud
+10:57
+CLI. Apparently, Codex also has deep
+10:58
+links, which is very, very nice. Cool to
+11:01
+see. Does this work with app? The codeex
+11:03
+app registers the codeex deep link. Oh,
+11:05
+cool. That's actually really nice. That
+11:06
+opens an app. Good [ __ ] I like that. I
+11:09
+might even add this to my skill for
+11:11
+making HTML plans where it has
+11:13
+suggestions on how to kick off the job
+11:15
+and I can click the cloud CLI link in
+11:18
+that HTML page and it will just open up
+11:20
+the terminal automatically. That's
+11:22
+actually really cool. It does lead into
+11:24
+the idea that your computer that you do
+11:25
+work on is the same computer that your
+11:28
+quad code runs on, which honestly hasn't
+11:30
+been the best experience for me, even
+11:31
+just for performance reasons. I've
+11:33
+really enjoyed running quad code on
+11:35
+other computers on my network, which
+11:37
+this will not work for. But if you are
+11:39
+just using one computer with all of your
+11:40
+stuff, this is actually a really cool
+11:41
+pattern. If you combine this with HTML
+11:43
+planning, you can make some really cool
+11:44
+UX with this. It even lets you pass the
+11:47
+working directory and a GitHub repo
+11:49
+which will be resolved automatically by
+11:51
+Claude Code if it's seen it before. If
+11:53
+it doesn't, then it will make the
+11:54
+session in your home directory instead
+11:56
+interesting. So far, everything we've
+11:58
+talked about isn't actually inside of
+11:59
+Claude Code. It's just features it
+12:01
+supports. But I want to hop into Cloud
+12:02
+Code itself and show off some things
+12:04
+that I actually find quite nice. In
+12:06
+order to show the first one, I need to
+12:07
+kick off some work. So, I'm going to do
+12:09
+that. Do a quick audit of this work to
+12:12
+make sure it's in a good state. then
+12:15
+commit, push, and make a PR. Cool. So, I
+12:19
+now have Mythos taking work it just did
+12:21
+to go make a PR for it. But one of the
+12:23
+really nice things Cloud Code has that I
+12:25
+haven't seen anyone else do is a special
+12:27
+command slash by the way, which lets you
+12:29
+ask a quick side question without
+12:31
+interrupting the main conversation. Can
+12:33
+you tell me a bit about the performance
+12:37
+or backups? And now I have a separate
+12:40
+chat inside of this chat going while
+12:43
+it's still doing the work that I told it
+12:45
+to do. Apparently Codex has slashside
+12:47
+which is really cool as well. I'm pumped
+12:49
+that other things are doing this now.
+12:50
+But when I found this feature, it was
+12:52
+the only one that had it. Super nice to
+12:55
+just run a thing like this separately.
+12:57
+Cool. And here we have the info on the
+12:59
+performance. And while that was running,
+13:01
+we got a bunch of sub aents queued up to
+13:04
+explore. More cool things that Anthropic
+13:06
+was first to, but a lot of other stuff
+13:07
+now has, is the ability to like navigate
+13:10
+through different sub aents it spun up.
+13:13
+This isn't the coolest implementation of
+13:14
+it, though. The coolest implementation
+13:16
+by far is workflows, and nothing else
+13:18
+has gone quite as far as Anthropic has
+13:20
+here. One other little thing, and this
+13:22
+is just one I've been using a lot
+13:23
+because I've been stuck in the CLI more.
+13:25
+Work trees are not my favorite way to
+13:27
+deal with stuff, but for the ephemeral
+13:29
+work where I spin up, do it, file PR,
+13:30
+and then drop it forever. Having a
+13:32
+d-work tree that actually behaves
+13:35
+properly is really nice. Now I have the
+13:38
+repo I was in, but in a subwork tree in
+13:40
+the cloud/work trees, which has since
+13:42
+been get ignored. This pattern's
+13:44
+actually been very nice for me, and I've
+13:45
+been enjoying it to just quickly spin up
+13:47
+a work tree on some random idea I have.
+13:49
+But what I want to show off is
+13:50
+workflows. There's a couple ways to
+13:52
+trigger a workflow. So the easiest is to
+13:54
+just tell the model to do it. The most
+13:56
+expensive and most reliable option
+13:57
+though is Ultra Code. As grotesque as
+14:00
+that purple gradient it does is I do
+14:02
+often use it to maximize my utilization
+14:05
+of my sub. That said, I'm trying now to
+14:08
+use high and XH high directly more and
+14:10
+just tell it to do a workflow. I'm going
+14:12
+to voice the text because I'm lazy and
+14:14
+want to just explain what I'm doing here
+14:16
+at the same time. So let's do that. I
+14:19
+want to audit the open PRs on this
+14:21
+project and figure out what their status
+14:22
+is. Which ones have been trumped? Which
+14:24
+ones don't need to be left open anymore
+14:26
+because similar work has been merged.
+14:28
+Which ones are ready to go? And which
+14:29
+ones need a little more before they're
+14:31
+worth pushing over the finish line. I
+14:32
+want to use a workflow to break up all
+14:34
+of this work. Before you run the
+14:36
+workflow, please output the code you're
+14:38
+going to use to run it so that we can
+14:39
+read through it together. The last line
+14:41
+of there is probably my favorite part
+14:43
+because workflows aren't just a bunch of
+14:45
+tool calls the agent can do. They fully
+14:48
+embraced code mode, which is when you
+14:50
+don't just tell the LLM to spit out text
+14:53
+to trigger specific stuff and keep all
+14:54
+of this stuff in its own memory. You let
+14:56
+the agent write code to do a thing.
+14:58
+Instead, instead of having all your MCP
+15:00
+servers that flood you with thousands of
+15:02
+rows from your database, you can just
+15:04
+have it write code to call the MCP
+15:06
+server, get those thousand rows, and
+15:08
+then filter it programmatically before
+15:10
+it ever makes its way into the context
+15:12
+window. While this is running, I want to
+15:14
+point out how I'm running Claude Code.
+15:16
+because I'm not using the standard UI. I
+15:18
+was an early mover to their full screen
+15:20
+mode, which is using the alt screen
+15:21
+rendering technique in the terminal. So
+15:23
+instead of doing weird reaxes to replace
+15:25
+text in the scroll back history and the
+15:27
+buffer, which is how a lot of these
+15:28
+terminal apps work, it instead takes
+15:31
+over the full terminal. So when I scroll
+15:33
+up, I can't scroll to before I ran cloud
+15:35
+code. And when I close it, it fully
+15:38
+closes and restores my old terminal
+15:40
+view. So if I like, I don't know, lsa
+15:43
+here, I have all this stuff. It's my
+15:45
+custom command. so I don't leak. I run
+15:46
+Claude here and now it's full screen and
+15:49
+when I close it, I go back to the
+15:51
+terminal. That's cuz I'm using the full
+15:52
+screen mode or the flickerless renderer.
+15:55
+I found it pretty good. I would
+15:56
+recommend switching to it if you're okay
+15:58
+with not having traditional scroll
+15:59
+buffer. It does get a little annoying
+16:01
+when you're sshing with T-Max, but I
+16:03
+just told my agent to go figure that out
+16:05
+and fix it. And now I have fully working
+16:07
+scroll in T-m over SSH, which has been a
+16:10
+lifesaver. Apparently, you can turn this
+16:12
+on by running slashtuy full screen in
+16:15
+cloud code, but you can also do cloud
+16:17
+code no flicker equals one as an
+16:18
+environment variable. That's how I have
+16:19
+it set. We now have the workflow
+16:22
+written. So, here is what a workflow
+16:24
+actually is. If you're not familiar, the
+16:26
+point of a workflow is to take a bunch
+16:29
+of work and break it up into groups of
+16:31
+sub agents that have different system
+16:33
+prompts, different roles, different
+16:35
+things they are working on. It's not
+16:37
+just like, okay, let's have six things
+16:39
+go off and look at this stuff. It's a
+16:41
+staged workflow that has different steps
+16:43
+along the way. So, I was gonna tell it
+16:44
+this looks good. Run it. Be cautious
+16:47
+when you tell it to run a workflow
+16:48
+though because these burn tokens. By
+16:51
+default, workflows use up to eight
+16:53
+agents in parallel and it will
+16:55
+constantly be spinning up new ones as
+16:57
+previous work is finished. Going to wait
+16:59
+actually starts running so I can open up
+17:01
+the workflow and show you. Here we are.
+17:02
+Once a workflow is running, you can go
+17:04
+look at it here and it currently has 15
+17:06
+agents. it cued one for every single one
+17:09
+of the PRs that is currently open
+17:10
+because that's what I asked it to do to
+17:12
+audit the PRs. Each time it audits one
+17:14
+of those PRs, it will decide whether or
+17:16
+not it needs to throw that PR over to
+17:19
+this new rule phase and then after
+17:21
+there's a third verify phase. It doesn't
+17:23
+even necessarily go through the phases
+17:25
+in order. It just sets up these sub
+17:26
+agents to find some information and then
+17:29
+decide if it should go through
+17:31
+additional phases or not. It's a fully
+17:33
+dynamic step-by-step workflow based on
+17:35
+what you're asking for. It does burn
+17:38
+usage like [ __ ] mad, though, so know
+17:40
+that going in. So, we're at 9% used
+17:43
+right now, and in not much time, that
+17:46
+will bump. Yep, it's already up to 10.
+17:48
+And if I refresh again in a minute,
+17:49
+it'll be at like 12 or 14. From my
+17:52
+testing, when I had a workflow going,
+17:53
+just one workflow with those eight like
+17:56
+parallel threads, it was costing about
+17:58
+$100 every 10 minutes. Yeah. No. going
+18:01
+in workflows are expensive with Fable
+18:03
+specifically, but if you use them with
+18:05
+cheaper models or you even tell Fable to
+18:08
+orchestrate using Sonnet and Opus
+18:10
+instead, you can make the usage here way
+18:13
+less aggressive. But just those two
+18:15
+sentences I said there were enough for
+18:17
+it to go up to 12%. So use with caution.
+18:20
+But I want to read through the code it
+18:21
+wrote for the workflow because one of
+18:23
+the things I think is coolest about it.
+18:24
+This is going to sound contradictory, so
+18:25
+hear me out. You can never be more
+18:27
+dynamic than code. I know that sounds
+18:29
+crazy cuz code is code. It does what it
+18:31
+says. But when the agent can write code,
+18:34
+it is effectively building its own
+18:36
+custom feature every time it does a
+18:38
+workflow. If we were to build workflows
+18:40
+as like a core feature that the agent
+18:42
+just calls, it would have to be
+18:43
+structured such that you tell the model,
+18:45
+okay, here are the different phases you
+18:47
+can do. Here's how you structure it.
+18:49
+Here's where you put prompts and we'll
+18:51
+go spin up the rest. But when you tell
+18:52
+it to write code, it's now able to
+18:55
+structure it however the [ __ ] it wants.
+18:57
+And it takes advantage of that. I've
+18:59
+seen Fable write workflows that just
+19:00
+weren't compatible. Some of them weren't
+19:02
+even valid JS because it's trying so
+19:03
+hard to push the limits of what this
+19:05
+feature can do which I do actually think
+19:07
+is kind of cool. So it starts with this
+19:08
+meta export which is the name of the
+19:11
+workflow open PR audit says what it's
+19:13
+going to do. Audit all 15 open PRs and
+19:16
+it has three phases it defines. One is
+19:18
+audit which is detailed as one readonly
+19:20
+agent per PR. Then the rule is to pick a
+19:23
+winner inside of each overlapping
+19:24
+cluster and then verify, which is one
+19:26
+adversarial checker per disposition. So
+19:29
+every time it finds a thing it's not
+19:30
+sure about, it will verify that here.
+19:32
+And here are all of the PRs. This is
+19:34
+code that isn't actually being used
+19:36
+directly for the workflow. It's not
+19:37
+exported. It just has this here for its
+19:40
+own usage. This is all info it got from
+19:42
+probably running the GitHub CLI, getting
+19:44
+this data, and then putting it into this
+19:46
+JS file. Has each PR here. Here it says
+19:48
+what the title is, whether or not it's a
+19:49
+draft, whether or not it's mergeable,
+19:52
+and when it was updated. Whether or not
+19:54
+it's mergeable is like if it's
+19:55
+conflicting or not, which is cool that
+19:56
+it got that data ahead of time, so the
+19:58
+agents aren't stuck figuring that out
+20:00
+for each of themselves. Then we have by
+20:03
+number, which is a mapping of all of the
+20:05
+data here so that it's an object that is
+20:08
+number, key, data, value, just to make
+20:11
+it easier to go through. Then it
+20:13
+actually pulled some stuff from memory
+20:15
+because I've done this specific audit
+20:16
+before. So here it had prior where PR35
+20:20
+won in a tournament against 37 and 39.
+20:23
+PR37 lost that same tournament. PR39
+20:26
+superseded 35 and 37, but it was
+20:28
+empirically refuted. All caps refuted.
+20:31
+Chamra reference MD documents a return
+20:33
+type that code doesn't produce. Two
+20:35
+disjointing storage runtimes. Four or
+20:37
+five smoke functions dead. Hosted. Yeah,
+20:39
+it really did not like that PR. That PR
+20:41
+was written by 55. So I fable. It's
+20:44
+funny. Opus48 glazed the [ __ ] out of GPT
+20:47
+code. Fable hates GPT code. It's
+20:50
+actually really interesting how
+20:51
+different they are in this way. I would
+20:53
+say that this is probably the single
+20:54
+area I've seen Fable differ the most
+20:56
+from Opus. Opus loved OpenAI code. Fable
+20:59
+hates it. And then it has the main logs.
+21:01
+This is things that have recently
+21:03
+merged. So it has as a reference. Then
+21:05
+it is best to group all the different
+21:06
+clusters of PRs that are related. So all
+21:08
+of these have to do with files. All of
+21:10
+these have to do with whitelisting. All
+21:12
+of these are off brokers. The rest are
+21:13
+all unique. Cool that they did that for
+21:15
+me. Dispositions. These are all the
+21:17
+different states it can be in. The audit
+21:19
+schema. This is how it wants the audit
+21:21
+to return when the model is done. The
+21:24
+ruling schema. This is for the ruler
+21:26
+verifier layer. And then we have the
+21:28
+verdict schema. The audit prompt which
+21:30
+is the prompt that is dynamically
+21:31
+generated as a function that takes in a
+21:33
+PR. It also uses the today definition so
+21:36
+that the model knows what today is
+21:38
+without having to potentially destroy
+21:40
+its context by putting that in the
+21:41
+system prompt. It's actually I haven't
+21:43
+read one of these in full before. This
+21:44
+is super cool. This whole thing here
+21:47
+actually is just a function that returns
+21:48
+a string. It's a template string
+21:50
+generator that you pass a PR to that has
+21:52
+number, title, branch, all of this stuff
+21:54
+to give that to the model as a prompt
+21:56
+because again it's doing all of this
+21:58
+dynamically on the fly which is super
+22:00
+cool. Here it even has a dynamic turnary
+22:02
+where it puts different context based on
+22:04
+whether or not there are priors for this
+22:06
+PR. Has a different prompt for ruling
+22:08
+which is deciding whether or not this
+22:09
+thing should be used or not. And then a
+22:11
+verify prompt. You're an adversarial
+22:13
+verifier in the lake bed repo. Read
+22:15
+only. Origin already fetched. Do not
+22:16
+fetch, check out, or modify. It knows
+22:18
+how to prompt Claude. Historically, I
+22:20
+didn't feel like models knew how to
+22:21
+prompt themselves. Fable has pushed me
+22:23
+way over the line here. Fable is great
+22:25
+at prompting anthropic models. It knows
+22:27
+all the ways they screw up and tells
+22:28
+them not to ahead of time. The proposed
+22:29
+disposition for PR is the data that it
+22:33
+fetched from the other agents. Try to
+22:34
+refute this using actual repo state. the
+22:37
+GitHub PR view diff checks git logs
+22:40
+close superseded close stale yada yada
+22:42
+it's a decent prompt and then we have
+22:44
+the results where they call pipeline
+22:46
+which is their magic global helper as
+22:48
+clusters which are the groups that we
+22:49
+talked about before an async function
+22:52
+for uh auditing every PR member that's
+22:54
+the first stage then stage two is the
+22:56
+next section stage three is the end part
+22:59
+but you define this all in a pipeline
+23:02
+that takes the clusters which is the
+23:03
+data as the first argument and then the
+23:05
+functions to define the sub jobs and the
+23:07
+subruns for all of these other sub
+23:09
+aents. It's [ __ ] cool. It wrote 240
+23:12
+lines of code that is entirely throwaway
+23:15
+that is only going to be executed ever
+23:17
+once to trigger this workflow. That's
+23:20
+[ __ ] awesome. Although I will admit
+23:23
+with Fable that is also expensive. We
+23:25
+are now up to 24% used in the time that
+23:28
+I read that. Another 12% of my $200 a
+23:31
+month 5 hour window. When you see
+23:32
+everybody talking about agent loops and
+23:34
+letting the agent prompt itself, this is
+23:36
+a phenomenal example of it. Should you
+23:39
+go use this and burn all of your usage
+23:41
+yourself? Maybe. But at the very least,
+23:44
+you should look at this and learn from
+23:46
+it, realizing that this is where you get
+23:48
+really crazy powers with models when you
+23:50
+let them write their own code to do
+23:52
+additional subprompting where code isn't
+23:55
+just the output of a model. Code is a
+23:57
+step between model runs. Genuinely
+24:00
+really cool. and has got me thinking a
+24:02
+lot more deeply about how to use these
+24:04
+things as well if I'm being honest with
+24:05
+y'all. On the topic of usage limits
+24:07
+though, I'm burning through them pretty
+24:09
+fast. That's why I now have to use
+24:11
+multiple accounts. Let's say I want to
+24:14
+reduce my usage on this account right
+24:15
+now. If I was near the end and I was
+24:17
+scared, I'd have a lot of reasons I'd
+24:19
+want to do that. We have this workflow
+24:21
+already running. So, it's going to keep
+24:23
+going. But a problem I've had is that
+24:25
+when your usage limit gets hit, this run
+24:27
+can stop and it's really hard to recover
+24:29
+it, if possible at all. But what you can
+24:31
+do to handle this is make sure you
+24:33
+switch accounts before you get there.
+24:35
+But Theo, isn't that going to screw up
+24:37
+the run? Isn't that going to like break
+24:39
+your current stuff? Not for my
+24:41
+experience. As I mentioned, I have that
+24:43
+workflow running right now. And I'm
+24:45
+going to switch accounts. I have to hide
+24:47
+myself doing this, but I'll show you.
+24:49
+Going to click authorize. Login
+24:51
+successful. And again, this agent was
+24:53
+already running, but now all of its
+24:56
+usage is going to be routed to this
+24:57
+other account. So even though I already
+24:59
+had a run going, it will start future
+25:02
+turns on the other accounts off because
+25:04
+every time it does a tool call, a new
+25:06
+API request is made and once that
+25:09
+happens, the new O is used. So it will
+25:12
+keep using this in a given generation,
+25:14
+but when it runs another command, it
+25:16
+reads additional data, it does anything
+25:18
+that requires execution of code, a new
+25:21
+API request will be made and that one
+25:22
+will go through your other off. This is
+25:24
+awesome and really abusable. While I was
+25:27
+recording this, a fun announcement went
+25:29
+live that apparently uh Anthropic is no
+25:32
+longer letting anyone use Fable because
+25:34
+the US government told them to suspend
+25:36
+Fable and Mythos access for foreign
+25:38
+actors. That is unprecedented.
+25:41
+I have a couple more features I want to
+25:42
+show off really quick before I forget.
+25:44
+One that a lot of other things have, but
+25:46
+I've actually found myself liking the
+25:47
+implementation in Cloud Code quite a
+25:49
+bit, is branch as well as rewind. Rewind
+25:53
+I actually use a ton because if I
+25:54
+accidentally send a prompt or get
+25:56
+something wrong, I will use it to like
+25:58
+go back one or two steps. I do have an
+26:00
+issue with it, which is that if you do
+26:01
+this erroneously, fastforwarding is
+26:03
+nearly impossible.
+26:05
+So be careful with rewind, but when you
+26:08
+accidentally send something and want to
+26:09
+go back, it is very nice. Slanch is the
+26:12
+better option for when you want to go do
+26:15
+something else or take the history you
+26:17
+have now and go somewhere else with it.
+26:19
+It's very, very nice. Thankful more
+26:22
+things are starting to add that. I
+26:23
+definitely recommend it. One more that a
+26:25
+lot of people told me to talk about
+26:26
+which I haven't used yet but I've heard
+26:28
+really good things so I'm going to try
+26:29
+it here is remote control. It's a
+26:31
+builtin feature where I can type /
+26:33
+remote control. So now I've given the
+26:35
+ability for this cloud code instance on
+26:37
+my real computer to be controlled
+26:39
+through cloud.ai the website or from my
+26:41
+phone using the claude app. Yeah, I just
+26:43
+went to claude on my phone. I had to go
+26:46
+to claude code of course but here you
+26:48
+probably can't see great and I'm not
+26:49
+going to do anything to fix that. I can
+26:50
+click audit open PRs and workflow
+26:54
+planning. And this is the exact run that
+26:56
+is going on on my computer right now.
+26:57
+And it just hit a Python decoding error
+27:00
+with some of the JSON that it got back
+27:02
+as a response. Fascinating. Cool though.
+27:04
+I have that on my phone now. I actually
+27:05
+do really like that. I will probably use
+27:06
+that more when I'm like running a bunch
+27:08
+of [ __ ] and then out on the go. I wish
+27:10
+they had a better like proper remote
+27:12
+control the whole instance feature like
+27:14
+codeex does, but it's a quick way to
+27:16
+just throw the session externally so you
+27:18
+can do it from other things. That's kind
+27:20
+of cool. I think that's all I have to
+27:22
+say here though. This is a weird
+27:24
+reflective experience for me. There's a
+27:26
+lot of things in cloud code that are
+27:28
+good. I went out of my way to not talk
+27:30
+about the bad here, but I might have to
+27:33
+in the future. So, if you want me to do
+27:34
+a video where I tear apart all of the
+27:36
+things that Cloud Code does wrong, let
+27:38
+me know in the comments. Hope you
+27:39
+enjoyed this one. I need to go crash out
+27:41
+about Fable being taken away from me. I
+27:43
+am not excited to do that.

@@ -1,14 +1,17 @@
-import { Component, computed, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, computed, signal, effect, OnInit, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { NgFor, NgIf, NgClass } from '@angular/common';
+import { ActivatedRoute } from '@angular/router';
 import { ConduitService } from '../../services/conduit.service';
 import { PlanCard } from '../../services/types';
 import { PlanCardComponent } from '../plan-card/plan-card.component';
+import { PlanDetailComponent } from '../plan-detail/plan-detail.component';
 import { KeyboardShortcutService } from '../../services/keyboard.service';
 
 @Component({
   selector: 'app-kanban-board',
   standalone: true,
-  imports: [NgFor, NgIf, NgClass, PlanCardComponent],
+  imports: [NgFor, NgIf, NgClass, PlanCardComponent, PlanDetailComponent],
   templateUrl: './kanban-board.component.html',
   styleUrls: ['./kanban-board.component.scss'],
 })
@@ -20,6 +23,9 @@ export class KanbanBoardComponent implements OnInit, OnDestroy {
   /** Index into the flat plan list for j/k navigation */
   readonly focusedIndex = signal(0);
   readonly selectedPlan = signal<PlanCard | null>(null);
+
+  /** Plan number from URL query param, set on navigation */
+  private readonly planParam = signal<string | null>(null);
 
   readonly columns = signal([
     { key: 'pending' as const, label: 'Pending', color: 'blue' as const },
@@ -45,12 +51,28 @@ export class KanbanBoardComponent implements OnInit, OnDestroy {
     return plans;
   });
 
+  private querySub: Subscription | null = null;
+
   constructor(
     private pipeline: ConduitService,
     private kb: KeyboardShortcutService,
-  ) {}
+    private route: ActivatedRoute,
+  ) {
+    // Reactively select plan when both query param and pipeline data are available
+    effect(() => {
+      const num = this.planParam();
+      if (!num) return;
+      const plan = this.allPlans().find(p => p.planNumber === num);
+      if (plan) this.selectedPlan.set(plan);
+    });
+  }
 
   ngOnInit(): void {
+    // Read ?plan= from URL and store in signal (pipeline may not be loaded yet)
+    this.querySub = this.route.queryParamMap.subscribe(params => {
+      this.planParam.set(params.get('plan'));
+    });
+
     this.kb.registerView('kanban-board', [
       {
         key: 'j',
@@ -74,6 +96,7 @@ export class KanbanBoardComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.querySub?.unsubscribe();
     this.kb.unregisterView('kanban-board');
   }
 

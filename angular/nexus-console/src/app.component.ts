@@ -22,6 +22,7 @@ import { User } from './models/user.model.js';
 import { PreferencesService } from './services/preferences.service.js';
 import { DragDropPayload } from './services/drag-drop.service.js';
 import { ToolbarComponent, SortCriteria } from './components/toolbar/toolbar.component.js';
+import { BottomBarComponent } from './bottom-bar/bottom-bar.component.js';
 import { ClipboardService } from './services/clipboard.service.js';
 import { BookmarkService } from './services/bookmark.service.js';
 import { NewBookmark, Bookmark } from './models/bookmark.model.js';
@@ -63,7 +64,6 @@ import { GatewayEditorComponent } from './components/gateway-editor/gateway-edit
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
 import { GatewayManagementComponent } from './components/gateway-management/gateway-management.component.js';
 import { HostServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
-import { ViewModeToolbarComponent } from './components/view-mode-toolbar/view-mode-toolbar.component.js';
 import { IframeViewComponent } from './components/iframe-view/iframe-view.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 
@@ -114,7 +114,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, ViewModeToolbarComponent, IframeViewComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -183,7 +183,12 @@ export class AppComponent implements OnInit, OnDestroy {
     'nebula-rms': 'http://localhost:3000',
   };
 
-  isIframeMode = computed(() => this.currentViewMode() === 'conduit-ui' || this.currentViewMode() === 'duality' || this.currentViewMode() === 'plurality' || this.currentViewMode() === 'nebula-rms');
+  isIframeMode = computed(() =>
+    this.currentViewMode() === 'conduit-ui' ||
+    this.currentViewMode() === 'duality' ||
+    this.currentViewMode() === 'plurality' ||
+    this.currentViewMode() === 'nebula-rms'
+  );
 
   // --- Pane Visibility State (from service) ---
   isSidebarVisible = this.uiPreferencesService.isSidebarVisible;
@@ -261,7 +266,10 @@ export class AppComponent implements OnInit, OnDestroy {
     return info;
   });
 
+ /** Default image server URL for the image substitution scheme (used by bottom bar for site icons) */
+  defaultImageUrl = computed(() => this.localConfigService.defaultImageUrl());
   statusBarItemCounts = computed(() => {
+
     const status = this.activePaneStatus();
     let message = `${status.totalItemsCount} items`;
 

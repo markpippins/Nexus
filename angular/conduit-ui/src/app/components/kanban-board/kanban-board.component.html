@@ -20,6 +20,7 @@
           *ngFor="let plan of getColumnPlans(col.key)"
           [plan]="plan"
           [status]="col.key"
+          (select)="selectedPlan.set(plan)"
         ></app-plan-card>
         <button
           *ngIf="col.key === 'archived' && archivedExpanded() && archivedRemaining() > 0"
@@ -31,4 +32,11 @@
       </div>
     </div>
   </div>
+
+  <!-- Plan Detail panel -->
+  <app-plan-detail
+    *ngIf="selectedPlan()"
+    [plan]="selectedPlan()"
+    (close)="selectedPlan.set(null)"
+  ></app-plan-detail>
 </div>

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import json
 import logging
-import os
-from pathlib import Path
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
@@ -41,32 +38,7 @@ class RegistryConfig(BaseModel):
     model_config = {"extra": "allow"}
 
 
-def load_registry(path: str | Path | None = None) -> RegistryConfig:
-    """Load the registry from a JSON file.
-
-    If *path* is omitted the file ``registry.json`` in the directory
-    that contains this module is used.
-
-    Relative executor ``command`` values are resolved against the
-    directory that contains the registry file.
-    """
-    if path is None:
-        path = Path(__file__).with_name("registry.json")
-    _log.info("load_registry: entry path=%s", path)
-    registry_dir = Path(path).resolve().parent
-    with open(path) as fh:
-        config = RegistryConfig.model_validate(json.load(fh))
-    # Resolve relative commands against the registry file's directory
-    resolved_count = 0
-    for executor in config.executors:
-        cmd = executor.invocation_contract.command
-        if cmd and not os.path.isabs(cmd):
-            resolved = str(Path(registry_dir, cmd).resolve())
-            executor.invocation_contract.command = resolved
-            resolved_count += 1
-    _log.info("load_registry: loaded executor=%s resolved_paths=%d",
-              len(config.executors), resolved_count)
-    return config
+# load_registry removed — executor resolution uses DB exclusively via DBAdapter.
 
 
 def resolve_executor(
@@ -105,6 +77,5 @@ __all__ = [
     "ModelConfig",
     "RegistryConfig",
     "available_harnesses",
-    "load_registry",
     "resolve_executor",
 ]

@@ -144,6 +144,7 @@ class TestSchema:
             CREATE TABLE work_requests (
                 id TEXT PRIMARY KEY, plan_id TEXT NOT NULL,
                 status TEXT NOT NULL, dco_json TEXT NOT NULL,
+                step_outputs TEXT NOT NULL DEFAULT '{}',
                 created_at TEXT NOT NULL, updated_at TEXT NOT NULL
             )
         """)

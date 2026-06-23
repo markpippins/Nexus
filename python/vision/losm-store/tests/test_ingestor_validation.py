@@ -1,28 +1,44 @@
 """Tests for the receipt ingestor validation gate (Plan 0021).
 
 Every lifecycle mutation in the ingestor must first validate the transition.
+Runs against the live PostgreSQL vision schema.
 """
 
 import uuid
 from datetime import datetime
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from losm_store.models import Base, GovernanceEvent, PlanningTask, ReceiptIngestRecord, WorkStatus
+from losm_store.models import GovernanceEvent, PlanningTask, ReceiptIngestRecord, WorkStatus
+from losm_store.session import SessionLocal
 from losm_store.ingestor import ExecutionReceiptIngestor
+
+
+@pytest.fixture(autouse=True)
+def clean_db():
+    """Clean up all test data before each test."""
+    db = SessionLocal()
+    try:
+        # Clean in reverse dependency order
+        db.execute(text("DELETE FROM vision.governance_events_history"))
+        db.execute(text("DELETE FROM vision.receipt_ingest_records_history"))
+        db.execute(text("DELETE FROM vision.work_requests_history"))
+        db.commit()
+    finally:
+        db.close()
 
 
 @pytest.fixture
 def db_session():
-    """Create an in-memory SQLite database for testing."""
-    engine = create_engine("sqlite:///:memory:", echo=False)
-    Base.metadata.create_all(engine)
-    TestSession = sessionmaker(bind=engine)
-    session = TestSession()
-    yield session
-    session.close()
+    """Create a fresh session against the live PostgreSQL database."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.rollback()
+        db.close()
 
 
 @pytest.fixture
@@ -48,7 +64,6 @@ def _create_task(db: Session, status: WorkStatus) -> PlanningTask:
         intent="Test task",
         status=status,
         created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
     )
     db.add(task)
     db.commit()

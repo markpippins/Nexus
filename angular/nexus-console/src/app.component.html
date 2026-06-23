@@ -1,11 +1,7 @@
 <div
   class="flex flex-col h-screen antialiased text-[rgb(var(--color-text-base))] bg-[rgb(var(--color-background))]"
 >
-  <!-- Top-Level View Mode Toolbar -->
-  <app-view-mode-toolbar
-    [viewMode]="currentViewMode()"
-    (viewModeChange)="currentViewMode.set($event)"
-  ></app-view-mode-toolbar>
+  <!-- Top toolbar removed — navigation buttons are now in app-bottom-bar at the bottom -->
 
   <!-- Main Content -->
   <main class="flex-1 flex flex-row overflow-hidden">
@@ -114,103 +110,7 @@
           </button>
         </div>
 
-        @if (!isIframeMode()) {
-        <app-toolbar
-          [viewMode]="currentViewMode()"
-          [meshViewMode]="meshViewMode()"
-          [managementType]="
-            activePaneId() === 1 ? pane1PlatformNode()?.type : pane2PlatformNode()?.type
-          "
-          [isGatewayContext]="isGatewayContext()"
-          [isGatewaysNodeSelected]="isGatewaysNodeSelected()"
-          [isGatewaySelected]="isGatewaySelected()"
-          [isServiceRegistryContext]="isServiceRegistryContext()"
-          [isServiceRegistriesNodeSelected]="isServiceRegistriesNodeSelected()"
-          [isServiceRegistrySelected]="isServiceRegistrySelected()"
-          [isPlatformManagementContext]="isPlatformManagementContext()"
-          [graphInteractionMode]="vizService.modeSignal()"
-          [isSimulationActive]="vizService.isSimulationActive()"
-          [backgroundColor]="graphBackgroundColor()"
-          [graphSubView]="graphSubView()"
-          [canCreate]="isActionableContext()"
-          [canCut]="canCutCopyShareDelete()"
-          [canCopy]="canCutCopyShareDelete()"
-          [canCopyToMoveTo]="canCutCopyShareDelete()"
-          [canPaste]="canPaste()"
-          [canRename]="canRename()"
-          [canImport]="canImport()"
-          [canShare]="canCutCopyShareDelete()"
-          [canDelete]="canCutCopyShareDelete()"
-          [canMagnetize]="canMagnetize()"
-          [currentSort]="activeSortCriteria()"
-          [folderTree]="folderTree()"
-          [currentPath]="activePanePath()"
-          [displayMode]="activeDisplayMode()"
-          [filterQuery]="activeFilterQuery()"
-          [isSplitViewActive]="isSplitView()"
-          [isDetailPaneActive]="isDetailPaneOpen()"
-          [isSidebarVisible]="isSidebarVisible()"
-          [isTreeVisible]="isTreeVisible()"
-          [isChatVisible]="isChatVisible()"
-          [isNotesVisible]="isNotesVisible()"
-          [isSavedItemsVisible]="isSavedItemsVisible()"
-          [isRssFeedVisible]="isRssFeedVisible()"
-          [isStreamVisible]="isStreamVisible()"
-          [isHomeContext]="isHomeContext()"
-          [canSave]="editorIsDirty()"
-          [showExtendedControls]="showExtendedControls()"
-          [showAllControls]="showAllToolbarControls()"
-          (newFolderClick)="
-            isGatewayContext()
-              ? onAddGateway()
-              : isServiceRegistryContext()
-                ? onAddServiceRegistry()
-                : onToolbarAction('newFolder')
-          "
-          (newFileClick)="onToolbarAction('newFile')"
-          (importClick)="onToolbarImport()"
-          (saveClick)="onSaveGateway()"
-          (resetClick)="onResetGateway()"
-          (filesUploaded)="onToolbarAction('upload', $event)"
-          (cutClick)="onToolbarAction('cut')"
-          (copyClick)="onToolbarAction('copy')"
-          (copyItemsTo)="onToolbarAction('copyTo', $event)"
-          (moveItemsTo)="onToolbarAction('moveTo', $event)"
-          (pasteClick)="onToolbarAction('paste')"
-          (renameClick)="onToolbarAction('rename')"
-          (shareClick)="onToolbarAction('share')"
-          (deleteClick)="onToolbarAction('delete')"
-          (magnetizeClick)="onToolbarAction('magnetize')"
-          (sortChange)="onSortChange($event)"
-          (displayModeChange)="onDisplayModeChange($event)"
-          (filterChange)="onFilterChange($event)"
-          (splitViewClick)="toggleSplitView()"
-          (detailPaneClick)="toggleDetailPane()"
-          (themeMenuClick)="openThemeMenu($event)"
-          (rssFeedsMenuClick)="openRssFeedsDialog()"
-          (preferencesMenuClick)="openPreferencesDialog()"
-          (toggleSidebar)="toggleSidebar()"
-          (toggleTree)="toggleTree()"
-          (toggleChat)="toggleChat()"
-          (toggleNotes)="toggleNotes()"
-          (toggleSavedItems)="toggleSavedItems()"
-          (toggleRssFeed)="toggleRssFeed()"
-          (toggleStream)="toggleStream()"
-          (graphModeChange)="onGraphModeChange($event)"
-          (toggleSimulation)="onToggleSimulation()"
-          (saveGraph)="onSaveGraph()"
-          (loadGraph)="onLoadGraph()"
-          (backgroundColorChange)="onBackgroundColorChange($event)"
-          (zoomIn)="onZoomIn()"
-          (zoomOut)="onZoomOut()"
-          (rotateLeft)="onRotateLeft()"
-          (rotateRight)="onRotateRight()"
-          (resetCamera)="onResetCamera()"
-          (clearGraph)="onClearGraph()"
-          (graphSubViewChange)="onGraphSubViewChange($event)"
-        >
-        </app-toolbar>
-        }
+        <!-- Top toolbar removed — navigation is now in app-bottom-bar -->
         <div class="flex-1 flex flex-row overflow-hidden relative">
           <div #mainContentWrapper class="flex-1 flex flex-col overflow-hidden min-w-0">
             <div class="flex-1 flex flex-row overflow-hidden">
@@ -494,38 +394,14 @@
     </div>
   </main>
 
-  <!-- Footer/Status Bar -->
-  <div
-    class="h-7 p-1 px-3 border-t border-[rgb(var(--color-border-base))] text-xs text-[rgb(var(--color-text-muted))] flex-shrink-0 bg-[rgb(var(--color-surface))] flex items-center"
-  >
-    <span class="truncate flex items-center gap-2">
-      <span class="font-semibold text-[rgb(var(--color-accent-text))]">
-        @if (currentViewMode() === 'service-mesh') {
-          Service Mesh
-          @if (meshViewMode() === 'graph') {
-            (Graph)
-          } @else {
-            (Console)
-          }
-        } @else if (currentViewMode() === 'conduit-ui') {
-          Conduit UI
-        } @else if (currentViewMode() === 'duality') {
-          Duality
-        } @else if (currentViewMode() === 'plurality') {
-          Plurality
-        } @else if (currentViewMode() === 'nebula-rms') {
-          Nebula RMS
-        } @else {
-          File Explorer
-          @if (isSplitView()) {
-            (Split)
-          }
-        }
-      </span>
-      <span class="text-[rgb(var(--color-border-muted))]">|</span>
-      <span>{{ statusBarSelectionInfo() }}</span>
-    </span>
-  </div>
+  <!-- Bottom Navigation Bar (replaces the old top toolbar and footer/status bar) -->
+  <app-bottom-bar
+    [viewMode]="currentViewMode()"
+    [statusInfo]="statusBarSelectionInfo()"
+    [statusCounts]="statusBarItemCounts()"
+    [imageBaseUrl]="defaultImageUrl()"
+    (viewModeChange)="currentViewMode.set($event)"
+  ></app-bottom-bar>
 
   @if (isLocalConfigDialogOpen()) {
     <app-local-config-dialog (close)="closeLocalConfigDialog()" (save)="onLocalConfigSaved($event)">

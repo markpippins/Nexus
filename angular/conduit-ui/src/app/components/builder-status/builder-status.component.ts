@@ -92,11 +92,11 @@ export class BuilderStatusComponent implements OnDestroy {
     const b = this.builder();
     switch (b.status) {
       case 'running':
-        return `🟢 Builder Running · PID ${b.pid}`;
+        return `🟢 Builder Running · ${b.workflowId ?? `PID ${b.pid}`}`;
       case 'stale':
-        return `⚠️ Builder Stale · PID ${b.pid}`;
+        return `⚠️ Builder Stale · ${b.workflowId ?? `PID ${b.pid}`}`;
       case 'killed':
-        return `🔴 Builder Killed · PID ${b.pid}`;
+        return `🔴 Builder Killed · ${b.workflowId ?? `PID ${b.pid}`}`;
       default:
         return 'No builder running';
     }

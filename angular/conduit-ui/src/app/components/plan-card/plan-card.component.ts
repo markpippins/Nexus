@@ -1,4 +1,4 @@
-import { Component, Input, computed, signal, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, computed, signal, inject } from '@angular/core';
 import { NgClass, NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PlanCard } from '../../services/types';
@@ -15,6 +15,7 @@ import { ToastService } from '../../services/toast.service';
 export class PlanCardComponent {
   @Input({ required: true }) plan!: PlanCard;
   @Input({ required: true }) status!: string;
+  @Output() select = new EventEmitter<void>();
 
   private pipeline = inject(ConduitService);
   private toast = inject(ToastService);

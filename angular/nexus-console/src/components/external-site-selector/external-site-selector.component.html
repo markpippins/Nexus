@@ -1,0 +1,19 @@
+<div class="flex items-center gap-2 text-sm">
+  <label
+    for="external-site-select"
+    class="text-[rgb(var(--color-text-muted))] font-medium whitespace-nowrap"
+  >
+    External:
+  </label>
+  <select
+    id="external-site-select"
+    class="bg-[rgb(var(--color-background))] border border-[rgb(var(--color-border-muted))] rounded-md px-3 py-1.5 text-sm text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))] focus:border-transparent cursor-pointer min-w-[140px]"
+    [value]="selectedUrl() ?? ''"
+    (change)="onSelect($event)"
+  >
+    <option value="">— None —</option>
+    @for (site of sites; track site.url) {
+      <option [value]="site.url">{{ site.name }}</option>
+    }
+  </select>
+</div>

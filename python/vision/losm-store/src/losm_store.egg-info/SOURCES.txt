@@ -10,3 +10,4 @@ src/losm_store.egg-info/SOURCES.txt
 src/losm_store.egg-info/dependency_links.txt
 src/losm_store.egg-info/requires.txt
 src/losm_store.egg-info/top_level.txt
+tests/test_ingestor_validation.py

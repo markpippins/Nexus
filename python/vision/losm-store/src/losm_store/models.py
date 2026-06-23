@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime
 from enum import Enum
@@ -6,6 +7,15 @@ from sqlalchemy import Column, DateTime, Enum as SAEnum, Integer, String, Text, 
 from sqlalchemy.orm import declarative_base
 
 from losm_ir.states import WorkStatus
+
+# ── Schema ───────────────────────────────────────────────────────────────────
+# All models map to the "vision" schema in PostgreSQL.
+_SCHEMA = "vision"
+
+
+def _table_args() -> dict:
+    return {"schema": _SCHEMA}
+
 
 Base = declarative_base()
 
@@ -19,25 +29,40 @@ class ArtifactType(str, Enum):
     SUMMARY = "SUMMARY"
 
 
+# ── PlanningTask (view: work_requests) ──────────────────────────────────────
+
 class PlanningTask(Base):
     __tablename__ = "work_requests"
+    __table_args__ = _table_args()
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     wr_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    parent_request_id = Column(String(36), nullable=True)
     intent = Column(Text, nullable=False)
     constraints = Column(JSON, nullable=True)
     priority = Column(Integer, default=5, nullable=False)
     context_data = Column("context", JSON, nullable=True)
     status = Column(SAEnum(WorkStatus), default=WorkStatus.NEW, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Semi-bitemporal columns (set by DB triggers, read-only via ORM)
+    recorded_on_dt = Column(DateTime(timezone=True), nullable=True)
+    recorded_until_dt = Column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def updated_at(self):
+        """Backwards-compat: mapped to recorded_on_dt in PostgreSQL."""
+        return self.recorded_on_dt or self.created_at
 
     def __repr__(self) -> str:
         return f"<PlanningTask wr_id={self.wr_id} status={self.status} intent={self.intent[:30]!r}>"
 
 
+# ── Artifact (view: artifacts) ──────────────────────────────────────────────
+
 class Artifact(Base):
     __tablename__ = "artifacts"
+    __table_args__ = _table_args()
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     artifact_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
@@ -50,12 +75,18 @@ class Artifact(Base):
     template_metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    recorded_on_dt = Column(DateTime(timezone=True), nullable=True)
+    recorded_until_dt = Column(DateTime(timezone=True), nullable=True)
+
     def __repr__(self) -> str:
         return f"<Artifact artifact_id={self.artifact_id} type={self.type}>"
 
 
+# ── ReceiptIngestRecord (view: receipt_ingest_records) ──────────────────────
+
 class ReceiptIngestRecord(Base):
     __tablename__ = "receipt_ingest_records"
+    __table_args__ = _table_args()
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     receipt_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
@@ -67,9 +98,15 @@ class ReceiptIngestRecord(Base):
     payload = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    recorded_on_dt = Column(DateTime(timezone=True), nullable=True)
+    recorded_until_dt = Column(DateTime(timezone=True), nullable=True)
+
+
+# ── GovernanceEvent (view: governance_events) ───────────────────────────────
 
 class GovernanceEvent(Base):
     __tablename__ = "governance_events"
+    __table_args__ = _table_args()
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     event_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
@@ -79,9 +116,15 @@ class GovernanceEvent(Base):
     payload = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    recorded_on_dt = Column(DateTime(timezone=True), nullable=True)
+    recorded_until_dt = Column(DateTime(timezone=True), nullable=True)
+
+
+# ── LifecycleEvent (view: lifecycle_events) ─────────────────────────────────
 
 class LifecycleEvent(Base):
     __tablename__ = "lifecycle_events"
+    __table_args__ = _table_args()
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     event_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
@@ -93,12 +136,18 @@ class LifecycleEvent(Base):
     metadata_payload = Column("metadata", JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    recorded_on_dt = Column(DateTime(timezone=True), nullable=True)
+    recorded_until_dt = Column(DateTime(timezone=True), nullable=True)
+
     def __repr__(self) -> str:
         return f"<LifecycleEvent wr_id={self.wr_id} {self.from_state}->{self.to_state}>"
 
 
+# ── Branch (view: branches) ─────────────────────────────────────────────────
+
 class Branch(Base):
     __tablename__ = "branches"
+    __table_args__ = _table_args()
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     branch_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
@@ -109,14 +158,24 @@ class Branch(Base):
     score = Column(Float, nullable=True)
     status = Column(String(32), default="active", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    recorded_on_dt = Column(DateTime(timezone=True), nullable=True)
+    recorded_until_dt = Column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def updated_at(self):
+        """Backwards-compat: mapped to recorded_on_dt in PostgreSQL."""
+        return self.recorded_on_dt or self.created_at
 
     def __repr__(self) -> str:
         return f"<Branch {self.branch_id} wr={self.wr_id} label={self.label}>"
 
 
+# ── BranchArtifact (view: branch_artifacts) ─────────────────────────────────
+
 class BranchArtifact(Base):
     __tablename__ = "branch_artifacts"
+    __table_args__ = _table_args()
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     artifact_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
@@ -128,5 +187,29 @@ class BranchArtifact(Base):
     score = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    recorded_on_dt = Column(DateTime(timezone=True), nullable=True)
+    recorded_until_dt = Column(DateTime(timezone=True), nullable=True)
+
     def __repr__(self) -> str:
         return f"<BranchArtifact {self.artifact_id} branch={self.branch_id} type={self.artifact_type}>"
+
+
+# ── WorkRequestEdge (view: work_request_edges) ─────────────────────────────
+
+class WorkRequestEdge(Base):
+    __tablename__ = "work_request_edges"
+    __table_args__ = {"schema": _SCHEMA}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    edge_id = Column(String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    parent_wr_id = Column(String(36), nullable=False, index=True)
+    child_wr_id = Column(String(36), nullable=False, index=True)
+    edge_type = Column(String(32), default="depends_on", nullable=False)
+    metadata_json = Column("metadata", JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    recorded_on_dt = Column(DateTime(timezone=True), nullable=True)
+    recorded_until_dt = Column(DateTime(timezone=True), nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<WorkRequestEdge {self.edge_id} {self.parent_wr_id}→{self.child_wr_id} [{self.edge_type}]>"

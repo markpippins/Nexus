@@ -101,7 +101,39 @@ class PlanExecutionWorkflow:
                 )
                 return "cancelled"
 
-            # Step 2: Get the plan data
+            # Step 2: Check requeue cycle count — prevent infinite cycling
+            self._current_step = "check_requeue"
+            MAX_REQUEUE_CYCLES = 3
+            requeue_count = await workflow.execute_activity(
+                "get_requeue_count_activity",
+                args=[plan_id],
+                start_to_close_timeout=timedelta(seconds=10),
+            )
+            if requeue_count >= MAX_REQUEUE_CYCLES:
+                workflow.logger.warning(
+                    f"PlanExecutionWorkflow BLOCK plan={plan_id} "
+                    f"reason=max_requeue_cycles req={requeue_count}"
+                )
+                await workflow.execute_activity(
+                    "insert_receipt_activity",
+                    args=[plan_id, "BLOCK", role, session_id, ticket_id,
+                          f"Max requeue cycles ({MAX_REQUEUE_CYCLES}) exceeded. "
+                          f"Plan has been requeued {requeue_count} times. "
+                          f"Review the plan scope or split into smaller tasks.",
+                          {"error": "max_requeue_cycles", "requeue_count": requeue_count},
+                          0],
+                    start_to_close_timeout=timedelta(seconds=10),
+                )
+                await workflow.execute_activity(
+                    "close_ticket_activity",
+                    args=[plan_id, role, session_id, "failed"],
+                    start_to_close_timeout=timedelta(seconds=10),
+                )
+                # Set result so the finally block logs "blocked" not "failed"
+                result = {"status": "blocked", "exit_code": 0}
+                return "blocked"
+
+            # Step 3: Get the plan data
             self._current_step = "get_plan"
             plan = await workflow.execute_activity(
                 "get_plan_by_id_activity",
@@ -116,7 +148,7 @@ class PlanExecutionWorkflow:
                 )
                 return "failed"
 
-            # Step 3: Build the WorkRequest DCO
+            # Step 4: Build the WorkRequest DCO
             self._current_step = "build_dco"
 
             # Resolve model chain
@@ -142,7 +174,7 @@ class PlanExecutionWorkflow:
                 )
                 return "failed"
 
-            # Step 4: Execute with progressive fallback
+            # Step 5: Execute with progressive fallback
             self._current_step = "execute"
             final_model = model_chain[0]
 
@@ -279,12 +311,13 @@ class PlanExecutionWorkflow:
                 )
 
                 try:
-                    result = await workflow.execute_activity(
-                        "execute_with_model",
-                        args=[model_cfg, dco_result["dco"],
-                              dco_result["dco_path"],
-                              dco_result["executor_cmd"],
-                              ticket_id],
+result = await workflow.execute_activity(
+                     "execute_with_model",
+                     args=[model_cfg, dco_result["dco"],
+                               dco_result["wr_id"],
+                               dco_result["executor_cmd"],
+                               ticket_id,
+                               session_id],
                         retry_policy=RetryPolicy(
                             initial_interval=timedelta(seconds=retry_delay),
                             maximum_attempts=1,  # We handle retries in the workflow
