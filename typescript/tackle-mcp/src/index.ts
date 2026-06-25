@@ -40,6 +40,7 @@ import {
   getAllSessions,
   getResolvedRoleConfig,
 } from "./db";
+import { initRedis, closeRedis } from "./memory";
 import { registerToolHandlers, toolDefinitions } from "./tools";
 
 const PORT = parseInt(process.env.PORT || "3400", 10);
@@ -712,6 +713,10 @@ async function start() {
   const { initDb } = await import("./db");
   await initDb();
 
+  // Initialize Redis for memory procedure registry reads
+  initRedis();
+  console.log("[memory-mcp] Redis client initialized (lazy connect)");
+
   app.listen(PORT, () => {
     console.log(`Tackle MCP server listening on http://localhost:${PORT}`);
     console.log(`Health: http://localhost:${PORT}/health`);
@@ -722,4 +727,16 @@ async function start() {
 start().catch((err) => {
   console.error("Failed to start:", err);
   process.exit(1);
+});
+
+// Graceful shutdown
+process.on("SIGINT", async () => {
+  console.log("[tackle-mcp] Shutting down...");
+  await closeRedis();
+  process.exit(0);
+});
+process.on("SIGTERM", async () => {
+  console.log("[tackle-mcp] Shutting down...");
+  await closeRedis();
+  process.exit(0);
 });

@@ -3,275 +3,220 @@
 Batch Harvest → DB
 
 Processes unprocessed HTML chat transcripts through the Rover harvest pipeline
-and writes the extracted results directly into the nebula.harvests PostgreSQL
-table instead of generating markdown files.
+and writes the results directly into nebula.harvests via docker psql.
+
+Pipeline: Dockling (deterministic) → Docling (source_text) → DB insert
 
 Usage:
     cd /home/codex/dev/nexus/python/rover
     source .venv/bin/activate
-    python3 batch_harvest_to_db.py
+    python3 batch_harvest_to_db.py [--dry-run] [--limit N]
 """
 
+import argparse
 import json
 import logging
-import re
 import subprocess
 import sys
-import tempfile
 import time
 from pathlib import Path
 
-from harvest_pipeline import convert_to_markdown, chunk_text, extract_chunk
-from schemas import SpecificationAgenda
+log = logging.getLogger("batch_harvest_db")
+
+PROJECT_ROOT = Path("/home/codex/dev")
+CHATS_DIR = PROJECT_ROOT / "chats"
+DOCKLING = PROJECT_ROOT / "nexus/audit/ROVER/bin/dockling.py"
+DOCKER_PSQL = [
+    "docker", "exec", "-i", "pgvector_db",
+    "psql", "-U", "pguser", "-d", "nexus",
+]
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     stream=sys.stderr,
 )
-log = logging.getLogger("batch_harvest_db")
-
-# ── Config ─────────────────────────────────────────────────────
-PROJECT_ROOT = Path("/home/codex/dev")
-CHATS_DIR = PROJECT_ROOT / "chats"
-MODEL = "qwen3.5:latest"
-OLLAMA_URL = "http://localhost:11434"
-
-# The 5 most recent unprocessed HTMLs (verified against ROVER processed/incoming)
-TRANSCRIPTS = [
-    "Nexus - OrientDB, Pinecone & Convex",
-    "Nexus - Reviewing Qwen's Output",
-    "Reviewing LOSM Risk Management System",
-    "NLP Output from Chat Transcripts",
-    "Cognitive CPU Scheduler",
-]
-
-DOCKER_PSQL = [
-    "docker", "exec", "-i", "pgvector_db",
-    "psql", "-U", "pguser", "-d", "nexus",
-]
 
 
-def sql_escape(val: str) -> str:
-    """Escape a string for safe use as a PostgreSQL single-quoted literal."""
-    if val is None:
-        return "NULL"
-    return "'" + str(val).replace("'", "''") + "'"
+def psql(sql: str, timeout: int = 30) -> tuple[int, str]:
+    """Run SQL via docker psql (stdin pipe), return (returncode, stdout)."""
+    try:
+        result = subprocess.run(
+            DOCKER_PSQL + ["-t", "-A"],
+            input=sql, capture_output=True, text=True, timeout=timeout,
+        )
+        return result.returncode, result.stdout.strip()
+    except subprocess.TimeoutExpired:
+        return 1, "(timeout)"
 
 
-def insert_harvest(source_path: str, source_filename: str, model: str,
-                    total_candidates: int, candidates: list, source_text: str | None,
-                    tags: list[str], metadata: dict) -> dict | None:
-    """Insert a harvest record via docker exec psql (using temp file for large SQL)."""
+def get_harvested_filenames() -> set[str]:
+    """Return set of source_filenames already in nebula.harvests."""
+    rc, out = psql("SELECT source_filename FROM nebula.harvests;")
+    if rc != 0 or not out:
+        return set()
+    return set(line.strip() for line in out.splitlines() if line.strip())
 
-    candidates_json = json.dumps(candidates, ensure_ascii=False)
-    metadata_json = json.dumps(metadata, ensure_ascii=False)
+
+def dockling_html_path(html_path: Path) -> dict | None:
+    """Run Dockling on an HTML file and return the DockLang JSON, or None."""
+    try:
+        result = subprocess.run(
+            ["python3", str(DOCKLING), str(html_path)],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode == 0:
+            dl = json.loads(result.stdout)
+            stats = dl.get("stats", {})
+            log.info("  DockLang: %d units, %d blocks",
+                     stats.get("total_units", 0), stats.get("total_blocks", 0))
+            return dl
+        else:
+            log.warning("  Dockling failed: %s", result.stderr.strip()[:200])
+            return None
+    except subprocess.TimeoutExpired:
+        log.warning("  Dockling timed out after 120s")
+        return None
+    except json.JSONDecodeError as e:
+        log.warning("  Dockling output not JSON: %s", e)
+        return None
+
+
+def insert_harvest(source_path: str, source_filename: str,
+                   source_text: str | None, docklang: dict | None) -> bool:
+    """Insert a harvest record with docklang (no candidates)."""
+    tags = ["harvest", "rover", "dockling"]
+    metadata = json.dumps({"dockling_version": "v0.3"}, ensure_ascii=False)
+    docklang_json = json.dumps(docklang, ensure_ascii=False) if docklang else "NULL"
     source_text_val = source_text or ""
 
-    # Build tags array: single-quoted strings with proper escaping
-    tag_literals = ", ".join(sql_escape(t) for t in tags)
-    tags_array = f"ARRAY[{tag_literals}]"
+    def sqe(val: str) -> str:
+        return "'" + str(val).replace("'", "''") + "'"
+
+    tag_literals = ", ".join(sqe(t) for t in tags)
 
     sql = f"""
     INSERT INTO nebula.harvests
         (source_path, source_filename, model, total_candidates,
-         candidates, source_text, tags, metadata)
+         candidates, source_text, tags, metadata, docklang)
     VALUES
-        ({sql_escape(source_path)},
-         {sql_escape(source_filename)},
-         {sql_escape(model)},
-         {total_candidates},
-         '{candidates_json}'::jsonb,
-         {sql_escape(source_text_val)}::text,
-         {tags_array}::text[],
-         '{metadata_json}'::jsonb)
-    RETURNING id, source_filename, total_candidates, created_at;
+        ({sqe(source_path)},
+         {sqe(source_filename)},
+         'dockling',
+         0,
+         '[]'::jsonb,
+         {sqe(source_text_val)}::text,
+         ARRAY[{tag_literals}]::text[],
+         '{metadata}'::jsonb,
+         {docklang_json if docklang_json == 'NULL' else f"$${docklang_json}$$::jsonb"})
+    RETURNING id;
     """
 
-    # Write SQL to a temp file and use psql -f to avoid ARG_MAX issues with large source_text
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".sql", delete=False, encoding="utf-8"
-        ) as tmp:
-            tmp.write(sql)
-            tmp_path = tmp.name
-
-        result = subprocess.run(
-            DOCKER_PSQL + ["-t", "-A", "-f", tmp_path],
-            capture_output=True, text=True, timeout=60,
-        )
-        Path(tmp_path).unlink(missing_ok=True)
-
-        if result.returncode != 0:
-            stderr = result.stderr.strip()
-            log.error("INSERT failed for %s: %s", source_filename, stderr)
-            return None
-
-        out = result.stdout.strip()
-        if out:
-            parts = out.split("|")
-            log.info("INSERTED harvest %s | %s | %s candidates",
-                     parts[0], parts[1], parts[2])
-            return {"id": parts[0], "filename": parts[1], "candidates": int(parts[2])}
-        else:
-            log.warning("INSERT returned no output for %s", source_filename)
-            return None
-
-    except subprocess.TimeoutExpired:
-        log.error("INSERT timeout for %s", source_filename)
-        return None
-    except Exception as e:
-        log.error("INSERT error for %s: %s", source_filename, e)
-        return None
+    rc, out = psql(sql)
+    if rc == 0 and out:
+        log.info("  → DB harvest %s", out)
+        return True
+    log.error("  → INSERT failed (rc=%d): %s", rc, out[:200] if out else "(no output)")
+    return False
 
 
-def make_slug(name: str) -> str:
-    """Normalize a transcript title into a slug suitable for tags."""
-    return re.sub(r'[^a-z0-9]+', '_', name.lower()).strip('_')
-
-
-def process_transcript(name: str) -> int:
-    """Process one HTML transcript and write to DB. Returns candidate count or -1 on failure."""
-    html_path = CHATS_DIR / f"{name}.html"
-    if not html_path.exists():
-        log.error("File not found: %s", html_path)
-        return -1
-
-    slug = make_slug(name)
-
-    log.info("═" * 60)
+def process_transcript(html_path: Path) -> bool:
+    """Process one HTML transcript: Dockling → DB."""
+    name = html_path.stem
+    log.info("─" * 60)
     log.info("Processing: %s", name)
 
-    # Step 1: Convert HTML → Markdown
-    try:
-        log.info("Converting HTML to markdown via Docling...")
-        markdown = convert_to_markdown(str(html_path))
-        log.info("Markdown: %d chars", len(markdown))
-    except Exception as e:
-        log.error("Docling conversion failed: %s", e)
-        return -1
+    # Step 1: Dockling → DockLang
+    docklang = dockling_html_path(html_path)
+    if docklang is None:
+        log.error("  Dockling failed, skipping")
+        return False
 
-    # Step 2: Chunk text
-    chunks = chunk_text(markdown)
-    log.info("Chunks: %d", len(chunks))
-
-    if not chunks:
-        log.warning("No chunks produced, skipping")
-        return -1
-
-    # Step 3: Extract via Ollama for each chunk
-    all_agendas = []
-    failures = 0
-
-    for i, chunk in enumerate(chunks):
-        log.info("Extracting chunk %d/%d via Ollama (%s)...", i + 1, len(chunks), MODEL)
-        start = time.time()
-        result = extract_chunk(
-            chunk, i, len(chunks),
-            model=MODEL, ollama_url=OLLAMA_URL,
-        )
-        elapsed = time.time() - start
-        if result is not None:
-            all_agendas.append(result)
-            log.info("Chunk %d/%d done in %.1fs — %d items",
-                     i + 1, len(chunks), elapsed, len(result.agenda_items))
-        else:
-            failures += 1
-            log.error("Chunk %d/%d FAILED after %.1fs", i + 1, len(chunks), elapsed)
-
-    # Step 4: Combine results
-    combined = SpecificationAgenda(agenda_items=[])
-    for agenda in all_agendas:
-        combined.agenda_items.extend(agenda.agenda_items)
-
-    total = len(combined.agenda_items)
-    log.info("Total candidates extracted: %d (across %d/%d successful chunks, %d failures)",
-             total, len(all_agendas), len(chunks), failures)
-
-    # Step 5: Write to database
     source_path = str(html_path.relative_to(PROJECT_ROOT))
-    source_filename = html_path.name
 
-    # Build candidates array as plain dicts for JSONB
-    candidates_data = []
-    for item in combined.agenda_items:
-        entry = {
-            "title": item.title,
-            "status": item.status,
-            "intent_description": item.intent_description,
-            "requirements": item.requirements,
-            "implementation_notes": item.implementation_notes,
-            "code_snippets": [
-                {"language": c.language, "purpose": c.purpose, "raw_code": c.raw_code}
-                for c in item.code_snippets
-            ],
-            "open_questions": item.open_questions,
-        }
-        candidates_data.append(entry)
-
-    tags = ["qwen3.5", "harvest", slug]
-    if failures > 0:
-        tags.append("partial")
-
-    metadata = {
-        "total_chunks": len(chunks),
-        "successful_chunks": len(all_agendas),
-        "failed_chunks": failures,
-        "model": MODEL,
-        "ollama_url": OLLAMA_URL,
-    }
-
-    result = insert_harvest(
+    # Step 2: Insert to DB
+    return insert_harvest(
         source_path=source_path,
-        source_filename=source_filename,
-        model=MODEL,
-        total_candidates=total,
-        candidates=candidates_data,
-        source_text=markdown if total > 0 else None,
-        tags=tags,
-        metadata=metadata,
+        source_filename=html_path.name,
+        source_text=None,
+        docklang=docklang,
     )
 
-    if result:
-        log.info("✅ %s → DB harvest %s (%d candidates)", name, result["id"], result["candidates"])
-    else:
-        log.error("❌ %s → DB INSERT failed", name)
 
-    return total
+def find_unharvested(limit: int) -> list[Path]:
+    """Find the N largest unharvested HTML files, by recency (mtime)."""
+    harvested = get_harvested_filenames()
+    html_files = sorted(
+        [f for f in CHATS_DIR.glob("*.html") if f.name not in harvested],
+        key=lambda f: f.stat().st_mtime,   # most recent first
+        reverse=True,
+    )
+
+    if not html_files:
+        log.info("No unharvested HTML files found")
+    else:
+        log.info("Unharvested available: %d, processing %d most recent",
+                 len(html_files), min(limit, len(html_files)))
+
+    return html_files[:limit]
 
 
 def main():
-    log.info("=" * 60)
+    parser = argparse.ArgumentParser(description="Batch harvest chat HTMLs to DB")
+    parser.add_argument("--dry-run", action="store_true", help="Discover unharvested files but don't process")
+    parser.add_argument("--limit", type=int, default=5, help="Max transcripts to process (default: 5)")
+    parser.add_argument("file", nargs="*", help="Specific filenames to process (by title, .html optional)")
+    args = parser.parse_args()
+
+    if args.file:
+        targets = []
+        for f in args.file:
+            p = CHATS_DIR / (f if f.endswith(".html") else f + ".html")
+            if p.exists():
+                targets.append(p)
+            else:
+                log.error("File not found: %s", p)
+    else:
+        targets = find_unharvested(args.limit)
+
+    if args.dry_run:
+        log.info("DRY RUN — would process:")
+        for t in targets:
+            log.info("  %s", t.name)
+        return 0
+
+    if not targets:
+        log.info("Nothing to process.")
+        return 0
+
+    log.info("═" * 60)
     log.info("Batch Harvest → DB")
-    log.info("Model: %s @ %s", MODEL, OLLAMA_URL)
-    log.info("Transcripts: %d", len(TRANSCRIPTS))
-    for t in TRANSCRIPTS:
-        log.info("  • %s", t)
-    log.info("=" * 60)
+    log.info("Targets: %d file(s)", len(targets))
+    for t in targets:
+        log.info("  • %s", t.name)
+    log.info("═" * 60)
 
     results = {}
-    total_candidates_global = 0
-
-    for name in TRANSCRIPTS:
-        count = process_transcript(name)
-        results[name] = count
-        if count >= 0:
-            total_candidates_global += count
+    for t in targets:
+        start = time.time()
+        ok = process_transcript(t)
+        elapsed = time.time() - start
+        results[t.name] = (ok, elapsed)
         log.info("")
 
-    log.info("=" * 60)
+    log.info("═" * 60)
     log.info("BATCH COMPLETE")
     log.info("─" * 60)
-    for name, count in results.items():
-        if count >= 0:
-            log.info("✅ %s: %d candidates", name, count)
-        else:
-            log.info("❌ %s: FAILED", name)
+    success = 0
+    for name, (ok, elapsed) in results.items():
+        icon = "✅" if ok else "❌"
+        log.info("%s %s (%.1fs)", icon, name, elapsed)
+        if ok:
+            success += 1
     log.info("─" * 60)
-    log.info("Total candidates harvested to DB: %d", total_candidates_global)
-    log.info("=" * 60)
-
-    return 0 if all(c >= 0 for c in results.values()) else 1
+    log.info("%d/%d succeeded", success, len(targets))
+    log.info("═" * 60)
+    return 0 if success == len(targets) else 1
 
 
 if __name__ == "__main__":

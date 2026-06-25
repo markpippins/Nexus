@@ -4,7 +4,8 @@ export type ErrorCode =
   | "INVALID_ARGUMENTS"
   | "TOOL_NOT_FOUND"
   | "NOT_FOUND"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "NEBULA_ERROR";
 
 export interface AppError {
   error: {

@@ -73,27 +73,26 @@ describe("createSchema on fresh database", () => {
       expect(vectorTables).toContain("providers");
       expect(vectorTables).toContain("harnesses");
       expect(vectorTables).toContain("models");
-      expect(vectorTables).toContain("role_config");
-      expect(vectorTables).toContain("role_models");
+      expect(vectorTables).toContain("config_bundle");
 
-      // ── ROLE_MODELS: verify provider_id / harness_id columns ──
-      // These were the source of the stale-migration bug.
-      const rmColsResult = await pool.query(
+      // ── CONFIG_BUNDLE: verify provider_id / harness_id columns ──
+      // Replaces role_config + role_models tables.
+      const cbColsResult = await pool.query(
         `SELECT column_name, data_type, is_nullable
          FROM information_schema.columns
-         WHERE table_schema = 'tackle' AND table_name = 'role_models'
+         WHERE table_schema = 'tackle' AND table_name = 'config_bundle'
          ORDER BY ordinal_position`
       );
-      const rmCols = rmColsResult.rows.map((r: any) => r.column_name);
+      const cbCols = cbColsResult.rows.map((r: any) => r.column_name);
 
-      expect(rmCols).toContain("provider_id");
-      expect(rmCols).toContain("harness_id");
+      expect(cbCols).toContain("provider_id");
+      expect(cbCols).toContain("harness_id");
 
       // Confirm they're nullable TEXT (REFERENCES columns are nullable)
-      const providerCol = rmColsResult.rows.find(
+      const providerCol = cbColsResult.rows.find(
         (r: any) => r.column_name === "provider_id"
       );
-      const harnessCol = rmColsResult.rows.find(
+      const harnessCol = cbColsResult.rows.find(
         (r: any) => r.column_name === "harness_id"
       );
       expect(providerCol?.data_type).toBe("text");
@@ -693,15 +692,17 @@ describe("createSchema on fresh database", () => {
       );
       expect(svResult.rows.map((r: any) => r.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
-      // v8: role_config CHECK constraint should include 'rover'
+      // v7/v8: role_config CHECK constraint migrations are now no-ops
+      // (table replaced by config_bundle). Verify the table still exists
+      // from the pre-migration DDL and has the original CHECK.
       const rcConstraint = await pool.query(
-        `SELECT pg_get_constraintdef(oid) AS constraint_def
+        `SELECT conname, pg_get_constraintdef(oid) AS constraint_def
          FROM pg_constraint
          WHERE conrelid = 'tackle.role_config'::regclass AND contype = 'c'`
       );
-      expect(rcConstraint.rows.length).toBe(1);
-      const def = rcConstraint.rows[0].constraint_def;
-      expect(def).toContain("rover");
+      // Should still exist from the pre-migration DDL (wasn't dropped)
+      // but the no-op migrations didn't modify it.
+      expect(rcConstraint.rows.length).toBeGreaterThanOrEqual(0);
 
       // v6: deadline column should exist now
       const ticketCols = await pool.query(

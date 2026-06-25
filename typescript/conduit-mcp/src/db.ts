@@ -100,11 +100,11 @@ function translateSQL(sql: string): string {
     if (table === "receipts" || table === "tickets") {
       s = s.trimEnd() + " ON CONFLICT DO NOTHING";
     } else {
-      // For ON CONFLICT on 'role' column (role_config, pipeline_cursor)
+      // For ON CONFLICT on 'role' column (pipeline_cursor)
       if (table === "pipeline_cursor") {
         // Handled inline with explicit ON CONFLICT (role) in the SQL
-      } else if (table === "role_config") {
-        s = s.trimEnd() + " ON CONFLICT (role) DO NOTHING";
+      } else if (table === "config_bundle") {
+        // Handled inline with explicit ON CONFLICT (role, model_id) in the SQL
       } else {
         s = s.trimEnd() + " ON CONFLICT (id) DO NOTHING";
       }
@@ -268,11 +268,8 @@ async function createSchema(
     );
   `);
 
-  // role_models.provider_id / harness_id intentionally NOT in migrations.
-  // These columns are already in the CREATE TABLE IF NOT EXISTS
-  // tackle.role_models DDL below. Adding ALTER TABLE entries here would
-  // run before the CREATE TABLE executes, causing "relation does not exist"
-  // errors on fresh databases. The DDL is the source of truth for these columns.
+  // config_bundle.provider_id / harness_id are in the DDL below, not in
+  // migrations. They replace role_config and role_models entirely.
 
   await exec(`
     -- tickets live in vision schema (FK references stay in conduit for plans)
@@ -496,28 +493,25 @@ async function createSchema(
       updated_at       TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.role_config (
-      id            TEXT PRIMARY KEY,
-      role          TEXT NOT NULL UNIQUE CHECK(role IN (
-                       'planner','builder','reviewer','critic',
-                       'analyst','architect','inspector','engineer',
-                       'rover'
-                     )),
-      provider_id   TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.providers(id),
-      harness_id    TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.harnesses(id),
-      model_id      TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.models(id),
-      extra_params  TEXT NOT NULL DEFAULT '{}',
-      created_at    TEXT NOT NULL,
-      updated_at    TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.role_models (
-      id          TEXT PRIMARY KEY,
-      role        TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.role_config(role) ON DELETE CASCADE,
-      model_id    TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.models(id),
-      priority    INTEGER NOT NULL DEFAULT 0,
-      provider_id TEXT REFERENCES ${TACKLE_SCHEMA}.providers(id),
-      harness_id  TEXT REFERENCES ${TACKLE_SCHEMA}.harnesses(id),
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.config_bundle (
+      id              TEXT PRIMARY KEY,
+      name            TEXT NOT NULL,
+      role            TEXT NOT NULL,
+      model_id        TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.models(id),
+      provider_id     TEXT REFERENCES ${TACKLE_SCHEMA}.providers(id),
+      harness_id      TEXT REFERENCES ${TACKLE_SCHEMA}.harnesses(id),
+      priority        INTEGER NOT NULL DEFAULT 0,
+      invocation_mode TEXT NOT NULL DEFAULT 'CLI'
+                        CHECK(invocation_mode IN ('CLI', 'HTTP', 'SDK', 'MCP')),
+      command         TEXT,
+      endpoint_url    TEXT,
+      timeout_ms      INTEGER,
+      valid_from      TEXT,
+      valid_to        TEXT,
+      is_active       INTEGER NOT NULL DEFAULT 1,
+      metadata        TEXT NOT NULL DEFAULT '{}',
+      created_at      TEXT NOT NULL,
+      updated_at      TEXT NOT NULL,
       UNIQUE(role, model_id)
     );
 
@@ -651,59 +645,16 @@ const migrations: Migration[] = [
   },
   {
     version: 7,
-    description: "Expand role_config CHECK constraint to include all 8 agent roles (analyst, architect, inspector, engineer)",
-    up: async (exec) => {
-      // Drop the old CHECK constraint on tackle.role_config.role (auto-generated name)
-      // and recreate it with the expanded role list.
-      await exec(`
-        DO $MIGRATE$
-        DECLARE
-          v_conname text;
-        BEGIN
-          SELECT conname INTO v_conname
-          FROM pg_constraint
-          WHERE conrelid = 'tackle.role_config'::regclass AND contype = 'c';
-
-          IF v_conname IS NOT NULL THEN
-            EXECUTE format('ALTER TABLE tackle.role_config DROP CONSTRAINT %I', v_conname);
-          END IF;
-
-          ALTER TABLE tackle.role_config ADD CONSTRAINT role_config_role_check
-            CHECK (role IN (
-              'planner','builder','reviewer','critic',
-              'analyst','architect','inspector','engineer'
-            ));
-        END;
-        $MIGRATE$
-      `);
+    description: "(obsoleted) role_config CHECK constraint — table replaced by config_bundle",
+    up: async () => {
+      // No-op: role_config table was removed in favor of config_bundle.
     },
   },
   {
     version: 8,
-    description: "Add 'rover' role to role_config CHECK constraint for rover-mcp audit folder routing",
-    up: async (exec) => {
-      await exec(`
-        DO $MIGRATE$
-        DECLARE
-          v_conname text;
-        BEGIN
-          SELECT conname INTO v_conname
-          FROM pg_constraint
-          WHERE conrelid = 'tackle.role_config'::regclass AND contype = 'c';
-
-          IF v_conname IS NOT NULL THEN
-            EXECUTE format('ALTER TABLE tackle.role_config DROP CONSTRAINT %I', v_conname);
-          END IF;
-
-          ALTER TABLE tackle.role_config ADD CONSTRAINT role_config_role_check
-            CHECK (role IN (
-              'planner','builder','reviewer','critic',
-              'analyst','architect','inspector','engineer',
-              'rover'
-            ));
-        END;
-        $MIGRATE$
-      `);
+    description: "(obsoleted) role_config CHECK rover extension — table replaced by config_bundle",
+    up: async () => {
+      // No-op: role_config table was removed in favor of config_bundle.
     },
   },
   {
@@ -2110,11 +2061,30 @@ export async function deleteAIModel(id: string): Promise<boolean> {
 }
 
 export async function getAIRoleConfigs(): Promise<AIRoleConfigRow[]> {
-  return qAll("SELECT * FROM role_config ORDER BY role");
+  return qAll(
+    `SELECT DISTINCT ON (cb.role) cb.id, cb.role, cb.model_id,
+            COALESCE(cb.provider_id, m.provider_id) AS provider_id,
+            COALESCE(cb.harness_id, m.harness_id) AS harness_id,
+            '{}'::TEXT AS extra_params, cb.created_at, cb.updated_at
+     FROM config_bundle cb
+     JOIN models m ON cb.model_id = m.id
+     WHERE cb.is_active = 1
+     ORDER BY cb.role, cb.priority ASC`
+  );
 }
 
 export async function getAIRoleConfig(role: string): Promise<AIRoleConfigRow | undefined> {
-  return qOne("SELECT * FROM role_config WHERE role = @role", { role });
+  return qOne(
+    `SELECT cb.id, cb.role, cb.model_id,
+            COALESCE(cb.provider_id, m.provider_id) AS provider_id,
+            COALESCE(cb.harness_id, m.harness_id) AS harness_id,
+            '{}'::TEXT AS extra_params, cb.created_at, cb.updated_at
+     FROM config_bundle cb
+     JOIN models m ON cb.model_id = m.id
+     WHERE cb.role = @role AND cb.is_active = 1
+     ORDER BY cb.priority ASC LIMIT 1`,
+    { role }
+  );
 }
 
 export async function upsertAIRoleConfig(
@@ -2122,13 +2092,14 @@ export async function upsertAIRoleConfig(
 ): Promise<void> {
   const now = new Date().toISOString();
   await qRun(
-    `INSERT INTO role_config (id, role, provider_id, harness_id, model_id, extra_params, created_at, updated_at)
-    VALUES (@id, @role, @provider_id, @harness_id, @model_id, @extra_params, @created_at, @updated_at)
-    ON CONFLICT(role) DO UPDATE SET
-      id = EXCLUDED.id, provider_id = EXCLUDED.provider_id,
-      harness_id = EXCLUDED.harness_id, model_id = EXCLUDED.model_id,
-      extra_params = EXCLUDED.extra_params, updated_at = EXCLUDED.updated_at`,
-    { ...rc, extra_params: rc.extra_params ?? "{}",
+    `INSERT INTO config_bundle (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, is_active, metadata, created_at, updated_at)
+     VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, 0, 'CLI', 1, '{}', @created_at, @updated_at)
+     ON CONFLICT (role, model_id) DO UPDATE SET
+       id = EXCLUDED.id, provider_id = EXCLUDED.provider_id,
+       harness_id = EXCLUDED.harness_id, priority = 0,
+       is_active = 1, updated_at = EXCLUDED.updated_at`,
+    { ...rc, name: `Primary: ${rc.model_id} for ${rc.role}`,
+      extra_params: rc.extra_params ?? "{}",
       created_at: rc.created_at ?? now, updated_at: now }
   );
 }
@@ -2138,15 +2109,41 @@ export interface AIRoleModelRow {
   provider_id: string | null; harness_id: string | null;
 }
 
+export interface ConfigBundleRow {
+  id: string;
+  name: string;
+  role: string;
+  model_id: string;
+  provider_id: string | null;
+  harness_id: string | null;
+  priority: number;
+  invocation_mode: "CLI" | "HTTP" | "SDK" | "MCP";
+  command: string | null;
+  endpoint_url: string | null;
+  timeout_ms: number | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  is_active: number;
+  metadata: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export async function getRoleModels(role: string): Promise<AIRoleModelRow[]> {
   return qAll(
-    "SELECT * FROM role_models WHERE role = @role ORDER BY priority ASC",
+    `SELECT id, role, model_id, priority, provider_id, harness_id
+     FROM config_bundle WHERE role = @role AND is_active = 1
+     ORDER BY priority ASC`,
     { role }
   );
 }
 
 export async function getAllRoleModels(): Promise<AIRoleModelRow[]> {
-  return qAll("SELECT * FROM role_models ORDER BY role, priority ASC");
+  return qAll(
+    `SELECT id, role, model_id, priority, provider_id, harness_id
+     FROM config_bundle WHERE is_active = 1
+     ORDER BY role, priority ASC`
+  );
 }
 
 export async function upsertRoleModels(
@@ -2155,13 +2152,14 @@ export async function upsertRoleModels(
   if (priorities.length === 0) return;
 
   await withTransaction(async (client) => {
-    await tRun(client, "DELETE FROM role_models WHERE role = @role", { role });
+    await tRun(client, "DELETE FROM config_bundle WHERE role = @role", { role });
     for (const p of priorities) {
       await tRun(client,
-        `INSERT INTO role_models (id, role, model_id, priority, provider_id, harness_id)
-         VALUES (@id, @role, @model_id, @priority, @provider_id, @harness_id)`,
-        { id: `rm-${role}-${p.model_id}`, role, model_id: p.model_id, priority: p.priority,
-          provider_id: p.provider_id ?? null, harness_id: p.harness_id ?? null }
+        `INSERT INTO config_bundle (id, name, role, model_id, priority, provider_id, harness_id, invocation_mode, is_active, metadata, created_at, updated_at)
+         VALUES (@id, @name, @role, @model_id, @priority, @provider_id, @harness_id, 'CLI', 1, '{}', @now, @now)`,
+        { id: `cb-${role}-${p.model_id}`, name: `Bundle: ${p.model_id}`,
+          role, model_id: p.model_id, priority: p.priority,
+          provider_id: p.provider_id ?? null, harness_id: p.harness_id ?? null, now: new Date().toISOString() }
       );
     }
     // Reset role circuit breaker so scheduler can re-dispatch immediately
@@ -2175,17 +2173,18 @@ export async function upsertRoleModels(
 }
 
 /** Import a full AI config snapshot: clear existing data and bulk-insert.
- *  Runs inside a transaction so partial imports are rolled back on error. */
+ *  Runs inside a transaction so partial imports are rolled back on error.
+ *  Accepts legacy `roles` and `role_models` arrays, converting them to
+ *  config_bundle entries for backward compatibility. */
 export async function importAIConfig(
   data: AIConfigSnapshot & { role_models?: { role: string; model_id: string; priority: number; provider_id?: string | null; harness_id?: string | null }[] },
-): Promise<{ providers: number; harnesses: number; models: number; roles: number; role_models: number }> {
-  let pCount = 0, hCount = 0, mCount = 0, rCount = 0, rmCount = 0;
+): Promise<{ providers: number; harnesses: number; models: number; roles: number; bundles: number }> {
+  let pCount = 0, hCount = 0, mCount = 0, bCount = 0;
   const now = new Date().toISOString();
 
   await withTransaction(async (client) => {
     // Clear existing data in dependency order
-    await tRun(client, "DELETE FROM role_models");
-    await tRun(client, "DELETE FROM role_config");
+    await tRun(client, "DELETE FROM config_bundle");
     await tRun(client, "DELETE FROM models");
     await tRun(client, "DELETE FROM harnesses");
     await tRun(client, "DELETE FROM providers");
@@ -2224,33 +2223,39 @@ export async function importAIConfig(
       mCount++;
     }
 
-    // Insert role_configs
+    // Convert legacy roles to config_bundle entries (priority=0 primary)
     for (const r of data.roles || []) {
       await tRun(client,
-        `INSERT INTO role_config (id, role, provider_id, harness_id, model_id, extra_params, created_at, updated_at)
-         VALUES (@id, @role, @provider_id, @harness_id, @model_id, @extra_params, @created_at, @updated_at)`,
-        { id: r.id, role: r.role, provider_id: r.provider_id, harness_id: r.harness_id,
-          model_id: r.model_id, extra_params: r.extra_params ?? "{}",
-          created_at: r.created_at || now, updated_at: now }
+        `INSERT INTO config_bundle
+           (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, is_active, metadata, created_at, updated_at)
+         VALUES
+           (@id, @name, @role, @model_id, @provider_id, @harness_id, 0, 'CLI', 1, '{}', @created_at, @updated_at)
+         ON CONFLICT (role, model_id) DO NOTHING`,
+        { id: `cb-${r.role}-${r.model_id}`, name: `Primary: ${r.model_id} for ${r.role}`,
+          role: r.role, model_id: r.model_id, provider_id: r.provider_id ?? null,
+          harness_id: r.harness_id ?? null, created_at: r.created_at || now, updated_at: now }
       );
-      rCount++;
     }
 
-    // Insert role_models
+    // Insert role_models as config_bundle entries
     for (const rm of data.role_models || []) {
-      const rmId = `rm-${rm.role}-${rm.model_id}`;
       await tRun(client,
-        `INSERT INTO role_models (id, role, model_id, priority, provider_id, harness_id)
-         VALUES (@id, @role, @model_id, @priority, @provider_id, @harness_id)`,
-        { id: rmId, role: rm.role, model_id: rm.model_id,
-          priority: rm.priority ?? 0, provider_id: rm.provider_id ?? null, harness_id: rm.harness_id ?? null }
+        `INSERT INTO config_bundle
+           (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, is_active, metadata, created_at, updated_at)
+         VALUES
+           (@id, @name, @role, @model_id, @provider_id, @harness_id, @priority, 'CLI', 1, '{}', @created_at, @updated_at)
+         ON CONFLICT (role, model_id) DO NOTHING`,
+        { id: `cb-${rm.role}-${rm.model_id}`, name: `Bundle: ${rm.model_id}`,
+          role: rm.role, model_id: rm.model_id, priority: rm.priority ?? 0,
+          provider_id: rm.provider_id ?? null, harness_id: rm.harness_id ?? null,
+          created_at: now, updated_at: now }
       );
-      rmCount++;
+      bCount++;
     }
   });
 
-  console.log(`[import-ai-config] Imported ${pCount} providers, ${hCount} harnesses, ${mCount} models, ${rCount} roles, ${rmCount} role_models.`);
-  return { providers: pCount, harnesses: hCount, models: mCount, roles: rCount, role_models: rmCount };
+  console.log(`[import-ai-config] Imported ${pCount} providers, ${hCount} harnesses, ${mCount} models, ${bCount} bundles.`);
+  return { providers: pCount, harnesses: hCount, models: mCount, roles: (data.roles || []).length, bundles: bCount };
 }
 
 export async function getAIConfigSnapshot(): Promise<AIConfigSnapshot & { role_models: AIRoleModelRow[] }> {
@@ -2554,21 +2559,18 @@ export async function seedDefaultAIConfig(force?: boolean): Promise<{
       if (changes > 0) mCount++;
     }
 
-    // Role configs
+    // Role configs (stored as config_bundle with priority=0 for primary)
     for (const role of ALL_ROLES) {
       const changes = await tRun(client,
-        `INSERT OR IGNORE INTO role_config (id, role, provider_id, harness_id, model_id, extra_params, created_at, updated_at)
-         VALUES (@id, @role, @provider_id, @harness_id, @model_id, '{}', @now, @now)`,
-        { id: `rc-${role}`, role, provider_id: "prov-openai", harness_id: "harn-opencode", model_id: "mod-gpt4o", now }
+        `INSERT INTO config_bundle
+           (id, name, role, model_id, priority, provider_id, harness_id, invocation_mode, is_active, metadata, created_at, updated_at)
+         VALUES
+           (@id, @name, @role, @model_id, 0, @provider_id, @harness_id, 'CLI', 1, '{}', @now, @now)
+         ON CONFLICT (role, model_id) DO NOTHING`,
+        { id: `cb-${role}-mod-gpt4o`, name: `Default: GPT-4o for ${role}`, role,
+          model_id: "mod-gpt4o", provider_id: "prov-openai", harness_id: "harn-opencode", now }
       );
       if (changes > 0) rCount++;
-
-      await tRun(client,
-        `INSERT OR IGNORE INTO role_models (id, role, model_id, priority, provider_id, harness_id)
-         VALUES (@id, @role, @model_id, @priority, @provider_id, @harness_id)`,
-        { id: `rm-${role}-mod-gpt4o`, role, model_id: "mod-gpt4o", priority: 0,
-          provider_id: "prov-openai", harness_id: "harn-opencode" }
-      );
     }
 
     console.log(`[seed-defaults] ${force ? "Force re-" : "S"}eeded ${pCount} providers, ${hCount} harnesses, ${mCount} models, ${rCount} role configs.`);
