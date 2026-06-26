@@ -1,6 +1,5 @@
 import { Component, ChangeDetectionStrategy, signal, inject, Renderer2, NgZone, OnDestroy, input, output, HostListener, ElementRef, computed, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ChatComponent } from '../chat/chat.component.js';
 import { FileSystemNode } from '../../models/file-system.model.js';
 import { TreeViewComponent } from '../tree-view/tree-view.component.js';
 import { ServiceTreeComponent } from '../service-tree/service-tree.component.js';
@@ -22,7 +21,7 @@ import { NodeType } from '../../models/component-config.js';
 @Component({
   selector: 'app-sidebar',
   templateUrl: './sidebar.component.html',
-  imports: [CommonModule, ChatComponent, TreeViewComponent, ServiceTreeComponent, ComponentPaletteComponent, ComponentLibraryComponent, InputDialogComponent, ConfirmDialogComponent, NotesComponent],
+  imports: [CommonModule, TreeViewComponent, ServiceTreeComponent, ComponentPaletteComponent, ComponentLibraryComponent, InputDialogComponent, ConfirmDialogComponent, NotesComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SidebarComponent implements OnDestroy {
@@ -38,7 +37,6 @@ export class SidebarComponent implements OnDestroy {
   getImageService = input.required<(path: string[]) => ImageService>();
   getProvider = input.required<(path: string[]) => FileSystemProvider>();
   isTreeVisible = input(true);
-  isChatVisible = input(true);
   isNotesVisible = input(true);
   viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console'); // Sub-mode when in service-mesh
@@ -82,31 +80,20 @@ export class SidebarComponent implements OnDestroy {
 
   // --- Vertical Resizing State for internal panes ---
   // We keep treePaneHeight around only if we want to refer to it, but now Tree will be flex-1
-  // We use local signals for chat and notes to allow them to have fixed heights
-  chatPaneHeight = signal(this.uiPreferencesService.sidebarChatHeight() ?? 250);
+  // We use local signals for notes to allow them to have fixed heights
   notesPaneHeight = signal(250); // Default to 250px
 
-  isResizingChat = signal(false);
   isResizingNotes = signal(false);
 
-  private unlistenChatMouseMove: (() => void) | null = null;
-  private unlistenChatMouseUp: (() => void) | null = null;
   private unlistenNotesMouseMove: (() => void) | null = null;
   private unlistenNotesMouseUp: (() => void) | null = null;
 
-  isChatPaneCollapsed = this.uiPreferencesService.isChatPaneCollapsed;
   isNotesPaneCollapsed = this.uiPreferencesService.isNotesPaneCollapsed;
 
   @ViewChild('contentContainer') contentContainerEl!: ElementRef<HTMLDivElement>;
 
-  // Tree always takes full flex space so it expands when chat or notes collapse
   isTreeFlex = computed(() => {
     return true;
-  });
-
-  // Chat has fixed height unless overridden by collapse
-  isChatFlex = computed(() => {
-    return false;
   });
 
   // --- Context Menu State ---
@@ -168,58 +155,8 @@ export class SidebarComponent implements OnDestroy {
   }
 
   // --- Vertical resize methods ---
-  startTreeResize(event: MouseEvent): void {
-    // This resizer is between Tree and Chat.
-    // Since Tree is flex-1 and on top, dragging this resizer UP (smaller clientY) increases Chat's height.
-    this.isResizingChat.set(true);
-    const container = this.contentContainerEl.nativeElement;
-    const containerRect = container.getBoundingClientRect();
-    event.preventDefault();
-
-    this.unlistenChatMouseMove = this.renderer.listen('document', 'mousemove', (e: MouseEvent) => {
-      // The space below this resizer is Chat + Chat-Notes Resizer + Notes
-      let occupiedBelowBase = 0;
-      if (this.isNotesVisible()) {
-        if (this.isNotesPaneCollapsed()) {
-          occupiedBelowBase += 24; // h-6
-        } else {
-          occupiedBelowBase += this.notesPaneHeight();
-        }
-      }
-
-      // Height of Chat = Container Bottom - Mouse Y - occupiedBelowBase
-      let newChatHeight = (containerRect.bottom - occupiedBelowBase) - e.clientY;
-
-      const minHeight = 100;
-      const maxHeight = containerRect.height - occupiedBelowBase - 100; // Leave 100px for Tree
-
-      if (newChatHeight < minHeight) newChatHeight = minHeight;
-      if (newChatHeight > maxHeight) newChatHeight = maxHeight;
-
-      this.chatPaneHeight.set(newChatHeight);
-    });
-
-    this.unlistenChatMouseUp = this.renderer.listen('document', 'mouseup', () => {
-      this.stopChatResize();
-    });
-  }
-
-  private stopChatResize(): void {
-    if (!this.isResizingChat()) return;
-    this.isResizingChat.set(false);
-    if (this.unlistenChatMouseMove) {
-      this.unlistenChatMouseMove();
-      this.unlistenChatMouseMove = null;
-    }
-    if (this.unlistenChatMouseUp) {
-      this.unlistenChatMouseUp();
-      this.unlistenChatMouseUp = null;
-    }
-    this.uiPreferencesService.setSidebarChatHeight(this.chatPaneHeight());
-  }
-
-  startChatResize(event: MouseEvent): void {
-    // This resizer is between Chat and Notes.
+  startNotesResize(event: MouseEvent): void {
+    // This resizer is between Tree and Notes.
     // Dragging UP increases Notes height.
     this.isResizingNotes.set(true);
     const container = this.contentContainerEl.nativeElement;
@@ -230,12 +167,7 @@ export class SidebarComponent implements OnDestroy {
       let newNotesHeight = containerRect.bottom - e.clientY;
 
       const minHeight = 100;
-      // Chat is above this. Need to leave space for Chat and Tree.
-      let chatOccupied = 0;
-      if (this.isChatVisible()) {
-        chatOccupied = this.isChatPaneCollapsed() ? 24 : this.chatPaneHeight();
-      }
-      const maxHeight = containerRect.height - chatOccupied - 100; // 100px for Tree
+      const maxHeight = containerRect.height - 100; // 100px for Tree
 
       if (newNotesHeight < minHeight) newNotesHeight = minHeight;
       if (newNotesHeight > maxHeight) newNotesHeight = maxHeight;
@@ -259,10 +191,6 @@ export class SidebarComponent implements OnDestroy {
       this.unlistenNotesMouseUp();
       this.unlistenNotesMouseUp = null;
     }
-  }
-
-  toggleChatPaneCollapse(): void {
-    this.uiPreferencesService.toggleChatPaneCollapse();
   }
 
   toggleNotesPaneCollapse(): void {
@@ -520,7 +448,6 @@ export class SidebarComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.stopResize();
-    this.stopChatResize();
     this.stopNotesResize();
   }
 }

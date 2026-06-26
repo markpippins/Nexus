@@ -6,14 +6,12 @@ import { BuilderStatusComponent } from './components/builder-status/builder-stat
 import { AgentStatusBarComponent } from './components/agent-status-bar/agent-status-bar.component';
 import { ToastContainerComponent } from './components/toast-container/toast-container.component';
 import { KeyboardHelpComponent } from './components/keyboard-help/keyboard-help.component';
-import { MessageBoxContainerComponent } from './components/message-box-container/message-box-container.component';
 import { AIConfigDialogComponent } from './components/ai-config-dialog/ai-config-dialog.component';
 import { PlansSidebarComponent } from './components/plans-sidebar/plans-sidebar.component';
 import { ConduitService } from './services/conduit.service';
 import { ThemeService } from './services/theme.service';
 import { GlobalErrorService } from './services/global-error.service';
 import { KeyboardShortcutService } from './services/keyboard.service';
-import { MessageBoxService } from './services/message-box.service';
 
 interface NavItem {
   route: string;
@@ -32,7 +30,6 @@ interface NavItem {
     AgentStatusBarComponent,
     ToastContainerComponent,
     KeyboardHelpComponent,
-    MessageBoxContainerComponent,
     AIConfigDialogComponent,
     PlansSidebarComponent,
   ],
@@ -46,9 +43,6 @@ interface NavItem {
 
       <!-- AI config dialog -->
       <app-ai-config-dialog #aiConfigDialog></app-ai-config-dialog>
-
-      <!-- Gmail-style LLM message boxes -->
-      <app-message-box-container></app-message-box-container>
 
       <!-- Global error banner -->
       @if (globalError(); as err) {
@@ -76,12 +70,7 @@ interface NavItem {
         </div>
         <div class="nav-spacer"></div>
         <div class="top-nav-actions">
-          <button class="nav-icon-btn" (click)="openChat()" title="New chat (Ctrl+')">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-          </button>
-          <button class="nav-icon-btn" (click)="openConfig()" title="AI configuration (Ctrl+,)">
+<button class="nav-icon-btn" (click)="openConfig()" title="AI configuration (Ctrl+,)">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -221,8 +210,6 @@ export class AppComponent implements OnInit, OnDestroy {
     private errorService: GlobalErrorService,
     private router: Router,
     private kb: KeyboardShortcutService,
-    private messageBox: MessageBoxService,
-  
     @Inject(DOCUMENT) private doc: Document,
   ) {
     effect(() => {
@@ -295,11 +282,6 @@ export class AppComponent implements OnInit, OnDestroy {
   dismissError() { this.errorService.clear(); }
 
   toggleTheme() { this.theme.toggle(); }
-
-  openChat(): void {
-    const n = this.messageBox.instances().length + 1;
-    this.messageBox.open(n === 1 ? 'Assistant' : `Assistant ${n}`);
-  }
 
   openConfig(): void {
     this.aiConfigDialog?.open();

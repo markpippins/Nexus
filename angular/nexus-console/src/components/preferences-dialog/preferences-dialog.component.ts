@@ -41,7 +41,6 @@ export class PreferencesDialogComponent implements OnInit {
   panels: PanelPreference[] = [
     { key: 'isSidebarVisible', label: 'Show Main Sidebar' },
     { key: 'isTreeVisible', label: 'Show Folder Tree Pane' },
-    { key: 'isChatVisible', label: 'Show Chat Pane' },
     { key: 'isNotesVisible', label: 'Show Notes Pane' },
     { key: 'isDetailPaneOpen', label: 'Show Details Pane' },
     { key: 'isSavedItemsVisible', label: 'Show Saved Items Pane' },

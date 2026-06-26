@@ -1,7 +1,6 @@
 import { Component, signal, OnInit, OnDestroy } from '@angular/core';
 import { NgFor } from '@angular/common';
 import { KeyboardShortcutService, ShortcutHandler } from '../../services/keyboard.service';
-import { SLASH_COMMANDS } from '../../services/message-box.service';
 
 @Component({
   selector: 'app-keyboard-help',
@@ -34,14 +33,6 @@ import { SLASH_COMMANDS } from '../../services/message-box.service';
         </div>
         }
 
-        <div class="section">
-          <h3>Slash Commands</h3>
-          <div class="shortcut" *ngFor="let cmd of slashCommands">
-            <kbd>{{ cmd.command }}</kbd>
-            <span>{{ cmd.description }}</span>
-          </div>
-        </div>
-
         <p class="hint">Press <kbd>?</kbd> again to close</p>
       </div>
     </div>
@@ -66,8 +57,6 @@ export class KeyboardHelpComponent implements OnInit, OnDestroy {
   readonly visible = signal(false);
   readonly global = signal<ShortcutHandler[]>([]);
   readonly view = signal<ShortcutHandler[]>([]);
-  readonly slashCommands = SLASH_COMMANDS;
-
   constructor(private kb: KeyboardShortcutService) {}
 
   ngOnInit(): void {

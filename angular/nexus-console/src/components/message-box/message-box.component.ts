@@ -29,8 +29,6 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
     >
       @if (!box.minimized) {
         <div class="mbox-resize mbox-resize-n" (mousedown)="onResizeStart($event, 'n')"></div>
-        <div class="mbox-resize mbox-resize-e" (mousedown)="onResizeStart($event, 'e')"></div>
-        <div class="mbox-resize mbox-resize-w" (mousedown)="onResizeStart($event, 'w')"></div>
         <div class="mbox-resize mbox-resize-ne" (mousedown)="onResizeStart($event, 'ne')"></div>
         <div class="mbox-resize mbox-resize-nw" (mousedown)="onResizeStart($event, 'nw')"></div>
         <div class="mbox-resize mbox-resize-se" (mousedown)="onResizeStart($event, 'se')"></div>
@@ -126,7 +124,7 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
     </div>
   `,
   styles: [
-    `.message-box{position:fixed;bottom:0;display:flex;flex-direction:column;background:rgb(var(--color-surface));border:1px solid rgb(var(--color-border-base));border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -2px 24px rgba(0,0,0,.25);overflow:hidden}`,
+    `.message-box{position:fixed;bottom:30px;display:flex;flex-direction:column;background:rgb(var(--color-surface));border:1px solid rgb(var(--color-border-base));border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -2px 24px rgba(0,0,0,.25);overflow:hidden}`,
     `.message-box.minimized{height:auto!important;min-height:0}`,
     `.message-box.active{box-shadow:0 -4px 28px rgba(0,0,0,.35),0 0 0 1px rgb(var(--color-accent-ring))}`,
     `.mbox-header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgb(var(--color-surface-muted));border-bottom:1px solid rgb(var(--color-border-muted));cursor:grab;user-select:none;flex-shrink:0}`,
@@ -160,10 +158,6 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
     `.message-box:hover .mbox-resize::after,.message-box.resizing .mbox-resize::after{opacity:.55}`,
     `.mbox-resize-n{top:0;left:10px;right:10px;height:6px;cursor:ns-resize}`,
     `.mbox-resize-n::after{top:0;left:0;right:0;height:3px}`,
-    `.mbox-resize-e{top:10px;right:0;bottom:10px;width:6px;cursor:ew-resize}`,
-    `.mbox-resize-e::after{top:0;right:0;bottom:0;width:3px}`,
-    `.mbox-resize-w{top:10px;left:0;bottom:10px;width:6px;cursor:ew-resize}`,
-    `.mbox-resize-w::after{top:0;left:0;bottom:0;width:3px}`,
     `.mbox-resize-ne{top:0;right:0;width:12px;height:12px;cursor:nesw-resize}`,
     `.mbox-resize-ne::after{top:0;right:0;width:10px;height:3px}`,
     `.mbox-resize-nw{top:0;left:0;width:12px;height:12px;cursor:nwse-resize}`,

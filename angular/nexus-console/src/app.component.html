@@ -19,7 +19,6 @@
         [getImageService]="getImageService"
         [getProvider]="getProvider"
         [isTreeVisible]="isTreeVisible()"
-        [isChatVisible]="isChatVisible()"
         [isNotesVisible]="isNotesVisible()"
         [viewMode]="currentViewMode()"
         [meshViewMode]="meshViewMode()"
@@ -155,14 +154,6 @@
                       </svg>
                     }
                   </div>
-                  <div (click)="toggleChat(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
-                    <span>Chat Pane</span>
-                    @if (isChatVisible()) {
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                      </svg>
-                    }
-                  </div>
                   <div (click)="toggleNotes(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
                     <span>Notes Pane</span>
                     @if (isNotesVisible()) {
@@ -251,7 +242,6 @@
           [isDetailPaneActive]="isDetailPaneOpen()"
           [isSidebarVisible]="isSidebarVisible()"
           [isTreeVisible]="isTreeVisible()"
-          [isChatVisible]="isChatVisible()"
           [isNotesVisible]="isNotesVisible()"
           [isSavedItemsVisible]="isSavedItemsVisible()"
           [isRssFeedVisible]="isRssFeedVisible()"
@@ -291,7 +281,6 @@
           (preferencesMenuClick)="openPreferencesDialog()"
           (toggleSidebar)="toggleSidebar()"
           (toggleTree)="toggleTree()"
-          (toggleChat)="toggleChat()"
           (toggleNotes)="toggleNotes()"
           (toggleSavedItems)="toggleSavedItems()"
           (toggleRssFeed)="toggleRssFeed()"

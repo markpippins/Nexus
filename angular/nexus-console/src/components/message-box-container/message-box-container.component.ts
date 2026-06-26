@@ -17,7 +17,7 @@ import { MessageBoxComponent } from '../message-box/message-box.component';
     </div>
   `,
   styles: [
-    `.mbox-dock{position:fixed;inset:0;pointer-events:none;z-index:900}`,
+    `.mbox-dock{position:fixed;inset:0;bottom:0;pointer-events:none;z-index:900}`,
     `.mbox-dock>*{pointer-events:auto}`,
   ],
 })

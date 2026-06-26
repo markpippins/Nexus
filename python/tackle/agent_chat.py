@@ -6,7 +6,7 @@ Accepts @agent messages, dispatches to opencode in background threads,
 and streams responses via SSE.
 
 Usage:
-    python3 agent_chat.py              # listen on port 3102
+    python3 agent_chat.py              # listen on port 3017
     AGENT_CHAT_PORT=3103 python3 ...   # custom port
 
 Endpoints:
@@ -33,6 +33,14 @@ import uuid
 from datetime import datetime
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
+
+# ── Ensure the 'tackle' package is importable ────────────────────
+# This lets you run `python3 agent_chat.py` from any working directory
+# without needing PYTHONPATH set in the environment.
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_TACKLE_PARENT = os.path.dirname(_SCRIPT_DIR)  # nexus/python/
+if _TACKLE_PARENT not in sys.path:
+    sys.path.insert(0, _TACKLE_PARENT)
 
 # ── Shared env loader ────────────────────────────────────────────
 from tackle.env_config import load_env  # noqa: F401 — fires at import time
@@ -672,7 +680,7 @@ class ChatHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/chat/health":
-            self._send_json({"status": "ok", "port": 3102})
+            self._send_json({"status": "ok", "port": int(os.environ.get("AGENT_CHAT_PORT", "3017"))})
             return
 
         self._send_json({"error": "not found"}, 404)
@@ -703,7 +711,7 @@ def _cleanup_loop() -> None:
 def main():
     _ensure_dirs()
     threading.Thread(target=_cleanup_loop, daemon=True).start()
-    port = int(os.environ.get("AGENT_CHAT_PORT", "3102"))
+    port = int(os.environ.get("AGENT_CHAT_PORT", "3017"))
     bind = os.environ.get("AGENT_CHAT_BIND", "127.0.0.1")
     server = ThreadingHTTPServer((bind, port), ChatHandler)
     print(f"Agent chat server → http://{bind}:{port}")

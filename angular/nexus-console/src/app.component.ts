@@ -196,7 +196,6 @@ export class AppComponent implements OnInit, OnDestroy {
   // --- Pane Visibility State (from service) ---
   isSidebarVisible = this.uiPreferencesService.isSidebarVisible;
   isTreeVisible = this.uiPreferencesService.isTreeVisible;
-  isChatVisible = this.uiPreferencesService.isChatVisible;
   isNotesVisible = this.uiPreferencesService.isNotesVisible;
   isDetailPaneOpen = this.uiPreferencesService.isDetailPaneOpen;
   isSavedItemsVisible = this.uiPreferencesService.isSavedItemsVisible;
@@ -1706,10 +1705,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   toggleTree(): void {
     this.uiPreferencesService.toggleTree();
-  }
-
-  toggleChat(): void {
-    this.uiPreferencesService.toggleChat();
   }
 
   toggleNotes(): void {
