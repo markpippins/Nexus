@@ -68,13 +68,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Initialization flag
   private isInitialized = signal(false);
 
-  // Stable ID key to detect whether service list actually changed (not just reference)
-  private lastServiceIds = '';
-
-  // Track whether the last build used the backend registry, so we can
-  // force a full rebuild when backend components become available.
+  // Stable per-service key to detect whether service list *or visual style* actually changed (not just reference)
+  private lastServiceKey = '';
   private lastRegistryReady = false;
-  private refreshingRegistry = false;
 
   // Context Menu State
   contextMenu = signal<{
@@ -139,22 +135,21 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       const services = this.services();
       const allComponents = this.registry.allComponents(); // Dependency to ensure loaded
 
-      // Trigger a backend component load if the registry is still on fallback.
-      // refresh() is async — when it completes, registry signal updates,
-      // allComponents recomputes, and this effect re-runs with backend data.
-      if (!this.registry.backendLoaded() && !this.refreshingRegistry) {
-        this.refreshingRegistry = true;
-        this.registry.refresh().finally(() => this.refreshingRegistry = false);
-      }
-
       if (!services || services.length === 0) return;
       if (allComponents.length === 0) return; // Wait for registry (at least fallback)
-
-      // Skip full rebuild when service list hasn't changed AND registry hasn't
-      // transitioned from fallback to backend (which would change component IDs).
+      // Only resolve visual styles when backend registry is loaded.
+      // INITIAL_REGISTRY uses string IDs (sys-rest, sys-cache) that won't
+      // match the numeric IDs returned by the /api/v1/services endpoint.
       const registryReady = this.registry.backendLoaded();
-      const ids = services.map(s => s.id).sort().join(',');
-      if (ids === this.lastServiceIds && registryReady === this.lastRegistryReady) {
+
+      // Skip full rebuild when nothing changed (prevents position snap-back on poll cycles).
+      // Key includes per-service visual style so editing a ServiceType's
+      // defaultComponentId (or a service's componentOverrideId) triggers a
+      // full rebuild that re-resolves the 3D component.
+      const key = services
+        .map(s => `${s.id}:${s.componentOverrideId ?? ''}:${s.type?.defaultComponentId ?? s.type?.defaultComponent?.id ?? ''}`)
+        .sort().join(',');
+      if (key === this.lastServiceKey && registryReady === this.lastRegistryReady) {
         // Lightweight update: refresh labels without clearScene
         services.forEach(svc => {
           const node = this.vizService.getNode(String(svc.id));
@@ -166,7 +161,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         this.vizService.updateAllLabels();
         return;
       }
-      this.lastServiceIds = ids;
+      this.lastServiceKey = key;
       this.lastRegistryReady = registryReady;
 
       // Clear existing scene first
