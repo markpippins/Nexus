@@ -1,0 +1,8 @@
+{
+  "event_bindings": {
+    "IdeaCaptured": {
+      "produces_state": "draft",
+      "next_action": "formalize_spec"
+    }
+  }
+}

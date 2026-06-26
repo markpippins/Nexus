@@ -1,0 +1,34 @@
+{
+  "agenda_items": [
+    {
+      "title": "Timing and Role \u2014 When to Add Vector Database to System Architecture",
+      "status": "Agreed",
+      "intent_description": "Vector databases like Pinecone are best introduced when the system has established center of gravity \u2014 not during initial architecture definition. Adding a vector DB too early introduces a new paradigm before the existing one stabilizes, fragmenting the system. The correct architectural stack: Truth (services/events/state) \u2192 Contracts (TypeSpec) \u2192 Execution (Ballerina) \u2192 Control (Throttler) \u2192 Orchestration (Nexus) \u2192 Semantic Layer (Pinecone). The semantic layer only makes sense when everything above it exists.",
+      "requirements": [
+        "Vector DB = derived index over meaning, not primary datastore",
+        "Add after system has center of gravity, not during definition",
+        "Architectural stack: truth \u2192 contracts \u2192 execution \u2192 control \u2192 orchestration \u2192 semantic",
+        "Semantic layer = last addition, not foundation",
+        "Ready when concrete need exists: semantic search, agent memory, natural-language querying"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    },
+    {
+      "title": "Pinecone's Role \u2014 Semantic Memory and Leverage Multiplier",
+      "status": "Observed",
+      "intent_description": "Pinecone sits at the intersection of structured thinking, system design, and AI-assisted retrieval. It solves a problem already implicit in the architecture: moving from exact queries ('give me row X by ID') to meaning-based retrieval ('give me things similar to this idea'). Vector DBs add a new capability layer \u2014 semantic memory \u2014 that doesn't replace SQL (exact queries), Kafka (event streams), or Redis (fast state) but complements them. Pinecone is one of the cleanest entry points into the semantic retrieval world.",
+      "requirements": [
+        "Semantic memory: similarity over hierarchy, discovery over lookup",
+        "Complementary to SQL, Kafka, Redis \u2014 not a replacement",
+        "Powers: chatbots with memory, semantic search, code retrieval, AI copilots",
+        "Infrastructure for intelligence, not application storage",
+        "Fits knowledge system evolution \u2014 not just another database"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    }
+  ]
+}

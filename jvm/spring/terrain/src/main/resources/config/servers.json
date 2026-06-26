@@ -1,0 +1,11 @@
+[
+  {
+    "hostname": "localhost",
+    "ipAddress": "127.0.0.1",
+    "os": "Linux",
+    "status": "ONLINE",
+    "activeFlag": true,
+    "isInternal": false,
+    "notes": "Local development host — runs all nexus services"
+  }
+]

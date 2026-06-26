@@ -1,0 +1,132 @@
+{
+  "agenda_items": [
+    {
+      "title": "Cognitive Ontology Architecture — Replace Event-Driven with Observation-Driven Design",
+      "status": "Agreed",
+      "intent_description": "Shift the system architecture from a flat event-driven model (Event → State Change) to a cognitive ontology that layers observation, interpretation, motivation, priority, and action. Events are not important; observations are important. Priorities emerge from observations in the presence of motivations. This is the foundational architectural shift that transforms Cascade from an event server into a reality reconstruction domain.",
+      "requirements": [
+        "System must distinguish between raw observations (what happened) and interpreted priorities (what matters)",
+        "Priority must be a computed product of Observation × Motivation, never an inherent property of the observation itself",
+        "The Observation layer must be kept as close to ground truth as possible — no meaning attached at ingest time",
+        "Motivations must be defined as a separate, independently versioned set of concerns (Maintain Consistency, Reduce Drift, Complete Work, Preserve Invariants, Improve Understanding)"
+      ],
+      "implementation_notes": [
+        "Cascade starts as Event → Observation → Receipt → Timeline and evolves into Observation → Motivation → Priority → Introspection → Reflection → Perspective without changing its identity",
+        "The progression is additive, not disruptive — each new layer builds on the previous one",
+        "This architecture gives Cascade a much richer long-term role than simply being an event server"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the exact schema for Motivation objects — are they static config, learned weights, or user-defined?",
+        "How does the system bootstrap initial Motivations before any learning has occurred?"
+      ]
+    },
+    {
+      "title": "Observation → Motivation → Priority → Action Pipeline Specification",
+      "status": "Agreed",
+      "intent_description": "Define a four-layer pipeline where raw Observations flow through Motivation evaluation to produce Priorities, which then drive Actions. This replaces the flat event→state-change model with a structured cognitive processing chain. The pipeline separates signal detection (Cascade), signal interpretation (Analyst), and signal response (Conduit) into distinct, testable stages.",
+      "requirements": [
+        "Observations must be source-attributed, timestamped, typed, and include evidence (e.g., File changed, Git commit appeared, Service became unavailable)",
+        "Motivations must have a weight/priority field that determines their influence on priority scoring",
+        "Priority is a join table linking observation_id to motivation_id with a computed score and rationale",
+        "The pipeline must be observable end-to-end for debugging and CIR measurement"
+      ],
+      "implementation_notes": [
+        "This pipeline is the runtime core of the cognitive architecture",
+        "It maps directly onto the existing system roles: Cascade produces Observations, Analyst produces Priorities, Conduit produces Actions",
+        "PEB/Engineer constrains Motivation → Priority → Action through invariants"
+      ],
+      "code_snippets": [
+        {
+          "language": "typescript",
+          "purpose": "Core type definitions for the Observation → Motivation → Priority pipeline",
+          "raw_code": "Observation {\n  id\n  source\n  timestamp\n  type\n  evidence\n}\n\nMotivation {\n  id\n  description\n  weight\n}\n\nPriority {\n  observation_id\n  motivation_id\n  score\n  rationale\n}"
+        }
+      ],
+      "open_questions": [
+        "What scoring algorithm computes Priority.score from Observation + Motivation?",
+        "How are conflicting priorities (same observation, competing motivations) resolved?"
+      ]
+    },
+    {
+      "title": "Meta-Observational Layer — Introspection, Reflection, and Perspective",
+      "status": "Proposed",
+      "intent_description": "Introduce a meta-observational layer above the core pipeline that governs how priorities are formed. Perspective defines the interpretive frame, Reflection tracks belief changes over time, and Introspection captures current beliefs. These are not the same class of thing as raw Observations — they are meta-constructs that operate on the system's own internal state rather than external events.",
+      "requirements": [
+        "Perspective must answer: 'From which frame am I interpreting this?'",
+        "Reflection must answer: 'What has changed in my beliefs over time?'",
+        "Introspection must answer: 'What do I currently believe?'",
+        "These constructs must be stored alongside but separately from raw Observations to avoid category confusion"
+      ],
+      "implementation_notes": [
+        "The meta-observational layer sits above the core pipeline: Perspective → Reflection → Introspection governs how Priorities are formed",
+        "This is the key differentiator between a simple event server and a cognitive system",
+        "These constructs are observational and interpretive artifacts, not workflow or execution artifacts"
+      ],
+      "code_snippets": [
+        {
+          "language": "typescript",
+          "purpose": "Meta-observational construct type definitions",
+          "raw_code": "Perspective {\n  id\n  frame\n  active\n}\n\nIntrospection {\n  id\n  belief\n  confidence\n  timestamp\n}\n\nReflection {\n  id\n  previous_belief\n  current_belief\n  delta\n  timestamp\n}"
+        }
+      ],
+      "open_questions": [
+        "How does Perspective switch/update — is it event-driven or manually toggled?",
+        "What is the cadence for Reflection — continuous, periodic, or triggered by significant deltas?",
+        "How are Introspection beliefs represented — as structured data, natural language assertions, or embeddings?"
+      ]
+    },
+    {
+      "title": "Role-to-System Mapping for Cognitive Pipeline",
+      "status": "Agreed",
+      "intent_description": "Assign each existing system component a specific responsibility in the cognitive pipeline. Cascade produces Observations, Receipts, Timelines, and Signals. Analyst consumes Observations + Motivations and produces Priorities. Conduit consumes Priorities and produces Actions. PEB/Engineer constrains Motivation → Priority → Action through invariants. This creates clean separation of concerns and testable interfaces between components.",
+      "requirements": [
+        "Cascade must never attach meaning to observations — it is a pure signal producer",
+        "Analyst must have access to the full Motivation catalog to compute priorities correctly",
+        "Conduit must only act on computed Priorities, never on raw Observations",
+        "PEB/Engineer invariants must be enforceable at the Motivation, Priority, and Action levels",
+        "Each role's outputs must be persisted as audit artifacts for replay and CIR analysis"
+      ],
+      "implementation_notes": [
+        "This mapping transforms abstract cognitive theory into concrete system responsibilities",
+        "The boundaries are: Cascade (production), Analyst (interpretation), Conduit (execution), PEB (constraint)",
+        "This is a direct instantiation of the Observation → Motivation → Priority → Action pipeline in the existing system architecture"
+      ],
+      "code_snippets": [
+        {
+          "language": "text",
+          "purpose": "Role-to-system mapping specification",
+          "raw_code": "Cascade:\n  Produces: Observation | Receipt | Timeline | Signal\n\nAnalyst:\n  Consumes: Observation + Motivation\n  Produces: Priority\n\nConduit:\n  Consumes: Priority\n  Produces: Action\n\nPEB / Engineer:\n  Constrains: Motivation | Priority | Action (through invariants)"
+        }
+      ],
+      "open_questions": [
+        "Are Receipt and Signal subtypes of Observation or separate artifact types?",
+        "Does Analyst need its own persistence layer for computed Priorities, or does Cascade store them?",
+        "How are PEB invariants defined — as code, configuration, or learned constraints?"
+      ]
+    },
+    {
+      "title": "Cascade Evolution Path — From Event Server to Reality Reconstruction Domain",
+      "status": "Proposed",
+      "intent_description": "Define Cascade's long-term evolution from a simple event server (Event → Observation → Receipt → Timeline) into a full reality reconstruction domain (Observation → Motivation → Priority → Introspection → Reflection → Perspective). The evolution is additive — Cascade's identity remains constant while its capabilities expand through new artifact types and processing layers.",
+      "requirements": [
+        "Cascade's initial deployment must support at minimum: Event ingestion, Observation production, Receipt generation, Timeline construction",
+        "Each evolution phase must be backward-compatible with existing artifact types",
+        "New artifact types (Introspection, Reflection, Perspective) must conform to Cascade's existing storage and query patterns",
+        "The evolution must be versioned so CIR can compare across phases"
+      ],
+      "implementation_notes": [
+        "This is a phased roadmap, not a big-bang rewrite",
+        "Phase 1: Observation, Receipt, Timeline (current scope)",
+        "Phase 2: Motivation, Priority (introduces Analyst integration)",
+        "Phase 3: Introspection, Reflection, Perspective (meta-cognitive capabilities)",
+        "Observational and interpretive artifacts must remain separate from workflow and execution artifacts"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the trigger for phase transitions — feature completeness, stability metrics, or user demand?",
+        "How does Voyager's compression interact with the expanded artifact types in later phases?"
+      ]
+    }
+  ]
+}

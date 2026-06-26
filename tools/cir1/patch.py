@@ -65,7 +65,7 @@ def classify(path: str):
         return ("GOVERNANCE", "STATEFUL")
     if p.startswith("go/wrp/ccnf-ref/") and not any(x in p for x in ["/vectors/", "/tests/"]):
         return ("GOVERNANCE", "CANONICAL")
-    if p.startswith(".agent/"):
+    if p.startswith(".agents/"):
         return ("GOVERNANCE", "ASPIRATIONAL")
     if p.startswith(".tools/") or p.startswith(".github/"):
         return ("GOVERNANCE", "CANONICAL")
@@ -187,7 +187,7 @@ def patch_cir1(obj, mode, domain):
     if isinstance(obj, dict):
         if "intent_source" in obj:
             v = obj["intent_source"]
-            if isinstance(v, str) and ".pipeline/" in v:
+            if isinstance(v, str) and "nexus/.conduit-data/" in v:
                 obj.pop("intent_source")
                 if obj.get("mode") == "execute":
                     obj["mode"] = "legacy"

@@ -1,0 +1,917 @@
+#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# ///
+"""
+bin/mesh-register.py
+====================
+
+Probe the live Nexus service mesh and UPSERT every detected service into
+the Postgres ``terrain`` topology schema. Both the TS ``terrain-mcp`` MCP
+and the JVM ``TopologyServerApplication`` (port 8084, ``nexus/jvm/spring/
+terrain``) read the same ``terrain.*`` tables, so writes here are visible
+to both consumers via their existing tool/API surface — no source change is
+required in either.
+
+This script is the executable mirror of ``terrain-mcp``'s three write
+tools:
+
+* ``terrain_register_mcp_server``       → upsert into ``terrain.mcp_servers``
+* ``terrain_register_runnable_service`` → upsert into ``terrain.runnable_services``
+* ``terrain_register_dependency``       → upsert into ``terrain.service_dependencies``
+
+Driver selection
+----------------
+
+``psycopg2`` is preferred when importable (single connection, transactional,
+no subprocess overhead, atomic per-statement commit). If ``psycopg2`` is not
+installed the script degrades to one ``psql -c`` subprocess per statement.
+
+Usage
+-----
+
+::
+
+    bin/mesh-register.py --probe-only      # print probe JSON, do not touch the DB
+    bin/mesh-register.py --dry-run         # print upsert SQL to stdout
+    bin/mesh-register.py --mesh            # print human-readable mesh summary
+    bin/mesh-register.py                   # execute upserts via psycopg2 (or psql)
+    bin/mesh-register.py --json            # alias for --probe-only
+    bin/mesh-register.py --help
+
+Environment
+-----------
+
+``PGPASSWORD`` is required at run time. ``PGHOST`` / ``PGPORT`` /
+``PGDATABASE`` / ``PGUSER`` default to the same values the
+``terrain-mcp`` ``db/client.ts`` uses (``localhost`` / ``5432`` /
+``nexus`` / ``pguser``).
+
+Exit codes
+----------
+
+* ``0`` — every requested operation completed without uncaught error.
+* ``2`` — ``--dry-run`` produced SQL but invocation was halted by the flag.
+* ``3`` — DB writer returned non-zero.
+* ``4`` — required environment (PGPASSWORD, driver) was missing.
+
+The probe itself never aborts the program if a single port is unreachable;
+every candidate is queried independently and its result appears in the
+JSON / table output. ``status`` is set from the probe so registered
+services accurately read ONLINE (reachable) or OFFLINE (unreachable).
+"""
+
+from __future__ import annotations
+
+import argparse
+import glob
+import json
+import os
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from collections.abc import Iterable
+from dataclasses import dataclass, asdict
+
+
+# ── Configuration ──────────────────────────────────────────────────────
+
+PG_ENV_DEFAULTS = {
+    "PGHOST": "localhost",
+    "PGPORT": "5432",
+    "PGDATABASE": "nexus",
+    "PGUSER": "pguser",
+}
+
+PROBE_TIMEOUT_SECONDS = 2.0
+
+try:
+    import psycopg2  # type: ignore[import-untyped]
+
+    HAS_PSYCOPG2 = True
+except ImportError:  # pragma: no cover - opt-in driver
+    HAS_PSYCOPG2 = False
+
+
+@dataclass(frozen=True)
+class Candidate:
+    """A service we know about and are willing to register."""
+
+    name: str
+    port: int | None
+    kind: str  # "mcp_server" or "runnable_service"
+    health_url: str
+    transport_type: str | None = None  # only meaningful for mcp_server
+    service_type: str | None = None  # only meaningful for runnable_service
+    description: str = ""
+    startup: str = ""
+    workspace_path: str = ""
+
+
+# Every service we have either built in this session or know is live
+# upstream of nexus/. Edit this list as the mesh evolves.
+CANDIDATES: tuple[Candidate, ...] = (
+    Candidate(
+        name="conduit-mcp",
+        port=3100,
+        kind="mcp_server",
+        transport_type="streamable-http",
+        health_url="http://localhost:3100/health",
+        description=(
+            "WorkRequest orchestrator (conduit-mcp). Plan lifecycle: proposed "
+            "→ planning → pending → active → completed. Exposes /state."
+        ),
+        startup="cd typescript/conduit-mcp && npm run dev",
+        workspace_path="nexus/typescript/conduit-mcp",
+    ),
+    Candidate(
+        name="nebula-srv",
+        port=3101,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3101/health",
+        description=(
+            "Canonical REST API over the relational schemas. Endpoints: "
+            "/api/agent-records, /api/requirements, /api/systems, "
+            "/api/harvests (also projected via nebula-mcp SSE @ 3102)."
+        ),
+        startup="cd typescript/nebula-srv && npm run dev",
+        workspace_path="nexus/typescript/nebula-srv",
+    ),
+    Candidate(
+        name="nebula-mcp-sse",
+        port=3102,
+        kind="mcp_server",
+        transport_type="sse",
+        health_url="http://localhost:3102/sse",
+        description=(
+            "SSE wrapper around nebula-srv so stdio-only MCP clients (e.g. "
+            "Claude Desktop) can speak to the canonical DB API."
+        ),
+        startup="cd typescript/nebula-mcp && npm run dev:sse",
+        workspace_path="nexus/typescript/nebula-mcp",
+    ),
+    Candidate(
+        name="vision-srv",
+        port=3103,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3103/health",
+        description=(
+            "Vision REST proxy on its DEFAULT port (3103). vision-mcp's "
+            "VISION_SRV_URL defaults to this URL."
+        ),
+        startup="cd typescript/vision-srv && PORT=3103 npm run dev",
+        workspace_path="nexus/typescript/vision-srv",
+    ),
+    Candidate(
+        name="vision-srv-3104",
+        port=3104,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3104/health",
+        description=(
+            "Vision REST on PORT=3104 to avoid collision with terrain-mcp. "
+            "vision-mcp reads VISION_SRV_URL env to choose between this and "
+            "vision-srv on 3103."
+        ),
+        startup="cd typescript/vision-srv && PORT=3104 npm run dev",
+        workspace_path="nexus/typescript/vision-srv",
+    ),
+    Candidate(
+        name="tackle-mcp",
+        port=3400,
+        kind="mcp_server",
+        transport_type="streamable-http",
+        health_url="http://localhost:3400/health",
+        description="Tackle MCP server (already up before this session).",
+        startup="cd typescript/tackle-mcp && npm run dev",
+        workspace_path="nexus/typescript/tackle-mcp",
+    ),
+    Candidate(
+        name="peb-kernel",
+        port=8080,
+        kind="runnable_service",
+        service_type="Spring Boot",
+        health_url="http://localhost:8080/actuator/health",
+        description=(
+            "Spring Boot kernel for the plugin-execution bus (PEB). Started "
+            "Jun22; PID held in main JVM module nexus/jvm/spring/."
+        ),
+        startup="cd jvm/spring/peb-kernel && mvn -pl peb-bootstrap spring-boot:run",
+        workspace_path="nexus/jvm/spring/peb-kernel",
+    ),
+    Candidate(
+        name="broker-gateway",
+        port=8081,
+        kind="runnable_service",
+        service_type="Spring Boot",
+        health_url="http://localhost:8081/actuator/health",
+        description=(
+            "Spring broker gateway. Pre-existing JVM service, started Jun21."
+        ),
+        startup="cd jvm/spring/broker-gateway && mvn spring-boot:run",
+        workspace_path="nexus/jvm/spring/broker-gateway",
+    ),
+    Candidate(
+        name="topology-server",
+        port=8084,
+        kind="runnable_service",
+        service_type="Spring Boot",
+        health_url="http://localhost:8084/actuator/health",
+        description=(
+            "JVM TopologyServerApplication — second consumer of the "
+            "terrain.* schema; runs Spring Boot 3.x. PID 93734."
+        ),
+        startup="cd jvm/spring/terrain && mvn spring-boot:run",
+        workspace_path="nexus/jvm/spring/terrain",
+    ),
+    Candidate(
+        name="terrain-mcp",
+        port=None,
+        kind="mcp_server",
+        transport_type="stdio",
+        health_url="",
+        description=(
+            "TS stdio MCP server. Read+write surface over terrain.* tables. "
+            "Not currently running on a TCP port — stdio-only."
+        ),
+        startup="cd typescript/terrain-mcp && npm run dev",
+        workspace_path="nexus/typescript/terrain-mcp",
+    ),
+)
+
+
+# Dependencies (source → target). Criticality: critical | high | medium | low.
+#
+# Names MUST match rows currently registered in terrain.mcp_servers /
+# terrain.runnable_services. The emit_upsert_dependency DO/$do$ block
+# silently RETURNs when EITHER endpoint fails to resolve, so a typo here
+# produces zero feedback. Re-audit before changing any name.
+#
+# Aligned 2026-06-23: a probe-driven audit of the terrain.* tables found
+# these original spellings corresponded to actual rows under different
+# names (resolved via SELECT INTO probes; see the developer's audit
+# transcript for the 8-vs-2 diagnostic). Specifically:
+#
+#   - the SSE-wrapping MCP is registered as "nebula-mcp" (not "…-sse")
+#   - the JVM TopologyServerApplication is registered as "terrain"
+#     (matching the workspace directory name, not my Python label)
+#   - the vision REST is registered as "vision-srv" (the port tag was
+#     dropped because the DB row itself doesn't carry port info)
+#   - "peb-kernel" was never registered: until it lands in
+#     terrain.runnable_services, no edge to it can resolve.
+DEPENDENCIES: tuple[tuple[str, str, str, str], ...] = (
+    ("mcp_server", "terrain-mcp", "runnable_service", "nebula-srv"),
+    ("mcp_server", "nebula-mcp", "runnable_service", "nebula-srv"),
+    ("mcp_server", "conduit-mcp", "runnable_service", "nebula-srv"),
+    ("mcp_server", "tackle-mcp", "runnable_service", "nebula-srv"),
+    ("mcp_server", "terrain-mcp", "runnable_service", "terrain"),
+    ("runnable_service", "broker-gateway", "runnable_service", "nebula-srv"),
+    ("runnable_service", "vision-srv", "runnable_service", "nebula-srv"),
+)
+
+
+# ── Probe logic ────────────────────────────────────────────────────────
+
+
+@dataclass
+class ProbeResult:
+    candidate: Candidate
+    reachable: bool
+    http_status: int | None = None
+    body_excerpt: str = ""
+    error: str = ""
+
+
+def probe_one(c: Candidate) -> ProbeResult:
+    if not c.health_url:
+        return ProbeResult(
+            candidate=c,
+            reachable=False,
+            error="no health URL (stdio-only candidate; presence is best-effort)",
+        )
+    req = urllib.request.Request(c.health_url, headers={"Accept": "*/*"})
+    try:
+        with urllib.request.urlopen(req, timeout=PROBE_TIMEOUT_SECONDS) as r:
+            body = r.read(512).decode(errors="replace")
+            return ProbeResult(
+                candidate=c,
+                reachable=True,
+                http_status=r.status,
+                body_excerpt=body[:120],
+            )
+    except urllib.error.HTTPError as e:
+        # A real HTTP error response still proves the socket is open.
+        body = ""
+        try:
+            body = e.read(512).decode(errors="replace")
+        except Exception:  # defensive — connection is already erroring
+            pass
+        return ProbeResult(
+            candidate=c,
+            reachable=True,
+            http_status=e.code,
+            body_excerpt=body[:120],
+            error=f"HTTP {e.code}",
+        )
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        return ProbeResult(
+            candidate=c,
+            reachable=False,
+            error=str(e),
+        )
+
+
+def probe_all() -> list[ProbeResult]:
+    return [probe_one(c) for c in CANDIDATES]
+
+
+# ── SQL emission ───────────────────────────────────────────────────────
+
+
+def sql_quote(value: object) -> str:
+    """Render a Python value as a SQL literal (single-quoted, NULL-safe)."""
+    if value is None or value == "":
+        return "NULL"
+    if isinstance(value, bool):
+        return "TRUE" if value else "FALSE"
+    s = str(value).replace("'", "''")
+    return f"'{s}'"
+
+
+def sql_int(value: int | None) -> str:
+    """Render a Python int as a SQL integer literal (no quotes)."""
+    if value is None:
+        return "NULL"
+    if not isinstance(value, int):
+        raise TypeError(
+            f"sql_int expected int, got {type(value).__name__}: {value!r}"
+        )
+    return str(value)
+
+
+def fetch_service_type_ids() -> dict[str, int]:
+    """
+    Resolve service-type labels to ids by querying ``terrain.service_types``.
+
+    Fails loudly on connection / SELECT error so we never silently emit
+    wrong ids (the registry is a long-lived artifact; bad ids here would
+    propagate to every topology consumer).
+    """
+    sql = (
+        "SELECT name, id FROM terrain.service_types WHERE name IN "
+        "('MCP','Microservice','Express','Spring Boot','Python Service')"
+    )
+    rows = run_capture(sql)
+    ids: dict[str, int] = {}
+    for row in rows:
+        if len(row) >= 2:
+            try:
+                ids[row[0]] = int(row[1])
+            except ValueError:
+                pass
+    if not ids:
+        raise RuntimeError(
+            "fetch_service_type_ids: SELECT returned zero rows; refusing to "
+            "fall back to magic constants. Investigate terrain.service_types."
+        )
+    return ids
+
+
+def emit_upsert_runnabble_service(
+    c: Candidate,
+    type_ids: dict[str, int],
+    status: str,
+) -> str:
+    if c.kind != "runnable_service":
+        raise ValueError(f"{c.name}: not a runnable_service")
+    type_id = type_ids.get(c.service_type or "Express", type_ids["Express"])
+    cols = {
+        "name": sql_quote(c.name),
+        "service_type_id": sql_int(type_id),
+        "port": sql_int(c.port),
+        "workspace_path": sql_quote(c.workspace_path),
+        "health_check_url": sql_quote(c.health_url),
+        "status": sql_quote(status),
+        "version": "NULL",
+        "description": sql_quote(c.description),
+        "startup": sql_quote(c.startup),
+        "health": "NULL",
+    }
+    name_expr = cols["name"]
+    set_clause = ", ".join(f"{k} = {v}" for k, v in cols.items() if k != "name")
+    insert_cols = ", ".join(cols.keys())
+    insert_vals = ", ".join(cols.values())
+    return (
+        "DO $do$ BEGIN\n"
+        f"  UPDATE terrain.runnable_services SET {set_clause} WHERE name = {name_expr};\n"
+        "  IF NOT FOUND THEN\n"
+        f"    INSERT INTO terrain.runnable_services ({insert_cols})\n"
+        f"    VALUES ({insert_vals});\n"
+        "  END IF;\n"
+        "END $do$;\n"
+    )
+
+
+def emit_upsert_mcp_server(c: Candidate, status: str) -> str:
+    if c.kind != "mcp_server":
+        raise ValueError(f"{c.name}: not an mcp_server")
+    # service_type_id=1 is fixed for MCP servers — mirrors terrain-mcp's tool.
+    cols = {
+        "name": sql_quote(c.name),
+        "service_type_id": sql_int(1),
+        "port": sql_int(c.port),
+        "workspace_path": sql_quote(c.workspace_path),
+        "health_check_url": sql_quote(c.health_url),
+        "status": sql_quote(status),
+        "transport_type": sql_quote(c.transport_type),
+        "version": "NULL",
+        "description": sql_quote(c.description),
+        "startup": sql_quote(c.startup),
+        "health": "NULL",
+    }
+    name_expr = cols["name"]
+    set_clause = ", ".join(f"{k} = {v}" for k, v in cols.items() if k != "name")
+    insert_cols = ", ".join(cols.keys())
+    insert_vals = ", ".join(cols.values())
+    return (
+        "DO $do$ BEGIN\n"
+        f"  UPDATE terrain.mcp_servers SET {set_clause} WHERE name = {name_expr};\n"
+        "  IF NOT FOUND THEN\n"
+        f"    INSERT INTO terrain.mcp_servers ({insert_cols})\n"
+        f"    VALUES ({insert_vals});\n"
+        "  END IF;\n"
+        "END $do$;\n"
+    )
+
+
+def emit_upsert_dependency(
+    source_kind: str,
+    source_name: str,
+    target_kind: str,
+    target_name: str,
+) -> str:
+    # We use PL/pgSQL DECLARE + variable lookup rather than WITH CTE + FROM
+    # so that BOTH the UPDATE and the fallback INSERT share the same
+    # src_id / tgt_id / edge_desc bindings. (WITH-CTE is local to a
+    # single statement, so a follow-up INSERT would not see src/tgt
+    # from the prior UPDATE's CTE.)
+    #
+    # Note: the variable name is `edge_desc`, NOT `desc`. `desc` is
+    # reserved in PL/pgSQL (it's the ORDER BY ... DESC direction),
+    # which Postgres will throw `syntax error at or near "desc"` on.
+    src_table = "mcp_servers" if source_kind == "mcp_server" else "runnable_services"
+    tgt_table = "mcp_servers" if target_kind == "mcp_server" else "runnable_services"
+    edge_desc_expr = sql_quote(f"{source_name} -> {target_name}")
+    return (
+        "DO $do$ DECLARE\n"
+        "  src_id INTEGER;\n"
+        "  tgt_id INTEGER;\n"
+        f"  edge_desc TEXT := {edge_desc_expr};\n"
+        "BEGIN\n"
+        f"  SELECT id INTO src_id FROM terrain.{src_table} "
+        f"   WHERE name = {sql_quote(source_name)};\n"
+        f"  SELECT id INTO tgt_id FROM terrain.{tgt_table} "
+        f"   WHERE name = {sql_quote(target_name)};\n"
+        "  IF src_id IS NULL OR tgt_id IS NULL THEN\n"
+        "    RETURN;  -- one side not yet registered; skip silently\n"
+        "  END IF;\n"
+        "  UPDATE terrain.service_dependencies d SET\n"
+        "    criticality = COALESCE(d.criticality, 'medium'),\n"
+        "    description = COALESCE(d.description, edge_desc)\n"
+        f"  WHERE d.source_type = {sql_quote(source_kind)}\n"
+        "    AND d.source_id = src_id\n"
+        f"    AND d.target_type = {sql_quote(target_kind)}\n"
+        "    AND d.target_id = tgt_id;\n"
+        "  IF NOT FOUND THEN\n"
+        "    INSERT INTO terrain.service_dependencies\n"
+        "      (source_type, source_id, target_type, target_id,\n"
+        "       criticality, description)\n"
+        f"    VALUES ({sql_quote(source_kind)}, src_id,\n"
+        f"            {sql_quote(target_kind)}, tgt_id,\n"
+        "            'medium', edge_desc);\n"
+        "  END IF;\n"
+        "END $do$;\n"
+    )
+
+
+def emit_all_upserts(
+    type_ids: dict[str, int],
+    status_per_name: dict[str, str],
+) -> list[str]:
+    statements: list[str] = []
+    for c in CANDIDATES:
+        status = status_per_name.get(c.name, "OFFLINE")
+        if c.kind == "mcp_server":
+            statements.append(emit_upsert_mcp_server(c, status))
+        elif c.kind == "runnable_service":
+            statements.append(emit_upsert_runnabble_service(c, type_ids, status))
+    for sk, sn, tk, tn in DEPENDENCIES:
+        statements.append(emit_upsert_dependency(sk, sn, tk, tn))
+    return statements
+
+
+# ── Driver selection + DB execution ────────────────────────────────────
+
+
+def find_psql() -> str:
+    """Locate the psql binary. Used only when psycopg2 is unavailable."""
+    on_path = shutil.which("psql")
+    if on_path:
+        return on_path
+    candidates = sorted(glob.glob("/usr/lib/postgresql/*/bin/psql")) + [
+        "/usr/local/postgres*/bin/psql",
+        "/opt/homebrew/opt/postgresql*/bin/psql",
+    ]
+    for c in candidates:
+        if os.path.isfile(c) and os.access(c, os.X_OK):
+            return c
+    raise RuntimeError(
+        "psql binary not found and psycopg2 is not importable. "
+        "Install postgresql-client or psycopg2 to proceed.",
+    )
+
+
+def select_driver() -> tuple[str, str | None]:
+    """Return (driver, path) where path is None for psycopg2."""
+    if HAS_PSYCOPG2:
+        return ("psycopg2", None)
+    return ("psql", find_psql())
+
+
+def pg_env() -> dict[str, str]:
+    env = os.environ.copy()
+    for key, default in PG_ENV_DEFAULTS.items():
+        env.setdefault(key, default)
+    if "PGPASSWORD" not in env:
+        print(
+            "error: PGPASSWORD is not set. Set it to the postgres password "
+            "(terrain-mcp's default is 'pgpass').",
+            file=sys.stderr,
+        )
+        sys.exit(4)
+    return env
+
+
+def _run_capture_psycopg2(sql: str, env: dict[str, str]) -> list[list[str]]:
+    # autocommit=True is harmless on SELECTs and keeps this driver's
+    # transactional model identical to _execute_many_psycopg2 below —
+    # see that function for the full rationale. Set post-connect
+    # because psycopg2 2.x rejects ``autocommit`` as a libpq DSN option
+    # (audit 2026-06-23).
+    conn = psycopg2.connect(  # type: ignore[name-defined]
+        host=env["PGHOST"],
+        port=int(env["PGPORT"]),
+        dbname=env["PGDATABASE"],
+        user=env["PGUSER"],
+        password=env["PGPASSWORD"],
+        connect_timeout=5,
+    )
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return [
+                ["" if c is None else str(c) for c in row]
+                for row in cur.fetchall()
+            ]
+    finally:
+        conn.close()
+
+
+def _run_capture_psql(sql: str, psql_path: str, env: dict[str, str]) -> list[list[str]]:
+    cmd = [
+        psql_path,
+        "-h", env["PGHOST"],
+        "-p", env["PGPORT"],
+        "-U", env["PGUSER"],
+        "-d", env["PGDATABASE"],
+        "-tAc", sql,
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env, check=True)
+    return [line.split("\t") for line in proc.stdout.splitlines() if line.strip()]
+
+
+def run_capture(sql: str) -> list[list[str]]:
+    """Run a SELECT and return rows as lists of column strings."""
+    env = pg_env()
+    driver, path = select_driver()
+    if driver == "psycopg2":
+        return _run_capture_psycopg2(sql, env)
+    return _run_capture_psql(sql, path or find_psql(), env)
+
+
+def _execute_many_psycopg2(statements: Iterable[str], env: dict[str, str]) -> int:
+    # autocommit=True makes each ``cur.execute()`` its own atomic
+    # transaction. A failed statement rolls back at the server; subsequent
+    # executes proceed unaffected. Crucially, this avoids a silent loss of
+    # data: with autocommit=False (psycopg2's default), the connect-time
+    # transaction stays open across every iteration of the loop, and
+    # ``conn.close()`` at function-end rolls back the entire UPSERT batch
+    # per PEP 249's transactional-closure semantics — i.e. every successful
+    # registration this script emits disappears into the void unless we
+    # either commit explicitly or set autocommit=True here.
+    #
+    # NOTE: psycopg2 2.x rejects ``autocommit`` as a connect() keyword
+    # (it is not a libpq DSN option); it must be set as an attribute on
+    # the connection *after* connect. Getting this wrong aborts the
+    # script at fetch_service_type_ids() before any UPSERT runs and
+    # silently drops every registration — see the audit on 2026-06-23.
+    conn = psycopg2.connect(  # type: ignore[name-defined]
+        host=env["PGHOST"],
+        port=int(env["PGPORT"]),
+        dbname=env["PGDATABASE"],
+        user=env["PGUSER"],
+        password=env["PGPASSWORD"],
+        connect_timeout=5,
+    )
+    conn.autocommit = True
+    failures = 0
+    try:
+        with conn.cursor() as cur:
+            for sql in statements:
+                try:
+                    cur.execute(sql)
+                    sys.stdout.write(f"ok: {sql.splitlines()[0]}\n")
+                except Exception as e:
+                    # Rollback is a no-op under autocommit=True (each statement
+                    # is already atomic at the server) — preserved as a
+                    # defensive call that costs nothing.
+                    conn.rollback()
+                    failures += 1
+                    sys.stderr.write(
+                        f"failed: {sql.splitlines()[0]}\n"
+                        f"  err: {str(e)[:400]}\n"
+                    )
+    finally:
+        conn.close()
+    return failures
+
+
+def _execute_many_psql(
+    statements: Iterable[str], psql_path: str, env: dict[str, str]
+) -> int:
+    failures = 0
+    for sql in statements:
+        proc = subprocess.run(
+            [
+                psql_path,
+                "-h", env["PGHOST"],
+                "-p", env["PGPORT"],
+                "-U", env["PGUSER"],
+                "-d", env["PGDATABASE"],
+                "-v", "ON_ERROR_STOP=1",
+                "-c", sql,
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        if proc.returncode != 0:
+            failures += 1
+            sys.stderr.write(
+                f"failed (exit={proc.returncode}): "
+                f"{sql.splitlines()[0]}\n"
+                f"stderr: {proc.stderr.strip()[:400]}\n"
+            )
+        else:
+            sys.stdout.write(f"ok: {sql.splitlines()[0]}\n")
+    return failures
+
+
+def execute_many(statements: Iterable[str]) -> int:
+    env = pg_env()
+    driver, path = select_driver()
+    if driver == "psycopg2":
+        return _execute_many_psycopg2(statements, env)
+    return _execute_many_psql(statements, path or find_psql(), env)
+
+
+# ── Pretty printing ────────────────────────────────────────────────────
+
+
+def render_probe(probes: list[ProbeResult]) -> str:
+    """Render probe results as a fixed-width table."""
+    headers = ("name", "port", "kind", "reachable", "status", "excerpt")
+    rows: list[tuple[str, ...]] = []
+    for p in probes:
+        rows.append(
+            (
+                p.candidate.name,
+                str(p.candidate.port) if p.candidate.port is not None else "-",
+                p.candidate.kind,
+                "yes" if p.reachable else "no",
+                str(p.http_status) if p.http_status else "-",
+                (p.body_excerpt or p.error or "")[:40].replace("\n", " "),
+            )
+        )
+    widths = [
+        max(len(h), max(len(r[i]) for r in rows) if rows else 0)
+        for i, h in enumerate(headers)
+    ]
+    line = lambda fields: "  ".join(f.ljust(w) for f, w in zip(fields, widths))
+    buf = [line(headers), "-" * (sum(widths) + 2 * (len(widths) - 1))]
+    for r in rows:
+        buf.append(line(r))
+    return "\n".join(buf)
+
+
+def render_mesh_summary() -> str:
+    """Read the live terrain.* tables and emit a single human-readable
+    snapshot of the registered mesh.
+
+    Three fixed-width tables:
+
+    * MCP servers (name, port, status, transport)
+    * Runnable services (name, port, status, service type)
+    * Service dependencies (source_type/source_name → target_type/target_name + criticality)
+
+    This is the read-side mirror of the ``terrain_infrastructure_summary``
+    tool exposed by terrain-mcp over stdio. Cross-check the two via
+    ``bin/verify-mesh-mcp.py``.
+    """
+    headers_mcp = ["name", "port", "status", "transport"]
+    headers_svc = ["name", "port", "status", "svc_type"]
+    headers_dep = [
+        "source_type", "source_name",
+        "target_type", "target_name",
+        "criticality",
+    ]
+    mcp_rows = run_capture(
+        "SELECT name, "
+        "  COALESCE(port::text, '-') AS port, "
+        "  COALESCE(status, '-') AS status, "
+        "  COALESCE(transport_type, '-') AS transport "
+        "FROM terrain.mcp_servers ORDER BY name"
+    )
+    svc_rows = run_capture(
+        "SELECT rs.name, "
+        "  COALESCE(rs.port::text, '-') AS port, "
+        "  COALESCE(rs.status, '-') AS status, "
+        "  COALESCE(st.name, '-') AS svc_type "
+        "FROM terrain.runnable_services rs "
+        "LEFT JOIN terrain.service_types st ON st.id = rs.service_type_id "
+        "ORDER BY rs.name"
+    )
+    dep_rows = run_capture(
+        "SELECT sd.source_type, "
+        "  COALESCE(ms.name, rs_src.name) AS source_name, "
+        "  sd.target_type, "
+        "  COALESCE(rs.name, ms_tgt.name) AS target_name, "
+        "  COALESCE(sd.criticality, '-') AS criticality "
+        "FROM terrain.service_dependencies sd "
+        "LEFT JOIN terrain.mcp_servers ms "
+        "       ON sd.source_type = 'mcp_server' AND sd.source_id = ms.id "
+        "LEFT JOIN terrain.runnable_services rs_src "
+        "       ON sd.source_type = 'runnable_service' AND sd.source_id = rs_src.id "
+        "LEFT JOIN terrain.runnable_services rs "
+        "       ON sd.target_type = 'runnable_service' AND sd.target_id = rs.id "
+        "LEFT JOIN terrain.mcp_servers ms_tgt "
+        "       ON sd.target_type = 'mcp_server' AND sd.target_id = ms_tgt.id "
+        "ORDER BY sd.source_type, source_name"
+    )
+
+    def _pad(row: list[str], n: int) -> list[str]:
+        return (row + [""] * n)[:n]
+
+    def _tbl(headers: list[str], rows: list[list[str]]) -> str:
+        n = len(headers)
+        norm = [_pad(r, n) for r in rows]
+        widths = [len(h) for h in headers]
+        for r in norm:
+            for i, cell in enumerate(r):
+                if len(cell) > widths[i]:
+                    widths[i] = len(cell)
+        sep = "  "
+        out: list[str] = [
+            sep.join(h.ljust(widths[i]) for i, h in enumerate(headers)),
+            sep.join("-" * widths[i] for i in range(n)),
+        ]
+        for r in norm:
+            out.append(sep.join(c.ljust(widths[i]) for i, c in enumerate(r)))
+        return "\n".join(out)
+
+    buf: list[str] = [
+        "=== Mesh (terrain.* live snapshot) ===",
+        "",
+        f"## MCP Servers ({len(mcp_rows)})",
+        _tbl(headers_mcp, mcp_rows),
+        "",
+        f"## Runnable Services ({len(svc_rows)})",
+        _tbl(headers_svc, svc_rows),
+        "",
+        f"## Service Dependencies ({len(dep_rows)})",
+        _tbl(headers_dep, dep_rows),
+    ]
+    return "\n".join(buf)
+
+
+# ── CLI ───────────────────────────────────────────────────────────────
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        prog="mesh-register",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print upsert SQL to stdout instead of executing it.",
+    )
+    mode.add_argument(
+        "--probe-only",
+        "--json",
+        action="store_true",
+        help="Emit the probe result as JSON to stdout and exit.",
+    )
+    mode.add_argument(
+        "--mesh",
+        action="store_true",
+        help="Print a single human-readable summary of the registered mesh "
+             "(mcp_servers + runnable_services + service_dependencies). The "
+             "read-side mirror of terrain_infrastructure_summary exposed by "
+             "terrain-mcp; cross-check with bin/verify-mesh-mcp.py.",
+    )
+    return p.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    probes = probe_all()
+
+    if args.probe_only:
+        sys.stdout.write(
+            json.dumps(
+                [
+                    {
+                        **asdict(p.candidate),
+                        "reachable": p.reachable,
+                        "http_status": p.http_status,
+                        "body_excerpt": p.body_excerpt,
+                        "error": p.error,
+                    }
+                    for p in probes
+                ],
+                indent=2,
+                sort_keys=True,
+            ),
+        )
+        sys.stdout.write("\n")
+        return 0
+
+    if args.mesh:
+        sys.stdout.write(render_mesh_summary())
+        sys.stdout.write("\n")
+        return 0
+
+    sys.stderr.write("-- live mesh probe --\n")
+    sys.stderr.write(render_probe(probes))
+    sys.stderr.write("\n")
+
+    status_per_name = {
+        p.candidate.name: ("ONLINE" if p.reachable else "OFFLINE") for p in probes
+    }
+
+    if args.dry_run:
+        # Static id fallback for dry-run only (no DB touched).
+        type_ids = {
+            "MCP": 1,
+            "Microservice": 2,
+            "Express": 3,
+            "Spring Boot": 4,
+            "Python Service": 12,
+        }
+        for stmt in emit_all_upserts(type_ids, status_per_name):
+            sys.stdout.write(stmt)
+            sys.stdout.write("\n")
+        sys.stderr.write(
+            "dry-run: SQL emitted above; pass without --dry-run to execute.\n"
+        )
+        return 2
+
+    # Sanity-probe the driver before any heavy work.
+    driver, _ = select_driver()
+    sys.stderr.write(f"-- driver: {driver} --\n")
+
+    type_ids = fetch_service_type_ids()
+    sys.stderr.write(
+        f"-- service type ids: {json.dumps(type_ids, sort_keys=True)} --\n"
+    )
+    failures = execute_many(emit_all_upserts(type_ids, status_per_name))
+    if failures:
+        return 3
+    sys.stderr.write(
+        f"-- registered {len(CANDIDATES)} service(s) and "
+        f"{len(DEPENDENCIES)} dependency edge(s) --\n"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

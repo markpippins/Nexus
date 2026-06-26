@@ -1,0 +1,189 @@
+{
+  "agenda_items": [
+    {
+      "title": "Hard Constraint Enforcement — Prevent Violations, Don't Detect Them Post-Facto",
+      "status": "Agreed",
+      "intent_description": "Move constraint enforcement from detection-after-the-fact (model says 'I violated my constraints') to prevention-before-execution (the system hard-blocks invalid transitions). The 'self-audit prompt' pattern ('Good catch. I need to be honest here: I violated my own permission constraints.') is a symptom of soft constraints leaking into execution space. Violation detection should live in TransitionService/ExecutionEligibilityGate. Self-audit language should be a terminal state artifact, not a runtime behavior. Any component that produces that sentence is already post-failure, not recovering correctness.",
+      "requirements": [
+        "Constraint enforcement must be a hard gate before execution, not a detection after",
+        "TransitionService must validate proposed actions against invariants before allowing execution",
+        "Self-audit language must be treated as a terminal state artifact, not a runtime recovery mechanism",
+        "Separation: constraint enforcement (hard gate) ≠ constraint awareness (soft introspection)",
+        "Violations should be impossible, not just noticed"
+      ],
+      "implementation_notes": [
+        "This maps to NBK: the kernel validates constraints before committing state transitions",
+        "The distinction mirrors Atten (generates) vs Canonicalizer (enforces) separation",
+        "OpenCode dotfolder ecosystems lean toward compatibility/interpretation, not enforcement — this is the gap"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "How is the hard gate implemented in OpenCode environments where dotfolders are advisory?",
+        "What is the minimal enforcement layer between OpenCode and the agent?"
+      ]
+    },
+    {
+      "title": "Descriptive vs Operative Mode — Agents as Observers vs Governed Executors",
+      "status": "Agreed",
+      "intent_description": "Define a clear boundary between descriptive mode (model can reason about architecture, critique it, admire it) and operative mode (model is explicitly inside the governance domain, all actions filtered through constraints, violations impossible). Big Pickle treats Nexus as 'a neat framework' because nothing tells it 'you are executing inside Nexus' governance domain.' Without this mode switch, agents stay in observer mode treating governance structures as interesting objects rather than enclosing rule systems.",
+      "requirements": [
+        "Descriptive mode: agent can talk about, reason about, critique, admire the architecture",
+        "Operative mode: agent is explicitly inside governance domain with all actions filtered through constraints",
+        "Mode switch must be explicit: NEXUS_EXECUTION_CONTEXT=true or equivalent runtime tagging",
+        "In operative mode, outside-view reasoning must be suppressed; only in-context transitions permitted",
+        "The mode boundary leak is typically between planner framing and execution dispatch"
+      ],
+      "implementation_notes": [
+        "Compatibility layer: 'I can run here because I recognize the shape of the environment'",
+        "Constraint layer: 'I can only run as allowed by this environment'",
+        "OpenCode leans toward compatibility (wants portability, unifies heterogeneous tools)",
+        "Claude/Gemini/Codex are constrained upstream by fixed tool schemas and sandboxed execution boundaries"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the minimal 'Nexus Enforcement Compiler' that sits between OpenCode and the agent?",
+        "How is the mode switch triggered — system prompt, context compilation, or runtime manifest?"
+      ]
+    },
+    {
+      "title": "Workspace Topology — Root-of-Authority and Mount Semantics",
+      "status": "Proposed",
+      "intent_description": "Fix the workspace topology problem where agents independently decide 'what am I inside?' because governance is locally inferred, not globally anchored. /dev is the execution host containing Nexus as a governing subsystem, but nothing declares this authority hierarchy. Solution: introduce mount semantics and a root-of-authority declaration. A /dev/.runtime or /dev/CONTEXT_ROOT file defines authority hierarchy, execution rules, and which folders are governance vs data vs tools. Agents must be instantiated as 'running under /dev with Nexus mounted as governance layer', not 'reading Nexus inside /dev'.",
+      "requirements": [
+        "Root-of-authority declaration must define: authority hierarchy, execution rules, folder semantics (governance/data/tools)",
+        ".agent/.opencode must include binding scope declaration — 'this applies to all executors within /dev, including submodules'",
+        "Agents must be instantiated with explicit mount context, not inferred from directory",
+        "Without this, every agent independently builds its own notion of what matters based on directory context + prompt framing",
+        "Nexus-local .agent must not stay Nexus-local — it must declare its governance scope"
+      ],
+      "implementation_notes": [
+        "Current: strongly defined subsystem (Nexus) inside weakly defined execution host (/dev)",
+        "Target: strongly defined execution host with Nexus as first-class governance layer",
+        "This flips from interpretive hierarchy (agents guess) to enforced execution topology (system declares)",
+        "Not stronger metadata — mount semantics: explicit mount boundary that agents are instantiated under"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the schema for /dev/.runtime or /dev/CONTEXT_ROOT?",
+        "How are mount boundaries enforced for agents that don't natively support them?"
+      ]
+    },
+    {
+      "title": "Atten — Multi-State Projection Generator (Canonical Spec v0.2)",
+      "status": "Specified",
+      "intent_description": "Atten is a multi-state projection generator — NOT a brain, cognitive layer, deterministic reducer, knowledge substrate, or decision maker. It reads canonical state and emits zero, one, or many candidate projections of possible future or derived states. Each projection is hypothetical, uncommitted (carries no authority), potentially conflicting (feature, not bug), independent, and traceable to inputs. The core distinction: Observer owns records (factual, immutable, append-only), Atten generates projections (hypothetical, multiple, uncommitted), Commit layer owns state (resolved, committed, canonical). Atten is one projection operator in a broader Projection Algebra alongside Throttler, Nebula, Search, and WorkRequest.",
+      "requirements": [
+        "Atten must never mutate canonical state — projections only (Invariant I1)",
+        "Atten must never decide, select, prioritize, or reject projections internally — Canonicalizer's responsibility (I2)",
+        "Every projection must trace to: canonical state snapshot (input_state_hash), generator (source), trigger (context) (I3)",
+        "No generator may depend on another generator's output within same cycle — all read same snapshot (I4)",
+        "Each generator has bounded scope — permitted subset of canonical state, never full state (I5)",
+        "No recursive projection — generators project over canonical state, not prior projections (I6)",
+        "Generators must be pure: same state + same trigger = same projection set or documented distribution (I7)"
+      ],
+      "implementation_notes": [
+        "Architecture: Observations → Event Log → Canonical State Store → Atten → Canonicalizer/Commit → Committed State",
+        "Generators are parallel, independent, stateless, may conflict, bounded scope, async",
+        "7 projection types: state_transition, inference, classification, relationship, priority_ordering, anomaly, unknown",
+        "AttenProjection schema defined with full JSON Schema: projection_id, timestamp, type, input_state_hash, source, context, candidate, confidence, alternatives, trace, conflict_group",
+        "Implementation order: (1) Canonical State Store, (2) Canonicalizer/Commit Layer, (3) Atten generators, (4) Integration"
+      ],
+      "code_snippets": [
+        {
+          "language": "json",
+          "purpose": "AttenProjection schema — single candidate projection",
+          "raw_code": "{\n  \"projection_id\": \"uuid\",\n  \"timestamp\": \"ISO 8601\",\n  \"type\": \"state_transition | inference | classification | relationship | priority_ordering | anomaly | unknown\",\n  \"input_state_hash\": \"hash of canonical state snapshot\",\n  \"source\": \"atten::incident.classifier\",\n  \"context\": {\n    \"trigger_event_id\": \"...\",\n    \"trigger_type\": \"event | observation | schedule | manual\"\n  },\n  \"candidate\": {\n    \"description\": \"human-readable summary\",\n    \"delta\": {}  // proposed state delta\n  },\n  \"confidence\": 0.95,\n  \"alternatives\": [],\n  \"trace\": {\n    \"rules_applied\": [],\n    \"parent_projection_id\": \"...\"\n  },\n  \"conflict_group\": \"uuid\"\n}"
+        }
+      ],
+      "open_questions": [
+        "The Canonicalizer/Commit Layer does not exist yet — this is the primary architectural gap",
+        "How does the Canonicalizer resolve conflicts between contradictory projections from different generators?"
+      ]
+    },
+    {
+      "title": "Canonicalizer / Commit Layer — The Missing Architectural Gap",
+      "status": "Proposed",
+      "intent_description": "Design the Canonicalizer/Commit Layer that sits downstream of Atten. It collects projections from all generators for a cycle, classifies by conflict group, resolves conflicts (merge compatible, select among conflicting by confidence/priority/rule, reject invariant violations consulting PEB, escalate irreconcilable to human), validates selected against PEB invariants and RCL constraints, commits the resolved state delta, records the resolution (accepted/rejected/merged/why), and emits a commitment event to the Event Log. This layer does not exist yet and must be designed before Atten's projections become actionable.",
+      "requirements": [
+        "Collect: gather all projections from all generators for a cycle",
+        "Classify: group projections by conflict_group",
+        "Resolve: merge compatible, select among conflicting, reject invariant violations, escalate irreconcilable",
+        "Validate: check selected projection against PEB invariants and RCL constraints before commit",
+        "Commit: apply resolved state delta to Canonical State Store",
+        "Record: CommitmentReceipt with accepted/rejected/merged/state_delta/new_state_hash/invariants_checked/trace",
+        "Emit: commitment event to Event Log for auditability"
+      ],
+      "implementation_notes": [
+        "Contract: Atten emits ProjectionEnvelope[] (unordered, possibly conflicting); Canonicalizer produces CommitmentReceipt",
+        "This is the harder architectural problem than Atten itself",
+        "The Canonicalizer is the enforcement point — it's where soft projections become hard state",
+        "PEB provides the rule sets that constrain conflict resolution"
+      ],
+      "code_snippets": [
+        {
+          "language": "text",
+          "purpose": "Canonicalizer contract — Atten output to Canonicalizer output",
+          "raw_code": "Atten emits:       ProjectionEnvelope[] (unordered, possibly conflicting)\nCanonicalizer produces: CommitmentReceipt {\n  accepted: ProjectionId[],      // survived resolution\n  rejected: ProjectionId[],      // with rejection reason\n  merged:   ProjectionId[][],    // groups merged together\n  state_delta: StateDelta,       // what actually changed\n  new_state_hash: string,        // post-commit hash\n  invariants_checked: RuleId[],  // which invariants validated\n  trace: Trace                   // full provenance\n}"
+        }
+      ],
+      "open_questions": [
+        "What is the conflict resolution algorithm — confidence-weighted voting, rule-based, or LLM-mediated?",
+        "How are irreconcilable conflicts surfaced to the human operator?"
+      ]
+    },
+    {
+      "title": "Projection Algebra — Atten as One Operator Among Siblings",
+      "status": "Agreed",
+      "intent_description": "Correct the architectural framing: Atten is not the archetypal projection system. It is one member of a Projection Algebra alongside Throttler (filesystem scope, physical domain), Nebula (knowledge graphs, ontological domain), Search (query results, epistemic domain), and WorkRequest (intent onto execution, operational domain). Atten and Throttler are siblings, not parent and child. Without this correction, the architecture drifts toward Atten-centrism where every projection mechanism gets described 'in terms of' Atten, creating an accidental hub and single-point cognitive collapse.",
+      "requirements": [
+        "Projection Algebra must be defined as the unified family (schema/projection-algebra.md)",
+        "Atten: reads canonical state, emits candidate projections, semantic domain",
+        "Throttler: projects over filesystem scope, physical domain",
+        "Nebula: projects over knowledge graphs, ontological domain",
+        "Search: projects over query results, epistemic domain",
+        "WorkRequest: projects intent onto execution, operational domain",
+        "No operator is the 'reference' for the family — all are siblings"
+      ],
+      "implementation_notes": [
+        "Without correction: Throttler becomes 'a simpler Atten' rather than 'a different projection operator at a different layer'",
+        "Each operator has a distinct domain, input source, output target, and projection mechanism",
+        "This is the projection-layer equivalent of the cognitive ontology flattening (events→observations)"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the formal comparison matrix across all projection operators (domain, input, output, mechanism)?",
+        "Can projections from different operators compose? E.g., Atten projection → Nebula knowledge graph insertion"
+      ]
+    },
+    {
+      "title": "Epistemic Kernel + Merkle Causal DAG — Typed Causality with Verification",
+      "status": "Proposed",
+      "intent_description": "Design a minimal epistemic kernel with typed causality: Observation → (typed transition) → Inference → Projection → Belief. Each transition is a typed causal link with Merkle hashing for verification. MerkleCausalNode uses two-layer hashing (node hash + subtree hash). The Merkle DAG (not linear log) enables verification of causal chains. Implemented as a JVM embedded causal calculus with GADT-style causality types. SPoE (State Projection over Execution) is a type-level witness — a typed projection of valid execution composition that prevents unrepresentable causal invalidity. Functor as a compiler transform: staged IR with no dynamic branching.",
+      "requirements": [
+        "Observation → Projection: typed epistemic transition with verifiable causal link",
+        "MerkleCausalNode: two-layer hashing (node-level + subtree-level)",
+        "Merkle DAG structure: causal links form a DAG, not a linear log",
+        "GADT-style causality types: each transition has a provable type",
+        "SPoE: type-level witness that a given execution composition is valid",
+        "Functor transform: compiler-level transform over staged IR, no dynamic branching"
+      ],
+      "implementation_notes": [
+        "This is the JVM representation of the epistemic transitions defined in the TypeSpec model",
+        "Two-layer hashing: node content hash provides integrity; subtree hash provides structural verification",
+        "Merkle DAG enables partial verification — verify a subgraph without recomputing the whole chain",
+        "GADT types make invalid causal chains unrepresentable at the type level — compiler rejects them"
+      ],
+      "code_snippets": [
+        {
+          "language": "java",
+          "purpose": "Sealed epistemic type hierarchy for typed causal transitions",
+          "raw_code": "sealed interface Epistemic permits Observation, Inference, Projection, Belief {}\nrecord Observation(EventId source, Payload payload) implements Epistemic {}\nrecord Inference(Observation from, Rule applied, Confidence confidence) implements Epistemic {}\nrecord Projection(Inference from, StateDelta proposed, Confidence confidence) implements Epistemic {}\nrecord Belief(Projection accepted, CommitmentReceipt proof) implements Epistemic {}"
+        }
+      ],
+      "open_questions": [
+        "How does the Merkle DAG handle forks — when one observation produces multiple competing inferences?",
+        "What is the verification model for SPoE — compile-time type check or runtime witness validation?"
+      ]
+    }
+  ]
+}

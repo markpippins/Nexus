@@ -1,0 +1,34 @@
+# Documented Pipeline Drifts
+#
+# These are known, accepted divergences between pipeline layers.
+# The triage tool uses this to avoid false-positive divergence reports.
+#
+# Format:
+#   <layer>:
+#     - field: <fingerprint_key>
+#       expected: <value>
+#       description: "<human-readable justification>"
+#       reference: "<plan or issue reference>"
+
+graph_state:
+  - field: node_count
+    expected: 0
+    description: >
+      GraphStateReducer is not wired into the pipeline pipeline.
+      GraphState nodes are always 0 until reducer integration.
+    reference: "Plan 0015 Phase 3+ — post-closure cleanup"
+
+  - field: edge_count
+    expected: 0
+    description: >
+      Same as node_count — GraphState edge projection is not wired.
+    reference: "Plan 0015 Phase 3+"
+
+semantic_projection:
+  - field: resolved_concepts
+    expected: 0
+    description: >
+      GraphState-derived projection (via GraphStateReducer) is not
+      wired. All concept resolution flows through SemanticProjectionBuilder.
+      The resolved_concepts in GraphState is always 0 until reducer integration.
+    reference: "Plan 0015 Phase 3+"

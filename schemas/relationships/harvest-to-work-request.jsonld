@@ -1,0 +1,33 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+    "hv": "https://nexus.local/schema/core/harvest/",
+    "wr": "https://nexus.local/schema/core/work-request/",
+
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"}
+  },
+
+  "@graph": [
+    {
+      "@id": "hv:Harvest",
+      "comment": "A Harvest produces one or more WorkRequests when a SpecificationCandidate is promoted to implementation. The WorkRequest is derivedFrom the Harvest.",
+      "produces": {"@id": "wr:WorkRequest"},
+      "derivedFrom": null
+    },
+    {
+      "@id": "wr:WorkRequest",
+      "comment": "A WorkRequest may be derivedFrom a Harvest. The lineage.derivedFrom field references the Harvest's @id.",
+      "derivedFrom": {"@id": "hv:Harvest"},
+      "produces": null
+    },
+    {
+      "@id": "hv:SpecificationCandidate",
+      "comment": "A SpecificationCandidate references entities that may also appear in WorkRequests. This creates a semantic bridge between harvest analysis and execution intent.",
+      "references": {"@id": "hv:Harvest"},
+      "hasPart": {"@id": "wr:WorkRequestStep"}
+    }
+  ]
+}

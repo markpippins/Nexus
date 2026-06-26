@@ -1,0 +1,221 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+
+    "wr": "https://nexus.local/schema/core/work-request/",
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"},
+
+    "WorkRequest":           "wr:WorkRequest",
+    "WorkRequestIntent":     "wr:WorkRequestIntent",
+    "WorkRequestStep":       "wr:WorkRequestStep",
+    "WorkRequestDecomposition": "wr:WorkRequestDecomposition",
+    "WorkRequestRequirements":  "wr:WorkRequestRequirements",
+    "WorkRequestConstraints":   "wr:WorkRequestConstraints",
+    "WorkRequestResourceLimits": "wr:WorkRequestResourceLimits",
+    "CompletionCondition":      "wr:CompletionCondition",
+    "WorkRequestSuccessCriteria": "wr:WorkRequestSuccessCriteria",
+    "WorkRequestExecutionState":  "wr:WorkRequestExecutionState",
+    "WorkRequestLineage":         "wr:WorkRequestLineage",
+    "WorkRequestArtifacts":       "wr:WorkRequestArtifacts",
+    "ProducedFile":               "wr:ProducedFile",
+    "IntermediateOutput":         "wr:IntermediateOutput",
+    "WorkRequestMetadata":        "wr:WorkRequestMetadata",
+    "MergeHistoryItem":           "wr:MergeHistoryItem",
+    "WorkResultEvent":            "wr:WorkResultEvent",
+
+    "intent":            {"@id": "wr:intent",            "@type": "@id"},
+    "decomposition":     {"@id": "wr:decomposition",     "@type": "@id"},
+    "requirements":      {"@id": "wr:requirements",      "@type": "@id"},
+    "constraints":       {"@id": "wr:constraints",       "@type": "@id"},
+    "successCriteria":   {"@id": "wr:successCriteria",   "@type": "@id"},
+    "executionState":    {"@id": "wr:executionState",    "@type": "@id"},
+    "lineage":           {"@id": "wr:lineage",           "@type": "@id"},
+    "artifacts":         {"@id": "wr:artifacts",         "@type": "@id"},
+    "metadata":          {"@id": "wr:metadata",          "@type": "@id"},
+
+    "problemStatement":  "wr:problemStatement",
+    "desiredOutcome":    "wr:desiredOutcome",
+    "domain":            "wr:domain",
+    "abstractionLevel":  "wr:abstractionLevel",
+    "userIntentTrace":   "wr:userIntentTrace",
+
+    "strategy":         "wr:strategy",
+    "parallelismModel": "wr:parallelismModel",
+    "recursionAllowed": {"@id": "wr:recursionAllowed", "@type": "xsd:boolean"},
+    "steps":            {"@id": "wr:steps", "@container": "@list"},
+    "stepId":           "wr:stepId",
+    "stepType":         "wr:stepType",
+    "outputs":          {"@id": "wr:outputs", "@container": "@list"},
+
+    "functional":       {"@id": "wr:functional",       "@container": "@list"},
+    "nonFunctional":    {"@id": "wr:nonFunctional",    "@container": "@list"},
+    "systemRequirements": {"@id": "wr:systemRequirements", "@container": "@list"},
+    "toolRequirements":    {"@id": "wr:toolRequirements", "@container": "@list"},
+
+    "forbiddenActions":   {"@id": "wr:forbiddenActions",   "@container": "@list"},
+    "safetyConstraints":  {"@id": "wr:safetyConstraints",  "@container": "@list"},
+    "resourceLimits":     {"@id": "wr:resourceLimits",     "@type": "@id"},
+    "architecturalConstraints": {"@id": "wr:architecturalConstraints", "@container": "@list"},
+    "tokens":       {"@id": "wr:tokens",       "@type": "xsd:integer"},
+    "timeMs":       {"@id": "wr:timeMs",       "@type": "xsd:integer"},
+    "memoryMb":     {"@id": "wr:memoryMb",     "@type": "xsd:integer"},
+
+    "validationRules":      {"@id": "wr:validationRules",      "@container": "@list"},
+    "acceptanceTests":      {"@id": "wr:acceptanceTests",      "@container": "@list"},
+    "completionConditions": {"@id": "wr:completionConditions", "@type": "@id"},
+    "failureModes":         {"@id": "wr:failureModes",         "@container": "@list"},
+    "condition": "wr:condition",
+    "evaluator": "wr:evaluator",
+
+    "currentStep":  "wr:currentStep",
+    "progress":     {"@id": "wr:progress", "@type": "xsd:float"},
+    "retries":      {"@id": "wr:retries", "@type": "xsd:integer"},
+    "errorState":   "wr:errorState",
+    "contextSnapshotRef": "wr:contextSnapshotRef",
+    "lastUpdated":  {"@id": "wr:lastUpdated", "@type": "xsd:dateTime"},
+
+    "branches":     {"@id": "wr:branches", "@container": "@list"},
+    "mergeHistory": {"@id": "wr:mergeHistory", "@container": "@list"},
+
+    "producedFiles":       {"@id": "wr:producedFiles", "@container": "@list"},
+    "intermediateOutputs": {"@id": "wr:intermediateOutputs", "@container": "@list"},
+    "filePath": "wr:filePath",
+    "fileHash": "wr:fileHash",
+    "originStep": "wr:originStep",
+    "dataRef": "wr:dataRef",
+
+    "agentId": "wr:agentId",
+    "mode": "wr:mode",
+
+    "workRequestId": "wr:workRequestId",
+    "executorId": "wr:executorId",
+    "result": "wr:result",
+    "error": "wr:error",
+    "filesWritten": {"@id": "wr:filesWritten", "@container": "@list"},
+    "harness": "wr:harness",
+    "model": "wr:model"
+  },
+
+  "@graph": [
+    {
+      "@id": "wr:WorkRequest",
+      "@type": "rdfs:Class",
+      "subClassOf": {"@id": "nx:WorkRequest"},
+      "comment": "Directed Acyclic Cognitive Object. A self-contained unit of cognitive work with intent, decomposition, constraints, and lineage.",
+      "name": "WorkRequest",
+      "properties": [
+        "wr:intent", "wr:decomposition", "wr:requirements", "wr:constraints",
+        "wr:successCriteria", "wr:executionState", "wr:lineage", "wr:artifacts",
+        "wr:metadata", "derivedFrom", "dependsOn", "supersedes", "references"
+      ]
+    },
+    {
+      "@id": "wr:WorkRequestIntent",
+      "@type": "rdfs:Class",
+      "comment": "The originating intent behind a WorkRequest.",
+      "properties": [
+        "wr:problemStatement", "wr:desiredOutcome", "wr:domain",
+        "nx:priority", "wr:userIntentTrace", "wr:abstractionLevel"
+      ]
+    },
+    {
+      "@id": "wr:WorkRequestStep",
+      "@type": "rdfs:Class",
+      "comment": "A single step in the decomposition of a WorkRequest.",
+      "properties": [
+        "wr:stepId", "nx:description", "dependsOn", "wr:outputs", "wr:stepType"
+      ]
+    },
+    {
+      "@id": "wr:WorkRequestDecomposition",
+      "@type": "rdfs:Class",
+      "comment": "How a WorkRequest is decomposed into executable steps.",
+      "properties": ["wr:strategy", "wr:steps", "wr:parallelismModel", "wr:recursionAllowed"]
+    },
+    {
+      "@id": "wr:WorkRequestRequirements",
+      "@type": "rdfs:Class",
+      "comment": "Functional and non-functional requirements for the WorkRequest.",
+      "properties": ["wr:functional", "wr:nonFunctional", "wr:systemRequirements", "wr:toolRequirements"]
+    },
+    {
+      "@id": "wr:WorkRequestConstraints",
+      "@type": "rdfs:Class",
+      "comment": "Constraints that bound the execution of a WorkRequest.",
+      "properties": ["wr:forbiddenActions", "wr:safetyConstraints", "wr:resourceLimits", "wr:architecturalConstraints"]
+    },
+    {
+      "@id": "wr:WorkRequestResourceLimits",
+      "@type": "rdfs:Class",
+      "comment": "Resource limits for WorkRequest execution.",
+      "properties": ["wr:tokens", "wr:timeMs", "wr:memoryMb"]
+    },
+    {
+      "@id": "wr:CompletionCondition",
+      "@type": "rdfs:Class",
+      "comment": "A condition that must be met for the WorkRequest to be considered complete.",
+      "properties": ["wr:condition", "wr:evaluator"]
+    },
+    {
+      "@id": "wr:WorkRequestSuccessCriteria",
+      "@type": "rdfs:Class",
+      "comment": "How success is measured for a WorkRequest.",
+      "properties": ["wr:validationRules", "wr:acceptanceTests", "wr:completionConditions", "wr:failureModes"]
+    },
+    {
+      "@id": "wr:WorkRequestExecutionState",
+      "@type": "rdfs:Class",
+      "comment": "Current execution state of a WorkRequest.",
+      "properties": ["nx:status", "wr:currentStep", "wr:progress", "wr:retries", "wr:errorState", "wr:contextSnapshotRef", "wr:lastUpdated"]
+    },
+    {
+      "@id": "wr:WorkRequestLineage",
+      "@type": "rdfs:Class",
+      "comment": "Provenance and version history of a WorkRequest.",
+      "properties": ["nx:derivedFrom", "nx:supersedes", "wr:branches", "wr:mergeHistory"]
+    },
+    {
+      "@id": "wr:MergeHistoryItem",
+      "@type": "rdfs:Class",
+      "comment": "A single merge operation in the WorkRequest's history.",
+      "properties": ["wr:from", "wr:strategy"]
+    },
+    {
+      "@id": "wr:ProducedFile",
+      "@type": "rdfs:Class",
+      "comment": "A file produced during WorkRequest execution.",
+      "properties": ["wr:filePath", "wr:fileType", "wr:fileHash", "wr:originStep"]
+    },
+    {
+      "@id": "wr:IntermediateOutput",
+      "@type": "rdfs:Class",
+      "comment": "An intermediate data reference produced by a step.",
+      "properties": ["wr:stepId", "wr:dataRef"]
+    },
+    {
+      "@id": "wr:WorkRequestArtifacts",
+      "@type": "rdfs:Class",
+      "comment": "Artifacts produced by a completed WorkRequest.",
+      "properties": ["wr:producedFiles", "wr:intermediateOutputs"]
+    },
+    {
+      "@id": "wr:WorkRequestMetadata",
+      "@type": "rdfs:Class",
+      "comment": "Metadata about the WorkRequest itself.",
+      "properties": ["nx:createdAt", "nx:updatedAt", "wr:agentId", "wr:mode", "nx:tags"]
+    },
+    {
+      "@id": "wr:WorkResultEvent",
+      "@type": "rdfs:Class",
+      "comment": "Immutable execution outcome written to the audit trail.",
+      "properties": [
+        "wr:workRequestId", "nx:status", "wr:outputs",
+        "wr:artifacts", "wr:error", "nx:timestamp",
+        "wr:executorId", "wr:harness", "wr:model", "wr:filesWritten"
+      ]
+    }
+  ]
+}

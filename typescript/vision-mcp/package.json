@@ -1,0 +1,21 @@
+{
+  "name": "vision-mcp",
+  "version": "1.0.0",
+  "description": "MCP Server for Vision LOSM — exposes work requests, artifacts, branches via MCP tools",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

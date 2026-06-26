@@ -1,0 +1,1 @@
+{"id":"evt-js-1781637428","type":"IdeaCaptured","timestamp":"2026-06-16T19:17:08Z","source":"jetstream-test","payload":{"idea":"JetStream persistence test","workflow_vocabulary":{"event_bindings":{"IdeaCaptured":{"produces_state":"draft","next_action":"formalize_spec"}}},"auto_advance":false}}

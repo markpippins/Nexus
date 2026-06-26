@@ -1,0 +1,28 @@
+{
+  "agenda_items": [
+    {
+      "title": "Framework Ecosystem TypeSpec Model \u2014 Canonical CRUD for Framework, Category, Language, Vendor",
+      "status": "Implemented",
+      "intent_description": "Model the framework ecosystem as TypeSpec types: Framework (name, description, vendor, category, language, versions, URL, flags), FrameworkCategory (name), FrameworkLanguage (name, description, versions), FrameworkVendor (name, description, URL). TypeSpec becomes the canonical system contract \u2014 not Spring annotations. Layered approach: TypeSpec\u2192OpenAPI\u2192Spring Controller\u2192Repository\u2192UI. Vendor CRUD is the first integration with the /v1 API.",
+      "requirements": [
+        "TypeSpec models: Framework, FrameworkCategory, FrameworkLanguage, FrameworkVendor",
+        "TypeSpec\u2192OpenAPI\u2192Spring Controller\u2192Repository\u2192UI pipeline",
+        "Vendor as bootstrap entity: independent, referenceable, low complexity",
+        "No service layer \u2014 pure CRUD via Controller\u2192Repository",
+        "/v1/vendors CRUD endpoint as first integration"
+      ]
+    },
+    {
+      "title": "TypeSpec as Domain Language, Not Just Schema \u2014 Framework API as Typed Catalog",
+      "status": "Agreed",
+      "intent_description": "Position TypeSpec as the domain language for the framework catalog, not just a schema definition. The framework catalog is more than CRUD \u2014 it's a typed catalog of software ecosystems enabling AI reasoning over stacks, recommendation engines, compatibility graphs, and architecture exploration. TypeSpec models become the canonical system model from which all implementations derive.",
+      "requirements": [
+        "TypeSpec = domain language, not just schema",
+        "Framework catalog = typed ecosystem, not just CRUD forms",
+        "Enables: AI stack reasoning, recommendations, compatibility graphs",
+        "All implementations derive from TypeSpec models",
+        "No service layer \u2014 Controller\u2192Repository only"
+      ]
+    }
+  ]
+}

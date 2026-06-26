@@ -1,0 +1,76 @@
+app-bottom-bar {
+  display: block;
+  flex-shrink: 0;
+}
+
+.bottom-bar {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  background: rgb(var(--color-surface));
+  border-top: 1px solid rgb(var(--color-border-base));
+  font-size: 12px;
+}
+
+/* ── Left: status info ── */
+.bottom-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.status-text {
+  color: rgb(var(--color-text-muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-text.text-subtle {
+  color: rgb(var(--color-text-subtle));
+}
+
+.status-separator {
+  color: rgb(var(--color-border-muted));
+}
+
+/* ── Right: external site square buttons ── */
+.bottom-bar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex: 1 1 0;
+}
+
+.external-btn {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid rgb(var(--color-border-muted));
+  border-radius: 3px;
+  background: rgb(var(--color-background));
+  cursor: pointer;
+  transition: background-color 150ms, border-color 150ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.external-btn:hover {
+  background: rgb(var(--color-surface-hover));
+  border-color: rgb(var(--color-accent-ring));
+}
+
+.external-btn-img {
+  display: block;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}

@@ -1,0 +1,369 @@
+Welcome to Hypervelocity Engineering
+0:00
+The fire hose of vibe-coded  AI slop will not stop. But
+0:04
+our friends at Microsoft have the  answer: Hypervelocity Engineering.
+0:12
+So I've been going through Microsoft's  open-source stuff on this topic,
+0:16
+Hypervelocity Engineering, their  documentation, and some internal
+0:20
+stuff that I can't share. And even if you're  not a Microsoft shop, this is probably going
+0:24
+to impact you because this is basically the  Silicon Valley bros leaking into enterprise.
+0:29
+All right. So as a quick intro, Microsoft uses  this Hypervelocity Engineering methodology
+0:35
+internally, and they've been doing it across  their Industry Solutions Engineering team,
+0:42
+which is basically Microsoft Consulting. Okay.  So this is what they are trying to do on all of
+0:46
+their projects: use AI to hypervelocity-accelerate  the software engineering life cycle. Everybody in
+0:54
+the Microsoft ecosystem is going to be impacted by  this, from mom and pop .NET shops to big corporate
+0:59
+guys. This is going to leak everywhere. Okay? So,  we should pay some attention to this. Seriously.
+1:04
+So, what are people doing today with their AI  tools? Yeah. If you're at a quite low maturity
+1:08
+level, you will just be opening Copilot Chat.  You'll type a prompt, paste the result back in,
+Prompt Engineering vs Context Engineering
+1:15
+accept it, move on with our lives. But this  isn't engineering. This is vibe coding. All
+1:20
+right? And it's going to get everybody in a  lot of trouble. Okay? There's no structure.
+1:25
+There's no verification. There's no  persistence between sessions. I mean,
+1:29
+normally the system would have forgotten  what you did the day before. It can
+1:34
+be really useful. You can do some great  one-shot cracking demos. And when it works,
+1:39
+it's great. When it doesn't work, it sucks,  but you will normally end up with a giant
+1:44
+pull request that nobody understands or  a load of slop with security holes in it.
+1:49
+In Microsoft Docs, they put this pretty  bluntly, okay? They say AI code is still
+1:55
+your code, and if you can't explain it,  understand it, maintain it, or support it,
+1:59
+don't ship it. Which sounds fair enough to me.  But sadly for this boomer, this .NET boomer,
+2:05
+okay, who used to hand-crank his C# code—he  loved it, right—the question isn't "should we
+2:11
+use AI to write code anymore?" All right,  that ship has well and truly sailed away.
+2:17
+It's left the platform. Okay, we have to catch  up because the industry will demand it of us,
+2:22
+or we won't be competitive. We won't be  able to build anything ever. It'll just
+2:26
+be us doing some weird artisan thing that  nobody will pay for, and we will all starve.
+2:31
+All right, so the question is how can we  actually use this AI stuff without burying
+2:35
+ourselves in technical debt? And that  is the industry's number one challenge
+What exactly is Hypervelocity Engineering
+2:40
+at the moment. Hypervelocity Engineering is  Microsoft's proposed answer to this problem,
+2:46
+right? And they describe it as expert  multidisciplinary teams using AI tools,
+2:51
+proven starting points, and design thinking  across the entire life cycle. Design thinking is
+2:57
+basically consulting, genuine actual consulting,  the stuff that users on various parts of the
+3:05
+spectrum don't particularly want to do, but  we won't have a choice anymore. They claim,
+3:10
+and this sounds like, you know, your X/Twitter  tech bro yap, two to three times faster delivery,
+3:18
+half the team sizes from what they used  to use. They have three or four people
+3:22
+on a team instead of 10. I don't know what you  were doing with 10 people on the team anyway,
+3:26
+but I guess that was your average Agile Scrum dev  team, right? And 30% of the code in Microsoft is
+3:31
+now written by AI, they claim. So they use this  internally and externally with their customers.
+3:36
+Hypervelocity Engineering, according to the  documentation, has four key parts. All right,
+3:43
+multidisciplinary teams. These are those  full-stack engineers I keep banging on
+3:48
+about. We don't just have a little bit of  front end, a little bit of back end, a DBA,
+3:52
+an architect, a QA. Everybody ends up doing  everything. You are a software engineer. Okay,
+3:59
+design thinking, which is basically consulting all  over again. Proven starting points. So you have
+4:05
+to use accelerators. You don't rewrite or recreate  Hypervelocity Engineering on every single project,
+4:12
+and you use agents across the entire life cycle.  AI does everything from requirements checking to
+4:17
+validation at the end. That's what they want you  to do, and that is the future of this industry,
+4:23
+despite what us poor, whingeing  boomers have to say about it.
+4:30
+If you are a software engineer like me, okay,  you've been doing Agile Scrum for ages. So,
+4:35
+you're saying Agile is already fast. Well, yes,  it is. Agile is agile. Agile Scrum. We've been
+4:41
+doing this for decades now. Do you remember Scrum  Masters? Yeah. At least we're not going to have
+4:46
+Scrum Masters in all of this. All right. I see  that the principles of agile in Hypervelocity
+4:53
+Engineering are still there. All right. We ship  working software, we iterate, we keep talking
+4:57
+to the customer. Sometimes we've forgotten  how to do that in normal agile. But anyway,
+5:00
+we respond to change. Okay, that's what we  do. Most of the ceremony of agile, right,
+5:07
+accumulated to compensate for slow humans. All  right, you know those annoying standups and
+5:12
+those annoying retrospectives and all this slop  you have to deal with every week. Your week is
+5:18
+full of calendar meetings. It's because humans  have been really crap at this process. Right?
+Old Agile vs Super Agile
+5:24
+If you think of Hypervelocity Engineering as  super agile or agile squared, you're getting
+5:32
+the hang of it. Things that used to take two  weeks now need to be compressed again down
+5:37
+to two or three days with the same quality  rigor. That is the dream. Do you remember
+5:42
+those Agile Scrum loops on graphic PowerPoints  that all the consultants used to whip out? Do
+5:47
+you remember the SAFe Agile Release Train?  Choo choo. Let's all get on the train. Well,
+5:53
+Hypervelocity Engineering is being described as  multiple parallel development cycles in some sort
+6:00
+of messed up whirlwind vortex of productivity.  You should see some of the graphics that are
+6:05
+coming out on this. Story points and planning  poker, thank God, consigned to the dustbin of
+6:11
+history as it should have been, because the plan  itself is the contract with the AI agent. You
+6:17
+create the plan first. All right. No more backlog  refinement. Okay. The research agent reads your
+6:23
+codebase and writes the backlog for you. Or,  as one of the examples that Microsoft uses,
+6:28
+they just take a meeting transcript to use  the Azure DevOps MCP server to automatically
+6:33
+create the work items that the customer wants  based on those transcripts. Okay, it's wild.
+6:39
+So, it's still iterative and incremental. But I  think if you try to squint a bit, okay, you can
+6:48
+see that this is moving software engineering  again from what was a creative team sport,
+6:54
+almost like making a movie, into more of an  engineering discipline, like actual engineering
+7:03
+jobs. Okay. I mean, I think calling it agile  squared is a nice analogy, because in old agile,
+7:10
+one dev was one dev, right? But in Hypervelocity  Engineering, one dev is orchestrating a little
+7:16
+mini team of agents. And you might have seen  one of my old videos on the squad thing that
+7:20
+they were coming up with. But that is sadly  the direction that Microsoft and Enterprise
+7:27
+Software want you to go over the next few years.  And we're not going to have a choice. Okay.
+7:34
+So, how do you level up? How do you level up  to Hypervelocity Engineering? Well, step one,
+7:39
+okay, is moving from prompt engineering, which is  just spamming what you want built into Copilot or
+7:45
+Claude or whatever, and moving into context  engineering. And context engineering is a bit
+7:51
+like this, okay? The entire information pipeline  of your product and your work items and how to
+7:58
+verify the work is all available to the agent,  to the AI LLM that you're using. You tell it
+8:05
+what documentation it has access to, what coding  conventions you want to use, and it also has all
+8:10
+the context from all the work you did yesterday,  which if you just started a brand new chat session
+8:14
+in Copilot, you wouldn't have, right? Context  is so important because it actually lets you use
+8:20
+cheaper models, right? You don't have to bankrupt  yourself or your employer if there's actual work
+8:25
+on the context before using it in the model.  A small model with good context can outperform
+8:31
+something twice its size is what Microsoft claims,  and they have the data. So I kind of believe them.
+8:36
+Practically what this means you need to do  is, if you've never written or got the agent
+8:40
+to write a Copilot instructions file and stick  it in your repository, you haven't told your AI
+8:45
+what patterns and libraries it should be using  when writing code on this particular project,
+8:50
+and 80% of the value is left on the table.  Okay? It doesn't matter what model you use,
+8:56
+you need to level up from just spamming prompts  in and designing the context for your AI to use.
+9:05
+All right, I know this is painful for a boomer  like me, but this is just the way it's going.
+9:12
+So, how does Microsoft do it? This is it. The  money shot, boys. Okay, the actual workflow that
+RPI: Research, Plan, Implement, Review
+9:17
+Microsoft uses for their customer work and their  internal work, they call it RPI: Research, Plan,
+9:24
+Implement, and then Review. All right. Discover  is a fifth phase, but we'll ignore that. RPI is
+9:31
+a name that they stick with. Each is handled  by a different agent. They've created agents
+9:38
+for their AI LLM to use. And then by using  this process, the agents can hand off work.
+9:44
+First, there's a research agent. It goes off and  reads your codebase, your APIs, your conventions,
+9:49
+documentation, but it's not allowed to write  code. Okay? It can't write code. It just has
+9:53
+to plan and research, which is fine. Okay? I  mean, that's actually, if we were engineers,
+9:58
+the first thing we do shouldn't be to write code,  okay? It actually researches the task and creates
+10:04
+some evidence, right? It gets file references  and then comes up with a recommended approach,
+10:09
+because then it plans. It sends it over to  the planning agent for phase two. All right?
+10:14
+This takes the research and produces an explicit  plan with even some line numbers in some cases,
+10:20
+I'm told. Right, something then validates the  plan to make sure that it's okay against the
+10:26
+research and the context that you've given  your AI LLM, and it tries to catch design
+10:30
+issues before the code is written. So phase three  is implement. Now we can write some code. Okay,
+10:36
+you might still have some bit of fun with  this, maybe you can actually do some coding
+10:39
+for a change, but in reality, there's probably  a coding agent and you will need to handhold
+10:44
+and review the work because  phase four is review. All right?
+10:48
+And you're supposed to create automatic  checks and hooks and make sure that the
+10:52
+linting passes. And who uses StyleCop?  This is the equivalent, okay, of when
+10:58
+you had these weird people that insisted  on using StyleCop on every single project,
+11:02
+but basically, you have to check  the work. So you've got agents,
+11:05
+AI checking AI to keep it all on track. And  this is kind of checks and balances for the real
+11:12
+engineering work. It can be tough to swallow for  us creatives, but that's what they want us to do.
+11:20
+Here's a quote from the big boys, Microsoft  themselves. Okay. "When AI knows it cannot
+11:25
+implement during research, it stops optimizing  for plausible code and starts optimizing for
+11:31
+verified truth." Okay. The constraint changes the  optimization target. All right? Constraints make
+11:38
+AI better, not worse. So the more context you  have, the better the result you're going to get
+11:43
+when you finally get round to asking it to build  your app for you. They even have this thing called
+Tools Microsoft offer for Hypervelocity Engineering
+11:50
+phase bleed. Would you believe it? That sounds  pretty bleak to me. They leak phases together,
+11:55
+and this really does a bad job on their  AI-assisted efforts, is what Microsoft says.
+12:01
+The good news is this isn't  just an idea. All right,
+12:03
+Microsoft has published the same tools that they  use with their consulting customers. All right,
+12:09
+you don't have to build all this yourself.  They've open-sourced the whole toolkit.
+12:12
+It's called hve-core, right? It's  a VS Code extension. It's a GitHub
+12:17
+Copilot CLI plugin. And the source code is at  github.com/microsoft/hve-core. This is how you
+12:26
+install it in VS Code: install the extension  ise-hve-essentials.hve-core is what you want.
+12:34
+This gives you an entire dump of Microsoft's  entire AI development stack. All right,
+12:40
+you got agents for research, planning,  implementation, review, PR review,
+12:44
+doc ops, whatever the hell that is, conventional  commit messages, prompt evaluation, a coaching
+12:50
+agent that actually teaches you how to do design  thinking and be a proper user-centric consultant,
+12:57
+as well as memory agents. The whole works. All  right. They've even got some coding standards
+13:05
+for your favorite programming languages, such as  C#, my favorite obviously, and obviously Python,
+13:11
+Bash, TypeScript. It's all there. Okay. They've  really, really published the kitchen sink.
+13:20
+So, time for some advice. So, I'll close this rant  off with some advice for those boomers out there
+How to get started with HVE
+13:26
+like me that want to get started because they  want to pay the bills, and if they don't do this,
+13:31
+they will probably eventually at some point  get out-competed in the market. All right? So,
+13:38
+you need to stop one-shotting stuff. Okay? You  need to create a plan. Next time you have a task
+13:43
+that you want to use AI with, force yourself  to create two prompts. Okay? "Research this.
+13:49
+Do not write code." And then "propose a  plan." All right, you don't have to use
+13:53
+the actual hve-core stuff for this. You can  just practice when you're doing your yapping,
+13:58
+but plan first. All right, the next step is  to try the hve-core stuff. Okay, you can just
+14:06
+copy and paste some of the useful agent code,  the agents, into your skillset library in your
+14:12
+repository and share it amongst your team. So  this is like Copilot instructions, for example.
+14:17
+Step three is to write that file. All right, pick  something you care about like testing or secrets
+14:23
+management or UX design or whatever, or your  favorite libraries. Like my instructions file
+14:30
+would say "don't use AutoFixture," for example,  or AutoMapper. Okay, right, particularly don't use
+14:36
+AutoMapper, and put it in copilot-instructions.md.  Okay. And the AI LLM will never use it. And if it
+14:44
+does accidentally use it randomly, another agent  will check it against the instructions and make
+14:49
+sure that you didn't accidentally put AutoMapper  in your source code, for example. All right.
+14:56
+So, in closing, is this going  to change your life? Well,
+14:59
+I don't think it's going to change our lives,  our side projects. All right. Because actually,
+15:04
+prompt engineering is fun. It's like pulling a  slot machine. Will I get it right this time? Okay.
+15:10
+But when you're working with a team and  are using these very expensive tools,
+15:13
+all right, you kind of owe it to the poor gits  paying your token bills to do this properly,
+15:20
+right, and make sure that you're not wasting  everybody's time and money and GPU usage. Okay,
+15:27
+so Microsoft has done this for you. I mean, they  get the luxury obviously of unlimited GitHub
+15:33
+Copilot tokens, I'm assuming. So some of their  advice and shilling on X is a bit difficult for
+15:40
+us plebs to also replicate. But anyway, we still  should try and do some actual engineering here.
+15:48
+If you think of it as super agile or super  mega ultra agile, which I think we should
+15:54
+coin in this video, or agile squared  is a bit of a lazy way of doing it,
+16:00
+we need to be up to date on this because at some  point you'll be asked to do a project this way.
+16:05
+And if you haven't practiced with it, you'll be  stuck. You won't even be able to wipe your own
+16:11
+butt. Okay? And you'll look very stupid, right?  So this is at least... I actually think this is
+16:17
+better than Agile Scrum. Okay? It's better  than story points, planning poker, therapy,
+16:23
+retrospective sessions. All of that is meatware  for humans, and this is way smarter and more
+16:30
+concise. And if we can get used to it, okay, and  actually focus our human skills on the consulting
+16:38
+aspect of our projects, well, maybe we'll be  happier. Maybe software engineers will be happier.
+16:44
+Let me know what you think. Is Hypervelocity  Engineering going to be a total slop disaster
+16:49
+for the industry? Or will it be a saving grace  and turn us into proper real professionals?
+16:54
+Let me know in the comments. I reply  to every single one. Why not subscribe,
+16:59
+because I'm going to do a video where I  update one of my apps using this methodology,
+17:03
+and it's probably going to  be next. Thanks for watching.

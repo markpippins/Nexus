@@ -1,0 +1,104 @@
+{
+  "agenda_items": [
+    {
+      "title": "IRL IR Interaction System — Five-Phase Pipeline: Interpretation → Structure → Execution → Observation → Identity",
+      "status": "Agreed",
+      "intent_description": "Define the IRL IR Interaction System as a five-phase pipeline that flattens the interaction semantics stack into a clean, sequential model. Phase 1 (Interaction Semantics): define how prompts map to interaction types. Phase 2 (Specification Compiler): compile interaction types into structured IR. Phase 3 (Lowering Pass): freeze IR into immutable execution graphs. Phase 4 (Execution Runtime): execute frozen graphs with deterministic scheduling. Phase 5 (Observation Model): produce CER events and enable replay. Key invariants: determinism, append-only immutable event logs, CER identity resolution, frozen execution graphs, and snapshots.",
+      "requirements": [
+        "All 5 phases must be sequentially composable — output of phase N is input to phase N+1",
+        "Determinism invariant: same input → same IRL → same IR → same execution graph → same CER",
+        "Append-only event log: CER is authoritative ledger — no mutation, only append",
+        "Frozen execution graphs: once lowered, the graph is immutable — execution reads frozen state",
+        "CER identity resolution: every event must be uniquely identifiable and causally linked"
+      ],
+      "implementation_notes": [
+        "The system forms a pipeline of interpretation → structure → execution → observation → identity",
+        "This can be flattened into the 5-phase model for implementation clarity",
+        "Each phase is a compiler stage with strict input/output contracts",
+        "The frozen graph boundary is the key invariant — execution never modifies its input"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "How does the IRL vector model (Phase A upgrade) replace heuristic-based interaction classification?",
+        "What is the formal schema for the frozen execution graph?"
+      ]
+    },
+    {
+      "title": "MEEP — Minimal End-to-End Pipeline Bootstrap",
+      "status": "Implemented",
+      "intent_description": "Build the Minimal End-to-End Pipeline (MEEP) as the first concrete bootstrap of the full architecture. MEEP implements: prompt → IRL (interaction realization layer) → IR (intermediate representation) → Spec Compiler → Lowering/Freeze → Scheduled Execution → CER Append → Replay. The initial implementation uses stub/heuristic components that are replaced in later phases. This proves the execution loop before adding complexity — the system runs end-to-end with deterministic replay from day one.",
+      "requirements": [
+        "MEEP must execute the full prompt-to-replay loop",
+        "All stubs must have defined replacement paths (IRL stub → vector model, scheduler → DAG enforcement)",
+        "Deterministic replay must work from the first implementation",
+        "Zero external dependencies — self-contained pipeline"
+      ],
+      "implementation_notes": [
+        "MEEP is the 'prove the loop' stage — if it doesn't run end-to-end, nothing else matters",
+        "Stubs are intentional: replace heuristics with structured models in Phase A-E upgrade path",
+        "Phase A: real IRL vector model + structured IR selection rules",
+        "Phase B: real dependency scheduling + DAG enforcement",
+        "Phase C: single validation gate across phases",
+        "Phase D: CER formal grammar with typed events and identity keys",
+        "Phase E: replay determinism tests with golden traces"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the formal CER event schema for Phase D?",
+        "How are golden traces versioned as the pipeline evolves?"
+      ]
+    },
+    {
+      "title": "Golden Trace Test Harness — Behavioral Contract Locking for Regression Safety",
+      "status": "Proposed",
+      "intent_description": "Add a deterministic verification layer on top of MEEP using golden traces. A golden trace captures the canonical expected output for a given input: prompt → expected IRL → expected IR → expected execution nodes → expected final state. The comparison engine validates actual vs expected at each stage. Test runner replays golden traces and asserts pass/fail. Key invariant: NO CHANGE IS VALID UNLESS IT PASSES GOLDEN TRACE REPLAY. This turns the pipeline from 'runs prompts' to 'behavioral state is version-controlled'.",
+      "requirements": [
+        "Golden trace format: prompt, expected_irl, expected_ir, expected_execution_nodes, expected_final_state",
+        "Capture function: run pipeline normally, record output as golden trace",
+        "Comparison engine: compare actual vs expected at each stage, return pass/fail + error list",
+        "Test runner: load golden trace, run pipeline, compare, assert pass",
+        "Invariant: no change is valid unless it passes golden trace replay"
+      ],
+      "implementation_notes": [
+        "Golden traces are not documentation — they are behavioral contract locking",
+        "Structure: tests/golden_traces/ (traces), validation/golden_compare.py (comparison), tests/test_runner.py",
+        "No pytest dependency required — self-contained test harness",
+        "After: IRL changes become testable diffs, compiler changes become regression risks, execution changes become observable drift"
+      ],
+      "code_snippets": [
+        {
+          "language": "json",
+          "purpose": "Golden trace format — canonical expected output",
+          "raw_code": "{\n  \"prompt\": \"create a service that validates transactions\",\n  \"expected_irl\": { \"construction\": 0.6 },\n  \"expected_ir\": \"construction\",\n  \"expected_execution_nodes\": [\"A\", \"B\"],\n  \"expected_final_state\": {\n    \"A\": \"processed:construction\",\n    \"B\": \"processed:validate\"\n  }\n}"
+        }
+      ],
+      "open_questions": [
+        "How many golden traces are needed for adequate coverage — one per interaction type?",
+        "What is the golden trace versioning strategy as the pipeline evolves through phases?"
+      ]
+    },
+    {
+      "title": "Phase A-E Upgrade Path — From Stub Pipeline to Production Engine",
+      "status": "Proposed",
+      "intent_description": "Define the ordered upgrade path from MEEP stubs to production-grade pipeline. Phase A: replace IRL heuristic with real vector model and structured IR selection rules. Phase B: replace naive scheduler with real dependency scheduling and DAG enforcement. Phase C: centralize validation into a single gate across all phases. Phase D: formalize CER with typed event schema and identity keys. Phase E: implement replay determinism tests with golden traces. The order is strict: each phase builds on the stability of the previous one.",
+      "requirements": [
+        "Phase A: real IRL vector model — probabilistic interaction classification instead of heuristic matching",
+        "Phase B: dependency scheduling — topological execution with DAG cycle detection",
+        "Phase C: single validation gate — one validator across interpretation, compilation, and execution",
+        "Phase D: CER formal grammar — typed events (Event<T>), identity keys, deduplication rules",
+        "Phase E: replay determinism — golden traces verified on every change"
+      ],
+      "implementation_notes": [
+        "Order is strict: don't do DAG enforcement (B) before IRL is stable (A)",
+        "Phase C (validator centralization) is the architectural keystone — it prevents phase-specific validation drift",
+        "Phase D formalizes what MEEP stubs: event types, correlation IDs, identity resolution",
+        "Phase E is the regression safety net that makes all prior phases safe to evolve"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the IRL vector model — embedding-based similarity or rule-based classification?",
+        "How does the single validation gate compose rules from different phases without creating a monolith?"
+      ]
+    }
+  ]
+}

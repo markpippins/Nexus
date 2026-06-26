@@ -1,0 +1,23 @@
+{
+  "name": "role-memory-srv",
+  "version": "1.0.0",
+  "description": "PG-to-Redis sync server for the Role Memory Procedure Registry. Reads tackle.memory + tackle.role_memory from PostgreSQL and populates Redis keys (mem:proc:{slug}, mem:idx:{role}, mem:meta:last_updated).",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "ioredis": "^5.4.0",
+    "pg": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

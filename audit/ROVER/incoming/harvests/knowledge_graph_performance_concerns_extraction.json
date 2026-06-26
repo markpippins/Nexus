@@ -1,0 +1,146 @@
+{
+  "agenda_items": [
+    {
+      "title": "Projection API Contract — Formal Interface Between Work Artifact IR and Consumers",
+      "status": "Agreed",
+      "intent_description": "Define a formal Projection API that sits between the Work Artifact IR (truth substrate) and everything that reads it (UI, orb, scheduler, agents, reports). The API splits into 4 invariant getters (direct O(1) reads of stored IR fields), 6 derived projections (pure, deterministic, cacheable computed views), and 2 control surfaces (the only projections allowed to influence execution). This is the layer that turns LOSM from a conceptual architecture into a runtime with a clean separation of truth vs interpretation.",
+      "requirements": [
+        "All 4 invariant getters must be O(1), pure, and stable: getIntent, getState, getDecisions, getConstraints",
+        "All 6 derived projections must be deterministic, cacheable, and idempotent: deriveContext, deriveDiff, deriveRisks, deriveAmbiguities, deriveOutputs, deriveProvenance",
+        "Control surfaces (computeBlockers, computeNextAction) must be pure, composable, and policy-aware",
+        "Every projection must satisfy the meta-contract: Purity (no side effects), Determinism (same IR → same projection), Composability, Traceability (point back to IR nodes), Explainability (answer 'Why did you return this?')"
+      ],
+      "implementation_notes": [
+        "Projections are interpretations, not stored truth — they are computed from IR + history",
+        "Projections can be nested: computeBlockers(deriveRisks(artifact))",
+        "The separation of invariant getters (kernel truths) from derived projections (interpretations) is the key architectural invariant",
+        "This API contract answers the 12 canonical questions in the correct split between truth and interpretation"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the caching and invalidation model for derived projections?",
+        "How are projection composition rules enforced at the type level?"
+      ]
+    },
+    {
+      "title": "Invariant Getters — Direct O(1) Reads of Kernel Truth",
+      "status": "Agreed",
+      "intent_description": "Define four invariant getters that provide direct, O(1), pure reads of stored Work Artifact IR fields. getIntent returns the IntentBlock, getState returns the StateBlock, getDecisions returns the DecisionBlock list, and getConstraints returns the ConstraintBlock. These four are the kernel truths — they are the ground-level facts from which all projections are derived. They must never compute, interpret, or transform data.",
+      "requirements": [
+        "getIntent(artifactId) → IntentBlock: must return the stored intent without interpretation",
+        "getState(artifactId) → StateBlock: must return the current state atom",
+        "getDecisions(artifactId) → DecisionBlock[]: must return the full decision history",
+        "getConstraints(artifactId) → ConstraintBlock: must return all active constraints",
+        "All four must be O(1) reads with no computation, no side effects, and no caching dependencies"
+      ],
+      "implementation_notes": [
+        "These are the only functions that touch stored IR fields directly",
+        "They form the stable base that projections and control surfaces build upon",
+        "Changing an invariant getter signature is a breaking kernel change"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "Are IntentBlock, StateBlock, DecisionBlock, and ConstraintBlock defined as formal TypeSpec schemas?"
+      ]
+    },
+    {
+      "title": "Derived Projections — Pure Computed Views Over IR + History",
+      "status": "Agreed",
+      "intent_description": "Define six derived projections that are pure functions over IR + history. deriveContext computes environmental and lineage assumptions. deriveDiff computes structural, semantic, and state diffs between versions. deriveRisks runs the risk engine over state, constraints, and lineage. deriveAmbiguities runs ambiguity detectors over intent, context, and structure. deriveOutputs returns execution receipts as a projection. deriveProvenance returns actors, timestamps, and the mutation graph. These are interpretations, not stored truth.",
+      "requirements": [
+        "deriveContext(artifactId) → environmental + lineage assumptions",
+        "deriveDiff(artifactId, previousVersionId) → structural + semantic + state diff",
+        "deriveRisks(artifactId) → risk assessment over state + constraints + lineage",
+        "deriveAmbiguities(artifactId) → ambiguity detection over intent + context + structure",
+        "deriveOutputs(artifactId) → execution receipts as projection",
+        "deriveProvenance(artifactId) → actors + timestamps + mutation graph",
+        "All must be deterministic, cacheable, and idempotent — same IR always produces same projection"
+      ],
+      "implementation_notes": [
+        "These six are computed views that can be invalidated when underlying IR changes",
+        "They depend on invariant getters for their input data",
+        "Caching strategy: invalidate projection when any dependency IR node changes"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the formal schema for each projection's return type?",
+        "How does the risk engine weigh different types of risks (structural, semantic, temporal)?"
+      ]
+    },
+    {
+      "title": "Control Surfaces — computeBlockers and computeNextAction as OS Brain",
+      "status": "Agreed",
+      "intent_description": "Define two control surfaces as the only projections allowed to influence execution. computeBlockers returns the set of conditions preventing forward progress, using state, constraints, risks, ambiguities, and scheduler policy. computeNextAction returns the next required transition from [clarify, replan, execute, validate, escalate, complete]. These must be pure, composable, and policy-aware. computeNextAction is the 'OS brain' — the single point where the system decides what happens next.",
+      "requirements": [
+        "computeBlockers(artifactId) → set of blocking conditions using state, constraints, risks, ambiguities, scheduler policy",
+        "computeNextAction(artifactId) → next transition: clarify | replan | execute | validate | escalate | complete",
+        "Both must be pure functions — no side effects, no mutation of IR",
+        "Both must be composable with derived projections: computeBlockers(deriveRisks(artifact))",
+        "computeNextAction must be the single authoritative source for execution transitions"
+      ],
+      "implementation_notes": [
+        "These are the only projections that can influence the execution path",
+        "computeBlockers internally composes multiple derived projections",
+        "computeNextAction is the policy-enforcement point for scheduling decisions",
+        "The scheduler policy is a pluggable component within computeNextAction"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "How is scheduler policy defined — as configuration, learned weights, or hardcoded rules?",
+        "What happens when computeBlockers returns an empty set but computeNextAction returns 'escalate'?"
+      ]
+    },
+    {
+      "title": "Orb Force Model — Projections as Smoothed Long-Memory Forces",
+      "status": "Proposed",
+      "intent_description": "Define how the orb consumes the Projection API. The orb never reads IR directly — it only consumes long-memory smoothed projections. computeBlockers maps to turbulence, deriveAmbiguities maps to epistemic fog, deriveRisks maps to latent heat, deriveDiff maps to structural drift, and deriveProvenance maps to activity churn. These become forces (not colors) that the orb metabolizes over minutes/hours/days, making it feel like weather rather than telemetry.",
+      "requirements": [
+        "Orb must never read IR directly — only through smoothed projection surfaces",
+        "computeBlockers → turbulence force",
+        "deriveAmbiguities → epistemic fog force",
+        "deriveRisks → latent heat force",
+        "deriveDiff → structural drift force",
+        "deriveProvenance → activity churn force",
+        "Forces must be temporally smoothed (minutes/hours/days scale)"
+      ],
+      "implementation_notes": [
+        "The orb force model is a projection-of-projections: forces are derived from changes in projection values over time",
+        "This is why the orb feels like weather — it reflects cumulative system dynamics",
+        "Temporal smoothing prevents the orb from reacting to transient spikes"
+      ],
+      "code_snippets": [],
+      "open_questions": [
+        "What is the mathematical smoothing function — exponential moving average, Kalman filter, or custom?",
+        "How are force thresholds calibrated for different system scales?"
+      ]
+    },
+    {
+      "title": "Agent Interaction Protocol — Read via Projections, Propose Mutations, Kernel Validates",
+      "status": "Agreed",
+      "intent_description": "Define the protocol by which agents (DeepSeek, Flash, Copilot, etc.) interact with the system. Agents never mutate IR directly. They read via projections, propose mutations, the kernel validates constraints, the kernel commits state transitions, and projections update automatically. This five-step protocol prevents drift and hallucination from corrupting the truth substrate.",
+      "requirements": [
+        "Agent reads must go through projection API only — never direct IR access",
+        "Agent mutation proposals must be validated by kernel constraints before commit",
+        "Kernel must reject any mutation that violates constraints",
+        "State transitions must be atomic — partial mutations are not allowed",
+        "Projections must update automatically after each state transition"
+      ],
+      "implementation_notes": [
+        "This protocol is the primary defense against agent hallucination corrupting the system",
+        "The kernel acts as a transaction validator, not an orchestrator",
+        "The automatic projection update guarantees UI/orb/agent consistency after every mutation"
+      ],
+      "code_snippets": [
+        {
+          "language": "text",
+          "purpose": "Agent interaction protocol steps",
+          "raw_code": "Agent Interaction Protocol:\n1. Read via projections\n2. Propose mutations\n3. Kernel validates constraints\n4. Kernel commits state transition\n5. Projections update automatically"
+        }
+      ],
+      "open_questions": [
+        "What is the Kernel Mutation Protocol schema — how are mutation proposals formatted?",
+        "How are conflicting proposals from multiple agents resolved?"
+      ]
+    }
+  ]
+}

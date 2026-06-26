@@ -1,0 +1,40 @@
+{
+  "agenda_items": [
+    {
+      "title": "Three-Database Architecture \u2014 OrientDB (Structured), Pinecone (Vector), Convex (Metadata/UX State)",
+      "status": "Agreed",
+      "intent_description": "Define a three-database architecture with distinct roles: OrientDB handles structured data and graph modeling (relationships between components/services). Pinecone handles vector embeddings for semantic similarity, fuzzy matching, and discovery. Convex (local) acts as the local live-updating source of truth for project metadata, Kanban state, and subsystem information \u2014 operating independently of API keys or remote hosting. Filesystem (Throttler/Nexus) becomes a read-only display layer. Convex is the authoritative metadata and UX state source.",
+      "requirements": [
+        "OrientDB: structured data, graph relationships, dependency modeling",
+        "Pinecone: vector embeddings, semantic similarity search",
+        "Convex: authoritative metadata, live-updating UX state, local-only operation",
+        "Filesystem = dumb display layer, not metadata authority",
+        "Three parallel hierarchies: FS (visual), Convex (metadata), Services (runtime)"
+      ]
+    },
+    {
+      "title": "ETL/Sync Architecture \u2014 One-Way Default with File-Driven or Convex-Driven Options",
+      "status": "Agreed",
+      "intent_description": "Define ETL/sync strategy across three worlds: Filesystem/Throttler (dumb display), Convex (metadata authority), Services Registry (runtime state). Two main approaches: File-Driven (source of truth = folders/.magnet markers, ETL into Convex) and Convex-Driven (source of truth = Convex collections, updates flow to FS). Recommended hybrid: start with file-driven ETL into Convex for bootstrap, then Convex becomes authoritative. Two-way sync can be layered later. Conflicts (FS renames vs Convex updates) require stable IDs and reconciliation.",
+      "requirements": [
+        "One-way default: FS \u2192 Convex for bootstrap, then Convex is authoritative",
+        "Convex nodes store metadata: projects, subsystems, features, Kanban state",
+        "Live updates from Convex via live queries",
+        "Conflict resolution for FS renames vs Convex state",
+        ".magnet folders store optional embeddings for Throttler display",
+        "Services \u2192 Convex incremental ETL for registry metadata"
+      ]
+    },
+    {
+      "title": "Knowledge Topology vs Knowledge Graph \u2014 Taxonomy vs True Graph",
+      "status": "Observed",
+      "intent_description": "Distinguish between folder structures (taxonomy \u2014 hierarchical, tree-based) and true knowledge graphs (nodes + edges with typed relationships). Folder-based navigation (Throttler) is taxonomy; OrientDB/Pinecone enable true graph traversal. Magnets/Identity concept: shared identities across folder contexts enable cross-cutting views without duplicating folder structure. 'Folders are views, magnets are identities.'",
+      "requirements": [
+        "Taxonomy: hierarchical folder structure for navigation",
+        "Knowledge graph: typed nodes and edges for traversal",
+        "Magnets as cross-cutting identities that bridge folder contexts",
+        "Nebula's project/Kanban/Convex capabilities integrated without vendor lock-in"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vision-mcp"
+version = "0.1.0"
+description = "Vision LOSM MCP Server — exposes work requests, artifacts, branches as MCP tools"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.0",
+    "losm-store",
+    "losm-ir",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

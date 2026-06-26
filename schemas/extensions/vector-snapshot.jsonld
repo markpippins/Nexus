@@ -1,0 +1,71 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+
+    "vs": "https://nexus.local/schema/extensions/vector-snapshot/",
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"},
+
+    "VectorSnapshot":       "vs:VectorSnapshot",
+    "EmbeddingRecord":      "vs:EmbeddingRecord",
+    "SimilaritySearch":     "vs:SimilaritySearch",
+    "SearchResult":         "vs:SearchResult",
+
+    "snapshotTimestamp":  {"@id": "vs:snapshotTimestamp", "@type": "xsd:dateTime"},
+    "snapshotLabel":      "vs:snapshotLabel",
+    "sourceEntityType":   "vs:sourceEntityType",
+    "sourceEntityId":     "vs:sourceEntityId",
+    "sourceEntityText":   "vs:sourceEntityText",
+    "embeddingModel":     "vs:embeddingModel",
+    "embedding":          {"@id": "vs:embedding", "@type": "xsd:string"},
+    "dimensions":         {"@id": "vs:dimensions", "@type": "xsd:integer"},
+    "distance":           {"@id": "vs:distance", "@type": "xsd:float"},
+    "similarityScore":    {"@id": "vs:similarityScore", "@type": "xsd:float"},
+    "k":                  {"@id": "vs:k", "@type": "xsd:integer"},
+    "searchQuery":        "vs:searchQuery",
+    "searchResults":      {"@id": "vs:searchResults", "@type": "@id"}
+  },
+
+  "@graph": [
+    {
+      "@id": "vs:VectorSnapshot",
+      "@type": "rdfs:Class",
+      "subClassOf": {"@id": "nx:VectorSnapshot"},
+      "comment": "A point-in-time snapshot of embeddings for a set of entities. Enables time-series analysis and change detection across the knowledge graph.",
+      "properties": [
+        "vs:snapshotLabel", "vs:snapshotTimestamp",
+        "nx:name", "nx:description", "nx:tags", "nx:timestamp"
+      ]
+    },
+    {
+      "@id": "vs:EmbeddingRecord",
+      "@type": "rdfs:Class",
+      "comment": "A single embedding for a specific entity at a point in time.",
+      "properties": [
+        "vs:sourceEntityType", "vs:sourceEntityId", "vs:sourceEntityText",
+        "vs:embeddingModel", "vs:embedding", "vs:dimensions",
+        "vs:snapshotTimestamp", "nx:timestamp"
+      ]
+    },
+    {
+      "@id": "vs:SimilaritySearch",
+      "@type": "rdfs:Class",
+      "comment": "A similarity search query and its results.",
+      "properties": [
+        "vs:searchQuery", "vs:k", "vs:embeddingModel",
+        "vs:searchResults", "nx:timestamp"
+      ]
+    },
+    {
+      "@id": "vs:SearchResult",
+      "@type": "rdfs:Class",
+      "comment": "A single search result with similarity score.",
+      "properties": [
+        "vs:sourceEntityId", "vs:sourceEntityType",
+        "vs:sourceEntityText", "vs:distance", "vs:similarityScore"
+      ]
+    }
+  ]
+}

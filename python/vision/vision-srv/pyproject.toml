@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vision-srv"
+version = "0.1.0"
+description = "Vision LOSM REST API server — FastAPI over losm-store"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "losm-store",
+    "losm-ir",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

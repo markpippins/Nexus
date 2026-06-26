@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.nexus.peb</groupId>
+        <artifactId>peb-kernel</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>peb-domain</artifactId>
+
+    <dependencies>
+        <!-- JPA Annotations -->
+        <dependency>
+            <groupId>jakarta.persistence</groupId>
+            <artifactId>jakarta.persistence-api</artifactId>
+        </dependency>
+        
+        <!-- Jackson for JSON processing -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- Apache Commons Codec for Hash utilities -->
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+        </dependency>
+
+        <!--
+            Hibernate ORM core at provided scope: required so @JdbcTypeCode(SqlTypes.JSON)
+            resolves at compile time against the JsonNode fields. At runtime, hibernate-core
+            is pulled in by spring-boot-starter-data-jpa in downstream modules
+            (peb-store, peb-bootstrap); provided scope prevents transitive reinjection here.
+        -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            Test scope: brings in JUnit Jupiter, AssertJ, MockK, Mockito, etc. so
+            pure-Java enum parser unit tests (e.g. ViolationBridgeShapeTest) can
+            run under `mvn -pl pebble-domain test` without dragging in Spring
+            Boot's full integration-test stack. Version is managed by the
+            Spring Boot starter parent.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

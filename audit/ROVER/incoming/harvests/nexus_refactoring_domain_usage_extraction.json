@@ -1,0 +1,19 @@
+{
+  "agenda_items": [
+    {
+      "title": "Domain Naming Strategy \u2014 Freeze, Abstract, Migrate",
+      "status": "Agreed",
+      "intent_description": "Refactor strategy for domain naming when code uses a domain name (angrysurfer.com) that isn't owned. Three concerns: package/namespace names (com.angrysurfer), hardcoded URLs, and identity/schema naming. Reverse-domain naming is a convention, not a verification \u2014 fake domains work fine internally. Recommendation: freeze com.angrysurfer for now, introduce a neutral namespace (io.github.<username> or app.nexus) going forward, and only refactor when touching a module anyway. Centralize base URL and namespace in a config class so future changes are one-liner.",
+      "requirements": [
+        "Separate concerns: package names, hardcoded URLs, schema naming",
+        "Reverse-domain is convention, not verification \u2014 fake domains valid internally",
+        "Freeze existing namespace, introduce neutral namespace for new code",
+        "Centralize domain/namespace in ServiceConfig",
+        "Refactor existing code only when touching modules anyway"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    }
+  ]
+}

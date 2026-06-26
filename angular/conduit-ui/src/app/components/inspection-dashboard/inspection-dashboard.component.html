@@ -1,0 +1,56 @@
+<div class="inspections-dashboard">
+  <h2 class="page-title">🔎 Inspections</h2>
+
+  <!-- Status filters -->
+  <div class="chips">
+    <button class="chip" *ngFor="let s of statusFilters" [ngClass]="{ active: s.active }" (click)="toggleStatus(s.key)">
+      {{ s.label }}      @if (s.count > 0) {
+        <span class="chip-count">({{ s.count }})</span>
+      }
+    </button>
+  </div>
+
+  <!-- Category tabs -->
+  <div class="tabs">
+    <button class="tab" *ngFor="let t of categoryTabs" [ngClass]="{ active: activeCategory() === t.key }" (click)="selectCategory(t.key)">
+      {{ t.icon }} {{ t.label }}
+    </button>
+  </div>
+
+  @if (loading()) {
+    <app-loading-spinner />
+  }
+  @if (error(); as e) {
+    <app-error-banner [message]="e" retryLabel="Retry" (retry)="loadInspections()" />
+  }
+
+  @if (!loading() && !error()) {
+
+    <!-- Results -->
+    <div class="results-list">
+      <div class="result-row" *ngFor="let entry of results()" [ngClass]="{ expanded: expandedEntry()?.path === entry.path }" (click)="toggleEntry(entry)">
+        <div class="row-main">
+          <span class="row-icon">{{ getSeverityIcon(entry.severity) }}</span>
+          <span class="row-name">{{ entry.title }}</span>
+          <span class="row-age">{{ getAge(entry.mtime) }}</span>
+        </div>
+        @if (expandedEntry()?.path === entry.path) {
+          <div class="row-detail">
+            <div class="detail-grid">
+              <div class="detail-field"><span class="detail-label">Category</span><span class="detail-value">{{ entry.category }}</span></div>
+              <div class="detail-field"><span class="detail-label">Severity</span><span class="detail-value">{{ entry.severity }}</span></div>
+              <div class="detail-field"><span class="detail-label">Status</span><span class="detail-value">{{ entry.status }}</span></div>
+              @if (entry.planRefs.length > 0) {
+                <div class="detail-field"><span class="detail-label">Plan References</span><span class="detail-value">{{ entry.planRefs.join(', ') }}</span></div>
+              }
+              <div class="detail-field"><span class="detail-label">Full Report</span><pre class="detail-pre">{{ entry.fullContent }}</pre></div>
+            </div>
+          </div>
+      }
+      </div>
+      @if (results().length === 0) {
+        <app-empty-state icon="🔎" title="No inspections found" description="No inspections match the current filters." />
+      }
+    </div>
+  }
+</div>

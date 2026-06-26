@@ -1,0 +1,19 @@
+{
+  "agenda_items": [
+    {
+      "title": "Component Creator Tab \u2014 Functional Specification for 3D Mesh Component Editor",
+      "status": "Specified",
+      "intent_description": "Define a UI component for creating or subclassing 3D mesh components within a user-editable canvas system. Includes Browser (list/existing components), Editor (canvas-based with JSON schema backing), and Live Preview components. JSON schema defines validation rules, type constraints, and relationships. Persistence strategies include local storage and API-backed save/load.",
+      "requirements": [
+        "Browser: list existing components with search/filter",
+        "Editor: canvas-based with JSON schema definition",
+        "Live Preview: real-time render of component",
+        "JSON schema for validation and constraints",
+        "Persistence: local storage + API save/load"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    }
+  ]
+}

@@ -28,7 +28,7 @@ The Service Registry is a production-ready service management system providing c
 - **Service Discovery**: Operation-based service lookup with `/api/registry/services/by-operation/{operation}`
 - **Service Details**: Complete service information with `/api/registry/services/{serviceName}/details`
 - **Heartbeat Monitoring**: Continuous health monitoring with `/api/registry/heartbeat/{serviceName}`
-- **MySQL Persistence**: Production-grade persistent storage
+- **PostgreSQL Persistence**: Production-grade persistent storage
 - **Polyglot Support**: Framework-agnostic service integration
 - **Real-time Updates**: Live service status tracking with Redis caching
 - **Deployment Management**: Complete service instance tracking across servers
@@ -72,11 +72,11 @@ The service will start on port **8085**.
 
 ### Database Configuration
 
-The application uses MySQL database for persistence:
+The application uses PostgreSQL database for persistence:
 
-- **JDBC URL**: `jdbc:mysql://localhost:3306/services_console`
-- **Username**: `root`
-- **Password**: `rootpass`
+- **JDBC URL**: `jdbc:postgresql://localhost:5432/nexus?currentSchema=registry`
+- **Username**: `pguser`
+- **Password**: `pgpass`
 
 ### Common Commands
 
@@ -107,7 +107,7 @@ curl -X POST http://localhost:8085/api/registry/heartbeat/python-service
 │  └──────────────┘  └──────────────┘                            │
 │                                                                 │
 │                    ┌──────────────┐                             │
-│                    │  MySQL/H2    │                             │
+│                    │ PostgreSQL/H2│                             │
 │                    └──────────────┘                             │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -116,7 +116,7 @@ curl -X POST http://localhost:8085/api/registry/heartbeat/python-service
 
 - **Framework**: Spring Boot 3.x
 - **Language**: Java 21
-- **Database**: MySQL (production), H2 (development fallback)
+- **Database**: PostgreSQL (production), H2 (development fallback)
 - **ORM**: Spring Data JPA
 - **Caching**: Redis (optional, for real-time service status)
 - **Build Tool**: Maven
@@ -849,21 +849,6 @@ spring.jpa.hibernate.ddl-auto=validate
 spring.jpa.show-sql=false
 ```
 
-#### MySQL Configuration
-
-```properties
-# MySQL Configuration
-spring.datasource.url=jdbc:mysql://localhost:3306/hostserver?useSSL=true&serverTimezone=UTC
-spring.datasource.username=hostserver_user
-spring.datasource.password=${DB_PASSWORD}
-spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
-
-# JPA Configuration
-spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
-spring.jpa.hibernate.ddl-auto=validate
-spring.jpa.show-sql=false
-```
-
 ### Phase 2: Security
 
 Add Spring Security dependency and configure:
@@ -1000,12 +985,12 @@ The system initializes with real data from the Nexus Platform:
 **Services (7):** broker-gateway, user-service, login-service, file-service, note-service, quarkus-broker-gateway, moleculer-search
 
 **User Services Architecture:**
-- **user-access-service** (Port 8083): MySQL-based user registration and authentication
+- **user-access-service** (Port 8083): PostgreSQL-based user registration and authentication
 - **login-service** (Port 8082): Redis-based session management
 - **user-service** (deprecated): MongoDB-based social media functionality (being phased out)
 
 **Note:** The user-service is deprecated and will be removed. User authentication is now handled by:
-- `user-access-service` (MySQL) - User registration and credential validation
+- `user-access-service` (PostgreSQL) - User registration and credential validation
 - `login-service` (Redis) - Session token management
 
 ### Use Cases Enabled
@@ -1068,15 +1053,15 @@ The system initializes with real data from the Nexus Platform:
 netstat -ano | findstr :8085
 
 # Check database connection
-# The application uses MySQL:
-# JDBC URL: jdbc:mysql://localhost:3306/services_console
-# Username: root
-# Password: rootpass
+# The application uses PostgreSQL:
+# JDBC URL: jdbc:postgresql://localhost:5432/nexus?currentSchema=registry
+# Username: pguser
+# Password: pgpass
 ```
 
 ### Database Schema Issues
 
-If you encounter database schema compatibility errors during startup:
+If you encounter database schema compatibility errors during startup, Hibernate's `ddl-auto=update` will auto-create missing tables. For manual inspection:
 
 **Option 1: Run the automated database fix script**
 ```bash
@@ -1092,7 +1077,7 @@ chmod +x update-schema.sh
 
 **Option 3: Run SQL commands manually**
 ```bash
-mysql -u root -p services_console < database-fix.sql
+psql -h localhost -U pguser -d nexus -c "SET search_path TO registry; SELECT * FROM frameworks;"
 ```
 
 ### Can't connect to API
@@ -1111,7 +1096,7 @@ curl http://localhost:8085/actuator/health
 # Look for "Initializing sample data..." in logs
 
 # Verify database connection
-# Connect to MySQL and run:
+# Connect to PostgreSQL and run:
 # SELECT * FROM frameworks;
 # SELECT * FROM services;
 ```

@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.nexus.peb</groupId>
+        <artifactId>peb-kernel</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>peb-bootstrap</artifactId>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.nexus.peb</groupId>
+            <artifactId>peb-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.nexus.peb</groupId>
+            <artifactId>peb-adapters</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!--
+            Compile-scope JPA starter: required because PebApplication uses
+            @EnableJpaRepositories, whose annotation class lives in
+            spring-data-jpa. Transitive pull-through from runtime-scoped
+            peb-store would not put the API on the bootstrap classpath.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <!-- Include store at runtime for JPA/Flyway to activate -->
+        <dependency>
+            <groupId>org.nexus.peb</groupId>
+            <artifactId>peb-store</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- No H2 or Testcontainers — test connects directly to the running
+             pgvector/pgvector:pg17 container on localhost:5432 (see
+             @TestPropertySource in AdmissionControllerFacadeTest). -->
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <systemPropertyVariables>
+                        <!--
+                            Byte Buddy (used by Mockito's @MockitoBean) checks the
+                            JVM major version at class-initialization time. The
+                            current environment is Java 25 (class version 69), but
+                            the Byte Buddy version bundled with this Spring Boot
+                            starter test supports up to Java 24 (68). Setting
+                            net.bytebuddy.experimental=true allows Byte Buddy to
+                            work with an unreleased JVM version. Remove this when
+                            the upgraded Byte Buddy lands in a future Spring Boot
+                            release.
+                        -->
+                        <net.bytebuddy.experimental>true</net.bytebuddy.experimental>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

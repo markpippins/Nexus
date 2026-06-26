@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.0</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>org.nexus.peb</groupId>
+    <artifactId>peb-kernel</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>peb-kernel</name>
+    <description>Nexus Persistent Engineering Brain Kernel</description>
+
+    <modules>
+        <module>peb-domain</module>
+        <module>peb-store</module>
+        <module>peb-core</module>
+        <module>peb-hash</module>
+        <module>peb-api</module>
+        <module>peb-adapters</module>
+        <module>peb-observability</module>
+        <module>peb-bootstrap</module>
+        <module>peb-test</module>
+    </modules>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Module Dependencies -->
+            <dependency>
+                <groupId>org.nexus.peb</groupId>
+                <artifactId>peb-domain</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.nexus.peb</groupId>
+                <artifactId>peb-store</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.nexus.peb</groupId>
+                <artifactId>peb-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.nexus.peb</groupId>
+                <artifactId>peb-hash</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.nexus.peb</groupId>
+                <artifactId>peb-api</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.nexus.peb</groupId>
+                <artifactId>peb-adapters</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.nexus.peb</groupId>
+                <artifactId>peb-observability</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>

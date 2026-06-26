@@ -1,0 +1,56 @@
+{
+  "id": "fe439d17-d789-4eb4-83b1-2817365d1695",
+  "type": "WorkflowPlanned",
+  "timestamp": "2026-06-16T19:17:09.156892+00:00",
+  "source": "agent",
+  "payload": {
+    "idea_id": "evt-js-1781637428",
+    "idea": "JetStream persistence test",
+    "vocabulary_path": "artifacts/evt-js-1781637428/workflow_vocabulary.json",
+    "auto_advance": true,
+    "steps": [
+      {
+        "step": "vocabulary",
+        "event_type": "VocabularyDrafted",
+        "state": "draft",
+        "next_action": "formalize_spec",
+        "status": "pending"
+      },
+      {
+        "step": "requirements",
+        "event_type": "RequirementsFormalized",
+        "state": "specified",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "typespec",
+        "event_type": "TypeSpecDrafted",
+        "state": "specified",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "compile",
+        "event_type": "SpecCompiled",
+        "state": "compiled",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "refactor",
+        "event_type": "RefactorDrafted",
+        "state": "integrated",
+        "next_action": null,
+        "status": "pending"
+      },
+      {
+        "step": "integrate",
+        "event_type": "Integrated",
+        "state": "integrated",
+        "next_action": null,
+        "status": "pending"
+      }
+    ]
+  }
+}

@@ -1,16 +1,16 @@
 {
   "catalog_version": "1.0",
   "generated_on": "2026-04-21",
-  "purpose": "Consolidated catalog of persisted or persistence-worthy types across python/event-pipeline and python/ingest/html-importer.",
+  "purpose": "Consolidated catalog of persisted or persistence-worthy types across python/cascade and python/ingest/html-importer.",
   "projects": {
-    "event-pipeline": {
+    "cascade": {
       "source_roots": [
-        "C:\\dev\\nexus\\python\\event-pipeline\\validators\\events.py",
-        "C:\\dev\\nexus\\python\\event-pipeline\\handlers\\base.py",
-        "C:\\dev\\nexus\\python\\event-pipeline\\handlers\\dispatcher.py",
-        "C:\\dev\\nexus\\python\\event-pipeline\\handlers\\steps.py",
-        "C:\\dev\\nexus\\python\\event-pipeline\\agents\\architect_agent.py",
-        "C:\\dev\\nexus\\python\\event-pipeline\\projections\\update_tasks.py"
+        "C:\\dev\\nexus\\python\\cascade\\validators\\events.py",
+        "C:\\dev\\nexus\\python\\cascade\\handlers\\base.py",
+        "C:\\dev\\nexus\\python\\cascade\\handlers\\dispatcher.py",
+        "C:\\dev\\nexus\\python\\cascade\\handlers\\steps.py",
+        "C:\\dev\\nexus\\python\\cascade\\agents\\architect_agent.py",
+        "C:\\dev\\nexus\\python\\cascade\\projections\\update_tasks.py"
       ],
       "enums": {
         "EventType": [
@@ -1174,32 +1174,6 @@
             }
           }
         },
-        "ReconstructedClosureSet": {
-          "kind": "object",
-          "fields": {
-            "trajectory_id": {
-              "type": "string",
-              "required": true
-            },
-            "resolved_concepts": {
-              "type": "array<string>",
-              "storage_note": "Declared as Set[str] in code; persisted as a unique array if serialized to JSON.",
-              "required": true
-            },
-            "resolves_edges": {
-              "type": "array<any>",
-              "required": true
-            },
-            "constraints": {
-              "type": "array<ConstraintNode>",
-              "required": true
-            },
-            "completion_candidate": {
-              "type": "boolean",
-              "required": true
-            }
-          }
-        },
         "MaterializedReplayView": {
           "kind": "object",
           "fields": {
@@ -1211,8 +1185,8 @@
               "type": "string",
               "required": true
             },
-            "closures": {
-              "type": "map<string,ReconstructedClosureSet>",
+            "final_graph_state": {
+              "type": "GraphState",
               "required": true
             }
           }

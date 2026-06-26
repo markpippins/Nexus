@@ -30,7 +30,7 @@ export class ToolbarComponent {
   isColorPickerOpen = signal(false);
 
   // View mode inputs
-  viewMode = input<'file-explorer' | 'service-mesh' | 'nexus-rms'>('file-explorer');
+  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console');
 
   // Inputs for button states (file explorer)
@@ -54,7 +54,6 @@ export class ToolbarComponent {
   // Inputs for pane visibility status
   isSidebarVisible = input(true);
   isTreeVisible = input(true);
-  isChatVisible = input(true);
   isNotesVisible = input(true);
   isSavedItemsVisible = input(true);
   isRssFeedVisible = input(true);
@@ -109,7 +108,6 @@ export class ToolbarComponent {
   // Outputs for pane visibility toggles
   toggleSidebar = output<void>();
   toggleTree = output<void>();
-  toggleChat = output<void>();
   toggleNotes = output<void>();
   toggleSavedItems = output<void>();
   toggleRssFeed = output<void>();

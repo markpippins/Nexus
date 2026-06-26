@@ -1,0 +1,50 @@
+# Harvested Specification & Code Repository
+**Source:** /home/codex/dev/chats/Terrain service registry.html
+**Model:** DeepSeek V4
+**Total candidates:** 3
+---
+## 1. Terrain/Topologist/Steward Three-Layer Separation — Spatial, Structural, and Temporal Truth
+**Status:** `Specified`
+
+### Architectural Intent
+Define three distinct truth layers for system topology: Terrain (physical topology — ports, hosts, runtime bindings, infrastructure truth — 'where is it physically running?'), Topologist (current-state geometry — live structural projection, 'what is the shape of the system at this moment?'), and Steward (historical + semantic truth — causal memory system, 'how did the system become this way?'). Topologist is a read-only synthesizer across Terrain + Registry + Steward, never a writer. This replaces the overloaded 'host-server' concept with a three-axis model: TIME (Steward), STATE (Topologist), SPACE (Terrain).
+
+### Requirements & Acceptance Criteria
+- [ ] Terrain: physical topology only — ports, hosts, runtime bindings, infrastructure addresses
+- [ ] Topologist: current-state geometry only — read-only synthesizer, never writes
+- [ ] Steward: historical and causal truth only — migration records, transformation intent
+- [ ] Topologist forbidden from inferring history
+- [ ] Steward forbidden from asserting current runtime topology
+- [ ] Service Registry: logical/application topology — capabilities and contracts, separate from Terrain
+
+---
+
+## 2. Three-Axis Cognitive Model of Distributed Systems — TIME (Steward), STATE (Topologist), SPACE (Terrain)
+**Status:** `Specified`
+
+### Architectural Intent
+Formalize the three-axis model: TIME → Steward (temporal evolution, causal history), STATE → Topologist (current snapshot, structural geometry), SPACE → Terrain (physical location, infrastructure reality). Together they answer three distinct questions: 'Why is the system like this?' (Steward), 'What is the system right now?' (Topologist), 'Where is it physically running?' (Terrain). This is a layered epistemology of the system — a domain decomposition that replaces the single overloaded 'host-server' registry that previously collapsed all three truth domains.
+
+### Requirements & Acceptance Criteria
+- [ ] TIME axis: Steward owns temporal/causal truth
+- [ ] STATE axis: Topologist owns current-state truth
+- [ ] SPACE axis: Terrain owns physical location truth
+- [ ] Three questions: 'why' (Steward), 'what' (Topologist), 'where' (Terrain)
+- [ ] No single component owns multiple axes
+
+---
+
+## 3. Roundtable Reconciliation Model — Parallel Query Across All Three Truth Axes
+**Status:** `Proposed`
+
+### Architectural Intent
+Define a Roundtable reconciliation model where Terrain, Topologist, Steward, and Service Registry are queried in parallel and reconciled into a single coherent system narrative. Each component speaks its truth domain: Terrain says where things run, Registry says what they are, Topologist says current connectivity, Steward says how it evolved. Reconciliation outputs either a single coherent graph, layered views with conflict annotations, or explicit conflict resolution rules. This is the runtime query surface for the three-axis cognitive model.
+
+### Requirements & Acceptance Criteria
+- [ ] Parallel query across Terrain, Topologist, Steward, Service Registry
+- [ ] Each component contributes its truth domain only
+- [ ] Reconciliation outputs: single graph OR layered views OR conflict resolution rules
+- [ ] Roundtable query is read-only — never mutates any of the four components
+- [ ] Query result captures consensus and disagreement explicitly
+
+---

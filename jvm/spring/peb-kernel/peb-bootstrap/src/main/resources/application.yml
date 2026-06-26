@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: peb-kernel
+
+  # Jackson visibility: domain entities use private fields with no setters
+  # (see comment "Getters and Setters omitted for brevity" on PebTransaction).
+  # Default Jackson visibility is PUBLIC_ONLY which would skip these fields;
+  # we widen to ANY so request bodies deserialize into private fields directly.
+  jackson:
+    visibility:
+      field: any
+      setter: any
+      getter: any
+      creator: any
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/nexus?currentSchema=peb
+    username: ${DB_USER:pguser}
+    password: ${DB_PASS:pgpass}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    # Flyway disabled — V3 migration (public→peb schema, strip peb_ prefix)
+    # was applied manually. V1__init_peb_schema.sql has been updated to match
+    # the corrected table names (no peb_ prefix) in the peb schema.
+    # Hibernate ddl-auto=validate handles schema verification.
+    enabled: false
+    validate-on-migrate: false
+    locations: classpath:db/migration
+
+server:
+  port: 8080

@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: losm-store
+Version: 0.1.0
+Summary: LOSM Store — persistence subsystem
+Requires-Python: >=3.11
+Requires-Dist: losm-ir
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: psycopg2-binary>=2.9

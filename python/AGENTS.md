@@ -4,7 +4,7 @@ This document defines operational behavior for all agents working inside the Pyt
 
 ```
 python/
- ├── event-pipeline/
+ ├── cascade/
  ├── ingest/html-importer/
  └── fs/fs-crawler/   (Mildred)
 ```
@@ -188,7 +188,7 @@ python/ingest/html-importer/PROMPT_RECORD/*
 Approval Required:
 
 ```
-python/event-pipeline/ARCHITECTURE.md
+python/cascade/ARCHITECTURE.md
 python/ingest/html-importer/DESIGN_PHILOSOPHY.md
 python/ingest/html-importer/COMPILER_CONTRACT.md
 ```
@@ -224,7 +224,7 @@ Standard development cycle:
 
 This configuration governs:
 
-* `event-pipeline` — deterministic event processing
+* `cascade` — deterministic event processing
 * `html-importer` — structured ingestion compiler
 * `fs-crawler (Mildred)` — filesystem observation agent
 
@@ -240,6 +240,40 @@ Agents MUST NOT:
 * infer meaning from content
 * introduce AI reasoning into compiler layers
 * bypass documentation authority
+
+---
+
+# 9. Backlog Check Opt-Out
+
+The "Engineer Backlog Check" defined in `/home/codex/dev/AGENTS.md` DOES
+NOT apply to agents governed by this Compiler Contract Model.
+
+`nexus-engineer` operates strictly on Layer I-VI compilers. The parent's
+RMS check requires **priority reasoning**, **intent evaluation**, and
+**context-aware judgement**, which are CRITICAL VIOLATIONS of:
+
+* the Zero Semantics rule (§1)
+* the Drift Detection rule (§1)
+
+Agents governed by this file MUST NOT:
+
+* perform an RMS backlog check at session start
+* perform an RMS backlog check before turns
+* call `nebula_list_requirements`, `nebula_create_requirement`,
+  `nebula_update_requirement`, or `nebula_batch_update_requirements`
+* treat backlog state, requirement `status`, or `priority` as input to a
+  structural decision
+
+When a request arrives that would otherwise trigger the parent-document
+backlog check, the agent MUST proceed under §6 Operational Workflow
+without consulting the RMS. The `archivist` subagent (§3) MUST record the
+reason for bypassing the check so the lineage is preserved.
+
+*Note: The chat-server `"engineer"` role defined in*
+`python/angent/chat/agent_chat.py` *is a separate orchestration layer.
+That role is governed by chat-server configuration and the parent
+workspace directives, NOT by this Compiler Contract. The opt-out above
+does not extend to that role.*
 
 ---
 

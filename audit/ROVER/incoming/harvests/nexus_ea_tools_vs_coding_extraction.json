@@ -1,0 +1,35 @@
+{
+  "agenda_items": [
+    {
+      "title": "EA Tools as PowerPoint with Data Flow \u2014 Nexus as Code-Native Architecture",
+      "status": "Agreed",
+      "intent_description": "Traditional EA tools (Archi, ArchiMate, Ardoq, Orbus, Enterprise Architect) are essentially structured slide decks with connectors \u2014 document-first, not code-first. They map and visualize enterprise architecture for multi-stakeholder visibility, compliance, and governance. Nexus takes the inverse approach: architecture lives in code, diagrams are optional outputs, and the system is executable rather than documented. Nexus is a 'small sharp tool' with high leverage ratio \u2014 easy to use, cheap to run. TypeSpec adds the microscopic precision EA tools missed: formalized, machine-verifiable contracts.",
+      "requirements": [
+        "EA tools = document-first, code-second architecture modeling",
+        "Nexus = code-native, live, executable architecture",
+        "Diagrams are optional outputs, not primary artifacts",
+        "Nexus: small footprint, high leverage ratio",
+        "TypeSpec: machine-verifiable contracts vs manual EA governance",
+        "EA tools as 'Google Earth for architecture' \u2014 reference, not implementation"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    },
+    {
+      "title": "Power vs Leverage \u2014 Traditional EA vs Code-Native Architecture",
+      "status": "Agreed",
+      "intent_description": "Traditional EA tools occupy the high-effort, moderate-leverage quadrant \u2014 full suite of governance, reporting, and diagramming overhead designed for bureaucratic leverage, not technical leverage. Nexus/Alloy.js/TypeSpec sits in the low-effort, high-leverage zone: small, sharp, precise tools that formalize, validate, and generate artifacts automatically. The missing plot EA tools missed by millimeters is that architecture should be live, codified, and type-checked, not just drawn.",
+      "requirements": [
+        "EA: high effort, moderate leverage \u2014 bureaucratic overhead",
+        "Nexus: low effort, high leverage \u2014 executable architecture",
+        "Code-native > document-first for system evolution",
+        "TypeSpec: formalize, validate, generate \u2014 replace manual governance",
+        "Live architecture > static diagrams"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    }
+  ]
+}

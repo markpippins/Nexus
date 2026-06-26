@@ -1,0 +1,18 @@
+[
+  {
+    "sourceType": "McpServer",
+    "sourceId": 1,
+    "targetType": "RunnableService",
+    "targetId": 1,
+    "criticality": "REQUIRED",
+    "description": "conduit-mcp relies on nebula-srv for requirements data"
+  },
+  {
+    "sourceType": "McpServer",
+    "sourceId": 2,
+    "targetType": "RunnableService",
+    "targetId": 1,
+    "criticality": "REQUIRED",
+    "description": "nebula-mcp connects to nebula-srv for RMS data"
+  }
+]

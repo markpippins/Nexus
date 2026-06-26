@@ -1,0 +1,48 @@
+<div class="agent-status-bar">
+  <span class="agent-label">Agents:</span>
+  @for (agent of agents(); track agent.role) {
+    <span class="agent-badge" [ngClass]="'agent-' + agent.status" [title]="getTooltip(agent)">
+      <span class="agent-icon">{{ getIcon(agent.status) }}</span>
+      <span class="agent-role">{{ agent.role }}</span>
+      <span class="agent-state">{{ agent.status }}</span>
+      @if (agent.status === 'working' || agent.status === 'stale') {
+        <button
+          class="agent-kill-btn"
+          (click)="kill(agent.role); $event.stopPropagation()"
+          [disabled]="killingRoles().has(agent.role)"
+          title="Kill {{ agent.role }} (SIGKILL)"
+        >
+          {{ killingRoles().has(agent.role) ? '…' : '✕' }}
+        </button>
+      }
+    </span>
+  }
+  @if (agents().length === 0) {
+    <span class="no-agents">No agents seen</span>
+  }
+  <span class="conduit-controls">
+    <span class="conduit-state" [class.paused]="pipeline.conduitPaused()">
+      {{ pipeline.conduitPaused() ? '⏸ Paused' : '▶ Running' }}
+    </span>
+    @if (!pipeline.conduitPaused()) {
+      <button
+        class="conduit-btn pause-btn"
+        (click)="pauseConduit()"
+        [disabled]="conduitLoading()"
+        title="Pause conduit orchestration (stop dispatching new work)"
+      >
+        {{ conduitLoading() ? '…' : '⏸' }}
+      </button>
+    }
+    @if (pipeline.conduitPaused()) {
+      <button
+        class="conduit-btn resume-btn"
+        (click)="resumeConduit()"
+        [disabled]="conduitLoading()"
+        title="Resume conduit orchestration"
+      >
+        {{ conduitLoading() ? '…' : '▶' }}
+      </button>
+    }
+  </span>
+</div>

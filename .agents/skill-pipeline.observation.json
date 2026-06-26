@@ -1,0 +1,15 @@
+{
+    "name": "observation_pipeline_v1",
+    "phase": "post-execution (Phase 3)",
+    "description": "Phase 3 Observation Layer: pure read-only semantic projection over (EventLog + ExecutionGraph + ReplayState). Produces ephemeral View AST objects for inspection, analysis, and debugging.",
+    "stages": [
+        {
+            "id": "observation-engine",
+            "skill_ref": ".agents/skills/observation-engine/SKILL.md",
+            "description": "Semantic interpretation of execution history — dispatch query, resolve temporal mode, project View AST, emit ephemeral view"
+        }
+    ],
+    "sub_skills": {},
+    "handoff_input": "EventLog + ExecutionGraph + ObservationQuery",
+    "handoff_output": "ObservationView"
+}

@@ -1,0 +1,19 @@
+{
+  "agenda_items": [
+    {
+      "title": "io.clientcore.core vs OpenFeign \u2014 SDK Foundation vs Declarative HTTP Client",
+      "status": "Observed",
+      "intent_description": "io.clientcore.core (Azure SDK's next-gen client infrastructure) is a low-level client runtime providing HTTP pipeline abstraction, request/response modeling, policies (retry/auth/logging), transport independence, and async/sync execution \u2014 used for building SDK clients. OpenFeign is a high-level declarative HTTP API client \u2014 map Java interfaces to REST calls. They solve problems at different layers: Feign = how apps call services; ClientCore = how SDKs implement services. ClientCore is closer to something Nexus would generate than something business code would use directly.",
+      "requirements": [
+        "io.clientcore.core: SDK runtime foundation \u2014 HTTP pipeline, policies, transport abstraction",
+        "OpenFeign: declarative REST client \u2014 interface\u2192HTTP mapping, serialization",
+        "Stack: App Code \u2192 Feign/WebClient \u2192 Service Client SDK \u2192 ClientCore \u2192 HTTP transport",
+        "Feign = consumer-facing; ClientCore = provider-facing",
+        "ClientCore analogous to generated client runtime in Nexus"
+      ],
+      "implementation_notes": [],
+      "code_snippets": [],
+      "open_questions": []
+    }
+  ]
+}

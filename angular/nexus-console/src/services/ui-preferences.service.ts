@@ -8,7 +8,6 @@ export type FontSize = 'sm' | 'base' | 'lg';
 export interface UiPreferences {
   isSidebarVisible: boolean;
   isTreeVisible: boolean;
-  isChatVisible: boolean;
   isNotesVisible: boolean;
   isDetailPaneOpen: boolean;
   isSavedItemsVisible: boolean;
@@ -16,12 +15,10 @@ export interface UiPreferences {
   isStreamVisible: boolean;
   isConsoleCollapsed: boolean;
   isStreamPaneCollapsed: boolean;
-  isChatPaneCollapsed: boolean;
   isNotesPaneCollapsed: boolean;
   isStreamActiveSearchEnabled: boolean;
   sidebarWidth: number | null;
   sidebarTreeHeight: number | null;
-  sidebarChatHeight: number | null;
   splitViewPaneWidth: number | null;
   explorerStreamHeight: number | null;
   explorerConsoleHeight: number | null;
@@ -35,7 +32,6 @@ export interface UiPreferences {
 const DEFAULT_PREFERENCES: UiPreferences = {
   isSidebarVisible: true,
   isTreeVisible: true,
-  isChatVisible: true,
   isNotesVisible: true,
   isDetailPaneOpen: true,
   isSavedItemsVisible: true,
@@ -43,12 +39,10 @@ const DEFAULT_PREFERENCES: UiPreferences = {
   isStreamVisible: false,
   isConsoleCollapsed: true,
   isStreamPaneCollapsed: false,
-  isChatPaneCollapsed: false,
   isNotesPaneCollapsed: false,
   isStreamActiveSearchEnabled: true,
   sidebarWidth: null,
   sidebarTreeHeight: null,
-  sidebarChatHeight: null,
   splitViewPaneWidth: null,
   explorerStreamHeight: null,
   explorerConsoleHeight: 20,
@@ -68,7 +62,6 @@ export class UiPreferencesService {
   // Public readonly signals for consumers
   public readonly isSidebarVisible = computed(() => this.preferences().isSidebarVisible);
   public readonly isTreeVisible = computed(() => this.preferences().isTreeVisible);
-  public readonly isChatVisible = computed(() => this.preferences().isChatVisible);
   public readonly isNotesVisible = computed(() => this.preferences().isNotesVisible);
   public readonly isDetailPaneOpen = computed(() => this.preferences().isDetailPaneOpen);
   public readonly isSavedItemsVisible = computed(() => this.preferences().isSavedItemsVisible);
@@ -76,12 +69,10 @@ export class UiPreferencesService {
   public readonly isStreamVisible = computed(() => this.preferences().isStreamVisible);
   public readonly isConsoleCollapsed = computed(() => this.preferences().isConsoleCollapsed);
   public readonly isStreamPaneCollapsed = computed(() => this.preferences().isStreamPaneCollapsed);
-  public readonly isChatPaneCollapsed = computed(() => this.preferences().isChatPaneCollapsed);
   public readonly isNotesPaneCollapsed = computed(() => this.preferences().isNotesPaneCollapsed);
   public readonly isStreamActiveSearchEnabled = computed(() => this.preferences().isStreamActiveSearchEnabled);
   public readonly sidebarWidth = computed(() => this.preferences().sidebarWidth);
   public readonly sidebarTreeHeight = computed(() => this.preferences().sidebarTreeHeight);
-  public readonly sidebarChatHeight = computed(() => this.preferences().sidebarChatHeight);
   public readonly splitViewPaneWidth = computed(() => this.preferences().splitViewPaneWidth);
   public readonly explorerStreamHeight = computed(() => this.preferences().explorerStreamHeight);
   public readonly explorerConsoleHeight = computed(() => this.preferences().explorerConsoleHeight);
@@ -133,10 +124,6 @@ export class UiPreferencesService {
     this.preferences.update(p => ({ ...p, isTreeVisible: !p.isTreeVisible }));
   }
 
-  toggleChat(): void {
-    this.preferences.update(p => ({ ...p, isChatVisible: !p.isChatVisible }));
-  }
-
   toggleNotes(): void {
     this.preferences.update(p => ({ ...p, isNotesVisible: !p.isNotesVisible }));
   }
@@ -169,10 +156,6 @@ export class UiPreferencesService {
     this.preferences.update(p => ({ ...p, isStreamPaneCollapsed: value }));
   }
 
-  toggleChatPaneCollapse(): void {
-    this.preferences.update(p => ({ ...p, isChatPaneCollapsed: !p.isChatPaneCollapsed }));
-  }
-
   toggleNotesPaneCollapse(): void {
     this.preferences.update(p => ({ ...p, isNotesPaneCollapsed: !p.isNotesPaneCollapsed }));
   }
@@ -188,10 +171,6 @@ export class UiPreferencesService {
 
   setSidebarTreeHeight(height: number): void {
     this.preferences.update(p => ({ ...p, sidebarTreeHeight: height }));
-  }
-
-  setSidebarChatHeight(height: number): void {
-    this.preferences.update(p => ({ ...p, sidebarChatHeight: height }));
   }
 
   setSplitViewPaneWidth(width: number): void {

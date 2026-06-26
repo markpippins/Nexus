@@ -1,0 +1,17 @@
+{
+  "agenda_items": [
+    {
+      "title": "Service Broker Disambiguation \u2014 Embedded vs Remote Services Unified via ServiceDispatcher",
+      "status": "Agreed",
+      "intent_description": "Resolve the architectural disconnect between embedded services (packaged with a broker, e.g., Spring beans) and remote services (external services called via REST). Redefine LOCAL to mean 'co-located with and directly owned by a specific broker runtime' rather than 'in-process.' Introduce ServiceDispatcher with multiple invokers: LocalInvoker (native language/framework dispatch) and Remote/HttpInvoker (network-mediated calls). This normalizes all brokers (Spring, Quarkus, Helidon, Go, Python) under a unified model where all brokers handle both LOCAL and REMOTE services as first-class citizens.",
+      "requirements": [
+        "LOCAL redefined: co-located with and owned by broker runtime",
+        "ServiceDispatcher: unified dispatch across all brokers",
+        "LocalInvoker: native language/framework dispatch",
+        "RemoteInvoker: HTTP/network-mediated calls",
+        "All brokers handle LOCAL + REMOTE as first-class",
+        "Polyglot: Spring, Quarkus, Helidon, Go, Python unified model"
+      ]
+    }
+  ]
+}

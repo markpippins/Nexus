@@ -1,0 +1,32 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+    "ag": "https://nexus.local/schema/core/agent-role/",
+    "mc": "https://nexus.local/schema/extensions/model-capability/",
+
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"}
+  },
+
+  "@graph": [
+    {
+      "@id": "ag:Agent",
+      "comment": "An Agent is powered by a model with a specific capability set. The model must support the capabilities required by the agent's role.",
+      "assignedTo": {"@id": "ag:AgentRole"},
+      "instanceOf": {"@id": "mc:ModelCapabilitySet"}
+    },
+    {
+      "@id": "ag:AgentRole",
+      "comment": "An AgentRole requires certain capabilities (e.g., 'builder' requires 'code_generation' and 'file_operations'). The model router uses these to select the appropriate model.",
+      "requires": {"@id": "mc:ModelCapability"}
+    },
+    {
+      "@id": "mc:ModelCapabilitySet",
+      "comment": "A model capability set includes latency and cost metrics used by the scheduler to assign agents to work requests.",
+      "produces": {"@id": "wr:WorkRequest"},
+      "instanceOf": null
+    }
+  ]
+}

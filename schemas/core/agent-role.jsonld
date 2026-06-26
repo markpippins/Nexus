@@ -1,0 +1,81 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+
+    "ag": "https://nexus.local/schema/core/agent-role/",
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"},
+
+    "Agent":             "ag:Agent",
+    "AgentRole":         "ag:AgentRole",
+    "AgentRoleBinding":  "ag:AgentRoleBinding",
+    "PermissionSet":     "ag:PermissionSet",
+
+    "roleName":     "ag:roleName",
+    "rolePermissions": {"@id": "ag:rolePermissions", "@type": "@id"},
+    "mode":         "ag:mode",
+    "active":       {"@id": "ag:active", "@type": "xsd:boolean"},
+    "modelId":      "ag:modelId",
+    "modelCapabilities": {"@id": "ag:modelCapabilities", "@container": "@set"},
+    "modelEndpoint": "ag:modelEndpoint",
+    "modelCost":    {"@id": "ag:modelCost", "@type": "xsd:float"},
+
+    "readFolders":  {"@id": "ag:readFolders", "@container": "@set"},
+    "writeFolders": {"@id": "ag:writeFolders", "@container": "@set"},
+    "listenFolders":{"@id": "ag:listenFolders", "@container": "@set"},
+    "allowedActions":  {"@id": "ag:allowedActions", "@container": "@set"},
+    "forbiddenActions": {"@id": "ag:forbiddenActions", "@container": "@set"},
+
+    "lastHeartbeat": {"@id": "ag:lastHeartbeat", "@type": "xsd:dateTime"},
+    "currentState":  "ag:currentState",
+    "currentTask":   "ag:currentTask",
+    "sessionCount":  {"@id": "ag:sessionCount", "@type": "xsd:integer"}
+  },
+
+  "@graph": [
+    {
+      "@id": "ag:Agent",
+      "@type": "rdfs:Class",
+      "subClassOf": {"@id": "nx:Agent"},
+      "comment": "An agent that can be activated to perform work. May be a persistent process or an on-demand invocation.",
+      "properties": [
+        "nx:name", "ag:roleName", "ag:mode",
+        "ag:modelId", "ag:modelCapabilities", "ag:modelEndpoint", "ag:modelCost",
+        "ag:active", "ag:lastHeartbeat", "ag:currentState", "ag:currentTask",
+        "ag:sessionCount", "nx:createdAt", "nx:updatedAt",
+        "ag:rolePermissions", "nx:tags"
+      ]
+    },
+    {
+      "@id": "ag:AgentRole",
+      "@type": "rdfs:Class",
+      "subClassOf": {"@id": "nx:AgentRole"},
+      "comment": "A named role with a permission set and behavioral description.",
+      "properties": [
+        "ag:roleName", "nx:description", "ag:readFolders", "ag:writeFolders",
+        "ag:listenFolders", "ag:allowedActions", "ag:forbiddenActions",
+        "ag:mode", "ag:modelCapabilities"
+      ]
+    },
+    {
+      "@id": "ag:AgentRoleBinding",
+      "@type": "rdfs:Class",
+      "comment": "A binding between an agent instance and a role, with activation parameters.",
+      "properties": [
+        "nx:assignedTo", "ag:roleName", "ag:modelId", "ag:active",
+        "nx:createdAt", "nx:updatedAt"
+      ]
+    },
+    {
+      "@id": "ag:PermissionSet",
+      "@type": "rdfs:Class",
+      "comment": "A set of permissions governing what an agent role can access and do.",
+      "properties": [
+        "ag:readFolders", "ag:writeFolders", "ag:listenFolders",
+        "ag:allowedActions", "ag:forbiddenActions"
+      ]
+    }
+  ]
+}

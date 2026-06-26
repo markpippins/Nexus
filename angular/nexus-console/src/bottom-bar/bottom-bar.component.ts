@@ -1,0 +1,59 @@
+import { Component, ChangeDetectionStrategy, input, output, ViewEncapsulation } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { EXTERNAL_SITES } from '../components/external-site-selector/external-site-selector.component.js';
+
+export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms';
+
+export interface NavItem {
+  key: ViewMode;
+  label: string;
+  title: string;
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  { key: 'file-explorer', label: 'Explorer', title: 'Nexus Explorer' },
+  { key: 'nebula-rms',    label: 'Nebula',   title: 'Nebula Requirements Management System' },
+  { key: 'conduit-ui',    label: 'Conduit',  title: 'Conduit Pipeline Dashboard' },
+  { key: 'service-mesh',  label: 'Service Mesh', title: 'Service Mesh' },
+  { key: 'duality',       label: 'Duality',  title: 'Duality Dual-Pane Interface' },
+  { key: 'plurality',     label: 'Plurality', title: 'Plurality Multi-Agent View' },
+];
+
+@Component({
+  selector: 'app-bottom-bar',
+  templateUrl: './bottom-bar.component.html',
+  styleUrls: ['./bottom-bar.component.scss'],
+  imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  encapsulation: ViewEncapsulation.None,
+})
+export class BottomBarComponent {
+  /** Status text shown on the left side of the bar */
+  statusInfo = input<string>('Ready');
+  /** Selection count text shown next to status */
+  statusCounts = input<string>('');
+  /** Base URL for the image server (used for site button icons via substitution scheme) */
+  imageBaseUrl = input<string | null>(null);
+
+  readonly navItems = NAV_ITEMS;
+  readonly externalSites = EXTERNAL_SITES;
+
+  openExternal(url: string): void {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  /** Build an image URL for an external site using the same substitution scheme as the treeview. */
+  getSiteIconUrl(shortName: string): string | null {
+    const base = this.imageBaseUrl();
+    if (!base) return null;
+    // Normalize the same way ImageService.getIconUrl does: lowercase, spaces→dashes
+    const normalized = shortName.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-');
+    return `${base}/${encodeURIComponent(normalized)}`;
+  }
+
+  /** Hide the image inside a button when it fails to load (image not found on server). */
+  onImageError(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    img.style.display = 'none';
+  }
+}
