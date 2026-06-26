@@ -1,0 +1,73 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+*.egg-info/
+
+# Build outputs
+dist/
+build/
+target/
+*.pyc
+__pycache__/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Lock files
+bun.lock
+package-lock.json
+yarn.lock
+
+# Framework-specific
+.angular/
+.next/
+.cache/
+
+# Generated / output
+*.log
+*.bak
+*.sql.gz
+*.dump
+
+# Project-specific
+python/ingest/html-importer/transcripts/
+python/rover/.venv/
+python/absorb/html/.venv/
+python/absorb/html/transcripts/
+python/absorb/html/stats/
+python/absorb/html/.gitignore
+python/util/cleaned_transcript*.txt
+python/util/test.sh
+scripts/sql/nebula_backup_*.sql
+.conduit-data/
+.pipeline.bak/
+.bak/
+
+# Archive directories — excluded from ARL scanning
+graph/HISTORY/
+docs/HISTORY/
+
+# Temp / test files
+test.txt
+diff.txt
+WRDCO-prompt.md
+conduit-ai-config-*.json
+.kiro/
+python/voyager/fs-crawler-v2_files/
+legacy/python/conduit/
+WORK_TO_DATE.md
+**/__pycache__/
