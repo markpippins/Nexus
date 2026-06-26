@@ -1,5 +1,5 @@
 import { Component, HostListener, signal, inject, OnDestroy } from '@angular/core';
-import { NgFor, NgIf, NgSwitch, NgSwitchCase, TitleCasePipe } from '@angular/common';
+import { NgFor, NgSwitch, NgSwitchCase, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AIConfigService, AIProvider, AIHarness, AIModel, AIRoleConfig, LogLevel, FailureRecoveryConfig } from '../../services/ai-config.service';
 import { ToastService } from '../../services/toast.service';
@@ -54,9 +54,10 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
 @Component({
   selector: 'app-ai-config-dialog',
   standalone: true,
-  imports: [NgFor, NgIf, NgSwitch, NgSwitchCase, TitleCasePipe, FormsModule],
+  imports: [NgFor, NgSwitch, NgSwitchCase, TitleCasePipe, FormsModule],
   template: `
-    <div class="overlay" *ngIf="visible()" (click)="close()">
+    @if (visible()) {
+      <div class="overlay" (click)="close()">
       <div class="dialog" (click)="$event.stopPropagation()">
         <!-- Header -->
         <div class="header">
@@ -90,7 +91,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
               <div class="roles-toolbar">
                 <span class="filter-wrap">
                   <input class="filter-input" style="width:240px" [ngModel]="providerFilter()" (ngModelChange)="providerFilter.set($event)" placeholder="🔍 Filter by name, type, endpoint…" />
-                  <button class="filter-clear" *ngIf="providerFilter()" (click)="providerFilter.set('')">✕</button>
+                  @if (providerFilter()) {<button class="filter-clear" (click)="providerFilter.set('')">✕</button>}
                 </span>
                 <span class="roles-hint">{{ filteredProviders().length }} / {{ config().providers.length }} provider(s)</span>
                 <div class="roles-toolbar-btns">
@@ -117,21 +118,26 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                       <td>
                         <span class="item-tags item-tags-roles">
                           <span class="tag tag-role" *ngFor="let role of rolesForProvider(p.id)">{{ role }}</span>
-                          <span class="tag tag-role tag-empty" *ngIf="rolesForProvider(p.id).length === 0">unused</span>
+                          @if (rolesForProvider(p.id).length === 0) {<span class="tag tag-role tag-empty">unused</span>}
                         </span>
                       </td>
                     </tr>
-                    <tr *ngIf="config().providers.length === 0">
-                      <td colspan="4" class="empty-table-cell">No providers configured — click + Add to create one</td>
-                    </tr>
-                    <tr *ngIf="config().providers.length > 0 && filteredProviders().length === 0">
-                      <td colspan="4" class="empty-table-cell">No providers match your filter</td>
-                    </tr>
+                    @if (config().providers.length === 0) {
+                      <tr>
+                        <td colspan="4" class="empty-table-cell">No providers configured — click + Add to create one</td>
+                      </tr>
+                    }
+                    @if (config().providers.length > 0 && filteredProviders().length === 0) {
+                      <tr>
+                        <td colspan="4" class="empty-table-cell">No providers match your filter</td>
+                      </tr>
+                    }
                   </tbody>
                 </table>
               </div>
               <!-- Add/Edit Modal -->
-              <div class="mini-overlay" *ngIf="editProviderForm()" (click)="cancelEditProvider()">
+              @if (editProviderForm()) {
+                <div class="mini-overlay" (click)="cancelEditProvider()">
                 <div class="mini-dialog" (click)="$event.stopPropagation()">
                   <h4>{{ editProviderForm()!.id ? 'Edit' : 'New' }} Provider</h4>
                   <label>Name</label>
@@ -147,12 +153,13 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                   <label>Config JSON</label>
                   <textarea [(ngModel)]="editProviderForm()!.config_json" rows="4" placeholder="{}"></textarea>
                   <div class="form-actions">
-                    <button class="btn-delete" *ngIf="editProviderForm()!.id" (click)="deleteProvider(editProviderForm()!.id)">🗑 Delete</button>
+                    @if (editProviderForm()!.id) {<button class="btn-delete" (click)="deleteProvider(editProviderForm()!.id)">🗑 Delete</button>}
                     <button class="btn-cancel" (click)="cancelEditProvider()">Cancel</button>
                     <button class="btn-save" (click)="saveProvider()" [disabled]="!editProviderForm()?.name || !editProviderForm()?.type">💾 Save</button>
                   </div>
                 </div>
               </div>
+            }
             </div>
 
             <!-- ─── Harnesses Tab ─── -->
@@ -160,7 +167,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
               <div class="roles-toolbar">
                 <span class="filter-wrap">
                   <input class="filter-input" style="width:240px" [ngModel]="harnessFilter()" (ngModelChange)="harnessFilter.set($event)" placeholder="🔍 Filter by name, mode, capability…" />
-                  <button class="filter-clear" *ngIf="harnessFilter()" (click)="harnessFilter.set('')">✕</button>
+                  @if (harnessFilter()) {<button class="filter-clear" (click)="harnessFilter.set('')">✕</button>}
                 </span>
                 <span class="roles-hint">{{ filteredHarnesses().length }} / {{ config().harnesses.length }} harness(es)</span>
                 <div class="roles-toolbar-btns">
@@ -194,32 +201,38 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                       <td>
                         <span class="item-tags item-tags-caps">
                           <span class="tag tag-cap" *ngFor="let cap of harnessCapabilities(h)">{{ cap.replace('_', ' ') }}</span>
-                          <span class="tag tag-cap tag-empty" *ngIf="harnessCapabilities(h).length === 0">none</span>
+                          @if (harnessCapabilities(h).length === 0) {<span class="tag tag-cap tag-empty">none</span>}
                         </span>
                       </td>
                       <td>
                         <span class="item-tags item-tags-roles">
                           <span class="tag tag-role" *ngFor="let role of rolesForHarness(h.id)">{{ role }}</span>
-                          <span class="tag tag-role tag-empty" *ngIf="rolesForHarness(h.id).length === 0">unused</span>
+                          @if (rolesForHarness(h.id).length === 0) {<span class="tag tag-role tag-empty">unused</span>}
                         </span>
                       </td>
                     </tr>
-                    <tr *ngIf="config().harnesses.length === 0">
-                      <td colspan="6" class="empty-table-cell">No harnesses configured — click + Add to create one</td>
-                    </tr>
-                    <tr *ngIf="config().harnesses.length > 0 && filteredHarnesses().length === 0">
-                      <td colspan="6" class="empty-table-cell">No harnesses match your filter</td>
-                    </tr>
+                    @if (config().harnesses.length === 0) {
+                      <tr>
+                        <td colspan="6" class="empty-table-cell">No harnesses configured — click + Add to create one</td>
+                      </tr>
+                    }
+                    @if (config().harnesses.length > 0 && filteredHarnesses().length === 0) {
+                      <tr>
+                        <td colspan="6" class="empty-table-cell">No harnesses match your filter</td>
+                      </tr>
+                    }
                   </tbody>
                 </table>
               </div>
               <!-- Add/Edit Modal -->
-              <div class="mini-overlay" *ngIf="editHarnessForm()" (click)="cancelEditHarness()">
+              @if (editHarnessForm()) {
+                <div class="mini-overlay" (click)="cancelEditHarness()">
                 <div class="mini-dialog" (click)="$event.stopPropagation()">
                   <h4>{{ editHarnessForm()!.id ? 'Edit' : 'New' }} Harness</h4>
                   <label>Name</label>
                   <input [(ngModel)]="editHarnessForm()!.name" placeholder="e.g. Opencode CLI" />
-                  <ng-container *ngIf="harnessParsed() as s">
+                  @if (harnessParsed(); as s) {
+                    
                     <label>Binary</label>
                     <input [ngModel]="s.binary" (ngModelChange)="s.binary=$event; onHarnessFieldChange()" placeholder="e.g. opencode, codex, ollama" />
                     <label>Execution Mode</label>
@@ -245,14 +258,15 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                       <summary>Raw JSON <span class="label-hint">(advanced)</span></summary>
                       <textarea [ngModel]="s.rawJson" (ngModelChange)="s.rawJson=$event; onHarnessFieldChange()" rows="5" placeholder="{}"></textarea>
                     </details>
-                  </ng-container>
+                  }
                   <div class="form-actions">
-                    <button class="btn-delete" *ngIf="editHarnessForm()!.id" (click)="deleteHarness(editHarnessForm()!.id)">🗑 Delete</button>
+                    @if (editHarnessForm()!.id) {<button class="btn-delete" (click)="deleteHarness(editHarnessForm()!.id)">🗑 Delete</button>}
                     <button class="btn-cancel" (click)="cancelEditHarness()">Cancel</button>
                     <button class="btn-save" (click)="saveHarness()" [disabled]="!editHarnessForm()?.name">💾 Save</button>
                   </div>
                 </div>
               </div>
+            }
             </div>
 
             <!-- ─── Models Tab ─── -->
@@ -261,7 +275,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
               <div class="roles-toolbar">
                 <span class="filter-wrap">
                   <input class="filter-input" style="width:240px" [ngModel]="modelFilter()" (ngModelChange)="modelFilter.set($event)" placeholder="🔍 Filter by name, identifier, provider, harness…" />
-                  <button class="filter-clear" *ngIf="modelFilter()" (click)="modelFilter.set('')">✕</button>
+                  @if (modelFilter()) {<button class="filter-clear" (click)="modelFilter.set('')">✕</button>}
                 </span>
                 <span class="roles-hint">{{ filteredModels().length }} / {{ config().models.length }} model(s)</span>
                 <div class="roles-toolbar-btns">
@@ -294,7 +308,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                       (dblclick)="editModel(m)"
                     >
                       <td>
-                        <span class="tag tag-default" *ngIf="isDefaultModel(m)" style="font-size:9px">def</span>
+                        @if (isDefaultModel(m)) {<span class="tag tag-default" style="font-size:9px">def</span>}
                       </td>
                       <td class="model-name-cell">{{ m.name }}</td>
                       <td><code class="model-id-code">{{ m.model_identifier }}</code></td>
@@ -303,21 +317,26 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                       <td>
                         <span class="item-tags item-tags-roles">
                           <span class="tag tag-role" *ngFor="let role of rolesForModel(m)">{{ role }}</span>
-                          <span class="tag tag-role tag-empty" *ngIf="rolesForModel(m).length === 0">unassigned</span>
+                          @if (rolesForModel(m).length === 0) {<span class="tag tag-role tag-empty">unassigned</span>}
                         </span>
                       </td>
                     </tr>
-                    <tr *ngIf="config().models.length === 0">
-                      <td colspan="6" class="empty-table-cell">No models configured — click + Add to create one</td>
-                    </tr>
-                    <tr *ngIf="config().models.length > 0 && filteredModels().length === 0">
-                      <td colspan="6" class="empty-table-cell">No models match your filter</td>
-                    </tr>
+                    @if (config().models.length === 0) {
+                      <tr>
+                        <td colspan="6" class="empty-table-cell">No models configured — click + Add to create one</td>
+                      </tr>
+                    }
+                    @if (config().models.length > 0 && filteredModels().length === 0) {
+                      <tr>
+                        <td colspan="6" class="empty-table-cell">No models match your filter</td>
+                      </tr>
+                    }
                   </tbody>
                 </table>
               </div>
               <!-- Add/Edit Model Modal -->
-              <div class="mini-overlay" *ngIf="editModelForm()" (click)="cancelEditModel()">
+              @if (editModelForm()) {
+                <div class="mini-overlay" (click)="cancelEditModel()">
                 <div class="mini-dialog" (click)="$event.stopPropagation()">
                   <h4>{{ editModelForm()!.id ? 'Edit' : 'New' }} Model</h4>
                   <label>Name</label>
@@ -335,18 +354,20 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                   <label>Model Identifier</label>
                   <input [(ngModel)]="editModelForm()!.model_identifier" placeholder="e.g. gpt-4o or claude-sonnet-4-20250514" />
                   <div class="form-actions">
-                    <button class="btn-delete" *ngIf="editModelForm()!.id" (click)="deleteModel(editModelForm()!.id)">🗑 Delete</button>
+                    @if (editModelForm()!.id) {<button class="btn-delete" (click)="deleteModel(editModelForm()!.id)">🗑 Delete</button>}
                     <button class="btn-cancel" (click)="cancelEditModel()">Cancel</button>
                     <button class="btn-save" (click)="saveModel()" [disabled]="!editModelForm()?.name || !editModelForm()?.harness_id || !editModelForm()?.model_identifier">💾 Save</button>
                   </div>
                 </div>
               </div>
+            }
             </div>
 
             <!-- ─── Roles Tab ─── -->
             <div *ngSwitchCase="'roles'" class="tab-panel tab-roles">
               <!-- Empty-state / seed button -->
-              <div class="roles-empty" *ngIf="config().providers.length === 0; else rolesTable">
+              @if (config().providers.length === 0) {
+                <div class="roles-empty">
                 <span class="empty-icon">🚀</span>
                 <h4>No AI configuration yet</h4>
                 <p>Seed the default config to get started with OpenAI + Opencode CLI + GPT-4o.</p>
@@ -357,17 +378,18 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                   {{ aiConfig.seeding() ? 'Seeding...' : '⚡ Force Re-seed' }}
                 </button>
               </div>
-              <ng-template #rolesTable>
+              } @else {
+                
                 <div class="roles-toolbar">
                   <span class="filter-wrap">
                     <input class="filter-input" style="width:240px" [ngModel]="roleFilter()" (ngModelChange)="roleFilter.set($event)" placeholder="🔍 Filter by model, provider, harness…" />
-                    <button class="filter-clear" *ngIf="roleFilter()" (click)="roleFilter.set('')">✕</button>
+                    @if (roleFilter()) {<button class="filter-clear" (click)="roleFilter.set('')">✕</button>}
                   </span>
                   <span class="roles-hint">{{ filteredRoles().length }} / {{ ROLES.length }} roles · Each role can have multiple models (ordered by priority), each with its own provider and harness</span>
                   <div class="roles-toolbar-btns">
                     <button class="btn-save-sm" (click)="saveAllRoles()" [disabled]="!hasDirtyRoles()">💾 Save</button>
-                    <span class="roles-dirty-badge" *ngIf="hasDirtyRoles()">● Pending changes</span>
-                    <span class="roles-clean-badge" *ngIf="!hasDirtyRoles()">✓</span>
+                    @if (hasDirtyRoles()) {<span class="roles-dirty-badge">● Pending changes</span>}
+                    @if (!hasDirtyRoles()) {<span class="roles-clean-badge">✓</span>}
                     <button class="btn-seed-sm" (click)="seedDefaults()" [disabled]="aiConfig.seeding()">
                       {{ aiConfig.seeding() ? '...' : '🌱 Reset defaults' }}
                     </button>
@@ -387,14 +409,14 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                     <tbody>
                       <tr *ngFor="let r of filteredRoles()">
                         <td class="role-label">
-                          <span class="role-dirty-dot" *ngIf="isRoleDirty(r)">●</span>
+                          @if (isRoleDirty(r)) {<span class="role-dirty-dot">●</span>}
                           {{ r | titlecase }}
                         </td>
                         <td>
                           <div class="model-list">
                             <div class="model-item" *ngFor="let entry of roleEdits[r].model_entries; let i = index; let first = first; let last = last">
-                              <span class="model-badge" *ngIf="first">primary</span>
-                              <span class="model-badge model-badge-fallback" *ngIf="!first">#{{ i + 1 }}</span>
+                              @if (first) {<span class="model-badge">primary</span>}
+                              @if (!first) {<span class="model-badge model-badge-fallback">#{{ i + 1 }}</span>}
                               <select [ngModel]="entry.model_id" (ngModelChange)="onRoleModelChange(r, i, $event)" class="model-select" [class.model-primary]="first">
                                 <option *ngFor="let mod of availableModelsForRole(r, i)" [value]="mod.id">{{ mod.name }}</option>
                               </select>
@@ -408,7 +430,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                               </select>
                               <button class="btn-model-move" (click)="moveModelUp(r, i)" [disabled]="first" title="Move up">▲</button>
                               <button class="btn-model-move" (click)="moveModelDown(r, i)" [disabled]="last" title="Move down">▼</button>
-                              <button class="btn-model-remove" (click)="removeModelFromRole(r, i)" *ngIf="!first" title="Remove">✕</button>
+                              @if (!first) {<button class="btn-model-remove" (click)="removeModelFromRole(r, i)" title="Remove">✕</button>}
                             </div>
                             <div class="model-add-row">
                               <select class="model-add-select" (change)="addModelToRole(r, $event)">
@@ -419,13 +441,15 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                           </div>
                         </td>
                       </tr>
-                      <tr *ngIf="ROLES.length > 0 && filteredRoles().length === 0">
-                        <td colspan="2" class="empty-table-cell">No roles match your filter</td>
-                      </tr>
+                      @if (ROLES.length > 0 && filteredRoles().length === 0) {
+                        <tr>
+                          <td colspan="2" class="empty-table-cell">No roles match your filter</td>
+                        </tr>
+                      }
                     </tbody>
                   </table>
                 </div>
-              </ng-template>
+              }
             </div>
             <!-- ─── Test Tab ─── -->
             <div *ngSwitchCase="'test'" class="tab-panel tab-test">
@@ -440,8 +464,9 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                 </select>
 
                 <!-- Command preview -->
-                <label *ngIf="testCommandPreview()">Command Preview</label>
-                <div class="cmd-preview-wrap" *ngIf="testCommandPreview()">
+                @if (testCommandPreview()) {
+                  <label>Command Preview</label>
+                  <div class="cmd-preview-wrap">
                   <div class="cmd-preview-header">
                     <span class="cmd-preview-label">Command</span>
                     <button class="cmd-copy-btn" (click)="copyCommandPreview()" [title]="copied() ? 'Copied!' : 'Copy to clipboard'">{{ copied() ? '✓ Copied' : '📋 Copy' }}</button>
@@ -455,6 +480,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                     aria-label="Command preview for the selected model"
                   ></textarea>
                 </div>
+                }
 
                 <label>Test Prompt</label>
                 <textarea
@@ -469,18 +495,25 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                   <button class="btn-save" (click)="runTest()" [disabled]="!testModelId() || !testPrompt() || testRunning()">
                     {{ testRunning() ? '⏳ Running…' : '▶ Run Test' }}
                   </button>
-                  <button class="btn-delete" (click)="cancelTest()" *ngIf="testRunning()">
-                    ⏹ Cancel
-                  </button>
-                  <span class="test-status" *ngIf="testStatus()">{{ testStatus() }}</span>
+                  @if (testRunning()) {
+                    <button class="btn-delete" (click)="cancelTest()">
+                      ⏹ Cancel
+                    </button>
+                  }
+                  @if (testStatus()) {
+                    <span class="test-status">{{ testStatus() }}</span>
+                  }
                 </div>
 
-                <div class="test-output-wrap" *ngIf="testOutputLines().length > 0">
+                @if (testOutputLines().length > 0) {
+                  <div class="test-output-wrap">
                   <div class="test-output-header">
                     <span>Output</span>
-                    <span class="test-output-meta" *ngIf="testSessionId()">
+                    @if (testSessionId()) {
+                      <span class="test-output-meta">
                       session: <code>{{ testSessionId() }}</code>
                     </span>
+                    }
                     <button class="btn-cancel" (click)="clearTestOutput()" style="margin-left:auto;padding:3px 8px;font-size:10px">Clear</button>
                   </div>
                   <div class="test-output" #testOutputRef>
@@ -488,10 +521,15 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                       <span class="test-line-num">{{ i + 1 }}</span>
                       <span class="test-line-text">{{ line }}</span>
                     </div>
-                    <div class="test-output-tail" *ngIf="testRunning()">⏳ waiting for output…</div>
-                    <div class="test-output-tail test-output-done" *ngIf="!testRunning() && testOutputLines().length > 0">■ ended</div>
+                    @if (testRunning()) {
+                      <div class="test-output-tail">⏳ waiting for output…</div>
+                    }
+                    @if (!testRunning() && testOutputLines().length > 0) {
+                      <div class="test-output-tail test-output-done">■ ended</div>
+                    }
                   </div>
                 </div>
+              }
               </div>
             </div>
 
@@ -532,7 +570,9 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                   <button class="btn-save" (click)="saveFrConfig()" [disabled]="frSaving()">
                     {{ frSaving() ? 'Saving…' : '💾 Save' }}
                   </button>
-                  <span class="fr-saved-msg" *ngIf="frSavedMsg()">{{ frSavedMsg() }}</span>
+                  @if (frSavedMsg()) {
+                    <span class="fr-saved-msg">{{ frSavedMsg() }}</span>
+                  }
                 </div>
               </div>
             </div>
@@ -562,7 +602,8 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
           </ng-container>
         </div>
         <!-- Delete Confirmation Dialog -->
-        <div class="mini-overlay" *ngIf="confirmDelete() as d" (click)="cancelConfirmDelete()" style="position:absolute">
+        @if (confirmDelete(); as d) {
+          <div class="mini-overlay" (click)="cancelConfirmDelete()" style="position:absolute">
           <div class="mini-dialog" (click)="$event.stopPropagation()" style="width:440px">
             <h4>⚠ Delete {{ d.type | titlecase }}</h4>
             <p class="confirm-body">
@@ -580,9 +621,11 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
               <button class="btn-delete" (click)="confirmDeleteNow()">🗑 Delete Anyway</button>
             </div>
           </div>
-        </div>
+          </div>
+        }
       </div>
-    </div>
+      </div>
+    }
   `,
   styles: [
     // ── Overlay ────────────────────────────────────────────────

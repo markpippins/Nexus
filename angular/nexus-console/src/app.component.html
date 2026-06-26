@@ -1,6 +1,13 @@
 <div
-  class="flex flex-col h-screen antialiased text-[rgb(var(--color-text-base))] bg-[rgb(var(--color-background))]"
+  class="flex h-screen antialiased text-[rgb(var(--color-text-base))] bg-[rgb(var(--color-background))]"
 >
+  <!-- Left Nav Toolbar (always visible — stays up when iframes are shown) -->
+  <app-nav-toolbar
+    [viewMode]="currentViewMode()"
+    (viewModeChange)="currentViewMode.set($event)"
+  ></app-nav-toolbar>
+
+  <div class="flex flex-col flex-1 min-w-0">
   <!-- Top toolbar removed — navigation buttons are now in app-bottom-bar at the bottom -->
 
   <!-- Main Content -->
@@ -108,6 +115,102 @@
               />
             </svg>
           </button>
+
+          <!-- Hamburger Menu -->
+          <div class="relative" data-hamburger-menu>
+            <button
+              (click)="isHamburgerMenuOpen.set(!isHamburgerMenuOpen())"
+              type="button"
+              title="More options"
+              class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))]"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            @if (isHamburgerMenuOpen()) {
+              <div class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-[rgb(var(--color-surface-dialog))] shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu">
+                <div class="py-1" role="none">
+                  <div class="px-4 py-2 text-xs uppercase text-[rgb(var(--color-text-subtle))]">View</div>
+                  <div (click)="toggleSidebar(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>Main Sidebar</span>
+                    @if (isSidebarVisible()) {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    }
+                  </div>
+                  <div (click)="toggleTree(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>Folder Tree</span>
+                    @if (isTreeVisible()) {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    }
+                  </div>
+                  <div (click)="toggleChat(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>Chat Pane</span>
+                    @if (isChatVisible()) {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    }
+                  </div>
+                  <div (click)="toggleNotes(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>Notes Pane</span>
+                    @if (isNotesVisible()) {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    }
+                  </div>
+                  <div (click)="toggleSavedItems(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>Saved Items Pane</span>
+                    @if (isSavedItemsVisible()) {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    }
+                  </div>
+                  <div (click)="toggleRssFeed(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>RSS Feed Pane</span>
+                    @if (isRssFeedVisible()) {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    }
+                  </div>
+                  <div (click)="toggleStream(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>Idea Stream</span>
+                    @if (isStreamVisible()) {
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    }
+                  </div>
+
+                  <div class="my-1 h-px bg-[rgb(var(--color-border-base))]"></div>
+                  <div class="px-4 py-2 text-xs uppercase text-[rgb(var(--color-text-subtle))]">Settings</div>
+                  <div #themeMenuButton (click)="openThemeMenu(themeMenuButton)" data-theme-menu-trigger class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>Theme</span>
+                  </div>
+                  <div (click)="openRssFeedsDialog(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>Manage RSS Feeds...</span>
+                  </div>
+                  <div (click)="openPreferencesDialog(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>Preferences...</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
         </div>
 
         <!-- Top toolbar removed — navigation is now in app-bottom-bar -->
@@ -396,12 +499,12 @@
 
   <!-- Bottom Navigation Bar (replaces the old top toolbar and footer/status bar) -->
   <app-bottom-bar
-    [viewMode]="currentViewMode()"
     [statusInfo]="statusBarSelectionInfo()"
     [statusCounts]="statusBarItemCounts()"
     [imageBaseUrl]="defaultImageUrl()"
-    (viewModeChange)="currentViewMode.set($event)"
   ></app-bottom-bar>
+
+  </div><!-- end .flex-col main wrapper -->
 
   @if (isLocalConfigDialogOpen()) {
     <app-local-config-dialog (close)="closeLocalConfigDialog()" (save)="onLocalConfigSaved($event)">

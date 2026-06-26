@@ -28,10 +28,6 @@ export const NAV_ITEMS: NavItem[] = [
   encapsulation: ViewEncapsulation.None,
 })
 export class BottomBarComponent {
-  /** Current view mode to highlight the active button */
-  viewMode = input<ViewMode>('file-explorer');
-  /** Emitted when the user clicks a navigation button */
-  viewModeChange = output<ViewMode>();
   /** Status text shown on the left side of the bar */
   statusInfo = input<string>('Ready');
   /** Selection count text shown next to status */

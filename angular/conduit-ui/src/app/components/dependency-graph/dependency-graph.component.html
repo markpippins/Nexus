@@ -21,7 +21,7 @@
     </defs>
     <!-- Prompt nodes -->
     <ng-container *ngFor="let n of allNodes()">
-      <ng-container *ngIf="n.type === 'prompt'">
+      @if (n.type === 'prompt') {
         <rect
           [attr.x]="n.x * scale()" [attr.y]="n.y * scale()"
           [attr.width]="120 * scale()" [attr.height]="30 * scale()"
@@ -34,11 +34,11 @@
               font-size="10" fill="#fff" font-weight="bold" text-anchor="middle">💬 #{{n.planNumber}}</text>
         <text [attr.x]="(n.x + 60) * scale()" [attr.y]="(n.y + 25) * scale()"
               font-size="8" fill="rgba(255,255,255,0.7)" text-anchor="middle">{{n.title.slice(0,20)}}</text>
-      </ng-container>
+      }
     </ng-container>
     <!-- Plan nodes -->
     <ng-container *ngFor="let n of allNodes()">
-      <ng-container *ngIf="n.type === 'plan'">
+      @if (n.type === 'plan') {
         <rect
           [attr.x]="n.x * scale()" [attr.y]="n.y * scale()"
           [attr.width]="140 * scale()" [attr.height]="40 * scale()"
@@ -51,7 +51,7 @@
               font-size="11" fill="#fff" font-weight="bold">{{n.planNumber}}</text>
         <text [attr.x]="(n.x + 8) * scale()" [attr.y]="(n.y + 32) * scale()"
               font-size="9" fill="rgba(255,255,255,0.8)">{{n.title.slice(0,25)}}</text>
-      </ng-container>
+      }
     </ng-container>
   </svg>
   <!-- Legend -->
@@ -62,5 +62,7 @@
     <span class="leg-item"><span class="leg-dot" style="background:#f39c12"></span> Pending</span>
     <span class="leg-item"><span class="leg-dot" style="background:#e74c3c"></span> Blocked</span>
   </div>
-  <app-empty-state *ngIf="allNodes().length===0" icon="🔗" title="No dependency graph" description="Plans will appear here when they declare dependencies." />
+  @if (allNodes().length === 0) {
+    <app-empty-state icon="🔗" title="No dependency graph" description="Plans will appear here when they declare dependencies." />
+  }
 </div>

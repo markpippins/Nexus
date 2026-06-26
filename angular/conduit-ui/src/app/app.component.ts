@@ -1,5 +1,5 @@
 import { Component, signal, effect, OnInit, OnDestroy, Inject, ViewChild } from '@angular/core';
-import { NgIf, NgFor } from '@angular/common';
+import { NgFor } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { DOCUMENT } from '@angular/common';
 import { BuilderStatusComponent } from './components/builder-status/builder-status.component';
@@ -26,7 +26,6 @@ interface NavItem {
   selector: 'app-root',
   standalone: true,
   imports: [
-    NgIf,
     NgFor,
     RouterModule,
     BuilderStatusComponent,
@@ -52,57 +51,63 @@ interface NavItem {
       <app-message-box-container></app-message-box-container>
 
       <!-- Global error banner -->
-      <div class="global-error" *ngIf="globalError() as err">
-        ⚠ {{ err.message }}
-        <button class="dismiss-btn" (click)="dismissError()">✕</button>
-      </div>
+      @if (globalError(); as err) {
+        <div class="global-error">
+          ⚠ {{ err.message }}
+          <button class="dismiss-btn" (click)="dismissError()">✕</button>
+        </div>
+      }
+
+      <!-- Top horizontal toolbar -->
+      <nav class="top-navbar">
+        <div class="top-nav-items">
+          <a
+            *ngFor="let item of navItems"
+            class="nav-icon-btn"
+            [routerLink]="item.route"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: !!item.exact }"
+            [title]="item.label + ' (' + item.shortcut + ')'"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.svgPath" />
+            </svg>
+          </a>
+        </div>
+        <div class="nav-spacer"></div>
+        <div class="top-nav-actions">
+          <button class="nav-icon-btn" (click)="openChat()" title="New chat (Ctrl+')">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </button>
+          <button class="nav-icon-btn" (click)="openConfig()" title="AI configuration (Ctrl+,)">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+          <button class="nav-icon-btn" (click)="toggleTheme()" [title]="'Switch theme (Ctrl+T)'">
+            @if (theme.theme() === 'dark') {
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+            }
+            @if (theme.theme() === 'light') {
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            }
+          </button>
+          <a class="nav-icon-btn temporal-btn" href="http://localhost:8233" target="_blank" rel="noopener noreferrer" title="Temporal Web UI">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </a>
+        </div>
+      </nav>
 
       <div class="layout-body">
-        <!-- Vertical left-nav toolbar -->
-        <nav class="vertical-nav">
-          <div class="nav-items-top">
-            <a
-              *ngFor="let item of navItems"
-              class="nav-icon-btn"
-              [routerLink]="item.route"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: !!item.exact }"
-              [title]="item.label + ' (' + item.shortcut + ')'"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.svgPath" />
-              </svg>
-            </a>
-          </div>
-          <div class="nav-divider"></div>
-          <div class="nav-items-bottom">
-            <button class="nav-icon-btn" (click)="openChat()" title="New chat (Ctrl+')">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </button>
-            <button class="nav-icon-btn" (click)="openConfig()" title="AI configuration (Ctrl+,)">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-            <button class="nav-icon-btn" (click)="toggleTheme()" [title]="'Switch theme (Ctrl+T)'">
-              <svg *ngIf="theme.theme() === 'dark'" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-              </svg>
-              <svg *ngIf="theme.theme() === 'light'" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </button>
-            <a class="nav-icon-btn temporal-btn" href="http://localhost:8233" target="_blank" rel="noopener noreferrer" title="Temporal Web UI">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </a>
-          </div>
-        </nav>
-
         <!-- Plans sidebar (resizable) -->
         <app-plans-sidebar
           [(width)]="sidebarWidth"
@@ -118,9 +123,11 @@ interface NavItem {
           <app-agent-status-bar></app-agent-status-bar>
 
           <!-- Offline banner -->
-          <div class="offline-banner" *ngIf="offline()">
-            ⚠ Pipeline server offline — showing cached state if available
-          </div>
+          @if (offline()) {
+            <div class="offline-banner">
+              ⚠ Pipeline server offline — showing cached state if available
+            </div>
+          }
 
           <!-- Routed view -->
           <router-outlet></router-outlet>
@@ -132,19 +139,19 @@ interface NavItem {
     `.app-shell{display:flex;flex-direction:column;height:100vh;overflow:hidden}`,
     `.global-error{background:var(--accent-red-bg,#fef2f2);color:var(--accent-red-text,#991b1b);padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:12px;flex-shrink:0;border-bottom:1px solid var(--accent-red,#dc2626)}`,
     `.dismiss-btn{margin-left:auto;background:none;border:none;color:var(--accent-red-text);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px}.dismiss-btn:hover{background:rgba(0,0,0,0.1)}`,
-    `.layout-body{display:flex;flex:1;min-height:0;overflow:hidden}`,
 
-    /* ── Vertical Toolbar ── */
-    `.vertical-nav{width:56px;min-width:56px;display:flex;flex-direction:column;align-items:center;background:var(--bg-primary,#0f172a);border-right:1px solid var(--border-default,#475569);padding:12px 0;flex-shrink:0;z-index:5;gap:2px}`,
-    `.nav-items-top{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}`,
-    `.nav-items-bottom{display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:8px;margin-top:auto}`,
-    `.nav-divider{width:24px;height:1px;background:var(--border-subtle,#334155);margin:4px 0}`,
-    `.nav-icon-btn{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:12px;border:none;background:transparent;color:var(--text-muted,#64748b);cursor:pointer;text-decoration:none;transition:all .2s;flex-shrink:0}`,
-    `.nav-icon-btn svg{width:24px;height:24px}`,
+    /* ── Top Toolbar ── */
+    `.top-navbar{height:48px;min-height:48px;display:flex;align-items:center;background:var(--bg-primary,#0f172a);border-bottom:1px solid var(--border-default,#475569);padding:0 8px;flex-shrink:0;z-index:5;gap:4px}`,
+    `.top-nav-items{display:flex;align-items:center;gap:2px;overflow-x:auto;flex-shrink:0}`,
+    `.nav-spacer{margin-left:auto}`,
+    `.top-nav-actions{display:flex;align-items:center;gap:2px;flex-shrink:0}`,
+    `.nav-icon-btn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:none;background:transparent;color:var(--text-muted,#64748b);cursor:pointer;text-decoration:none;transition:all .2s;flex-shrink:0}`,
+    `.nav-icon-btn svg{width:20px;height:20px;flex-shrink:0}`,
     `.nav-icon-btn:hover{background:var(--bg-secondary,#1e293b);color:var(--text-primary,#f1f5f9)}`,
     `.nav-icon-btn.active{background:var(--accent-blue-bg,#1e3a5f);color:var(--accent-blue-text,#93c5fd)}`,
     `.nav-icon-btn:active{transform:scale(.92)}`,
     `.temporal-btn{opacity:.5}.temporal-btn:hover{opacity:1}`,
+    `.layout-body{display:flex;flex:1;min-height:0;overflow:hidden}`,
     `.main-content{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}`,
     `.offline-banner{background:#fef3c7;color:#92400e;text-align:center;padding:6px;font-size:12px;flex-shrink:0}`,
   ],
@@ -296,10 +303,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   openConfig(): void {
     this.aiConfigDialog?.open();
-  }
-
-  themeIcon(): string {
-    return this.theme.theme() === 'dark' ? '🌙' : '☀';
   }
 
   private labelForRoute(route: string): string {

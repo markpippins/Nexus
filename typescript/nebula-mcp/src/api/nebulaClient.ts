@@ -210,9 +210,11 @@ export const NebulaClient = {
 
   // ── Harvests ───────────────────────────────────────────────
   /** GET /api/harvests?model=&limit=&offset= */
-  listHarvests: (query?: { model?: string; limit?: number; offset?: number }) => {
+  listHarvests: (query?: { model?: string; level?: number; visibilityScope?: string; limit?: number; offset?: number }) => {
     const params = new URLSearchParams();
     if (query?.model) params.set("model", query.model);
+    if (query?.level !== undefined) params.set("level", String(query.level));
+    if (query?.visibilityScope) params.set("visibilityScope", query.visibilityScope);
     if (query?.limit) params.set("limit", String(query.limit));
     if (query?.offset) params.set("offset", String(query.offset));
     const qs = params.toString();
@@ -225,15 +227,54 @@ export const NebulaClient = {
     sourcePath: string; sourceFilename?: string; model?: string;
     totalCandidates?: number; candidates?: any[]; sourceText?: string;
     tags?: string[]; metadata?: any;
+    level?: number; visibilityScope?: string;
   }) => httpRequest("POST", "/api/harvests", body),
   /** DELETE /api/harvests/:id */
   deleteHarvest: (id: string) => httpRequest("DELETE", `/api/harvests/${encodeURIComponent(id)}`),
+
+  // ── Harvest Candidates ──────────────────────────────────────
+  /** GET /api/harvest-candidates?harvestId=&systemId=&subsystemId=&featureId=&limit=&offset= */
+  listHarvestCandidates: (query?: {
+    harvestId?: string; systemId?: string; subsystemId?: string; featureId?: string;
+    limit?: number; offset?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (query?.harvestId) params.set("harvestId", query.harvestId);
+    if (query?.systemId) params.set("systemId", query.systemId);
+    if (query?.subsystemId) params.set("subsystemId", query.subsystemId);
+    if (query?.featureId) params.set("featureId", query.featureId);
+    if (query?.limit) params.set("limit", String(query.limit));
+    if (query?.offset) params.set("offset", String(query.offset));
+    const qs = params.toString();
+    return httpGet(`/api/harvest-candidates${qs ? `?${qs}` : ""}`);
+  },
+  /** GET /api/harvest-candidates/:id */
+  getHarvestCandidate: (id: string) => httpGet(`/api/harvest-candidates/${encodeURIComponent(id)}`),
+  /** PATCH /api/harvest-candidates/:id */
+  updateHarvestCandidate: (id: string, body: {
+    title?: string; intentDescription?: string; status?: string;
+    systemId?: string | null; subsystemId?: string | null; featureId?: string | null;
+    tags?: string[]; planRef?: string;
+  }) => httpRequest("PATCH", `/api/harvest-candidates/${encodeURIComponent(id)}`, body),
+  /** POST /api/harvest-candidates */
+  createHarvestCandidate: (body: {
+    harvestId: string; title: string; intentDescription?: string;
+    implementationNotes?: any[]; codeSnippets?: any[]; openQuestions?: any[];
+    tags?: string[]; status?: string;
+    systemId?: string | null; subsystemId?: string | null; featureId?: string | null;
+    planRef?: string;
+  }) => httpRequest("POST", "/api/harvest-candidates", body),
+  /** POST /api/harvest-candidates/discover — semantic search matching of unlinked candidates to hierarchy */
+  discoverHarvestCandidates: (body: {
+    candidateIds?: string[]; limit?: number; threshold?: number;
+  }) => httpRequest("POST", "/api/harvest-candidates/discover", body),
 
   // ── Agent Records ──────────────────────────────────────────
   /** GET /api/agent-records?type=&role=&systemId=&planRef=&tag=&limit=&offset= */
   listAgentRecords: (query?: {
     type?: string; role?: string; systemId?: string; planRef?: string;
-    tag?: string; limit?: number; offset?: number;
+    tag?: string; level?: number; visibilityScope?: string;
+    limit?: number; offset?: number;
   }) => {
     const params = new URLSearchParams();
     if (query?.type) params.set("type", query.type);
@@ -241,6 +282,8 @@ export const NebulaClient = {
     if (query?.systemId) params.set("systemId", query.systemId);
     if (query?.planRef) params.set("planRef", query.planRef);
     if (query?.tag) params.set("tag", query.tag);
+    if (query?.level !== undefined) params.set("level", String(query.level));
+    if (query?.visibilityScope) params.set("visibilityScope", query.visibilityScope);
     if (query?.limit) params.set("limit", String(query.limit));
     if (query?.offset) params.set("offset", String(query.offset));
     const qs = params.toString();
@@ -253,11 +296,13 @@ export const NebulaClient = {
     recordType: string; role?: string; title?: string; content?: string;
     sourcePath?: string; metadata?: any; tags?: string[];
     systemId?: string; subsystemId?: string; featureId?: string; planRef?: string;
+    level?: number; visibilityScope?: string;
   }) => httpRequest("POST", "/api/agent-records", body),
   /** PATCH /api/agent-records/:id */
   updateAgentRecord: (id: string, body: {
     title?: string; content?: string; metadata?: any; tags?: string[];
     systemId?: string | null; subsystemId?: string | null; featureId?: string | null; planRef?: string | null;
+    level?: number; visibilityScope?: string;
   }) => httpRequest("PATCH", `/api/agent-records/${encodeURIComponent(id)}`, body),
   /** DELETE /api/agent-records/:id */
   deleteAgentRecord: (id: string) => httpRequest("DELETE", `/api/agent-records/${encodeURIComponent(id)}`),
@@ -300,6 +345,31 @@ export const NebulaClient = {
   }) => httpRequest("POST", "/api/cross-references", body),
   /** DELETE /api/cross-references/:id */
   deleteCrossReference: (id: string) => httpRequest("DELETE", `/api/cross-references/${encodeURIComponent(id)}`),
+
+  // ── Plan → Candidate reverse lookup ────────────────────────
+  /** GET /api/plans/:planRef/candidates */
+  getPlanCandidates: (planRef: string) =>
+    httpGet(`/api/plans/${encodeURIComponent(planRef)}/candidates`),
+
+  /** GET /api/systems/:id/harvest-candidates */
+  getSystemHarvestCandidates: (systemId: string) =>
+    httpGet(`/api/systems/${encodeURIComponent(systemId)}/harvest-candidates`),
+
+  /** GET /api/subsystems/:id/harvest-candidates */
+  getSubsystemHarvestCandidates: (subsystemId: string) =>
+    httpGet(`/api/subsystems/${encodeURIComponent(subsystemId)}/harvest-candidates`),
+
+  /** GET /api/features/:id/harvest-candidates */
+  getFeatureHarvestCandidates: (featureId: string) =>
+    httpGet(`/api/features/${encodeURIComponent(featureId)}/harvest-candidates`),
+
+  // ── Candidate → Plan spawn (full flow) ─────────────────────
+  /** POST /api/harvest-candidates/:id/spawn-plan — link + requirement + cross-reference */
+  spawnPlanFromCandidate: (id: string, body: {
+    systemId: string; subsystemId: string; featureId?: string | null;
+    planRef?: string; priority?: string; status?: string;
+    title?: string; description?: string;
+  }) => httpRequest("POST", `/api/harvest-candidates/${encodeURIComponent(id)}/spawn-plan`, body),
 
   // ── Conduit History (Plan 0169 recovery queries) ──────────
   /** GET /api/conduit/plans?includeDeleted=&asOf=&status=&limit=&offset= */

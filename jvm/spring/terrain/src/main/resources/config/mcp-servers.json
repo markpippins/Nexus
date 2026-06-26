@@ -56,11 +56,11 @@
     "status": "ONLINE",
     "transportType": "sse",
     "version": "1.0.0",
-    "description": "MCP server for the tackle AI configuration registry (providers, harnesses, models, role configs)",
+    "description": "MCP server for the tackle AI configuration registry (providers, harnesses, models, role configs) plus Role Memory Procedure Registry tools (memory_get_procedures, memory_get_procedure, memory_check_since, memory_refresh)",
     "repositoryUrl": "typescript/tackle-mcp",
     "startup": "npm run dev",
     "health": "/health",
-    "notes": "AI config registry — standalone from conduit-mcp",
+    "notes": "AI config registry + memory-mcp tools — reads Redis cache (populated by role-memory-srv :3500)",
     "isInternal": true
   },
   {

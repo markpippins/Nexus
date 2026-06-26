@@ -2,6 +2,12 @@ import { Request, Response, Router } from 'express';
 import { Pool } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import * as bs from './block-segmentation.service';
+import * as bsRedis from './services/block-segmentation-redis.service';
+
+const execFileAsync = promisify(execFile);
 
 // ── Color Palette (matches client) ────────────────────────────────
 const COLOR_PALETTE = [
@@ -13,6 +19,88 @@ const COLOR_PALETTE = [
 // ── Helpers ───────────────────────────────────────────────────────
 function titleCase(s: string): string {
   return s.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+}
+
+/**
+ * Bitemporal upsert of a harvest_context info tab on a system.
+ * Synthesizes the candidate's title, intent_description, and harvest source
+ * into a markdown block and writes it to nebula.system_info_tabs_history.
+ *
+ * Must be called inside an active transaction (uses the provided client).
+ */
+/** Returns true when planRef is a non-empty string (after trim). */
+function hasPlanRef(planRef: any): boolean {
+  return planRef !== undefined && planRef !== null && String(planRef).trim() !== '';
+}
+
+/**
+ * Create a cross-reference from a harvest_candidate to a conduit plan
+ * with rel_type='spawns_plan'. Uses WHERE NOT EXISTS for idempotency
+ * (cross_references has no unique constraint on the composite key).
+ *
+ * Must be called inside an active transaction (uses the provided client).
+ * Returns the created row, or null if planRef is empty or the link already exists.
+ */
+async function createSpawnsPlanCrossRef(
+  client: import('pg').PoolClient,
+  candidateId: string,
+  planRef: string | null | undefined,
+  extraMetadata?: Record<string, any>,
+): Promise<any | null> {
+  if (!hasPlanRef(planRef)) return null;
+  const planRefStr = String(planRef).trim();
+  const { rows: [xref] } = await client.query(
+    `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+     SELECT 'harvest_candidate', $1, 'plan', $2, 'spawns_plan', $3
+     WHERE NOT EXISTS (
+       SELECT 1 FROM nebula.cross_references
+       WHERE source_type = 'harvest_candidate'
+         AND source_id = $1
+         AND target_type = 'plan'
+         AND target_id = $2
+         AND rel_type = 'spawns_plan'
+     )
+     RETURNING *`,
+    [candidateId, planRefStr, JSON.stringify(extraMetadata || {})]
+  );
+  return xref || null;
+}
+
+async function upsertHarvestContextTab(
+  client: import('pg').PoolClient,
+  systemId: string,
+  candidate: { harvest_id: string; title: string; status: string | null; id: string; intent_description: string },
+) {
+  const { rows: [harvest] } = await client.query(
+    'SELECT source_filename FROM nebula.harvests WHERE id = $1',
+    [candidate.harvest_id]
+  );
+
+  const tabContent = [
+    `## Harvest: ${candidate.title}`,
+    '',
+    `**Source:** ${harvest?.source_filename || candidate.harvest_id}`,
+    `**Status:** ${candidate.status || 'unlinked'}`,
+    `**Candidate ID:** ${candidate.id}`,
+    '',
+    '### Intent',
+    '',
+    candidate.intent_description,
+  ].join('\n');
+
+  await client.query(
+    `UPDATE nebula.system_info_tabs_history
+     SET recorded_until_dt = NOW()
+     WHERE system_id = $1 AND tab_id = 'harvest_context'
+       AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+    [systemId]
+  );
+  await client.query(
+    `INSERT INTO nebula.system_info_tabs_history
+     (system_id, tab_id, content, recorded_on_dt, recorded_until_dt)
+     VALUES ($1, 'harvest_context', $2, NOW(), '9999-12-31 23:59:59+00')`,
+    [systemId, tabContent]
+  );
 }
 
 // ── Status Normalization (Plan 0132) ─────────────────────────
@@ -107,6 +195,7 @@ async function getUnusedColor(systemId: string, pool: Pool): Promise<string> {
   const used = new Set(rows.map(r => r.color));
   for (const c of COLOR_PALETTE) {
     if (!used.has(c)) return c;
+
   }
   return COLOR_PALETTE[0]; // all used — pick first
 }
@@ -823,7 +912,6 @@ export function createRoutes(pool: Pool): Router {
     try {
       const workspacePath = req.query.workspacePath as string;
       if (!workspacePath) return res.status(400).json({ error: 'workspacePath query parameter is required' });
-
       // Security: prevent directory traversal (explicit 403 for this endpoint)
       const resolved = path.resolve(NEXUS_ROOT, workspacePath);
       if (!resolved.startsWith(NEXUS_ROOT)) {
@@ -1062,6 +1150,43 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // GET /api/audit/graph — agent records as nodes, cross-references as edges
+  // ⚠ MUST be before /audit/:id to avoid Express matching 'graph' as a UUID
+  router.get('/audit/graph', async (req: Request, res: Response) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 200, 500);
+
+      const [records, crossRefs] = await Promise.all([
+        pool.query(
+          `SELECT id, record_type AS entity_type, role, title AS name,
+                  substring(content, 1, 300) AS description_abbr,
+                  tags, created_at
+           FROM nebula.agent_records
+           ORDER BY created_at DESC
+           LIMIT $1`,
+          [limit]
+        ),
+        pool.query(
+          `SELECT id, source_type AS relation_type,
+                  source_type AS source_section, source_id,
+                  target_type AS target_section, target_id,
+                  rel_type, metadata
+           FROM nebula.cross_references
+           LIMIT $1`,
+          [limit]
+        ),
+      ]);
+      res.json({
+        entities: records.rows,
+        edges: crossRefs.rows,
+        entityCount: records.rows.length,
+        edgeCount: crossRefs.rows.length,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/audit/:id — get single audit file with content
   router.get('/audit/:id', async (req: Request, res: Response) => {
     try {
@@ -1214,24 +1339,84 @@ export function createRoutes(pool: Pool): Router {
 
   // PUT /api/systems/:id/info/:tabId — save an info tab
   router.put('/systems/:id/info/:tabId', async (req: Request, res: Response) => {
+    const client = await pool.connect();
     try {
       const { id, tabId } = req.params;
       const { content } = req.body;
-      await pool.query(
+
+      await client.query('BEGIN');
+
+      await client.query(
         `UPDATE nebula.system_info_tabs_history
          SET recorded_until_dt = NOW()
          WHERE system_id = $1 AND tab_id = $2
            AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
         [id, tabId]
       );
-      await pool.query(
+      await client.query(
         `INSERT INTO nebula.system_info_tabs_history (system_id, tab_id, content, recorded_on_dt, recorded_until_dt)
          VALUES ($1, $2, $3, NOW(), '9999-12-31 23:59:59+00')`,
         [id, tabId, content || '']
       );
+
+      // Reverse link: when a harvest_context tab is cleared (empty content),
+      // unlink all candidates from this system.
+      if (tabId === 'harvest_context' && (!content || !String(content).trim())) {
+        await client.query(
+          'UPDATE nebula.harvest_candidates SET system_id = NULL WHERE system_id = $1',
+          [id]
+        );
+      }
+
+      await client.query('COMMIT');
       res.json({ ok: true });
     } catch (err: any) {
+      await client.query('ROLLBACK');
       res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // DELETE /api/systems/:id/info/:tabId — delete an info tab
+  // When tabId='harvest_context', also unlinks all candidates from this system.
+  router.delete('/systems/:id/info/:tabId', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      const { id, tabId } = req.params;
+
+      await client.query('BEGIN');
+
+      // Close the current row in the history table
+      const { rowCount } = await client.query(
+        `UPDATE nebula.system_info_tabs_history
+         SET recorded_until_dt = NOW()
+         WHERE system_id = $1 AND tab_id = $2
+           AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+        [id, tabId]
+      );
+
+      if (rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Info tab not found' });
+      }
+
+      // Reverse link: unlinking the harvest_context tab removes the
+      // system association from all candidates linked to this system.
+      if (tabId === 'harvest_context') {
+        await client.query(
+          'UPDATE nebula.harvest_candidates SET system_id = NULL WHERE system_id = $1',
+          [id]
+        );
+      }
+
+      await client.query('COMMIT');
+      res.json({ ok: true });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
     }
   });
 
@@ -1397,24 +1582,138 @@ export function createRoutes(pool: Pool): Router {
   //  HARVESTS — database-first harvest pipeline output
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/harvests — list all harvests, sorted newest first
+  // GET /api/harvests — list all harvests with sort/filter support
+  // sort options: candidate_count, code_blocks, turns, block_density, collaboration, created_at
   router.get('/harvests', async (req: Request, res: Response) => {
     try {
       const model = req.query.model as string | undefined;
+      const level = req.query.level as string | undefined;
+      const visibilityScope = req.query.visibilityScope as string | undefined;
+      const tag = req.query.tag as string | undefined;
+      const sort = (req.query.sort as string) || 'created_at';
       const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
       const offset = parseInt(req.query.offset as string) || 0;
 
-      let query = 'SELECT id, source_path, source_filename, model, total_candidates, tags, metadata, created_at FROM nebula.harvests';
-      const params: any[] = [];
-      if (model) {
-        query += ' WHERE model = $1';
-        params.push(model);
+      const validSorts = ['candidate_count', 'code_blocks', 'turns', 'block_density', 'collaboration', 'created_at', 'tag_frequency', 'keyword_hits'];
+      if (!validSorts.includes(sort)) {
+        return res.status(400).json({ error: `sort must be one of: ${validSorts.join(', ')}` });
       }
-      query += ' ORDER BY created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+
+      // Compute analytics via docklang for sortable metrics
+      const sortExpr: Record<string, string> = {
+        candidate_count: 'COALESCE(h.total_candidates, 0)',
+        code_blocks:      "COALESCE((h.docklang #>> '{stats,by_type,code}')\n::int, 0)",
+        turns:            'COALESCE(jsonb_array_length(h.docklang -> \'discourse_units\'), 0)',
+        block_density:    "CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0 THEN (h.docklang #>> '{stats,total_blocks}')::numeric / jsonb_array_length(h.docklang -> 'discourse_units') ELSE 0 END",
+        collaboration:    "(SELECT count(*) FROM jsonb_array_elements(h.docklang -> 'discourse_units') du WHERE du #>> '{heading}' ILIKE '%— user%' OR du #>> '{heading}' ILIKE '%- user%')",
+        created_at:       'h.created_at',
+        tag_frequency:    `(SELECT COALESCE(sum(freq), 0) FROM (
+           SELECT count(*) AS freq FROM nebula.harvests h2,
+           unnest(h2.tags) AS t WHERE t = ANY(h.tags) GROUP BY t
+         ) sub)`,
+        keyword_hits:     `(SELECT count(*) FROM jsonb_array_elements(h.docklang -> 'discourse_units') du
+            WHERE du #>> '{body}' ILIKE '%' || $1 || '%')`,
+      };
+
+      // Handle keyword_hits: keyword must be first param so it references $1
+      const keyword = req.query.keyword as string | undefined;
+
+      if (sort === 'keyword_hits' && !keyword) {
+        return res.status(400).json({ error: 'keyword query parameter is required when sort=keyword_hits' });
+      }
+
+      const clauses: string[] = [];
+      const params: any[] = [];
+      let pi = 1;
+      if (sort === 'keyword_hits' && keyword) { params.push(keyword); pi++; }  // keyword is $1
+      if (model) { clauses.push(`h.model = $${pi++}`); params.push(model); }
+      if (level) { clauses.push(`h.level = $${pi++}`); params.push(parseInt(level)); }
+      if (visibilityScope) { clauses.push(`h.visibility_scope = $${pi++}`); params.push(visibilityScope); }
+      if (tag) { clauses.push(`$${pi++} = ANY(h.tags)`); params.push(tag); }
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+
+      const query = `
+        SELECT h.id, h.source_path, h.source_filename, h.model,
+               h.total_candidates, h.tags, h.metadata, h.created_at,
+               h.level, h.visibility_scope,
+               COALESCE((h.docklang #>> '{stats,by_type,code}')::int, 0) AS code_blocks,
+               COALESCE(jsonb_array_length(h.docklang -> 'discourse_units'), 0) AS turns,
+               CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0
+                    THEN (h.docklang #>> '{stats,total_blocks}')::numeric / jsonb_array_length(h.docklang -> 'discourse_units')
+                    ELSE 0 END AS blocks_per_turn,
+               (SELECT count(*) FROM jsonb_array_elements(h.docklang -> 'discourse_units') du
+                WHERE du #>> '{heading}' ILIKE '%— user%' OR du #>> '{heading}' ILIKE '%- user%') AS user_turns,
+               ${sort === 'keyword_hits' ? sortExpr.keyword_hits + ' AS keyword_hits' : '0::bigint AS keyword_hits'},
+               ${sort === 'tag_frequency' ? sortExpr.tag_frequency + ' AS tag_frequency' : '0::bigint AS tag_frequency'}
+        FROM nebula.harvests h
+        ${where}
+        ORDER BY ${sortExpr[sort]} DESC NULLS LAST
+        LIMIT $${pi} OFFSET $${pi + 1}`;
       params.push(limit, offset);
 
       const { rows } = await pool.query(query, params);
-      res.json({ harvests: rows, count: rows.length });
+      res.json({ harvests: rows, count: rows.length, sort });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/harvests/distribution — analytics histograms across all harvests
+  router.get('/harvests/distribution', async (_req: Request, res: Response) => {
+    try {
+      // Turn count histogram
+      const { rows: turnBuckets } = await pool.query(`
+        SELECT
+          CASE
+            WHEN jsonb_array_length(h.docklang -> 'discourse_units') = 0 THEN '0'
+            WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 1 AND 1 THEN '1'
+            WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 2 AND 3 THEN '2-3'
+            WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 4 AND 6 THEN '4-6'
+            WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 7 AND 10 THEN '7-10'
+            WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 11 AND 20 THEN '11-20'
+            ELSE '20+'
+          END AS bucket,
+          count(*) AS harvest_count
+        FROM nebula.harvests h
+        WHERE h.docklang IS NOT NULL AND h.docklang != '{}'::jsonb
+        GROUP BY bucket
+        ORDER BY min(CASE
+          WHEN jsonb_array_length(h.docklang -> 'discourse_units') = 0 THEN 0
+          WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 1 AND 1 THEN 1
+          WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 2 AND 3 THEN 2
+          WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 4 AND 6 THEN 4
+          WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 7 AND 10 THEN 7
+          WHEN jsonb_array_length(h.docklang -> 'discourse_units') BETWEEN 11 AND 20 THEN 11
+          ELSE 21
+        END)
+      `);
+
+      // Block type totals across all harvests
+      const { rows: blockTypes } = await pool.query(`
+        SELECT block_type, count(*) AS cnt
+        FROM nebula.harvest_blocks()
+        GROUP BY block_type ORDER BY cnt DESC
+      `);
+
+      // Top tags across all harvests
+      const { rows: topTags } = await pool.query(`
+        SELECT t AS tag, count(*) AS cnt
+        FROM nebula.harvests h, unnest(h.tags) AS t
+        WHERE h.tags IS NOT NULL AND array_length(h.tags, 1) > 0
+        GROUP BY t ORDER BY cnt DESC LIMIT 20
+      `);
+
+      // Totals
+      const { rows: [totals] } = await pool.query(
+        'SELECT count(*) AS total_harvests, sum(total_candidates)::int AS total_candidates, avg(total_candidates)::numeric(5,1) AS avg_candidates_per_harvest FROM nebula.harvests'
+      );
+
+      res.json({
+        turnDistribution: turnBuckets,
+        blockTypeDistribution: blockTypes,
+        topTags,
+        totals,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1434,14 +1733,109 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // POST /api/harvests — create a new harvest record
-  router.post('/harvests', async (req: Request, res: Response) => {
+  // GET /api/harvests/:id/transcript — reconstructed conversation with code/diagrams
+  router.get('/harvests/:id/transcript', async (req: Request, res: Response) => {
     try {
-      const { sourcePath, sourceFilename, model, totalCandidates, candidates, sourceText, tags, metadata } = req.body;
+      const { id } = req.params;
+      const { rows: [harvest] } = await pool.query(
+        'SELECT id, source_filename, docklang #>> \'{meta,title}\' AS title FROM nebula.harvests WHERE id = $1', [id]
+      );
+      if (!harvest) return res.status(404).json({ error: 'Harvest not found' });
+
+      const { rows: units } = await pool.query(`
+        SELECT
+          (du_elem #>> '{provenance,turn_index}')::int AS turn_index,
+          du_elem #>> '{heading}' AS heading,
+          du_elem #>> '{provenance,role}' AS role,
+          du_elem #>> '{body}' AS body,
+          (du_elem #>> '{provenance,block_count}')::int AS block_count,
+          jsonb_agg(
+            jsonb_build_object(
+              'index', (b #>> '{provenance,block_index}')::int,
+              'type', b #>> '{type}',
+              'content', CASE WHEN b ? 'content' THEN b #>> '{content}' ELSE NULL END,
+              'items', CASE WHEN b ? 'items' THEN b -> 'items' ELSE NULL END
+            ) ORDER BY (b #>> '{provenance,block_index}')::int
+          ) AS blocks
+        FROM nebula.harvests h,
+             LATERAL jsonb_array_elements(h.docklang -> 'discourse_units') AS du_elem,
+             LATERAL jsonb_array_elements(du_elem -> 'blocks') AS b
+        WHERE h.id = $1 AND h.docklang IS NOT NULL AND h.docklang ? 'discourse_units'
+        GROUP BY turn_index, heading, role, body, block_count
+        ORDER BY turn_index
+      `, [id]);
+
+      // Count block types
+      const { rows: [stats] } = await pool.query(
+        "SELECT h.docklang -> 'stats' AS stats FROM nebula.harvests h WHERE h.id = $1", [id]
+      );
+
+      // Get candidates
+      const { rows: candidates } = await pool.query(
+        'SELECT id, title, status, system_id, intent_description FROM nebula.harvest_candidates WHERE harvest_id = $1 ORDER BY created_at', [id]
+      );
+
+      res.json({
+        harvestId: id,
+        title: harvest.title,
+        source: harvest.source_filename,
+        units,
+        stats: stats?.stats || null,
+        candidates,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/harvest-candidates/:id/promote — mark candidate as useful
+  router.post('/harvest-candidates/:id/promote', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { status = 'useful' } = req.body;
+      const validStatuses = ['useful', 'rejected', 'promoted'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: `status must be one of: ${validStatuses.join(', ')}` });
+      }
+      const { rows: [result] } = await pool.query(
+        'SELECT nebula.set_candidate_status($1, $2) AS result', [id, status]
+      );
+      res.json({ ok: true, result: result?.result });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // POST /api/harvest-candidates/promote-to-plan — collate useful candidates into a conduit plan
+  router.post('/harvest-candidates/promote-to-plan', async (req: Request, res: Response) => {
+    try {
+      const { candidateIds, project = 'nexus', goal } = req.body;
+      if (!candidateIds || !Array.isArray(candidateIds) || candidateIds.length === 0) {
+        return res.status(400).json({ error: 'candidateIds (array of UUIDs) is required' });
+      }
+      const { rows: [result] } = await pool.query(
+        'SELECT plan_id, plan_title, plan_goal, candidates_used, status_results FROM nebula.candidates_to_plan($1::uuid[], $2, $3)',
+        [candidateIds, project, goal || null]
+      );
+      res.json({ ok: true, ...result });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // POST /api/harvests — create a new harvest record AND unpack candidates
+  // into harvest_candidates (dual-write: JSONB preserved for Rover + relational for linking)
+  router.post('/harvests', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      const { sourcePath, sourceFilename, model, totalCandidates, candidates, sourceText, tags, metadata, level, visibilityScope } = req.body;
       if (!sourcePath) return res.status(400).json({ error: 'sourcePath is required' });
-      const { rows: [row] } = await pool.query(
-        `INSERT INTO nebula.harvests (source_path, source_filename, model, total_candidates, candidates, source_text, tags, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      await client.query('BEGIN');
+
+      // 1. Insert the harvest (JSONB candidates preserved exactly as provided)
+      const { rows: [row] } = await client.query(
+        `INSERT INTO nebula.harvests (source_path, source_filename, model, total_candidates, candidates, source_text, tags, metadata, level, visibility_scope)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
         [
           sourcePath,
           sourceFilename || '',
@@ -1451,22 +1845,662 @@ export function createRoutes(pool: Pool): Router {
           sourceText || null,
           tags || [],
           metadata || {},
+          level ?? 1,
+          visibilityScope || 'all',
         ]
       );
+
+      // 2. Unpack each candidate into harvest_candidates (redundant but non-destructive)
+      const candidateList: any[] = candidates || [];
+      for (const c of candidateList) {
+        await client.query(
+          `INSERT INTO nebula.harvest_candidates (harvest_id, title, intent_description, implementation_notes, code_snippets, open_questions, tags, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            row.id,
+            c.title || 'Untitled',
+            c.intentDescription || c.intent_description || null,
+            JSON.stringify(c.implementationNotes || c.implementation_notes || []),
+            JSON.stringify(c.codeSnippets || c.code_snippets || []),
+            JSON.stringify(c.openQuestions || c.open_questions || []),
+            c.tags || [],
+            c.status || c.promotionStatus || null,
+          ]
+        );
+      }
+
+      await client.query('COMMIT');
       res.status(201).json(row);
     } catch (err: any) {
+      await client.query('ROLLBACK');
       res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
     }
   });
 
   // DELETE /api/harvests/:id
   router.delete('/harvests/:id', async (req: Request, res: Response) => {
+    const client = await pool.connect();
     try {
       const { id } = req.params;
-      const { rowCount } = await pool.query('DELETE FROM nebula.harvests WHERE id = $1', [id]);
-      if (rowCount === 0) return res.status(404).json({ error: 'Harvest not found' });
+      await client.query('BEGIN');
+      // Manual cascade: harvest_candidates has no FK because harvests is a view
+      await client.query('DELETE FROM nebula.harvest_candidates WHERE harvest_id = $1', [id]);
+      const { rowCount } = await client.query('DELETE FROM nebula.harvests WHERE id = $1', [id]);
+      if (rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Harvest not found' });
+      }
+      await client.query('COMMIT');
       res.json({ ok: true });
     } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  HARVEST CANDIDATES — normalized relational access to harvest data
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/plans/:planRef/candidates — reverse lookup: find all
+  // harvest_candidates linked to a given conduit plan via cross_references.
+  router.get('/plans/:planRef/candidates', async (req: Request, res: Response) => {
+    try {
+      const { planRef } = req.params;
+      const { rows } = await pool.query(
+        `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
+                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
+                h.source_filename AS harvest_source,
+                cr.created_at AS linked_at
+         FROM nebula.harvest_candidates hc
+         JOIN nebula.cross_references cr ON cr.source_id = hc.id::text
+         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+         WHERE cr.source_type = 'harvest_candidate'
+           AND cr.target_type = 'plan'
+           AND cr.target_id = $1
+           AND cr.rel_type = 'spawns_plan'
+         ORDER BY cr.created_at DESC`,
+        [planRef]
+      );
+      res.json({ planRef, candidates: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/systems/:id/harvest-candidates — list all harvest candidates
+  // linked to a specific system (direct filter by system_id).
+  router.get('/systems/:id/harvest-candidates', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
+                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
+                h.source_filename AS harvest_source
+         FROM nebula.harvest_candidates hc
+         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+         WHERE hc.system_id = $1
+         ORDER BY hc.created_at DESC`,
+        [id]
+      );
+      res.json({ systemId: id, candidates: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/subsystems/:id/harvest-candidates — list all harvest
+  // candidates linked to a specific subsystem (filter by subsystem_id).
+  router.get('/subsystems/:id/harvest-candidates', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
+                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
+                h.source_filename AS harvest_source
+         FROM nebula.harvest_candidates hc
+         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+         WHERE hc.subsystem_id = $1
+         ORDER BY hc.created_at DESC`,
+        [id]
+      );
+      res.json({ subsystemId: id, candidates: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/features/:id/harvest-candidates — list all harvest
+  // candidates linked to a specific feature (filter by feature_id).
+  router.get('/features/:id/harvest-candidates', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
+                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
+                h.source_filename AS harvest_source
+         FROM nebula.harvest_candidates hc
+         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+         WHERE hc.feature_id = $1
+         ORDER BY hc.created_at DESC`,
+        [id]
+      );
+      res.json({ featureId: id, candidates: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy
+  router.get('/harvest-candidates', async (req: Request, res: Response) => {
+    try {
+      const { harvestId, systemId, subsystemId, featureId, limit: qLimit, offset: qOffset } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 100, 500);
+      const offset = parseInt(qOffset as string) || 0;
+
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (harvestId) { clauses.push(`hc.harvest_id = $${i++}`); vals.push(harvestId); }
+      if (systemId) { clauses.push(`hc.system_id = $${i++}`); vals.push(systemId); }
+      if (subsystemId) { clauses.push(`hc.subsystem_id = $${i++}`); vals.push(subsystemId); }
+      if (featureId) { clauses.push(`hc.feature_id = $${i++}`); vals.push(featureId); }
+
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+      vals.push(limit, offset);
+
+      const { rows } = await pool.query(
+        `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description, hc.status, hc.tags,
+                hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
+                h.source_filename AS harvest_source
+         FROM nebula.harvest_candidates hc
+         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+         ${where}
+         ORDER BY hc.created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+        vals
+      );
+      res.json({ candidates: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/harvest-candidates/:id — full candidate with all fields
+  router.get('/harvest-candidates/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        'SELECT * FROM nebula.harvest_candidates WHERE id = $1', [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Harvest candidate not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/harvest-candidates/:id — update candidate (primarily for linking to hierarchy)
+  // When systemId is set, auto-upserts the candidate's intent into a harvest_context info tab.
+  router.patch('/harvest-candidates/:id', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      const { id } = req.params;
+      const { title, intentDescription, status, systemId, subsystemId, featureId, tags, planRef } = req.body;
+
+      await client.query('BEGIN');
+
+      const sets: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (title !== undefined) { sets.push(`title = $${i++}`); vals.push(title); }
+      if (intentDescription !== undefined) { sets.push(`intent_description = $${i++}`); vals.push(intentDescription); }
+      if (status !== undefined) { sets.push(`status = $${i++}`); vals.push(status); }
+      if (systemId !== undefined) { sets.push(`system_id = $${i++}`); vals.push(systemId); }
+      if (subsystemId !== undefined) { sets.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
+      if (featureId !== undefined) { sets.push(`feature_id = $${i++}`); vals.push(featureId); }
+      if (tags !== undefined) { sets.push(`tags = $${i++}`); vals.push(tags); }
+
+      // planRef creates a cross-reference but doesn't update the candidate row;
+      // still count it as a "change" to avoid the early no-op return.
+      const planRefProvided = hasPlanRef(planRef);
+      const hasChanges = sets.length > 0 || planRefProvided;
+      if (!hasChanges) {
+        await client.query('COMMIT');
+        return res.json({ ok: true });
+      }
+
+      // Execute UPDATE (or fetch current row if planRef-only)
+      let row: any;
+      if (sets.length > 0) {
+        vals.push(id);
+        const result = await client.query(
+          `UPDATE nebula.harvest_candidates SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
+          vals
+        );
+        row = result.rows[0];
+      } else {
+        // planRef-only: fetch current row so cross-reference has context
+        const result = await client.query(
+          'SELECT * FROM nebula.harvest_candidates WHERE id = $1', [id]
+        );
+        row = result.rows[0];
+      }
+      if (!row) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Harvest candidate not found' });
+      }
+
+      // Auto-upsert: when a candidate is explicitly linked to a system (systemId
+      // provided in the request), synthesize its intent_description into a
+      // 'harvest_context' info tab on that system. Does NOT fire on status/title-only
+      // patches of already-linked candidates.
+      const shouldUpsert = systemId !== undefined && row.system_id && row.intent_description;
+      if (shouldUpsert) {
+        await upsertHarvestContextTab(client, row.system_id, row);
+      }
+
+      // Plan integration: when a planRef is provided, create a cross-reference
+      // linking this harvest_candidate to a conduit plan with rel_type='spawns_plan'.
+      await createSpawnsPlanCrossRef(client, row.id, planRef, {
+        candidateTitle: row.title,
+        harvestId: row.harvest_id,
+        systemId: row.system_id,
+        linkedAt: new Date().toISOString(),
+      });
+
+      await client.query('COMMIT');
+      res.json(row);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/harvest-candidates/:id/spawn-plan — full flow: link candidate
+  // to system, create a requirement derived from the candidate, and optionally
+  // cross-reference a conduit plan — all in one atomic transaction.
+  router.post('/harvest-candidates/:id/spawn-plan', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      const { id } = req.params;
+      const {
+        systemId,
+        subsystemId,
+        featureId = null,
+        planRef,
+        priority = 'Medium',
+        status = 'Backlog',
+        title,
+        description,
+      } = req.body;
+
+      if (!systemId) return res.status(400).json({ error: 'systemId is required' });
+      if (!subsystemId) return res.status(400).json({ error: 'subsystemId is required (requirement must belong to a subsystem)' });
+      await client.query('BEGIN');
+
+      // 1. Fetch the harvest candidate (must exist)
+      const { rows: [candidate] } = await client.query(
+        'SELECT * FROM nebula.harvest_candidates WHERE id = $1', [id]
+      );
+      if (!candidate) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Harvest candidate not found' });
+      }
+
+      // 2. Link candidate to hierarchy
+      const { rows: [updatedCandidate] } = await client.query(
+        `UPDATE nebula.harvest_candidates
+         SET system_id = $1, subsystem_id = $2, feature_id = $3
+         WHERE id = $4 RETURNING *`,
+        [systemId, subsystemId, featureId, id]
+      );
+
+      // 3. Auto-upsert harvest_context info tab (same pattern as PATCH)
+      if (candidate.intent_description) {
+        await upsertHarvestContextTab(client, systemId, candidate);
+      }
+
+      // 4. Create a requirement derived from the candidate
+      const reqTitle = title || candidate.title;
+      const reqDescription = description || candidate.intent_description || '';
+      const normalizedStatus = normalizeStatus(status);
+      if (!normalizedStatus) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: `status, if provided, must be one of: ${Array.from(STATUS_CANONICAL).join(', ')}` });
+      }
+      const { rows: [requirement] } = await client.query(
+        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [systemId, subsystemId, featureId, reqTitle, reqDescription, normalizedStatus, priority, null, null]
+      );
+
+      // 5. Create cross-reference: candidate → plan (if planRef provided)
+      const crossRef = await createSpawnsPlanCrossRef(client, candidate.id, planRef, {
+        candidateTitle: candidate.title,
+        harvestId: candidate.harvest_id,
+        systemId,
+        requirementId: requirement.id,
+        linkedAt: new Date().toISOString(),
+      });
+
+      await client.query('COMMIT');
+
+      res.status(201).json({
+        candidate: updatedCandidate,
+        requirement: {
+          ...toEpochMs(requirement, 'created_at'),
+          systemId: requirement.system_id,
+          subsystemId: requirement.subsystem_id,
+          featureId: requirement.feature_id,
+          startDate: requirement.start_date,
+          completionDate: requirement.completion_date,
+        },
+        crossReference: crossRef
+          ? { ...toEpochMs(crossRef, 'created_at'), sourceType: crossRef.source_type, sourceId: crossRef.source_id, targetType: crossRef.target_type, targetId: crossRef.target_id, relType: crossRef.rel_type }
+          : null,
+      });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/harvest-candidates — create a standalone candidate (e.g. manually linked).
+  // When systemId is set, auto-upserts a harvest_context info tab on the target system.
+  router.post('/harvest-candidates', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      const { harvestId, title, intentDescription, implementationNotes, codeSnippets, openQuestions, tags, status, systemId, subsystemId, featureId, planRef } = req.body;
+      if (!harvestId || !title) return res.status(400).json({ error: 'harvestId and title are required' });
+      await client.query('BEGIN');
+
+      const { rows: [row] } = await client.query(
+        `INSERT INTO nebula.harvest_candidates (harvest_id, title, intent_description, implementation_notes, code_snippets, open_questions, tags, status, system_id, subsystem_id, feature_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [
+          harvestId, title,
+          intentDescription || null,
+          JSON.stringify(implementationNotes || []),
+          JSON.stringify(codeSnippets || []),
+          JSON.stringify(openQuestions || []),
+          tags || [], status || null,
+          systemId || null, subsystemId || null, featureId || null,
+        ]
+      );
+
+      // Auto-upsert: when created with a systemId and intent_description,
+      // synthesize into a harvest_context info tab (same pattern as PATCH).
+      if (row.system_id && row.intent_description) {
+        await upsertHarvestContextTab(client, row.system_id, row);
+      }
+
+      // Plan integration: create cross-reference if planRef provided
+      await createSpawnsPlanCrossRef(client, row.id, planRef, {
+        candidateTitle: row.title,
+        harvestId: row.harvest_id,
+        systemId: row.system_id,
+        linkedAt: new Date().toISOString(),
+      });
+
+      await client.query('COMMIT');
+      res.status(201).json(row);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  HARVEST CANDIDATE DISCOVERY — semantic search against project hierarchy
+  // ════════════════════════════════════════════════════════════════
+
+  // POST /api/harvest-candidates/discover — match unlinked candidates to systems/subsystems/features
+  // via semantic search, flagging undocumented projects below confidence threshold.
+  router.post('/harvest-candidates/discover', async (req: Request, res: Response) => {
+    try {
+      const {
+        candidateIds,
+        limit = 50,
+        threshold = 0.75,
+      } = req.body;
+
+      const candidateLimit = Math.min(parseInt(String(limit)) || 50, 200);
+      const rawThreshold = parseFloat(String(threshold));
+      const matchThreshold = !isNaN(rawThreshold) && rawThreshold >= 0 && rawThreshold <= 1 ? rawThreshold : 0.75;
+
+      // Validate threshold range at the REST level (zod validates at MCP level)
+      if (isNaN(rawThreshold) || rawThreshold < 0 || rawThreshold > 1) {
+        return res.status(400).json({ error: 'threshold must be a number between 0 and 1' });
+      }
+
+      // 1. Query unlinked harvest candidates (respect temporal validity)
+      let candidateQuery = `
+        SELECT hc.id, hc.title, hc.intent_description, hc.harvest_id,
+               h.source_filename AS harvest_source
+        FROM nebula.harvest_candidates hc
+        LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+        WHERE hc.system_id IS NULL
+          AND hc.subsystem_id IS NULL
+          AND hc.feature_id IS NULL
+          AND NOW() >= hc.valid_from
+          AND NOW() < hc.valid_until
+      `;
+      const candidateParams: any[] = [];
+
+      if (candidateIds && Array.isArray(candidateIds) && candidateIds.length > 0) {
+        candidateQuery += ` AND hc.id = ANY($1::uuid[])`;
+        candidateParams.push(candidateIds);
+      }
+
+      candidateQuery += ` ORDER BY hc.created_at DESC LIMIT $${candidateParams.length + 1}`;
+      candidateParams.push(candidateLimit);
+
+      const { rows: candidates } = await pool.query(candidateQuery, candidateParams);
+
+      if (candidates.length === 0) {
+        return res.json({
+          candidateCount: 0,
+          matchThreshold,
+          matches: [],
+          undocumented: [],
+        });
+      }
+
+      // 2. Fetch full hierarchy (systems, subsystems, features) for name-based matching
+      const [systemsRes, subsystemsRes, featuresRes] = await Promise.all([
+        pool.query('SELECT id, name, description FROM systems ORDER BY name'),
+        pool.query('SELECT s.id, s.name, s.description, s.system_id, sys.name AS system_name FROM subsystems s LEFT JOIN systems sys ON sys.id = s.system_id ORDER BY s.name'),
+        pool.query('SELECT f.id, f.name, f.description, f.subsystem_id, sub.name AS subsystem_name, sub.system_id FROM features f LEFT JOIN subsystems sub ON sub.id = f.subsystem_id ORDER BY f.name'),
+      ]);
+
+      const allSystems = systemsRes.rows;
+      const allSubsystems = subsystemsRes.rows;
+      const allFeatures = featuresRes.rows;
+
+      // 3. For each candidate, run semantic search (parallelized) and evaluate confidence
+      const scriptPath = '/home/codex/dev/nexus/python/rover/unified_semantic_search.py';
+      const pythonBin = '/home/codex/dev/nexus/python/rover/.venv/bin/python3';
+
+      interface MatchResult {
+        candidateId: string;
+        candidateTitle: string;
+        candidateIntent: string | null;
+        harvestSource: string | null;
+        curatedMatches: Array<{
+          entityId: string;
+          entityName: string;
+          section: string;
+          entityType: string;
+          description: string;
+          similarity: number;
+        }>;
+        hierarchyMatches: Array<{
+          type: 'system' | 'subsystem' | 'feature';
+          id: string;
+          name: string;
+          description: string;
+          parentInfo?: string;
+        }>;
+        topSimilarity: number;
+        searchFailed?: boolean;
+      }
+
+      // Helper: build search query and run text matching for one candidate
+      const searchPromises = candidates.map(async (cand): Promise<MatchResult> => {
+        const searchQuery = [cand.title, cand.intent_description]
+          .filter(Boolean)
+          .join(' ')
+          .slice(0, 500);
+
+        if (!searchQuery) {
+          return {
+            candidateId: cand.id,
+            candidateTitle: cand.title,
+            candidateIntent: cand.intent_description,
+            harvestSource: cand.harvest_source,
+            curatedMatches: [],
+            hierarchyMatches: [],
+            topSimilarity: 0,
+          };
+        }
+
+        let curatedMatches: MatchResult['curatedMatches'] = [];
+        let searchFailed = false;
+        try {
+          const { stdout } = await execFileAsync(
+            pythonBin,
+            [scriptPath, searchQuery, '--limit', '15', '--json'],
+            { timeout: 60000, maxBuffer: 10 * 1024 * 1024 }
+          );
+
+          const parsed = JSON.parse(stdout);
+          const results: any[] = parsed.results || [];
+
+          curatedMatches = results
+            .filter((r: any) => r.provenance === 'curated')
+            .map((r: any) => ({
+              entityId: r.id,
+              entityName: r.title,
+              section: r.section || '',
+              entityType: r.entity_type || '',
+              description: (r.description || '').slice(0, 300),
+              similarity: r.similarity,
+            }));
+        } catch (searchErr: any) {
+          console.error(`[discover] Semantic search failed for candidate ${cand.id}:`, searchErr.message);
+          searchFailed = true;
+        }
+
+        // Simple text matching against hierarchy (token-based, ILIKE equivalent)
+        const hierarchyMatches: MatchResult['hierarchyMatches'] = [];
+        const searchTokens = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+
+        for (const sys of allSystems) {
+          const sysName = (sys.name || '').toLowerCase();
+          const sysDesc = (sys.description || '').toLowerCase();
+          const tokenHits = searchTokens.filter(t => sysName.includes(t) || sysDesc.includes(t)).length;
+          if (tokenHits > 0) {
+            hierarchyMatches.push({
+              type: 'system',
+              id: sys.id,
+              name: sys.name,
+              description: (sys.description || '').slice(0, 200),
+              parentInfo: undefined,
+            });
+          }
+        }
+
+        for (const sub of allSubsystems) {
+          const subName = (sub.name || '').toLowerCase();
+          const subDesc = (sub.description || '').toLowerCase();
+          const tokenHits = searchTokens.filter(t => subName.includes(t) || subDesc.includes(t)).length;
+          if (tokenHits > 0) {
+            hierarchyMatches.push({
+              type: 'subsystem',
+              id: sub.id,
+              name: sub.name,
+              description: (sub.description || '').slice(0, 200),
+              parentInfo: `System: ${sub.system_name || 'unknown'}`,
+            });
+          }
+        }
+
+        for (const feat of allFeatures) {
+          const featName = (feat.name || '').toLowerCase();
+          const featDesc = (feat.description || '').toLowerCase();
+          const tokenHits = searchTokens.filter(t => featName.includes(t) || featDesc.includes(t)).length;
+          if (tokenHits > 0) {
+            hierarchyMatches.push({
+              type: 'feature',
+              id: feat.id,
+              name: feat.name,
+              description: (feat.description || '').slice(0, 200),
+              parentInfo: `Subsystem: ${feat.subsystem_name || 'unknown'}`,
+            });
+          }
+        }
+
+        const topCuratedSimilarity = curatedMatches.length > 0
+          ? Math.max(...curatedMatches.map(m => m.similarity))
+          : 0;
+
+        const result: MatchResult = {
+          candidateId: cand.id,
+          candidateTitle: cand.title,
+          candidateIntent: cand.intent_description,
+          harvestSource: cand.harvest_source,
+          curatedMatches: curatedMatches.slice(0, 5),
+          hierarchyMatches: hierarchyMatches.slice(0, 5),
+          topSimilarity: topCuratedSimilarity,
+        };
+        if (searchFailed) result.searchFailed = true;
+        return result;
+      });
+
+      // Run searches with concurrency limiting (max 8 parallel Python subprocesses
+      // to avoid overwhelming Ollama and system resources)
+      const MAX_CONCURRENT = 8;
+      const allResults: MatchResult[] = [];
+      for (let i = 0; i < searchPromises.length; i += MAX_CONCURRENT) {
+        const batch = searchPromises.slice(i, i + MAX_CONCURRENT);
+        const batchResults = await Promise.all(batch);
+        allResults.push(...batchResults);
+      }
+
+      // Classify by threshold
+      const matched: MatchResult[] = [];
+      const undocumented: MatchResult[] = [];
+      for (const result of allResults) {
+        if (result.topSimilarity >= matchThreshold) {
+          matched.push(result);
+        } else {
+          undocumented.push(result);
+        }
+      }
+
+      res.json({
+        candidateCount: candidates.length,
+        matchThreshold,
+        matches: matched,
+        undocumented,
+      });
+    } catch (err: any) {
+      console.error('[discover] Error:', err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1478,7 +2512,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/agent-records — list records with optional filters
   router.get('/agent-records', async (req: Request, res: Response) => {
     try {
-      const { type, role, systemId, planRef, tag, limit: qLimit, offset: qOffset } = req.query;
+      const { type, role, systemId, planRef, tag, level, visibilityScope, limit: qLimit, offset: qOffset } = req.query;
       const limit = Math.min(parseInt(qLimit as string) || 100, 500);
       const offset = parseInt(qOffset as string) || 0;
 
@@ -1491,10 +2525,12 @@ export function createRoutes(pool: Pool): Router {
       if (systemId) { clauses.push(`system_id = $${i++}`); vals.push(systemId); }
       if (planRef) { clauses.push(`plan_ref = $${i++}`); vals.push(planRef); }
       if (tag) { clauses.push(`$$${i} = ANY(tags)`); vals.push(tag); i++; }
+      if (level) { clauses.push(`level = $${i++}`); vals.push(parseInt(level as string)); }
+      if (visibilityScope) { clauses.push(`visibility_scope = $${i++}`); vals.push(visibilityScope); }
 
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
       const { rows } = await pool.query(
-        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, plan_ref, created_at, recorded_on_dt
+        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
          FROM nebula.agent_records ${where}
          ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
         [...vals, limit, offset]
@@ -1522,20 +2558,25 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/agent-records — create a new agent record (canonical write path)
   router.post('/agent-records', async (req: Request, res: Response) => {
     try {
-      const { recordType, role, title, content, sourcePath, metadata, tags, systemId, subsystemId, featureId, planRef } = req.body;
+      const { recordType, role, title, content, sourcePath, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope } = req.body;
 
       const validTypes = ['report', 'analysis', 'assessment', 'inspection', 'prompt', 'response', 'engineering_log', 'architecture_note', 'decision'];
       if (!recordType || !validTypes.includes(recordType)) {
         return res.status(400).json({ error: `recordType must be one of: ${validTypes.join(', ')}` });
       }
 
+      if (level !== undefined && (level < 1 || level > 4)) {
+        return res.status(400).json({ error: 'level must be between 1 and 4' });
+      }
+
       const { rows: [row] } = await pool.query(
-        `INSERT INTO nebula.agent_records (record_type, role, title, content, source_path, metadata, tags, system_id, subsystem_id, feature_id, plan_ref)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        `INSERT INTO nebula.agent_records (record_type, role, title, content, source_path, metadata, tags, system_id, subsystem_id, feature_id, plan_ref, level, visibility_scope)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
         [
           recordType, role || '', title || '', content || '',
           sourcePath || null, metadata || {}, tags || [],
           systemId || null, subsystemId || null, featureId || null, planRef || null,
+          level ?? 1, visibilityScope || 'all',
         ]
       );
       res.status(201).json(row);
@@ -1548,7 +2589,10 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/agent-records/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { title, content, metadata, tags, systemId, subsystemId, featureId, planRef } = req.body;
+      const { title, content, metadata, tags, systemId, subsystemId, featureId, planRef, level, visibilityScope } = req.body;
+      if (level !== undefined && (level < 1 || level > 4)) {
+        return res.status(400).json({ error: 'level must be between 1 and 4' });
+      }
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -1560,6 +2604,8 @@ export function createRoutes(pool: Pool): Router {
       if (subsystemId !== undefined) { sets.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
       if (featureId !== undefined) { sets.push(`feature_id = $${i++}`); vals.push(featureId); }
       if (planRef !== undefined) { sets.push(`plan_ref = $${i++}`); vals.push(planRef); }
+      if (level !== undefined) { sets.push(`level = $${i++}`); vals.push(level); }
+      if (visibilityScope !== undefined) { sets.push(`visibility_scope = $${i++}`); vals.push(visibilityScope); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [row] } = await pool.query(
@@ -1742,6 +2788,451 @@ export function createRoutes(pool: Pool): Router {
       res.status(500).json({ error: err.message });
     }
   });
+
+
+  // ════════════════════════════════════════════════════════════════
+  //  BLOCK SEGMENTATION — interactive block-level transcript editing
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/conversations/:id/snapshots — list all snapshots for a conversation
+  router.get('/conversations/:id/snapshots', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const result = await bs.listSnapshots(pool, id as string);
+      res.json(result);
+
+      // Warm session cache on read
+      try {
+        await bsRedis.cacheSession(id as string, {
+          conversationId: id as string,
+          activeSnapshotId: result.snapshots[0]?.id || null,
+          mode: 'view',
+          userId: 'unknown',
+        });
+      } catch (_) { /* Redis unavailable — non-fatal */ }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/snapshots/:id/blocks — list blocks with optional diff from a previous snapshot
+  router.get('/snapshots/:id/blocks', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const dq = req.query.diffFrom;
+      const diffFrom = typeof dq === 'string' ? dq : undefined;
+      const result = await bs.listBlocks(pool, id as string, diffFrom);
+      res.json(result);
+
+      // Cache blocks for next read (non-diff queries only)
+      if (!diffFrom) {
+        try { await bsRedis.cacheBlocks(id as string, result.blocks); }
+        catch (_) { /* non-fatal */ }
+
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/snapshots — create a new conversation snapshot with blocks
+  router.post('/snapshots', async (req: Request, res: Response) => {
+    try {
+      const { conversationId, snapshotIndex, sourceHash, captureMode, blockCount, createdBy, blocks } = req.body;
+      if (!conversationId || snapshotIndex === undefined || !sourceHash) {
+        return res.status(400).json({ error: 'conversationId, snapshotIndex, and sourceHash are required' });
+      }
+      const result = await bs.createSnapshot(pool, {
+        conversationId, snapshotIndex, sourceHash, captureMode, blockCount, createdBy, blocks,
+      });
+      // Cache new blocks and invalidate stale projection
+      try {
+        await bsRedis.cacheBlocks(result.snapshot.id, blocks || []);
+        await bsRedis.invalidateProjection(result.snapshot.id);
+      } catch (_) { /* non-fatal */ }
+      res.status(201).json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/segments — commit a user-defined segment
+  router.post('/segments', async (req: Request, res: Response) => {
+    try {
+      const { conversationId, snapshotId, startBlockId, endBlockId, startBlockIndex, endBlockIndex, segmentType, source, title, notesMd, createdBy } = req.body;
+      if (!conversationId || !snapshotId || !startBlockId || !endBlockId || startBlockIndex === undefined || endBlockIndex === undefined) {
+        return res.status(400).json({ error: 'conversationId, snapshotId, startBlockId, endBlockId, startBlockIndex, and endBlockIndex are required' });
+      }
+      // Invalidate caches after segment commit
+      try {
+        await bsRedis.invalidateCandidates(req.body.snapshotId);
+        await bsRedis.invalidateProjection(req.body.snapshotId);
+        await bsRedis.invalidateGraph(req.body.snapshotId);
+      } catch (_) { /* non-fatal */ }
+      const segment = await bs.createSegment(pool, {
+        conversationId, snapshotId, startBlockId, endBlockId, startBlockIndex, endBlockIndex, segmentType, source, title, notesMd, createdBy,
+      });
+      res.status(201).json(segment);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/segments/:id — update segment (type, state, title, notes)
+  router.patch('/segments/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { segmentType, state, title, notesMd } = req.body;
+      const segment = await bs.updateSegment(pool, id as string, { segmentType, state, title, notesMd });
+      if (!segment) return res.status(404).json({ error: 'Segment not found' });
+      res.json(segment);
+      try { await bsRedis.invalidateProjection(segment.snapshot_id); }
+      catch (_) { /* non-fatal */ }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/segments/:id — supersede (bitemporal expire) a segment
+  router.delete('/segments/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const result = await bs.supersedeSegment(pool, id as string);
+      res.json(result);
+
+      // Invalidate caches after segment deletion
+      try {
+        const { rows } = await pool.query(
+          'SELECT snapshot_id FROM nebula.segments_history WHERE id = $1 AND recorded_until_dt = \'9999-12-31 23:59:59+00\'',
+          [req.params.id]
+        );
+        if (rows.length > 0) {
+          await bsRedis.invalidateProjection(rows[0].snapshot_id);
+          await bsRedis.invalidateGraph(rows[0].snapshot_id);
+        }
+      } catch (_) { /* non-fatal */ }
+    } catch (err: any) {
+      const status = err.message === 'Segment not found' ? 404 : 500;
+      res.status(status).json({ error: err.message });
+    }
+  });
+
+  // POST /api/projection-overrides — add a suppression/deprioritization override
+  router.post('/projection-overrides', async (req: Request, res: Response) => {
+    try {
+      const { conversationId, snapshotId, targetType, targetId, projectionTarget, overrideType, reasonCode, notesMd, source, createdBy } = req.body;
+      if (!conversationId || !snapshotId || !targetId) {
+        return res.status(400).json({ error: 'conversationId, snapshotId, and targetId are required' });
+      }
+      // Invalidate projection cache for this snapshot
+      try {
+        await bsRedis.invalidateProjection(req.body.snapshotId, req.body.projectionTarget || 'BP');
+      } catch (_) { /* non-fatal */ }
+      const override = await bs.createProjectionOverride(pool, {
+        conversationId, snapshotId, targetType, targetId, projectionTarget, overrideType, reasonCode, notesMd, source, createdBy,
+      });
+      res.status(201).json(override);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/projection-overrides/:id — remove an override
+  router.delete('/projection-overrides/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const result = await bs.removeProjectionOverride(pool, id as string);
+      res.json(result);
+
+      // Invalidate projection cache
+      try {
+        const { rows } = await pool.query(
+          "SELECT snapshot_id, projection_target FROM nebula.projection_overrides_history WHERE id = $1 AND recorded_until_dt = '9999-12-31 23:59:59+00'",
+          [req.params.id]
+        );
+        if (rows.length > 0) {
+          await bsRedis.invalidateProjection(rows[0].snapshot_id, rows[0].projection_target);
+        }
+      } catch (_) { /* non-fatal */ }
+    } catch (err: any) {
+      const status = err.message === 'Override not found' ? 404 : 500;
+      res.status(status).json({ error: err.message });
+    }
+  });
+
+  // GET /api/snapshots/:id/projection — get the BP projection for a snapshot
+  router.get('/snapshots/:id/projection', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const tq = req.query.target;
+      const target = (typeof tq === 'string' ? tq : undefined) || 'BP';
+
+      // Try Redis cache first
+      try {
+        const cached = await bsRedis.getCachedProjection(id as string, target);
+        if (cached) { res.json(cached); return; }
+      } catch (_) { /* cache miss — fall through to PG */ }
+      const result = await bs.getProjection(pool, id as string, target);
+      res.json(result);
+
+      // Cache projection for next read
+      try { await bsRedis.cacheProjection(id as string, target, result); }
+      catch (_) { /* non-fatal */ }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/snapshots/:id/references — get harvest references for a snapshot
+  router.get('/snapshots/:id/references', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const sq = req.query.state;
+      const eq = req.query.edgeType;
+      const state = typeof sq === 'string' ? sq : undefined;
+      const edgeType = typeof eq === 'string' ? eq : undefined;
+      const mq = req.query.minConfidence;
+      const minConfidence = typeof mq === 'string' ? parseFloat(mq) : undefined;
+      const result = await bs.listReferences(pool, id as string, { state, edgeType, minConfidence });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  KNOWLEDGE GRAPH — read-only queries for graph visualization
+  // ═══════════════════════════════════════════════════════════════════
+
+  // GET /api/knowledge/entities — list knowledge graph entities with optional filters
+  router.get('/knowledge/entities', async (req: Request, res: Response) => {
+    try {
+      const { section, entity_type, search, limit: qLimit, offset: qOffset } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 200, 500);
+      const offset = parseInt(qOffset as string) || 0;
+
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let i = 1;
+
+      if (section) { conditions.push(`section = $${i++}`); params.push(section); }
+      if (entity_type) { conditions.push(`entity_type = $${i++}`); params.push(entity_type); }
+      if (search) { conditions.push(`(name ILIKE $${i} OR description ILIKE $${i})`); params.push(`%${search}%`); i++; }
+
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      params.push(limit, offset);
+
+      const { rows } = await pool.query(
+        `SELECT id, section, entity_id, name, entity_type, status,
+                substring(description, 1, 500) AS description_abbr,
+                created_at, updated_at
+         FROM knowledge.graph_entities ${where}
+         ORDER BY section, name
+         LIMIT $${i++} OFFSET $${i}`,
+        params
+      );
+      res.json({ entities: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/knowledge/entities/:section/:entityId — get single entity
+  router.get('/knowledge/entities/:section/:entityId', async (req: Request, res: Response) => {
+    try {
+      const { section, entityId } = req.params;
+      const { rows: [row] } = await pool.query(
+        'SELECT * FROM knowledge.graph_entities WHERE section = $1 AND entity_id = $2',
+        [section, entityId]
+      );
+      if (!row) return res.status(404).json({ error: 'Entity not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/knowledge/entities/:section/:entityId/relations — inbound + outbound
+  router.get('/knowledge/entities/:section/:entityId/relations', async (req: Request, res: Response) => {
+    try {
+      const { section, entityId } = req.params;
+      const [outbound, inbound] = await Promise.all([
+        pool.query(
+          `SELECT e.id, e.relation_type, e.target_section, e.target_id, e.properties,
+                  tgt.name AS target_name
+           FROM knowledge.graph_edges e
+           LEFT JOIN knowledge.graph_entities tgt ON tgt.section = e.target_section AND tgt.entity_id = e.target_id
+           WHERE e.source_section = $1 AND e.source_id = $2
+           ORDER BY e.relation_type`,
+          [section, entityId]
+        ),
+        pool.query(
+          `SELECT e.id, e.relation_type, e.source_section, e.source_id, e.properties,
+                  src.name AS source_name
+           FROM knowledge.graph_edges e
+           LEFT JOIN knowledge.graph_entities src ON src.section = e.source_section AND src.entity_id = e.source_id
+           WHERE e.target_section = $1 AND e.target_id = $2
+           ORDER BY e.relation_type`,
+          [section, entityId]
+        ),
+      ]);
+      res.json({
+        entity: { section, entity_id: entityId },
+        outbound: { count: outbound.rows.length, edges: outbound.rows },
+        inbound: { count: inbound.rows.length, edges: inbound.rows },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/knowledge/edges — list graph edges with optional filters
+  router.get('/knowledge/edges', async (req: Request, res: Response) => {
+    try {
+      const { source_section, source_id, target_section, target_id, relation_type, limit: qLimit, offset: qOffset } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 200, 500);
+      const offset = parseInt(qOffset as string) || 0;
+
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let i = 1;
+
+      if (source_section) { conditions.push(`e.source_section = $${i++}`); params.push(source_section); }
+      if (source_id) { conditions.push(`e.source_id = $${i++}`); params.push(source_id); }
+      if (target_section) { conditions.push(`e.target_section = $${i++}`); params.push(target_section); }
+      if (target_id) { conditions.push(`e.target_id = $${i++}`); params.push(target_id); }
+      if (relation_type) { conditions.push(`e.relation_type = $${i++}`); params.push(relation_type); }
+
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      params.push(limit, offset);
+
+      const { rows } = await pool.query(
+        `SELECT e.id, e.source_section, e.source_id, e.relation_type,
+                e.target_section, e.target_id, e.properties, e.created_at,
+                src.name AS source_name, tgt.name AS target_name
+         FROM knowledge.graph_edges e
+         LEFT JOIN knowledge.graph_entities src ON src.section = e.source_section AND src.entity_id = e.source_id
+         LEFT JOIN knowledge.graph_entities tgt ON tgt.section = e.target_section AND tgt.entity_id = e.target_id
+         ${where}
+         ORDER BY e.source_section, e.source_id, e.relation_type
+         LIMIT $${i++} OFFSET $${i}`,
+        params
+      );
+      res.json({ edges: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/knowledge/summary — entity counts by section, edge counts by relation type
+  router.get('/knowledge/summary', async (_req: Request, res: Response) => {
+    try {
+      const [entityCount, edgeCount, xrefCount, sections, relationTypes] = await Promise.all([
+        pool.query('SELECT COUNT(*)::int AS count FROM knowledge.graph_entities'),
+        pool.query('SELECT COUNT(*)::int AS count FROM knowledge.graph_edges'),
+        pool.query('SELECT COUNT(*)::int AS count FROM knowledge.graph_cross_references'),
+        pool.query('SELECT section, COUNT(*)::int AS count FROM knowledge.graph_entities GROUP BY section ORDER BY count DESC'),
+        pool.query('SELECT relation_type, COUNT(*)::int AS count FROM knowledge.graph_edges GROUP BY relation_type ORDER BY count DESC'),
+      ]);
+      res.json({
+        entityCount: entityCount.rows[0]?.count ?? 0,
+        edgeCount: edgeCount.rows[0]?.count ?? 0,
+        crossReferenceCount: xrefCount.rows[0]?.count ?? 0,
+        bySection: sections.rows,
+        byRelationType: relationTypes.rows,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/knowledge/view — combined data payload for graph visualization
+  // Returns all entities (including linked harvest_candidates) + all edges in one call, with optional limit. Harvest_candidates are unioned so spawn-plan cross-references render as dashed edges in graph-view X-Refs mode.
+  router.get('/knowledge/view', async (req: Request, res: Response) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
+
+      // Union knowledge entities with linked harvest_candidates (for cross-ref visibility)
+      const unionEntities = `
+        SELECT id, section, entity_id, name, entity_type, status, description_abbr
+        FROM (
+          SELECT id, section, entity_id, name, entity_type, status,
+                 substring(description, 1, 300) AS description_abbr
+          FROM knowledge.graph_entities
+          UNION ALL
+          SELECT gen_random_uuid() AS id,
+                 'harvest_candidate' AS section,
+                 id::text AS entity_id,
+                 COALESCE(title, 'Untitled') AS name,
+                 'harvest_candidate' AS entity_type,
+                 COALESCE(status, 'unlinked') AS status,
+                 substring(intent_description, 1, 300) AS description_abbr
+          FROM nebula.harvest_candidates
+          WHERE system_id IS NOT NULL
+        ) AS all_entities
+        ORDER BY section, name
+        LIMIT $1`;
+
+      const [entities, edges] = await Promise.all([
+        pool.query(unionEntities, [limit]),
+        pool.query(
+          `SELECT e.id, e.source_section, e.source_id, e.relation_type,
+                  e.target_section, e.target_id,
+                  src.name AS source_name, tgt.name AS target_name
+           FROM knowledge.graph_edges e
+           LEFT JOIN knowledge.graph_entities src ON src.section = e.source_section AND src.entity_id = e.source_id
+           LEFT JOIN knowledge.graph_entities tgt ON tgt.section = e.target_section AND tgt.entity_id = e.target_id
+           LIMIT $1`,
+          [limit * 3]
+        ),
+      ]);
+      res.json({
+        entities: entities.rows,
+        edges: edges.rows,
+        entityCount: entities.rows.length,
+        edgeCount: edges.rows.length,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/knowledge/cross-references — list cross-references for graph overlay. Also includes harvest_candidate spawn-plan cross-references from nebula.cross_references.
+  router.get('/knowledge/cross-references', async (req: Request, res: Response) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
+      // Union knowledge cross-references with harvest_candidate spawn-plan xrefs
+      const { rows } = await pool.query(
+        `SELECT id, map_name, source_section, source_id, target_section, target_id, weight
+         FROM (
+           SELECT xr.id, xr.map_name, xr.source_section, xr.source_id,
+                  xr.target_section, xr.target_id, xr.weight
+           FROM knowledge.graph_cross_references xr
+           UNION ALL
+           SELECT gen_random_uuid() AS id,
+                  'harvest_candidate' AS map_name,
+                  source_type AS source_section,
+                  source_id,
+                  target_type AS target_section,
+                  target_id,
+                  1 AS weight
+           FROM nebula.cross_references
+           WHERE source_type = 'harvest_candidate'
+             AND rel_type = 'spawns_plan'
+         ) AS all_xrefs
+         LIMIT $1`,
+        [limit]
+      );
+      res.json({ crossReferences: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  AUDIT GRAPH — agent records as graph nodes
+  //  (route handler is defined above, alongside other audit routes)
+  // ═══════════════════════════════════════════════════════════════════
 
   // ═══════════════════════════════════════════════════════════════════
   //  CONDUIT — plan history & point-in-time queries (conduit + vision schemas)

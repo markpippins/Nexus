@@ -1,6 +1,6 @@
 import { Component, signal, OnInit, Inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { NgFor, NgClass, NgIf } from '@angular/common';
+import { NgFor, NgClass } from '@angular/common';
 import { ConduitMetrics } from '../../services/types';
 import { API_BASE_URL } from '../../services/api-config';
 import { LoadingSpinnerComponent } from '../loading-spinner/loading-spinner.component';
@@ -10,13 +10,14 @@ import { EmptyStateComponent } from '../empty-state/empty-state.component';
 @Component({
   selector: 'app-analytics-dashboard',
   standalone: true,
-  imports: [NgFor, NgClass, NgIf, LoadingSpinnerComponent, ErrorBannerComponent, EmptyStateComponent],
+  imports: [NgFor, NgClass, LoadingSpinnerComponent, ErrorBannerComponent, EmptyStateComponent],
   template: `<div class="dashboard">
     <h2>📊 Analytics</h2>
-    <app-loading-spinner *ngIf="loading()" />
-    <app-error-banner *ngIf="error() as e" [message]="e" retryLabel="Retry" (retry)="load()" />
-    <ng-container *ngIf="!loading() && !error()">
-      <ng-container *ngIf="metrics(); else noData">
+    @if (loading()) {<app-loading-spinner />}
+    @if (error(); as e) {<app-error-banner [message]="e" retryLabel="Retry" (retry)="load()" />}
+    @if (!loading() && !error()) {
+      @if (metrics()) {
+
         <div class="chips"><button class="chip" *ngFor="let r of [{k:'all',l:'All'},{k:'7d',l:'7d'},{k:'24h',l:'24h'}]" [ngClass]="{active:range()===r.k}" (click)="setRange(r.k)">{{r.l}}</button></div>
         <div class="stat-cards">
           <div class="stat" *ngFor="let s of statCards()"><div class="stat-num">{{s.value}}</div><div class="stat-label">{{s.label}}</div></div>
@@ -30,11 +31,10 @@ import { EmptyStateComponent } from '../empty-state/empty-state.component';
         <div class="section"><h3>Plan Distribution</h3>
           <div class="age-bar" *ngFor="let a of metrics()?.planAgeDistribution || []"><span class="age-label">{{a.bucket}}</span><span class="age-bg"><span class="age-fill" [style.width.%]="a.count*5>100?100:a.count*5"></span></span><span class="age-count">{{a.count}}</span></div>
         </div>
-      </ng-container>
-      <ng-template #noData>
+      } @else {
         <app-empty-state icon="📊" title="No analytics data" description="Run some plans to see analytics." />
-      </ng-template>
-    </ng-container>
+      }
+    }
   </div>`,
   styles: [`.dashboard{padding:16px;height:calc(100vh - 60px);overflow-y:auto}h2{color:var(--text-primary);margin-bottom:12px}h3{color:var(--text-muted);font-size:13px;margin-bottom:8px}.chips{display:flex;gap:6px;margin-bottom:12px}.chip{background:var(--bg-secondary);border:1px solid var(--border-default);color:var(--text-muted);padding:4px 12px;border-radius:14px;font-size:12px;cursor:pointer}.chip.active{background:var(--accent-blue-bg);color:var(--accent-blue-text)}.stat-cards{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}.stat{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;padding:16px;min-width:120px;flex:1}.stat-num{font-size:28px;font-weight:700;color:var(--text-primary)}.stat-label{font-size:11px;color:var(--text-dim);margin-top:4px}.section{background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;padding:14px;margin-bottom:12px}.sparkline{display:flex;align-items:flex-end;gap:4px;height:60px;color:var(--accent-blue-text);font-size:18px}.bar{cursor:pointer}.avg{font-size:12px;color:var(--text-dim);margin-top:8px}.age-bar{display:flex;align-items:center;gap:8px;margin-bottom:4px}.age-label{font-size:11px;color:var(--text-muted);width:50px}.age-bg{flex:1;height:10px;background:var(--bg-primary);border-radius:5px;overflow:hidden}.age-fill{height:100%;background:var(--accent-blue);border-radius:5px}.age-count{font-size:11px;color:var(--text-dim);width:30px;text-align:right}`]
 })

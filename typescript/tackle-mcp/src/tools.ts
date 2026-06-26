@@ -33,6 +33,14 @@ import {
   triggerRefresh,
   getLastUpdated,
 } from "./memory";
+import {
+  listSchedulerEntries,
+  getSchedulerEntry,
+  createSchedulerEntry,
+  updateSchedulerEntry,
+  deleteSchedulerEntry,
+  getDueSchedulerEntries,
+} from "./db";
 
 // ── Nebula RMS API helpers (HTTP calls to nebula-srv) ───────────────
 
@@ -387,6 +395,75 @@ export const toolDefinitions: MCPToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {},
+    },
+  },
+
+  // ── Agent Scheduler ─────────────────────────────────────────────
+
+  {
+    name: "tackle_list_scheduler_entries",
+    description: "List all agent scheduler entries that define cron-scheduled agent runs.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "tackle_get_scheduler_entry",
+    description: "Get a single agent scheduler entry by ID.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "number", description: "Scheduler entry ID" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "tackle_create_scheduler_entry",
+    description: "Create a new agent scheduler entry to schedule periodic agent runs.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        role: { type: "string", description: "Agent role (builder, planner, reviewer, critic, etc.)" },
+        model_id: { type: "string", description: "Model ID for opencode harness runs" },
+        harness: { type: "string", description: "opencode or conduit (default opencode)", enum: ["opencode", "conduit"] },
+        agent_config: { type: "string", description: "Optional JSON agent config (title, extra_args, etc.)" },
+        schedule_type: { type: "string", description: "interval or cron (default interval)", enum: ["interval", "cron"] },
+        schedule_value: { type: "number", description: "Interval in seconds (default 3600), or cron expression" },
+        project_dir: { type: "string", description: "Working directory (default /home/codex/dev)" },
+        enabled: { type: "number", description: "1 to enable, 0 to disable (default 1)" },
+      },
+      required: ["role"],
+    },
+  },
+  {
+    name: "tackle_update_scheduler_entry",
+    description: "Update an existing agent scheduler entry.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "number", description: "Scheduler entry ID" },
+        role: { type: "string", description: "Agent role" },
+        model_id: { type: "string", description: "Model ID" },
+        harness: { type: "string", description: "opencode or conduit", enum: ["opencode", "conduit"] },
+        agent_config: { type: "string", description: "JSON agent config" },
+        schedule_type: { type: "string", description: "interval or cron", enum: ["interval", "cron"] },
+        schedule_value: { type: "number", description: "Interval seconds or cron expression" },
+        project_dir: { type: "string", description: "Working directory" },
+        enabled: { type: "number", description: "1 enabled, 0 disabled" },
+        last_run_at: { type: "string", description: "ISO timestamp of last run" },
+        last_run_status: { type: "string", description: "Status of last run" },
+      },
+      required: ["id"],
+    },
+  },
+  {
+    name: "tackle_delete_scheduler_entry",
+    description: "Delete an agent scheduler entry by ID.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "number", description: "Scheduler entry ID" },
+      },
+      required: ["id"],
     },
   },
 
@@ -747,6 +824,49 @@ export function registerToolHandlers(): Record<string, Function> {
         roleIndices: result.result?.roleIndices ?? 0,
         timestamp: result.result?.timestamp ?? new Date().toISOString(),
       };
+    },
+
+    // ── Agent Scheduler ──────────────────────────────────────────
+
+    tackle_list_scheduler_entries: async (_args: any) => {
+      const entries = await listSchedulerEntries();
+      return { count: entries.length, entries };
+    },
+
+    tackle_get_scheduler_entry: async (args: { id: number }) => {
+      if (args.id == null) throw createError("INVALID_ARGUMENTS", "id is required");
+      const entry = await getSchedulerEntry(args.id);
+      if (!entry) throw createError("NOT_FOUND", `Scheduler entry '${args.id}' not found`);
+      return entry;
+    },
+
+    tackle_create_scheduler_entry: async (args: {
+      role: string; model_id?: string; harness?: string;
+      agent_config?: string; schedule_type?: string; schedule_value?: number;
+      project_dir?: string; enabled?: number;
+    }) => {
+      if (!args.role) throw createError("INVALID_ARGUMENTS", "role is required");
+      const entry = await createSchedulerEntry(args);
+      return { created: true, entry };
+    },
+
+    tackle_update_scheduler_entry: async (args: {
+      id: number; role?: string; model_id?: string | null; harness?: string;
+      agent_config?: string; schedule_type?: string; schedule_value?: number;
+      project_dir?: string; enabled?: number;
+      last_run_at?: string; last_run_status?: string;
+    }) => {
+      if (args.id == null) throw createError("INVALID_ARGUMENTS", "id is required");
+      const entry = await updateSchedulerEntry(args.id, args);
+      if (!entry) throw createError("NOT_FOUND", `Scheduler entry '${args.id}' not found or not updated`);
+      return { updated: true, entry };
+    },
+
+    tackle_delete_scheduler_entry: async (args: { id: number }) => {
+      if (args.id == null) throw createError("INVALID_ARGUMENTS", "id is required");
+      const deleted = await deleteSchedulerEntry(args.id);
+      if (!deleted) throw createError("NOT_FOUND", `Scheduler entry '${args.id}' not found`);
+      return { deleted: true, id: args.id };
     },
 
     // ── Nebula RMS — Harvest Candidates ──────────────────────────

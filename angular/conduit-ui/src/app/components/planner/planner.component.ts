@@ -1,5 +1,5 @@
 import { Component, signal, computed, Inject, OnInit, OnDestroy } from '@angular/core';
-import { NgFor, NgIf, DatePipe } from '@angular/common';
+import { NgFor, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { SILENT_REQUEST } from '../../interceptors/request-context';
@@ -11,7 +11,7 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
 @Component({
   selector: 'app-planner',
   standalone: true,
-  imports: [NgFor, NgIf, FormsModule, DatePipe],
+  imports: [NgFor, FormsModule, DatePipe],
   template: `
     <div class="planner">
       <!-- Left panel: plan list -->
@@ -30,8 +30,8 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
             >Proposals <span class="count-badge">{{ stateProposalCount() }}</span></button>
           </div>
           <div class="header-buttons">
-            <button class="btn-new" *ngIf="viewMode() === 'plans'" (click)="startCreate()">+ New</button>
-            <button class="btn-propose" *ngIf="viewMode() === 'proposals'" (click)="startPropose()">💡 New</button>
+            @if (viewMode() === 'plans') {<button class="btn-new" (click)="startCreate()">+ New</button>}
+            @if (viewMode() === 'proposals') {<button class="btn-propose" (click)="startPropose()">💡 New</button>}
           </div>
         </div>
 
@@ -47,7 +47,8 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
             >
               <span class="plan-num">#{{ plan.planNumber }}</span>
               <span class="plan-title">{{ plan.title || plan.fileName }}</span>
-              <div class="plan-tickets" *ngIf="plan.ticketStatuses">
+              @if (plan.ticketStatuses) {
+                <div class="plan-tickets">
                 <span class="ticket-badge"
                   *ngFor="let role of roleOrder"
                   [class]="'ticket-' + ((plan.ticketStatuses[role].status) || 'none')"
@@ -61,21 +62,26 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
           </ng-container>
         </div>
 
-        <div class="list-empty" *ngIf="!pipeline.state()">
-          <div class="loading-spinner"></div>
-          Connecting to conduit server...
-        </div>
-        <div class="list-empty" *ngIf="pipeline.state() && totalPlans() === 0">
-          No plans loaded yet. Create a new plan to get started.
-        </div>
+        @if (!pipeline.state()) {
+          <div class="list-empty">
+            <div class="loading-spinner"></div>
+            Connecting to conduit server...
+          </div>
+        }
+        @if (pipeline.state() && totalPlans() === 0) {
+          <div class="list-empty">
+            No plans loaded yet. Create a new plan to get started.
+          </div>
+        }
       </div>
 
       <!-- Right panel: editor or create form -->
       <div class="editor-panel" [class.overlay]="mode() !== 'empty'">
         <!-- Mobile back button -->
-        <button class="back-btn" (click)="cancelEdit()" *ngIf="mode() !== 'empty'">← Back</button>
+        @if (mode() !== 'empty') {<button class="back-btn" (click)="cancelEdit()">← Back</button>}
         <!-- Create mode -->
-        <ng-container *ngIf="mode() === 'create'">
+        @if (mode() === 'create') {
+
           <h3>New Plan</h3>
           <div class="form-group">
             <label>Title *</label>
@@ -107,12 +113,13 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
               {{ submitting() ? 'Creating...' : 'Create Plan' }}
             </button>
           </div>
-          <div class="form-feedback success" *ngIf="feedback() === 'created'">Plan created successfully!</div>
-          <div class="form-feedback error" *ngIf="feedback() === 'error'">Creation failed. Check the server connection.</div>
-        </ng-container>
+          @if (feedback() === 'created') {<div class="form-feedback success">Plan created successfully!</div>}
+          @if (feedback() === 'error') {<div class="form-feedback error">Creation failed. Check the server connection.</div>}
+        }
 
         <!-- Propose mode -->
-        <ng-container *ngIf="mode() === 'propose'">
+        @if (mode() === 'propose') {
+
           <h3>Propose Idea</h3>
           <p class="propose-hint">Capture a suggested followup or idea. Files affected and acceptance criteria will be added during planning.</p>
           <div class="form-group">
@@ -133,26 +140,29 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
               {{ submitting() ? 'Proposing...' : 'Propose Idea' }}
             </button>
           </div>
-          <div class="form-feedback success" *ngIf="feedback() === 'proposed'">Idea proposed! See it in the Proposed group.</div>
-          <div class="form-feedback error" *ngIf="feedback() === 'error'">Proposal failed. Check the server connection.</div>
-        </ng-container>
+          @if (feedback() === 'proposed') {<div class="form-feedback success">Idea proposed! See it in the Proposed group.</div>}
+          @if (feedback() === 'error') {<div class="form-feedback error">Proposal failed. Check the server connection.</div>}
+        }
 
         <!-- Edit mode -->
-        <ng-container *ngIf="mode() === 'edit'">
+        @if (mode() === 'edit') {
+
           <h3>
             {{ editable() ? 'Edit' : 'View' }} Plan #{{ selectedPlan()?.planNumber }}
-            <span class="readonly-badge" *ngIf="!editable()">Read-only</span>
+            @if (!editable()) {<span class="readonly-badge">Read-only</span>}
             <button class="btn-close" (click)="cancelEdit()">✕</button>
           </h3>
 
-          <div class="readonly-banner" *ngIf="!editable()">
-            <ng-container *ngIf="currentGroup() !== 'REVIEW_PASS'">
-              ⓘ This plan is {{ groupLabel(currentGroup()) }} — save is disabled. Use <strong>Revise</strong> to create an editable copy, or <strong>Promote</strong> to move a PROPOSED plan to PLANNING.
-            </ng-container>
-            <ng-container *ngIf="currentGroup() === 'REVIEW_PASS'">
-              ⓘ This plan is REVIEW_PASS — no further actions available.
-            </ng-container>
-          </div>
+          @if (!editable()) {
+            <div class="readonly-banner">
+              @if (currentGroup() !== 'REVIEW_PASS') {
+                ⓘ This plan is {{ groupLabel(currentGroup()) }} — save is disabled. Use <strong>Revise</strong> to create an editable copy, or <strong>Promote</strong> to move a PROPOSED plan to PLANNING.
+              }
+              @if (currentGroup() === 'REVIEW_PASS') {
+                ⓘ This plan is REVIEW_PASS — no further actions available.
+              }
+            </div>
+          }
 
           <div class="form-group">
             <label>Title</label>
@@ -180,40 +190,41 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
           </div>
 
           <div class="form-actions">            <button class="btn-cancel" (click)="cancelEdit()">Cancel</button>
-            <button
-              *ngIf="editable()"
-              class="btn-submit" (click)="submitUpdate()" [disabled]="submitting()">
-              {{ submitting() ? 'Saving...' : 'Save Changes' }}
-            </button>
-            <button
-              *ngIf="canRevise()"
-              class="btn-revise" (click)="submitRevise()" [disabled]="submitting()">
-              {{ submitting() ? 'Revising...' : '↻ Revise' }}
-            </button>
-            <button
-              *ngIf="canUnblock()"
-              class="btn-unblock" (click)="submitUnblock()" [disabled]="submitting()">
-              {{ submitting() ? 'Unblocking...' : '→ Move to Pending' }}
-            </button>
-            <button
-              *ngIf="canMoveToPending()"
-              class="btn-move-pending" (click)="submitMoveToPending()" [disabled]="submitting()">
-              {{ submitting() ? 'Moving...' : '→ Move to Pending' }}
-            </button>
-            <button
-              *ngIf="canPromote()"
-              class="btn-promote" (click)="submitPromote()" [disabled]="submitting()">
-              {{ submitting() ? 'Promoting...' : '↑ Promote' }}
-            </button>
-            <button
-              *ngIf="currentGroup() !== 'REVIEW_PASS'"
-              class="btn-delete" (click)="confirmDelete()" [disabled]="submitting()">
-              🗑 Delete
-            </button>
+            @if (editable()) {
+              <button class="btn-submit" (click)="submitUpdate()" [disabled]="submitting()">
+                {{ submitting() ? 'Saving...' : 'Save Changes' }}
+              </button>
+            }
+            @if (canRevise()) {
+              <button class="btn-revise" (click)="submitRevise()" [disabled]="submitting()">
+                {{ submitting() ? 'Revising...' : '↻ Revise' }}
+              </button>
+            }
+            @if (canUnblock()) {
+              <button class="btn-unblock" (click)="submitUnblock()" [disabled]="submitting()">
+                {{ submitting() ? 'Unblocking...' : '→ Move to Pending' }}
+              </button>
+            }
+            @if (canMoveToPending()) {
+              <button class="btn-move-pending" (click)="submitMoveToPending()" [disabled]="submitting()">
+                {{ submitting() ? 'Moving...' : '→ Move to Pending' }}
+              </button>
+            }
+            @if (canPromote()) {
+              <button class="btn-promote" (click)="submitPromote()" [disabled]="submitting()">
+                {{ submitting() ? 'Promoting...' : '↑ Promote' }}
+              </button>
+            }
+            @if (currentGroup() !== 'REVIEW_PASS') {
+              <button class="btn-delete" (click)="confirmDelete()" [disabled]="submitting()">
+                🗑 Delete
+              </button>
+            }
           </div>
 
           <!-- Delete confirmation -->
-          <div class="delete-confirm" *ngIf="showDeleteConfirm()">
+          @if (showDeleteConfirm()) {
+            <div class="delete-confirm">
             <p>Delete plan #{{ selectedPlan()?.planNumber }}? This is a soft-delete — the audit trail is preserved but the plan will disappear from all views.</p>
             <div class="delete-confirm-actions">
               <button class="btn-cancel" (click)="showDeleteConfirm.set(false)">Cancel</button>
@@ -223,62 +234,78 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
             </div>
           </div>
 
-          <div class="form-feedback success" *ngIf="feedback() === 'updated'">Plan updated!</div>
-          <div class="form-feedback success" *ngIf="feedback() === 'revised'">Revision created in Planning!</div>
-          <div class="form-feedback success" *ngIf="feedback() === 'unblocked'">Plan moved back to Pending!</div>
-          <div class="form-feedback success" *ngIf="feedback() === 'pending'">Plan moved to Pending!</div>
-          <div class="form-feedback success" *ngIf="feedback() === 'promoted'">Plan promoted to Planning!</div>
-          <div class="form-feedback success" *ngIf="feedback() === 'deleted'">Plan deleted.</div>
-          <div class="form-feedback error" *ngIf="feedback() === 'error'">Operation failed. Check the server connection.</div>
+          @if (feedback() === 'updated') {<div class="form-feedback success">Plan updated!</div>}
+          @if (feedback() === 'revised') {<div class="form-feedback success">Revision created in Planning!</div>}
+          @if (feedback() === 'unblocked') {<div class="form-feedback success">Plan moved back to Pending!</div>}
+          @if (feedback() === 'pending') {<div class="form-feedback success">Plan moved to Pending!</div>}
+          @if (feedback() === 'promoted') {<div class="form-feedback success">Plan promoted to Planning!</div>}
+          @if (feedback() === 'deleted') {<div class="form-feedback success">Plan deleted.</div>}
+          @if (feedback() === 'error') {<div class="form-feedback error">Operation failed. Check the server connection.</div>}
 
           <!-- Source Prompt (expandable) -->
-          <div class="prompt-section" *ngIf="selectedPlan()?.promptRef">
-            <button class="prompt-toggle" (click)="promptExpanded.set(!promptExpanded())">
-              💬 Source: Prompt #{{ selectedPlan()?.promptRef }}
-              <span class="toggle-arrow">{{ promptExpanded() ? '▾' : '▸' }}</span>
-            </button>
-            <div class="prompt-body" *ngIf="promptExpanded()">
-              <div class="loading-hint" *ngIf="!sourcePrompt()">Loading prompt...</div>
-              <div class="prompt-content" *ngIf="sourcePrompt() && !sourcePrompt()._notFound && !sourcePrompt()._error">
-                <div class="prompt-title">{{ sourcePrompt().title }}</div>
-                <div class="prompt-summary">{{ sourcePrompt().summary }}</div>
-              </div>
-              <div class="prompt-not-found" *ngIf="sourcePrompt()?._notFound">
-                Prompt #{{ sourcePrompt().promptNumber }} not found.
-              </div>
-              <div class="prompt-error" *ngIf="sourcePrompt()?._error">
-                Failed to load prompt. The audit trail may be incomplete.
-              </div>
+          @if (selectedPlan()?.promptRef) {
+            <div class="prompt-section">
+              <button class="prompt-toggle" (click)="promptExpanded.set(!promptExpanded())">
+                💬 Source: Prompt #{{ selectedPlan()?.promptRef }}
+                <span class="toggle-arrow">{{ promptExpanded() ? '▾' : '▸' }}</span>
+              </button>
+              @if (promptExpanded()) {
+                <div class="prompt-body">
+                  @if (!sourcePrompt()) {
+                    <div class="loading-hint">Loading prompt...</div>
+                  }
+                  @if (sourcePrompt() && !sourcePrompt()._notFound && !sourcePrompt()._error) {
+                    <div class="prompt-content">
+                      <div class="prompt-title">{{ sourcePrompt().title }}</div>
+                      <div class="prompt-summary">{{ sourcePrompt().summary }}</div>
+                    </div>
+                  }
+                  @if (sourcePrompt()?._notFound) {
+                    <div class="prompt-not-found">
+                      Prompt #{{ sourcePrompt().promptNumber }} not found.
+                    </div>
+                  }
+                  @if (sourcePrompt()?._error) {
+                    <div class="prompt-error">
+                      Failed to load prompt. The audit trail may be incomplete.
+                    </div>
+                  }
+                </div>
+              }
             </div>
-          </div>
+          }
 
           <!-- Receipt Timeline -->
           <div class="receipt-section">
             <h4>Receipts</h4>
-            <div class="receipt-list" *ngIf="receipts().length > 0; else noReceipts">
-              <div class="receipt-item" *ngFor="let r of receipts()">
-                <span class="receipt-type {{r.type}}">{{ receiptLabel(r.type) }}</span>
-                <span class="receipt-agent">{{ r.agent_role }}</span>
-                <span class="receipt-summary">{{ r.summary || '—' }}</span>
-                <span class="receipt-time">{{ r.created_at | date:'short' }}</span>
+            @if (receipts().length > 0) {
+              <div class="receipt-list">
+                <div class="receipt-item" *ngFor="let r of receipts()">
+                  <span class="receipt-type {{r.type}}">{{ receiptLabel(r.type) }}</span>
+                  <span class="receipt-agent">{{ r.agent_role }}</span>
+                  <span class="receipt-summary">{{ r.summary || '—' }}</span>
+                  <span class="receipt-time">{{ r.created_at | date:'short' }}</span>
+                </div>
               </div>
-            </div>
-            <ng-template #noReceipts>
+            } @else {
               <div class="receipt-empty">No receipts issued yet.</div>
-            </ng-template>
+            }
           </div>
-        </ng-container>
+        }
 
         <!-- Empty state -->
-        <div class="editor-empty" *ngIf="mode() === 'empty'">
+        @if (mode() === 'empty') {
+          <div class="editor-empty">
           <div class="empty-icon">📋</div>
           <p>Select a plan from the list to edit,</p>
           <p>or click <strong>+ New Plan</strong> to create one.</p>
-        </div>
+          </div>
+        }
       </div>
 
       <!-- Ticket detail popover -->
-      <div class="ticket-popover" *ngIf="ticketPopover() as tp" [style.left.px]="tp.x" [style.top.px]="tp.y" (click)="closeTicketPopover()">
+      @if (ticketPopover(); as tp) {
+        <div class="ticket-popover" [style.left.px]="tp.x" [style.top.px]="tp.y" (click)="closeTicketPopover()">
         <div class="tp-role">{{ tp.role }}</div>
         <div class="tp-row"><span class="tp-label">Status</span><span class="tp-value">{{ selectedTicketDetail(tp)?.status || '—' }}</span></div>
         <div class="tp-row"><span class="tp-label">Ticket ID</span><span class="tp-value">{{ selectedTicketDetail(tp)?.id || '—' }}</span></div>
@@ -286,6 +313,7 @@ import { KeyboardShortcutService } from '../../services/keyboard.service';
         <div class="tp-row"><span class="tp-label">Expires</span><span class="tp-value">{{ (selectedTicketDetail(tp)?.expires_at | date:'short') || '—' }}</span></div>
         <div class="tp-row"><span class="tp-label">Objective</span><span class="tp-value">{{ selectedTicketDetail(tp)?.objective || '—' }}</span></div>
       </div>
+      }
     </div>
   `,
   styles: [

@@ -1,5 +1,5 @@
 import { Component, signal, computed, effect, OnInit, OnDestroy, Inject, ViewChild, ElementRef, AfterViewChecked, HostListener } from '@angular/core';
-import { NgFor, NgIf, DatePipe, CurrencyPipe } from '@angular/common';
+import { NgFor, DatePipe, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ConduitService } from '../../services/conduit.service';
@@ -53,7 +53,7 @@ const MAX_SPLIT = 0.65;
 @Component({
   selector: 'app-sessions',
   standalone: true,
-  imports: [NgFor, NgIf, DatePipe, CurrencyPipe, FormsModule],
+  imports: [NgFor, DatePipe, CurrencyPipe, FormsModule],
   template: `
     <div class="sessions-view" #container>
       <!-- Session history table -->
@@ -61,18 +61,24 @@ const MAX_SPLIT = 0.65;
         <div class="table-header">
           <h3>Sessions</h3>
           <span class="session-count">{{ sessions().length }} total</span>
-          <span class="session-cost-total" *ngIf="recentCost() !== null" [class.high]="(recentCost() ?? 0) > 10">
+          @if (recentCost() !== null) {
+            <span class="session-cost-total" [class.high]="(recentCost() ?? 0) > 10">
             💰 {{ recentCost() | currency:'USD' }} / 24h
           </span>
-          <span class="next-run-chip" *ngIf="schedulerLabel()" [class.pulse-green]="pulseGreen()">
+          }
+          @if (schedulerLabel()) {
+            <span class="next-run-chip" [class.pulse-green]="pulseGreen()">
             ⏱️ <span class="next-run-value">{{ schedulerLabel() }}</span>
             <span class="next-run-label">Temporal Scheduler</span>
             <a class="temporal-link" href="http://localhost:8233/namespaces/conduit/workflows" target="_blank" rel="noopener noreferrer" title="Open Temporal Web UI — workflow history">↗</a>
           </span>
-          <span class="next-run-chip next-run-paused" *ngIf="pipeline.circuitBreaker().tripped">
+          }
+          @if (pipeline.circuitBreaker().tripped) {
+            <span class="next-run-chip next-run-paused">
             ⛔ <span class="next-run-value">Paused</span>
             <span class="next-run-label">circuit breaker tripped</span>
           </span>
+          }
           <button class="btn-refresh" (click)="fetchSessions()" [disabled]="loading()">
             {{ loading() ? 'Loading...' : '↻ Refresh' }}
           </button>
@@ -83,12 +89,16 @@ const MAX_SPLIT = 0.65;
           <button class="analytics-toggle" (click)="toggleAnalytics()">
             <span class="analytics-toggle-icon">{{ showAnalytics() ? '▾' : '▸' }}</span>
             📊 Analytics
-            <span class="analytics-badge" *ngIf="analytics() as a">
-              {{ a.sessionCount }} sessions
-            </span>
+            @if (analytics(); as a) {
+              <span class="analytics-badge">
+                {{ a.sessionCount }} sessions
+              </span>
+            }
           </button>
-          <div class="analytics-panel" *ngIf="showAnalytics()" [class.visible]="showAnalytics()">
-            <ng-container *ngIf="analytics() as a; else analyticsEmpty">
+          @if (showAnalytics()) {
+            <div class="analytics-panel" [class.visible]="showAnalytics()">
+            @if (analytics(); as a) {
+              
               <!-- Summary stats -->
               <div class="analytics-summary">
                 <div class="analytics-stat">
@@ -144,18 +154,19 @@ const MAX_SPLIT = 0.65;
                   </div>
                 </div>
               </div>
-            </ng-container>
-            <ng-template #analyticsEmpty>
+            } @else {
               <div class="analytics-empty">
                 <p>Not enough session data to compute analytics.</p>
                 <p class="analytics-empty-hint">At least 2 sessions are needed for gap analysis.</p>
               </div>
-            </ng-template>
+            }
           </div>
+          }
         </div>
 
         <div class="table-wrap">
-          <table *ngIf="sessions().length > 0; else emptyState">
+          @if (sessions().length > 0) {
+            <table>
             <thead>
               <tr>
                 <th>Session</th>
@@ -186,13 +197,17 @@ const MAX_SPLIT = 0.65;
                 <td class="cell-time">{{ s.start_iso | date:'MMM d, HH:mm' }}</td>
                 <td class="cell-duration">{{ duration(s) }}</td>
                 <td class="cell-plans">
-                  <span class="plan-count-badge" *ngIf="s.plan_count > 0">
-                    {{ s.plan_count }}
-                  </span>
-                  <span class="plan-ids" *ngIf="s.plan_count > 0" [title]="parsedPlans(s).join(', ')">
+                  @if (s.plan_count > 0) {
+                    <span class="plan-count-badge">
+                      {{ s.plan_count }}
+                    </span>
+                    <span class="plan-ids" [title]="parsedPlans(s).join(', ')">
                     {{ parsedPlans(s).join(' ') }}
                   </span>
-                  <span class="no-plans" *ngIf="s.plan_count === 0">—</span>
+                  }
+                  @if (s.plan_count === 0) {
+                    <span class="no-plans">—</span>
+                  }
                 </td>
                 <td class="cell-exit">
                   <span class="exit-badge" [class.ok]="s.exit_code === 0" [class.fail]="s.exit_code !== 0 && s.exit_code !== null" [class.none]="s.exit_code === null">
@@ -200,67 +215,79 @@ const MAX_SPLIT = 0.65;
                   </span>
                 </td>
                 <td class="cell-cost">
-                  <span class="cost-value" *ngIf="s.cost_usd !== null && s.cost_usd !== undefined" [class.high]="s.cost_usd > 1">
+                  @if (s.cost_usd !== null && s.cost_usd !== undefined) {
+                    <span class="cost-value" [class.high]="s.cost_usd > 1">
                     {{ s.cost_usd | currency:'USD':'symbol':'1.2-4' }}
                   </span>
-                  <span class="no-cost" *ngIf="s.cost_usd === null || s.cost_usd === undefined">—</span>
+                  }
+                  @if (s.cost_usd === null || s.cost_usd === undefined) {
+                    <span class="no-cost">—</span>
+                  }
                 </td>
                 <td class="cell-retries">{{ s.retries_used }}</td>
                 <td class="cell-model" [title]="s.model || ''">
                   {{ shortModel(s.model) }}
-                  <span class="fallback-tag" *ngIf="s.fallback_used === 1">FALLBACK</span>
+                  @if (s.fallback_used === 1) {
+                    <span class="fallback-tag">FALLBACK</span>
+                  }
                 </td>
                 <td class="cell-status">
                   <span class="status-badge" [class.running]="s.is_running === 1" [class.paused]="s.is_running === 2" [class.ended]="s.is_running === 0" [class.pulse-running]="pulsingSessions().has(s.id)">
                     {{ statusLabel(s.is_running) }}
                   </span>
                 </td>
-                <td class="cell-workflow">
-                  <span class="workflow-row" *ngIf="s.workflow_id; else noWorkflow">
-                    <a class="workflow-link" [href]="'http://localhost:8233/namespaces/conduit/workflows/' + s.workflow_id + '/' + (s.run_id || '')" target="_blank" rel="noopener noreferrer" [title]="s.workflow_id">
-                      {{ shortWfId(s.workflow_id) }}
-                    </a>
-                    <span class="workflow-result" *ngIf="s.workflow_result" [class.wf-ok]="s.workflow_result === 'completed'" [class.wf-fail]="s.workflow_result === 'failed'" [class.wf-skip]="s.workflow_result === 'skipped'">
-                      {{ s.workflow_result }}
-                    </span>
-                    <span class="workflow-runtime" *ngIf="s.workflow_run_time_ms !== null">
-                      {{ formatMs(s.workflow_run_time_ms) }}
-                    </span>
-                  </span>
-                  <ng-template #noWorkflow>
-                    <span class="no-workflow">—</span>
-                  </ng-template>
+                <td class="cell-workflow">                    @if (s.workflow_id) {
+                      <span class="workflow-row">
+                        <a class="workflow-link" [href]="'http://localhost:8233/namespaces/conduit/workflows/' + s.workflow_id + '/' + (s.run_id || '')" target="_blank" rel="noopener noreferrer" [title]="s.workflow_id">
+                          {{ shortWfId(s.workflow_id) }}
+                        </a>
+                        @if (s.workflow_result) {
+                          <span class="workflow-result" [class.wf-ok]="s.workflow_result === 'completed'" [class.wf-fail]="s.workflow_result === 'failed'" [class.wf-skip]="s.workflow_result === 'skipped'">
+                            {{ s.workflow_result }}
+                          </span>
+                        }
+                        @if (s.workflow_run_time_ms !== null) {
+                          <span class="workflow-runtime">
+                            {{ formatMs(s.workflow_run_time_ms) }}
+                          </span>
+                        }
+                      </span>
+                    } @else {
+                      <span class="no-workflow">—</span>
+                    }
                 </td>
                 <td class="cell-actions" (click)="$event.stopPropagation()">
-                  <button
-                    class="btn-restart"
-                    *ngIf="s.agent_role === 'builder' && s.is_running === 0 && s.plan_count > 0"
-                    (click)="restartBuilderForSession(s)"
-                    [disabled]="restartingPlans().has(parsedPlans(s)[0])"
-                    title="Restart builder for this plan"
-                  >
-                    {{ restartingPlans().has(parsedPlans(s)[0]) ? '...' : '🔄' }}
-                  </button>
-                  <button
-                    class="btn-kill"
-                    *ngIf="s.is_running === 1"
-                    (click)="killSession(s.id)"
-                    [disabled]="killedSessions().has(s.id)"
-                    title="Kill session (SIGKILL)"
-                  >
-                    {{ killedSessions().has(s.id) ? '...' : '⏻' }}
-                  </button>
+                  @if (s.agent_role === 'builder' && s.is_running === 0 && s.plan_count > 0) {
+                    <button
+                      class="btn-restart"
+                      (click)="restartBuilderForSession(s)"
+                      [disabled]="restartingPlans().has(parsedPlans(s)[0])"
+                      title="Restart builder for this plan"
+                    >
+                      {{ restartingPlans().has(parsedPlans(s)[0]) ? '...' : '🔄' }}
+                    </button>
+                  }
+                  @if (s.is_running === 1) {
+                    <button
+                      class="btn-kill"
+                      (click)="killSession(s.id)"
+                      [disabled]="killedSessions().has(s.id)"
+                      title="Kill session (SIGKILL)"
+                    >
+                      {{ killedSessions().has(s.id) ? '...' : '⏻' }}
+                    </button>
+                  }
                 </td>
               </tr>
             </tbody>
           </table>
-          <ng-template #emptyState>
+          } @else {
             <div class="empty-state">
               <span class="empty-icon">📊</span>
               <p>No sessions recorded yet.</p>
               <p class="empty-hint">Sessions are created when the builder processes plans.</p>
             </div>
-          </ng-template>
+          }
         </div>
       </div>
 
@@ -277,7 +304,8 @@ const MAX_SPLIT = 0.65;
       <!-- Session log viewer -->
       <div class="session-log-area" [style.flex]="'0 0 ' + (splitRatio() * 100) + '%'">
         <!-- Breaker confirmation dialog (v074) -->
-        <div class="breaker-confirm-overlay" *ngIf="showBreakerConfirm()" (click)="cancelBreakerRestart()">
+        @if (showBreakerConfirm()) {
+          <div class="breaker-confirm-overlay" (click)="cancelBreakerRestart()">
           <div class="breaker-confirm-dialog" (click)="$event.stopPropagation()">
             <div class="breaker-confirm-icon">⚠️</div>
             <h4>Circuit Breaker Is Open</h4>
@@ -289,6 +317,7 @@ const MAX_SPLIT = 0.65;
             </div>
           </div>
         </div>
+        }
 
         <!-- Log viewer header -->
         <div class="log-header">
@@ -302,9 +331,15 @@ const MAX_SPLIT = 0.65;
             </select>
           </div>
           <div class="log-header-right">
-            <span class="log-status" *ngIf="pipeline.sessionLogActive() && pipeline.sessionLogFileExists() !== false" [class.live]="true">● LIVE</span>
-            <span class="log-status no-file" *ngIf="pipeline.sessionLogActive() && pipeline.sessionLogFileExists() === false">● no log file</span>
-            <span class="log-status" *ngIf="!pipeline.sessionLogActive()">● disconnected</span>
+            @if (pipeline.sessionLogActive() && pipeline.sessionLogFileExists() !== false) {
+              <span class="log-status" [class.live]="true">● LIVE</span>
+            }
+            @if (pipeline.sessionLogActive() && pipeline.sessionLogFileExists() === false) {
+              <span class="log-status no-file">● no log file</span>
+            }
+            @if (!pipeline.sessionLogActive()) {
+              <span class="log-status">● disconnected</span>
+            }
             <span class="log-line-count">{{ pipeline.sessionLog().length }} lines</span>
             <button class="btn-log-clear" (click)="clearLog()" title="Clear log">✕</button>
           </div>
@@ -313,42 +348,42 @@ const MAX_SPLIT = 0.65;
         <!-- Terminal-like log output -->
         <div class="log-terminal" #logTerminal (scroll)="onLogScroll()"
           [class.empty]="pipeline.sessionLog().length === 0 && !pipeline.sessionLogActive()">
-          <ng-container *ngIf="pipeline.sessionLogFileExists() === false && pipeline.sessionLog().length === 0; else logContent">
+          @if (pipeline.sessionLogFileExists() === false && pipeline.sessionLog().length === 0) {
             <div class="log-placeholder-content">
               <span class="placeholder-icon">📭</span>
               <h4>No Log Available</h4>
               <p>This session was created before log streaming was deployed.</p>
               <p class="placeholder-hint">Future sessions will stream live output here.</p>
             </div>
-          </ng-container>
-          <ng-template #logContent>
-            <ng-container *ngIf="pipeline.sessionLog().length > 0 || pipeline.sessionLogActive(); else logPlaceholder">
-              <div
-                class="log-line"
-                [class.log-line-stderr]="entry.logType === 'stderr' || entry.logType === 'error'"
-                *ngFor="let entry of pipeline.sessionLog(); trackBy: trackByTimestamp"
-              >
-                <span class="log-timestamp">{{ entry.timestamp | date:'HH:mm:ss' }}</span>
-                <span class="log-icon-type" *ngIf="entry.logType === 'stderr' || entry.logType === 'error'">
+          } @else if (pipeline.sessionLog().length > 0 || pipeline.sessionLogActive()) {
+            <div
+              class="log-line"
+              [class.log-line-stderr]="entry.logType === 'stderr' || entry.logType === 'error'"
+              *ngFor="let entry of pipeline.sessionLog(); trackBy: trackByTimestamp"
+            >
+              <span class="log-timestamp">{{ entry.timestamp | date:'HH:mm:ss' }}</span>
+              @if (entry.logType === 'stderr' || entry.logType === 'error') {
+                <span class="log-icon-type">
                   <svg class="log-error-icon" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
                   </svg>
                 </span>
-                <span class="log-text" [innerHTML]="renderAnsi(entry.line)"></span>
-              </div>
-              <div class="log-spacer" *ngIf="pipeline.sessionLogActive()">
+              }
+              <span class="log-text" [innerHTML]="renderAnsi(entry.line)"></span>
+            </div>
+            @if (pipeline.sessionLogActive()) {
+              <div class="log-spacer">
                 <span class="cursor-blink">▊</span>
               </div>
-            </ng-container>
-            <ng-template #logPlaceholder>
-              <div class="log-placeholder-content">
-                <span class="placeholder-icon">📜</span>
-                <h4>Session Log</h4>
-                <p>Click a session row above to view its live output.</p>
-                <p class="placeholder-hint">Real-time builder terminal output with ANSI color support.</p>
-              </div>
-            </ng-template>
-          </ng-template>
+            }
+          } @else {
+            <div class="log-placeholder-content">
+              <span class="placeholder-icon">📜</span>
+              <h4>Session Log</h4>
+              <p>Click a session row above to view its live output.</p>
+              <p class="placeholder-hint">Real-time builder terminal output with ANSI color support.</p>
+            </div>
+          }
         </div>
       </div>
     </div>

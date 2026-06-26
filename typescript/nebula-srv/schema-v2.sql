@@ -30,6 +30,50 @@ CREATE TRIGGER trg_harvests_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ═══════════════════════════════════════════════════════════════════════
+--  HARVEST CANDIDATES — normalized relational view of harvests.candidates
+--  JSONB. Each row is one SpecificationCandidate extracted from a harvest.
+--  Provides direct foreign-key linking to the Nebula project hierarchy
+--  (systems/subsystems/features) while the JSONB in harvests.candidates
+--  remains the authoritative dump for the Rover pipeline.
+-- ═══════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS nebula.harvest_candidates (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    harvest_id        UUID NOT NULL,  -- FK omitted: harvests is a view in the bitemporal schema
+    title             TEXT NOT NULL,
+    intent_description TEXT,
+    implementation_notes JSONB NOT NULL DEFAULT '[]',
+    code_snippets     JSONB NOT NULL DEFAULT '[]',
+    open_questions    JSONB NOT NULL DEFAULT '[]',
+    tags              TEXT[] NOT NULL DEFAULT '{}',
+    status            TEXT,
+
+    -- Project hierarchy links (set when candidate is mapped to a project)
+    -- FK omitted: systems/subsystems/features are views in the bitemporal schema
+    system_id         UUID,
+    subsystem_id      UUID,
+    feature_id        UUID,
+
+    -- Temporal columns (business/valid time — when this candidate mapping is valid)
+    valid_from        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    valid_until       TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31 23:59:59+00',
+
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hc_harvest ON nebula.harvest_candidates(harvest_id);
+CREATE INDEX IF NOT EXISTS idx_hc_system ON nebula.harvest_candidates(system_id);
+CREATE INDEX IF NOT EXISTS idx_hc_subsystem ON nebula.harvest_candidates(subsystem_id);
+CREATE INDEX IF NOT EXISTS idx_hc_feature ON nebula.harvest_candidates(feature_id);
+CREATE INDEX IF NOT EXISTS idx_hc_tags ON nebula.harvest_candidates USING GIN(tags);
+CREATE INDEX IF NOT EXISTS idx_hc_valid ON nebula.harvest_candidates(valid_from, valid_until);
+
+CREATE TRIGGER trg_harvest_candidates_updated_at
+    BEFORE UPDATE ON nebula.harvest_candidates
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ═══════════════════════════════════════════════════════════════════════
 --  AGENT RECORDS — all agent-written artifacts stored canonically
 --  This replaces the audit/ filesystem as the source of truth.
 --  Type discriminator: report | analysis | assessment | inspection |

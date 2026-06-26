@@ -1,5 +1,5 @@
 import { Component, Input, Output, signal, computed, OnChanges, EventEmitter, inject, Inject } from '@angular/core';
-import { NgFor, NgIf, NgClass, DatePipe, SlicePipe } from '@angular/common';
+import { NgFor, NgClass, DatePipe, SlicePipe } from '@angular/common';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { SILENT_REQUEST } from '../../interceptors/request-context';
 import { PlanCard, ReceiptEntry } from '../../services/types';
@@ -9,7 +9,7 @@ import { API_BASE_URL } from '../../services/api-config';
 @Component({
   selector: 'app-plan-detail',
   standalone: true,
-  imports: [NgFor, NgIf, NgClass, DatePipe, SlicePipe],
+  imports: [NgFor, NgClass, DatePipe, SlicePipe],
   template: `
     <div class="detail-overlay" (click)="close.emit()">
       <div class="detail-panel" (click)="$event.stopPropagation()">
@@ -37,89 +37,116 @@ import { API_BASE_URL } from '../../services/api-config';
               <span class="meta-label">Created</span>
               <span class="meta-value">{{ plan?.createdAt | date:'medium' }}</span>
             </div>
-            <div class="meta-item" *ngIf="plan?.blockReason">
-              <span class="meta-label">Block Reason</span>
-              <span class="meta-value block-reason">{{ plan?.blockReason }}</span>
-            </div>
+            @if (plan?.blockReason) {
+              <div class="meta-item">
+                <span class="meta-label">Block Reason</span>
+                <span class="meta-value block-reason">{{ plan?.blockReason }}</span>
+              </div>
+            }
           </div>
 
           <!-- Goal -->
-          <div class="section" *ngIf="plan?.goal">
-            <div class="section-title">Goal</div>
-            <p class="section-text">{{ plan?.goal }}</p>
-          </div>
+          @if (plan?.goal) {
+            <div class="section">
+              <div class="section-title">Goal</div>
+              <p class="section-text">{{ plan?.goal }}</p>
+            </div>
+          }
 
           <!-- Files Affected -->
-          <div class="section" *ngIf="plan?.filesAffected && plan!.filesAffected!.length > 0">
-            <div class="section-title">Files Affected</div>
-            <ul class="file-list">
-              <li *ngFor="let f of plan?.filesAffected"><code>{{ f }}</code></li>
-            </ul>
-          </div>
+          @if (plan?.filesAffected && plan!.filesAffected!.length > 0) {
+            <div class="section">
+              <div class="section-title">Files Affected</div>
+              <ul class="file-list">
+                <li *ngFor="let f of plan?.filesAffected"><code>{{ f }}</code></li>
+              </ul>
+            </div>
+          }
 
           <!-- Acceptance Criteria -->
-          <div class="section" *ngIf="plan?.acceptanceCriteria && plan!.acceptanceCriteria!.length > 0">
-            <div class="section-title">Acceptance Criteria</div>
-            <ol class="criterion-list">
-              <li *ngFor="let c of plan?.acceptanceCriteria">{{ c }}</li>
-            </ol>
-          </div>
+          @if (plan?.acceptanceCriteria && plan!.acceptanceCriteria!.length > 0) {
+            <div class="section">
+              <div class="section-title">Acceptance Criteria</div>
+              <ol class="criterion-list">
+                <li *ngFor="let c of plan?.acceptanceCriteria">{{ c }}</li>
+              </ol>
+            </div>
+          }
 
           <!-- Dependencies -->
-          <div class="section" *ngIf="plan?.dependencies && plan!.dependencies!.length > 0">
-            <div class="section-title">Dependencies</div>
-            <div class="dep-list">
-              <span class="dep-chip" *ngFor="let d of plan?.dependencies">{{ d }}</span>
+          @if (plan?.dependencies && plan!.dependencies!.length > 0) {
+            <div class="section">
+              <div class="section-title">Dependencies</div>
+              <div class="dep-list">
+                <span class="dep-chip" *ngFor="let d of plan?.dependencies">{{ d }}</span>
+              </div>
             </div>
-          </div>
+          }
 
           <!-- Source Prompt -->
-          <div class="section" *ngIf="plan?.promptRef">
-            <div class="section-title">Source Prompt</div>
-            <button class="prompt-link" (click)="promptExpanded.set(!promptExpanded())">
-              💬 Prompt #{{ plan?.promptRef }} <span class="arrow">{{ promptExpanded() ? '▾' : '▸' }}</span>
-            </button>
-            <div class="prompt-body" *ngIf="promptExpanded()">
-              <div class="loading-hint" *ngIf="!sourcePrompt()">Loading...</div>
-              <div class="prompt-content" *ngIf="sourcePrompt() && !sourcePrompt()._notFound">
-                <strong>{{ sourcePrompt().title }}</strong>
-                <p>{{ sourcePrompt().summary }}</p>
-              </div>
-              <div class="prompt-missing" *ngIf="sourcePrompt()?._notFound">Prompt not found.</div>
+          @if (plan?.promptRef) {
+            <div class="section">
+              <div class="section-title">Source Prompt</div>
+              <button class="prompt-link" (click)="promptExpanded.set(!promptExpanded())">
+                💬 Prompt #{{ plan?.promptRef }} <span class="arrow">{{ promptExpanded() ? '▾' : '▸' }}</span>
+              </button>
+              @if (promptExpanded()) {
+                <div class="prompt-body">
+                  @if (!sourcePrompt()) {
+                    <div class="loading-hint">Loading...</div>
+                  }
+                  @if (sourcePrompt() && !sourcePrompt()._notFound) {
+                    <div class="prompt-content">
+                      <strong>{{ sourcePrompt().title }}</strong>
+                      <p>{{ sourcePrompt().summary }}</p>
+                    </div>
+                  }
+                  @if (sourcePrompt()?._notFound) {
+                    <div class="prompt-missing">Prompt not found.</div>
+                  }
+                </div>
+              }
             </div>
-          </div>
+          }
 
           <!-- Ticket Statuses -->
-          <div class="section" *ngIf="plan?.ticketStatuses && hasTickets()">
-            <div class="section-title">Tickets</div>
-            <div class="tickets-grid">
-              <div class="ticket-row" *ngFor="let entry of tickets()">
-                <span class="ticket-role">{{ entry.role }}</span>
-                <span class="ticket-status" [ngClass]="'tkt-' + entry.status">{{ entry.status }}</span>
-                <span class="ticket-id" *ngIf="entry.id">{{ entry.id | slice:0:8 }}…</span>
+          @if (plan?.ticketStatuses && hasTickets()) {
+            <div class="section">
+              <div class="section-title">Tickets</div>
+              <div class="tickets-grid">
+                <div class="ticket-row" *ngFor="let entry of tickets()">
+                  <span class="ticket-role">{{ entry.role }}</span>
+                  <span class="ticket-status" [ngClass]="'tkt-' + entry.status">{{ entry.status }}</span>
+                  @if (entry.id) {
+                    <span class="ticket-id">{{ entry.id | slice:0:8 }}…</span>
+                  }
+                </div>
               </div>
             </div>
-          </div>
+          }
 
           <!-- Receipt Timeline -->
           <div class="section">
             <div class="section-title">Receipt Timeline</div>
-            <div class="receipt-list" *ngIf="receipts().length > 0; else noReceipts">
-              <div class="receipt-item" *ngFor="let r of receipts()">
-                <div class="receipt-dot" [ngClass]="'dot-' + r.type"></div>
-                <div class="receipt-body">
-                  <div class="receipt-top">
-                    <span class="receipt-type" [ngClass]="'type-' + r.type">{{ receiptLabel(r.type) }}</span>
-                    <span class="receipt-agent">{{ r.agent_role }}</span>
+            @if (receipts().length > 0) {
+              <div class="receipt-list">
+                <div class="receipt-item" *ngFor="let r of receipts()">
+                  <div class="receipt-dot" [ngClass]="'dot-' + r.type"></div>
+                  <div class="receipt-body">
+                    <div class="receipt-top">
+                      <span class="receipt-type" [ngClass]="'type-' + r.type">{{ receiptLabel(r.type) }}</span>
+                      <span class="receipt-agent">{{ r.agent_role }}</span>
+                    </div>
+                    @if (r.summary) {
+                      <div class="receipt-summary">{{ r.summary }}</div>
+                    }
+                    <div class="receipt-time">{{ r.created_at | date:'short' }}</div>
                   </div>
-                  <div class="receipt-summary" *ngIf="r.summary">{{ r.summary }}</div>
-                  <div class="receipt-time">{{ r.created_at | date:'short' }}</div>
                 </div>
               </div>
-            </div>
-            <ng-template #noReceipts>
+            } @else {
               <div class="empty-hint">No receipts yet.</div>
-            </ng-template>
+            }
           </div>
 
           <!-- Actions -->
@@ -129,16 +156,19 @@ import { API_BASE_URL } from '../../services/api-config';
               <button class="btn-action btn-delete" (click)="deletePlan()" [disabled]="deleting()">
                 {{ deleting() ? 'Deleting...' : '🗑 Soft Delete' }}
               </button>
-              <button
-                *ngIf="canUnblock()"
-                class="btn-action btn-unblock"
-                (click)="unblockPlan()"
-                [disabled]="unblocking()"
-              >
-                {{ unblocking() ? 'Unblocking...' : '→ Unblock & Move to Pending' }}
-              </button>
+              @if (canUnblock()) {
+                <button
+                  class="btn-action btn-unblock"
+                  (click)="unblockPlan()"
+                  [disabled]="unblocking()"
+                >
+                  {{ unblocking() ? 'Unblocking...' : '→ Unblock & Move to Pending' }}
+                </button>
+              }
             </div>
-            <div class="action-feedback" *ngIf="actionFeedback()">{{ actionFeedback() }}</div>
+            @if (actionFeedback()) {
+              <div class="action-feedback">{{ actionFeedback() }}</div>
+            }
           </div>
         </div>
       </div>

@@ -59,5 +59,20 @@
     "startup": "npm run dev",
     "health": "/health",
     "isInternal": true
+  },
+  {
+    "name": "role-memory-srv",
+    "port": 3500,
+    "workspacePath": "typescript/role-memory-srv",
+    "serviceTypeId": 2,
+    "healthCheckUrl": "http://localhost:3500/health",
+    "status": "ONLINE",
+    "version": "1.0.0",
+    "description": "PG-to-Redis sync server for the Role Memory Procedure Registry. Reads tackle.memory + tackle.role_memory from PostgreSQL and populates Redis keys (mem:proc:{slug}, mem:idx:{role}, mem:meta:last_updated) consumed by tackle-mcp memory tools.",
+    "repositoryUrl": "typescript/role-memory-srv",
+    "activeFlag": true,
+    "startup": "npx tsx src/index.ts",
+    "health": "/health",
+    "isInternal": true
   }
 ]

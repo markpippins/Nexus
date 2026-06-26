@@ -6,6 +6,8 @@ import org.nexus.peb.store.repository.PebTransactionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+
 /**
  * Manages the low-level persistence lifecycle of a {@link PebTransaction}.
  *
@@ -43,6 +45,7 @@ public class PebTransactionEngine {
 
     @Transactional
     public PebTransaction commitTransaction(PebTransaction transaction) {
+        transaction.setCommittedAt(Instant.now());
         // Compute state delta, final hashes, etc.
         return repository.save(transaction);
     }

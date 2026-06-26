@@ -647,12 +647,16 @@ export function registerTools(server: McpServer) {
     "List harvest pipeline outputs, optionally filtered by model.",
     {
       model: z.string().optional().describe("Filter by model name (e.g. 'DeepSeek V4')"),
+      level: z.number().optional().describe("Filter by abstraction level (1-4)"),
+      visibilityScope: z.string().optional().describe("Filter by visibility scope (builder, architect, planner, reviewer, all)"),
       limit: z.number().optional().describe("Max results (default 100, max 500)"),
       offset: z.number().optional().describe("Offset for pagination"),
     },
     async (args) => {
       const result = await NebulaClient.listHarvests({
         model: args.model,
+        level: args.level,
+        visibilityScope: args.visibilityScope,
         limit: args.limit,
         offset: args.offset,
       });
@@ -684,6 +688,8 @@ export function registerTools(server: McpServer) {
       sourceText: z.string().optional().describe("Raw markdown text of the harvest file"),
       tags: z.array(z.string()).optional().describe("Tags for filtering"),
       metadata: z.any().optional().describe("Optional metadata object"),
+      level: z.number().optional().describe("Abstraction level 1-4 (default 1)"),
+      visibilityScope: z.string().optional().describe("Visibility scope: builder, architect, planner, reviewer, all (default 'all')"),
     },
     async (args) => {
       const result = await NebulaClient.createHarvest({
@@ -695,6 +701,8 @@ export function registerTools(server: McpServer) {
         sourceText: args.sourceText,
         tags: args.tags,
         metadata: args.metadata,
+        level: args.level,
+        visibilityScope: args.visibilityScope,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -713,6 +721,190 @@ export function registerTools(server: McpServer) {
   );
 
   // ════════════════════════════════════════════════════════════════
+  //  HARVEST CANDIDATES
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_list_harvest_candidates",
+    "List harvest candidates, optionally filtered by harvest, system, subsystem, or feature. Each candidate is an individually addressable specification extracted from a harvest.",
+    {
+      harvestId: z.string().optional().describe("Filter by parent harvest UUID"),
+      systemId: z.string().optional().describe("Filter by linked system UUID"),
+      subsystemId: z.string().optional().describe("Filter by linked subsystem UUID"),
+      featureId: z.string().optional().describe("Filter by linked feature UUID"),
+      limit: z.number().optional().describe("Max results (default 100, max 500)"),
+      offset: z.number().optional().describe("Offset for pagination"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listHarvestCandidates({
+        harvestId: args.harvestId,
+        systemId: args.systemId,
+        subsystemId: args.subsystemId,
+        featureId: args.featureId,
+        limit: args.limit,
+        offset: args.offset,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_harvest_candidate",
+    "Get a single harvest candidate with full detail (implementation notes, code snippets, open questions).",
+    {
+      id: z.string().describe("Harvest candidate UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getHarvestCandidate(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_update_harvest_candidate",
+    "Update a harvest candidate — primarily used to link it to a system, subsystem, or feature in the Nebula project hierarchy. Also supports updating title, status, intent description, and tags.",
+    {
+      id: z.string().describe("Harvest candidate UUID"),
+      title: z.string().optional().describe("New title"),
+      intentDescription: z.string().optional().describe("Revised intent description"),
+      status: z.string().optional().describe("Status (e.g. 'promoted', 'reviewed', 'discarded')"),
+      systemId: z.string().nullable().optional().describe("Link to system UUID (or null to unlink)"),
+      subsystemId: z.string().nullable().optional().describe("Link to subsystem UUID (or null to unlink)"),
+      featureId: z.string().nullable().optional().describe("Link to feature UUID (or null to unlink)"),
+      tags: z.array(z.string()).optional().describe("New tags array"),
+      planRef: z.string().optional().describe("Conduit plan reference (e.g. '0136') — creates a cross-reference linking this candidate to the plan with rel_type='spawns_plan'"),
+    },
+    async (args) => {
+      const { id, ...body } = args;
+      const result = await NebulaClient.updateHarvestCandidate(id, body);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_create_harvest_candidate",
+    "Create a standalone harvest candidate (e.g. manually linked to a harvest or project).",
+    {
+      harvestId: z.string().describe("Parent harvest UUID"),
+      title: z.string().describe("Candidate title"),
+      intentDescription: z.string().optional().describe("What this candidate proposes to build or change"),
+      implementationNotes: z.array(z.any()).optional().describe("Implementation notes array"),
+      codeSnippets: z.array(z.any()).optional().describe("Extracted code snippets"),
+      openQuestions: z.array(z.any()).optional().describe("Open questions raised"),
+      tags: z.array(z.string()).optional().describe("Tags for filtering"),
+      status: z.string().optional().describe("Status string"),
+      systemId: z.string().nullable().optional().describe("Pre-linked system UUID"),
+      subsystemId: z.string().nullable().optional().describe("Pre-linked subsystem UUID"),
+      featureId: z.string().nullable().optional().describe("Pre-linked feature UUID"),
+      planRef: z.string().optional().describe("Conduit plan reference (e.g. '0136') — creates a cross-reference with rel_type='spawns_plan'"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createHarvestCandidate({
+        harvestId: args.harvestId,
+        title: args.title,
+        intentDescription: args.intentDescription,
+        implementationNotes: args.implementationNotes,
+        codeSnippets: args.codeSnippets,
+        openQuestions: args.openQuestions,
+        tags: args.tags,
+        status: args.status,
+        systemId: args.systemId,
+        subsystemId: args.subsystemId,
+        featureId: args.featureId,
+        planRef: args.planRef,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_discover_harvest_candidates",
+    "Discover which existing systems, subsystems, or features match unlinked harvest candidates. Uses semantic search (knowledge_semantic_search) to find curated knowledge entities similar to each candidate, plus direct text matching against hierarchy names. Candidates with top curated similarity >= threshold (default 0.75) are returned as \"matches\" — they can be linked to existing projects. Candidates below threshold are returned as \"undocumented\" — they may represent new projects not yet in the hierarchy.",
+    {
+      candidateIds: z.array(z.string()).optional().describe("Optional list of specific candidate UUIDs to check. If omitted, all unlinked candidates are processed (up to limit)."),
+      limit: z.number().optional().describe("Max unlinked candidates to process (default 50, max 200)"),
+      threshold: z.number().min(0).max(1).optional().describe("Confidence threshold for curated semantic matches (default 0.75). Candidates with top similarity >= threshold go to 'matches'; below go to 'undocumented'."),
+    },
+    async (args) => {
+      const result = await NebulaClient.discoverHarvestCandidates({
+        candidateIds: args.candidateIds,
+        limit: args.limit,
+        threshold: args.threshold,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_plan_candidates",
+    "Reverse lookup: find all harvest candidates linked to a given conduit plan via cross_references (rel_type='spawns_plan'). Returns candidates with their hierarchy links, harvest source, and the timestamp they were linked to the plan.",
+    {
+      planRef: z.string().describe("Conduit plan reference (e.g. '0136')"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getPlanCandidates(args.planRef);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_system_harvest_candidates",
+    "List all harvest candidates linked to a specific system (filtered by system_id). Returns candidates with their hierarchy links and harvest source.",
+    {
+      systemId: z.string().describe("System UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getSystemHarvestCandidates(args.systemId);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_subsystem_harvest_candidates",
+    "List all harvest candidates linked to a specific subsystem (filtered by subsystem_id). Returns candidates with their hierarchy links and harvest source.",
+    {
+      subsystemId: z.string().describe("Subsystem UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getSubsystemHarvestCandidates(args.subsystemId);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_feature_harvest_candidates",
+    "List all harvest candidates linked to a specific feature (filtered by feature_id). Returns candidates with their hierarchy links and harvest source.",
+    {
+      featureId: z.string().describe("Feature UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getFeatureHarvestCandidates(args.featureId);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_spawn_plan_from_candidate",
+    "Full flow: link a harvest candidate to a system/subsystem, create a requirement derived from the candidate's title and intent, and optionally cross-reference a conduit plan — all in one atomic transaction. Returns the updated candidate, the new requirement, and the cross-reference (if planRef was provided).",
+    {
+      id: z.string().describe("Harvest candidate UUID"),
+      systemId: z.string().describe("System UUID to link the candidate to (also used for the requirement and info tab)"),
+      subsystemId: z.string().describe("Subsystem UUID — required because the requirement must belong to a subsystem"),
+      featureId: z.string().nullable().optional().describe("Optional feature UUID to link candidate and requirement to"),
+      planRef: z.string().optional().describe("Optional conduit plan reference (e.g. '0136') — creates a cross-reference with rel_type='spawns_plan'"),
+      priority: z.string().optional().describe("Requirement priority: Low, Medium, High (default Medium)"),
+      status: z.string().optional().describe("Requirement status: Backlog, ToDo, InProgress, Active, Blocked, Done, Cancelled, Accepted (default Backlog)"),
+      title: z.string().optional().describe("Requirement title (defaults to candidate title)"),
+      description: z.string().optional().describe("Requirement description (defaults to candidate intent_description)"),
+    },
+    async (args) => {
+      const { id, ...body } = args;
+      const result = await NebulaClient.spawnPlanFromCandidate(id, body);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
   //  AGENT RECORDS
   // ════════════════════════════════════════════════════════════════
 
@@ -725,6 +917,8 @@ export function registerTools(server: McpServer) {
       systemId: z.string().optional().describe("Filter by associated system UUID"),
       planRef: z.string().optional().describe("Filter by conduit plan reference (e.g. '0136')"),
       tag: z.string().optional().describe("Filter by tag"),
+      level: z.number().optional().describe("Filter by abstraction level (1-4)"),
+      visibilityScope: z.string().optional().describe("Filter by visibility scope (builder, architect, planner, reviewer, all)"),
       limit: z.number().optional().describe("Max results (default 100, max 500)"),
       offset: z.number().optional().describe("Offset for pagination"),
     },
@@ -735,6 +929,8 @@ export function registerTools(server: McpServer) {
         systemId: args.systemId,
         planRef: args.planRef,
         tag: args.tag,
+        level: args.level,
+        visibilityScope: args.visibilityScope,
         limit: args.limit,
         offset: args.offset,
       });
@@ -773,6 +969,8 @@ export function registerTools(server: McpServer) {
       subsystemId: z.string().optional().describe("Associated subsystem UUID"),
       featureId: z.string().optional().describe("Associated feature UUID"),
       planRef: z.string().optional().describe("Conduit plan reference (e.g. '0136')"),
+      level: z.number().optional().describe("Abstraction level 1-4 (default 1)"),
+      visibilityScope: z.string().optional().describe("Visibility scope: builder, architect, planner, reviewer, all (default 'all')"),
     },
     async (args) => {
       const result = await NebulaClient.createAgentRecord({
@@ -787,6 +985,8 @@ export function registerTools(server: McpServer) {
         subsystemId: args.subsystemId,
         featureId: args.featureId,
         planRef: args.planRef,
+        level: args.level,
+        visibilityScope: args.visibilityScope,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -805,6 +1005,8 @@ export function registerTools(server: McpServer) {
       subsystemId: z.string().nullable().optional().describe("Associated subsystem UUID"),
       featureId: z.string().nullable().optional().describe("Associated feature UUID"),
       planRef: z.string().nullable().optional().describe("Conduit plan reference"),
+      level: z.number().optional().describe("New abstraction level (1-4)"),
+      visibilityScope: z.string().optional().describe("New visibility scope (builder, architect, planner, reviewer, all)"),
     },
     async (args) => {
       const { id, ...body } = args;

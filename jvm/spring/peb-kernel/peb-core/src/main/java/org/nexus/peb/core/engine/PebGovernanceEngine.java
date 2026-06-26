@@ -6,6 +6,7 @@ import org.nexus.peb.core.violation.PebViolationEngine;
 import org.nexus.peb.domain.entity.PebTransaction;
 import org.nexus.peb.domain.enums.AdmissionPath;
 import org.nexus.peb.domain.enums.AdmissionResult;
+import org.nexus.peb.domain.dto.AdmissionResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +59,7 @@ public class PebGovernanceEngine {
      * malformed violation report never leaves an audit-only orphan row.
      */
     @Transactional
-    public String processForPath(PebTransaction request, AdmissionPath path) {
+    public AdmissionResponse processForPath(PebTransaction request, AdmissionPath path) {
         boolean bypassValidator = (path == AdmissionPath.REPORT_VIOLATION);
         boolean validatorPassed = bypassValidator || validator.validate(request);
 
@@ -80,16 +81,17 @@ public class PebGovernanceEngine {
             // IllegalArgumentException on a malformed violation_type/severity,
             // which the controller surfaces as a 4xx to the MCP client.
             violationEngine.ingest(tx);
-            return "Violation recorded as REJECTED";
+            return AdmissionResponse.accepted("Violation recorded as REJECTED");
         }
         if (validatorPassed) {
-            switch (path) {
-                case VALIDATE:           return "Validation processed";
-                case MUTATE:             return "Mutation processed";
-                case UNKNOWN:            return "Routed (unknown tool)";
-                default:                 return "Transaction processed";
-            }
+            String message = switch (path) {
+                case VALIDATE -> "Validation processed";
+                case MUTATE   -> "Mutation processed";
+                case UNKNOWN  -> "Routed (unknown tool)";
+                default       -> "Transaction processed";
+            };
+            return AdmissionResponse.accepted(message);
         }
-        return "Admission denied by invariant validator";
+        return AdmissionResponse.denied("Admission denied by invariant validator");
     }
 }

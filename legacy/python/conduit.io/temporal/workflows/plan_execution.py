@@ -174,6 +174,35 @@ class PlanExecutionWorkflow:
                 )
                 return "failed"
 
+            # Step 4b: Pre-flight provider health check (skip if forced)
+            if not force:
+                model_chain = await workflow.execute_activity(
+                    "check_provider_health_activity",
+                    args=[model_chain],
+                    start_to_close_timeout=timedelta(seconds=30),
+                )
+
+            if not model_chain:
+                workflow.logger.warning(
+                    f"PlanExecutionWorkflow BLOCK plan={plan_id} "
+                    f"reason=all_providers_down"
+                )
+                await workflow.execute_activity(
+                    "insert_receipt_activity",
+                    args=[plan_id, "BLOCK", role, session_id, ticket_id,
+                          f"All AI providers are unreachable for role={role}. "
+                          f"Check local infrastructure (ollama, opencode).",
+                          {"error": "all_providers_down", "role": role},
+                          0],
+                    start_to_close_timeout=timedelta(seconds=10),
+                )
+                await workflow.execute_activity(
+                    "close_ticket_activity",
+                    args=[plan_id, role, session_id, "failed"],
+                    start_to_close_timeout=timedelta(seconds=10),
+                )
+                return "failed"
+
             # Step 5: Execute with progressive fallback
             self._current_step = "execute"
             final_model = model_chain[0]
@@ -311,20 +340,22 @@ class PlanExecutionWorkflow:
                 )
 
                 try:
-result = await workflow.execute_activity(
-                     "execute_with_model",
-                     args=[model_cfg, dco_result["dco"],
-                               dco_result["wr_id"],
-                               dco_result["executor_cmd"],
-                               ticket_id,
-                               session_id],
-                        retry_policy=RetryPolicy(
-                            initial_interval=timedelta(seconds=retry_delay),
-                            maximum_attempts=1,  # We handle retries in the workflow
-                            non_retryable_error_types=[
-                                "HarnessError",
-                                "LaunchError",
-                                "RateLimitError",
+                    working_path = dco_result["dco"].get("path", "/home/codex/dev")
+                    result = await workflow.execute_activity(
+                         "execute_with_model",
+                         args=[model_cfg, dco_result["dco"],
+                                   dco_result["wr_id"],
+                                   dco_result["executor_cmd"],
+                                   ticket_id,
+                                   working_path,
+                                   session_id],
+                            retry_policy=RetryPolicy(
+                                initial_interval=timedelta(seconds=retry_delay),
+                                maximum_attempts=1,  # We handle retries in the workflow
+                                non_retryable_error_types=[
+                                    "HarnessError",
+                                    "LaunchError",
+                                    "RateLimitError",
                             ],
                         ),
                         heartbeat_timeout=timedelta(seconds=30),

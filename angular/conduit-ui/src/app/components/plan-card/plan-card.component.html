@@ -18,13 +18,18 @@
     </button>
   </div>
   <div class="card-title">{{ plan.title }}</div>
-  <div *ngIf="plan.blockReason" class="block-reason">
-    ⚠ {{ getBlockReasonLabel(plan.blockReason) }}
-  </div>
-  <div *ngIf="status === 'completed'" class="completed-check">✓</div>
+  @if (plan.blockReason) {
+    <div class="block-reason">
+      ⚠ {{ getBlockReasonLabel(plan.blockReason) }}
+    </div>
+  }
+  @if (status === 'completed') {
+    <div class="completed-check">✓</div>
+  }
 
   <!-- Hard-delete confirmation overlay -->
-  <div *ngIf="showHardDeleteConfirm()" class="hard-delete-overlay" (click)="$event.stopPropagation()">
+  @if (showHardDeleteConfirm()) {
+    <div class="hard-delete-overlay" (click)="$event.stopPropagation()">
     <div class="hard-delete-dialog">
       <div class="hard-delete-icon">⚠️</div>
       <h4>Permanently Delete Plan?</h4>
@@ -45,7 +50,9 @@
         (keydown.enter)="confirmHardDelete()"
         [disabled]="hardDeleting()"
       />
-      <div *ngIf="hardDeleteError()" class="hard-delete-error">{{ hardDeleteError() }}</div>
+      @if (hardDeleteError()) {
+        <div class="hard-delete-error">{{ hardDeleteError() }}</div>
+      }
       <div class="hard-delete-actions">
         <button class="btn-cancel" (click)="cancelHardDelete()" [disabled]="hardDeleting()">
           Cancel
@@ -60,35 +67,46 @@
       </div>
     </div>
   </div>
+  }
 
   <!-- Expanded detail panel -->
-  <div *ngIf="expanded() && hasDetails()" class="card-detail" (click)="$event.stopPropagation()">
-    <div class="detail-section" *ngIf="plan.goal">
-      <div class="detail-label">Goal</div>
-      <div class="detail-text">{{ plan.goal }}</div>
-    </div>
+  @if (expanded() && hasDetails()) {
+    <div class="card-detail" (click)="$event.stopPropagation()">
+      @if (plan.goal) {
+        <div class="detail-section">
+          <div class="detail-label">Goal</div>
+          <div class="detail-text">{{ plan.goal }}</div>
+        </div>
+      }
 
-    <div class="detail-section" *ngIf="plan.filesAffected && plan.filesAffected.length > 0">
-      <div class="detail-label">Files Affected</div>
-      <ul class="detail-list">
-        <li *ngFor="let f of plan.filesAffected">
-          <code>{{ f }}</code>
-        </li>
-      </ul>
-    </div>
+      @if (plan.filesAffected && plan.filesAffected.length > 0) {
+        <div class="detail-section">
+          <div class="detail-label">Files Affected</div>
+          <ul class="detail-list">
+            <li *ngFor="let f of plan.filesAffected">
+              <code>{{ f }}</code>
+            </li>
+          </ul>
+        </div>
+      }
 
-    <div class="detail-section" *ngIf="plan.acceptanceCriteria && plan.acceptanceCriteria.length > 0">
-      <div class="detail-label">Acceptance Criteria</div>
-      <ol class="detail-list">
-        <li *ngFor="let c of plan.acceptanceCriteria">{{ c }}</li>
-      </ol>
-    </div>
+      @if (plan.acceptanceCriteria && plan.acceptanceCriteria.length > 0) {
+        <div class="detail-section">
+          <div class="detail-label">Acceptance Criteria</div>
+          <ol class="detail-list">
+            <li *ngFor="let c of plan.acceptanceCriteria">{{ c }}</li>
+          </ol>
+        </div>
+      }
 
-    <div class="detail-section" *ngIf="plan.dependencies && plan.dependencies.length > 0">
-      <div class="detail-label">Dependencies</div>
-      <ul class="detail-list">
-        <li *ngFor="let d of plan.dependencies">{{ d }}</li>
-      </ul>
+      @if (plan.dependencies && plan.dependencies.length > 0) {
+        <div class="detail-section">
+          <div class="detail-label">Dependencies</div>
+          <ul class="detail-list">
+            <li *ngFor="let d of plan.dependencies">{{ d }}</li>
+          </ul>
+        </div>
+      }
     </div>
-  </div>
+  }
 </div>

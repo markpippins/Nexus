@@ -1,6 +1,7 @@
 package org.nexus.peb.api.controller;
 
 import org.nexus.peb.core.engine.PebGovernanceEngine;
+import org.nexus.peb.domain.dto.AdmissionResponse;
 import org.nexus.peb.domain.entity.PebTransaction;
 import org.nexus.peb.domain.enums.AdmissionPath;
 import org.nexus.peb.domain.exception.MalformedAdmissionRequestException;
@@ -44,8 +45,12 @@ public class AdmissionControllerFacade {
     @PostMapping("/transaction")
     public ResponseEntity<String> submitTransaction(@RequestBody PebTransaction transaction) {
         AdmissionPath path = AdmissionPath.fromToolName(transaction.getToolName());
-        String result = governanceEngine.processForPath(transaction, path);
-        return ResponseEntity.ok(result);
+        AdmissionResponse response = governanceEngine.processForPath(transaction, path);
+        if (response.admitted()) {
+            return ResponseEntity.ok(response.message());
+        }
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                             .body(response.message());
     }
 
     /**

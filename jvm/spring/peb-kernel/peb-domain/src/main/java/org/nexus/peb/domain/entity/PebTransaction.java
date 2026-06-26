@@ -57,7 +57,7 @@ public class PebTransaction {
     private Instant createdAt;
 
     @Column
-    private Instant committedAt;           // null if rolled back
+    private Instant committedAt;           // null if rolled back; set by commitTransaction()
 
     // Getters/Setters — only the ones the kernel dispatch layer actually needs
     // are wired in; the rest stay absent to keep the entity narrow. Jackson
@@ -93,6 +93,14 @@ public class PebTransaction {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Instant getCommittedAt() {
+        return committedAt;
+    }
+
+    public void setCommittedAt(Instant committedAt) {
+        this.committedAt = committedAt;
     }
 
     /**

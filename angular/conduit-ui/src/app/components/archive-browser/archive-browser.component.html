@@ -12,9 +12,11 @@
       (click)="selectTab(tab.key)"
     >
       {{ tab.icon }} {{ tab.label }}
-      <span class="tab-count" *ngIf="activeTab() === tab.key && total() > 0">
-        ({{ total() }})
-      </span>
+      @if (activeTab() === tab.key && total() > 0) {
+        <span class="tab-count">
+          ({{ total() }})
+        </span>
+      }
     </button>
   </div>
 
@@ -39,10 +41,15 @@
     </div>
   </div>
 
-  <app-loading-spinner *ngIf="loading()" />
-  <app-error-banner *ngIf="error() as e" [message]="e" retryLabel="Retry" (retry)="loadArchive()" />
+  @if (loading()) {
+    <app-loading-spinner />
+  }
+  @if (error(); as e) {
+    <app-error-banner [message]="e" retryLabel="Retry" (retry)="loadArchive()" />
+  }
 
-  <ng-container *ngIf="!loading() && !error()">
+  @if (!loading() && !error()) {
+
     <!-- Results -->
     <div class="results-list">
       <div
@@ -58,46 +65,64 @@
         </div>
 
         <!-- Expanded detail -->
-        <div class="row-detail" *ngIf="expandedEntry()?.path === entry.path">
-          <div class="detail-grid">
-            <div class="detail-field" *ngIf="entry.goal">
-              <span class="detail-label">Goal</span>
-              <span class="detail-value">{{ entry.goal }}</span>
-            </div>
-            <div class="detail-field" *ngIf="entry.filesAffected?.length">
-              <span class="detail-label">Files Affected</span>
-              <ul class="detail-list">
-                <li *ngFor="let f of entry.filesAffected"><code>{{ f }}</code></li>
-              </ul>
-            </div>
-            <div class="detail-field" *ngIf="entry.acceptanceCriteria">
-              <span class="detail-label">Acceptance Criteria</span>
-              <pre class="detail-pre">{{ entry.acceptanceCriteria }}</pre>
-            </div>
-            <div class="detail-field" *ngIf="entry.dependencies">
-              <span class="detail-label">Dependencies</span>
-              <span class="detail-value">{{ entry.dependencies }}</span>
-            </div>
-            <div class="detail-field" *ngIf="entry.sessionId">
-              <span class="detail-label">Session</span>
-              <span class="detail-value"><code>{{ entry.sessionId }}</code></span>
-            </div>
-            <div class="detail-field" *ngIf="entry.exitCode != null">
-              <span class="detail-label">Exit Code</span>
-              <span class="detail-value">{{ entry.exitCode }}</span>
+        @if (expandedEntry()?.path === entry.path) {
+          <div class="row-detail">
+            <div class="detail-grid">
+              @if (entry.goal) {
+                <div class="detail-field">
+                  <span class="detail-label">Goal</span>
+                  <span class="detail-value">{{ entry.goal }}</span>
+                </div>
+              }
+              @if (entry.filesAffected?.length) {
+                <div class="detail-field">
+                  <span class="detail-label">Files Affected</span>
+                  <ul class="detail-list">
+                    <li *ngFor="let f of entry.filesAffected"><code>{{ f }}</code></li>
+                  </ul>
+                </div>
+              }
+              @if (entry.acceptanceCriteria) {
+                <div class="detail-field">
+                  <span class="detail-label">Acceptance Criteria</span>
+                  <pre class="detail-pre">{{ entry.acceptanceCriteria }}</pre>
+                </div>
+              }
+              @if (entry.dependencies) {
+                <div class="detail-field">
+                  <span class="detail-label">Dependencies</span>
+                  <span class="detail-value">{{ entry.dependencies }}</span>
+                </div>
+              }
+              @if (entry.sessionId) {
+                <div class="detail-field">
+                  <span class="detail-label">Session</span>
+                  <span class="detail-value"><code>{{ entry.sessionId }}</code></span>
+                </div>
+              }
+              @if (entry.exitCode != null) {
+                <div class="detail-field">
+                  <span class="detail-label">Exit Code</span>
+                  <span class="detail-value">{{ entry.exitCode }}</span>
+                </div>
+              }
             </div>
           </div>
-        </div>
+        }
       </div>
 
-      <app-empty-state *ngIf="results().length === 0" icon="🔍" title="No archive entries found" description="Try adjusting your search or date filter." />
+      @if (results().length === 0) {
+        <app-empty-state icon="🔍" title="No archive entries found" description="Try adjusting your search or date filter." />
+      }
     </div>
 
     <!-- Pagination -->
-    <div class="pagination" *ngIf="totalPages() > 1">
+    @if (totalPages() > 1) {
+      <div class="pagination">
       <button class="page-btn" [disabled]="page() <= 1" (click)="goToPage(page() - 1)">← Prev</button>
       <span class="page-info">{{ page() }} / {{ totalPages() }}</span>
       <button class="page-btn" [disabled]="page() >= totalPages()" (click)="goToPage(page() + 1)">Next →</button>
-    </div>
-  </ng-container>
+      </div>
+    }
+  }
 </div>

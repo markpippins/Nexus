@@ -5,6 +5,7 @@ adapted for Temporal with heartbeat-based progress reporting and stderr capture.
 """
 
 import asyncio
+import logging
 import os
 import select
 import signal
@@ -21,7 +22,7 @@ sys.path.insert(0, str(_PARENT))
 
 from harness_launcher import HarnessLauncher, DEFAULT_BINARIES
 from harness_enums import ExecutionMode, RoleMappingStrategy
-from ..prompt_renderer import build_opencode_prompt
+from conduit.prompt_renderer import build_opencode_prompt
 
 _log = logging.getLogger("conduit.temporal")
 
@@ -470,7 +471,8 @@ def _build_opencode_cmd(
     launcher.set_agent(role)
     if qualified_model:
         launcher.set_model(qualified_model)
-    launcher.set_working_directory(working_path)
+    if working_path and os.path.isdir(working_path):
+        launcher.set_working_directory(working_path)
     launcher.set_prompt(prompt)
 
     cmd = launcher.build()

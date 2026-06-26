@@ -42,6 +42,7 @@ import {
 } from "./db";
 import { initRedis, closeRedis } from "./memory";
 import { registerToolHandlers, toolDefinitions } from "./tools";
+import { getDueSchedulerEntries, updateSchedulerEntry, listSchedulerEntries, createSchedulerEntry, deleteSchedulerEntry } from "./db";
 
 const PORT = parseInt(process.env.PORT || "3400", 10);
 
@@ -623,6 +624,60 @@ app.get("/config/ai/resolve/:role", async (req, res) => {
       return;
     }
     res.json(config);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Agent Scheduler ─────────────────────────────────────────────────
+
+app.get("/scheduler", async (_req, res) => {
+  try {
+    const entries = await listSchedulerEntries();
+    res.json({ count: entries.length, entries });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/scheduler/due", async (_req, res) => {
+  try {
+    const due = await getDueSchedulerEntries();
+    res.json({ count: due.length, entries: due });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/scheduler", async (req, res) => {
+  try {
+    const { role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled } = req.body || {};
+    if (!role) { res.status(400).json({ error: "role is required" }); return; }
+    const entry = await createSchedulerEntry({ role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled });
+    res.json({ created: true, entry });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.patch("/scheduler/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+    const entry = await updateSchedulerEntry(id, req.body);
+    if (!entry) { res.status(404).json({ error: "Not found" }); return; }
+    res.json({ updated: true, entry });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/scheduler/:id", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+    const deleted = await deleteSchedulerEntry(id);
+    res.json({ deleted, id });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

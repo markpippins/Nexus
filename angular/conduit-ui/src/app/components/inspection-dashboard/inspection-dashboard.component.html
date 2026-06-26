@@ -4,7 +4,9 @@
   <!-- Status filters -->
   <div class="chips">
     <button class="chip" *ngFor="let s of statusFilters" [ngClass]="{ active: s.active }" (click)="toggleStatus(s.key)">
-      {{ s.label }} <span class="chip-count" *ngIf="s.count > 0">({{ s.count }})</span>
+      {{ s.label }}      @if (s.count > 0) {
+        <span class="chip-count">({{ s.count }})</span>
+      }
     </button>
   </div>
 
@@ -15,10 +17,15 @@
     </button>
   </div>
 
-  <app-loading-spinner *ngIf="loading()" />
-  <app-error-banner *ngIf="error() as e" [message]="e" retryLabel="Retry" (retry)="loadInspections()" />
+  @if (loading()) {
+    <app-loading-spinner />
+  }
+  @if (error(); as e) {
+    <app-error-banner [message]="e" retryLabel="Retry" (retry)="loadInspections()" />
+  }
 
-  <ng-container *ngIf="!loading() && !error()">
+  @if (!loading() && !error()) {
+
     <!-- Results -->
     <div class="results-list">
       <div class="result-row" *ngFor="let entry of results()" [ngClass]="{ expanded: expandedEntry()?.path === entry.path }" (click)="toggleEntry(entry)">
@@ -27,17 +34,23 @@
           <span class="row-name">{{ entry.title }}</span>
           <span class="row-age">{{ getAge(entry.mtime) }}</span>
         </div>
-        <div class="row-detail" *ngIf="expandedEntry()?.path === entry.path">
-          <div class="detail-grid">
-            <div class="detail-field"><span class="detail-label">Category</span><span class="detail-value">{{ entry.category }}</span></div>
-            <div class="detail-field"><span class="detail-label">Severity</span><span class="detail-value">{{ entry.severity }}</span></div>
-            <div class="detail-field"><span class="detail-label">Status</span><span class="detail-value">{{ entry.status }}</span></div>
-            <div class="detail-field" *ngIf="entry.planRefs.length > 0"><span class="detail-label">Plan References</span><span class="detail-value">{{ entry.planRefs.join(', ') }}</span></div>
-            <div class="detail-field"><span class="detail-label">Full Report</span><pre class="detail-pre">{{ entry.fullContent }}</pre></div>
+        @if (expandedEntry()?.path === entry.path) {
+          <div class="row-detail">
+            <div class="detail-grid">
+              <div class="detail-field"><span class="detail-label">Category</span><span class="detail-value">{{ entry.category }}</span></div>
+              <div class="detail-field"><span class="detail-label">Severity</span><span class="detail-value">{{ entry.severity }}</span></div>
+              <div class="detail-field"><span class="detail-label">Status</span><span class="detail-value">{{ entry.status }}</span></div>
+              @if (entry.planRefs.length > 0) {
+                <div class="detail-field"><span class="detail-label">Plan References</span><span class="detail-value">{{ entry.planRefs.join(', ') }}</span></div>
+              }
+              <div class="detail-field"><span class="detail-label">Full Report</span><pre class="detail-pre">{{ entry.fullContent }}</pre></div>
+            </div>
           </div>
-        </div>
+      }
       </div>
-      <app-empty-state *ngIf="results().length === 0" icon="🔎" title="No inspections found" description="No inspections match the current filters." />
+      @if (results().length === 0) {
+        <app-empty-state icon="🔎" title="No inspections found" description="No inspections match the current filters." />
+      }
     </div>
-  </ng-container>
+  }
 </div>

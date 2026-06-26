@@ -5,7 +5,7 @@ import {
   ViewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NgFor, NgIf } from '@angular/common';
+import { NgFor } from '@angular/common';
 import { MessageBoxInstance, MessageBoxService, SlashCommand, SLASH_COMMANDS } from '../../services/message-box.service';
 
 type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
@@ -13,7 +13,7 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 @Component({
   selector: 'app-message-box',
   standalone: true,
-  imports: [NgFor, NgIf, FormsModule],
+  imports: [NgFor, FormsModule],
   template: `
     <div
       class="message-box"
@@ -57,11 +57,14 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
         </div>
       </div>
 
-      <div class="mbox-body" *ngIf="!box.minimized">
+      @if (!box.minimized) {
+        <div class="mbox-body">
         <div class="mbox-transcript" #transcript>
-          <div class="mbox-empty" *ngIf="box.messages.length === 0">
-            Start a conversation…
-          </div>
+          @if (box.messages.length === 0) {
+            <div class="mbox-empty">
+              Start a conversation…
+            </div>
+          }
           <div
             class="mbox-msg"
             *ngFor="let msg of box.messages"
@@ -71,10 +74,12 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
             <span class="mbox-role">{{ msg.role === 'user' ? 'You' : (box.agentRole || 'Assistant') }}</span>
             <div class="mbox-content">{{ msg.content }}</div>
           </div>
-          <div class="mbox-msg assistant" *ngIf="box.submitting">
-            <span class="mbox-role">{{ box.agentRole || 'Assistant' }}</span>
-            <div class="mbox-content mbox-thinking">Thinking…</div>
-          </div>
+          @if (box.submitting) {
+            <div class="mbox-msg assistant">
+              <span class="mbox-role">{{ box.agentRole || 'Assistant' }}</span>
+              <div class="mbox-content mbox-thinking">Thinking…</div>
+            </div>
+          }
         </div>
 
         <div class="mbox-compose">
@@ -87,7 +92,8 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
             rows="3"
             [disabled]="box.submitting"
           ></textarea>
-          <div class="mbox-slash-dropdown" *ngIf="slashVisible">
+          @if (slashVisible) {
+            <div class="mbox-slash-dropdown">
             <div
               class="mbox-slash-item"
               *ngFor="let cmd of slashFiltered; let i = index"
@@ -97,10 +103,13 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
               <span class="mbox-slash-cmd">{{ cmd.command }}</span>
               <span class="mbox-slash-desc">{{ cmd.description }}</span>
             </div>
-            <div class="mbox-slash-empty" *ngIf="slashFiltered.length === 0">
-              No matching commands
-            </div>
+            @if (slashFiltered.length === 0) {
+              <div class="mbox-slash-empty">
+                No matching commands
+              </div>
+            }
           </div>
+          }
           <div class="mbox-actions">
             <button
               class="mbox-submit"
@@ -113,6 +122,7 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
           </div>
         </div>
       </div>
+      }
     </div>
   `,
   styles: [

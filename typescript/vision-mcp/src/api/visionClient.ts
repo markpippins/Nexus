@@ -1,12 +1,51 @@
 /**
  * HTTP client for vision-srv REST API.
- * All vision-mcp tools proxy through this client to vision-srv (port 3103).
+ * All vision-mcp tools proxy through this client to vision-srv.
+ *
+ * Configuration (all optional, environment-driven):
+ *   - VISION_SRV_URL                     — full base URL of vision-srv.
+ *                                          Default: http://localhost:3103.
+ *                                          Both http:// and https:// are
+ *                                          supported; the client dispatches
+ *                                          to the matching Node transport.
+ *   - VISION_SRV_TLS_REJECT_UNAUTHORIZED — "true" (default) or "false".
+ *                                          Set to "false" only for dev with
+ *                                          self-signed certificates.
+ *
+ * Override examples:
+ *   VISION_SRV_URL=http://localhost:3104 \
+ *     npx tsx src/index.ts
+ *   VISION_SRV_URL=https://vision.internal:8443 \
+ *     VISION_SRV_TLS_REJECT_UNAUTHORIZED=false \
+ *     npx tsx src/index.ts
+ *
+ * If VISION_SRV_URL is malformed, the process exits at module load with a
+ * clear, actionable error — there is no point starting an MCP server that
+ * cannot reach its upstream.
  */
 import * as http from "http";
+import * as https from "https";
 
-const VISION_SRV_URL = "http://localhost:3103";
+function parseBaseUrl(raw: string): URL {
+  try {
+    return new URL(raw);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(
+      `vision-mcp: invalid VISION_SRV_URL=${JSON.stringify(raw)} — ${msg}. ` +
+        `Expected form: http://host:port or https://host:port`,
+    );
+    process.exit(1);
+  }
+}
 
-const BASE_URL = new URL(VISION_SRV_URL);
+const BASE_URL = parseBaseUrl(
+  process.env.VISION_SRV_URL ?? "http://localhost:3103",
+);
+const USE_HTTPS = BASE_URL.protocol === "https:";
+const REJECT_UNAUTHORIZED =
+  (process.env.VISION_SRV_TLS_REJECT_UNAUTHORIZED ?? "true").toLowerCase() !==
+  "false";
 
 function httpRequest(method: string, path: string, body?: any): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -16,15 +55,21 @@ function httpRequest(method: string, path: string, body?: any): Promise<any> {
       headers["Content-Type"] = "application/json";
       headers["Content-Length"] = Buffer.byteLength(bodyStr).toString();
     }
+
+    const defaultPort = USE_HTTPS ? 443 : 80;
     const options: http.RequestOptions = {
       hostname: BASE_URL.hostname,
-      port: BASE_URL.port,
+      port: BASE_URL.port || String(defaultPort),
       path,
       method,
       headers,
     };
+    if (USE_HTTPS) {
+      (options as https.RequestOptions).rejectUnauthorized = REJECT_UNAUTHORIZED;
+    }
 
-    const req = http.request(options, (res) => {
+    const transport = USE_HTTPS ? https : http;
+    const req = transport.request(options, (res) => {
       let data = "";
       res.on("data", (chunk: string) => (data += chunk));
       res.on("end", () => {

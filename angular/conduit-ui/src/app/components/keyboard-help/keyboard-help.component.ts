@@ -1,14 +1,15 @@
 import { Component, signal, OnInit, OnDestroy } from '@angular/core';
-import { NgFor, NgIf } from '@angular/common';
+import { NgFor } from '@angular/common';
 import { KeyboardShortcutService, ShortcutHandler } from '../../services/keyboard.service';
 import { SLASH_COMMANDS } from '../../services/message-box.service';
 
 @Component({
   selector: 'app-keyboard-help',
   standalone: true,
-  imports: [NgFor, NgIf],
+  imports: [NgFor],
   template: `
-    <div class="overlay" *ngIf="visible()" (click)="close()">
+    @if (visible()) {
+      <div class="overlay" (click)="close()">
       <div class="panel" (click)="$event.stopPropagation()">
         <div class="header">
           <h2>Keyboard Shortcuts</h2>
@@ -23,13 +24,15 @@ import { SLASH_COMMANDS } from '../../services/message-box.service';
           </div>
         </div>
 
-        <div class="section" *ngIf="view().length > 0">
-          <h3>Current View</h3>
+        @if (view().length > 0) {
+          <div class="section">
+            <h3>Current View</h3>
           <div class="shortcut" *ngFor="let s of view()">
             <kbd>{{ label(s.key) }}</kbd>
             <span>{{ s.description }}</span>
           </div>
         </div>
+        }
 
         <div class="section">
           <h3>Slash Commands</h3>
@@ -42,6 +45,7 @@ import { SLASH_COMMANDS } from '../../services/message-box.service';
         <p class="hint">Press <kbd>?</kbd> again to close</p>
       </div>
     </div>
+    }
   `,
   styles: [
     `.overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;padding:16px}`,

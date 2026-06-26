@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, computed, signal, inject } from '@angular/core';
-import { NgClass, NgIf, NgFor } from '@angular/common';
+import { NgClass, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PlanCard } from '../../services/types';
 import { ConduitService } from '../../services/conduit.service';
@@ -8,7 +8,7 @@ import { ToastService } from '../../services/toast.service';
 @Component({
   selector: 'app-plan-card',
   standalone: true,
-  imports: [NgClass, NgIf, NgFor, FormsModule],
+  imports: [NgClass, NgFor, FormsModule],
   templateUrl: './plan-card.component.html',
   styleUrls: ['./plan-card.component.scss'],
 })

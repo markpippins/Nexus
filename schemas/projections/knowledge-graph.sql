@@ -90,7 +90,7 @@ CREATE INDEX IF NOT EXISTS idx_graph_entities_embedding ON knowledge.graph_entit
 -- ── Views for common query patterns ────────────────────────────────
 
 -- All edges for a given entity (by section:id)
-CREATE OR REPLACE VIEW v_entity_edges AS
+CREATE OR REPLACE VIEW knowledge.v_entity_edges AS
 SELECT
     e.id AS entity_uuid,
     e.section,
@@ -112,7 +112,7 @@ LEFT JOIN knowledge.graph_edges g2 ON g2.target_section = e.section AND g2.targe
 GROUP BY e.id, e.section, e.entity_id, e.name;
 
 -- Full graph summary
-CREATE OR REPLACE VIEW v_graph_summary AS
+CREATE OR REPLACE VIEW knowledge.v_graph_summary AS
 SELECT
     section,
     count(*) AS entity_count,
@@ -122,11 +122,11 @@ GROUP BY section
 ORDER BY section;
 
 -- ── Helper: semantic search ───────────────────────────────────────
--- Usage: SELECT * FROM semantic_search('governance kernel', 10);
+-- Usage: SELECT * FROM knowledge.semantic_search('governance kernel', 10);
 -- Note: this function is a STUB. Application-layer code must provide
 -- the query embedding and replace the zero-vector parameter.
 -- Until then, run:   SELECT * FROM semantic_search() WHERE false;
-CREATE OR REPLACE FUNCTION semantic_search(
+CREATE OR REPLACE FUNCTION knowledge.semantic_search(
     query_text TEXT DEFAULT NULL,
     result_limit INTEGER DEFAULT 10,
     target_section TEXT DEFAULT NULL

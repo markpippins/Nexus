@@ -214,6 +214,28 @@ async function createSchema(
     ON CONFLICT (id) DO NOTHING
   `, [new Date().toISOString()]);
 
+  // ── Agent scheduler (cron-driven agent runs) ───────────────────────
+  await exec(`
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.agent_scheduler (
+      id               SERIAL PRIMARY KEY,
+      role             TEXT NOT NULL,
+      model_id         TEXT,
+      harness          TEXT NOT NULL DEFAULT 'opencode'
+                        CHECK(harness IN ('opencode', 'conduit')),
+      agent_config     TEXT NOT NULL DEFAULT '{}',
+      schedule_type    TEXT NOT NULL DEFAULT 'interval'
+                        CHECK(schedule_type IN ('interval', 'cron')),
+      schedule_value   INTEGER NOT NULL DEFAULT 3600,
+      project_dir      TEXT NOT NULL DEFAULT '/home/codex/dev',
+      enabled          INTEGER NOT NULL DEFAULT 1,
+      last_run_at      TEXT,
+      last_run_status  TEXT,
+      metadata         TEXT NOT NULL DEFAULT '{}',
+      created_at       TEXT NOT NULL,
+      updated_at       TEXT NOT NULL
+    );
+  `);
+
   // ── Memory procedure registry ─────────────────────────────────────
   await exec(`CREATE EXTENSION IF NOT EXISTS btree_gist`);
 
@@ -1836,6 +1858,101 @@ export async function saveFailureRecoveryConfig(config: {
       now,
     ]
   );
+}
+
+// ── Agent Scheduler ──────────────────────────────────────────────────
+
+export interface AgentSchedulerRow {
+  id: number;
+  role: string;
+  model_id: string | null;
+  harness: string;
+  agent_config: string;
+  schedule_type: string;
+  schedule_value: number;
+  project_dir: string;
+  enabled: number;
+  last_run_at: string | null;
+  last_run_status: string | null;
+  metadata: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listSchedulerEntries(): Promise<AgentSchedulerRow[]> {
+  return qAll("SELECT * FROM agent_scheduler ORDER BY role, id ASC");
+}
+
+export async function getSchedulerEntry(id: number): Promise<AgentSchedulerRow | undefined> {
+  return qOne("SELECT * FROM agent_scheduler WHERE id = @id", { id });
+}
+
+export async function createSchedulerEntry(data: {
+  role: string; model_id?: string; harness?: string;
+  agent_config?: string; schedule_type?: string; schedule_value?: number;
+  project_dir?: string; enabled?: number;
+}): Promise<AgentSchedulerRow> {
+  const now = new Date().toISOString();
+  const row = await qOne(`
+    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled, metadata, created_at, updated_at)
+    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @enabled, '{}', @now, @now)
+    RETURNING *
+  `, {
+    role: data.role,
+    model_id: data.model_id ?? null,
+    harness: data.harness ?? "opencode",
+    agent_config: data.agent_config ?? "{}",
+    schedule_type: data.schedule_type ?? "interval",
+    schedule_value: data.schedule_value ?? 3600,
+    project_dir: data.project_dir ?? "/home/codex/dev",
+    enabled: data.enabled ?? 1,
+    now,
+  });
+  return row;
+}
+
+export async function updateSchedulerEntry(id: number, data: Partial<{
+  role: string; model_id: string | null; harness: string;
+  agent_config: string; schedule_type: string; schedule_value: number;
+  project_dir: string; enabled: number; last_run_at: string;
+  last_run_status: string; metadata: string;
+}>): Promise<AgentSchedulerRow | undefined> {
+  const now = new Date().toISOString();
+  const sets: string[] = ["updated_at = @now"];
+  const params: Record<string, any> = { id, now };
+  const fields = ["role", "model_id", "harness", "agent_config", "schedule_type",
+    "schedule_value", "project_dir", "enabled", "last_run_at", "last_run_status", "metadata"];
+  for (const f of fields) {
+    if ((data as any)[f] !== undefined) {
+      sets.push(`${f} = @${f}`);
+      params[f] = (data as any)[f];
+    }
+  }
+  return qOne(
+    `UPDATE agent_scheduler SET ${sets.join(", ")} WHERE id = @id RETURNING *`,
+    params
+  );
+}
+
+export async function deleteSchedulerEntry(id: number): Promise<boolean> {
+  const changes = await qRun("DELETE FROM agent_scheduler WHERE id = @id", { id });
+  return changes > 0;
+}
+
+export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
+  return qAll(`
+    SELECT * FROM agent_scheduler
+    WHERE enabled = 1
+      AND (
+        last_run_at IS NULL
+        OR last_run_at = ''
+        OR (
+          schedule_type = 'interval'
+          AND EXTRACT(EPOCH FROM NOW() - last_run_at::timestamp) >= schedule_value
+        )
+      )
+    ORDER BY last_run_at ASC NULLS FIRST
+  `);
 }
 
 // ── Snapshot / Import / Export / Validate ─────────────────────────

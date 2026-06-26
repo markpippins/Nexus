@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { Pool } from 'pg';
 import { createRoutes } from './routes';
+import { initRedis, closeRedis } from './services/block-segmentation-redis.service';
 
 // ── PostgreSQL Connection ──────────────────────────────────────────
 const pool = new Pool({
@@ -36,7 +37,30 @@ app.get('/health', async (_req, res) => {
   }
 });
 
+// ── Redis init ──────────────────────────────────────────────────────
+try {
+  initRedis();
+  console.log('[redis] block-segmentation client initialized (lazy connect)');
+} catch (err: any) {
+  console.warn('[redis] block-segmentation init failed (non-fatal):', err.message);
+}
+
 // ── Start ─────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`nebula-srv listening on http://localhost:${PORT}`);
+});
+
+// ── Graceful shutdown ──────────────────────────────────────────────
+process.on('SIGTERM', async () => {
+  console.log('[server] SIGTERM received, shutting down...');
+  await closeRedis();
+  await pool.end();
+  server.close(() => process.exit(0));
+});
+
+process.on('SIGINT', async () => {
+  console.log('[server] SIGINT received, shutting down...');
+  await closeRedis();
+  await pool.end();
+  server.close(() => process.exit(0));
 });

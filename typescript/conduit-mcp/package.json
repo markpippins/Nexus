@@ -12,7 +12,6 @@
     "daemon-status": "bash scripts/mcp-daemon.sh status"
   },
   "dependencies": {
-    "@temporalio/client": "^1.18.1",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "pg": "^8.21.0",

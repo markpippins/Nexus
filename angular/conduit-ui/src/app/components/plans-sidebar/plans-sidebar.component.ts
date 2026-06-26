@@ -1,5 +1,5 @@
 import { Component, signal, computed, output, model } from '@angular/core';
-import { NgFor, NgIf } from '@angular/common';
+import { NgFor } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { ConduitService } from '../../services/conduit.service';
 import { PlanCard } from '../../services/types';
@@ -7,7 +7,7 @@ import { PlanCard } from '../../services/types';
 @Component({
   selector: 'app-plans-sidebar',
   standalone: true,
-  imports: [NgFor, NgIf, RouterModule],
+  imports: [NgFor, RouterModule],
   template: `
     <div
       class="sidebar-container"
@@ -15,7 +15,8 @@ import { PlanCard } from '../../services/types';
       [class.collapsed]="collapsed()"
     >
       <!-- Sidebar content -->
-      <div class="sidebar-inner" *ngIf="!collapsed()">
+      @if (!collapsed()) {
+        <div class="sidebar-inner">
         <div class="sidebar-header">
           <span class="header-title">Plans</span>
           <span class="header-count">{{ totalPlans() }}</span>
@@ -23,10 +24,12 @@ import { PlanCard } from '../../services/types';
 
         <div class="sidebar-groups">
           <ng-container *ngFor="let group of planGroups(); trackBy: trackGroup">
-            <div class="group-header" *ngIf="group.plans.length > 0">
+            @if (group.plans.length > 0) {
+              <div class="group-header">
               <span class="group-label">{{ group.label }}</span>
               <span class="group-count">{{ group.plans.length }}</span>
             </div>
+            }
             <a
               class="plan-item"
               *ngFor="let plan of group.plans; trackBy: trackPlan"
@@ -43,16 +46,21 @@ import { PlanCard } from '../../services/types';
             </a>
           </ng-container>
 
-          <div class="sidebar-empty" *ngIf="totalPlans() === 0">
-            No plans loaded
-          </div>
+          @if (totalPlans() === 0) {
+            <div class="sidebar-empty">
+              No plans loaded
+            </div>
+          }
         </div>
       </div>
+      }
 
       <!-- Collapsed state -->
-      <div class="sidebar-collapsed" *ngIf="collapsed()">
+      @if (collapsed()) {
+        <div class="sidebar-collapsed">
         <span class="collapsed-label" title="Show plans sidebar" (click)="collapsed.set(false)">☰</span>
       </div>
+      }
 
       <!-- Resize handle -->
       <div

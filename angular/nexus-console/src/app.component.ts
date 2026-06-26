@@ -65,6 +65,7 @@ import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dial
 import { GatewayManagementComponent } from './components/gateway-management/gateway-management.component.js';
 import { HostServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
 import { IframeViewComponent } from './components/iframe-view/iframe-view.component.js';
+import { NavToolbarComponent } from './nav-toolbar/nav-toolbar.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 
 interface PanePath {
@@ -114,7 +115,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -162,6 +163,7 @@ export class AppComponent implements OnInit, OnDestroy {
   isImportDialogOpen = signal(false);
   isExportDialogOpen = signal(false);
   isPreferencesDialogOpen = signal(false);
+  isHamburgerMenuOpen = signal(false);
   isComplexSearchDialogOpen = signal(false);
   isGeminiSearchDialogOpen = signal(false);
   isCreateUserDialogOpen = signal(false);
@@ -2297,6 +2299,11 @@ export class AppComponent implements OnInit, OnDestroy {
   // --- Global Click for closing menus ---
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as HTMLElement;
+
+    // Close hamburger menu if clicking outside
+    if (this.isHamburgerMenuOpen() && !target.closest('[data-hamburger-menu]')) {
+      this.isHamburgerMenuOpen.set(false);
+    }
 
     // If the click is on the button that opens the theme menu, do nothing.
     // This prevents the menu from closing immediately after opening.

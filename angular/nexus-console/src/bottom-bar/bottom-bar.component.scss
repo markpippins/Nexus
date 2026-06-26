@@ -37,39 +37,6 @@ app-bottom-bar {
   color: rgb(var(--color-border-muted));
 }
 
-/* ── Center: navigation buttons ── */
-.bottom-bar-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  flex: 0 0 auto;
-}
-
-.nav-btn {
-  background: none;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 13px;
-  font-family: inherit;
-  color: rgb(var(--color-text-muted));
-  cursor: pointer;
-  transition: color 150ms, background-color 150ms;
-  white-space: nowrap;
-  line-height: 1.4;
-}
-
-.nav-btn:hover {
-  background: rgb(var(--color-surface-hover-subtle));
-  color: rgb(var(--color-text-base));
-}
-
-.nav-btn.active {
-  color: rgb(var(--color-accent-text));
-  font-weight: 600;
-}
-
 /* ── Right: external site square buttons ── */
 .bottom-bar-right {
   display: flex;

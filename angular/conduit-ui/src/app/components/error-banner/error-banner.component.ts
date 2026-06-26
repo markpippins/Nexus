@@ -1,14 +1,13 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
-import { NgIf } from '@angular/common';
-
 @Component({
   selector: 'app-error-banner',
   standalone: true,
-  imports: [NgIf],
   template: `<div class="error-banner">
     <div class="error-icon">⚠️</div>
     <div class="error-message">{{ message }}</div>
-    <button *ngIf="retryLabel" class="retry-btn" (click)="retry.emit()">{{ retryLabel }}</button>
+    @if (retryLabel) {
+      <button class="retry-btn" (click)="retry.emit()">{{ retryLabel }}</button>
+    }
   </div>`,
   styles: [`
     .error-banner {

@@ -1,6 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { query, queryOne } from "../db/client.js";
+
+const execFileAsync = promisify(execFile);
 
 export function registerTools(server: McpServer) {
 
@@ -304,6 +308,66 @@ export function registerTools(server: McpServer) {
           }, null, 2)
         }],
       };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  UNIFIED SEMANTIC SEARCH
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "knowledge_semantic_search",
+    "Unified semantic search across both knowledge.graph_entity_embeddings (curated) and nebula.harvest_candidate_embeddings (harvested) using cosine similarity via nomic-embed-text. Returns merged results with provenance labels.",
+    {
+      query: z.string().describe("Search query string (e.g. 'TypeSpec contract architecture')"),
+      limit: z.number().min(1).max(50).optional().default(15).describe("Max results (1-50)"),
+    },
+    async (args) => {
+      const scriptPath = "/home/codex/dev/nexus/python/rover/unified_semantic_search.py";
+      const pythonBin = "/home/codex/dev/nexus/python/rover/.venv/bin/python3";
+
+      try {
+        const { stdout, stderr } = await execFileAsync(
+          pythonBin,
+          [scriptPath, args.query, "--limit", String(args.limit), "--json"],
+          { timeout: 60000, maxBuffer: 10 * 1024 * 1024 }
+        );
+
+        if (stderr) {
+          console.error("[knowledge_semantic_search] stderr:", stderr);
+        }
+
+        let result;
+        try {
+          result = JSON.parse(stdout);
+        } catch {
+          return {
+            content: [{
+              type: "text" as const,
+              text: JSON.stringify({ error: "Failed to parse search results", raw: stdout.slice(0, 500) }, null, 2)
+            }],
+          };
+        }
+
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify(result, null, 2)
+          }],
+        };
+      } catch (err: any) {
+        console.error("[knowledge_semantic_search] error:", err);
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({
+              error: "Semantic search failed",
+              message: err?.message || String(err),
+              hint: "Ensure Ollama is running with nomic-embed-text and the rover venv has httpx installed"
+            }, null, 2)
+          }],
+        };
+      }
     }
   );
 }

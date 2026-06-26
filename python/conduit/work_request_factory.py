@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from executor_registry import ModelConfig
@@ -114,7 +115,7 @@ class WorkRequestFactory:
         plan_id = plan.get("id", "?")
         _log.info("create_from_plan: plan=%s role=%s model=%s",
                   plan_id, role, model_cfg.model if model_cfg else "default")
-        wr_id = f"wr-{plan['id']}-{int(datetime.utcnow().timestamp())}"
+        wr_id = f"wr-{plan['id']}-{int(datetime.utcnow().timestamp())}-{os.urandom(4).hex()}"
         now = datetime.utcnow().isoformat() + "Z"
 
         acceptance_criteria = _parse_json(plan.get("acceptance_criteria"))

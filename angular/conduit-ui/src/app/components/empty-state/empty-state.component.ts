@@ -1,14 +1,13 @@
 import { Component, Input } from '@angular/core';
-import { NgIf } from '@angular/common';
-
 @Component({
   selector: 'app-empty-state',
   standalone: true,
-  imports: [NgIf],
   template: `<div class="empty-state">
     <div class="empty-icon">{{ icon }}</div>
     <div class="empty-title">{{ title }}</div>
-    <div *ngIf="description" class="empty-desc">{{ description }}</div>
+    @if (description) {
+      <div class="empty-desc">{{ description }}</div>
+    }
   </div>`,
   styles: [`
     .empty-state {

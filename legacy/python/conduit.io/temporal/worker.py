@@ -60,6 +60,7 @@ from temporal.activities.execute_model import execute_with_model
 from temporal.activities.work_request import (
     build_work_request_dco_activity,
     resolve_model_chain_activity,
+    check_provider_health_activity,
 )
 
 # Import Workflows
@@ -97,6 +98,7 @@ ALL_ACTIVITIES = [
     execute_with_model,
     build_work_request_dco_activity,
     resolve_model_chain_activity,
+    check_provider_health_activity,
     resolve_test_model_activity,
     execute_test_invoke_activity,
 ]

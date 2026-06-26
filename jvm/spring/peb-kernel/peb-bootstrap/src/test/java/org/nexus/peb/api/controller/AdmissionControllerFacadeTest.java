@@ -2,6 +2,7 @@ package org.nexus.peb.api.controller;
 
 import org.nexus.peb.bootstrap.PebApplication;
 import org.nexus.peb.core.engine.PebGovernanceEngine;
+import org.nexus.peb.domain.dto.AdmissionResponse;
 import org.nexus.peb.domain.exception.MalformedAdmissionRequestException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * {@code currentSchema=peb}). Hibernate's {@code ddl-auto: validate}
  * confirms entity annotations align with the {@code peb} schema tables.
  * The {@code PebGovernanceEngine} is mocked, so no DB writes occur.
+ *
+ * <p>Two categories of 422 are tested here:
+ * <ol>
+ *   <li>Malformed admission request (e.g. {@code peb_report_violation}
+ *       without a valid {@code violation_type}) — engine throws
+ *       {@link MalformedAdmissionRequestException}, controller maps to 422.
+ *   <li>Invariant-validator denial — engine returns
+ *       {@link AdmissionResponse#denied(String)}, controller maps to 422.
+ * </ol>
  */
 @SpringBootTest(
     classes = PebApplication.class,
@@ -82,12 +92,24 @@ class AdmissionControllerFacadeTest {
     @Test
     void validTransaction_returns200() throws Exception {
         when(governanceEngine.processForPath(any(), any()))
-            .thenReturn("Mutation processed");
+            .thenReturn(AdmissionResponse.accepted("Mutation processed"));
 
         mockMvc.perform(post("/api/v1/peb/transaction")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isOk())
             .andExpect(content().string("Mutation processed"));
+    }
+
+    @Test
+    void validatorDenial_returns422() throws Exception {
+        when(governanceEngine.processForPath(any(), any()))
+            .thenReturn(AdmissionResponse.denied("Admission denied by invariant validator"));
+
+        mockMvc.perform(post("/api/v1/peb/transaction")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(content().string("Admission denied by invariant validator"));
     }
 }

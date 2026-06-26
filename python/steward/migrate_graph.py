@@ -108,10 +108,25 @@ def extract_relations(item: dict) -> list[tuple[str, str, str, str | None]]:
 
 
 def parse_cross_references(cross_refs: dict) -> list[dict]:
-    """Parse the cross_references section into uniform records."""
+    """Parse the cross_references section into uniform records.
+    
+    Handles three formats found in the JSON:
+    - Flat string: {"map_name": "target_id"} — most common
+    - List of strings: {"map_name": ["id1", "id2"]}
+    - List of dicts: {"map_name": [{"from": "x", "to": "y"}]}
+    """
     records: list[dict] = []
     for map_name, entries in cross_refs.items():
-        if isinstance(entries, list):
+        if isinstance(entries, str):
+            # Flat string cross-ref: "map_name" → "target_id"
+            records.append({
+                "map_name": map_name,
+                "source_section": None,
+                "source_id": None,
+                "target_section": None,
+                "target_id": entries,
+            })
+        elif isinstance(entries, list):
             for entry in entries:
                 if isinstance(entry, str):
                     # Simple string cross-ref: "CIRS-001"
