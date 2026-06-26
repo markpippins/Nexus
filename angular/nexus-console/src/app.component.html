@@ -214,6 +214,103 @@
         </div>
 
         <!-- Top toolbar removed — navigation is now in app-bottom-bar -->
+        @if (!isIframeMode()) {
+        <app-toolbar
+          [viewMode]="currentViewMode()"
+          [meshViewMode]="meshViewMode()"
+          [managementType]="
+            activePaneId() === 1 ? pane1PlatformNode()?.type : pane2PlatformNode()?.type
+          "
+          [isGatewayContext]="isGatewayContext()"
+          [isGatewaysNodeSelected]="isGatewaysNodeSelected()"
+          [isGatewaySelected]="isGatewaySelected()"
+          [isServiceRegistryContext]="isServiceRegistryContext()"
+          [isServiceRegistriesNodeSelected]="isServiceRegistriesNodeSelected()"
+          [isServiceRegistrySelected]="isServiceRegistrySelected()"
+          [isPlatformManagementContext]="isPlatformManagementContext()"
+          [graphInteractionMode]="vizService.modeSignal()"
+          [isSimulationActive]="vizService.isSimulationActive()"
+          [backgroundColor]="graphBackgroundColor()"
+          [graphSubView]="graphSubView()"
+          [canCreate]="isActionableContext()"
+          [canCut]="canCutCopyShareDelete()"
+          [canCopy]="canCutCopyShareDelete()"
+          [canCopyToMoveTo]="canCutCopyShareDelete()"
+          [canPaste]="canPaste()"
+          [canRename]="canRename()"
+          [canImport]="canImport()"
+          [canShare]="canCutCopyShareDelete()"
+          [canDelete]="canCutCopyShareDelete()"
+          [canMagnetize]="canMagnetize()"
+          [currentSort]="activeSortCriteria()"
+          [folderTree]="folderTree()"
+          [currentPath]="activePanePath()"
+          [displayMode]="activeDisplayMode()"
+          [filterQuery]="activeFilterQuery()"
+          [isSplitViewActive]="isSplitView()"
+          [isDetailPaneActive]="isDetailPaneOpen()"
+          [isSidebarVisible]="isSidebarVisible()"
+          [isTreeVisible]="isTreeVisible()"
+          [isChatVisible]="isChatVisible()"
+          [isNotesVisible]="isNotesVisible()"
+          [isSavedItemsVisible]="isSavedItemsVisible()"
+          [isRssFeedVisible]="isRssFeedVisible()"
+          [isStreamVisible]="isStreamVisible()"
+          [isHomeContext]="isHomeContext()"
+          [canSave]="editorIsDirty()"
+          [showExtendedControls]="showExtendedControls()"
+          [showAllControls]="showAllToolbarControls()"
+          (newFolderClick)="
+            isGatewayContext()
+              ? onAddGateway()
+              : isServiceRegistryContext()
+                ? onAddServiceRegistry()
+                : onToolbarAction('newFolder')
+          "
+          (newFileClick)="onToolbarAction('newFile')"
+          (importClick)="onToolbarImport()"
+          (saveClick)="onSaveGateway()"
+          (resetClick)="onResetGateway()"
+          (filesUploaded)="onToolbarAction('upload', $event)"
+          (cutClick)="onToolbarAction('cut')"
+          (copyClick)="onToolbarAction('copy')"
+          (copyItemsTo)="onToolbarAction('copyTo', $event)"
+          (moveItemsTo)="onToolbarAction('moveTo', $event)"
+          (pasteClick)="onToolbarAction('paste')"
+          (renameClick)="onToolbarAction('rename')"
+          (shareClick)="onToolbarAction('share')"
+          (deleteClick)="onToolbarAction('delete')"
+          (magnetizeClick)="onToolbarAction('magnetize')"
+          (sortChange)="onSortChange($event)"
+          (displayModeChange)="onDisplayModeChange($event)"
+          (filterChange)="onFilterChange($event)"
+          (splitViewClick)="toggleSplitView()"
+          (detailPaneClick)="toggleDetailPane()"
+          (themeMenuClick)="openThemeMenu($event)"
+          (rssFeedsMenuClick)="openRssFeedsDialog()"
+          (preferencesMenuClick)="openPreferencesDialog()"
+          (toggleSidebar)="toggleSidebar()"
+          (toggleTree)="toggleTree()"
+          (toggleChat)="toggleChat()"
+          (toggleNotes)="toggleNotes()"
+          (toggleSavedItems)="toggleSavedItems()"
+          (toggleRssFeed)="toggleRssFeed()"
+          (toggleStream)="toggleStream()"
+          (graphModeChange)="onGraphModeChange($event)"
+          (toggleSimulation)="onToggleSimulation()"
+          (saveGraph)="onSaveGraph()"
+          (loadGraph)="onLoadGraph()"
+          (backgroundColorChange)="onBackgroundColorChange($event)"
+          (zoomIn)="onZoomIn()"
+          (zoomOut)="onZoomOut()"
+          (rotateLeft)="onRotateLeft()"
+          (rotateRight)="onRotateRight()"
+          (resetCamera)="onResetCamera()"
+          (clearGraph)="onClearGraph()"
+          (graphSubViewChange)="onGraphSubViewChange($event)"
+        >
+        </app-toolbar>
+        }
         <div class="flex-1 flex flex-row overflow-hidden relative">
           <div #mainContentWrapper class="flex-1 flex flex-col overflow-hidden min-w-0">
             <div class="flex-1 flex flex-row overflow-hidden">
@@ -660,4 +757,7 @@
     style="display: none"
     (change)="onImportFileSelected($event)"
   />
+
+  <!-- Message Box Chat Interface (copied from conduit-ui) -->
+  <app-message-box-container></app-message-box-container>
 </div>

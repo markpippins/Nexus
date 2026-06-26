@@ -68,8 +68,8 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Initialization flag
   private isInitialized = signal(false);
 
-  // Stable ID key to detect whether service list actually changed (not just reference)
-  private lastServiceIds = '';
+  // Stable per-service key to detect whether service list *or visual style* actually changed (not just reference)
+  private lastServiceKey = '';
   private lastRegistryReady = false;
 
   // Context Menu State
@@ -142,9 +142,14 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       // match the numeric IDs returned by the /api/v1/services endpoint.
       const registryReady = this.registry.backendLoaded();
 
-      // Skip full rebuild when nothing changed (prevents position snap-back on poll cycles)
-      const ids = services.map(s => s.id).sort().join(',');
-      if (ids === this.lastServiceIds && registryReady === this.lastRegistryReady) {
+      // Skip full rebuild when nothing changed (prevents position snap-back on poll cycles).
+      // Key includes per-service visual style so editing a ServiceType's
+      // defaultComponentId (or a service's componentOverrideId) triggers a
+      // full rebuild that re-resolves the 3D component.
+      const key = services
+        .map(s => `${s.id}:${s.componentOverrideId ?? ''}:${s.type?.defaultComponentId ?? s.type?.defaultComponent?.id ?? ''}`)
+        .sort().join(',');
+      if (key === this.lastServiceKey && registryReady === this.lastRegistryReady) {
         // Lightweight update: refresh labels without clearScene
         services.forEach(svc => {
           const node = this.vizService.getNode(String(svc.id));
@@ -156,7 +161,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         this.vizService.updateAllLabels();
         return;
       }
-      this.lastServiceIds = ids;
+      this.lastServiceKey = key;
       this.lastRegistryReady = registryReady;
 
       // Clear existing scene first

@@ -6,11 +6,11 @@ app-bottom-bar {
 .bottom-bar {
   display: flex;
   align-items: center;
-  height: 40px;
+  height: 30px;
   padding: 0 12px;
   background: rgb(var(--color-surface));
   border-top: 1px solid rgb(var(--color-border-base));
-  font-size: 13px;
+  font-size: 12px;
 }
 
 /* ── Left: status info ── */

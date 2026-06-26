@@ -67,6 +67,7 @@ import { HostServerManagementComponent } from './components/host-server-manageme
 import { IframeViewComponent } from './components/iframe-view/iframe-view.component.js';
 import { NavToolbarComponent } from './nav-toolbar/nav-toolbar.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
+import { MessageBoxContainerComponent } from './components/message-box-container/message-box-container.component.js';
 
 interface PanePath {
   id: number;
@@ -115,7 +116,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
