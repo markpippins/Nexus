@@ -3,6 +3,7 @@ import cors from "cors";
 import path from "path";
 import crypto from "crypto";
 import fs from "fs";
+import { spawn } from "child_process";
 import { PipelineWatcher } from "./watcher";
 import { registerToolHandlers, toolDefinitions } from "./tools";
 import { createError, createSuccess } from "./errors";
@@ -27,22 +28,6 @@ import {
   getTokenUsageByRole,
   getTokenUsageByTicket,
   getTicketLineage,
-  getAIConfigSnapshot,
-  getAIProviders,
-  getAIHarnesses,
-  getAIModels,
-  getAIRoleConfigs,
-  upsertAIProvider,
-  upsertAIHarness,
-  upsertAIModel,
-  upsertAIRoleConfig,
-  upsertRoleModels,
-  deleteAIProvider,
-  deleteAIHarness,
-  deleteAIModel,
-  seedDefaultAIConfig,
-  importAIConfig,
-  validateAIConfig,
   requestSchedulerWake,
   startSession,
   updateSessionPid,
@@ -56,14 +41,6 @@ import {
 } from "./db";
 import http from "http";
 import { loadEnv } from "./env"; // shared .env loader (no dotenv dependency)
-import {
-  ensureTemporalConnected,
-  startPlanWorkflow,
-  startTestInvokeWorkflow,
-  signalWorkflowCancel,
-  listWorkflows,
-  sessionToWorkflowId,
-} from "./temporal-client";
 
 // .env already loaded by env.ts at module evaluation time
 
@@ -224,36 +201,6 @@ watcher.onEvent((event: any) => {
 // State endpoint
 app.get("/state", async (_req, res) => {
   const state = await watcher.getState();
-
-  // Phase 3: Enrich with Temporal workflow counts
-  try {
-    if (await ensureTemporalConnected()) {
-      const workflows = await listWorkflows(
-        'WorkflowType = "PlanExecutionWorkflow"'
-      );
-      const counts = { running: 0, completed: 0, failed: 0, cancelled: 0 };
-      for (const wf of workflows) {
-        const s = wf.status.toLowerCase();
-        if (s === "running") counts.running++;
-        else if (s === "completed") counts.completed++;
-        else if (s === "failed") counts.failed++;
-        else if (s === "cancelled") counts.cancelled++;
-      }
-      (state as any).temporal = {
-        connected: true,
-        address: process.env.TEMPORAL_ADDRESS || "localhost:7233",
-        namespace: process.env.TEMPORAL_NAMESPACE || "conduit",
-        schedulerIntervalMs: 30000,
-        workflowCounts: { ...counts, total: workflows.length },
-      };
-    } else {
-      (state as any).temporal = { connected: false };
-    }
-  } catch (e: any) {
-    console.warn(`[state] Temporal enrichment failed: ${e.message}`);
-    (state as any).temporal = { connected: false };
-  }
-
   res.json(state);
 });
 
@@ -311,53 +258,31 @@ app.get("/health", async (_req, res) => {
   });
 });
 
-// Phase 3: Workflow status endpoint — lists PlanExecutionWorkflows from Temporal
+// Workflow status endpoint — backed by sessions (Temporal removed).
+// Returns active sessions formatted the same way the UI expects.
 app.get("/workflows", async (req, res) => {
   try {
-    if (!(await ensureTemporalConnected())) {
-      res.json({
-        connected: false,
-        counts: { running: 0, completed: 0, failed: 0, cancelled: 0, total: 0 },
-        workflows: [],
-      });
-      return;
-    }
-
-    const statusFilter = req.query.status as string | undefined;
-    let query = 'WorkflowType = "PlanExecutionWorkflow"';
-    if (statusFilter) {
-      // Map uppercase API values to Temporal's native mixed-case status values
-      const temporalStatus: Record<string, string> = {
-        RUNNING: "Running",
-        COMPLETED: "Completed",
-        FAILED: "Failed",
-        CANCELLED: "Canceled",
-        TERMINATED: "Terminated",
-        TIMED_OUT: "TimedOut",
+    const sessions = await getAllSessions();
+    const active = sessions.filter((s: any) => s.is_running === 1 || s.is_running === true);
+    const workflows = active.map((s: any) => {
+      let planId = "";
+      try {
+        const plans = JSON.parse(s.plans_processed || "[]");
+        if (Array.isArray(plans) && plans.length > 0) planId = plans[0];
+      } catch {}
+      return {
+        workflowId: planId ? `plan-${planId}-${s.agent_role}` : s.id,
+        runId: s.id,
+        status: "running",
+        startTime: s.start_iso || s.created_at || null,
+        closeTime: s.end_iso || null,
+        planId,
+        role: s.agent_role,
+        pid: s.pid ?? null,
       };
-      const s = statusFilter.toUpperCase();
-      const native = temporalStatus[s];
-      if (native) {
-        query += ` AND ExecutionStatus = "${native}"`;
-      }
-    }
-
-    const workflows = await listWorkflows(query);
-
-    const counts = { running: 0, completed: 0, failed: 0, cancelled: 0 };
-    for (const wf of workflows) {
-      const s = wf.status.toLowerCase();
-      if (s === "running") counts.running++;
-      else if (s === "completed") counts.completed++;
-      else if (s === "failed") counts.failed++;
-      else if (s === "cancelled") counts.cancelled++;
-    }
-
-    res.json({
-      connected: true,
-      counts: { ...counts, total: workflows.length },
-      workflows,
     });
+    const counts = { running: workflows.length, completed: 0, failed: 0, cancelled: 0, total: workflows.length };
+    res.json({ connected: true, counts, workflows });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -431,29 +356,11 @@ app.post("/sessions/:sessionId/kill", async (req, res) => {
   }
 
   const now = new Date().toISOString();
-  let cancelledViaTemporal = false;
   let killedPids: number[] = [];
   const errors: string[] = [];
 
-  // ── Phase 3: Try Temporal signal first (graceful cancellation) ──
-  const workflowId = sessionToWorkflowId(session);
-  if (workflowId && (await ensureTemporalConnected())) {
-    try {
-      await signalWorkflowCancel(workflowId);
-      cancelledViaTemporal = true;
-      console.log(
-        `[${now}] KILL session ${sessionId} → Temporal signal 'cancel' sent to ${workflowId}`,
-      );
-    } catch (e: any) {
-      errors.push(`Temporal signal failed: ${e.message}`);
-      console.warn(
-        `[${now}] KILL session ${sessionId} → Temporal signal failed: ${e.message}`,
-      );
-    }
-  }
-
-  // ── Fallback: SIGKILL the process if Temporal was unavailable ──
-  if (!cancelledViaTemporal && session.pid) {
+  // ── SIGKILL the process (Temporal removed — direct kill always) ──
+  if (session.pid) {
     try {
       process.kill(-session.pid, "SIGKILL");
       killedPids.push(session.pid);
@@ -467,7 +374,7 @@ app.post("/sessions/:sessionId/kill", async (req, res) => {
     }
   }
 
-  // ── Always run DB cleanup (safe even if workflow already cleaned up) ──
+  // ── Always run DB cleanup ──
   await endSession(sessionId, 137, now);
 
   const released = await releaseSessionTickets(sessionId);
@@ -484,8 +391,6 @@ app.post("/sessions/:sessionId/kill", async (req, res) => {
         type: "session_killed",
         data: {
           sessionId,
-          cancelledViaTemporal,
-          workflowId: workflowId || null,
           killedPids,
           timestamp: now,
         },
@@ -496,8 +401,6 @@ app.post("/sessions/:sessionId/kill", async (req, res) => {
   res.json({
     killed: true,
     sessionId,
-    cancelledViaTemporal,
-    workflowId: workflowId || null,
     pids: killedPids,
     errors: errors.length > 0 ? errors : undefined,
     timestamp: now,
@@ -754,33 +657,46 @@ app.post("/plans/:planId/restart-builder", async (req, res) => {
     return;
   }
 
-  // Phase 3: Start builder via Temporal instead of spawning main.py subprocess
+  // Spawn main.py --plan <id> --force (cron-driven dispatch)
   const now = new Date().toISOString();
-  console.log(`[${now}] RESTART builder plan=${planId} force=${force} (Temporal)`);
+  console.log(`[${now}] RESTART builder plan=${planId} force=${force} (main.py)`);
 
   try {
-    const handle = await startPlanWorkflow(planId, "builder", force);
-    const workflowId = `plan-${planId}-builder`;
+    const pyBin = process.env.CONDUIT_PYTHON || "python3";
+    const conduitDir = process.env.CONDUIT_PY_DIR ||
+      path.resolve(__dirname, "../../../../nexus/python/conduit");
+    // `tackle` package lives in nexus/python (parent of conduit dir). The
+    // scheduled builder relies on PYTHONPATH set by cron; mirror that here so
+    // `from tackle.db import get_role_config` resolves when restarted via the
+    // REST endpoint instead of the scheduler.
+    const pythonPath = process.env.PYTHONPATH ||
+      path.resolve(conduitDir, "..");
+    const proc = spawn(pyBin, ["main.py", "--plan", planId, ...(force ? ["--force"] : [])], {
+      cwd: conduitDir,
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, PYTHONPATH: pythonPath },
+    });
+    proc.unref();
 
     console.log(
-      `[${now}] RESTART builder plan=${planId} → workflow ${workflowId} started`,
+      `[${now}] RESTART builder plan=${planId} → main.py PID ${proc.pid} spawned`,
     );
 
     res.json({
       restarted: true,
       planId,
       force,
-      workflowId,
-      runId: handle.runId || null,
+      pid: proc.pid,
       breakerTripped: breaker.tripped === 1,
       timestamp: now,
     });
   } catch (e: any) {
     console.error(
-      `[${now}] RESTART builder plan=${planId} → Temporal start failed:`,
+      `[${now}] RESTART builder plan=${planId} → spawn failed:`,
       e.message,
     );
-    res.status(500).json({ error: `Failed to start builder workflow: ${e.message}` });
+    res.status(500).json({ error: `Failed to spawn builder: ${e.message}` });
   }
 });
 
@@ -1025,304 +941,9 @@ app.post("/config/failure-recovery", async (req, res) => {
   }
 });
 
-// ── v083: AI Configuration Registry ───────────────────────────────
+// ── AI Configuration Registry removed — owned by tackle-mcp (:3400) ──
 
-// Test invoke: run a model with a test prompt and stream stdout
-app.post("/config/ai/test", async (req, res) => {
-  try {
-    const { model_id, test_prompt } = req.body || {};
-    if (!model_id || !test_prompt) {
-      res.status(400).json({ error: "model_id and test_prompt are required" });
-      return;
-    }
-
-    // Look up the model from the DB
-    const models = await getAIModels();
-    const model = models.find((m: any) => m.id === model_id);
-    if (!model) {
-      res.status(404).json({ error: `Model ${model_id} not found` });
-      return;
-    }
-
-    // Look up the harness
-    const harnesses = await getAIHarnesses();
-    const harness = harnesses.find((h: any) => h.id === model.harness_id);
-    if (!harness) {
-      res.status(404).json({ error: `Harness ${model.harness_id} not found` });
-      return;
-    }
-
-    // Resolve harness type from invocation_semantics
-    let harnessType = "opencode";
-    try {
-      const sem = JSON.parse(harness.invocation_semantics || "{}");
-      const binary = (sem.binary || "opencode").toLowerCase();
-      if (binary.includes("codex")) harnessType = "codex";
-      else if (binary.includes("ollama")) harnessType = "ollama";
-      else harnessType = "opencode";
-    } catch { /* use default */ }
-
-    // Create a test session
-    const now = new Date().toISOString();
-    const sessionId = `test-${model_id}-${Date.now()}`;
-    await startSession({
-      id: sessionId,
-      agent_role: "test",
-      start_iso: now,
-      plans_processed: [],
-      plan_count: 0,
-      model: model.model_identifier,
-    });
-
-    // Set up session log path (the Temporal activity writes to this path)
-    const sessionsDir = path.join(PIPELINE_DIR, "sessions");
-    fs.mkdirSync(sessionsDir, { recursive: true });
-
-    // Start via Temporal workflow instead of direct spawn
-    if (await ensureTemporalConnected()) {
-      const handle = await startTestInvokeWorkflow(model_id, test_prompt, sessionId);
-
-      const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}] TEST INVOKE model=${model_id} session=${sessionId} workflow=${handle.workflowId}`);
-
-      res.json({
-        started: true,
-        sessionId,
-        model_id,
-        model_name: model.name,
-        model_identifier: model.model_identifier,
-        harness: harnessType,
-        workflowId: handle.workflowId,
-        logPath: `/log/${sessionId}`,
-        timestamp,
-      });
-    } else {
-      // Fallback: direct spawn if Temporal is unavailable
-      const sessionLogPath = path.join(sessionsDir, `${sessionId}.log`);
-      const pythonBin = process.env.PYTHON_BIN || "python3";
-      const testInvokePath = path.resolve(__dirname, "../../../../legacy/python/conduit/test_invoke.py");
-      const projectRoot = process.env.PIPELINE_ROOT || "/home/codex/dev";
-
-      const { spawn } = require("child_process");
-      const proc = spawn(pythonBin, [
-        testInvokePath,
-        "--harness", harnessType,
-        "--model-identifier", model.model_identifier,
-        "--test-prompt", test_prompt,
-        "--session-id", sessionId,
-        "--session-log", sessionLogPath,
-        "--working-dir", projectRoot,
-      ], {
-        detached: true,
-        stdio: "ignore",
-      });
-      proc.unref();
-      await updateSessionPid(sessionId, proc.pid);
-
-      const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}] TEST INVOKE (fallback) model=${model_id} session=${sessionId} pid=${proc.pid}`);
-
-      res.json({
-        started: true,
-        sessionId,
-        model_id,
-        model_name: model.name,
-        model_identifier: model.model_identifier,
-        harness: harnessType,
-        logPath: `/log/${sessionId}`,
-        timestamp,
-      });
-    }
-  } catch (e: any) {
-    console.error(`[${new Date().toISOString()}] TEST INVOKE error:`, e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Full snapshot: all providers, harnesses, models, and role configs
-app.get("/config/ai", async (_req, res) => {
-  res.json(await getAIConfigSnapshot());
-});
-
-// Validate AI config: checks for missing references, broken harness binaries, etc.
-app.get("/config/ai/validate", async (_req, res) => {
-  try {
-    const warnings = await validateAIConfig();
-    res.json({ valid: warnings.length === 0, warnings });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Seed defaults: populates empty AI config tables with reasonable starter values
-app.post("/config/ai/seed-defaults", async (req, res) => {
-  try {
-    const { force } = req.body || {};
-    const result = await seedDefaultAIConfig(!!force);
-    res.json(result);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Import full AI config snapshot: clears existing data and bulk-inserts
-app.post("/config/ai/import", async (req, res) => {
-  try {
-    const { providers, harnesses, models, roles, role_models } = req.body || {};
-    if (!providers && !harnesses && !models && !roles) {
-      res.status(400).json({ error: "No import data provided — need at least one of: providers, harnesses, models, roles" });
-      return;
-    }
-    const result = await importAIConfig({ providers: providers || [], harnesses: harnesses || [], models: models || [], roles: roles || [], role_models: role_models || [] });
-    res.json({ imported: true, ...result });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Providers ─────────────────────────────────────────────────────
-app.post("/config/ai/provider", async (req, res) => {
-  try {
-    const { id, name, type, endpoint_url, api_key, config_json } =
-      req.body || {};
-    if (!id || !name || !type) {
-      res.status(400).json({ error: "id, name, and type are required" });
-      return;
-    }
-    await upsertAIProvider({
-      id,
-      name,
-      type,
-      endpoint_url: endpoint_url ?? null,
-      api_key: api_key ?? null,
-      config_json: config_json ?? "{}",
-    });
-    res.json({ saved: true, id });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.delete("/config/ai/provider/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const deleted = await deleteAIProvider(id);
-    res.json({ deleted, id });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Harnesses ─────────────────────────────────────────────────────
-app.post("/config/ai/harness", async (req, res) => {
-  try {
-    const { id, name, invocation_semantics } = req.body || {};
-    if (!id || !name) {
-      res.status(400).json({ error: "id and name are required" });
-      return;
-    }
-    await upsertAIHarness({
-      id,
-      name,
-      invocation_semantics: invocation_semantics ?? "{}",
-    });
-    res.json({ saved: true, id });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.delete("/config/ai/harness/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const deleted = await deleteAIHarness(id);
-    res.json({ deleted, id });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Models ────────────────────────────────────────────────────────
-app.post("/config/ai/model", async (req, res) => {
-  try {
-    const { id, name, harness_id, provider_id, model_identifier } =
-      req.body || {};
-    if (!id || !name || !harness_id || !model_identifier) {
-      res
-        .status(400)
-        .json({
-          error: "id, name, harness_id, and model_identifier are required",
-        });
-      return;
-    }
-    await upsertAIModel({
-      id,
-      name,
-      harness_id,
-      provider_id: provider_id ?? null,
-      model_identifier,
-    });
-    res.json({ saved: true, id });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.delete("/config/ai/model/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const deleted = await deleteAIModel(id);
-    res.json({ deleted, id });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Role Assignment ───────────────────────────────────────────────
-app.post("/config/ai/role", async (req, res) => {
-  try {
-    const {
-      id,
-      role,
-      provider_id,
-      harness_id,
-      model_id,
-      extra_params,
-      model_priorities,
-    } = req.body || {};
-    if (!id || !role || !provider_id || !harness_id || !model_id) {
-      res
-        .status(400)
-        .json({
-          error: "id, role, provider_id, harness_id, and model_id are required",
-        });
-      return;
-    }
-    await upsertAIRoleConfig({
-      id,
-      role,
-      provider_id,
-      harness_id,
-      model_id,
-      extra_params: extra_params ?? "{}",
-    });
-
-    // v093: Save multi-model priorities if provided (v098: per-model provider/harness)
-    if (
-      Array.isArray(model_priorities) &&
-      model_priorities.length > 0
-    ) {
-      await upsertRoleModels(role, model_priorities);
-    }
-
-    // Signal scheduler to wake from idle backoff (config may affect eligibility)
-    await requestSchedulerWake();
-
-    res.json({ saved: true, id, role });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// (All /config/ai/* endpoints deleted. Use tackle-mcp for AI config.)
 
 // ── v081: Agent chat (message box) ──────────────────────────────────
 
