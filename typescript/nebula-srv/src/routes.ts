@@ -2731,6 +2731,21 @@ export function createRoutes(pool: Pool): Router {
       if (!sourceType || !sourceId || !targetType || !targetId || !relType) {
         return res.status(400).json({ error: 'sourceType, sourceId, targetType, targetId, and relType are required' });
       }
+
+      // Validate against cross-reference taxonomy
+      const { isValidCrossReferenceType, validateCrossRefConstraint } = await import('./crossref-taxonomy');
+      if (!isValidCrossReferenceType(relType)) {
+        const allowed = (await import('./crossref-taxonomy')).ALL_CROSSREF_TYPES.join(', ');
+        return res.status(400).json({
+          error: `Invalid rel_type "${relType}". Allowed values: ${allowed}`,
+        });
+      }
+
+      const constraint = validateCrossRefConstraint(relType, sourceType, targetType);
+      if (!constraint.valid) {
+        return res.status(400).json({ error: constraint.error });
+      }
+
       const { rows: [row] } = await pool.query(
         `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,

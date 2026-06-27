@@ -1089,15 +1089,17 @@ export function registerTools(server: McpServer) {
   //  CROSS-REFERENCES
   // ════════════════════════════════════════════════════════════════
 
+  const CROSSREF_TYPES_HINT = "Valid types: wrp:depends_on, wrp:implements, wrp:tracked_by, wrp:impacts_system, wrp:supersedes, ag:references_plan, ag:same_thread_as, ag:prompted_by, ag:spawns_plan, kv:sourced_from, kv:informs, kv:cross_schema, kv:name_overlap, kv:description_overlap";
+
   server.tool(
     "nebula_list_cross_references",
     "List cross-references between entities, optionally filtered by source/target type/id or relation type.",
     {
-      sourceType: z.string().optional().describe("Filter by source entity type (e.g. 'requirement', 'system')"),
+      sourceType: z.string().optional().describe("Filter by source entity type (e.g. 'plan', 'agent_record')"),
       sourceId: z.string().optional().describe("Filter by source entity UUID"),
       targetType: z.string().optional().describe("Filter by target entity type"),
       targetId: z.string().optional().describe("Filter by target entity UUID"),
-      relType: z.string().optional().describe("Filter by relation type (e.g. 'depends_on', 'implements', 'duplicates')"),
+      relType: z.string().optional().describe(`Filter by relation type. ${CROSSREF_TYPES_HINT}`),
     },
     async (args) => {
       const result = await NebulaClient.listCrossReferences({
@@ -1125,13 +1127,13 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_create_cross_reference",
-    "Create a cross-reference link between two entities.",
+    "Create a cross-reference link between two entities. Validates rel_type against the formal taxonomy.",
     {
-      sourceType: z.string().describe("Source entity type (e.g. 'requirement', 'system')"),
+      sourceType: z.string().describe("Source entity type (e.g. 'plan', 'agent_record')"),
       sourceId: z.string().describe("Source entity UUID"),
       targetType: z.string().describe("Target entity type"),
       targetId: z.string().describe("Target entity UUID"),
-      relType: z.string().describe("Relation type (e.g. 'depends_on', 'implements', 'duplicates')"),
+      relType: z.string().describe(`Relation type. ${CROSSREF_TYPES_HINT}`),
       metadata: z.any().optional().describe("Optional JSON metadata for the link"),
     },
     async (args) => {
