@@ -914,6 +914,88 @@ const migrations: Migration[] = [
       console.log("  - Updated governance trigger to propagate UUID");
     },
   },
+  {
+    version: 15,
+    description: "Add sequence column to vision.receipts for deterministic WRP bridge ordering (Conduit→Nebula #0174)",
+    up: async (exec) => {
+      // Step 1: Add sequence column (nullable initially for backfill)
+      await exec(`
+        ALTER TABLE ${VISION_SCHEMA}.receipts
+        ADD COLUMN IF NOT EXISTS sequence INTEGER
+      `);
+
+      // Step 2: Backfill existing receipts with per-plan monotonic sequence numbers.
+      // Uses a window function ordered by (created_at, id) — the canonical ordering
+      // key minus the explicit sequence field itself.
+      await exec(`
+        WITH numbered AS (
+          SELECT id, plan_id,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY plan_id
+                   ORDER BY created_at ASC, id ASC
+                 ) - 1 AS seq
+          FROM ${VISION_SCHEMA}.receipts
+          WHERE sequence IS NULL
+        )
+        UPDATE ${VISION_SCHEMA}.receipts r
+        SET sequence = n.seq
+        FROM numbered n
+        WHERE r.id = n.id
+      `);
+
+      // Step 3: Add NOT NULL constraint.  By this point every row has a sequence.
+      await exec(`
+        ALTER TABLE ${VISION_SCHEMA}.receipts
+        ALTER COLUMN sequence SET NOT NULL
+      `);
+
+      // Step 4: Add per-plan uniqueness constraint so no two receipts share a sequence.
+      await exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_receipts_plan_sequence
+        ON ${VISION_SCHEMA}.receipts(plan_id, sequence)
+      `);
+
+      // Step 5: Add CHECK constraint guaranteeing sequence >= 0 and no gaps are
+      // enforced at application level (insert-time sequence assignment).  The
+      // UNIQUE index + NOT NULL guarantee that each plan has at most one receipt
+      // per sequence value; MAX(sequence) = COUNT(*)-1 is a runtime invariant.
+      await exec(`
+        ALTER TABLE ${VISION_SCHEMA}.receipts
+        ADD CONSTRAINT chk_receipts_sequence_non_negative
+        CHECK (sequence >= 0)
+      `);
+
+      // Step 6: Create a trigger function that auto-assigns sequence on INSERT
+      // if the caller does not provide one.  Uses MAX+1 per plan_id.
+      await exec(`
+        CREATE OR REPLACE FUNCTION vision.receipts_assign_sequence()
+        RETURNS TRIGGER AS $BODY$
+        BEGIN
+          IF NEW.sequence IS NULL THEN
+            SELECT COALESCE(MAX(r.sequence), -1) + 1
+            INTO NEW.sequence
+            FROM ${VISION_SCHEMA}.receipts r
+            WHERE r.plan_id = NEW.plan_id;
+          END IF;
+          RETURN NEW;
+        END;
+        $BODY$ LANGUAGE plpgsql
+      `);
+
+      await exec(`
+        DROP TRIGGER IF EXISTS trg_receipts_assign_sequence ON ${VISION_SCHEMA}.receipts;
+        CREATE TRIGGER trg_receipts_assign_sequence
+        BEFORE INSERT ON ${VISION_SCHEMA}.receipts
+        FOR EACH ROW
+        EXECUTE FUNCTION vision.receipts_assign_sequence()
+      `);
+
+      console.log("[migrations] v15: Added sequence column to vision.receipts");
+      console.log("  - Backfilled per-plan monotonic sequence numbers");
+      console.log("  - Added UNIQUE(plan_id, sequence) index");
+      console.log("  - Added BEFORE INSERT trigger for auto-assignment");
+    },
+  },
 ];
 
 /**
