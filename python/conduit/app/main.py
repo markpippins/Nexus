@@ -5,15 +5,21 @@ Wires together:
     - Delta ingestion API      (POST /delta)
     - State inspection API     (GET  /state)
     - Replay API               (GET  /replay)
+    - Prometheus metrics       (GET  /metrics)
+    - API key authentication   (middleware, opt-in)
 
 Start:   uvicorn app.main:app --reload --port 3103
 """
 
 import logging
+import os
 import sys
+import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 from app.api.routes_delta import router as delta_router
 from app.api.routes_state import router as state_router
@@ -27,6 +33,78 @@ logging.basicConfig(
 )
 
 _log = logging.getLogger("kernel.api")
+
+# ── Prometheus metrics ───────────────────────────────────────────────
+
+REQUEST_COUNT = Counter(
+    "kernel_requests_total",
+    "Total HTTP requests by method, path, and status",
+    ["method", "path", "status"],
+)
+
+REQUEST_DURATION = Histogram(
+    "kernel_request_duration_seconds",
+    "HTTP request duration in seconds",
+    ["method", "path"],
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
+)
+
+# Gauges updated lazily on /metrics scrape — no per-request overhead
+KERNEL_VERSION = Gauge("kernel_version", "Current kernel state version")
+KERNEL_PLAN_COUNT = Gauge("kernel_plan_count", "Number of plans tracked")
+KERNEL_RECEIPT_COUNT = Gauge("kernel_receipt_count", "Number of receipts stored")
+KERNEL_IDENTITY_COUNT = Gauge("kernel_identity_count", "Number of resolved identities")
+KERNEL_GRAPH_EDGE_COUNT = Gauge("kernel_graph_edge_count", "Number of graph edges")
+KERNEL_LINEAGE_EVENT_COUNT = Gauge("kernel_lineage_event_count", "Number of lineage events")
+
+
+def _update_state_gauges():
+    """Refresh Prometheus gauges from current kernel state."""
+    try:
+        from app.services.reducer_service import current_state
+        s = current_state()
+        KERNEL_VERSION.set(s.get("version", 0))
+        KERNEL_PLAN_COUNT.set(len(s.get("plans", [])))
+        KERNEL_RECEIPT_COUNT.set(len(s.get("receipts", {})))
+        KERNEL_IDENTITY_COUNT.set(len(s.get("identity_map", {})))
+        KERNEL_GRAPH_EDGE_COUNT.set(len(s.get("graph_edges", [])))
+        KERNEL_LINEAGE_EVENT_COUNT.set(len(s.get("lineage_events", [])))
+    except Exception:
+        pass  # engine not yet initialized
+
+
+# ── API key auth ─────────────────────────────────────────────────────
+
+API_KEY = os.environ.get("KERNEL_API_KEY", "")
+AUTH_ENABLED = bool(API_KEY)
+
+PUBLIC_PATHS = {
+    "/",
+    "/metrics",
+    "/state/health",
+    "/docs",
+    "/redoc",
+    "/openapi.json",
+}
+
+
+async def _check_auth(request: Request) -> Response | None:
+    """Reject request if X-API-Key is missing or wrong. Returns a 401 Response or None."""
+    if not AUTH_ENABLED:
+        return None
+    if request.url.path in PUBLIC_PATHS:
+        return None
+    # Allow swagger UI paths
+    if request.url.path.startswith(("/docs/", "/redoc/", "/openapi.json")):
+        return None
+    key = request.headers.get("X-API-Key", "")
+    if key != API_KEY:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Unauthorized: missing or invalid X-API-Key header"},
+        )
+    return None
+
 
 # ── App ──────────────────────────────────────────────────────────────
 
@@ -44,11 +122,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── Metrics + auth middleware ───────────────────────────────────────
+
+
+@app.middleware("http")
+async def metrics_auth_middleware(request: Request, call_next):
+    """Combined middleware: authenticate, then record metrics."""
+    # Auth check — return 401 response immediately if auth fails
+    auth_response = await _check_auth(request)
+    if auth_response is not None:
+        return auth_response
+
+    # Metrics timing
+    start = time.monotonic()
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        duration = time.monotonic() - start
+        # Use matched route pattern for cleaner aggregation, fallback to path
+        route_path = (
+            request.scope.get("route")
+            and getattr(request.scope["route"], "path", request.url.path)
+        ) or request.url.path
+        REQUEST_COUNT.labels(
+            method=request.method,
+            path=route_path,
+            status=response.status_code,
+        ).inc()
+        REQUEST_DURATION.labels(
+            method=request.method,
+            path=route_path,
+        ).observe(duration)
+
+
 # ── Include routers ──────────────────────────────────────────────────
 
 app.include_router(delta_router, prefix="/delta", tags=["delta"])
 app.include_router(state_router, prefix="/state", tags=["state"])
 app.include_router(replay_router, prefix="/replay", tags=["replay"])
+
+
+# ── Metrics endpoint ────────────────────────────────────────────────
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+def metrics():
+    """Prometheus metrics endpoint — served in text/plain format.
+
+    Updates state gauges on each scrape so they reflect current
+    kernel state without per-request overhead.
+    """
+    _update_state_gauges()
+    return generate_latest()
+
+
+# ── Startup ─────────────────────────────────────────────────────────
 
 
 @app.on_event("startup")
@@ -57,6 +187,10 @@ async def startup():
     from app.models.db import Base, engine
     Base.metadata.create_all(bind=engine)
     _log.info("Kernel API started — tables verified in PG")
+    if AUTH_ENABLED:
+        _log.info("API key authentication enabled")
+    else:
+        _log.info("API key authentication disabled (set KERNEL_API_KEY to enable)")
 
 
 @app.get("/")
