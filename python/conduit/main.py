@@ -985,9 +985,32 @@ if __name__ == "__main__":
     parser.add_argument("--supersede-replace", action="store_true", help="Also create a replacement ticket (used with --supersede)")
     parser.add_argument("--cancel", help="Cancel a ticket by ID (mark terminal, deny authorization)")
     parser.add_argument("--cancel-reason", default="", help="Reason for cancelling (used with --cancel)")
+    parser.add_argument("--kernel-sync", action="store_true",
+                        help="Sync conduit receipts to the WRP Kernel Runtime (one-shot)")
+    parser.add_argument("--kernel-sync-daemon", action="store_true",
+                        help="Run kernel sync in continuous poll loop")
 
     args = parser.parse_args()
     registry = load_registry(args.registry)
+
+    # ── Kernel bridge flags (no lock needed) ─────────────────────
+    if args.kernel_sync_daemon:
+        from bridge.sync import syncer as _bridge
+        print("Kernel bridge daemon starting (Ctrl+C to stop)...")
+        _bridge.run_daemon()
+        sys.exit(0)
+    elif args.kernel_sync:
+        from bridge.sync import syncer as _bridge
+        count = _bridge.sync_once()
+        if count > 0:
+            print(f"Kernel bridge: synced {count} receipt(s)")
+        elif count == 0:
+            print("Kernel bridge: nothing new")
+        else:
+            print(f"Kernel bridge: sync failed (kernel API rejected)")
+            sys.exit(1)
+        _bridge.close()
+        sys.exit(0)
 
     if args.clean_test_artifacts:
         clean_test_artifacts(args.db)
