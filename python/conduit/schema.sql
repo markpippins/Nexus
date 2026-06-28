@@ -248,3 +248,50 @@ SELECT
     END AS derived_status
 FROM plans p
 WHERE p.deleted = 0;
+
+-- ===================================================================
+-- WRP Kernel persistence tables (plan 1023)
+-- Design: kernel-projection-answers.md
+-- Schema: immutable event + snapshot + lineage store
+-- ===================================================================
+
+-- KernelDelta log: source of truth for all state changes
+CREATE TABLE IF NOT EXISTS kernel_delta_log (
+    delta_id    TEXT PRIMARY KEY,
+    batch_id    TEXT NOT NULL,
+    payload     JSONB NOT NULL,
+    version     INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    CHECK(version >= 0)
+);
+CREATE INDEX IF NOT EXISTS idx_kernel_delta_version 
+    ON kernel_delta_log(version);
+CREATE INDEX IF NOT EXISTS idx_kernel_delta_batch 
+    ON kernel_delta_log(batch_id);
+
+-- KernelSnapshot: check-pointed state for fast reconstruction
+CREATE TABLE IF NOT EXISTS kernel_snapshot (
+    version             INTEGER PRIMARY KEY,
+    state               JSONB NOT NULL,
+    identity_hash       TEXT,
+    graph_hash          TEXT,
+    lineage_cursor      INTEGER,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+    CHECK(version >= 0)
+);
+
+-- Lineage log: causal event trace
+CREATE TABLE IF NOT EXISTS lineage_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    version     INTEGER NOT NULL,
+    delta_id    TEXT NOT NULL REFERENCES kernel_delta_log(delta_id),
+    step        TEXT NOT NULL,
+    event_type  TEXT NOT NULL DEFAULT 'apply',
+    affected_plans TEXT NOT NULL DEFAULT '[]',
+    detail      TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_lineage_version 
+    ON lineage_log(version);
+CREATE INDEX IF NOT EXISTS idx_lineage_delta 
+    ON lineage_log(delta_id);
