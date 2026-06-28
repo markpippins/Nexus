@@ -95,6 +95,8 @@ AUTH_ENABLED = bool(VALID_API_KEYS)
 
 PUBLIC_PATHS = {
     "/",
+    "/healthz",
+    "/readyz",
     "/metrics",
     "/state/health",
     "/docs",
@@ -196,6 +198,50 @@ def metrics():
     return generate_latest()
 
 
+# ── Liveness / Readiness probes ─────────────────────────────────────
+#
+# Kubernetes convention:
+#   /healthz — liveness: is the process alive? (no deps)
+#   /readyz  — readiness: can we accept traffic? (checks DB + engine)
+#   /state/health — kept for backward compat (hybrid)
+
+
+@app.get("/healthz")
+def liveness():
+    """Liveness probe — always returns 200 if the process is running."""
+    # If this handler runs, the process is alive — no further checks needed.
+    return {"status": "alive"}
+
+
+@app.get("/readyz")
+def readiness():
+    """Readiness probe — checks DB connectivity and engine state.
+
+    Returns 503 if the database is unreachable.
+    """
+    from sqlalchemy import text
+    from app.models.db import engine as db_engine
+    try:
+        with db_engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "ready", "kernel_version": _safe_get_version()}
+    except Exception as exc:
+        _log.warning("Readiness probe failed: %s", exc)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not ready", "detail": str(exc)},
+        )
+
+
+def _safe_get_version() -> int:
+    """Return current kernel version, or 0 if engine not yet initialized."""
+    try:
+        from app.services.reducer_service import current_version
+        return current_version()
+    except RuntimeError:
+        return 0
+
+
 # ── Startup ─────────────────────────────────────────────────────────
 
 
@@ -209,6 +255,43 @@ async def startup():
         _log.info("API key authentication enabled (%d key(s) loaded)", len(VALID_API_KEYS))
     else:
         _log.info("API key authentication disabled (set KERNEL_API_KEYS or KERNEL_API_KEY to enable)")
+
+
+# ── Graceful shutdown ────────────────────────────────────────────────
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Flush in-memory engine state to PG on graceful shutdown.
+
+    On SIGTERM (uvicorn worker stop, container stop), forces a snapshot
+    of the current KernelState so the next restart has a recent checkpoint
+    and reconstructs faster.
+
+    This is an optimization, not a correctness fix — the delta log is
+    the source of truth and already persisted before the engine reduces.
+    Full reconstruction from PG is always possible without this hook.
+    """
+    try:
+        from app.services.reducer_service import get_engine, snapshot_store, SNAPSHOT_EVERY
+        engine = get_engine()
+        version = engine.kernel_state.version
+        if version > 0 and version % SNAPSHOT_EVERY != 0:
+            snapshot_store.save(version, engine.kernel_state.to_dict())
+            _log.info("Shutdown: forced snapshot at version=%d", version)
+        elif version > 0:
+            _log.info("Shutdown: snapshot already exists at version=%d", version)
+        else:
+            _log.info("Shutdown: engine idle (version=0), no snapshot needed")
+    except RuntimeError:
+        _log.info("Shutdown: engine not yet initialized — nothing to flush")
+    except Exception:
+        _log.warning("Shutdown: snapshot flush failed", exc_info=True)
+    finally:
+        # Close DB connections cleanly
+        from app.models.db import engine as db_engine
+        db_engine.dispose()
+        _log.info("Kernel API stopped")
 
 
 @app.get("/")
