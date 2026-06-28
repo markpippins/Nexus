@@ -74,9 +74,24 @@ def _update_state_gauges():
 
 
 # ── API key auth ─────────────────────────────────────────────────────
+#
+# Layer (a): static keys via environment variable.
+#
+#   KERNEL_API_KEYS="sk-key-1,sk-key-2"    # multiple, comma-separated
+#   KERNEL_API_KEY="sk-key-1"               # single-key shorthand (backward compat)
+#
+# If neither is set, auth is disabled (passthrough).
+#
+# Layer (b) — planned future (ask the architect):
+#   - Key table in PostgreSQL with CRUD admin endpoints
+#   - Per-key metadata (consumer label, last-used timestamp)
+#   - Rotation without restart (re-read from DB on schedule or SIGHUP)
+#   - Integration with Azure Key Vault / secret store
+# ─────────────────────────────────────────────────────────────────────
 
-API_KEY = os.environ.get("KERNEL_API_KEY", "")
-AUTH_ENABLED = bool(API_KEY)
+_KEYS_CSV = os.environ.get("KERNEL_API_KEYS") or os.environ.get("KERNEL_API_KEY", "")
+VALID_API_KEYS: set[str] = {k.strip() for k in _KEYS_CSV.split(",") if k.strip()} if _KEYS_CSV else set()
+AUTH_ENABLED = bool(VALID_API_KEYS)
 
 PUBLIC_PATHS = {
     "/",
@@ -89,7 +104,10 @@ PUBLIC_PATHS = {
 
 
 async def _check_auth(request: Request) -> Response | None:
-    """Reject request if X-API-Key is missing or wrong. Returns a 401 Response or None."""
+    """Reject request if X-API-Key header is missing or not in VALID_API_KEYS set.
+
+    Returns a 401 JSONResponse or None (allow).
+    """
     if not AUTH_ENABLED:
         return None
     if request.url.path in PUBLIC_PATHS:
@@ -98,7 +116,7 @@ async def _check_auth(request: Request) -> Response | None:
     if request.url.path.startswith(("/docs/", "/redoc/", "/openapi.json")):
         return None
     key = request.headers.get("X-API-Key", "")
-    if key != API_KEY:
+    if key not in VALID_API_KEYS:
         return JSONResponse(
             status_code=401,
             content={"detail": "Unauthorized: missing or invalid X-API-Key header"},
@@ -188,9 +206,9 @@ async def startup():
     Base.metadata.create_all(bind=engine)
     _log.info("Kernel API started — tables verified in PG")
     if AUTH_ENABLED:
-        _log.info("API key authentication enabled")
+        _log.info("API key authentication enabled (%d key(s) loaded)", len(VALID_API_KEYS))
     else:
-        _log.info("API key authentication disabled (set KERNEL_API_KEY to enable)")
+        _log.info("API key authentication disabled (set KERNEL_API_KEYS or KERNEL_API_KEY to enable)")
 
 
 @app.get("/")
