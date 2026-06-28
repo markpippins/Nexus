@@ -16,10 +16,21 @@ import os
 import sys
 import time
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+
+from app.models.error import (
+    ErrorResponse,
+    ErrorDetail,
+    ERR_NOT_FOUND,
+    ERR_VALIDATION,
+    ERR_UNAUTHORIZED,
+    ERR_INTERNAL,
+    ERR_SERVICE_UNAVAILABLE,
+)
 
 from app.api.routes_delta import router as delta_router
 from app.api.routes_state import router as state_router
@@ -121,7 +132,12 @@ async def _check_auth(request: Request) -> Response | None:
     if key not in VALID_API_KEYS:
         return JSONResponse(
             status_code=401,
-            content={"detail": "Unauthorized: missing or invalid X-API-Key header"},
+            content=ErrorResponse(
+                error=ErrorDetail(
+                    code=ERR_UNAUTHORIZED,
+                    message="Unauthorized: missing or invalid X-API-Key header",
+                )
+            ).model_dump(),
         )
     return None
 
@@ -184,6 +200,71 @@ app.include_router(state_router, prefix="/state", tags=["state"])
 app.include_router(replay_router, prefix="/replay", tags=["replay"])
 
 
+# ── Exception handlers ──────────────────────────────────────────────
+#
+# Converts all errors to the standard envelope:
+#   {"error": {"code": "...", "message": "...", "details": ...}}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Pydantic validation errors → standard error envelope (422)."""
+    return JSONResponse(
+        status_code=422,
+        content=ErrorResponse(
+            error=ErrorDetail(
+                code=ERR_VALIDATION,
+                message="Request validation failed",
+                details={"errors": exc.errors()},
+            )
+        ).model_dump(),
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """FastAPI HTTPException → standard error envelope.
+
+    Catches all ``raise HTTPException(...)`` calls from route handlers.
+    """
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ErrorResponse(
+            error=ErrorDetail(
+                code=_status_to_error_code(exc.status_code),
+                message=exc.detail if isinstance(exc.detail, str) else str(exc.detail),
+            )
+        ).model_dump(),
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """Unhandled exceptions → standard error envelope (500)."""
+    _log.error("Unhandled exception: %s", exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content=ErrorResponse(
+            error=ErrorDetail(code=ERR_INTERNAL, message="Internal server error")
+        ).model_dump(),
+    )
+
+
+def _status_to_error_code(status: int) -> str:
+    """Map HTTP status code to canonical error code."""
+    if status == 401:
+        return ERR_UNAUTHORIZED
+    if status == 404:
+        return ERR_NOT_FOUND
+    if status == 422:
+        return ERR_VALIDATION
+    if status == 503:
+        return ERR_SERVICE_UNAVAILABLE
+    if status >= 500:
+        return ERR_INTERNAL
+    return f"HTTP_{status}"
+
+
 # ── Metrics endpoint ────────────────────────────────────────────────
 
 
@@ -229,7 +310,12 @@ def readiness():
         _log.warning("Readiness probe failed: %s", exc)
         return JSONResponse(
             status_code=503,
-            content={"status": "not ready", "detail": str(exc)},
+            content=ErrorResponse(
+                error=ErrorDetail(
+                    code=ERR_SERVICE_UNAVAILABLE,
+                    message=f"Database unreachable: {exc}",
+                )
+            ).model_dump(),
         )
 
 
