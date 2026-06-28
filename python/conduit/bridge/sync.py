@@ -51,6 +51,7 @@ _log = logging.getLogger("bridge.sync")
 # ── Defaults ──────────────────────────────────────────────────────────
 
 KERNEL_API_URL = os.environ.get("KERNEL_API_URL", "http://localhost:3103")
+KERNEL_API_KEY = os.environ.get("KERNEL_API_KEY", "")
 POLL_INTERVAL_SECONDS = 30
 MAX_RECEIPTS_PER_BATCH = 500
 
@@ -254,6 +255,8 @@ def _post_delta(payload: dict) -> bool:
     data = json.dumps(payload).encode("utf-8")
     req = Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
+    if KERNEL_API_KEY:
+        req.add_header("X-API-Key", KERNEL_API_KEY)
 
     try:
         with urlopen(req, timeout=30) as resp:
