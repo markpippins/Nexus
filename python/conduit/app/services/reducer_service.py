@@ -17,7 +17,13 @@ import logging
 from typing import Optional
 
 from wrp_kernel.delta import KernelDelta
-from wrp_kernel.engine import KernelEngine, KernelState, KernelResult
+from wrp_kernel.engine import (
+    KernelEngine,
+    KernelState,
+    KernelResult,
+    RECEIPT_TO_WRP_STATE,
+    WRP_ADJACENCY_MATRIX,
+)
 
 from app.storage.delta_store import DeltaStore
 from app.storage.snapshot_store import SnapshotStore
@@ -217,6 +223,82 @@ def get_receipts_by_plan(plan_num: str) -> list[dict]:
         for receipt in engine.kernel_state.receipts.values()
         if receipt.get("plan_id") == plan_num
     ]
+
+
+def get_plan_detail(plan_num: str) -> Optional[dict]:
+    """Return a detailed profile of a single plan.
+
+    Returns the plan's identity, receipt timeline, current WRP state
+    (derived from the last receipt type), valid state transitions,
+    and connected graph edges.
+
+    Args:
+        plan_num: Plan number (e.g. ``"0124"``).
+
+    Returns:
+        A dict with the plan's full profile, or ``None`` if the plan
+        is not known to the kernel.
+    """
+    engine = get_engine()
+    state = engine.kernel_state
+
+    # 1. Resolve identity
+    identity = state.identity.get_identity_for_node(plan_num)
+    if identity is None:
+        # Try as identity_id (e.g. "iden::0124")
+        identity = state.identity.get_identity(f"iden::{plan_num}")
+        if identity is None:
+            return None
+
+    # 2. Get receipts for this plan, sorted by created_at
+    receipts = [
+        receipt
+        for receipt in state.receipts.values()
+        if receipt.get("plan_id") == plan_num
+    ]
+    receipts.sort(key=lambda r: r.get("created_at", ""))
+
+    # 3. Determine current WRP state from the last receipt type
+    current_wrp_state = "UNKNOWN"
+    if receipts:
+        last_type = receipts[-1].get("type", "")
+        current_wrp_state = RECEIPT_TO_WRP_STATE.get(last_type, "UNKNOWN")
+
+    # 4. Valid transitions from current state
+    valid_transitions = sorted(WRP_ADJACENCY_MATRIX.get(current_wrp_state, set()))
+
+    # 5. Graph edges for this plan's identity
+    edges_outgoing = [
+        {"target": e.target, "relation": e.relation, "metadata": e.metadata}
+        for e in state.graph.edges_from(identity.id)
+    ]
+    edges_incoming = [
+        {"source": e.source, "relation": e.relation, "metadata": e.metadata}
+        for e in state.graph.edges_to(identity.id)
+    ]
+
+    return {
+        "plan_num": plan_num,
+        "identity_id": identity.id,
+        "aliases": sorted(identity.aliases) if identity.aliases else [],
+        "label": identity.label,
+        "receipt_count": len(receipts),
+        "current_wrp_state": current_wrp_state,
+        "valid_transitions": valid_transitions,
+        "receipts": [
+            {
+                "id": r.get("id"),
+                "type": r.get("type"),
+                "agent_role": r.get("agent_role"),
+                "created_at": r.get("created_at"),
+                "summary": r.get("summary", ""),
+                "ticket_id": r.get("ticket_id"),
+            }
+            for r in receipts
+        ],
+        "edges_outgoing": edges_outgoing,
+        "edges_incoming": edges_incoming,
+    }
 
 
 def get_graph() -> dict:

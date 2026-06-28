@@ -19,6 +19,7 @@ from app.services.reducer_service import (
     get_receipt,
     get_receipts_by_plan,
     get_graph,
+    get_plan_detail,
 )
 from app.storage.delta_store import DeltaStore
 from app.storage.lineage_store import LineageStore
@@ -58,6 +59,28 @@ class ReceiptResponse(BaseModel):
 class GraphResponse(BaseModel):
     nodes: list[dict]
     edges: list[dict]
+
+
+class PlanReceiptItem(BaseModel):
+    id: Optional[str] = None
+    type: Optional[str] = None
+    agent_role: Optional[str] = None
+    created_at: Optional[str] = None
+    summary: str = ""
+    ticket_id: Optional[str] = None
+
+
+class PlanDetailResponse(BaseModel):
+    plan_num: str
+    identity_id: str
+    aliases: list[str] = []
+    label: Optional[str] = None
+    receipt_count: int = 0
+    current_wrp_state: str = "UNKNOWN"
+    valid_transitions: list[str] = []
+    receipts: list[PlanReceiptItem] = []
+    edges_outgoing: list[dict] = []
+    edges_incoming: list[dict] = []
 
 
 # ── Routes ────────────────────────────────────────────────────────────
@@ -158,6 +181,34 @@ def get_graph_route():
     """
     _log.debug("GET /state/graph")
     return get_graph()
+
+
+@router.get("/plan/{plan_num}", response_model=PlanDetailResponse)
+def get_plan_detail_route(plan_num: str):
+    """Return a detailed profile of a single plan.
+
+    Aggregates the plan's identity, receipt timeline (in chronological
+    order), current WRP state machine position, valid next transitions,
+    and all connected graph edges.
+
+    The current WRP state is derived from the **last** receipt type
+    using the ``RECEIPT_TO_WRP_STATE`` mapping:
+      - ``PLAN_CREATE``       → ``PLANNING``
+      - ``IMPLEMENTATION``    → ``EXECUTING``
+      - ``REVIEW_PASS``       → ``COMPLETED``
+      - ``CANCELLED``         → ``ARCHIVED``
+      - etc.
+
+    Valid transitions come from the WRP adjacency matrix for that state.
+    """
+    _log.debug("GET /state/plan/%s", plan_num)
+    detail = get_plan_detail(plan_num)
+    if detail is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Plan not found: {plan_num}",
+        )
+    return detail
 
 
 @router.get("/health")
