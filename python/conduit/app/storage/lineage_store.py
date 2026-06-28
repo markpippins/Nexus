@@ -21,6 +21,7 @@ _log = logging.getLogger("kernel.lineage_store")
 
 class LineageRow(Base):
     __tablename__ = "lineage_log"
+    __table_args__ = {"schema": "conduit"}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     version = Column(Integer, nullable=False)

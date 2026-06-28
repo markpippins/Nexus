@@ -23,6 +23,7 @@ _log = logging.getLogger("kernel.snapshot_store")
 
 class KernelSnapshotRow(Base):
     __tablename__ = "kernel_snapshot"
+    __table_args__ = {"schema": "conduit"}
 
     version = Column(Integer, primary_key=True)
     state = Column(JSONB, nullable=False)

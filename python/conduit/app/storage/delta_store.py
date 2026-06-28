@@ -23,6 +23,7 @@ _log = logging.getLogger("kernel.delta_store")
 
 class KernelDeltaRow(Base):
     __tablename__ = "kernel_delta_log"
+    __table_args__ = {"schema": "conduit"}
 
     delta_id = Column(String, primary_key=True)
     batch_id = Column(String, nullable=False)
