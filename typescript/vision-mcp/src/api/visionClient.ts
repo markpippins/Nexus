@@ -4,7 +4,7 @@
  *
  * Configuration (all optional, environment-driven):
  *   - VISION_SRV_URL                     — full base URL of vision-srv.
- *                                          Default: http://localhost:3103.
+ *                                          Default: http://localhost:3104.
  *                                          Both http:// and https:// are
  *                                          supported; the client dispatches
  *                                          to the matching Node transport.
@@ -40,7 +40,7 @@ function parseBaseUrl(raw: string): URL {
 }
 
 const BASE_URL = parseBaseUrl(
-  process.env.VISION_SRV_URL ?? "http://localhost:3103",
+  process.env.VISION_SRV_URL ?? "http://localhost:3104",
 );
 const USE_HTTPS = BASE_URL.protocol === "https:";
 const REJECT_UNAUTHORIZED =
