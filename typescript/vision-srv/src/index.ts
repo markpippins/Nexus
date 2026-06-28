@@ -18,7 +18,7 @@ const pool = new Pool({
 
 // ── Express Setup ──────────────────────────────────────────────────
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3103;
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3104;
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
