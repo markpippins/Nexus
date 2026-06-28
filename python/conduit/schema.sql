@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS tickets (
     closed_at           TEXT,
     token_budget        INTEGER,
     tokens_used         INTEGER,
+    cost_budget_usd     REAL,
+    cost_used_usd       REAL DEFAULT 0,
     objective           TEXT,
     completion_criteria TEXT,
     owner               TEXT NOT NULL DEFAULT '',
@@ -88,6 +90,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     pid             INTEGER,
     is_running      INTEGER DEFAULT 1,
     last_activity   TEXT,
+    last_heartbeat_at TEXT,
     model           TEXT,
     fallback_used   INTEGER DEFAULT 0,
     cost_usd        REAL,
@@ -109,6 +112,45 @@ CREATE TABLE IF NOT EXISTS circuit_breaker (
 );
 INSERT INTO circuit_breaker (id, tripped) VALUES (1, 0)
 ON CONFLICT (id) DO NOTHING;
+
+-- Token cost tracking tables (plan 1018)
+
+CREATE TABLE IF NOT EXISTS model_pricing (
+    model_name              TEXT PRIMARY KEY,
+    provider                TEXT NOT NULL,
+    input_price_per_token   DOUBLE PRECISION NOT NULL,
+    output_price_per_token  DOUBLE PRECISION NOT NULL,
+    cache_hit_price         DOUBLE PRECISION,
+    updated_at              TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_budgets (
+    agent_role      TEXT PRIMARY KEY,
+    ceiling_usd     DOUBLE PRECISION,
+    ceiling_tokens  INTEGER,
+    current_usd     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    current_tokens  INTEGER NOT NULL DEFAULT 0,
+    reset_period    TEXT NOT NULL DEFAULT 'monthly'
+                    CHECK(reset_period IN ('daily','weekly','monthly')),
+    reset_at        TEXT,
+    updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cost_logs (
+    id                BIGSERIAL PRIMARY KEY,
+    session_id        TEXT NOT NULL,
+    ticket_id         TEXT,
+    model             TEXT NOT NULL,
+    input_tokens      INTEGER NOT NULL DEFAULT 0,
+    output_tokens     INTEGER NOT NULL DEFAULT 0,
+    estimated_cost_usd DOUBLE PRECISION,
+    actual_cost_usd   DOUBLE PRECISION,
+    recorded_at       TEXT NOT NULL,
+    tags              TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE INDEX IF NOT EXISTS idx_cost_logs_session ON cost_logs(session_id);
+CREATE INDEX IF NOT EXISTS idx_cost_logs_ticket  ON cost_logs(ticket_id);
 
 -- AI config tables (moved to vector schema, renamed without ai_ prefix)
 SET search_path TO vector;

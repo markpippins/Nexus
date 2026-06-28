@@ -912,6 +912,114 @@ class DBAdapter:
             _log.debug("get_token_usage_by_ticket: ticket=%s tokens=%d", ticket_id, result["tokens_used"])
             return result
 
+    # ── Token cost tracking (plan 1018) ────────────────────────────────
+
+    def fetch_model_pricing(self) -> List[Dict[str, Any]]:
+        _log.debug("fetch_model_pricing")
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT model_name, provider, input_price_per_token, "
+                "output_price_per_token, cache_hit_price, updated_at "
+                "FROM model_pricing"
+            )
+            rows = cursor.dict_fetchall()
+            _log.debug("fetch_model_pricing: returned %d rows", len(rows))
+            return rows
+
+    def get_agent_budget(self, role: str) -> Optional[Dict[str, Any]]:
+        _log.debug("get_agent_budget: role=%s", role)
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT agent_role, ceiling_usd, ceiling_tokens, "
+                "current_usd, current_tokens, reset_period, reset_at "
+                "FROM agent_budgets WHERE agent_role = %s",
+                (role,),
+            ).fetchone()
+            if not row:
+                return None
+            return {
+                "agent_role": row[0],
+                "ceiling_usd": row[1],
+                "ceiling_tokens": row[2],
+                "current_usd": row[3],
+                "current_tokens": row[4],
+                "reset_period": row[5],
+                "reset_at": row[6],
+            }
+
+    def update_agent_budget_usage(self, role: str, cost_usd: float, tokens: int) -> None:
+        _log.debug("update_agent_budget_usage: role=%s cost=%.6f tokens=%d", role, cost_usd, tokens)
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE agent_budgets SET "
+                "current_usd = COALESCE(current_usd, 0) + %s, "
+                "current_tokens = COALESCE(current_tokens, 0) + %s, "
+                "updated_at = %s "
+                "WHERE agent_role = %s",
+                (cost_usd, tokens, datetime.utcnow().isoformat() + "Z", role),
+            )
+            conn.commit()
+
+    def insert_cost_log(
+        self,
+        session_id: str,
+        ticket_id: Optional[str],
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        estimated_cost_usd: Optional[float],
+        actual_cost_usd: Optional[float],
+        tags: Optional[List[str]] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat() + "Z"
+        tags_json = json.dumps(tags or [])
+        _log.debug(
+            "insert_cost_log: session=%s ticket=%s model=%s in=%d out=%d est=%s act=%s",
+            session_id, ticket_id, model, input_tokens, output_tokens,
+            estimated_cost_usd, actual_cost_usd,
+        )
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO cost_logs "
+                "(session_id, ticket_id, model, input_tokens, output_tokens, "
+                "estimated_cost_usd, actual_cost_usd, recorded_at, tags) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    session_id, ticket_id, model,
+                    input_tokens, output_tokens,
+                    estimated_cost_usd, actual_cost_usd,
+                    now, tags_json,
+                ),
+            )
+            conn.commit()
+
+    def update_ticket_costs(self, ticket_id: str, cost_usd: float) -> None:
+        _log.debug("update_ticket_costs: ticket=%s cost=%.6f", ticket_id, cost_usd)
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE tickets SET cost_used_usd = COALESCE(cost_used_usd, 0) + %s WHERE id = %s",
+                (cost_usd, ticket_id),
+            )
+            conn.commit()
+
+    def get_ticket_budget(self, ticket_id: str) -> Dict[str, Any]:
+        _log.debug("get_ticket_budget: ticket=%s", ticket_id)
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT COALESCE(token_budget, 0), COALESCE(tokens_used, 0), "
+                "COALESCE(cost_budget_usd, 0), COALESCE(cost_used_usd, 0) "
+                "FROM tickets WHERE id = %s",
+                (ticket_id,),
+            ).fetchone()
+            if not row:
+                return {"token_budget": 0, "tokens_used": 0, "cost_budget_usd": 0, "cost_used_usd": 0}
+            return {
+                "token_budget": row[0],
+                "tokens_used": row[1],
+                "cost_budget_usd": row[2],
+                "cost_used_usd": row[3],
+            }
+
     def get_ticket_lineage(self, plan_id: str) -> List[Dict[str, Any]]:
         _log.debug("get_ticket_lineage: plan=%s", plan_id)
         with self._get_connection() as conn:

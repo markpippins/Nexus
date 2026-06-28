@@ -16,6 +16,9 @@ except ImportError:
 
 from env_config import load_env  # shared .env loader; load_env() fires at import time
 
+from token_estimator import estimate_tokens
+from work_request import WorkRequestDCO  # Pydantic model for DCO validation
+
 
 # ── Module-level logger ─────────────────────────────────────────────
 _log = logging.getLogger("conduit.executor_cloud")
@@ -50,6 +53,7 @@ except ImportError:
 
 
 MCP_BASE_URL = os.environ.get("MCP_BASE_URL", "http://localhost:3100")
+HEARTBEAT_INTERVAL_SECONDS = int(os.environ.get("PIPELINE_HEARTBEAT_INTERVAL", "30"))
 
 
 def _capture_session_cost(session_id: str, opencode_bin: str) -> None:
@@ -96,6 +100,28 @@ def _capture_session_cost(session_id: str, opencode_bin: str) -> None:
     except Exception as e:
         print(f"[cost] Failed to capture cost for {session_id}: {type(e).__name__}: {e}", file=sys.stderr)
         _log.warning("_capture_session_cost: failed session=%s error=%s", session_id, e)
+
+
+def _send_heartbeat(session_id: str, role: str, pid: int | None) -> None:
+    """POST a liveness heartbeat to the conduit MCP server."""
+    if not session_id:
+        return
+    try:
+        payload = json.dumps({
+            "role": role,
+            "state": "working",
+            "pid": pid,
+        }).encode("utf-8")
+        req = Request(
+            f"{MCP_BASE_URL}/sessions/{session_id}/heartbeat",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urlopen(req, timeout=5)
+    except Exception as e:
+        # Heartbeat failures are non-fatal — log and continue
+        _log.debug("_send_heartbeat: failed session=%s error=%s", session_id, e)
 
 
 def _resolve_harness(req: Dict[str, Any]) -> str:
@@ -359,6 +385,44 @@ def _resolve_role(req: Dict[str, Any]) -> str:
     return resolved
 
 
+def _build_role_instructions(role: str) -> str:
+    """Return the role-specific instruction block for agent prompts."""
+    if role == "builder":
+        return (
+            "Execute this WorkRequest. Implement the plan, modifying only "
+            "the files listed in Target Files. Satisfy all acceptance criteria "
+            "and completion conditions. Respect all safety constraints."
+        )
+    elif role == "reviewer":
+        return (
+            "Review the implementation described in this WorkRequest. "
+            "Compare the change report in CHANGES/committed/ against the plan. "
+            "If changes match the acceptance criteria, issue a REVIEW_PASS receipt. "
+            "If they don't match, issue a REVIEW_REJECT receipt with explanation."
+        )
+    elif role == "planner":
+        return (
+            "Elucidate the proposed plan in this WorkRequest. "
+            "Define acceptance criteria, identify files affected, and note dependencies. "
+            "When the plan is fully defined, issue a PLAN_CREATE receipt."
+        )
+    elif role == "critic":
+        return (
+            "Critique the plan in this WorkRequest. "
+            "Evaluate the acceptance criteria, identify gaps, suggest improvements. "
+            "Issue a CRITIQUE_PASS or CRITIQUE_REJECT receipt."
+        )
+    return ""
+
+
+def _build_system_prompt(req: Dict[str, Any]) -> str:
+    """Build a system-level prompt for harnesses that support system/instruction separation."""
+    role = _resolve_role(req)
+    parts = [_build_role_instructions(role)]
+    parts.append("Do NOT issue receipts — the conduit manager handles the audit trail.")
+    return "\n\n".join(parts)
+
+
 def _build_opencode_prompt(
     req: Dict[str, Any],
     working_path: str,
@@ -375,39 +439,16 @@ def _build_opencode_prompt(
             f"{artifacts_dir}/request.json. Read it for full detail."
         )
 
-    # ── role-specific instructions ──
-    if role == "builder":
-        lines.extend([
-            "\n## Instructions",
-            "Execute this WorkRequest. Implement the plan, modifying only "
-            "the files listed in Target Files. Satisfy all acceptance criteria "
-            "and completion conditions. Respect all safety constraints.",
-        ])
-    elif role == "reviewer":
-        lines.extend([
-            "\n## Instructions",
-            "Review the implementation described in this WorkRequest. "
-            "Compare the change report in CHANGES/committed/ against the plan. "
-            "If changes match the acceptance criteria, issue a REVIEW_PASS receipt. "
-            "If they don't match, issue a REVIEW_REJECT receipt with explanation.",
-        ])
-    elif role == "planner":
-        lines.extend([
-            "\n## Instructions",
-            "Elucidate the proposed plan in this WorkRequest. "
-            "Define acceptance criteria, identify files affected, and note dependencies. "
-            "When the plan is fully defined, issue a PLAN_CREATE receipt.",
-        ])
-    elif role == "critic":
-        lines.extend([
-            "\n## Instructions",
-            "Critique the plan in this WorkRequest. "
-            "Evaluate the acceptance criteria, identify gaps, suggest improvements. "
-            "Issue a CRITIQUE_PASS or CRITIQUE_REJECT receipt.",
-        ])
+    instructions = _build_role_instructions(role)
+    if instructions:
+        lines.extend(["\n## Instructions", instructions])
 
     lines.append("\nDo NOT issue receipts — the conduit manager handles the audit trail.")
-    return "\n".join(lines)
+    prompt = "\n".join(lines)
+    model = _resolve_model_name(req)
+    est = estimate_tokens(prompt, model)
+    _log.info("_build_opencode_prompt: estimated %d tokens for model=%s role=%s", est, model, role)
+    return prompt
 
 
 def _run_harness_subprocess(
@@ -415,6 +456,9 @@ def _run_harness_subprocess(
     session_log_path: str | None,
     timeout: int,
     tool_name: str,
+    *,
+    session_id: str = "",
+    role: str = "",
 ) -> str:
     """Run a harness CLI subprocess and return stdout.
 
@@ -425,6 +469,7 @@ def _run_harness_subprocess(
     - Launches ``cmd`` via ``subprocess.Popen`` with **separate stderr**
     - Reads stdout with a ``select.select()`` polling loop (1s tick)
     - Enforces ``timeout`` as a last-resort safety valve
+    - Periodically POSTs to ``/sessions/:sessionId/heartbeat`` for agent liveness
     - Writes every output line to the log file in real time
     - On non-zero exit, writes stderr to the log file with ``[ERROR]`` prefix
     - Raises ``RuntimeError`` on launch failure, timeout, or non-zero exit
@@ -435,12 +480,14 @@ def _run_harness_subprocess(
         session_log_path: Optional path to append stdout to a log file.
         timeout: Maximum wall-clock seconds before the process is killed.
         tool_name: Human-readable name used in error messages (e.g., "opencode", "Codex").
+        session_id: Session ID for heartbeat liveness reporting.
+        role: Agent role for heartbeat liveness reporting.
 
     Returns:
         Combined stdout as a single string.
     """
-    _log.info("_run_harness_subprocess: entry tool=%s cmd=%s timeout=%ds",
-              tool_name, ' '.join(cmd), timeout)
+    _log.info("_run_harness_subprocess: entry tool=%s cmd=%s timeout=%ds session=%s",
+              tool_name, ' '.join(cmd), timeout, session_id or "(none)")
     log_fh = None
     if session_log_path:
         os.makedirs(os.path.dirname(session_log_path), exist_ok=True)
@@ -473,6 +520,7 @@ def _run_harness_subprocess(
 
     stdout_lines: list[str] = []
     start_time = datetime.utcnow()
+    heartbeat_ticks = 0
 
     try:
         # Read stdout + stderr in parallel via select to avoid deadlocks
@@ -488,6 +536,13 @@ def _run_harness_subprocess(
                     raise subprocess.TimeoutExpired(cmd, timeout)
                 if proc.poll() is not None:
                     break
+
+                # ── Agent heartbeat (every HEARTBEAT_INTERVAL_SECONDS ticks) ──
+                heartbeat_ticks += 1
+                if session_id and heartbeat_ticks >= HEARTBEAT_INTERVAL_SECONDS:
+                    heartbeat_ticks = 0
+                    _send_heartbeat(session_id, role, proc.pid)
+
                 continue
 
             got_data = False
@@ -587,7 +642,11 @@ def run_opencode(req, working_path, artifacts_dir=None, session_log_path=None):
         insert_pos += 1
 
     _log.debug("run_opencode: cmd=%s", ' '.join(cmd))
-    result = _run_harness_subprocess(cmd, session_log_path, OPENCODE_TIMEOUT_SECONDS, "opencode")
+    session_id = (req.get("metadata") or {}).get("session_id", "")
+    result = _run_harness_subprocess(
+        cmd, session_log_path, OPENCODE_TIMEOUT_SECONDS, "opencode",
+        session_id=session_id, role=role,
+    )
     _log.info("run_opencode: exit role=%s chars=%d", role, len(result))
     return result
 
@@ -625,7 +684,11 @@ def run_codex(req, working_path, artifacts_dir=None, session_log_path=None):
 
     cmd = launcher.build()
     _log.debug("run_codex: cmd=%s", ' '.join(cmd))
-    result = _run_harness_subprocess(cmd, session_log_path, OPENCODE_TIMEOUT_SECONDS, "Codex")
+    session_id = (req.get("metadata") or {}).get("session_id", "")
+    result = _run_harness_subprocess(
+        cmd, session_log_path, OPENCODE_TIMEOUT_SECONDS, "Codex",
+        session_id=session_id, role=role,
+    )
     _log.info("run_codex: exit role=%s chars=%d", role, len(result))
     return result
 
@@ -640,17 +703,25 @@ def _run_from_path(dco_path: str) -> int:
     """
     try:
         with open(dco_path, "r", encoding="utf-8") as f:
-            req = json.load(f)
+            raw = json.load(f)
     except Exception as e:
         _log.error("_run_from_path: failed to read DCO path=%s error=%s", dco_path, e)
         print(f"[executor] Failed to read DCO: {e}", file=sys.stderr)
         return 2
 
-    wr_id = req.get("id") or os.path.splitext(os.path.basename(dco_path))[0]
-    role = _resolve_role(req)
-    harness = _resolve_harness(req)
-    working_path = os.path.abspath(req.get("path", "."))
-    session_id = (req.get("metadata") or {}).get("session_id", "")
+    try:
+        dco = WorkRequestDCO.model_validate(raw)
+    except Exception as e:
+        _log.error("_run_from_path: DCO validation failed path=%s error=%s", dco_path, e)
+        print(f"[executor] DCO validation failed: {e}", file=sys.stderr)
+        return 2
+
+    req = raw  # keep raw dict for backward-compat in helpers that use .get()
+    wr_id = dco.id or os.path.splitext(os.path.basename(dco_path))[0]
+    role = dco.metadata.role or _resolve_role(req)
+    harness = dco.metadata.harness or _resolve_harness(req)
+    working_path = os.path.abspath(dco.path)
+    session_id = dco.metadata.session_id
 
     _log.info("_run_from_path: wr_id=%s role=%s harness=%s working_path=%s",
               wr_id, role, harness, working_path)
@@ -671,7 +742,8 @@ def _run_from_path(dco_path: str) -> int:
             run_codex(req, working_path, artifacts_dir=None, session_log_path=session_log_path)
         elif harness == "ollama":
             prompt_body = _build_opencode_prompt(req, working_path, artifacts_dir=None)
-            result = run_ollama(req, "", prompt_body, session_log_path=session_log_path)
+            system_prompt = _build_system_prompt(req)
+            result = run_ollama(req, system_prompt, prompt_body, session_log_path=session_log_path)
             if result is None:
                 raise RuntimeError("ollama produced no output")
         else:

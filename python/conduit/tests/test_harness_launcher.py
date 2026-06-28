@@ -12,8 +12,8 @@ import os
 # Ensure the harness_launcher module is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from harness_launcher import HarnessLauncher
-from harness_enums import ExecutionMode, RoleMappingStrategy
+from tackle.harness_launcher import HarnessLauncher
+from tackle.harness_enums import ExecutionMode, RoleMappingStrategy
 
 
 # ── Fixture data (matches the seeded DB state from nexus/typescript/conduit-mcp/src/db.ts) ──

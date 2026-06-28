@@ -16,6 +16,7 @@ from typing import Optional
 from db_adapter import DBAdapter
 from env_config import load_env  # shared .env loader; load_env() fires at import time
 from executor_registry import ModelConfig, RegistryConfig, load_registry, resolve_executor
+from token_estimator import load_pricing, estimate_tokens, estimate_cost
 from work_request_factory import WorkRequestFactory
 
 
@@ -63,7 +64,7 @@ DCO_DIR = os.environ.get("PIPELINE_DCO_DIR", "/home/codex/dev/nexus/.conduit-dat
 PROJECT_ROOT = os.environ.get("PIPELINE_ROOT", "/home/codex/dev/nexus")
 
 EXECUTOR_TIMEOUT_SECONDS = int(os.environ.get("PIPELINE_EXECUTOR_TIMEOUT", "1800"))
-WATCHDOG_STALE_SECONDS = int(os.environ.get("PIPELINE_WATCHDOG_STALE", "3600"))
+WATCHDOG_STALE_SECONDS = int(os.environ.get("PIPELINE_WATCHDOG_STALE", "600"))
 LOCK_STALE_SECONDS = int(os.environ.get("PIPELINE_LOCK_STALE", "3600"))
 
 # ── Rate-limit retry (v090) ───────────────────────────────────────
@@ -86,6 +87,31 @@ def _kill_process_tree(pid: int, sig: int = signal.SIGKILL) -> None:
             pass
 
 
+def _is_descendant_of(pid: int, ancestor_pid: int) -> bool:
+    """Check if *pid* is a descendant of *ancestor_pid* by walking /proc PPID."""
+    if pid <= 0 or ancestor_pid <= 0:
+        return False
+    visited: set[int] = set()
+    current = pid
+    while current > 0 and current not in visited:
+        visited.add(current)
+        try:
+            with open(f"/proc/{current}/status") as f:
+                ppid = None
+                for line in f:
+                    if line.startswith("PPid:"):
+                        ppid = int(line.split()[1])
+                        break
+                if ppid is None:
+                    return False
+                if ppid == ancestor_pid:
+                    return True
+                current = ppid
+        except (FileNotFoundError, OSError, ValueError):
+            return False
+    return False
+
+
 def _cleanup_orphaned_processes() -> None:
     orphans_killed = 0
     try:
@@ -93,6 +119,7 @@ def _cleanup_orphaned_processes() -> None:
             ["ps", "-eo", "pid,etime,cmd", "--no-headers"],
             capture_output=True, text=True, timeout=5
         )
+        my_pid = os.getpid()
         for line in result.stdout.splitlines():
             parts = line.strip().split(None, 2)
             if len(parts) < 3:
@@ -101,14 +128,21 @@ def _cleanup_orphaned_processes() -> None:
             if not pid_str.isdigit():
                 continue
             pid = int(pid_str)
-            if pid == os.getpid():
+            if pid == my_pid:
                 continue
-            if "executor_cloud.py" in cmd or "opencode" in cmd:
+            if "executor_cloud.py" in cmd:
                 total_seconds = _parse_elapsed(elapsed)
                 if total_seconds is not None and total_seconds > WATCHDOG_STALE_SECONDS:
-                    print(f"Orphan cleanup: Killing stale process PID {pid} (elapsed {elapsed}): {cmd[:80]}...")
+                    print(f"Orphan cleanup: Killing stale executor PID {pid} (elapsed {elapsed}): {cmd[:80]}...")
                     _kill_process_tree(pid)
                     orphans_killed += 1
+            elif "opencode" in cmd:
+                total_seconds = _parse_elapsed(elapsed)
+                if total_seconds is not None and total_seconds > WATCHDOG_STALE_SECONDS:
+                    if _is_descendant_of(pid, my_pid):
+                        print(f"Orphan cleanup: Killing stale conduit-spawned opencode PID {pid} (elapsed {elapsed}): {cmd[:80]}...")
+                        _kill_process_tree(pid)
+                        orphans_killed += 1
     except Exception as e:
         print(f"Orphan cleanup: scan failed ({e}), continuing.")
     if orphans_killed:
@@ -289,6 +323,23 @@ def _extract_tokens_from_output(output: str) -> int:
     return 0
 
 
+def _extract_token_split(output: str) -> tuple[int, int]:
+    """Extract input and output token counts from model output.
+    
+    Returns (input_tokens, output_tokens). Falls back to total if split unavailable.
+    """
+    input_pat = r'"(?:prompt|input)_tokens"\s*:\s*(\d+)'
+    output_pat = r'"(?:completion|output)_tokens"\s*:\s*(\d+)'
+    input_m = re.search(input_pat, output, re.IGNORECASE)
+    output_m = re.search(output_pat, output, re.IGNORECASE)
+    if input_m and output_m:
+        return int(input_m.group(1)), int(output_m.group(1))
+    total = _extract_tokens_from_output(output)
+    if total > 0:
+        return total // 2, total - total // 2
+    return 0, 0
+
+
 # ── v078: Receipt-type mappings (used after work completes) ────────
 _SUCCESS_RECEIPTS = {
     "builder": "IMPLEMENTATION",
@@ -302,6 +353,30 @@ _FAIL_RECEIPTS = {
     "planner": "PLAN_BLOCK",
     "critic": "CRITIQUE_REJECT",
 }
+
+BUDGET_EXIT_CODE = 4
+
+
+def _record_cost(
+    db: DBAdapter, output_text: str, ticket_id: str,
+    session_id: str, role: str, model: str,
+    tokens_override: int = 0,
+) -> None:
+    if tokens_override > 0:
+        total_tokens = tokens_override
+    else:
+        total_tokens = _extract_tokens_from_output(output_text)
+    if total_tokens <= 0:
+        return
+    input_tokens, output_tokens = _extract_token_split(output_text)
+    if input_tokens == 0 and output_tokens == 0:
+        input_tokens = total_tokens // 2
+        output_tokens = total_tokens - input_tokens
+    pricing = load_pricing(db)
+    cost_usd = estimate_cost(input_tokens, output_tokens, model, pricing)
+    db.insert_cost_log(session_id, ticket_id, model, input_tokens, output_tokens, None, cost_usd)
+    db.update_ticket_costs(ticket_id, cost_usd)
+    db.update_agent_budget_usage(role, cost_usd, total_tokens)
 
 
 def _insert_empty_chain_block(db: DBAdapter, plan_id: str, role: str,
@@ -370,6 +445,62 @@ def _resolve_model_chain(db: DBAdapter, role: str) -> list:
     return chain
 
 
+def _reject_budget_exceeded(
+    db: DBAdapter, plan_id: str, role: str,
+    session_id: str, ticket_id: str, reason: str,
+) -> None:
+    log = _get_log()
+    log.warning("_reject_budget_exceeded: role=%s plan=%s reason=%s", role, plan_id, reason)
+    db.insert_receipt(
+        plan_id=plan_id,
+        receipt_type="BLOCK",
+        agent_role=role,
+        session_id=session_id,
+        ticket_id=ticket_id,
+        summary=f"Budget exceeded for {role}: {reason}",
+        metadata={"reason": reason, "exit_code": BUDGET_EXIT_CODE},
+        tokens_used=0,
+    )
+    db.close_ticket(plan_id, role, session_id, "failed")
+    db.close_session(session_id, BUDGET_EXIT_CODE)
+
+
+def _check_budget(
+    db: DBAdapter, plan: dict, role: str,
+    session_id: str, ticket_id: str, model: str,
+) -> bool:
+    """Check aggregate agent budget before dispatch.
+    
+    Returns True if within budget (OK to proceed), False if budget exceeded (rejected).
+    """
+    agent_budget = db.get_agent_budget(role)
+    if agent_budget:
+        ceiling = agent_budget.get("ceiling_usd")
+        current = agent_budget.get("current_usd", 0)
+        if ceiling is not None and current >= ceiling:
+            _reject_budget_exceeded(
+                db, plan["id"], role, session_id, ticket_id,
+                f"agent budget exhausted: ${current:.2f} >= ${ceiling:.2f}",
+            )
+            return False
+
+    ticket_budget = db.get_ticket_budget(ticket_id)
+    cost_budget = ticket_budget.get("cost_budget_usd", 0)
+    if cost_budget > 0:
+        plan_text = json.dumps(plan)
+        rough_tokens = estimate_tokens(plan_text, model)
+        pricing = load_pricing(db)
+        estimated = estimate_cost(rough_tokens, 0, model, pricing)
+        if estimated >= cost_budget:
+            _reject_budget_exceeded(
+                db, plan["id"], role, session_id, ticket_id,
+                f"estimated cost ${estimated:.6f} >= ticket budget ${cost_budget:.2f}",
+            )
+            return False
+
+    return True
+
+
 def _dispatch_one(
     plan: dict,
     role: str,
@@ -389,7 +520,7 @@ def _dispatch_one(
     print(f"Processing plan: {plan_id} - {plan.get('title', '')} for role {role}")
     print(f"  cursor before: {cursor_before or '(none)'}")
 
-    session_id = f"{role}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+    session_id = f"{role}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{os.urandom(4).hex()}"
     db.create_session(session_id, role, [plan_id])
 
     # ── Claim the Ticket (Invariant 1: no work without a Ticket) ──
@@ -418,6 +549,12 @@ def _dispatch_one(
         json.dump(dco.model_dump(by_alias=True), f, indent=2)
 
     db.add_work_request(wr_id, plan_id, json.dumps(dco.model_dump(by_alias=True)))
+
+    # ── Budget check (plan 1018) — reject before dispatch if over ceiling ──
+    if not _check_budget(db, plan, role, session_id, ticket_id, model_cfg.model):
+        db.advance_cursor(role, plan_id, wr_id)
+        print(f"  Budget check failed for {role} on plan {plan_id}. Skipping.")
+        return
 
     # ── Resolve executor ──
     executor = resolve_executor(registry, model_cfg.harness)
@@ -489,6 +626,7 @@ def _dispatch_one(
                 )
                 if tokens_used > 0:
                     db.increment_ticket_tokens(ticket_id, tokens_used)
+                _record_cost(db, output_text, ticket_id, session_id, role, model_cfg.model)
 
                 created = db.create_next_tickets(
                     plan_id, role, "completed",
@@ -531,6 +669,7 @@ def _dispatch_one(
                 )
                 if tokens_used > 0:
                     db.increment_ticket_tokens(ticket_id, tokens_used)
+                _record_cost(db, output_text, ticket_id, session_id, role, model_cfg.model)
 
                 if attempt < _retry_max_attempts:
                     print(f"  Waiting {_retry_delay_seconds}s before retry...")
@@ -573,6 +712,7 @@ def _dispatch_one(
             )
             if tokens_used > 0:
                 db.increment_ticket_tokens(ticket_id, tokens_used)
+            _record_cost(db, output_text, ticket_id, session_id, role, model_cfg.model)
             created = db.create_next_tickets(
                     plan_id, role, "failed",
                     parent_ticket_id=ticket_id,
