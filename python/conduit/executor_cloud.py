@@ -5,6 +5,7 @@ import re
 import select
 import subprocess
 import sys
+import time
 from datetime import datetime
 from typing import Any, Dict
 
@@ -734,6 +735,37 @@ def _run_from_path(dco_path: str) -> int:
             f"{session_id}.log",
         )
 
+    # ── CCNF bridge (optional, feature-flagged) ─────────────────────
+    _ccnf_cer_json: dict | None = None
+    _ccnf_hash: str | None = None
+    _ccnf_started_at: int | None = None
+    _ccnf_artifacts_dir: str | None = None
+
+    if os.environ.get("CONDUIT_USE_CCNF", "").lower() in ("1", "true"):
+        from ccnf_bridge import (
+            CCNFAdapter,
+            CCNFBridgeError,
+            call_ccnf_conformance,
+        )
+
+        _binary = os.environ.get(
+            "CCNF_CONFORMANCE_BIN",
+            os.path.join(os.path.dirname(__file__),
+                         "../../go/wrp/ccnf-ref/bin/ccnf-conformance"),
+        )
+        try:
+            _ccnf_input = CCNFAdapter.from_work_request(req)
+            _ccnf_result = call_ccnf_conformance(_ccnf_input, _binary)
+            _ccnf_cer_json = _ccnf_result.cer
+            _ccnf_hash = _ccnf_result.hash
+            _ccnf_started_at = int(time.time())
+            _ccnf_artifacts_dir = os.path.join(working_path, ".artifacts")
+            _log.info("[ccnf] anchored wr=%s hash=%s", wr_id, _ccnf_hash)
+        except CCNFBridgeError as _e:
+            _log.warning("[ccnf] bridge failed, continuing without CCNF: %s", _e)
+            _ccnf_cer_json = None
+            _ccnf_hash = None
+
     exit_code = 3
     try:
         if harness == "opencode":
@@ -763,6 +795,28 @@ def _run_from_path(dco_path: str) -> int:
                 _capture_session_cost(session_id, OPENCODE_BIN)
             except Exception as e:
                 _log.warning("_run_from_path: cost capture failed session=%s error=%s", session_id, e)
+
+    # ── Write CCNF execution receipt (if bridge ran successfully) ──
+    if _ccnf_cer_json is not None and _ccnf_started_at is not None and _ccnf_artifacts_dir is not None:
+        from ccnf_bridge import CERBinder
+        try:
+            os.makedirs(_ccnf_artifacts_dir, exist_ok=True)
+            _completed_at = int(time.time())
+            _receipt = CERBinder.attach_execution(
+                cer_json=_ccnf_cer_json,
+                session_id=session_id,
+                plan_id="",
+                wr_id=wr_id,
+                status="SUCCESS" if exit_code == 0 else "FAILURE",
+                started_at=_ccnf_started_at,
+                completed_at=_completed_at,
+            )
+            _receipt_path = os.path.join(_ccnf_artifacts_dir, "execution_receipt.json")
+            with open(_receipt_path, "w", encoding="utf-8") as _rf:
+                json.dump(_receipt, _rf, indent=2)
+            _log.info("[ccnf] receipt written: %s", _receipt_path)
+        except Exception as _e:
+            _log.warning("[ccnf] receipt write failed: %s", _e)
 
     return exit_code
 
