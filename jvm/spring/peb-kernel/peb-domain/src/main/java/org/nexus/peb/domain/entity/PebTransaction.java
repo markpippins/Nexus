@@ -59,6 +59,13 @@ public class PebTransaction {
     @Column
     private Instant committedAt;           // null if rolled back; set by commitTransaction()
 
+    // ── Kernel semantic kernel linkage ──
+    @Column
+    private UUID kernelEventId;            // event_id from kernel.sys_transition()
+
+    @Column(length = 32)
+    private String kernelEventType;        // event_type from kernel.sys_transition()
+
     // Getters/Setters — only the ones the kernel dispatch layer actually needs
     // are wired in; the rest stay absent to keep the entity narrow. Jackson
     // deserializes the rest via the application.yml visibility: any config.
@@ -101,6 +108,22 @@ public class PebTransaction {
 
     public void setCommittedAt(Instant committedAt) {
         this.committedAt = committedAt;
+    }
+
+    public UUID getKernelEventId() {
+        return kernelEventId;
+    }
+
+    public void setKernelEventId(UUID kernelEventId) {
+        this.kernelEventId = kernelEventId;
+    }
+
+    public String getKernelEventType() {
+        return kernelEventType;
+    }
+
+    public void setKernelEventType(String kernelEventType) {
+        this.kernelEventType = kernelEventType;
     }
 
     /**

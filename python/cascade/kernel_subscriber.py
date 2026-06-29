@@ -1,0 +1,200 @@
+"""kernel_subscriber.py — PostgreSQL LISTEN subscriber for kernel transitions.
+
+Listens on the ``kernel_transition_committed`` NOTIFY channel and
+publishes each transition as a CanonicalEnvelope over NATS.
+
+This is the bridge between the **PostgreSQL Semantic Kernel** (the
+append-only event log) and **Cascade** (the orchestration runtime that
+responds to events).
+
+Designed to run alongside ``main.py`` as its own process::
+
+    # Terminal 1 — Cascade file poller (existing)
+    python3 main.py
+
+    # Terminal 2 — Kernel NOTIFY subscriber (new)
+    DATABASE_URL=postgres://pguser:pgpass@localhost:5432/nexus python3 kernel_subscriber.py
+
+Architecture::
+
+    PostgreSQL                              Python                     NATS
+    kernel.transition_event                 kernel_subscriber.py       ──→ CanonicalEnvelope
+        │  AFTER INSERT trigger                  │                          on subject:
+        │  ──→ pg_notify(...)                    │                          kernel.transition.committed
+        │                                       │
+        └──────────────── NOTIFY ────────────────┘
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import signal
+import sys
+import time
+from typing import Any
+
+# ── Path setup ──────────────────────────────────────────────────────
+_PARENT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PARENT not in sys.path:
+    sys.path.insert(0, _PARENT)
+
+# ── Configuration ───────────────────────────────────────────────────
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgres://pguser:pgpass@localhost:5432/nexus",
+)
+NATS_URL = os.getenv("NATS_URL")
+LISTEN_CHANNEL = "kernel_transition_committed"
+
+# ── Globals for graceful shutdown ──────────────────────────────────
+_running = True
+
+
+def _signal_handler(signum: int, _frame: Any) -> None:
+    global _running
+    print(f"[kernel_subscriber] Signal {signum} received — shutting down...",
+          file=sys.stderr)
+    _running = False
+
+
+signal.signal(signal.SIGTERM, _signal_handler)
+signal.signal(signal.SIGINT, _signal_handler)
+
+
+# ── Core subscriber ─────────────────────────────────────────────────
+
+def _build_kernel_transition_subject(event_type: str) -> str:
+    """Map a kernel event_type to a NATS subject.
+
+    Pattern: nexus.kernel.v1.transition.<event_type_snake>
+
+    Examples:
+        intent.created    → nexus.kernel.v1.transition.intent.created
+        transition.committed → nexus.kernel.v1.transition.transition.committed
+    """
+    return f"nexus.kernel.v1.transition.{event_type}"
+
+
+def _build_envelope(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Build the event dict that nats_publisher expects for enqueue.
+
+    Returns a flat dict matching cascade's event format so the
+    existing ``try_enqueue_event()`` adapter can wrap it.
+    """
+    return {
+        "id": payload["event_id"],
+        "type": payload["event_type"],
+        "timestamp": payload["timestamp"],
+        "source": "kernel",
+        "payload": {
+            "aggregate_type": payload.get("aggregate_type"),
+            "aggregate_id": payload.get("aggregate_id"),
+            "actor": payload.get("actor"),
+            "raw": payload,
+        },
+    }
+
+
+def run_kernel_subscriber() -> None:
+    """Main loop: connect to PostgreSQL, LISTEN, and publish over NATS."""
+    # ── Import optional deps with helpful error messages ──
+    try:
+        import psycopg2
+        import psycopg2.extensions
+    except ImportError:
+        print(
+            "[kernel_subscriber] FATAL: psycopg2 is not installed.\n"
+            "  Install it with:  pip install psycopg2-binary\n"
+            "  Or add it to requirements.txt.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    # ── Start NATS sidecar (if NATS_URL is configured) ──
+    if NATS_URL:
+        try:
+            from nats_publisher import start_nats_sidecar
+            start_nats_sidecar(NATS_URL)
+            print(f"[kernel_subscriber] NATS sidecar started ({NATS_URL})")
+        except ImportError:
+            print("[kernel_subscriber] nats_publisher not available — "
+                  "events will not be published over NATS",
+                  file=sys.stderr)
+    else:
+        print("[kernel_subscriber] NATS_URL not set — events will be "
+              "printed to stdout only",
+              file=sys.stderr)
+
+    # ── Connect to PostgreSQL ──
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.set_isolation_level(
+        psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT
+    )
+    cur = conn.cursor()
+    cur.execute(f"LISTEN {LISTEN_CHANNEL};")
+    print(f"[kernel_subscriber] Listening on channel "
+          f"'{LISTEN_CHANNEL}' — waiting for kernel transitions...")
+
+    # ── Main notification loop ──
+    try:
+        while _running:
+            if conn.notifies:
+                notify = conn.notifies.pop(0)
+                try:
+                    payload: dict[str, Any] = json.loads(notify.payload)
+                    event_type = payload.get("event_type", "unknown")
+                    subject = _build_kernel_transition_subject(event_type)
+
+                    print(f"[kernel_subscriber] Transition committed: "
+                          f"{event_type} ({payload.get('event_id', '?')})")
+
+                    # Build cascade-style event dict and enqueue
+                    event_dict = _build_envelope(payload)
+
+                    # Use try_enqueue_event (which wraps in CanonicalEnvelope)
+                    try:
+                        from nats_publisher import try_enqueue_event
+                        try_enqueue_event(
+                            event_dict,
+                            correlation_id=payload.get("event_id"),
+                        )
+                    except ImportError:
+                        # Fallback: print to stdout
+                        print(f"[kernel_subscriber] [EVENT] {subject}")
+                        print(json.dumps(payload, indent=2))
+                    except Exception as e:
+                        print(f"[kernel_subscriber] Enqueue error: {e}",
+                              file=sys.stderr)
+
+                except json.JSONDecodeError as e:
+                    print(f"[kernel_subscriber] Invalid NOTIFY payload: "
+                          f"{e}", file=sys.stderr)
+
+            # Wait for notifications (checks every 500ms for shutdown signal)
+            if _running:
+                time.sleep(0.5)
+    finally:
+        cur.close()
+        conn.close()
+        print("[kernel_subscriber] Connection closed")
+
+        # ── Stop NATS sidecar ──
+        if NATS_URL:
+            try:
+                from nats_publisher import stop_nats_sidecar
+                stop_nats_sidecar()
+            except ImportError:
+                pass
+
+
+def main() -> None:
+    """Entry point."""
+    print("[kernel_subscriber] Starting PostgreSQL Kernel Subscriber...")
+    run_kernel_subscriber()
+
+
+if __name__ == "__main__":
+    main()
