@@ -1,44 +1,37 @@
-import "@typespec/http";
+/**
+ * Nexus TypeSpec Contracts — Root Entry Point
+ *
+ * Umbrella entry point for generating the full Nexus OpenAPI specification
+ * and multi-language client SDKs. Imports all real service contracts:
+ *
+ *   - Core (shared types)
+ *   - Service Registry (lookup entities, CRUD operations)
+ *   - Service Broker (request routing, broker gateway)
+ *     - API layer (public contract)
+ *     - SPI layer (service provider interface)
+ *     - Service layer (implementation endpoints)
+ *   - File Service (file system operations)
+ *   - Terrain Topology (servers, MCP servers, runnable services, CLI tools)
+ *   - PEB Kernel (governance engine, decision ledger, state hashing)
+ *
+ * Each sub-package is independently compilable via its own tspconfig.yaml.
+ * This root config aggregates them for holistic code generation.
+ */
 
-using Http;
-@service(#{ title: "Widget Service" })
-namespace DemoService;
+// Core shared types — PagedResponse, BinaryData, ErrorResponse
+import "./core/main.tsp";
 
-model Widget {
-  id: string;
-  weight: int32;
-  color: "red" | "blue";
-}
+// User API — shared user DTOs
+import "./user-api/main.tsp";
 
-model WidgetList {
-  items: Widget[];
-}
+// Service Registry — framework vendors, categories, languages, services, deployments
+import "./service-registry/spring/main.tsp";
 
-@error
-model Error {
-  code: int32;
-  message: string;
-}
+// Service Broker — request submission, broker gateway, file service
+import "./service-broker/spring/main.tsp";
 
-model AnalyzeResult {
-  id: string;
-  analysis: string;
-}
+// Terrain Topology — servers, MCP servers, runnable services, CLI tools, profiles
+import "./terrain/spring/main.tsp";
 
-@route("/widgets")
-@tag("Widgets")
-interface Widgets {
-  /** List widgets */
-  @get list(): WidgetList | Error;
-  /** Read widgets */
-  @get read(@path id: string): Widget | Error;
-  /** Create a widget */
-  @post create(@body body: Widget): Widget | Error;
-  /** Update a widget */
-  @patch update(@path id: string, @body body: MergePatchUpdate<Widget>): Widget | Error;
-  /** Delete a widget */
-  @delete delete(@path id: string): void | Error;
-
-  /** Analyze a widget */
-  @route("{id}/analyze") @post analyze(@path id: string): AnalyzeResult | Error;
-}
+// PEB Kernel — governance engine, decision ledger, capability enforcement
+import "./peb-kernel/spring/main.tsp";

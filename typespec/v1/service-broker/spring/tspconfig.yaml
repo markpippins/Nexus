@@ -2,4 +2,4 @@ emit:
   - "@typespec/http-client-java"
 options:
   "@typespec/http-client-java":
-    emitter-output-dir: "{project-root}/../../../../jvm/spring/service-broker"
+    emitter-output-dir: "{project-root}/../../staging/jvm/spring/service-broker"

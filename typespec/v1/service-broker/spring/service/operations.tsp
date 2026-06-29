@@ -1,7 +1,8 @@
 /**
  * Broker Service Operations
- * 
+ *
  * Defines the concrete service operations for the broker implementation.
+ * Routes match JVM BrokerController at /api/v1/broker.
  */
 
 import "@typespec/http";
@@ -15,12 +16,15 @@ using com.aibizarchitect.nexus.v1.servicebroker.service;
 /**
  * Broker service implementation.
  *
- * This service handles request submission and response processing.
+ * Matches JVM com.aibizarchitect.nexus.v1.spring.broker.BrokerController
+ * at @RequestMapping("/api/v1/broker").
  */
 @route("/api/v1/broker")
 namespace com.aibizarchitect.nexus.v1.servicebroker.service {
+
   /**
    * Submit a request to the broker for processing.
+   * JVM: POST /api/v1/broker/submitRequest
    */
   @route("/submitRequest")
   @post
@@ -28,39 +32,19 @@ namespace com.aibizarchitect.nexus.v1.servicebroker.service {
 
   /**
    * Test endpoint for broker functionality.
+   * JVM: POST /api/v1/broker/testBroker
    */
   @route("/testBroker")
   @post
   op testBroker(): ServiceResponseBody;
 
   /**
-   * Invoke an operation on an external service.
+   * Health check endpoint.
+   * JVM: GET /health (at root, returns Map)
+   * NOTE: JVM HealthController returns Map<String,Object> not ServiceResponseBody.
+   * This is a contract-to-be-reconciled — currently defined for future alignment.
    */
-  @route("/invokeExternalService")
-  @post
-  @doc("Invoke an external service operation")
-  op invokeExternalService(
-    /**
-     * The operation name to invoke.
-     */
-    @query operation: string,
-
-    /**
-     * The request body to send.
-     */
-    @body requestBody: unknown
-  ): InvocationResult;
-
-  /**
-   * Perform a health check on an external service.
-   */
-  @route("/healthCheck")
-  @post
-  @doc("Health check for an external service")
-  op healthCheck(
-    /**
-     * The name of the service to check.
-     */
-    serviceName: string
-  ): boolean;
+  @route("/health")
+  @get
+  op healthCheck(): ServiceResponseBody;
 }

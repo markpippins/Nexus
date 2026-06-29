@@ -15,14 +15,24 @@ model BinaryData {
 // Response Models
 // ============================================================================
 
-/** Generic paged wrapper for API responses. */
+/** Pagination metadata — matches JVM com.aibizarchitect.nexus.v1.dto.PagedResponse.Meta */
+model PagedMeta {
+  /** Current page index (0-based) */
+  page: int32;
+  /** Items per page */
+  per_page: int32;
+  /** Total items across all pages */
+  total: int64;
+  /** Last page index */
+  last_page: int32;
+  /** URL for the next page (null on last page) */
+  next_page_url?: string;
+}
+
+/** Generic paged wrapper for API responses — matches JVM com.aibizarchitect.nexus.v1.dto.PagedResponse */
 model PagedResponse<T> {
   data: T[];
-  totalElements: int64;
-  totalPages: int32;
-  number: int32; // current page index (0-based)
-  numberOfElements: int32;
-  size: int32;
+  meta: PagedMeta;
 }
 
 /**
