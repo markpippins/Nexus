@@ -161,12 +161,13 @@ class DBAdapter:
             # ── Manager-owned tables ─────────────────────────
             # work_requests and pipeline_cursor are owned by the Python
             # pipeline manager.  The MCP server creates receipts/tickets
-            # in the vision schema and plans/sessions/circuit_breaker
+            # in the vision schema and sessions/circuit_breaker
             # in the conduit schema — we do not create those here.
+            # Plans table lives in nebula schema (migrated from conduit).
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS work_requests (
                     id TEXT PRIMARY KEY,
-                    plan_id TEXT REFERENCES plans(id),
+                    plan_id TEXT REFERENCES nebula.plans(id),
                     status TEXT NOT NULL,
                     dco_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
@@ -655,7 +656,7 @@ class DBAdapter:
                 receipt_id, plan_id, receipt_type, agent_role, session_id,
                 ticket_id, summary, artifact_path, meta_json, tokens_used, now,
             ))
-            conn.execute("UPDATE plans SET updated_at = %s WHERE id = %s", (now, plan_id))
+            conn.execute("UPDATE nebula.plans SET updated_at = %s WHERE id = %s", (now, plan_id))
             conn.commit()
         _log.debug("insert_receipt: created %s", receipt_id)
 
@@ -731,7 +732,7 @@ class DBAdapter:
     def get_plan_by_id(self, plan_id: str) -> Optional[Dict[str, Any]]:
         _log.debug("get_plan_by_id: plan=%s", plan_id)
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT * FROM plans WHERE id = %s", (plan_id,))
+            cursor = conn.execute("SELECT * FROM nebula.plans WHERE id = %s", (plan_id,))
             plan = cursor.dict_fetchone()
             _log.debug("get_plan_by_id: plan=%s found=%s", plan_id, plan is not None)
             return plan
@@ -911,6 +912,114 @@ class DBAdapter:
             }
             _log.debug("get_token_usage_by_ticket: ticket=%s tokens=%d", ticket_id, result["tokens_used"])
             return result
+
+    # ── Token cost tracking (plan 1018) ────────────────────────────────
+
+    def fetch_model_pricing(self) -> List[Dict[str, Any]]:
+        _log.debug("fetch_model_pricing")
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT model_name, provider, input_price_per_token, "
+                "output_price_per_token, cache_hit_price, updated_at "
+                "FROM model_pricing"
+            )
+            rows = cursor.dict_fetchall()
+            _log.debug("fetch_model_pricing: returned %d rows", len(rows))
+            return rows
+
+    def get_agent_budget(self, role: str) -> Optional[Dict[str, Any]]:
+        _log.debug("get_agent_budget: role=%s", role)
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT agent_role, ceiling_usd, ceiling_tokens, "
+                "current_usd, current_tokens, reset_period, reset_at "
+                "FROM agent_budgets WHERE agent_role = %s",
+                (role,),
+            ).fetchone()
+            if not row:
+                return None
+            return {
+                "agent_role": row[0],
+                "ceiling_usd": row[1],
+                "ceiling_tokens": row[2],
+                "current_usd": row[3],
+                "current_tokens": row[4],
+                "reset_period": row[5],
+                "reset_at": row[6],
+            }
+
+    def update_agent_budget_usage(self, role: str, cost_usd: float, tokens: int) -> None:
+        _log.debug("update_agent_budget_usage: role=%s cost=%.6f tokens=%d", role, cost_usd, tokens)
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE agent_budgets SET "
+                "current_usd = COALESCE(current_usd, 0) + %s, "
+                "current_tokens = COALESCE(current_tokens, 0) + %s, "
+                "updated_at = %s "
+                "WHERE agent_role = %s",
+                (cost_usd, tokens, datetime.utcnow().isoformat() + "Z", role),
+            )
+            conn.commit()
+
+    def insert_cost_log(
+        self,
+        session_id: str,
+        ticket_id: Optional[str],
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        estimated_cost_usd: Optional[float],
+        actual_cost_usd: Optional[float],
+        tags: Optional[List[str]] = None,
+    ) -> None:
+        now = datetime.utcnow().isoformat() + "Z"
+        tags_json = json.dumps(tags or [])
+        _log.debug(
+            "insert_cost_log: session=%s ticket=%s model=%s in=%d out=%d est=%s act=%s",
+            session_id, ticket_id, model, input_tokens, output_tokens,
+            estimated_cost_usd, actual_cost_usd,
+        )
+        with self._get_connection() as conn:
+            conn.execute(
+                "INSERT INTO cost_logs "
+                "(session_id, ticket_id, model, input_tokens, output_tokens, "
+                "estimated_cost_usd, actual_cost_usd, recorded_at, tags) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    session_id, ticket_id, model,
+                    input_tokens, output_tokens,
+                    estimated_cost_usd, actual_cost_usd,
+                    now, tags_json,
+                ),
+            )
+            conn.commit()
+
+    def update_ticket_costs(self, ticket_id: str, cost_usd: float) -> None:
+        _log.debug("update_ticket_costs: ticket=%s cost=%.6f", ticket_id, cost_usd)
+        with self._get_connection() as conn:
+            conn.execute(
+                "UPDATE tickets SET cost_used_usd = COALESCE(cost_used_usd, 0) + %s WHERE id = %s",
+                (cost_usd, ticket_id),
+            )
+            conn.commit()
+
+    def get_ticket_budget(self, ticket_id: str) -> Dict[str, Any]:
+        _log.debug("get_ticket_budget: ticket=%s", ticket_id)
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT COALESCE(token_budget, 0), COALESCE(tokens_used, 0), "
+                "COALESCE(cost_budget_usd, 0), COALESCE(cost_used_usd, 0) "
+                "FROM tickets WHERE id = %s",
+                (ticket_id,),
+            ).fetchone()
+            if not row:
+                return {"token_budget": 0, "tokens_used": 0, "cost_budget_usd": 0, "cost_used_usd": 0}
+            return {
+                "token_budget": row[0],
+                "tokens_used": row[1],
+                "cost_budget_usd": row[2],
+                "cost_used_usd": row[3],
+            }
 
     def get_ticket_lineage(self, plan_id: str) -> List[Dict[str, Any]]:
         _log.debug("get_ticket_lineage: plan=%s", plan_id)
@@ -1162,3 +1271,212 @@ class DBAdapter:
         results = _tackle_fallbacks(role)
         _log.debug("get_fallback_models: role=%s returning %d models", role, len(results))
         return results
+
+    # ── Kernel persistence (plan 1023) ─────────────────────────────────
+
+    def save_kernel_delta(self, delta: "KernelDelta") -> bool:
+        """Persist a KernelDelta to the kernel_delta_log table.
+
+        Args:
+            delta: The KernelDelta to persist.
+
+        Returns:
+            True if inserted, False if duplicate (already exists).
+        """
+        from wrp_kernel.delta import KernelDelta
+        _log.debug("save_kernel_delta: delta_id=%s batch=%s version=%d",
+                   delta.delta_id, delta.batch_id, delta.version)
+        payload = {
+            "receipts": delta.receipts,
+            "affected_plans": list(delta.affected_plans),
+            "invalidated_plans": list(delta.invalidated_plans),
+        }
+        now = datetime.utcnow().isoformat() + "Z"
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO kernel_delta_log
+                    (delta_id, batch_id, payload, version, created_at)
+                VALUES (%s, %s, %s::jsonb, %s, %s)
+                ON CONFLICT (delta_id) DO NOTHING
+                """,
+                (delta.delta_id, delta.batch_id,
+                 json.dumps(payload), delta.version, now),
+            )
+            conn.commit()
+            inserted = cursor.rowcount > 0
+            if inserted:
+                _log.info("save_kernel_delta: persisted delta_id=%s version=%d",
+                          delta.delta_id, delta.version)
+            else:
+                _log.debug("save_kernel_delta: duplicate delta_id=%s", delta.delta_id)
+            return inserted
+
+    def save_kernel_snapshot(self, state: "KernelState") -> bool:
+        """Save a KernelSnapshot checkpoint to the kernel_snapshot table.
+
+        Args:
+            state: The current KernelState to snapshot.
+
+        Returns:
+            True if saved.
+        """
+        from wrp_kernel.engine import KernelState
+        _log.debug("save_kernel_snapshot: version=%d", state.version)
+        state_dict = state.to_dict()
+        now = datetime.utcnow().isoformat() + "Z"
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO kernel_snapshot
+                    (version, state, created_at)
+                VALUES (%s, %s::jsonb, %s)
+                ON CONFLICT (version)
+                DO UPDATE SET state = EXCLUDED.state, created_at = EXCLUDED.created_at
+                """,
+                (state.version, json.dumps(state_dict), now),
+            )
+            conn.commit()
+            _log.info("save_kernel_snapshot: saved version=%d", state.version)
+            return True
+
+    def get_latest_snapshot(self) -> Optional[dict]:
+        """Get the latest (highest version) KernelSnapshot.
+
+        Returns:
+            Deserialized state dict, or None if no snapshots exist.
+        """
+        _log.debug("get_latest_snapshot")
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT state FROM kernel_snapshot ORDER BY version DESC LIMIT 1"
+            ).fetchone()
+            if not row:
+                _log.debug("get_latest_snapshot: no snapshots found")
+                return None
+            _log.debug("get_latest_snapshot: found version=...")
+            return row[0] if isinstance(row[0], dict) else json.loads(row[0])
+
+    def get_nearest_snapshot(self, version: int) -> Optional[dict]:
+        """Get the nearest valid snapshot with version <= given version.
+
+        For KSRA: KernelState(N) = Snapshot(K) + Replay(deltas K+1 → N)
+        where K = this method's output version.
+
+        Args:
+            version: The target version to reconstruct to.
+
+        Returns:
+            Deserialized state dict of the nearest ancestor, or None.
+        """
+        _log.debug("get_nearest_snapshot: target_version=%d", version)
+        with self._get_connection() as conn:
+            row = conn.execute(
+                "SELECT state FROM kernel_snapshot "
+                "WHERE version <= %s ORDER BY version DESC LIMIT 1",
+                (version,),
+            ).fetchone()
+            if not row:
+                _log.debug("get_nearest_snapshot: no ancestor for version=%d", version)
+                return None
+            snap = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+            snap_version = snap.get("version", -1)
+            _log.debug("get_nearest_snapshot: ancestor version=%d for target=%d",
+                       snap_version, version)
+            return snap
+
+    def get_deltas_since(self, version: int) -> List[dict]:
+        """Get all deltas with version > given version, ordered by version ASC.
+
+        For replay in KSRA.
+
+        Args:
+            version: The snapshot version to replay after.
+
+        Returns:
+            List of kernel_delta_log rows as dicts (delta_id, batch_id,
+            payload, version, created_at).
+        """
+        _log.debug("get_deltas_since: since_version=%d", version)
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "SELECT delta_id, batch_id, payload, version, created_at "
+                "FROM kernel_delta_log WHERE version > %s "
+                "ORDER BY version ASC",
+                (version,),
+            )
+            rows = cursor.dict_fetchall()
+            _log.debug("get_deltas_since: found %d deltas since version=%d",
+                       len(rows), version)
+            return rows
+
+    def log_lineage_event(
+        self,
+        version: int,
+        delta_id: str,
+        step: str,
+        event_type: str = "apply",
+        affected_plans: Optional[List[str]] = None,
+        detail: Optional[str] = None,
+    ) -> bool:
+        """Record a lineage event in the lineage_log table.
+
+        Args:
+            version: The kernel version at this event.
+            delta_id: The associated delta_id.
+            step: Which reduce step produced this event.
+            event_type: 'apply' | 'error' | 'reconstruct'.
+            affected_plans: Plans affected in this event.
+            detail: Optional detail string.
+
+        Returns:
+            True if inserted.
+        """
+        _log.debug("log_lineage_event: version=%d delta=%s step=%s type=%s",
+                   version, delta_id, step, event_type)
+        plans_json = json.dumps(affected_plans or [])
+        now = datetime.utcnow().isoformat() + "Z"
+        with self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO lineage_log
+                    (version, delta_id, step, event_type,
+                     affected_plans, detail, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (version, delta_id, step, event_type,
+                 plans_json, detail, now),
+            )
+            conn.commit()
+            return True
+
+    def get_lineage_events(
+        self,
+        version: Optional[int] = None,
+        limit: int = 100,
+    ) -> List[dict]:
+        """Retrieve lineage events, optionally filtered by version.
+
+        Args:
+            version: Optional version filter.
+            limit: Max events to return (default 100).
+
+        Returns:
+            List of lineage event dicts.
+        """
+        _log.debug("get_lineage_events: version=%s limit=%d", version, limit)
+        with self._get_connection() as conn:
+            if version is not None:
+                cursor = conn.execute(
+                    "SELECT * FROM lineage_log WHERE version = %s "
+                    "ORDER BY id ASC LIMIT %s",
+                    (version, limit),
+                )
+            else:
+                cursor = conn.execute(
+                    "SELECT * FROM lineage_log ORDER BY id DESC LIMIT %s",
+                    (limit,),
+                )
+            events = cursor.dict_fetchall()
+            _log.debug("get_lineage_events: returned %d events", len(events))
+            return events

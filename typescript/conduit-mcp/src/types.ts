@@ -5,8 +5,8 @@ export type PlanStatus =
   | "active"
   | "completed"
   | "blocked"
-  | "proposed"
-  | "planning";
+  | "planning"
+  | "hold";
 
 export interface PlanCard {
   fileName: string;
@@ -55,8 +55,8 @@ export interface PipelineState {
     completed: PlanCard[];
     blocked: PlanCard[];
     archived: PlanCard[];
-    proposed: PlanCard[];
     planning: PlanCard[];
+    hold: PlanCard[];
   };
   builder: BuilderStatus;
   circuitBreaker: CircuitBreaker;
@@ -78,7 +78,9 @@ export type PipelineEventType =
   | "builder_update"
   | "circuit_breaker_update"
   | "agent_update"
-  | "state_full";
+  | "state_full"
+  // WorkRequest runtime pipeline events
+  | "wr_state_changed"; // WR lifecycle transition (submitted/ticked/transitioned)
 
 export interface PipelineEvent {
   type: PipelineEventType;
@@ -143,8 +145,8 @@ export type ReceiptType =
   | "REVIEW_PASS"
   | "REVIEW_REJECT"
   | "BLOCK"
-  | "PROPOSED"
   | "PLANNING"
+  | "HOLD"
   | "REVIEW"
   | "CRITIQUE"
   | "CRITIQUE_PASS"

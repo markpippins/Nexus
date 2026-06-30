@@ -1,0 +1,153 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "rdfs:comment"},
+    "label": {"@id": "rdfs:label"},
+    "domain": {"@id": "rdfs:domain"},
+    "range": {"@id": "rdfs:range"},
+
+    "CrossReferenceType": "nx:CrossReferenceType",
+    "sourceType": {"@id": "nx:sourceType", "@type": "@id"},
+    "targetType": {"@id": "nx:targetType", "@type": "@id"},
+    "status": {"@id": "nx:status"},
+    "inverseOf": {"@id": "nx:inverseOf", "@type": "@id"}
+  },
+
+  "@graph": [
+    {
+      "@id": "nx:wrp:depends_on",
+      "type": "CrossReferenceType",
+      "label": "Plan depends on Plan",
+      "comment": "Plan A depends on plan B (B must be complete before A executes). Derived from plan.dependencies.",
+      "domain": "nx:Plan",
+      "range": "nx:Plan",
+      "status": "active"
+    },
+    {
+      "@id": "nx:wrp:implements",
+      "type": "CrossReferenceType",
+      "label": "Plan implements WorkRequest",
+      "comment": "Plan implements (satisfies) a WorkRequest. Directs the WorkRequest to the plan that delivers it.",
+      "domain": "nx:Plan",
+      "range": "nx:WorkRequest",
+      "status": "active",
+      "inverseOf": "nx:wrp:tracked_by"
+    },
+    {
+      "@id": "nx:wrp:tracked_by",
+      "type": "CrossReferenceType",
+      "label": "WorkRequest tracked by Plan",
+      "comment": "WorkRequest is tracked by a plan. Inverse of wrp:implements.",
+      "domain": "nx:WorkRequest",
+      "range": "nx:Plan",
+      "status": "active",
+      "inverseOf": "nx:wrp:implements"
+    },
+    {
+      "@id": "nx:wrp:impacts_system",
+      "type": "CrossReferenceType",
+      "label": "Plan impacts System",
+      "comment": "Plan affects a system or subsystem via shared files_affected entries.",
+      "domain": "nx:Plan",
+      "range": "nx:System",
+      "status": "active"
+    },
+    {
+      "@id": "nx:wrp:supersedes",
+      "type": "CrossReferenceType",
+      "label": "Plan supersedes Plan",
+      "comment": "New plan replaces an older plan in a revision chain.",
+      "domain": "nx:Plan",
+      "range": "nx:Plan",
+      "status": "active"
+    },
+    {
+      "@id": "nx:ag:references_plan",
+      "type": "CrossReferenceType",
+      "label": "Agent record references Plan",
+      "comment": "Agent record references a plan in its content or metadata.",
+      "domain": "nx:AgentRecord",
+      "range": "nx:Plan",
+      "status": "active"
+    },
+    {
+      "@id": "nx:ag:same_thread_as",
+      "type": "CrossReferenceType",
+      "label": "Agent record shares thread",
+      "comment": "Two agent records belong to the same conversation thread.",
+      "domain": "nx:AgentRecord",
+      "range": "nx:AgentRecord",
+      "status": "active"
+    },
+    {
+      "@id": "nx:ag:prompted_by",
+      "type": "CrossReferenceType",
+      "label": "Agent record prompted by",
+      "comment": "Agent record was produced in response to a specific prompt.",
+      "domain": "nx:AgentRecord",
+      "range": "nx:Prompt",
+      "status": "active"
+    },
+    {
+      "@id": "nx:ag:spawns_plan",
+      "type": "CrossReferenceType",
+      "label": "Harvest candidate spawns plan",
+      "comment": "A harvest candidate caused a plan to be spawned.",
+      "domain": "nx:HarvestCandidate",
+      "range": "nx:Plan",
+      "status": "active"
+    },
+    {
+      "@id": "nx:kv:sourced_from",
+      "type": "CrossReferenceType",
+      "label": "Knowledge entity sourced from harvest",
+      "comment": "Knowledge entity content is directly sourced from a harvest.",
+      "domain": "nx:KnowledgeEntity",
+      "range": "nx:Harvest",
+      "status": "active",
+      "inverseOf": "nx:kv:informs"
+    },
+    {
+      "@id": "nx:kv:informs",
+      "type": "CrossReferenceType",
+      "label": "Harvest informs knowledge entity",
+      "comment": "A harvest informed the creation or content of a knowledge entity.",
+      "domain": "nx:Harvest",
+      "range": "nx:KnowledgeEntity",
+      "status": "active",
+      "inverseOf": "nx:kv:sourced_from"
+    },
+    {
+      "@id": "nx:kv:cross_schema",
+      "type": "CrossReferenceType",
+      "label": "Cross-schema embedding similarity",
+      "comment": "Semantic similarity link between vector embeddings across different schemas (harvest_candidate and knowledge_entity).",
+      "domain": "nx:Embedding",
+      "range": "nx:Embedding",
+      "status": "active"
+    },
+    {
+      "@id": "nx:kv:name_overlap",
+      "type": "CrossReferenceType",
+      "label": "Knowledge entity name overlap",
+      "comment": "Keyword overlap detected between knowledge entity names.",
+      "domain": "nx:KnowledgeEntity",
+      "range": "nx:KnowledgeEntity",
+      "status": "active"
+    },
+    {
+      "@id": "nx:kv:description_overlap",
+      "type": "CrossReferenceType",
+      "label": "Knowledge entity description overlap",
+      "comment": "Keyword overlap detected between knowledge entity descriptions.",
+      "domain": "nx:KnowledgeEntity",
+      "range": "nx:KnowledgeEntity",
+      "status": "active"
+    }
+  ]
+}

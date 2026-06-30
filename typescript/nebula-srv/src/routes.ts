@@ -1587,6 +1587,8 @@ export function createRoutes(pool: Pool): Router {
   router.get('/harvests', async (req: Request, res: Response) => {
     try {
       const model = req.query.model as string | undefined;
+      const version = req.query.version as string | undefined;
+      const sourceHash = req.query.sourceHash as string | undefined;
       const level = req.query.level as string | undefined;
       const visibilityScope = req.query.visibilityScope as string | undefined;
       const tag = req.query.tag as string | undefined;
@@ -1627,6 +1629,8 @@ export function createRoutes(pool: Pool): Router {
       let pi = 1;
       if (sort === 'keyword_hits' && keyword) { params.push(keyword); pi++; }  // keyword is $1
       if (model) { clauses.push(`h.model = $${pi++}`); params.push(model); }
+      if (version) { clauses.push(`h.version = $${pi++}`); params.push(parseInt(version)); }
+      if (sourceHash) { clauses.push(`h.source_hash = $${pi++}`); params.push(sourceHash); }
       if (level) { clauses.push(`h.level = $${pi++}`); params.push(parseInt(level)); }
       if (visibilityScope) { clauses.push(`h.visibility_scope = $${pi++}`); params.push(visibilityScope); }
       if (tag) { clauses.push(`$${pi++} = ANY(h.tags)`); params.push(tag); }
@@ -1636,6 +1640,7 @@ export function createRoutes(pool: Pool): Router {
         SELECT h.id, h.source_path, h.source_filename, h.model,
                h.total_candidates, h.tags, h.metadata, h.created_at,
                h.level, h.visibility_scope,
+               h.source_hash, h.version, h.run_metadata,
                COALESCE((h.docklang #>> '{stats,by_type,code}')::int, 0) AS code_blocks,
                COALESCE(jsonb_array_length(h.docklang -> 'discourse_units'), 0) AS turns,
                CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0
@@ -1828,14 +1833,14 @@ export function createRoutes(pool: Pool): Router {
   router.post('/harvests', async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
-      const { sourcePath, sourceFilename, model, totalCandidates, candidates, sourceText, tags, metadata, level, visibilityScope } = req.body;
+      const { sourcePath, sourceFilename, model, totalCandidates, candidates, sourceText, tags, metadata, level, visibilityScope, sourceHash, runMetadata, docklang } = req.body;
       if (!sourcePath) return res.status(400).json({ error: 'sourcePath is required' });
       await client.query('BEGIN');
 
-      // 1. Insert the harvest (JSONB candidates preserved exactly as provided)
+      // 1. Insert the harvest (trigger auto-computes version and source_hash)
       const { rows: [row] } = await client.query(
-        `INSERT INTO nebula.harvests (source_path, source_filename, model, total_candidates, candidates, source_text, tags, metadata, level, visibility_scope)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+        `INSERT INTO nebula.harvests (source_path, source_filename, model, total_candidates, candidates, source_text, tags, metadata, level, visibility_scope, source_hash, run_metadata, docklang)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
         [
           sourcePath,
           sourceFilename || '',
@@ -1847,6 +1852,9 @@ export function createRoutes(pool: Pool): Router {
           metadata || {},
           level ?? 1,
           visibilityScope || 'all',
+          sourceHash || null,
+          runMetadata || {},
+          docklang || null,
         ]
       );
 
@@ -2731,6 +2739,21 @@ export function createRoutes(pool: Pool): Router {
       if (!sourceType || !sourceId || !targetType || !targetId || !relType) {
         return res.status(400).json({ error: 'sourceType, sourceId, targetType, targetId, and relType are required' });
       }
+
+      // Validate against cross-reference taxonomy
+      const { isValidCrossReferenceType, validateCrossRefConstraint } = await import('./crossref-taxonomy');
+      if (!isValidCrossReferenceType(relType)) {
+        const allowed = (await import('./crossref-taxonomy')).ALL_CROSSREF_TYPES.join(', ');
+        return res.status(400).json({
+          error: `Invalid rel_type "${relType}". Allowed values: ${allowed}`,
+        });
+      }
+
+      const constraint = validateCrossRefConstraint(relType, sourceType, targetType);
+      if (!constraint.valid) {
+        return res.status(400).json({ error: constraint.error });
+      }
+
       const { rows: [row] } = await pool.query(
         `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
@@ -2784,6 +2807,160 @@ export function createRoutes(pool: Pool): Router {
       const { rowCount } = await pool.query('DELETE FROM nebula.cross_references WHERE id = $1', [id]);
       if (rowCount === 0) return res.status(404).json({ error: 'Cross-reference not found' });
       res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  EVIDENCE LINKS — typed harvest→knowledge bridge
+  // ═══════════════════════════════════════════════════════════════════
+
+  // POST /api/evidence-links
+  router.post('/evidence-links', async (req: Request, res: Response) => {
+    try {
+      const {
+        knowledgeEntityId, nebulaHarvestId, nebulaCandidateId,
+        linkType, confidence, provenance, rationale, sourceSpan, metadata,
+      } = req.body;
+
+      if (!knowledgeEntityId || !linkType) {
+        return res.status(400).json({
+          error: 'knowledgeEntityId and linkType are required',
+        });
+      }
+
+      if (!nebulaHarvestId && !nebulaCandidateId) {
+        return res.status(400).json({
+          error: 'At least one of nebulaHarvestId or nebulaCandidateId is required',
+        });
+      }
+
+      // Validate link type against taxonomy
+      const { isValidEvidenceLinkType } = await import('./evidence-link-types');
+      if (!isValidEvidenceLinkType(linkType)) {
+        const allowed = (await import('./evidence-link-types')).ALL_EVIDENCE_LINK_TYPES.join(', ');
+        return res.status(400).json({
+          error: `Invalid linkType "${linkType}". Allowed values: ${allowed}`,
+        });
+      }
+
+      // Validate provenance if provided
+      if (provenance) {
+        const { isValidProvenance } = await import('./evidence-link-types');
+        if (!isValidProvenance(provenance)) {
+          const allowed = (await import('./evidence-link-types')).EVIDENCE_PROVENANCE_VALUES.join(', ');
+          return res.status(400).json({
+            error: `Invalid provenance "${provenance}". Allowed values: ${allowed}`,
+          });
+        }
+      }
+
+      const { rows: [row] } = await pool.query(
+        `INSERT INTO knowledge.evidence_links
+           (knowledge_entity_id, nebula_harvest_id, nebula_candidate_id,
+            link_type, confidence, provenance, rationale, source_span, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING *`,
+        [
+          knowledgeEntityId,
+          nebulaHarvestId || null,
+          nebulaCandidateId || null,
+          linkType,
+          confidence != null ? confidence : null,
+          provenance || 'auto_ingestor',
+          rationale || null,
+          sourceSpan ? JSON.stringify(sourceSpan) : null,
+          JSON.stringify(metadata || {}),
+        ]
+      );
+      res.status(201).json(toEpochMs(row, 'created_at'));
+    } catch (err: any) {
+      if (err.code === '23505') {
+        return res.status(409).json({
+          error: 'Duplicate evidence link — this entity+source+type combination already exists',
+        });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/evidence-links
+  router.get('/evidence-links', async (req: Request, res: Response) => {
+    try {
+      const {
+        knowledgeEntityId, nebulaHarvestId, nebulaCandidateId,
+        linkType, provenance, minConfidence, maxConfidence,
+        limit, offset,
+      } = req.query;
+
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+
+      if (knowledgeEntityId) { clauses.push(`knowledge_entity_id = $${i++}`); vals.push(knowledgeEntityId); }
+      if (nebulaHarvestId) { clauses.push(`nebula_harvest_id = $${i++}`); vals.push(nebulaHarvestId); }
+      if (nebulaCandidateId) { clauses.push(`nebula_candidate_id = $${i++}`); vals.push(nebulaCandidateId); }
+      if (linkType) { clauses.push(`link_type = $${i++}`); vals.push(linkType); }
+      if (provenance) { clauses.push(`provenance = $${i++}`); vals.push(provenance); }
+      if (minConfidence) { clauses.push(`confidence >= $${i++}`); vals.push(parseFloat(minConfidence as string)); }
+      if (maxConfidence) { clauses.push(`confidence <= $${i++}`); vals.push(parseFloat(maxConfidence as string)); }
+
+      const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
+      const l = limit ? parseInt(limit as string, 10) : 100;
+      const o = offset ? parseInt(offset as string, 10) : 0;
+
+      const { rows } = await pool.query(
+        `SELECT * FROM knowledge.evidence_links ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+        [...vals, l, o]
+      );
+      res.json(rows.map((r: any) => toEpochMs(r, 'created_at')));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/evidence-links/:id
+  router.get('/evidence-links/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        'SELECT * FROM knowledge.evidence_links WHERE id = $1', [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Evidence link not found' });
+      res.json(toEpochMs(row, 'created_at'));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/evidence-links/:id
+  router.delete('/evidence-links/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rowCount } = await pool.query(
+        'DELETE FROM knowledge.evidence_links WHERE id = $1', [id]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'Evidence link not found' });
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/evidence-links?knowledgeEntityId=... — bulk delete all links for an entity
+  router.delete('/evidence-links', async (req: Request, res: Response) => {
+    try {
+      const { knowledgeEntityId } = req.query;
+      if (!knowledgeEntityId) {
+        return res.status(400).json({ error: 'knowledgeEntityId query parameter is required for bulk delete' });
+      }
+      const { rowCount } = await pool.query(
+        'DELETE FROM knowledge.evidence_links WHERE knowledge_entity_id = $1',
+        [knowledgeEntityId]
+      );
+      res.json({ deleted: rowCount });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3124,6 +3301,253 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════
+  //  OP MAPPING REGISTRY — versioned intent→opcode mapping table
+  //  Schema: nebula.op_registry
+  // ═══════════════════════════════════════════════════════════════════
+
+  // POST /api/op-registry — create a new registry entry
+  router.post('/op-registry', async (req: Request, res: Response) => {
+    try {
+      const {
+        id, intent_id, version, status, label,
+        match_patterns, opcode_template, required_params, optional_params,
+        preconditions, postconditions, idempotency_key, successor_id, notes,
+      } = req.body;
+
+      if (!id || !intent_id) {
+        return res.status(400).json({ error: 'id and intent_id are required' });
+      }
+
+      const now = new Date().toISOString();
+      const { rows: [row] } = await pool.query(
+        `INSERT INTO nebula.op_registry
+          (id, intent_id, version, status, label,
+           match_patterns, opcode_template, required_params, optional_params,
+           preconditions, postconditions, idempotency_key, successor_id, notes,
+           created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+         RETURNING *`,
+        [
+          id, intent_id, version || 'v1', status || 'active', label || '',
+          match_patterns || [], JSON.stringify(opcode_template || []),
+          required_params || [], optional_params || [],
+          preconditions || [], postconditions || [],
+          idempotency_key || '', successor_id || null, notes || '',
+          now, now,
+        ]
+      );
+      res.status(201).json(row);
+    } catch (err: any) {
+      // Catch ISA validation trigger errors
+      if (err.message && err.message.includes('Invalid opcode')) {
+        return res.status(422).json({ error: err.message });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/op-registry — list registry entries with optional filters
+  router.get('/op-registry', async (req: Request, res: Response) => {
+    try {
+      const {
+        intent_id, status, search,
+        limit: qLimit, offset: qOffset,
+      } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 100, 500);
+      const offset = parseInt(qOffset as string) || 0;
+
+      const conditions: string[] = ['deleted_at IS NULL'];
+      const params: any[] = [];
+      let i = 1;
+
+      if (intent_id) { conditions.push(`intent_id = $${i++}`); params.push(intent_id); }
+      if (status) { conditions.push(`status = $${i++}`); params.push(status); }
+      if (search) {
+        conditions.push(`(label ILIKE $${i} OR intent_id ILIKE $${i} OR notes ILIKE $${i})`);
+        params.push(`%${search}%`);
+        i++;
+      }
+
+      const where = conditions.join(' AND ');
+      params.push(limit, offset);
+
+      const { rows } = await pool.query(
+        `SELECT * FROM nebula.op_registry
+         WHERE ${where}
+         ORDER BY intent_id, version DESC
+         LIMIT $${i++} OFFSET $${i}`,
+        params
+      );
+      res.json({ entries: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/op-registry/:id — get a single registry entry
+  router.get('/op-registry/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        'SELECT * FROM nebula.op_registry WHERE id = $1 AND deleted_at IS NULL',
+        [id]
+      );
+      if (!row) return res.status(404).json({ error: `Registry entry ${id} not found` });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/op-registry/:id/deprecate — deprecate a registry entry
+  router.patch('/op-registry/:id/deprecate', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { successor_id } = req.body;
+      const now = new Date().toISOString();
+      const { rows: [row] } = await pool.query(
+        `UPDATE nebula.op_registry
+         SET status = 'deprecated', successor_id = COALESCE($2, successor_id),
+             updated_at = $3
+         WHERE id = $1 AND deleted_at IS NULL
+         RETURNING *`,
+        [id, successor_id || null, now]
+      );
+      if (!row) return res.status(404).json({ error: `Registry entry ${id} not found or already deleted` });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/op-registry/:id/supersede — mark as superseded (replaced by fork)
+  router.patch('/op-registry/:id/supersede', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { successor_id } = req.body;
+      if (!successor_id) return res.status(400).json({ error: 'successor_id is required to supersede an entry' });
+      const now = new Date().toISOString();
+      const { rows: [row] } = await pool.query(
+        `UPDATE nebula.op_registry
+         SET status = 'superseded', successor_id = $2, updated_at = $3
+         WHERE id = $1 AND deleted_at IS NULL
+         RETURNING *`,
+        [id, successor_id, now]
+      );
+      if (!row) return res.status(404).json({ error: `Registry entry ${id} not found or already deleted` });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/op-registry/:id — soft-delete a registry entry
+  router.delete('/op-registry/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const now = new Date().toISOString();
+      const { rows: [row] } = await pool.query(
+        'UPDATE nebula.op_registry SET deleted_at = $2, updated_at = $2 WHERE id = $1 AND deleted_at IS NULL RETURNING *',
+        [id, now]
+      );
+      if (!row) return res.status(404).json({ error: `Registry entry ${id} not found` });
+      res.json({ deleted: true, id });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/op-registry/fork — create a new version of an existing intent mapping
+  router.post('/op-registry/fork', async (req: Request, res: Response) => {
+    try {
+      const { source_id, new_version, label, notes, opcode_template, required_params } = req.body;
+      if (!source_id || !new_version) {
+        return res.status(400).json({ error: 'source_id and new_version are required' });
+      }
+
+      // Get the source entry
+      const { rows: [source] } = await pool.query(
+        'SELECT * FROM nebula.op_registry WHERE id = $1 AND deleted_at IS NULL',
+        [source_id]
+      );
+      if (!source) return res.status(404).json({ error: `Source registry entry ${source_id} not found` });
+
+      // Create the fork with a new ID
+      const forkId = `${source.intent_id}:${new_version}`;
+      const now = new Date().toISOString();
+
+      const { rows: [fork] } = await pool.query(
+        `INSERT INTO nebula.op_registry
+          (id, intent_id, version, status, label,
+           match_patterns, opcode_template, required_params, optional_params,
+           preconditions, postconditions, idempotency_key, notes,
+           created_at, updated_at)
+         VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         RETURNING *`,
+        [
+          forkId,
+          source.intent_id,
+          new_version,
+          label || `${source.label} (${new_version})`,
+          source.match_patterns,
+          JSON.stringify(opcode_template || source.opcode_template),
+          required_params || source.required_params,
+          source.optional_params,
+          source.preconditions,
+          source.postconditions,
+          source.idempotency_key,
+          notes || '',
+          now, now,
+        ]
+      );
+
+      // Supersede the source
+      await pool.query(
+        `UPDATE nebula.op_registry SET status = 'superseded', successor_id = $2, updated_at = $3
+         WHERE id = $1`,
+        [source_id, forkId, now]
+      );
+
+      res.status(201).json({
+        fork,
+        superseded: source_id,
+        message: `Forked ${source_id} → ${forkId}`,
+      });
+    } catch (err: any) {
+      if (err.message && err.message.includes('Invalid opcode')) {
+        return res.status(422).json({ error: err.message });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/op-registry/:id/lineage — show the version lineage of an intent
+  router.get('/op-registry/:id/lineage', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      // Get the entry and follow successor chain
+      const { rows: [entry] } = await pool.query(
+        'SELECT * FROM nebula.op_registry WHERE id = $1 AND deleted_at IS NULL',
+        [id]
+      );
+      if (!entry) return res.status(404).json({ error: `Registry entry ${id} not found` });
+
+      // Get all versions of this intent
+      const { rows: lineage } = await pool.query(
+        `SELECT id, intent_id, version, status, successor_id, label, created_at
+         FROM nebula.op_registry
+         WHERE intent_id = $1 AND deleted_at IS NULL
+         ORDER BY version DESC`,
+        [entry.intent_id]
+      );
+
+      res.json({ intent_id: entry.intent_id, entries: lineage, count: lineage.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/knowledge/summary — entity counts by section, edge counts by relation type
   router.get('/knowledge/summary', async (_req: Request, res: Response) => {
     try {
@@ -3236,7 +3660,7 @@ export function createRoutes(pool: Pool): Router {
 
   // ═══════════════════════════════════════════════════════════════════
   //  CONDUIT — plan history & point-in-time queries (conduit + vision schemas)
-  //  Reads from conduit.plans, vision.receipts, vision.tickets
+  //  Reads from nebula.plans, vision.receipts, vision.tickets
   //  via fully qualified table names (pool search_path=nebula).
   // ═══════════════════════════════════════════════════════════════════
 
@@ -3264,7 +3688,7 @@ export function createRoutes(pool: Pool): Router {
               AND r.created_at <= $${i}
             ORDER BY r.created_at DESC LIMIT 1
           ) AS derived_status_at_time
-          FROM conduit.plans p
+          FROM nebula.plans p
           WHERE 1=1`;
         i++;
         params.push(asOf);
@@ -3284,7 +3708,7 @@ export function createRoutes(pool: Pool): Router {
         params.push(limit, offset);
       } else {
         // Current state: use plan_status view
-        sql = `SELECT * FROM conduit.plan_status ps WHERE 1=1`;
+        sql = `SELECT * FROM nebula.plan_status ps WHERE 1=1`;
 
         if (!includeDeleted) {
           sql += ` AND ps.deleted = 0`;
@@ -3325,7 +3749,7 @@ export function createRoutes(pool: Pool): Router {
             WHERE r.plan_id = p.id AND r.created_at <= $1
             ORDER BY r.created_at DESC LIMIT 1
           ) AS last_receipt_at_time
-          FROM conduit.plans p
+          FROM nebula.plans p
           WHERE (p.created_at <= $1 OR p.updated_at <= $1)
           ${includeDeleted ? '' : 'AND p.deleted = 0'}
           ORDER BY p.created_at DESC`,
@@ -3345,7 +3769,7 @@ export function createRoutes(pool: Pool): Router {
 
       // Plan row (even if deleted)
       const { rows: [plan] } = await pool.query(
-        'SELECT * FROM conduit.plans WHERE id = $1',
+        'SELECT * FROM nebula.plans WHERE id = $1',
         [id]
       );
       if (!plan) return res.status(404).json({ error: `Plan ${id} not found` });
@@ -3404,7 +3828,7 @@ export function createRoutes(pool: Pool): Router {
   router.get('/conduit/deleted-plans', async (req: Request, res: Response) => {
     try {
       const { rows } = await pool.query(
-        'SELECT * FROM conduit.plans WHERE deleted = 1 ORDER BY updated_at DESC'
+        'SELECT * FROM nebula.plans WHERE deleted = 1 ORDER BY updated_at DESC'
       );
       res.json({ plans: rows, count: rows.length });
     } catch (err: any) {

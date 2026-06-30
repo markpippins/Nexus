@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  kernel-pg:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pguser
+      POSTGRES_PASSWORD: pgpass
+      POSTGRES_DB: nexus
+    ports:
+      - "5432:5432"
+    volumes:
+      - kernel-pg-data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pguser -d nexus"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - kernel-net
+
+  kernel-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.kernel
+    ports:
+      - "3103:3103"
+    environment:
+      CONDUIT_PG_DSN: "host=kernel-pg port=5432 user=pguser password=pgpass dbname=nexus"
+      KERNEL_HOST: "0.0.0.0"
+      KERNEL_PORT: "3103"
+    depends_on:
+      kernel-pg:
+        condition: service_healthy
+    networks:
+      - kernel-net
+    restart: unless-stopped
+
+  bridge-daemon:
+    build:
+      context: .
+      dockerfile: Dockerfile.kernel
+    environment:
+      CONDUIT_PG_DSN: "host=kernel-pg port=5432 user=pguser password=pgpass dbname=nexus"
+      KERNEL_API_URL: "http://kernel-api:3103"
+      POLL_INTERVAL: "30"
+      LOG_LEVEL: "INFO"
+    command:
+      - python
+      - -m
+      - bridge.daemon
+    depends_on:
+      kernel-pg:
+        condition: service_healthy
+      kernel-api:
+        condition: service_started
+    networks:
+      - kernel-net
+    restart: unless-stopped
+
+volumes:
+  kernel-pg-data:
+
+networks:
+  kernel-net:
+    driver: bridge

@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS tickets (
     closed_at           TEXT,
     token_budget        INTEGER,
     tokens_used         INTEGER,
+    cost_budget_usd     REAL,
+    cost_used_usd       REAL DEFAULT 0,
     objective           TEXT,
     completion_criteria TEXT,
     owner               TEXT NOT NULL DEFAULT '',
@@ -88,6 +90,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     pid             INTEGER,
     is_running      INTEGER DEFAULT 1,
     last_activity   TEXT,
+    last_heartbeat_at TEXT,
     model           TEXT,
     fallback_used   INTEGER DEFAULT 0,
     cost_usd        REAL,
@@ -109,6 +112,45 @@ CREATE TABLE IF NOT EXISTS circuit_breaker (
 );
 INSERT INTO circuit_breaker (id, tripped) VALUES (1, 0)
 ON CONFLICT (id) DO NOTHING;
+
+-- Token cost tracking tables (plan 1018)
+
+CREATE TABLE IF NOT EXISTS model_pricing (
+    model_name              TEXT PRIMARY KEY,
+    provider                TEXT NOT NULL,
+    input_price_per_token   DOUBLE PRECISION NOT NULL,
+    output_price_per_token  DOUBLE PRECISION NOT NULL,
+    cache_hit_price         DOUBLE PRECISION,
+    updated_at              TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_budgets (
+    agent_role      TEXT PRIMARY KEY,
+    ceiling_usd     DOUBLE PRECISION,
+    ceiling_tokens  INTEGER,
+    current_usd     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    current_tokens  INTEGER NOT NULL DEFAULT 0,
+    reset_period    TEXT NOT NULL DEFAULT 'monthly'
+                    CHECK(reset_period IN ('daily','weekly','monthly')),
+    reset_at        TEXT,
+    updated_at      TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cost_logs (
+    id                BIGSERIAL PRIMARY KEY,
+    session_id        TEXT NOT NULL,
+    ticket_id         TEXT,
+    model             TEXT NOT NULL,
+    input_tokens      INTEGER NOT NULL DEFAULT 0,
+    output_tokens     INTEGER NOT NULL DEFAULT 0,
+    estimated_cost_usd DOUBLE PRECISION,
+    actual_cost_usd   DOUBLE PRECISION,
+    recorded_at       TEXT NOT NULL,
+    tags              TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE INDEX IF NOT EXISTS idx_cost_logs_session ON cost_logs(session_id);
+CREATE INDEX IF NOT EXISTS idx_cost_logs_ticket  ON cost_logs(ticket_id);
 
 -- AI config tables (moved to vector schema, renamed without ai_ prefix)
 SET search_path TO vector;
@@ -206,3 +248,50 @@ SELECT
     END AS derived_status
 FROM plans p
 WHERE p.deleted = 0;
+
+-- ===================================================================
+-- WRP Kernel persistence tables (plan 1023)
+-- Design: kernel-projection-answers.md
+-- Schema: immutable event + snapshot + lineage store
+-- ===================================================================
+
+-- KernelDelta log: source of truth for all state changes
+CREATE TABLE IF NOT EXISTS kernel_delta_log (
+    delta_id    TEXT PRIMARY KEY,
+    batch_id    TEXT NOT NULL,
+    payload     JSONB NOT NULL,
+    version     INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    CHECK(version >= 0)
+);
+CREATE INDEX IF NOT EXISTS idx_kernel_delta_version 
+    ON kernel_delta_log(version);
+CREATE INDEX IF NOT EXISTS idx_kernel_delta_batch 
+    ON kernel_delta_log(batch_id);
+
+-- KernelSnapshot: check-pointed state for fast reconstruction
+CREATE TABLE IF NOT EXISTS kernel_snapshot (
+    version             INTEGER PRIMARY KEY,
+    state               JSONB NOT NULL,
+    identity_hash       TEXT,
+    graph_hash          TEXT,
+    lineage_cursor      INTEGER,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+    CHECK(version >= 0)
+);
+
+-- Lineage log: causal event trace
+CREATE TABLE IF NOT EXISTS lineage_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    version     INTEGER NOT NULL,
+    delta_id    TEXT NOT NULL REFERENCES kernel_delta_log(delta_id),
+    step        TEXT NOT NULL,
+    event_type  TEXT NOT NULL DEFAULT 'apply',
+    affected_plans TEXT NOT NULL DEFAULT '[]',
+    detail      TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_lineage_version 
+    ON lineage_log(version);
+CREATE INDEX IF NOT EXISTS idx_lineage_delta 
+    ON lineage_log(delta_id);

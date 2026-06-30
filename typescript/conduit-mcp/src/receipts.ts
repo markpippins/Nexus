@@ -1,33 +1,33 @@
 import { getLatestReceiptType } from "./db";
 
-// Allowed transitions: from → to (v067: added PROPOSED, PLANNING)
+// Allowed transitions: from → to (v018: removed PROPOSED, added HOLD)
 const ALLOWED: Record<string, string[]> = {
-  // Anything can be created or proposed:
-  "": ["PLAN_CREATE", "BLOCK", "PROPOSED"],
-  // After creation, builder can implement or block:
-  PLAN_CREATE: ["IMPLEMENTATION", "BLOCK", "CRITIQUE"],
-  // After implementation, reviewer can pass or reject:
-  IMPLEMENTATION: ["REVIEW_PASS", "REVIEW_REJECT", "REVIEW"],
-  // Rejection → builder re-implements, or manual REVIEW_PASS override
-  REVIEW_REJECT: ["IMPLEMENTATION", "REVIEW_PASS"],
-  // After pass, plan is done. Block from any state:
-  BLOCK: ["IMPLEMENTATION"], // unblock by implementing
+  // Anything can be created, or start from a requirement idea:
+  "": ["PLAN_CREATE", "BLOCK"],
+  // After creation, builder can implement, hold, or route to critique:
+  PLAN_CREATE: ["IMPLEMENTATION", "BLOCK", "CRITIQUE", "HOLD"],
+  // After implementation, reviewer can pass, reject, or hold:
+  IMPLEMENTATION: ["REVIEW_PASS", "REVIEW_REJECT", "REVIEW", "HOLD"],
+  // Rejection → builder re-implements, or manual REVIEW_PASS override, or hold:
+  REVIEW_REJECT: ["IMPLEMENTATION", "REVIEW_PASS", "HOLD"],
+  // Block → implement (unblocked), hold while blocked is allowed:
+  BLOCK: ["IMPLEMENTATION", "HOLD"],
   // REVIEW_PASS is terminal — no further receipts for THIS plan.
   // But a revision creates a NEW plan with a PLANNING receipt.
   REVIEW_PASS: [],
-  // Proposed plans can be promoted to planning:
-  PROPOSED: ["PLANNING"],
-  // Planning plans can be finalized (pending) or sent back to proposed:
-  PLANNING: ["PLAN_CREATE", "PROPOSED", "PLAN_BLOCK"],
+  // Planning plans can be finalized (pending) or blocked:
+  PLANNING: ["PLAN_CREATE", "PLAN_BLOCK", "HOLD"],
+  // Hold can be released back to pending, or canceled:
+  HOLD: ["PLAN_CREATE", "CANCELLED", "ABANDONED"],
   // Reviewer starts reviewing after implementation:
-  REVIEW: ["REVIEW_PASS", "REVIEW_REJECT"],
+  REVIEW: ["REVIEW_PASS", "REVIEW_REJECT", "HOLD"],
   // Critic starts critique after plan creation:
-  CRITIQUE: ["CRITIQUE_PASS", "CRITIQUE_REJECT"],
+  CRITIQUE: ["CRITIQUE_PASS", "CRITIQUE_REJECT", "HOLD"],
   // Critic outcomes:
-  CRITIQUE_PASS: ["IMPLEMENTATION"], // critique passed → builder can implement
-  CRITIQUE_REJECT: ["PLAN_CREATE"], // critique failed → back to planning
+  CRITIQUE_PASS: ["IMPLEMENTATION", "HOLD"], // critique passed → builder can implement or hold
+  CRITIQUE_REJECT: ["PLAN_CREATE", "HOLD"], // critique failed → back to planning or hold
   // Planner block:
-  PLAN_BLOCK: ["IMPLEMENTATION"], // unblock via implementation
+  PLAN_BLOCK: ["IMPLEMENTATION", "HOLD"], // unblock or hold
   // Requeued plans can be re-dispatched:
   REQUEUED: ["PLAN_CREATE", "IMPLEMENTATION"],
   // Cancelled / abandoned plans can be resurrected:

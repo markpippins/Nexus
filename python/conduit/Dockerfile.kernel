@@ -1,0 +1,20 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir fastapi uvicorn psycopg2-binary sqlalchemy pydantic
+
+# Copy application
+COPY wrp_kernel/ wrp_kernel/
+COPY app/ app/
+COPY cli/ cli/
+COPY bridge/ bridge/
+
+ENV KERNEL_HOST="0.0.0.0"
+ENV KERNEL_PORT="3103"
+
+EXPOSE 3103
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3103"]

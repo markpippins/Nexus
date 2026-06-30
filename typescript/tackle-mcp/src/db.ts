@@ -343,20 +343,25 @@ BEGIN
     VALUES (
         'bootstrap-self-update',
         'Bootstrap Self-Update (Activation)',
-        'On activation: ensure audit directories, query inbox, present open items.',
+        'On activation: ensure audit directories, load procedure index, query inbox, present open items.',
         E'## Procedure\\n\\n'
         'On role activation (every session start):\\n\\n'
-        '1. **Ensure projection target directories exist:**\\n'
+        '1. **Load your procedure index:**\\n'
+        '   - Call \\\`memory_get_procedures("<your_role>")\` to get the full list of '
+        'procedure cards available for your role.\\n'
+        '   - This populates your runtime procedure index from Redis (backed by '
+        'tackle.memory and tackle.role_memory in PostgreSQL).\\n\\n'
+        '2. **Ensure projection target directories exist:**\\n'
         '   mkdir -p nexus/audit/{PROMPTS,RESPONSES,PLANS/pending, ...}\\n'
         '   These are on-demand projection targets, not the canonical store.\\n\\n'
-        '2. **Query your inbox:**\\n'
+        '3. **Query your inbox:**\\n'
         '   - Use nebula_list_agent_records and filter for tags containing '
         '"to:<your_role>" and "status:open"\\n'
         '   - If nebula-mcp is unreachable, surface as a blocking infrastructure issue\\n'
         '   - Present any open items to the user before proceeding\\n\\n'
-        '3. **Query nebula projection config** to verify current role\\u2192folder '
+        '4. **Query nebula projection config** to verify current role\\u2192folder '
         'assignments.\\n\\n'
-        '4. **Present any new items** to the user before proceeding.',
+        '5. **Present any new items** to the user before proceeding.',
         ARRAY['turn-protocol', 'activation', 'bootstrap', 'inbox'],
         ARRAY['activate', 'session start', 'boot', 'turn start'],
         ARRAY['nebula_list_agent_records', 'nebula_create_agent_record']
@@ -731,8 +736,9 @@ BEGIN
         'nexus-boot-procedure', 'Nexus Boot Procedure',
         'Minimum startup read set before working in nexus/.',
         E'## Procedure\\n\\n'
-        'Load: nexus/CLAUDE.md, pipeline-mode.json, OPERATING_MODEL.md, '
-        'mode-router/SKILL.md, and conduit state.',
+        'Load: nexus/CLAUDE.md, pipeline-mode.json, and conduit state. '
+        '(OPERATING_MODEL.md and mode-router/SKILL.md are archived '
+        'historical references -- do not read as live authority.)',
         ARRAY['bootstrap', 'startup', 'initialization'],
         ARRAY['start session', 'activate', 'boot'],
         ARRAY[]::TEXT[]
@@ -1632,10 +1638,10 @@ export async function upsertAIRoleConfig(
   await qRun(
     `INSERT INTO config_bundle (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode, is_active, metadata, created_at, updated_at)
      VALUES (@id, @name, @role, @model_id, @provider_id, @harness_id, 0, 'CLI', 1, '{}', @created_at, @updated_at)
-     ON CONFLICT (role, model_id) DO UPDATE SET
-       id = EXCLUDED.id, provider_id = EXCLUDED.provider_id,
-       harness_id = EXCLUDED.harness_id, priority = 0,
-       is_active = 1, updated_at = EXCLUDED.updated_at`,
+     ON CONFLICT (id) DO UPDATE SET
+       name = EXCLUDED.name, role = EXCLUDED.role, model_id = EXCLUDED.model_id,
+       provider_id = EXCLUDED.provider_id, harness_id = EXCLUDED.harness_id,
+       priority = 0, is_active = 1, updated_at = EXCLUDED.updated_at`,
     { ...rc, name: `Primary: ${rc.model_id} for ${rc.role}`,
       extra_params: rc.extra_params ?? "{}",
       created_at: rc.created_at ?? now, updated_at: now }
@@ -1714,9 +1720,15 @@ export async function upsertConfigBundles(
   if (bundles.length === 0) return;
   const now = new Date().toISOString();
 
+  console.log(`[upsertConfigBundles] Starting for role: ${role}, bundles: ${bundles.length}`);
+
   await withTransaction(async (client) => {
-    await tRun(client, "DELETE FROM config_bundle WHERE role = @role", { role });
+    const deleteResult = await tRun(client, "DELETE FROM config_bundle WHERE role = @role", { role });
+    console.log(`[upsertConfigBundles] Deleted rows for role ${role}:`, deleteResult);
+    
     for (const b of bundles) {
+      const id = `cb-${role}-${b.model_id}`;
+      console.log(`[upsertConfigBundles] Inserting bundle: ${id}`);
       await tRun(client,
         `INSERT INTO config_bundle
            (id, name, role, model_id, provider_id, harness_id, priority, invocation_mode,
@@ -1725,7 +1737,7 @@ export async function upsertConfigBundles(
            (@id, @name, @role, @model_id, @provider_id, @harness_id, @priority, @invocation_mode,
             @command, @endpoint_url, @timeout_ms, 1, '{}', @now, @now)`,
         {
-          id: `cb-${role}-${b.model_id}`,
+          id,
           name: b.name ?? `Bundle: ${b.model_id}`,
           role,
           model_id: b.model_id,
@@ -1740,6 +1752,7 @@ export async function upsertConfigBundles(
         }
       );
     }
+    console.log(`[upsertConfigBundles] Completed for role: ${role}`);
   });
 }
 

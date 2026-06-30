@@ -198,6 +198,9 @@
                   <div (click)="openPreferencesDialog(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
                     <span>Preferences...</span>
                   </div>
+                  <div (click)="openAiConfigDialog(); isHamburgerMenuOpen.set(false)" class="text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] flex items-center justify-between px-4 py-2 text-sm cursor-pointer" role="menuitem">
+                    <span>AI Configuration...</span>
+                  </div>
                 </div>
               </div>
             }
@@ -348,13 +351,19 @@
                         (deleteGateway)="onDeleteGatewayById($event)"
                         (connectGateway)="onConnectToServer($event)"
                       ></app-gateway-management>
-                    } @else if (pane1PlatformNode()) {
-                      <app-platform-management
-                        [managementType]="pane1PlatformNode()!.type"
-                        [baseUrl]="pane1PlatformNode()!.baseUrl"
-                        [toolbarAction]="activePaneId() === 1 ? toolbarAction() : null"
-                        (statusInfo)="contentStatusInfo.set($event)"
-                      ></app-platform-management>
+                    }                    @else if (pane1PlatformNode()) {
+                      @if (pane1PlatformNode()!.type === 'system-health') {
+                        <app-system-health
+                          [baseUrl]="pane1PlatformNode()!.baseUrl"
+                        ></app-system-health>
+                      } @else {
+                        <app-platform-management
+                          [managementType]="pane1PlatformNode()!.type"
+                          [baseUrl]="pane1PlatformNode()!.baseUrl"
+                          [toolbarAction]="activePaneId() === 1 ? toolbarAction() : null"
+                          (statusInfo)="contentStatusInfo.set($event)"
+                        ></app-platform-management>
+                      }
                     } @else {
                       <app-file-explorer
                         [id]="1"
@@ -445,13 +454,19 @@
                         (deleteGateway)="onDeleteGatewayById($event)"
                         (connectGateway)="onConnectToServer($event)"
                       ></app-gateway-management>
-                    } @else if (pane2PlatformNode()) {
-                      <app-platform-management
-                        [managementType]="pane2PlatformNode()!.type"
-                        [baseUrl]="pane2PlatformNode()!.baseUrl"
-                        [toolbarAction]="activePaneId() === 2 ? toolbarAction() : null"
-                        (statusInfo)="contentStatusInfo.set($event)"
-                      ></app-platform-management>
+                    }                    @else if (pane2PlatformNode()) {
+                      @if (pane2PlatformNode()!.type === 'system-health') {
+                        <app-system-health
+                          [baseUrl]="pane2PlatformNode()!.baseUrl"
+                        ></app-system-health>
+                      } @else {
+                        <app-platform-management
+                          [managementType]="pane2PlatformNode()!.type"
+                          [baseUrl]="pane2PlatformNode()!.baseUrl"
+                          [toolbarAction]="activePaneId() === 2 ? toolbarAction() : null"
+                          (statusInfo)="contentStatusInfo.set($event)"
+                        ></app-platform-management>
+                      }
                     } @else {
                       <app-file-explorer
                         [id]="2"
@@ -588,6 +603,7 @@
     [statusInfo]="statusBarSelectionInfo()"
     [statusCounts]="statusBarItemCounts()"
     [imageBaseUrl]="defaultImageUrl()"
+    (aiconfigClick)="openAiConfigDialog()"
   ></app-bottom-bar>
 
   </div><!-- end .flex-col main wrapper -->
@@ -748,5 +764,17 @@
   />
 
   <!-- Message Box Chat Interface (copied from conduit-ui) -->
+  <!-- Tackle UI — AI Configuration (iframe popup) -->
+  @if (showAiConfigPopup()) {
+    <div class="fixed inset-0 z-[10000] bg-black/60 flex items-center justify-center p-4"
+         (click)="closeAiConfigPopup()">
+      <div class="bg-[#0f172a] rounded-lg shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden relative"
+           (click)="$event.stopPropagation()">
+        <button class="absolute top-2 right-2 z-10 text-[#94a3b8] hover:text-white text-2xl leading-none px-3 py-1 bg-black/40 rounded"
+                (click)="closeAiConfigPopup()">&times;</button>
+        <app-iframe-view [src]="tackleUiUrl" class="flex-1 w-full"></app-iframe-view>
+      </div>
+    </div>
+  }
   <app-message-box-container></app-message-box-container>
 </div>

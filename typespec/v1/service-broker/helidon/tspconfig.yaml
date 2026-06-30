@@ -2,4 +2,4 @@ emit:
   - "@typespec/http-client-java"
 options:
   "@typespec/http-client-java":
-    emitter-output-dir: "{project-root}/../../../../jvm/helidon"
+    emitter-output-dir: "{project-root}/../../staging/jvm/helidon"

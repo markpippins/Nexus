@@ -368,8 +368,8 @@ BEGIN
         v_acceptance := format('["Implement %s successfully"]', v_title);
     END IF;
 
-    -- Insert into conduit.plans
-    INSERT INTO conduit.plans (title, project, goal, content, files_affected, acceptance_criteria)
+    -- Insert into nebula.plans
+    INSERT INTO nebula.plans (title, project, goal, content, files_affected, acceptance_criteria)
     VALUES (v_title, p_project, v_goal, v_content, v_files_affected, v_acceptance)
     RETURNING id INTO v_plan_id;
 

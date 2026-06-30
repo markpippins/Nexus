@@ -57,8 +57,8 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
   imports: [NgFor, NgSwitch, NgSwitchCase, TitleCasePipe, FormsModule],
   template: `
     @if (visible()) {
-      <div class="overlay" (click)="close()">
-      <div class="dialog" (click)="$event.stopPropagation()">
+      <div class="overlay">
+      <div class="dialog">
         <!-- Header -->
         <div class="header">
           <h2>⚙ AI Configuration</h2>
@@ -67,7 +67,6 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
             <button class="header-btn" (click)="importConfigClick()" title="Import config from JSON file">📤 Import</button>
             <input data-import-input type="file" accept=".json" (change)="onImportFileSelected($event)" style="display:none" />
           </div>
-          <button class="close-btn" (click)="close()">✕</button>
         </div>
 
         <!-- Tab bar -->
@@ -629,11 +628,11 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
   `,
   styles: [
     // ── Overlay ────────────────────────────────────────────────
-    `.overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .15s}`,
+    `.overlay{position:fixed;inset:0;z-index:10000;background:transparent;display:flex;align-items:center;justify-content:center;padding:0;animation:fadeIn .15s}`,
     `@keyframes fadeIn{from{opacity:0}to{opacity:1}}`,
 
     // ── Dialog ─────────────────────────────────────────────────
-    `.dialog{background:var(--bg-primary);border:1px solid var(--border-default);border-radius:14px;width:960px;height:640px;max-height:90vh;max-width:98vw;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(0,0,0,0.35);animation:slideUp .2s}`,
+    `.dialog{background:var(--bg-primary);border:none;border-radius:0;width:100vw;height:100vh;display:flex;flex-direction:column;animation:slideUp .2s}`,
     `@keyframes slideUp{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}`,
     `@media(max-width:1000px){.dialog{width:98vw;height:90vh}}`,
 
@@ -1276,9 +1275,9 @@ export class AIConfigDialogComponent implements OnDestroy {
     return m.model_identifier === DEFAULT_MODEL_IDENTIFIER;
   }
 
-  /** Return the roles assigned to this model (v093: checks role_models for multi-model support). */
+  /** Return the roles assigned to this model (v093: checks bundles for multi-model support). */
   rolesForModel(m: AIModel): string[] {
-    const rm = this.config().role_models;
+    const rm = this.config().bundles;
     if (rm && rm.length > 0) {
       const roleIds = rm.filter(r => r.model_id === m.id).map(r => r.role);
       return [...new Set(roleIds)];
@@ -1655,7 +1654,7 @@ export class AIConfigDialogComponent implements OnDestroy {
       harness_id: string;
       model_id: string;
       extra_params: string;
-      model_priorities: { model_id: string; priority: number; provider_id?: string | null; harness_id?: string | null }[];
+      bundles: { model_id: string; priority: number; provider_id?: string | null; harness_id?: string | null }[];
     }[] = [];
 
     for (const r of ROLES) {
@@ -1671,7 +1670,7 @@ export class AIConfigDialogComponent implements OnDestroy {
         harness_id: primary.harness_id,
         model_id: primary.model_id,
         extra_params: existing?.extra_params ?? '{}',
-        model_priorities: edits.model_entries.map((me, i) => ({
+        bundles: edits.model_entries.map((me, i) => ({
           model_id: me.model_id,
           priority: i,
           provider_id: me.provider_id || undefined,
@@ -1816,8 +1815,8 @@ export class AIConfigDialogComponent implements OnDestroy {
 
     const server = c.roles.find(rc => rc.role === role);
 
-    // Build expected model_entries from server role_models (sorted by priority), fall back to legacy model_id
-    const serverRm = (c.role_models ?? [])
+    // Build expected model_entries from server bundles (sorted by priority), fall back to legacy model_id
+    const serverRm = (c.bundles ?? [])
       .filter(rm => rm.role === role)
       .sort((a, b) => a.priority - b.priority);
 
@@ -1931,8 +1930,8 @@ export class AIConfigDialogComponent implements OnDestroy {
     const c = this.config();
     for (const r of ROLES) {
       const existing = c.roles.find(rc => rc.role === r);
-      // Build model_entries from role_models (prioritized), fall back to single model_id
-      const rm = (c.role_models ?? [])
+      // Build model_entries from bundles (prioritized), fall back to single model_id
+      const rm = (c.bundles ?? [])
         .filter(m => m.role === r)
         .sort((a, b) => a.priority - b.priority);
 

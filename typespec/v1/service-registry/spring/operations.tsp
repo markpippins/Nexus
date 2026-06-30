@@ -113,23 +113,4 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
     @query sort?: string;
   }
 
-  // Framework Language CRUD models
-  model FrameworkLanguageCreate {
-    name: string;
-    description?: string;
-    url?: string;
-    currentVersion?: string;
-    ltsVersion?: string;
-    activeFlag?: boolean;
-  }
-
-  model FrameworkLanguageUpdate {
-    name: string;
-    description?: string;
-    url?: string;
-    currentVersion?: string;
-    ltsVersion?: string;
-    activeFlag?: boolean;
-  }
-
 }

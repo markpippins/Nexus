@@ -1,0 +1,32 @@
+{
+  "delta_id": "delta-example-001",
+  "batch_id": "batch-example-001",
+  "receipts": [
+    {
+      "id": "receipt-101",
+      "plan_id": "0053",
+      "type": "PLAN_CREATE",
+      "agent_role": "planner",
+      "dependencies": [],
+      "files_affected": ["python/conduit/app/services/reducer_service.py"]
+    },
+    {
+      "id": "receipt-102",
+      "plan_id": "0054",
+      "type": "PLAN_CREATE",
+      "agent_role": "planner",
+      "dependencies": ["0053"],
+      "files_affected": ["python/conduit/app/api/routes_delta.py"]
+    },
+    {
+      "id": "receipt-103",
+      "plan_id": "0053",
+      "type": "IMPLEMENTATION",
+      "agent_role": "builder",
+      "dependencies": [],
+      "files_affected": ["python/conduit/app/services/reducer_service.py"]
+    }
+  ],
+  "affected_plans": ["0053", "0054"],
+  "invalidated_plans": []
+}

@@ -69,6 +69,8 @@ import { NavToolbarComponent } from './nav-toolbar/nav-toolbar.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 import { MessageBoxContainerComponent } from './components/message-box-container/message-box-container.component.js';
 
+import { SystemHealthComponent } from './components/system-health/system-health.component.js';
+
 interface PanePath {
   id: number;
   path: string[];
@@ -116,7 +118,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -339,7 +341,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private getPlatformNodeForPath(path: string[]) {
     // Valid management types
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'hosts', 'service hosts', 'lookup tables', 'service types', 'server types', 'framework languages', 'framework categories', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments'];
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'hosts', 'service hosts', 'lookup tables', 'service types', 'server types', 'framework languages', 'framework categories', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'system health'];
     const profiles = this.hostProfileService.profiles();
     const activeProfile = this.hostProfileService.activeProfile();
 
@@ -352,6 +354,7 @@ export class AppComponent implements OnInit, OnDestroy {
       if (n === 'service-hosts' || n === 'hosts') return 'servers';
       if (n === 'languages') return 'framework-languages';
       if (n === 'categories') return 'framework-categories';
+      if (n === 'system-health') return 'system-health';
       return n;
     };
 
@@ -416,17 +419,25 @@ export class AppComponent implements OnInit, OnDestroy {
       }
 
       if (type) {
+        const normalizedType = normalizeType(type);
+        // If normalized type is null (e.g., Data Dictionary), return null to show children instead
+        if (!normalizedType) {
+          return null;
+        }
+
+        // System Health always uses the terrain server URL, not a profile's hostServerUrl
+        if (normalizedType === 'system-health') {
+          const terrainUrl = this.localConfigService.terrainServerUrl();
+          console.log('[AppComponent] Matched Platform Management path - system-health', { terrainUrl });
+          return { type: normalizedType, baseUrl: terrainUrl };
+        }
+
         const profile = targetProfileName
           ? profiles.find(p => p.name === targetProfileName)
           : (path[0] === 'Service Registries' && path.length > 1 ? profiles.find(p => p.name === path[1]) : (path[0].toLowerCase() !== 'platform management' ? profiles.find(p => p.name === path[0]) : activeProfile));
 
         const finalProfile = profile || activeProfile;
         if (finalProfile) {
-          const normalizedType = normalizeType(type);
-          // If normalized type is null (e.g., Data Dictionary), return null to show children instead
-          if (!normalizedType) {
-            return null;
-          }
           const baseUrl = finalProfile.hostServerUrl.startsWith('http') ? finalProfile.hostServerUrl.replace(/\/$/, '') : `http://${finalProfile.hostServerUrl.replace(/\/$/, '')}`;
           console.log('[AppComponent] Matched Platform Management path', { type, baseUrl, targetProfileName });
           return { type: normalizedType, baseUrl };
@@ -915,6 +926,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
 
   private treeAdapters = new Map<string, TreeProviderAdapter>();
+
+  /** Tackle UI (AI Config) runs as a standalone app on port 4202 */
+  readonly tackleUiUrl = 'http://localhost:4202';
+  showAiConfigPopup = signal(false);
 
   constructor() {
     // Initialize adapters for each Host Server root
@@ -2452,6 +2467,15 @@ export class AppComponent implements OnInit, OnDestroy {
   // --- Preferences Dialog ---
   openPreferencesDialog(): void {
     this.isPreferencesDialogOpen.set(true);
+  }
+
+  /** Open the AI configuration dialog (tackle-ui iframe popup) */
+  openAiConfigDialog(): void {
+    this.showAiConfigPopup.set(true);
+  }
+
+  closeAiConfigPopup(): void {
+    this.showAiConfigPopup.set(false);
   }
 
   closePreferencesDialog(): void {

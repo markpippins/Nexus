@@ -48,8 +48,9 @@ model ServiceRequest {
 
   /**
    * Whether the request/response should be encrypted.
+   * Required boolean in JVM (defaults to false).
    */
-  encrypt?: boolean;
+  encrypt: boolean;
 }
 
 /**

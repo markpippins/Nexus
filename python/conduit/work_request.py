@@ -111,13 +111,18 @@ class WorkRequestMetadata(BaseModel):
     agent_id: Optional[str] = None
     mode: Optional[str] = None
     tags: List[str] = Field(default_factory=list)
+    session_id: str = ""
+    role: str = ""
+    harness: str = "opencode"
+    model: str = ""
 
-    model_config = {"extra": "allow"}
+    model_config = {"extra": "forbid"}
 
 
 class WorkRequestDCO(BaseModel):
     id: str
     version: int
+    path: str = "."
     intent: WorkRequestIntent
     decomposition: WorkRequestDecomposition
     requirements: WorkRequestRequirements
@@ -127,8 +132,6 @@ class WorkRequestDCO(BaseModel):
     lineage: WorkRequestLineage
     artifacts: WorkRequestArtifacts
     metadata: WorkRequestMetadata
-
-    model_config = {"extra": "allow"}
 
 
 class WorkResultEvent(BaseModel):

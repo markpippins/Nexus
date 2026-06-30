@@ -94,12 +94,12 @@ export interface AIConfigSnapshot {
   harnesses: AIHarness[];
   models: AIModel[];
   roles: AIRoleConfig[];
-  role_models: AIRoleModel[];
+  bundles: AIRoleModel[];
 }
 
 @Injectable({ providedIn: 'root' })
 export class AIConfigService {
-  readonly config = signal<AIConfigSnapshot>({ providers: [], harnesses: [], models: [], roles: [], role_models: [] });
+  readonly config = signal<AIConfigSnapshot>({ providers: [], harnesses: [], models: [], roles: [], bundles: [] });
   readonly loading = signal(false);
   readonly saving = signal<Record<string, boolean>>({});
 
@@ -214,16 +214,19 @@ export class AIConfigService {
    *  `config.set(data)` destroys `<option>` elements in the select dropdowns,
    *  causing ngModel to lose track of selected values and resetting all controls.
    *  The caller must call fetch() manually after subscribe. */
-  saveRolesBatch(roles: Omit<AIRoleConfig, 'created_at' | 'updated_at'>[]): Observable<unknown> {
+  saveRolesBatch(roles: any[]): Observable<unknown> {
     if (roles.length === 0) return EMPTY;
 
     for (const rc of roles) {
       this._setSaving(rc.id, true);
     }
 
-    const requests$ = roles.map(rc =>
-      this.http.post<{ saved: boolean }>(`${this.api}/config/ai/role`, rc)
-    );
+    console.log('[AIConfigService] saveRolesBatch payload:', JSON.stringify(roles, null, 2));
+
+    const requests$ = roles.map(rc => {
+      console.log('[AIConfigService] Sending role config:', rc.role, 'with bundles:', rc.bundles);
+      return this.http.post<{ saved: boolean }>(`${this.api}/config/ai/role`, rc);
+    });
 
     return concat(...requests$).pipe(
       last(),
@@ -270,8 +273,8 @@ export class AIConfigService {
   }
 
   /** Import a full AI config snapshot — replaces all existing data. */
-  importConfig(data: AIConfigSnapshot): Observable<{ imported: boolean; providers: number; harnesses: number; models: number; roles: number; role_models: number }> {
-    return this.http.post<{ imported: boolean; providers: number; harnesses: number; models: number; roles: number; role_models: number }>(`${this.api}/config/ai/import`, data);
+  importConfig(data: AIConfigSnapshot): Observable<{ imported: boolean; providers: number; harnesses: number; models: number; roles: number; bundles: number }> {
+    return this.http.post<{ imported: boolean; providers: number; harnesses: number; models: number; roles: number; bundles: number }>(`${this.api}/config/ai/import`, data);
   }
 
   /** Export the current config as a downloadable JSON file. */

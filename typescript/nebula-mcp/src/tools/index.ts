@@ -644,9 +644,11 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_list_harvests",
-    "List harvest pipeline outputs, optionally filtered by model.",
+    "List harvest pipeline outputs, optionally filtered by model, version, or source hash.",
     {
       model: z.string().optional().describe("Filter by model name (e.g. 'DeepSeek V4')"),
+      version: z.number().optional().describe("Filter by harvest version number"),
+      sourceHash: z.string().optional().describe("Filter by source content hash (MD5)"),
       level: z.number().optional().describe("Filter by abstraction level (1-4)"),
       visibilityScope: z.string().optional().describe("Filter by visibility scope (builder, architect, planner, reviewer, all)"),
       limit: z.number().optional().describe("Max results (default 100, max 500)"),
@@ -655,6 +657,8 @@ export function registerTools(server: McpServer) {
     async (args) => {
       const result = await NebulaClient.listHarvests({
         model: args.model,
+        version: args.version,
+        sourceHash: args.sourceHash,
         level: args.level,
         visibilityScope: args.visibilityScope,
         limit: args.limit,
@@ -678,7 +682,7 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_create_harvest",
-    "Record a new harvest pipeline output in the database.",
+    "Record a new harvest pipeline output in the database. Version auto-increments per source_path+model.",
     {
       sourcePath: z.string().describe("Path to the source chat transcript"),
       sourceFilename: z.string().optional().describe("Display filename for the source"),
@@ -690,6 +694,8 @@ export function registerTools(server: McpServer) {
       metadata: z.any().optional().describe("Optional metadata object"),
       level: z.number().optional().describe("Abstraction level 1-4 (default 1)"),
       visibilityScope: z.string().optional().describe("Visibility scope: builder, architect, planner, reviewer, all (default 'all')"),
+      sourceHash: z.string().optional().describe("Override source content hash (MD5); auto-computed if omitted"),
+      runMetadata: z.any().optional().describe("Optional JSON metadata about this specific harvest run"),
     },
     async (args) => {
       const result = await NebulaClient.createHarvest({
@@ -703,6 +709,8 @@ export function registerTools(server: McpServer) {
         metadata: args.metadata,
         level: args.level,
         visibilityScope: args.visibilityScope,
+        sourceHash: args.sourceHash,
+        runMetadata: args.runMetadata,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -1089,15 +1097,17 @@ export function registerTools(server: McpServer) {
   //  CROSS-REFERENCES
   // ════════════════════════════════════════════════════════════════
 
+  const CROSSREF_TYPES_HINT = "Valid types: wrp:depends_on, wrp:implements, wrp:tracked_by, wrp:impacts_system, wrp:supersedes, ag:references_plan, ag:same_thread_as, ag:prompted_by, ag:spawns_plan, kv:sourced_from, kv:informs, kv:cross_schema, kv:name_overlap, kv:description_overlap";
+
   server.tool(
     "nebula_list_cross_references",
     "List cross-references between entities, optionally filtered by source/target type/id or relation type.",
     {
-      sourceType: z.string().optional().describe("Filter by source entity type (e.g. 'requirement', 'system')"),
+      sourceType: z.string().optional().describe("Filter by source entity type (e.g. 'plan', 'agent_record')"),
       sourceId: z.string().optional().describe("Filter by source entity UUID"),
       targetType: z.string().optional().describe("Filter by target entity type"),
       targetId: z.string().optional().describe("Filter by target entity UUID"),
-      relType: z.string().optional().describe("Filter by relation type (e.g. 'depends_on', 'implements', 'duplicates')"),
+      relType: z.string().optional().describe(`Filter by relation type. ${CROSSREF_TYPES_HINT}`),
     },
     async (args) => {
       const result = await NebulaClient.listCrossReferences({
@@ -1125,13 +1135,13 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_create_cross_reference",
-    "Create a cross-reference link between two entities.",
+    "Create a cross-reference link between two entities. Validates rel_type against the formal taxonomy.",
     {
-      sourceType: z.string().describe("Source entity type (e.g. 'requirement', 'system')"),
+      sourceType: z.string().describe("Source entity type (e.g. 'plan', 'agent_record')"),
       sourceId: z.string().describe("Source entity UUID"),
       targetType: z.string().describe("Target entity type"),
       targetId: z.string().describe("Target entity UUID"),
-      relType: z.string().describe("Relation type (e.g. 'depends_on', 'implements', 'duplicates')"),
+      relType: z.string().describe(`Relation type. ${CROSSREF_TYPES_HINT}`),
       metadata: z.any().optional().describe("Optional JSON metadata for the link"),
     },
     async (args) => {
@@ -1155,6 +1165,109 @@ export function registerTools(server: McpServer) {
     },
     async (args) => {
       const result = await NebulaClient.deleteCrossReference(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  EVIDENCE LINKS — typed harvest→knowledge bridge
+  // ════════════════════════════════════════════════════════════════
+
+  const EVIDENCE_LINK_TYPES_HINT = "Valid types: supports, refines, instantiates, contradicts, supersedes, mentions, informs, validates";
+  const EVIDENCE_PROVENANCE_HINT = "Valid provenance: auto_ingestor, manual, reconciler, llm_extracted, migration";
+
+  server.tool(
+    "nebula_list_evidence_links",
+    "List evidence links between knowledge entities and harvested evidence, with optional filters.",
+    {
+      knowledgeEntityId: z.string().optional().describe("Filter by knowledge graph entity UUID"),
+      nebulaHarvestId: z.string().optional().describe("Filter by harvest UUID"),
+      nebulaCandidateId: z.string().optional().describe("Filter by harvest candidate UUID"),
+      linkType: z.string().optional().describe(`Filter by link type. ${EVIDENCE_LINK_TYPES_HINT}`),
+      provenance: z.string().optional().describe(`Filter by provenance. ${EVIDENCE_PROVENANCE_HINT}`),
+      minConfidence: z.number().optional().describe("Minimum confidence filter (0–1)"),
+      maxConfidence: z.number().optional().describe("Maximum confidence filter (0–1)"),
+      limit: z.number().optional().describe("Max results, default 100"),
+      offset: z.number().optional().describe("Pagination offset"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listEvidenceLinks({
+        knowledgeEntityId: args.knowledgeEntityId,
+        nebulaHarvestId: args.nebulaHarvestId,
+        nebulaCandidateId: args.nebulaCandidateId,
+        linkType: args.linkType,
+        provenance: args.provenance,
+        minConfidence: args.minConfidence,
+        maxConfidence: args.maxConfidence,
+        limit: args.limit,
+        offset: args.offset,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_evidence_link",
+    "Get a single evidence link by ID.",
+    {
+      id: z.string().describe("Evidence link UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getEvidenceLink(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_create_evidence_link",
+    "Create an evidence link connecting a knowledge entity to harvested evidence. Validates link_type against the formal taxonomy.",
+    {
+      knowledgeEntityId: z.string().describe("Knowledge graph entity UUID"),
+      nebulaHarvestId: z.string().optional().describe("Harvest UUID (required if nebulaCandidateId not provided)"),
+      nebulaCandidateId: z.string().optional().describe("Harvest candidate UUID (required if nebulaHarvestId not provided)"),
+      linkType: z.string().describe(`Link type. ${EVIDENCE_LINK_TYPES_HINT}`),
+      confidence: z.number().optional().describe("Confidence score (0–1)"),
+      provenance: z.string().optional().describe(`How the link was established. ${EVIDENCE_PROVENANCE_HINT}`),
+      rationale: z.string().optional().describe("Free-text explanation of why this link exists"),
+      sourceSpan: z.any().optional().describe("Source span coordinates (JSON object with start_offset, end_offset, chunk_index)"),
+      metadata: z.any().optional().describe("Optional JSON metadata"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createEvidenceLink({
+        knowledgeEntityId: args.knowledgeEntityId,
+        nebulaHarvestId: args.nebulaHarvestId,
+        nebulaCandidateId: args.nebulaCandidateId,
+        linkType: args.linkType,
+        confidence: args.confidence,
+        provenance: args.provenance,
+        rationale: args.rationale,
+        sourceSpan: args.sourceSpan,
+        metadata: args.metadata,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_delete_evidence_link",
+    "Delete a single evidence link by ID.",
+    {
+      id: z.string().describe("Evidence link UUID to delete"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deleteEvidenceLink(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_delete_evidence_links_by_entity",
+    "Delete all evidence links for a given knowledge entity (bulk delete).",
+    {
+      knowledgeEntityId: z.string().describe("Knowledge entity UUID whose links should be deleted"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deleteEvidenceLinksByEntity(args.knowledgeEntityId);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );
@@ -1289,6 +1402,120 @@ export function registerTools(server: McpServer) {
     {},
     async () => {
       const result = await NebulaClient.listDeletedConduitPlans();
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  OP MAPPING REGISTRY
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_create_op_registry_entry",
+    "Create a new Op Mapping Registry entry. Maps an Implementation Plan intent pattern " +
+    "to a WorkRequest opcode sequence. Entries are versioned and immutable after creation.",
+    {
+      id: z.string().describe("Unique entry ID (e.g. 'INIT_SERVICE_SCAFFOLD:v1')"),
+      intent_id: z.string().describe("Intent identifier (e.g. 'INIT_SERVICE_SCAFFOLD')"),
+      version: z.string().optional().describe("Semantic version (default: 'v1')"),
+      status: z.string().optional().describe("Status: active, deprecated, superseded (default: active)"),
+      label: z.string().optional().describe("Human-readable label"),
+      match_patterns: z.array(z.string()).optional().describe("Goal patterns to match against"),
+      opcode_template: z.array(z.any()).optional().describe("JSON array of opcode sequence templates"),
+      required_params: z.array(z.string()).optional().describe("Required parameter names"),
+      optional_params: z.array(z.string()).optional().describe("Optional parameter names"),
+      preconditions: z.array(z.string()).optional().describe("Precondition descriptions"),
+      postconditions: z.array(z.string()).optional().describe("Postcondition descriptions"),
+      idempotency_key: z.string().optional().describe("Default idempotency key template"),
+      notes: z.string().optional().describe("Human-readable notes"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createOpRegistryEntry(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_list_op_registry",
+    "List Op Mapping Registry entries with optional filters by intent_id, status, or text search.",
+    {
+      intent_id: z.string().optional().describe("Filter by intent identifier"),
+      status: z.string().optional().describe("Filter by status (active, deprecated, superseded)"),
+      search: z.string().optional().describe("Free-text search across label, intent_id, notes"),
+      limit: z.number().optional().describe("Max results (default 100)"),
+      offset: z.number().optional().describe("Offset for pagination"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listOpRegistry(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_op_registry_entry",
+    "Get a single Op Mapping Registry entry by ID.",
+    {
+      id: z.string().describe("Registry entry ID (e.g. 'INIT_SERVICE_SCAFFOLD:v1')"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getOpRegistryEntry(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_deprecate_op_registry_entry",
+    "Deprecate a registry entry. Soft-retires it so existing WorkRequests still work, " +
+    "but new compilations should use the replacement.",
+    {
+      id: z.string().describe("Registry entry ID to deprecate"),
+      successor_id: z.string().optional().describe("Replacement entry ID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deprecateOpRegistryEntry(args.id, args.successor_id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_supersede_op_registry_entry",
+    "Mark a registry entry as superseded (replaced by a fork). Requires successor_id.",
+    {
+      id: z.string().describe("Registry entry ID to supersede"),
+      successor_id: z.string().describe("Replacement entry ID (required)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.supersedeOpRegistryEntry(args.id, args.successor_id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_fork_op_registry_entry",
+    "Create a new version of an existing intent mapping (fork). " +
+    "The source entry is superseded and the new version becomes active.",
+    {
+      source_id: z.string().describe("Source entry ID to fork from"),
+      new_version: z.string().describe("New version string (e.g. 'v2')"),
+      label: z.string().optional().describe("New label (defaults to source label with version suffix)"),
+      notes: z.string().optional().describe("Notes about what changed in this version"),
+      opcode_template: z.array(z.any()).optional().describe("Updated opcode template (defaults to source)"),
+      required_params: z.array(z.string()).optional().describe("Updated required params (defaults to source)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.forkOpRegistryEntry(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_op_registry_lineage",
+    "Show the version lineage of an intent mapping. Returns all versions in order.",
+    {
+      id: z.string().describe("Registry entry ID to get lineage for"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getOpRegistryLineage(args.id);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );

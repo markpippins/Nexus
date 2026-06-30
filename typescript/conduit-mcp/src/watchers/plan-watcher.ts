@@ -12,16 +12,16 @@ export class PlanWatcher extends BaseWatcher {
     completed: PlanCard[];
     blocked: PlanCard[];
     archived: PlanCard[];
-    proposed: PlanCard[];
     planning: PlanCard[];
+    hold: PlanCard[];
   } = {
     pending: [],
     active: [],
     completed: [],
     blocked: [],
     archived: [],
-    proposed: [],
     planning: [],
+    hold: [],
   };
 
   /** Interval handle for periodic DB refresh. Null if not yet started. */
@@ -63,8 +63,8 @@ export class PlanWatcher extends BaseWatcher {
         "active",
         "completed",
         "blocked",
-        "proposed",
         "planning",
+        "hold",
       ] as const;
       // Clear all arrays first, then repopulate — prevents stale entries and
       // duplicates when plans move between statuses between refresh cycles.

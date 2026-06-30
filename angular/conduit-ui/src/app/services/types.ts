@@ -178,6 +178,29 @@ export interface DepEdge { from: string; to: string }
 export type ToastType = 'builder_stale' | 'builder_killed' | 'circuit_tripped' | 'circuit_resolved' | 'blocker_filed' | 'agent_stale' | 'agent_gone' | 'sse_disconnected' | 'sse_reconnected' | 'run_started' | 'hard_deleted' | 'role_saved';
 export interface ToastEntry { id: string; type: ToastType; title: string; message: string; icon: string; timestamp: string; priority: 'high' | 'normal'; }
 
+// WorkRequest runtime state (v100 — runtime-kernel folded state)
+export type WrStatus = 'DRAFT' | 'VALIDATED' | 'QUEUED' | 'CLAIMED' | 'ACKED' | 'SETTLED' | 'REJECTED' | 'FAILED' | 'NOOP' | 'DEFERRED';
+
+export interface WorkRequestState {
+  wrId: string;
+  status: WrStatus;
+  version: number;
+  workerId?: string;
+  reason?: string;
+  error?: string;
+  lastEvent: string;
+  lastTimestamp: string;
+  createdAt: string;
+}
+
+export interface WrEventLogEntry {
+  wrId: string;
+  event: string;
+  previousStatus: string;
+  currentStatus: string;
+  timestamp: string;
+}
+
 // SSE event types (v032)
 export type ConduitEventType =
   | 'connected'
@@ -202,7 +225,8 @@ export type ConduitEventType =
   | 'session_log'
   | 'session_killed'
   | 'agent_killed'
-  | 'conduit_paused';
+  | 'conduit_paused'
+  | 'wr_state_changed';
 
 export interface ConduitEvent {
   type: ConduitEventType;
