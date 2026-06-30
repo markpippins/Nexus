@@ -4,6 +4,13 @@ export const routes: Routes = [
   {
     path: '',
     loadComponent: () =>
+      import('./components/wr-dashboard/wr-dashboard.component').then(
+        (m) => m.WrDashboardComponent,
+      ),
+  },
+  {
+    path: 'overview',
+    loadComponent: () =>
       import('./components/overview-dashboard/overview-dashboard.component').then(
         (m) => m.OverviewDashboardComponent,
       ),

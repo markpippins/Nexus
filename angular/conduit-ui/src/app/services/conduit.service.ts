@@ -13,6 +13,8 @@ import {
   ChangeReportEntry,
   SessionLogEvent,
   CronConfig,
+  WorkRequestState,
+  WrStatus,
 } from './types';
 import { API_BASE_URL } from './api-config';
 
@@ -43,6 +45,23 @@ export class ConduitService {
 
   /** Cron schedule config (v092 — exposed by GET /config/cron) */
   readonly cronConfig = signal<CronConfig | null>(null);
+
+  // WorkRequest runtime pipeline state (v100)
+  readonly workRequests = signal<WorkRequestState[]>([]);
+  readonly wrEventLog = signal<Array<{
+    wrId: string;
+    event: string;
+    previousStatus: string;
+    currentStatus: string;
+    timestamp: string;
+  }>>([]);
+
+  /** Group work requests by status for dashboard display */
+  private _wrByStatus = new Map<string, WorkRequestState[]>();
+  readonly wrCountByStatus = (status: string): number =>
+    this.workRequests().filter(wr => wr.status === status).length;
+  readonly wrByStatus = (status: string): WorkRequestState[] =>
+    this.workRequests().filter(wr => wr.status === status);
 
   private eventSource: EventSource | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -81,12 +100,40 @@ export class ConduitService {
         this.conduitPaused.set(state.circuitBreaker.paused);
         this.connected.set(true);
         this.offline.set(false);
+        this.fetchWorkRequests();
         this.connectSSE();
       },
       error: () => {
         this.offline.set(true);
         this.startPollingFallback();
       },
+    });
+  }
+
+  /** Fetch all work requests with their current folded state */
+  private fetchWorkRequests() {
+    this.http.get<{ ok: boolean; count: number; states: WorkRequestState[] }>(
+      `${this.apiBase}/wr`
+    ).subscribe({
+      next: (res) => {
+        if (res.ok && res.states) {
+          this.workRequests.set(res.states);
+          // Prime the event log with existing terminal states
+          const log: Array<{ wrId: string; event: string; previousStatus: string; currentStatus: string; timestamp: string }> = [];
+          for (const wr of res.states) {
+            log.push({
+              wrId: wr.wrId,
+              event: wr.lastEvent,
+              previousStatus: '',
+              currentStatus: wr.status,
+              timestamp: wr.lastTimestamp || wr.createdAt,
+            });
+          }
+          log.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          this.wrEventLog.set(log.slice(0, 100));
+        }
+      },
+      error: () => { /* WR state unavailable — dashboard will show empty */ },
     });
   }
 
@@ -178,6 +225,10 @@ export class ConduitService {
     });
 
     this.eventSource.addEventListener('plan_deleted', (event: any) => {
+      this.zone.run(() => this.handleSSEEvent(JSON.parse(event.data)));
+    });
+
+    this.eventSource.addEventListener('wr_state_changed', (event: any) => {
       this.zone.run(() => this.handleSSEEvent(JSON.parse(event.data)));
     });
 
@@ -473,6 +524,43 @@ export class ConduitService {
         this.addActivity(
           'conduit_paused',
           paused ? 'Conduit PAUSED' : 'Conduit RESUMED',
+          timestamp,
+        );
+        break;
+      }
+
+      // WorkRequest runtime pipeline events (v100)
+      case 'wr_state_changed': {
+        const data = event.data as {
+          wrId: string;
+          event: string;
+          previousStatus: string;
+          currentStatus: string;
+          state: WorkRequestState;
+        };
+        // Update or insert the WR in the workRequests list
+        const existing = this.workRequests();
+        const idx = existing.findIndex((w) => w.wrId === data.wrId);
+        if (idx === -1) {
+          this.workRequests.set([...existing, data.state]);
+        } else {
+          const updated = [...existing];
+          updated[idx] = data.state;
+          this.workRequests.set(updated);
+        }
+        // Add to event log
+        const logEntry = {
+          wrId: data.wrId,
+          event: data.event,
+          previousStatus: data.previousStatus,
+          currentStatus: data.currentStatus,
+          timestamp: event.timestamp || new Date().toISOString(),
+        };
+        this.wrEventLog.update((log) => [logEntry, ...log].slice(0, 200));
+        // Also add to the activity log for the overview dashboard
+        this.addActivity(
+          'wr_state_changed',
+          `${data.wrId}: ${data.previousStatus} → ${data.currentStatus} (via ${data.event})`,
           timestamp,
         );
         break;

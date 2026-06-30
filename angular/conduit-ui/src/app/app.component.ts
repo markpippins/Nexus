@@ -1,4 +1,4 @@
-import { Component, signal, effect, OnInit, OnDestroy, Inject, ViewChild } from '@angular/core';
+import { Component, signal, effect, OnInit, OnDestroy, Inject } from '@angular/core';
 import { NgFor } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { DOCUMENT } from '@angular/common';
@@ -6,7 +6,7 @@ import { BuilderStatusComponent } from './components/builder-status/builder-stat
 import { AgentStatusBarComponent } from './components/agent-status-bar/agent-status-bar.component';
 import { ToastContainerComponent } from './components/toast-container/toast-container.component';
 import { KeyboardHelpComponent } from './components/keyboard-help/keyboard-help.component';
-import { AIConfigDialogComponent } from './components/ai-config-dialog/ai-config-dialog.component';
+
 import { PlansSidebarComponent } from './components/plans-sidebar/plans-sidebar.component';
 import { ConduitService } from './services/conduit.service';
 import { ThemeService } from './services/theme.service';
@@ -30,7 +30,6 @@ interface NavItem {
     AgentStatusBarComponent,
     ToastContainerComponent,
     KeyboardHelpComponent,
-    AIConfigDialogComponent,
     PlansSidebarComponent,
   ],
   template: `
@@ -40,9 +39,6 @@ interface NavItem {
 
       <!-- Toast notifications -->
       <app-toast-container></app-toast-container>
-
-      <!-- AI config dialog -->
-      <app-ai-config-dialog #aiConfigDialog></app-ai-config-dialog>
 
       <!-- Global error banner -->
       @if (globalError(); as err) {
@@ -70,12 +66,6 @@ interface NavItem {
         </div>
         <div class="nav-spacer"></div>
         <div class="top-nav-actions">
-<button class="nav-icon-btn" (click)="openConfig()" title="AI configuration (Ctrl+,)">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
           <button class="nav-icon-btn" (click)="toggleTheme()" [title]="'Switch theme (Ctrl+T)'">
             @if (theme.theme() === 'dark') {
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -153,7 +143,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   readonly navItems: (NavItem & { shortcut: string })[] = [
     {
-      route: '/', label: 'Overview', exact: true, shortcut: '1',
+      route: '/', label: 'Pipeline', exact: true, shortcut: '1',
       svgPath: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
     },
     {
@@ -201,8 +191,6 @@ export class AppComponent implements OnInit, OnDestroy {
     '8': '/graph',
     '9': '/sessions',
   };
-
-  @ViewChild('aiConfigDialog') aiConfigDialog!: AIConfigDialogComponent;
 
   constructor(
     private pipeline: ConduitService,
@@ -283,13 +271,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   toggleTheme() { this.theme.toggle(); }
 
-  openConfig(): void {
-    this.aiConfigDialog?.open();
-  }
-
   private labelForRoute(route: string): string {
     const labels: Record<string, string> = {
-      '/': 'Go to Overview',
+      '/': 'Go to Pipeline',
       '/kanban': 'Go to Kanban',
       '/archive': 'Go to Archive',
       '/inspections': 'Go to Inspections',
