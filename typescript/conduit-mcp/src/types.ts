@@ -78,7 +78,9 @@ export type PipelineEventType =
   | "builder_update"
   | "circuit_breaker_update"
   | "agent_update"
-  | "state_full";
+  | "state_full"
+  // WorkRequest runtime pipeline events
+  | "wr_state_changed"; // WR lifecycle transition (submitted/ticked/transitioned)
 
 export interface PipelineEvent {
   type: PipelineEventType;

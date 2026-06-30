@@ -12,6 +12,7 @@ import {
   getSession,
   endSession,
   updateSessionCost,
+  updateSessionHeartbeat,
   tripBreaker,
   clearBreaker,
   setConduitPaused,
@@ -38,7 +39,25 @@ import {
   listWorkRequests,
   listReceiptsByPlan,
   insertReceipt,
+  appendEvent,
+  getEvents,
+  getAllEvents,
+  selectNextRunnable,
+  listWorkRequestStates,
 } from "./db";
+import {
+  validateCompilerOutput,
+  compilerOutputToEvent,
+  foldEvents,
+  decide,
+  validateTransition,
+  createDraftState,
+  getDecisionPriority,
+  dbEventsToRuntimeEvents,
+  CompilerOutput,
+  WorkRequestState,
+  RuntimeEvent,
+} from "./runtime-kernel";
 import http from "http";
 import { loadEnv } from "./env"; // shared .env loader (no dotenv dependency)
 
@@ -327,6 +346,35 @@ app.post("/sessions/:sessionId/cost", async (req, res) => {
   try {
     await updateSessionCost(sessionId, cost_usd);
     res.json({ updated: true, sessionId, cost_usd });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Agent heartbeat — called periodically by executor_cloud.py during harness execution
+// Updates last_activity and last_heartbeat_at on the sessions row for staleness detection.
+// Also updates the in-memory agent-watcher state for /state visibility.
+app.post("/sessions/:sessionId/heartbeat", async (req, res) => {
+  const { sessionId } = req.params;
+
+  if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+    res.status(400).json({ error: "Invalid session ID" });
+    return;
+  }
+
+  try {
+    await updateSessionHeartbeat(sessionId);
+    // Update in-memory agent state if role is provided in body
+    const role = req.body?.role;
+    if (role && watcher) {
+      watcher.updateAgentHeartbeat(
+        role as any,
+        req.body?.state || "working",
+        req.body?.detail || null,
+        req.body?.pid || null,
+      );
+    }
+    res.json({ updated: true, sessionId, timestamp: new Date().toISOString() });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -1322,6 +1370,216 @@ app.post("/vision/receipts", async (req, res) => {
       created_at,
     });
     res.json({ ok: true, id, plan_id });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  RUNTIME KERNEL — WorkRequest lifecycle state machine
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * POST /wr/submit — Submit compiler output as a new WorkRequest.
+ * Validates the contract boundary (no execution fields in compiler output),
+ * creates the WR, appends WR_SUBMITTED event, and returns the initial state.
+ */
+app.post("/wr/submit", async (req, res) => {
+  try {
+    const output = req.body;
+    // Enforce the compiler/runtime contract boundary
+    validateCompilerOutput(output);
+    // Convert to event and persist
+    const event = compilerOutputToEvent(output);
+    // Upsert the work request (idempotent on wrId)
+    await createWorkRequest({
+      id: event.wrId,
+      dco_json: JSON.stringify(output),
+      context: { intent: output.intent, constraints: output.constraints, opTrace: output.opTrace },
+      status: "draft",
+    });
+    // Append the WR_SUBMITTED event
+    await appendEvent(event.wrId, event.type, event.payload as Record<string, unknown>);
+    // Fold events to get current state
+    const events = dbEventsToRuntimeEvents(await getEvents(event.wrId));
+    const state = foldEvents(event.wrId, events);
+    // Broadcast SSE event
+    const now = new Date().toISOString();
+    watcher.emitToolEvent({
+      type: "wr_state_changed",
+      data: {
+        wrId: event.wrId,
+        event: event.type,
+        previousStatus: "DRAFT",
+        currentStatus: state.status,
+        state,
+      },
+      timestamp: now,
+    });
+    res.status(201).json({ ok: true, state });
+  } catch (err: any) {
+    const status = err.message.startsWith("COMPILER_LEAK") ? 422 : 500;
+    res.status(status).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /wr — List all WorkRequests with optional status filter.
+ */
+app.get("/wr", async (req, res) => {
+  try {
+    const { status, limit } = req.query;
+    const rows = await listWorkRequestStates({
+      status: status as string | undefined,
+      limit: limit ? parseInt(limit as string, 10) : undefined,
+    });
+    // Fold events for each row to get the authoritative state
+    const states: WorkRequestState[] = [];
+    for (const row of rows) {
+      const events = dbEventsToRuntimeEvents(await getEvents(row.wr_id));
+      states.push(foldEvents(row.wr_id, events));
+    }
+    res.json({ ok: true, count: states.length, states });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /wr/:id — Get the current folded state of a WorkRequest.
+ */
+app.get("/wr/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rawEvents = await getEvents(id);
+    if (rawEvents.length === 0) {
+      res.status(404).json({ ok: false, error: `WorkRequest ${id} not found` });
+      return;
+    }
+    const events = dbEventsToRuntimeEvents(rawEvents);
+    const state = foldEvents(id, events);
+    res.json({ ok: true, state });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /wr/:id/events — Get the raw event log for a WorkRequest.
+ */
+app.get("/wr/:id/events", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const events = await getEvents(id);
+    if (events.length === 0) {
+      res.status(404).json({ ok: false, error: `WorkRequest ${id} not found` });
+      return;
+    }
+    res.json({ ok: true, count: events.length, events });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /wr/:id/transition — Apply a transition event to a WorkRequest.
+ * Generic endpoint for manual/supervised transitions.
+ * Body: { type: "WR_CLAIMED" | "WR_ACKED" | "WR_SETTLED" | "WR_REJECTED" | "WR_FAILED" | "WR_NOOP" | "WR_DEFERRED", payload?: {} }
+ */
+app.post("/wr/:id/transition", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, payload } = req.body;
+    if (!type) {
+      res.status(400).json({ ok: false, error: "Missing required field: type" });
+      return;
+    }
+    // Get current state from event log
+    const rawEvents = await getEvents(id);
+    if (rawEvents.length === 0) {
+      res.status(404).json({ ok: false, error: `WorkRequest ${id} not found` });
+      return;
+    }
+    const events = dbEventsToRuntimeEvents(rawEvents);
+    const state = foldEvents(id, events);
+    // Validate the transition
+    validateTransition(state.status, type);
+    // Persist the event
+    await appendEvent(id, type, payload || {});
+    // Return new state
+    const rawNewEvents = await getEvents(id);
+    const newEvents = dbEventsToRuntimeEvents(rawNewEvents);
+    const newState = foldEvents(id, newEvents);
+    // Broadcast SSE event
+    const timestamp = new Date().toISOString();
+    watcher.emitToolEvent({
+      type: "wr_state_changed",
+      data: {
+        wrId: id,
+        event: type,
+        previousStatus: state.status,
+        currentStatus: newState.status,
+        state: newState,
+      },
+      timestamp,
+    });
+    res.json({ ok: true, state: newState });
+  } catch (err: any) {
+    const status = err.message.startsWith("INVALID_TRANSITION") ? 422 : 500;
+    res.status(status).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * POST /wr/tick — Run ONE tick of the decision loop.
+ * Scans for the next runnable WR, applies the decision, returns what happened.
+ * This is the "causal loop" entry point — call it on a timer or after any event.
+ */
+app.post("/wr/tick", async (_req, res) => {
+  try {
+    const wr = await selectNextRunnable();
+    if (!wr) {
+      res.json({ ok: true, ticked: false, reason: "no runnable work requests" });
+      return;
+    }
+    // Get current state
+    const rawEvents = await getEvents(wr.wr_id);
+    const events = dbEventsToRuntimeEvents(rawEvents);
+    const state = foldEvents(wr.wr_id, events);
+    // Decide next action
+    const decision = decide(state);
+    if (!decision) {
+      res.json({ ok: true, ticked: false, reason: `state ${state.status} has no automatic transition` });
+      return;
+    }
+    // Emit the decision as an event
+    await appendEvent(decision.wrId, decision.type, decision.payload as Record<string, unknown>);
+    // Return the result
+    const rawNewEvents = await getEvents(wr.wr_id);
+    const newEvents = dbEventsToRuntimeEvents(rawNewEvents);
+    const newState = foldEvents(wr.wr_id, newEvents);
+    // Broadcast SSE event
+    const now = new Date().toISOString();
+    watcher.emitToolEvent({
+      type: "wr_state_changed",
+      data: {
+        wrId: wr.wr_id,
+        event: decision.type,
+        previousStatus: state.status,
+        currentStatus: newState.status,
+        state: newState,
+      },
+      timestamp: now,
+    });
+    res.json({
+      ok: true,
+      ticked: true,
+      wrId: wr.wr_id,
+      event: decision.type,
+      previousStatus: state.status,
+      currentStatus: newState.status,
+      state: newState,
+    });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
   }

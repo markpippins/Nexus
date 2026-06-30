@@ -506,19 +506,26 @@ app.get("/config/ai/role/:role", async (req, res) => {
 
 app.post("/config/ai/role", async (req, res) => {
   try {
+    console.log('[tackle-mcp] POST /config/ai/role body:', JSON.stringify(req.body, null, 2));
     const { id, role, provider_id, harness_id, model_id, extra_params, bundles } = req.body || {};
+    console.log('[tackle-mcp] Destructured bundles:', bundles);
     if (!id || !role || !provider_id || !harness_id || !model_id) {
       res.status(400).json({ error: "id, role, provider_id, harness_id, and model_id are required" });
       return;
     }
-    await upsertAIRoleConfig({ id, role, provider_id, harness_id, model_id, extra_params });
 
     if (Array.isArray(bundles) && bundles.length > 0) {
+      // Bundles include the primary model — use upsertConfigBundles which handles everything
+      console.log('[tackle-mcp] Saving bundles for role:', role, 'count:', bundles.length);
       await upsertConfigBundles(role, bundles);
+    } else {
+      // No bundles — just save the primary role config
+      await upsertAIRoleConfig({ id, role, provider_id, harness_id, model_id, extra_params });
     }
 
     res.json({ saved: true, id, role });
   } catch (e: any) {
+    console.error('[tackle-mcp] Error saving role:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
