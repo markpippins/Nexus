@@ -1407,6 +1407,120 @@ export function registerTools(server: McpServer) {
   );
 
   // ════════════════════════════════════════════════════════════════
+  //  OP MAPPING REGISTRY
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_create_op_registry_entry",
+    "Create a new Op Mapping Registry entry. Maps an Implementation Plan intent pattern " +
+    "to a WorkRequest opcode sequence. Entries are versioned and immutable after creation.",
+    {
+      id: z.string().describe("Unique entry ID (e.g. 'INIT_SERVICE_SCAFFOLD:v1')"),
+      intent_id: z.string().describe("Intent identifier (e.g. 'INIT_SERVICE_SCAFFOLD')"),
+      version: z.string().optional().describe("Semantic version (default: 'v1')"),
+      status: z.string().optional().describe("Status: active, deprecated, superseded (default: active)"),
+      label: z.string().optional().describe("Human-readable label"),
+      match_patterns: z.array(z.string()).optional().describe("Goal patterns to match against"),
+      opcode_template: z.array(z.any()).optional().describe("JSON array of opcode sequence templates"),
+      required_params: z.array(z.string()).optional().describe("Required parameter names"),
+      optional_params: z.array(z.string()).optional().describe("Optional parameter names"),
+      preconditions: z.array(z.string()).optional().describe("Precondition descriptions"),
+      postconditions: z.array(z.string()).optional().describe("Postcondition descriptions"),
+      idempotency_key: z.string().optional().describe("Default idempotency key template"),
+      notes: z.string().optional().describe("Human-readable notes"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createOpRegistryEntry(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_list_op_registry",
+    "List Op Mapping Registry entries with optional filters by intent_id, status, or text search.",
+    {
+      intent_id: z.string().optional().describe("Filter by intent identifier"),
+      status: z.string().optional().describe("Filter by status (active, deprecated, superseded)"),
+      search: z.string().optional().describe("Free-text search across label, intent_id, notes"),
+      limit: z.number().optional().describe("Max results (default 100)"),
+      offset: z.number().optional().describe("Offset for pagination"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listOpRegistry(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_op_registry_entry",
+    "Get a single Op Mapping Registry entry by ID.",
+    {
+      id: z.string().describe("Registry entry ID (e.g. 'INIT_SERVICE_SCAFFOLD:v1')"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getOpRegistryEntry(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_deprecate_op_registry_entry",
+    "Deprecate a registry entry. Soft-retires it so existing WorkRequests still work, " +
+    "but new compilations should use the replacement.",
+    {
+      id: z.string().describe("Registry entry ID to deprecate"),
+      successor_id: z.string().optional().describe("Replacement entry ID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deprecateOpRegistryEntry(args.id, args.successor_id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_supersede_op_registry_entry",
+    "Mark a registry entry as superseded (replaced by a fork). Requires successor_id.",
+    {
+      id: z.string().describe("Registry entry ID to supersede"),
+      successor_id: z.string().describe("Replacement entry ID (required)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.supersedeOpRegistryEntry(args.id, args.successor_id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_fork_op_registry_entry",
+    "Create a new version of an existing intent mapping (fork). " +
+    "The source entry is superseded and the new version becomes active.",
+    {
+      source_id: z.string().describe("Source entry ID to fork from"),
+      new_version: z.string().describe("New version string (e.g. 'v2')"),
+      label: z.string().optional().describe("New label (defaults to source label with version suffix)"),
+      notes: z.string().optional().describe("Notes about what changed in this version"),
+      opcode_template: z.array(z.any()).optional().describe("Updated opcode template (defaults to source)"),
+      required_params: z.array(z.string()).optional().describe("Updated required params (defaults to source)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.forkOpRegistryEntry(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_op_registry_lineage",
+    "Show the version lineage of an intent mapping. Returns all versions in order.",
+    {
+      id: z.string().describe("Registry entry ID to get lineage for"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getOpRegistryLineage(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
   //  HEALTH
   // ════════════════════════════════════════════════════════════════
 

@@ -442,6 +442,50 @@ export const NebulaClient = {
   /** GET /api/conduit/deleted-plans */
   listDeletedConduitPlans: () => httpGet("/api/conduit/deleted-plans"),
 
+  // ── Op Mapping Registry ────────────────────────────────────
+  /** POST /api/op-registry — create a new registry entry */
+  createOpRegistryEntry: (body: {
+    id: string; intent_id: string; version?: string; status?: string; label?: string;
+    match_patterns?: string[]; opcode_template?: any[];
+    required_params?: string[]; optional_params?: string[];
+    preconditions?: string[]; postconditions?: string[];
+    idempotency_key?: string; successor_id?: string; notes?: string;
+  }) => httpRequest("POST", "/api/op-registry", body),
+  /** GET /api/op-registry?intent_id=&status=&search=&limit=&offset= */
+  listOpRegistry: (query?: {
+    intent_id?: string; status?: string; search?: string;
+    limit?: number; offset?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (query?.intent_id) params.set("intent_id", query.intent_id);
+    if (query?.status) params.set("status", query.status);
+    if (query?.search) params.set("search", query.search);
+    if (query?.limit) params.set("limit", String(query.limit));
+    if (query?.offset) params.set("offset", String(query.offset));
+    const qs = params.toString();
+    return httpGet(`/api/op-registry${qs ? `?${qs}` : ""}`);
+  },
+  /** GET /api/op-registry/:id — get a single registry entry */
+  getOpRegistryEntry: (id: string) =>
+    httpGet(`/api/op-registry/${encodeURIComponent(id)}`),
+  /** PATCH /api/op-registry/:id/deprecate — deprecate an entry */
+  deprecateOpRegistryEntry: (id: string, successor_id?: string) =>
+    httpRequest("PATCH", `/api/op-registry/${encodeURIComponent(id)}/deprecate`, { successor_id }),
+  /** PATCH /api/op-registry/:id/supersede — mark as superseded */
+  supersedeOpRegistryEntry: (id: string, successor_id: string) =>
+    httpRequest("PATCH", `/api/op-registry/${encodeURIComponent(id)}/supersede`, { successor_id }),
+  /** DELETE /api/op-registry/:id — soft-delete an entry */
+  deleteOpRegistryEntry: (id: string) =>
+    httpRequest("DELETE", `/api/op-registry/${encodeURIComponent(id)}`),
+  /** POST /api/op-registry/fork — create new version of an intent mapping */
+  forkOpRegistryEntry: (body: {
+    source_id: string; new_version: string; label?: string; notes?: string;
+    opcode_template?: any[]; required_params?: string[];
+  }) => httpRequest("POST", "/api/op-registry/fork", body),
+  /** GET /api/op-registry/:id/lineage — show version lineage */
+  getOpRegistryLineage: (id: string) =>
+    httpGet(`/api/op-registry/${encodeURIComponent(id)}/lineage`),
+
   // ── Import / Seed ──────────────────────────────────────────
   /** POST /api/import */
   importData: (body: {

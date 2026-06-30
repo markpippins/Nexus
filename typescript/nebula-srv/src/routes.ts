@@ -3301,6 +3301,253 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════
+  //  OP MAPPING REGISTRY — versioned intent→opcode mapping table
+  //  Schema: nebula.op_registry
+  // ═══════════════════════════════════════════════════════════════════
+
+  // POST /api/op-registry — create a new registry entry
+  router.post('/op-registry', async (req: Request, res: Response) => {
+    try {
+      const {
+        id, intent_id, version, status, label,
+        match_patterns, opcode_template, required_params, optional_params,
+        preconditions, postconditions, idempotency_key, successor_id, notes,
+      } = req.body;
+
+      if (!id || !intent_id) {
+        return res.status(400).json({ error: 'id and intent_id are required' });
+      }
+
+      const now = new Date().toISOString();
+      const { rows: [row] } = await pool.query(
+        `INSERT INTO nebula.op_registry
+          (id, intent_id, version, status, label,
+           match_patterns, opcode_template, required_params, optional_params,
+           preconditions, postconditions, idempotency_key, successor_id, notes,
+           created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+         RETURNING *`,
+        [
+          id, intent_id, version || 'v1', status || 'active', label || '',
+          match_patterns || [], JSON.stringify(opcode_template || []),
+          required_params || [], optional_params || [],
+          preconditions || [], postconditions || [],
+          idempotency_key || '', successor_id || null, notes || '',
+          now, now,
+        ]
+      );
+      res.status(201).json(row);
+    } catch (err: any) {
+      // Catch ISA validation trigger errors
+      if (err.message && err.message.includes('Invalid opcode')) {
+        return res.status(422).json({ error: err.message });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/op-registry — list registry entries with optional filters
+  router.get('/op-registry', async (req: Request, res: Response) => {
+    try {
+      const {
+        intent_id, status, search,
+        limit: qLimit, offset: qOffset,
+      } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 100, 500);
+      const offset = parseInt(qOffset as string) || 0;
+
+      const conditions: string[] = ['deleted_at IS NULL'];
+      const params: any[] = [];
+      let i = 1;
+
+      if (intent_id) { conditions.push(`intent_id = $${i++}`); params.push(intent_id); }
+      if (status) { conditions.push(`status = $${i++}`); params.push(status); }
+      if (search) {
+        conditions.push(`(label ILIKE $${i} OR intent_id ILIKE $${i} OR notes ILIKE $${i})`);
+        params.push(`%${search}%`);
+        i++;
+      }
+
+      const where = conditions.join(' AND ');
+      params.push(limit, offset);
+
+      const { rows } = await pool.query(
+        `SELECT * FROM nebula.op_registry
+         WHERE ${where}
+         ORDER BY intent_id, version DESC
+         LIMIT $${i++} OFFSET $${i}`,
+        params
+      );
+      res.json({ entries: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/op-registry/:id — get a single registry entry
+  router.get('/op-registry/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        'SELECT * FROM nebula.op_registry WHERE id = $1 AND deleted_at IS NULL',
+        [id]
+      );
+      if (!row) return res.status(404).json({ error: `Registry entry ${id} not found` });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/op-registry/:id/deprecate — deprecate a registry entry
+  router.patch('/op-registry/:id/deprecate', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { successor_id } = req.body;
+      const now = new Date().toISOString();
+      const { rows: [row] } = await pool.query(
+        `UPDATE nebula.op_registry
+         SET status = 'deprecated', successor_id = COALESCE($2, successor_id),
+             updated_at = $3
+         WHERE id = $1 AND deleted_at IS NULL
+         RETURNING *`,
+        [id, successor_id || null, now]
+      );
+      if (!row) return res.status(404).json({ error: `Registry entry ${id} not found or already deleted` });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/op-registry/:id/supersede — mark as superseded (replaced by fork)
+  router.patch('/op-registry/:id/supersede', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { successor_id } = req.body;
+      if (!successor_id) return res.status(400).json({ error: 'successor_id is required to supersede an entry' });
+      const now = new Date().toISOString();
+      const { rows: [row] } = await pool.query(
+        `UPDATE nebula.op_registry
+         SET status = 'superseded', successor_id = $2, updated_at = $3
+         WHERE id = $1 AND deleted_at IS NULL
+         RETURNING *`,
+        [id, successor_id, now]
+      );
+      if (!row) return res.status(404).json({ error: `Registry entry ${id} not found or already deleted` });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/op-registry/:id — soft-delete a registry entry
+  router.delete('/op-registry/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const now = new Date().toISOString();
+      const { rows: [row] } = await pool.query(
+        'UPDATE nebula.op_registry SET deleted_at = $2, updated_at = $2 WHERE id = $1 AND deleted_at IS NULL RETURNING *',
+        [id, now]
+      );
+      if (!row) return res.status(404).json({ error: `Registry entry ${id} not found` });
+      res.json({ deleted: true, id });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/op-registry/fork — create a new version of an existing intent mapping
+  router.post('/op-registry/fork', async (req: Request, res: Response) => {
+    try {
+      const { source_id, new_version, label, notes, opcode_template, required_params } = req.body;
+      if (!source_id || !new_version) {
+        return res.status(400).json({ error: 'source_id and new_version are required' });
+      }
+
+      // Get the source entry
+      const { rows: [source] } = await pool.query(
+        'SELECT * FROM nebula.op_registry WHERE id = $1 AND deleted_at IS NULL',
+        [source_id]
+      );
+      if (!source) return res.status(404).json({ error: `Source registry entry ${source_id} not found` });
+
+      // Create the fork with a new ID
+      const forkId = `${source.intent_id}:${new_version}`;
+      const now = new Date().toISOString();
+
+      const { rows: [fork] } = await pool.query(
+        `INSERT INTO nebula.op_registry
+          (id, intent_id, version, status, label,
+           match_patterns, opcode_template, required_params, optional_params,
+           preconditions, postconditions, idempotency_key, notes,
+           created_at, updated_at)
+         VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         RETURNING *`,
+        [
+          forkId,
+          source.intent_id,
+          new_version,
+          label || `${source.label} (${new_version})`,
+          source.match_patterns,
+          JSON.stringify(opcode_template || source.opcode_template),
+          required_params || source.required_params,
+          source.optional_params,
+          source.preconditions,
+          source.postconditions,
+          source.idempotency_key,
+          notes || '',
+          now, now,
+        ]
+      );
+
+      // Supersede the source
+      await pool.query(
+        `UPDATE nebula.op_registry SET status = 'superseded', successor_id = $2, updated_at = $3
+         WHERE id = $1`,
+        [source_id, forkId, now]
+      );
+
+      res.status(201).json({
+        fork,
+        superseded: source_id,
+        message: `Forked ${source_id} → ${forkId}`,
+      });
+    } catch (err: any) {
+      if (err.message && err.message.includes('Invalid opcode')) {
+        return res.status(422).json({ error: err.message });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/op-registry/:id/lineage — show the version lineage of an intent
+  router.get('/op-registry/:id/lineage', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      // Get the entry and follow successor chain
+      const { rows: [entry] } = await pool.query(
+        'SELECT * FROM nebula.op_registry WHERE id = $1 AND deleted_at IS NULL',
+        [id]
+      );
+      if (!entry) return res.status(404).json({ error: `Registry entry ${id} not found` });
+
+      // Get all versions of this intent
+      const { rows: lineage } = await pool.query(
+        `SELECT id, intent_id, version, status, successor_id, label, created_at
+         FROM nebula.op_registry
+         WHERE intent_id = $1 AND deleted_at IS NULL
+         ORDER BY version DESC`,
+        [entry.intent_id]
+      );
+
+      res.json({ intent_id: entry.intent_id, entries: lineage, count: lineage.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/knowledge/summary — entity counts by section, edge counts by relation type
   router.get('/knowledge/summary', async (_req: Request, res: Response) => {
     try {
