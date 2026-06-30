@@ -209,10 +209,12 @@ export const NebulaClient = {
     httpRequest("POST", `/api/systems/demote/${sourceSystemId}`, { targetSystemId }),
 
   // ── Harvests ───────────────────────────────────────────────
-  /** GET /api/harvests?model=&limit=&offset= */
-  listHarvests: (query?: { model?: string; level?: number; visibilityScope?: string; limit?: number; offset?: number }) => {
+  /** GET /api/harvests?model=&version=&sourceHash=&level=&limit=&offset= */
+  listHarvests: (query?: { model?: string; version?: number; sourceHash?: string; level?: number; visibilityScope?: string; limit?: number; offset?: number }) => {
     const params = new URLSearchParams();
     if (query?.model) params.set("model", query.model);
+    if (query?.version !== undefined) params.set("version", String(query.version));
+    if (query?.sourceHash) params.set("sourceHash", query.sourceHash);
     if (query?.level !== undefined) params.set("level", String(query.level));
     if (query?.visibilityScope) params.set("visibilityScope", query.visibilityScope);
     if (query?.limit) params.set("limit", String(query.limit));
@@ -228,6 +230,7 @@ export const NebulaClient = {
     totalCandidates?: number; candidates?: any[]; sourceText?: string;
     tags?: string[]; metadata?: any;
     level?: number; visibilityScope?: string;
+    sourceHash?: string; runMetadata?: any;
   }) => httpRequest("POST", "/api/harvests", body),
   /** DELETE /api/harvests/:id */
   deleteHarvest: (id: string) => httpRequest("DELETE", `/api/harvests/${encodeURIComponent(id)}`),
@@ -345,6 +348,43 @@ export const NebulaClient = {
   }) => httpRequest("POST", "/api/cross-references", body),
   /** DELETE /api/cross-references/:id */
   deleteCrossReference: (id: string) => httpRequest("DELETE", `/api/cross-references/${encodeURIComponent(id)}`),
+
+  // ── Evidence Links ──────────────────────────────────────────
+  /** GET /api/evidence-links?knowledgeEntityId=&linkType=&provenance=&minConfidence=&maxConfidence=&limit=&offset= */
+  listEvidenceLinks: (query?: {
+    knowledgeEntityId?: string; nebulaHarvestId?: string; nebulaCandidateId?: string;
+    linkType?: string; provenance?: string;
+    minConfidence?: number; maxConfidence?: number;
+    limit?: number; offset?: number;
+  }) => {
+    const params = new URLSearchParams();
+    if (query?.knowledgeEntityId) params.set("knowledgeEntityId", query.knowledgeEntityId);
+    if (query?.nebulaHarvestId) params.set("nebulaHarvestId", query.nebulaHarvestId);
+    if (query?.nebulaCandidateId) params.set("nebulaCandidateId", query.nebulaCandidateId);
+    if (query?.linkType) params.set("linkType", query.linkType);
+    if (query?.provenance) params.set("provenance", query.provenance);
+    if (query?.minConfidence != null) params.set("minConfidence", String(query.minConfidence));
+    if (query?.maxConfidence != null) params.set("maxConfidence", String(query.maxConfidence));
+    if (query?.limit) params.set("limit", String(query.limit));
+    if (query?.offset) params.set("offset", String(query.offset));
+    const qs = params.toString();
+    return httpGet(`/api/evidence-links${qs ? `?${qs}` : ""}`);
+  },
+  /** GET /api/evidence-links/:id */
+  getEvidenceLink: (id: string) => httpGet(`/api/evidence-links/${encodeURIComponent(id)}`),
+  /** POST /api/evidence-links */
+  createEvidenceLink: (body: {
+    knowledgeEntityId: string;
+    nebulaHarvestId?: string; nebulaCandidateId?: string;
+    linkType: string;
+    confidence?: number; provenance?: string; rationale?: string;
+    sourceSpan?: any; metadata?: any;
+  }) => httpRequest("POST", "/api/evidence-links", body),
+  /** DELETE /api/evidence-links/:id */
+  deleteEvidenceLink: (id: string) => httpRequest("DELETE", `/api/evidence-links/${encodeURIComponent(id)}`),
+  /** DELETE /api/evidence-links?knowledgeEntityId= — bulk delete all links for an entity */
+  deleteEvidenceLinksByEntity: (knowledgeEntityId: string) =>
+    httpRequest("DELETE", `/api/evidence-links?knowledgeEntityId=${encodeURIComponent(knowledgeEntityId)}`),
 
   // ── Plan → Candidate reverse lookup ────────────────────────
   /** GET /api/plans/:planRef/candidates */

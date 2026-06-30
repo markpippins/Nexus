@@ -58,7 +58,7 @@ MAX_RECEIPTS_PER_BATCH = 500
 # ── PG query helpers ──────────────────────────────────────────────────
 
 RECEIPT_SCHEMA = "vision"
-PLAN_SCHEMA = "conduit"
+PLAN_SCHEMA = "nebula"
 
 # Columns we read from vision.receipts — must stay stable
 _RECEIPT_COLS = """

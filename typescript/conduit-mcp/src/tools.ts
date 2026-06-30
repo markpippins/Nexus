@@ -18,6 +18,7 @@ import {
   deleteReceiptsByPlanAndType,
   undeletePlan,
   hardDeletePlan,
+  updateSessionHeartbeat,
 } from "./db";
 import fs from "fs";
 import path from "path";
@@ -108,6 +109,10 @@ export const toolDefinitions: MCPToolDefinition[] = [
           description: 'Optional detail (e.g., "Executing plan 0029")',
         },
         pid: { type: "number", description: "Optional OS process ID" },
+        sessionId: {
+          type: "string",
+          description: "Optional session ID — if provided, heartbeat is persisted to the database for staleness detection",
+        },
       },
       required: ["role", "state"],
     },
@@ -216,7 +221,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
         type: {
           type: "string",
           description:
-            "PLAN_CREATE|IMPLEMENTATION|REVIEW_PASS|REVIEW_REJECT|BLOCK|PROPOSED|PLANNING|API_LIMIT|CANCELLED|ABANDONED",
+            "PLAN_CREATE|IMPLEMENTATION|REVIEW_PASS|REVIEW_REJECT|BLOCK|PLANNING|HOLD|API_LIMIT|CANCELLED|ABANDONED",
         },
         agent_role: {
           type: "string",
@@ -293,29 +298,6 @@ export const toolDefinitions: MCPToolDefinition[] = [
     },
   },
   {
-    name: "promote_plan",
-    description:
-      "Promote a proposed plan to planning state. Accepts optional title/goal edits that are saved before promoting. Issues a PLANNING receipt so the Planner can elucidate and prepare it for implementation.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        planNumber: {
-          type: "string",
-          description: 'Plan number to promote (e.g. "0067")',
-        },
-        title: {
-          type: "string",
-          description: "Optional updated title to save before promoting",
-        },
-        goal: {
-          type: "string",
-          description: "Optional updated goal to save before promoting",
-        },
-      },
-      required: ["planNumber"],
-    },
-  },
-  {
     name: "delete_plan",
     description:
       "Soft-delete a plan: marks it deleted in the database so it disappears from all views. Receipts and audit trail are preserved.",
@@ -347,31 +329,6 @@ export const toolDefinitions: MCPToolDefinition[] = [
         },
       },
       required: ["planNumber", "confirmPlanTitle"],
-    },
-  },
-  {
-    name: "create_proposed_plan",
-    description:
-      "Create a new proposed plan with a PROPOSED receipt. Simplified form — only title, project, and goal are accepted. Files affected and acceptance criteria are deferred to planning.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          description: 'Plan title (e.g., "Add dark mode toggle")',
-        },
-        project: {
-          type: "string",
-          description: 'Project name (e.g., "conduit-ui")',
-        },
-        goal: { type: "string", description: "Goal description" },
-        promptRef: {
-          type: "string",
-          description:
-            'Optional prompt number this idea was spawned from (e.g., "0001")',
-        },
-      },
-      required: ["title"],
     },
   },
   {
@@ -520,6 +477,7 @@ export function registerToolHandlers(
       state: string;
       detail?: string;
       pid?: number;
+      sessionId?: string;
     }) => {
       const errs = validate(args, [
         { field: "role", type: "string", required: true },
@@ -527,6 +485,9 @@ export function registerToolHandlers(
       ]);
       if (errs.length > 0)
         throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
+      if (args.sessionId) {
+        await updateSessionHeartbeat(args.sessionId);
+      }
       watcher.updateAgentHeartbeat(
         args.role as AgentRole,
         args.state as AgentStatus,
@@ -921,92 +882,6 @@ export function registerToolHandlers(
         timestamp: now,
       };
     },
-    create_proposed_plan: async (args: {
-      title: string;
-      project?: string;
-      goal?: string;
-      promptRef?: string;
-    }) => {
-      const errs = validate(args, [
-        { field: "title", type: "string", required: true },
-        { field: "project", type: "string" },
-        { field: "goal", type: "string" },
-      ]);
-      if (errs.length > 0)
-        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
-
-      // Create the plan in the database
-      const result = await watcher.createPlan({
-        title: args.title,
-        project: args.project || "conduit-ui",
-        goal: args.goal || "",
-        filesAffected: [],
-        acceptanceCriteria: [],
-        dependencies: [],
-        promptRef: args.promptRef,
-      });
-
-      // Upsert plan into DB immediately so the FK constraint on receipts is satisfied
-      const now = new Date().toISOString();
-      await upsertPlan({
-        id: result.planNumber,
-        file_name: result.fileName,
-        title: args.title,
-        project: args.project || "conduit-ui",
-        goal: args.goal || "",
-        content: "",
-        files_affected: "[]",
-        acceptance_criteria: "[]",
-        dependencies: "[]",
-        prompt_ref: args.promptRef || "",
-        notes: "",
-        priority: 0,
-        created_at: now,
-        updated_at: now,
-      });
-
-      // Issue PROPOSED receipt (no ticket_id — the planner will bootstrap tickets)
-      const receiptId = crypto.randomUUID();
-      await insertReceipt({
-        id: receiptId,
-        plan_id: result.planNumber,
-        type: "PROPOSED",
-        agent_role: "planner",
-        session_id: "",
-        ticket_id: null,
-        artifact_path: null,
-        summary: `Proposed: ${args.title}`,
-        metadata_json: JSON.stringify({
-          proposed_from_ui: true,
-          ...(args.promptRef ? { promptRef: args.promptRef } : {}),
-        }),
-        tokens_used: 0,
-        created_at: now,
-      });
-      checkpointWal(); // durable across abrupt restarts
-
-      if (emitter) {
-        emitter({
-          type: "plan_state_changed",
-          data: {
-            planNumber: result.planNumber,
-            planTitle: result.fileName,
-            receiptType: "PROPOSED",
-            agentRole: "planner",
-            newDerivedStatus: "PROPOSED",
-            timestamp: now,
-          },
-        });
-      }
-
-      return {
-        created: true,
-        planNumber: result.planNumber,
-        fileName: result.fileName,
-        status: "proposed",
-        timestamp: now,
-      };
-    },
     save_prompt: async (args: {
       title: string;
       content: string;
@@ -1300,88 +1175,6 @@ export function registerToolHandlers(
         ticketsDeleted: result.ticketsDeleted,
         receiptsDeleted: result.receiptsDeleted,
         cleanedPaths,
-        timestamp: now,
-      };
-    },
-
-    promote_plan: async (args: {
-      planNumber: string;
-      title?: string;
-      goal?: string;
-    }) => {
-      const errs = validate(args, [
-        { field: "planNumber", type: "string", required: true },
-        { field: "title", type: "string" },
-        { field: "goal", type: "string" },
-      ]);
-      if (errs.length > 0)
-        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
-
-      const plan = await getPlan(args.planNumber);
-      if (!plan) {
-        throw createError(
-          "PLAN_NOT_FOUND",
-          `Plan ${args.planNumber} not found`,
-          null,
-        );
-      }
-
-      const newTitle = args.title?.trim() || plan.title;
-      const newGoal = args.goal?.trim() || plan.goal;
-
-      // Issue PLANNING receipt to promote from PROPOSED → PLANNING
-      const now = new Date().toISOString();
-      await upsertPlan({
-        id: args.planNumber,
-        file_name: plan.file_name,
-        title: newTitle,
-        project: plan.project,
-        goal: newGoal,
-        content: "",
-        files_affected: plan.files_affected,
-        acceptance_criteria: plan.acceptance_criteria,
-        dependencies: plan.dependencies,
-        prompt_ref: plan.prompt_ref || "",
-        notes: plan.notes,
-        priority: plan.priority,
-        created_at: plan.created_at,
-        updated_at: now,
-      });
-
-      const receiptId = crypto.randomUUID();
-      await insertReceipt({
-        id: receiptId,
-        plan_id: args.planNumber,
-        type: "PLANNING",
-        agent_role: "planner",
-        session_id: "",
-        ticket_id: null,
-        artifact_path: null,
-        summary: "Promoted from proposed to planning",
-        metadata_json: JSON.stringify({ promoted: true }),
-        tokens_used: 0,
-        created_at: now,
-      });
-      checkpointWal();
-
-      if (emitter) {
-        emitter({
-          type: "plan_state_changed",
-          data: {
-            planNumber: args.planNumber,
-            planTitle: newTitle,
-            receiptType: "PLANNING",
-            agentRole: "planner",
-            newDerivedStatus: "PLANNING",
-            timestamp: now,
-          },
-        });
-      }
-
-      return {
-        promoted: true,
-        planNumber: args.planNumber,
-        newStatus: "planning",
         timestamp: now,
       };
     },

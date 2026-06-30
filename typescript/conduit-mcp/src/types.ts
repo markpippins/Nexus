@@ -5,8 +5,8 @@ export type PlanStatus =
   | "active"
   | "completed"
   | "blocked"
-  | "proposed"
-  | "planning";
+  | "planning"
+  | "hold";
 
 export interface PlanCard {
   fileName: string;
@@ -55,8 +55,8 @@ export interface PipelineState {
     completed: PlanCard[];
     blocked: PlanCard[];
     archived: PlanCard[];
-    proposed: PlanCard[];
     planning: PlanCard[];
+    hold: PlanCard[];
   };
   builder: BuilderStatus;
   circuitBreaker: CircuitBreaker;
@@ -143,8 +143,8 @@ export type ReceiptType =
   | "REVIEW_PASS"
   | "REVIEW_REJECT"
   | "BLOCK"
-  | "PROPOSED"
   | "PLANNING"
+  | "HOLD"
   | "REVIEW"
   | "CRITIQUE"
   | "CRITIQUE_PASS"

@@ -90,10 +90,10 @@ async function backfillCrossReferences(): Promise<void> {
     }
   }
 
-  // ── 3. conduit.plans dependencies → depends_on ────────────────
-  console.log('[3/4] Scanning conduit.plans.dependencies...');
+  // ── 3. nebula.plans dependencies → depends_on ────────────────
+  console.log('[3/4] Scanning nebula.plans.dependencies...');
   const { rows: depRows } = await pool.query(
-    `SELECT id, dependencies FROM conduit.plans WHERE dependencies != '[]' AND dependencies != ''`
+    `SELECT id, dependencies FROM nebula.plans WHERE dependencies != '[]' AND dependencies != ''`
   );
   for (const row of depRows) {
     let deps: string[];

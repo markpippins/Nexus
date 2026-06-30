@@ -28,7 +28,7 @@
  * (includes REQUEUED, CANCELLED, ABANDONED, API_LIMIT from the transition map)
  */
 export type ConduitReceiptType =
-  | "PROPOSED"        // Idea captured, not yet promoted
+  | "HOLD"            // Execution paused (not blocked — intentional pause)
   | "PLANNING"        // Planner is elucidating scope
   | "PLAN_CREATE"     // Plan fully defined, ready for execution
   | "CRITIQUE"        // Critic reviewing the plan
@@ -155,7 +155,7 @@ export function wrpStateCategory(state: WRPState): WRPStateCategory {
  */
 export function receiptToWrpState(type: ConduitReceiptType): WRPState {
   switch (type) {
-    case "PROPOSED":        return "CREATED";
+    case "HOLD":            return "QUEUED";  // Hold maps to QUEUED in WRP — paused, not failed
     case "PLANNING":        return "INTAKE";
     case "PLAN_CREATE":     return "PLANNING";
     case "CRITIQUE":        return "CRITIQUE";
@@ -439,6 +439,7 @@ export function reduceToProjection(
   filesAffected: string[],
   acceptanceCriteria: string[],
   dependencies: string[],
+  promptRef: string | undefined,
   receipts: ConduitReceipt[],
 ): WRPProjection {
   // Step 1: Sort deterministically

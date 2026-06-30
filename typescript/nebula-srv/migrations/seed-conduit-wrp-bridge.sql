@@ -47,7 +47,7 @@ WITH plan_receipts AS (
         COUNT(r.id)::integer AS total_receipts,
         SUM(CASE WHEN r.type IN ('BLOCK','PLAN_BLOCK','API_LIMIT') THEN 1 ELSE 0 END)::integer
             AS exception_count
-    FROM conduit.plans p
+    FROM nebula.plans p
     LEFT JOIN vision.receipts r ON r.plan_id = p.id
     WHERE p.deleted = 0
     GROUP BY p.id, p.title, p.project, p.goal, p.files_affected,

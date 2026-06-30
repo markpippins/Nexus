@@ -161,12 +161,13 @@ class DBAdapter:
             # ── Manager-owned tables ─────────────────────────
             # work_requests and pipeline_cursor are owned by the Python
             # pipeline manager.  The MCP server creates receipts/tickets
-            # in the vision schema and plans/sessions/circuit_breaker
+            # in the vision schema and sessions/circuit_breaker
             # in the conduit schema — we do not create those here.
+            # Plans table lives in nebula schema (migrated from conduit).
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS work_requests (
                     id TEXT PRIMARY KEY,
-                    plan_id TEXT REFERENCES plans(id),
+                    plan_id TEXT REFERENCES nebula.plans(id),
                     status TEXT NOT NULL,
                     dco_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
@@ -655,7 +656,7 @@ class DBAdapter:
                 receipt_id, plan_id, receipt_type, agent_role, session_id,
                 ticket_id, summary, artifact_path, meta_json, tokens_used, now,
             ))
-            conn.execute("UPDATE plans SET updated_at = %s WHERE id = %s", (now, plan_id))
+            conn.execute("UPDATE nebula.plans SET updated_at = %s WHERE id = %s", (now, plan_id))
             conn.commit()
         _log.debug("insert_receipt: created %s", receipt_id)
 
@@ -731,7 +732,7 @@ class DBAdapter:
     def get_plan_by_id(self, plan_id: str) -> Optional[Dict[str, Any]]:
         _log.debug("get_plan_by_id: plan=%s", plan_id)
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT * FROM plans WHERE id = %s", (plan_id,))
+            cursor = conn.execute("SELECT * FROM nebula.plans WHERE id = %s", (plan_id,))
             plan = cursor.dict_fetchone()
             _log.debug("get_plan_by_id: plan=%s found=%s", plan_id, plan is not None)
             return plan

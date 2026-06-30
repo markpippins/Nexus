@@ -290,6 +290,8 @@ async function createSchema(
       closed_at           TEXT,
       token_budget        INTEGER,
       tokens_used         INTEGER,
+      cost_budget_usd     REAL,
+      cost_used_usd       REAL DEFAULT 0,
       objective           TEXT,
       completion_criteria TEXT,
       owner               TEXT NOT NULL DEFAULT '',
@@ -311,7 +313,7 @@ async function createSchema(
       plan_id       TEXT NOT NULL,
       type          TEXT NOT NULL CHECK(type IN (
                       'PLAN_CREATE','IMPLEMENTATION','REVIEW_PASS','REVIEW_REJECT','BLOCK',
-                      'PROPOSED','PLANNING',
+                      'PLANNING','HOLD',
                       'REVIEW','CRITIQUE','CRITIQUE_PASS','CRITIQUE_REJECT','PLAN_BLOCK','API_LIMIT',
                       'REQUEUED',
                       'CANCELLED','ABANDONED'
@@ -383,6 +385,47 @@ async function createSchema(
     ON CONFLICT (id) DO NOTHING;
 
     ALTER TABLE circuit_breaker ADD COLUMN IF NOT EXISTS wake_requested_at TEXT;
+
+    -- ════════════════════════════════════════════════════════════════
+    -- Token cost tracking tables (plan 1018)
+    -- ════════════════════════════════════════════════════════════════
+
+    CREATE TABLE IF NOT EXISTS model_pricing (
+      model_name             TEXT PRIMARY KEY,
+      provider               TEXT NOT NULL,
+      input_price_per_token  DOUBLE PRECISION NOT NULL,
+      output_price_per_token DOUBLE PRECISION NOT NULL,
+      cache_hit_price        DOUBLE PRECISION,
+      updated_at             TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_budgets (
+      agent_role      TEXT PRIMARY KEY,
+      ceiling_usd     DOUBLE PRECISION,
+      ceiling_tokens  INTEGER,
+      current_usd     DOUBLE PRECISION NOT NULL DEFAULT 0,
+      current_tokens  INTEGER NOT NULL DEFAULT 0,
+      reset_period    TEXT NOT NULL DEFAULT 'monthly'
+                      CHECK(reset_period IN ('daily','weekly','monthly')),
+      reset_at        TEXT,
+      updated_at      TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS cost_logs (
+      id                BIGSERIAL PRIMARY KEY,
+      session_id        TEXT NOT NULL,
+      ticket_id         TEXT,
+      model             TEXT NOT NULL,
+      input_tokens      INTEGER NOT NULL DEFAULT 0,
+      output_tokens     INTEGER NOT NULL DEFAULT 0,
+      estimated_cost_usd REAL,
+      actual_cost_usd   REAL,
+      recorded_at       TEXT NOT NULL,
+      tags              TEXT NOT NULL DEFAULT '[]'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cost_logs_session ON cost_logs(session_id);
+    CREATE INDEX IF NOT EXISTS idx_cost_logs_ticket  ON cost_logs(ticket_id);
 
     -- role_circuit_breaker lives in peb schema (governance engine)
     CREATE TABLE IF NOT EXISTS ${PEB_SCHEMA}.role_circuit_breaker (
@@ -521,14 +564,22 @@ async function createSchema(
     SELECT 
       p.*,
       CASE
-        -- REQUEUED: circuit breaker reset — checked FIRST so it can override even
+        -- HOLD: highest priority — if the latest receipt is HOLD, show it regardless
+        WHEN EXISTS (
+          SELECT 1 FROM ${VISION_SCHEMA}.receipts r WHERE r.plan_id = p.id AND r.type = 'HOLD'
+          AND NOT EXISTS (
+            SELECT 1 FROM ${VISION_SCHEMA}.receipts r2
+            WHERE r2.plan_id = p.id
+            AND r2.type IN ('CANCELLED', 'ABANDONED')
+            AND r2.created_at > r.created_at
+          )
+        ) THEN 'HOLD'
+        -- REQUEUED: circuit breaker reset — checked early so it can override even
         -- REVIEW_PASS (e.g. plan was completed, then manually requeued for retry).
-        -- Uses "latest meaningful receipt" guard so stale REQUEUED receipts from
-        -- a previous breaker trip don't override later IMPLEMENTATION/REVIEW_PASS.
         WHEN (
           SELECT r.type FROM ${VISION_SCHEMA}.receipts r
           WHERE r.plan_id = p.id
-          AND r.type NOT IN ('PROPOSED', 'PLANNING')
+          AND r.type NOT IN ('PLANNING', 'HOLD')
           ORDER BY r.created_at DESC LIMIT 1
         ) = 'REQUEUED' THEN 'PLAN_CREATE'
         -- REVIEW_PASS — terminal success, unless overridden by later BLOCK/PLAN_BLOCK
@@ -554,7 +605,7 @@ async function createSchema(
         ELSE COALESCE(
           (SELECT r.type FROM ${VISION_SCHEMA}.receipts r 
            WHERE r.plan_id = p.id 
-           AND r.type NOT IN ('PROPOSED', 'PLANNING')
+           AND r.type NOT IN ('PLANNING', 'HOLD')
            ORDER BY r.created_at DESC LIMIT 1),
           (SELECT r.type FROM ${VISION_SCHEMA}.receipts r 
            WHERE r.plan_id = p.id 
@@ -562,7 +613,7 @@ async function createSchema(
           NULL
         )
       END AS derived_status
-    FROM ${PG_SCHEMA}.plans p
+    FROM nebula.plans p
     WHERE p.deleted = 0;
 
     CREATE VIEW ${PG_SCHEMA}.plans_by_status AS
@@ -996,6 +1047,13 @@ const migrations: Migration[] = [
       console.log("  - Added BEFORE INSERT trigger for auto-assignment");
     },
   },
+  {
+    version: 16,
+    description: "Add last_heartbeat_at TEXT column to sessions for agent-liveness tracking",
+    up: async (exec) => {
+      await exec(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_heartbeat_at TEXT`);
+    },
+  },
 ];
 
 /**
@@ -1059,7 +1117,7 @@ export type UpsertPlanInput = Omit<PlanRow, "derived_status" | "deleted"> & {
 
 export async function upsertPlan(plan: UpsertPlanInput): Promise<void> {
   await qRun(
-    `INSERT INTO plans (id, file_name, title, project, goal, content,
+    `INSERT INTO nebula.plans (id, file_name, title, project, goal, content,
       files_affected, acceptance_criteria, dependencies, prompt_ref,
       notes, priority, deleted, created_at, updated_at)
     VALUES (@id, @file_name, @title, @project, @goal, @content,
@@ -1101,12 +1159,12 @@ export async function getAllPlans(): Promise<PlanRow[]> {
 }
 
 export async function getPlanById(id: string): Promise<PlanRow | undefined> {
-  return qOne("SELECT * FROM plans WHERE id = @id", { id });
+  return qOne("SELECT * FROM nebula.plans WHERE id = @id", { id });
 }
 
 export async function softDeletePlan(planId: string): Promise<boolean> {
   const changes = await qRun(
-    "UPDATE plans SET deleted = 1, updated_at = @now WHERE id = @planId AND deleted = 0",
+    "UPDATE nebula.plans SET deleted = 1, updated_at = @now WHERE id = @planId AND deleted = 0",
     { planId, now: new Date().toISOString() }
   );
   return changes > 0;
@@ -1114,7 +1172,7 @@ export async function softDeletePlan(planId: string): Promise<boolean> {
 
 export async function undeletePlan(planId: string): Promise<boolean> {
   const changes = await qRun(
-    "UPDATE plans SET deleted = 0, updated_at = @now WHERE id = @planId AND deleted = 1",
+    "UPDATE nebula.plans SET deleted = 0, updated_at = @now WHERE id = @planId AND deleted = 1",
     { planId, now: new Date().toISOString() }
   );
   return changes > 0;
@@ -1133,7 +1191,7 @@ export async function hardDeletePlan(planId: string): Promise<{
       client, `DELETE FROM ${VISION_SCHEMA}.tickets WHERE plan_id = @planId`, { planId }
     );
     const changes = await tRun(
-      client, "DELETE FROM plans WHERE id = @planId", { planId }
+      client, "DELETE FROM nebula.plans WHERE id = @planId", { planId }
     );
     return {
       deleted: changes > 0,
@@ -1240,8 +1298,8 @@ export interface PlansByStatus {
   completed: PlanRow[];
   blocked: PlanRow[];
   archived: PlanRow[];
-  proposed: PlanRow[];
   planning: PlanRow[];
+  hold: PlanRow[];
 }
 
 export async function getPlansGroupedByStatus(): Promise<PlansByStatus> {
@@ -1249,7 +1307,7 @@ export async function getPlansGroupedByStatus(): Promise<PlansByStatus> {
 
   const result: PlansByStatus = {
     pending: [], active: [], completed: [], blocked: [],
-    archived: [], proposed: [], planning: [],
+    archived: [], planning: [], hold: [],
   };
 
   for (const plan of all) {
@@ -1259,7 +1317,7 @@ export async function getPlansGroupedByStatus(): Promise<PlansByStatus> {
       case "REVIEW_PASS": result.completed.push(plan); break;
       case "BLOCK": result.blocked.push(plan); break;
       case "REVIEW_REJECT": result.active.push(plan); break;
-      case "PROPOSED": result.proposed.push(plan); break;
+      case "HOLD": result.hold.push(plan); break;
       case "PLANNING": result.planning.push(plan); break;
       case "REVIEW": result.active.push(plan); break;
       case "CRITIQUE": result.active.push(plan); break;
@@ -1311,9 +1369,11 @@ export interface SessionRow {
   pid: number | null;
   is_running: number;
   last_activity: string | null;
+  last_heartbeat_at: string | null;
   model: string | null;
   fallback_used: number;
   cost_usd: number | null;
+  total_work_seconds: number;
   workflow_id: string | null;
   run_id: string | null;
   workflow_start_time: string | null;
@@ -1428,6 +1488,24 @@ export async function updateSessionCost(id: string, costUsd: number): Promise<vo
   await qRun(
     "UPDATE sessions SET cost_usd = @cost WHERE id = @id",
     { id, cost: costUsd }
+  );
+}
+
+export async function updateSessionHeartbeat(id: string): Promise<void> {
+  const now = new Date().toISOString();
+  await qRun(
+    "UPDATE sessions SET last_activity = @now, last_heartbeat_at = @now WHERE id = @id",
+    { id, now }
+  );
+}
+
+export async function getStaleSessions(staleThresholdSeconds: number): Promise<SessionRow[]> {
+  return qAll(
+    `SELECT * FROM sessions
+     WHERE is_running = 1
+     AND last_heartbeat_at IS NOT NULL
+     AND (EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM last_heartbeat_at::timestamptz)) > @threshold`,
+    { threshold: staleThresholdSeconds }
   );
 }
 

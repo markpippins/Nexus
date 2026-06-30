@@ -644,9 +644,11 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_list_harvests",
-    "List harvest pipeline outputs, optionally filtered by model.",
+    "List harvest pipeline outputs, optionally filtered by model, version, or source hash.",
     {
       model: z.string().optional().describe("Filter by model name (e.g. 'DeepSeek V4')"),
+      version: z.number().optional().describe("Filter by harvest version number"),
+      sourceHash: z.string().optional().describe("Filter by source content hash (MD5)"),
       level: z.number().optional().describe("Filter by abstraction level (1-4)"),
       visibilityScope: z.string().optional().describe("Filter by visibility scope (builder, architect, planner, reviewer, all)"),
       limit: z.number().optional().describe("Max results (default 100, max 500)"),
@@ -655,6 +657,8 @@ export function registerTools(server: McpServer) {
     async (args) => {
       const result = await NebulaClient.listHarvests({
         model: args.model,
+        version: args.version,
+        sourceHash: args.sourceHash,
         level: args.level,
         visibilityScope: args.visibilityScope,
         limit: args.limit,
@@ -678,7 +682,7 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_create_harvest",
-    "Record a new harvest pipeline output in the database.",
+    "Record a new harvest pipeline output in the database. Version auto-increments per source_path+model.",
     {
       sourcePath: z.string().describe("Path to the source chat transcript"),
       sourceFilename: z.string().optional().describe("Display filename for the source"),
@@ -690,6 +694,8 @@ export function registerTools(server: McpServer) {
       metadata: z.any().optional().describe("Optional metadata object"),
       level: z.number().optional().describe("Abstraction level 1-4 (default 1)"),
       visibilityScope: z.string().optional().describe("Visibility scope: builder, architect, planner, reviewer, all (default 'all')"),
+      sourceHash: z.string().optional().describe("Override source content hash (MD5); auto-computed if omitted"),
+      runMetadata: z.any().optional().describe("Optional JSON metadata about this specific harvest run"),
     },
     async (args) => {
       const result = await NebulaClient.createHarvest({
@@ -703,6 +709,8 @@ export function registerTools(server: McpServer) {
         metadata: args.metadata,
         level: args.level,
         visibilityScope: args.visibilityScope,
+        sourceHash: args.sourceHash,
+        runMetadata: args.runMetadata,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -1157,6 +1165,109 @@ export function registerTools(server: McpServer) {
     },
     async (args) => {
       const result = await NebulaClient.deleteCrossReference(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  EVIDENCE LINKS — typed harvest→knowledge bridge
+  // ════════════════════════════════════════════════════════════════
+
+  const EVIDENCE_LINK_TYPES_HINT = "Valid types: supports, refines, instantiates, contradicts, supersedes, mentions, informs, validates";
+  const EVIDENCE_PROVENANCE_HINT = "Valid provenance: auto_ingestor, manual, reconciler, llm_extracted, migration";
+
+  server.tool(
+    "nebula_list_evidence_links",
+    "List evidence links between knowledge entities and harvested evidence, with optional filters.",
+    {
+      knowledgeEntityId: z.string().optional().describe("Filter by knowledge graph entity UUID"),
+      nebulaHarvestId: z.string().optional().describe("Filter by harvest UUID"),
+      nebulaCandidateId: z.string().optional().describe("Filter by harvest candidate UUID"),
+      linkType: z.string().optional().describe(`Filter by link type. ${EVIDENCE_LINK_TYPES_HINT}`),
+      provenance: z.string().optional().describe(`Filter by provenance. ${EVIDENCE_PROVENANCE_HINT}`),
+      minConfidence: z.number().optional().describe("Minimum confidence filter (0–1)"),
+      maxConfidence: z.number().optional().describe("Maximum confidence filter (0–1)"),
+      limit: z.number().optional().describe("Max results, default 100"),
+      offset: z.number().optional().describe("Pagination offset"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listEvidenceLinks({
+        knowledgeEntityId: args.knowledgeEntityId,
+        nebulaHarvestId: args.nebulaHarvestId,
+        nebulaCandidateId: args.nebulaCandidateId,
+        linkType: args.linkType,
+        provenance: args.provenance,
+        minConfidence: args.minConfidence,
+        maxConfidence: args.maxConfidence,
+        limit: args.limit,
+        offset: args.offset,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_evidence_link",
+    "Get a single evidence link by ID.",
+    {
+      id: z.string().describe("Evidence link UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getEvidenceLink(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_create_evidence_link",
+    "Create an evidence link connecting a knowledge entity to harvested evidence. Validates link_type against the formal taxonomy.",
+    {
+      knowledgeEntityId: z.string().describe("Knowledge graph entity UUID"),
+      nebulaHarvestId: z.string().optional().describe("Harvest UUID (required if nebulaCandidateId not provided)"),
+      nebulaCandidateId: z.string().optional().describe("Harvest candidate UUID (required if nebulaHarvestId not provided)"),
+      linkType: z.string().describe(`Link type. ${EVIDENCE_LINK_TYPES_HINT}`),
+      confidence: z.number().optional().describe("Confidence score (0–1)"),
+      provenance: z.string().optional().describe(`How the link was established. ${EVIDENCE_PROVENANCE_HINT}`),
+      rationale: z.string().optional().describe("Free-text explanation of why this link exists"),
+      sourceSpan: z.any().optional().describe("Source span coordinates (JSON object with start_offset, end_offset, chunk_index)"),
+      metadata: z.any().optional().describe("Optional JSON metadata"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createEvidenceLink({
+        knowledgeEntityId: args.knowledgeEntityId,
+        nebulaHarvestId: args.nebulaHarvestId,
+        nebulaCandidateId: args.nebulaCandidateId,
+        linkType: args.linkType,
+        confidence: args.confidence,
+        provenance: args.provenance,
+        rationale: args.rationale,
+        sourceSpan: args.sourceSpan,
+        metadata: args.metadata,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_delete_evidence_link",
+    "Delete a single evidence link by ID.",
+    {
+      id: z.string().describe("Evidence link UUID to delete"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deleteEvidenceLink(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_delete_evidence_links_by_entity",
+    "Delete all evidence links for a given knowledge entity (bulk delete).",
+    {
+      knowledgeEntityId: z.string().describe("Knowledge entity UUID whose links should be deleted"),
+    },
+    async (args) => {
+      const result = await NebulaClient.deleteEvidenceLinksByEntity(args.knowledgeEntityId);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );

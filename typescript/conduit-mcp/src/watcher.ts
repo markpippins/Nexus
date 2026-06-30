@@ -26,6 +26,10 @@ import {
   qOne,
   qAll,
   qRun,
+  getStaleSessions,
+  getSession,
+  endSession,
+  releaseSessionTickets,
 } from "./db";
 import { breakerRowToStatus } from "./watchers/cb-watcher";
 
@@ -69,12 +73,12 @@ export class PipelineWatcher {
    *  so the plan disappears from /state immediately without waiting for a rescan. */
   removePlanFromMemory(planNumber: string): void {
     const dirs = [
-      "proposed",
       "planning",
       "pending",
       "active",
       "completed",
       "blocked",
+      "hold",
     ] as const;
     for (const dir of dirs) {
       const idx = this.planWatcher.plans[dir].findIndex(
@@ -107,8 +111,8 @@ export class PipelineWatcher {
       completed: [] as PlanCard[],
       blocked: [] as PlanCard[],
       archived: [] as PlanCard[],
-      proposed: [] as PlanCard[],
       planning: [] as PlanCard[],
+      hold: [] as PlanCard[],
     };
     const placed = new Set<string>();
 
@@ -124,21 +128,10 @@ export class PipelineWatcher {
       }
     }
 
-    // Proposed and planning: filesystem-driven (no receipt types for these).
-    // Plans already in the DB with PROPOSED/PLANNING status are included as
-    // a safety net for any that lack a filesystem counterpart.
-    // Guard: skip soft-deleted plans (deleted=1) — prevents stale in-memory
-    // watcher cache from showing plans after their .md file was removed.
-    for (const dir of ["proposed", "planning"] as const) {
-      for (const p of this.planWatcher.plans[dir]) {
-        if (!placed.has(p.planNumber)) {
-          const dbPlan = await getPlanById(p.planNumber);
-          if (dbPlan?.deleted) continue;
-          result[dir].push(p);
-          placed.add(p.planNumber);
-        }
-      }
-      // Safety net: DB-only plans for proposed/planning
+    // Planning and hold: populated from DB (receipt-driven like other states).
+    // The plan_status view now correctly derives PLANNING and HOLD, so
+    // these states are receipt-authoritative — no filesystem fallback needed.
+    for (const dir of ["planning", "hold"] as const) {
       for (const row of grouped[dir]) {
         const card = planRowToPlanCard(row);
         if (!placed.has(card.planNumber)) {
@@ -191,7 +184,7 @@ export class PipelineWatcher {
           card.ticketStatuses = ticketMap.get(card.planNumber);
         }
       }
-      for (const dir of ["proposed", "planning"] as const) {
+      for (const dir of ["planning", "hold"] as const) {
         for (const card of result[dir]) {
           card.ticketStatuses = ticketMap.get(card.planNumber);
         }
@@ -216,8 +209,8 @@ export class PipelineWatcher {
     result.pending.sort(sortAsc);
     result.active.sort(sortAsc);
     result.blocked.sort(sortAsc);
-    result.proposed.sort(sortAsc);
     result.planning.sort(sortAsc);
+    result.hold.sort(sortAsc);
     result.completed.sort(sortDesc);
     result.archived.sort(sortDesc);
 
@@ -277,6 +270,66 @@ export class PipelineWatcher {
     }, 10000);
   }
 
+  // Stale session sweeper — runs every 60s, kills sessions whose last_heartbeat_at
+  // exceeds STALE_SESSION_THRESHOLD_SECONDS (default 300s = 5 min).
+  private staleSweepInterval: ReturnType<typeof setInterval> | null = null;
+  private readonly STALE_SESSION_THRESHOLD_SECONDS = parseInt(
+    process.env.PIPELINE_STALE_SESSION_THRESHOLD || "300", 10
+  );
+
+  startStaleSessionSweep() {
+    this.staleSweepInterval = setInterval(async () => {
+      try {
+        const stale = await getStaleSessions(this.STALE_SESSION_THRESHOLD_SECONDS);
+        for (const session of stale) {
+          const now = new Date().toISOString();
+          const sessionId = session.id;
+          let killedPids: number[] = [];
+          const errors: string[] = [];
+
+          // Try to SIGKILL the process group, then the individual PID
+          if (session.pid) {
+            try {
+              process.kill(-session.pid, "SIGKILL");
+              killedPids.push(session.pid);
+            } catch (e: any) {
+              try {
+                process.kill(session.pid, "SIGKILL");
+                killedPids.push(session.pid);
+              } catch (e2: any) {
+                errors.push(`PID ${session.pid}: ${e2.message}`);
+              }
+            }
+          }
+
+          // Close the session in DB
+          await endSession(sessionId, 137, now);
+
+          // Release any tickets held by the session
+          try {
+            await releaseSessionTickets(sessionId);
+          } catch (_) { /* best-effort */ }
+
+          // Update in-memory agent state
+          const role = session.agent_role as AgentRole;
+          this.agentWatcher.updateHeartbeat(role, "gone", `stale-session-reaped (${sessionId})`, null);
+
+          console.log(
+            `[stale-sweep] reaped session ${sessionId} (role=${session.agent_role}, `
+            + `PID=${session.pid}, killed=${killedPids.join(",")}, errors=${errors.join(";")})`
+          );
+
+          this.emit({
+            type: "session_killed",
+            data: { sessionId, reason: "stale", killedPids, errors },
+          });
+        }
+      } catch (e: any) {
+        console.error(`[stale-sweep] error: ${e.message}`);
+      }
+    }, 60000);
+  }
+
   async computeAnalytics(): Promise<PipelineMetrics> {
     const receiptStats = await getReceiptCount();
     const implCount = receiptStats.find((r) => r.type === "IMPLEMENTATION")?.count ?? 0;
@@ -299,7 +352,7 @@ export class PipelineWatcher {
     dependencies: string[];
     promptRef?: string;
   }): Promise<{ planNumber: string; fileName: string; filePath: string }> {
-    const row = await qOne("SELECT MAX(CAST(id AS INTEGER)) as max_id FROM plans");
+    const row = await qOne("SELECT MAX(CAST(id AS INTEGER)) as max_id FROM nebula.plans");
     const maxId = row?.max_id ?? 0;
     const nextNum = String(maxId + 1).padStart(4, "0");
     const slug = meta.title
@@ -363,6 +416,7 @@ export class PipelineWatcher {
     await this.cbWatcher.initialize();
     await this.agentWatcher.initialize();
     this.startStateHeartbeat();
+    this.startStaleSessionSweep();
   }
 
   destroy() {
@@ -370,5 +424,6 @@ export class PipelineWatcher {
     this.builderWatcher.destroy();
     this.cbWatcher.destroy();
     this.agentWatcher.destroy();
+    if (this.staleSweepInterval) clearInterval(this.staleSweepInterval);
   }
 }
