@@ -5,6 +5,7 @@ const CONFIG_STORAGE_KEY = 'file-explorer-local-config';
 export interface LocalConfig {
   sessionName: string;
   defaultImageUrl: string;
+  terrainServerUrl: string;
   logBrokerMessages: boolean;
   healthCheckDelayMinutes: number;
 }
@@ -12,6 +13,7 @@ export interface LocalConfig {
 const DEFAULT_CONFIG: LocalConfig = {
   sessionName: 'Local Session',
   defaultImageUrl: 'http://localhost:8081', // A sensible default
+  terrainServerUrl: 'http://localhost:8084',
   logBrokerMessages: true,
   healthCheckDelayMinutes: 3,
 };
@@ -24,6 +26,7 @@ export class LocalConfigService {
   
   public readonly sessionName = computed(() => this.config().sessionName);
   public readonly defaultImageUrl = computed(() => this.config().defaultImageUrl);
+  public readonly terrainServerUrl = computed(() => this.config().terrainServerUrl);
   public readonly currentConfig = this.config.asReadonly();
 
   constructor() {

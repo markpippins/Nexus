@@ -1007,8 +1007,7 @@ class DBAdapter:
         _log.debug("get_ticket_budget: ticket=%s", ticket_id)
         with self._get_connection() as conn:
             row = conn.execute(
-                "SELECT COALESCE(token_budget, 0), COALESCE(tokens_used, 0), "
-                "COALESCE(cost_budget_usd, 0), COALESCE(cost_used_usd, 0) "
+                "SELECT COALESCE(token_budget, 0), COALESCE(tokens_used, 0) "
                 "FROM tickets WHERE id = %s",
                 (ticket_id,),
             ).fetchone()
@@ -1017,8 +1016,8 @@ class DBAdapter:
             return {
                 "token_budget": row[0],
                 "tokens_used": row[1],
-                "cost_budget_usd": row[2],
-                "cost_used_usd": row[3],
+                "cost_budget_usd": 0,
+                "cost_used_usd": 0,
             }
 
     def get_ticket_lineage(self, plan_id: str) -> List[Dict[str, Any]]:

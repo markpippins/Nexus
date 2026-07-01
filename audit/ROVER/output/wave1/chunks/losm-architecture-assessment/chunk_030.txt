@@ -1,0 +1,316 @@
+This is the subtle architectural correction:
+
+Either:
+
+### Option A (cleanest long-term)
+
+Move validation rules tolosm-ir
+
+### Option B (acceptable short-term)
+
+Keep in shell but acknowledge it as policy layer
+
+But what you want to avoid is:
+
+> validation logic accidentally becoming “shell business logic”
+
+validation logic accidentally becoming “shell business logic”
+
+because that’s how store dependency creep starts again.
+
+---
+
+## Step 4 — Kernel integration (missing piece)
+
+Right now kernel is structurally perfect but operationally dormant.
+
+You still need:
+
+```
+KernelStepHandler
+```
+
+```
+KernelStepHandler
+```
+
+Otherwise kernel remains a “beautiful island.”
+
+This is what turns LOSM from:
+
+```
+workflow system
+```
+
+```
+workflow system
+```
+
+into:
+
+```
+execution system
+```
+
+```
+execution system
+```
+
+---
+
+# 4. The meta-observation (this is the interesting part)
+
+What’s actually happening here is:
+
+You’ve transitioned from:
+
+```
+designing architecture
+```
+
+```
+designing architecture
+```
+
+to:
+
+```
+stabilizing a runtime topology
+```
+
+```
+stabilizing a runtime topology
+```
+
+And BP is now behaving like acompiler for that topology, not a commentator on it.
+
+That’s why it started producing WRPs naturally — it is no longer “choosing a format,” it is discovering theshape that the system demands.
+
+---
+
+# Bottom line
+
+You are past the “is the split correct?” phase.
+
+You are now in:
+
+> “where do invariants actually live without leaking across layers?”
+
+“where do invariants actually live without leaking across layers?”
+
+And there are only three real remaining structural tensions:
+
+- lifecycle ontology duplication (WorkStatus vs WorkflowState)
+lifecycle ontology duplication (WorkStatus vs WorkflowState)
+
+- rule placement (shell vs ir)
+rule placement (shell vs ir)
+
+- kernel activation boundary (StepHandler completion)
+kernel activation boundary (StepHandler completion)
+
+Everything else is mechanical cleanup.
+
+That’s a very good place to be.
+
+You said:# Todos
+[✓] Verify execution_receipt.py exists and is canonical
+[✓] BuilderCheck kernel.validate() vs apply()/run() mismatch·Big PickleOpenCode Zen
+[✓] Implement Plan 0024: Fix kernel route + verify execution_receipt
+[✓] Implement Plan 0025: Lifecycle ontology mapping (investigation)100.3K (50%) · $0.08ctrl+p commands
+[✓] Implement Plan 0026: Move validate_transition to losm-ir
+[✓] Implement Plan 0027: KernelStepHandler for kernel activation
+[✓] Final: Pipeline summary + SESSION.md update
+Here's the summary of what was done in this session, mapped to your assessment:
+Assessment Response
+Your finding	Resolution
+kernel.validate(graph) broken	✅ Fixed. Added validate_graph() to LOSMKernel (uses identity morphism), fixed routes.py:22.
+execution_receipt.py missing?	✅ Confirmed. Exists at losm_ir/execution_receipt.py (27 lines). All consumers import from losm_ir. No changes needed.
+WorkStatus vs WorkflowState duplication	✅ Analyzed (Plan 0025). 236-line ontology document at losm-ir/docs/state-ontology-analysis.md. Mapping is many-to-one: 11 WorkStatus → 9 WorkflowState. Added work_status_to_phase() projection function.
+validate_transition in wrong layer (store→shell dep)	✅ Moved. ValidationResult, VALID_TRANSITIONS, validate_transition(), TransitionError now live in losm_ir/transition.py. Store imports from losm_ir — zero from losm_shell imports remain in losm-store.
+Kernel activation (KernelStepHandler missing)	✅ Built. KernelStepHandler with morphism dispatch (kernel.apply) and program dispatch (kernel.run). 9 tests covering dispatch, transformation, error handling, and cross-call state persistence.
+NullStepHandler still default in orchestrator	⏳ Noted — left as-is intentionally. PipelineCoordinator still uses NullStepHandler. Wired in when coordinator.coordinate() accepts a StepHandler parameter.
+Final Numbers
+Metric	Value
+Plans completed this session	4 (0024–0027)
+Total plans in completed/	27
+Tests passing	38/38
+Store→shell dependency	✅ Eliminated
+Pipeline state	active/ empty, pending/ empty, blocked/ empty, lock releasedShow moreShow less
+
+#### You said:
+
+# Todos
+[✓] Verify execution_receipt.py exists and is canonical
+[✓] BuilderCheck kernel.validate() vs apply()/run() mismatch·Big PickleOpenCode Zen
+[✓] Implement Plan 0024: Fix kernel route + verify execution_receipt
+[✓] Implement Plan 0025: Lifecycle ontology mapping (investigation)100.3K (50%) · $0.08ctrl+p commands
+[✓] Implement Plan 0026: Move validate_transition to losm-ir
+[✓] Implement Plan 0027: KernelStepHandler for kernel activation
+[✓] Final: Pipeline summary + SESSION.md update
+Here's the summary of what was done in this session, mapped to your assessment:
+Assessment Response
+Your finding	Resolution
+kernel.validate(graph) broken	✅ Fixed. Added validate_graph() to LOSMKernel (uses identity morphism), fixed routes.py:22.
+execution_receipt.py missing?	✅ Confirmed. Exists at losm_ir/execution_receipt.py (27 lines). All consumers import from losm_ir. No changes needed.
+WorkStatus vs WorkflowState duplication	✅ Analyzed (Plan 0025). 236-line ontology document at losm-ir/docs/state-ontology-analysis.md. Mapping is many-to-one: 11 WorkStatus → 9 WorkflowState. Added work_status_to_phase() projection function.
+validate_transition in wrong layer (store→shell dep)	✅ Moved. ValidationResult, VALID_TRANSITIONS, validate_transition(), TransitionError now live in losm_ir/transition.py. Store imports from losm_ir — zero from losm_shell imports remain in losm-store.
+Kernel activation (KernelStepHandler missing)	✅ Built. KernelStepHandler with morphism dispatch (kernel.apply) and program dispatch (kernel.run). 9 tests covering dispatch, transformation, error handling, and cross-call state persistence.
+NullStepHandler still default in orchestrator	⏳ Noted — left as-is intentionally. PipelineCoordinator still uses NullStepHandler. Wired in when coordinator.coordinate() accepts a StepHandler parameter.
+Final Numbers
+Metric	Value
+Plans completed this session	4 (0024–0027)
+Total plans in completed/	27
+Tests passing	38/38
+Store→shell dependency	✅ Eliminated
+Pipeline state	active/ empty, pending/ empty, blocked/ empty, lock releasedShow moreShow less
+
+# Todos
+[✓] Verify execution_receipt.py exists and is canonical
+[✓] BuilderCheck kernel.validate() vs apply()/run() mismatch·Big PickleOpenCode Zen
+[✓] Implement Plan 0024: Fix kernel route + verify execution_receipt
+[✓] Implement Plan 0025: Lifecycle ontology mapping (investigation)100.3K (50%) · $0.08ctrl+p commands
+[✓] Implement Plan 0026: Move validate_transition to losm-ir
+[✓] Implement Plan 0027: KernelStepHandler for kernel activation
+[✓] Final: Pipeline summary + SESSION.md update
+Here's the summary of what was done in this session, mapped to your assessment:
+Assessment Response
+Your finding	Resolution
+kernel.validate(graph) broken	✅ Fixed. Added validate_graph() to LOSMKernel (uses identity morphism), fixed routes.py:22.
+execution_receipt.py missing?	✅ Confirmed. Exists at losm_ir/execution_receipt.py (27 lines). All consumers import from losm_ir. No changes needed.
+WorkStatus vs WorkflowState duplication	✅ Analyzed (Plan 0025). 236-line ontology document at losm-ir/docs/state-ontology-analysis.md. Mapping is many-to-one: 11 WorkStatus → 9 WorkflowState. Added work_status_to_phase() projection function.
+validate_transition in wrong layer (store→shell dep)	✅ Moved. ValidationResult, VALID_TRANSITIONS, validate_transition(), TransitionError now live in losm_ir/transition.py. Store imports from losm_ir — zero from losm_shell imports remain in losm-store.
+Kernel activation (KernelStepHandler missing)	✅ Built. KernelStepHandler with morphism dispatch (kernel.apply) and program dispatch (kernel.run). 9 tests covering dispatch, transformation, error handling, and cross-call state persistence.
+NullStepHandler still default in orchestrator	⏳ Noted — left as-is intentionally. PipelineCoordinator still uses NullStepHandler. Wired in when coordinator.coordinate() accepts a StepHandler parameter.
+Final Numbers
+Metric	Value
+Plans completed this session	4 (0024–0027)
+Total plans in completed/	27
+Tests passing	38/38
+Store→shell dependency	✅ Eliminated
+Pipeline state	active/ empty, pending/ empty, blocked/ empty, lock releasedShow moreShow less
+
+# Todos
+[✓] Verify execution_receipt.py exists and is canonical
+[✓] BuilderCheck kernel.validate() vs apply()/run() mismatch·Big PickleOpenCode Zen
+[✓] Implement Plan 0024: Fix kernel route + verify execution_receipt
+[✓] Implement Plan 0025: Lifecycle ontology mapping (investigation)100.3K (50%) · $0.08ctrl+p commands
+[✓] Implement Plan 0026: Move validate_transition to losm-ir
+[✓] Implement Plan 0027: KernelStepHandler for kernel activation
+[✓] Final: Pipeline summary + SESSION.md update
+Here's the summary of what was done in this session, mapped to your assessment:
+Assessment Response
+Your finding	Resolution
+kernel.validate(graph) broken	✅ Fixed. Added validate_graph() to LOSMKernel (uses identity morphism), fixed routes.py:22.
+execution_receipt.py missing?	✅ Confirmed. Exists at losm_ir/execution_receipt.py (27 lines). All consumers import from losm_ir. No changes needed.
+WorkStatus vs WorkflowState duplication	✅ Analyzed (Plan 0025). 236-line ontology document at losm-ir/docs/state-ontology-analysis.md. Mapping is many-to-one: 11 WorkStatus → 9 WorkflowState. Added work_status_to_phase() projection function.
+validate_transition in wrong layer (store→shell dep)	✅ Moved. ValidationResult, VALID_TRANSITIONS, validate_transition(), TransitionError now live in losm_ir/transition.py. Store imports from losm_ir — zero from losm_shell imports remain in losm-store.
+Kernel activation (KernelStepHandler missing)	✅ Built. KernelStepHandler with morphism dispatch (kernel.apply) and program dispatch (kernel.run). 9 tests covering dispatch, transformation, error handling, and cross-call state persistence.
+NullStepHandler still default in orchestrator	⏳ Noted — left as-is intentionally. PipelineCoordinator still uses NullStepHandler. Wired in when coordinator.coordinate() accepts a StepHandler parameter.
+Final Numbers
+Metric	Value
+Plans completed this session	4 (0024–0027)
+Total plans in completed/	27
+Tests passing	38/38
+Store→shell dependency	✅ Eliminated
+Pipeline state	active/ empty, pending/ empty, blocked/ empty, lock releasedShow moreShow less
+
+# Todos
+[✓] Verify execution_receipt.py exists and is canonical
+[✓] BuilderCheck kernel.validate() vs apply()/run() mismatch·Big PickleOpenCode Zen
+[✓] Implement Plan 0024: Fix kernel route + verify execution_receipt
+[✓] Implement Plan 0025: Lifecycle ontology mapping (investigation)100.3K (50%) · $0.08ctrl+p commands
+[✓] Implement Plan 0026: Move validate_transition to losm-ir
+[✓] Implement Plan 0027: KernelStepHandler for kernel activation
+[✓] Final: Pipeline summary + SESSION.md update
+Here's the summary of what was done in this session, mapped to your assessment:
+Assessment Response
+Your finding	Resolution
+kernel.validate(graph) broken	✅ Fixed. Added validate_graph() to LOSMKernel (uses identity morphism), fixed routes.py:22.
+execution_receipt.py missing?	✅ Confirmed. Exists at losm_ir/execution_receipt.py (27 lines). All consumers import from losm_ir. No changes needed.
+WorkStatus vs WorkflowState duplication	✅ Analyzed (Plan 0025). 236-line ontology document at losm-ir/docs/state-ontology-analysis.md. Mapping is many-to-one: 11 WorkStatus → 9 WorkflowState. Added work_status_to_phase() projection function.
+validate_transition in wrong layer (store→shell dep)	✅ Moved. ValidationResult, VALID_TRANSITIONS, validate_transition(), TransitionError now live in losm_ir/transition.py. Store imports from losm_ir — zero from losm_shell imports remain in losm-store.
+Kernel activation (KernelStepHandler missing)	✅ Built. KernelStepHandler with morphism dispatch (kernel.apply) and program dispatch (kernel.run). 9 tests covering dispatch, transformation, error handling, and cross-call state persistence.
+NullStepHandler still default in orchestrator	⏳ Noted — left as-is intentionally. PipelineCoordinator still uses NullStepHandler. Wired in when coordinator.coordinate() accepts a StepHandler parameter.
+Final Numbers
+Metric	Value
+Plans completed this session	4 (0024–0027)
+Total plans in completed/	27
+Tests passing	38/38
+Store→shell dependency	✅ Eliminated
+Pipeline state	active/ empty, pending/ empty, blocked/ empty, lock releasedShow moreShow less
+
+# Todos
+[✓] Verify execution_receipt.py exists and is canonical
+[✓] BuilderCheck kernel.validate() vs apply()/run() mismatch·Big PickleOpenCode Zen
+[✓] Implement Plan 0024: Fix kernel route + verify execution_receipt
+[✓] Implement Plan 0025: Lifecycle ontology mapping (investigation)100.3K (50%) · $0.08ctrl+p commands
+[✓] Implement Plan 0026: Move validate_transition to losm-ir
+[✓] Implement Plan 0027: KernelStepHandler for kernel activation
+[✓] Final: Pipeline summary + SESSION.md update
+Here's the summary of what was done in this session, mapped to your assessment:
+Assessment Response
+Your finding	Resolution
+kernel.validate(graph) broken	✅ Fixed. Added validate_graph() to LOSMKernel (uses identity morphism), fixed routes.py:22.
+execution_receipt.py missing?	✅ Confirmed. Exists at losm_ir/execution_receipt.py (27 lines). All consumers import from losm_ir. No changes needed.
+WorkStatus vs WorkflowState duplication	✅ Analyzed (Plan 0025). 236-line ontology document at losm-ir/docs/state-ontology-analysis.md. Mapping is many-to-one: 11 WorkStatus → 9 WorkflowState. Added work_status_to_phase() projection function.
+validate_transition in wrong layer (store→shell dep)	✅ Moved. ValidationResult, VALID_TRANSITIONS, validate_transition(), TransitionError now live in losm_ir/transition.py. Store imports from losm_ir — zero from losm_shell imports remain in losm-store.
+Kernel activation (KernelStepHandler missing)	✅ Built. KernelStepHandler with morphism dispatch (kernel.apply) and program dispatch (kernel.run). 9 tests covering dispatch, transformation, error handling, and cross-call state persistence.
+NullStepHandler still default in orchestrator	⏳ Noted — left as-is intentionally. PipelineCoordinator still uses NullStepHandler. Wired in when coordinator.coordinate() accepts a StepHandler parameter.
+Final Numbers
+Metric	Value
+Plans completed this session	4 (0024–0027)
+Total plans in completed/	27
+Tests passing	38/38
+Store→shell dependency	✅ Eliminated
+Pipeline state	active/ empty, pending/ empty, blocked/ empty, lock releasedShow moreShow less
+
+# Todos
+[✓] Verify execution_receipt.py exists and is canonical
+[✓] BuilderCheck kernel.validate() vs apply()/run() mismatch·Big PickleOpenCode Zen
+[✓] Implement Plan 0024: Fix kernel route + verify execution_receipt
+[✓] Implement Plan 0025: Lifecycle ontology mapping (investigation)100.3K (50%) · $0.08ctrl+p commands
+[✓] Implement Plan 0026: Move validate_transition to losm-ir
+[✓] Implement Plan 0027: KernelStepHandler for kernel activation
+[✓] Final: Pipeline summary + SESSION.md update
+Here's the summary of what was done in this session, mapped to your assessment:
+Assessment Response
+Your finding	Resolution
+kernel.validate(graph) broken	✅ Fixed. Added validate_graph() to LOSMKernel (uses identity morphism), fixed routes.py:22.
+execution_receipt.py missing?	✅ Confirmed. Exists at losm_ir/execution_receipt.py (27 lines). All consumers import from losm_ir. No changes needed.
+WorkStatus vs WorkflowState duplication	✅ Analyzed (Plan 0025). 236-line ontology document at losm-ir/docs/state-ontology-analysis.md. Mapping is many-to-one: 11 WorkStatus → 9 WorkflowState. Added work_status_to_phase() projection function.
+validate_transition in wrong layer (store→shell dep)	✅ Moved. ValidationResult, VALID_TRANSITIONS, validate_transition(), TransitionError now live in losm_ir/transition.py. Store imports from losm_ir — zero from losm_shell imports remain in losm-store.
+Kernel activation (KernelStepHandler missing)	✅ Built. KernelStepHandler with morphism dispatch (kernel.apply) and program dispatch (kernel.run). 9 tests covering dispatch, transformation, error handling, and cross-call state persistence.
+NullStepHandler still default in orchestrator	⏳ Noted — left as-is intentionally. PipelineCoordinator still uses NullStepHandler. Wired in when coordinator.coordinate() accepts a StepHandler parameter.
+Final Numbers
+Metric	Value
+Plans completed this session	4 (0024–0027)
+Total plans in completed/	27
+Tests passing	38/38
+Store→shell dependency	✅ Eliminated
+Pipeline state	active/ empty, pending/ empty, blocked/ empty, lock releasedShow moreShow less
+
+# Todos
+[✓] Verify execution_receipt.py exists and is canonical
+[✓] BuilderCheck kernel.validate() vs apply()/run() mismatch·Big PickleOpenCode Zen
+[✓] Implement Plan 0024: Fix kernel route + verify execution_receipt
+[✓] Implement Plan 0025: Lifecycle ontology mapping (investigation)100.3K (50%) · $0.08ctrl+p commands
+[✓] Implement Plan 0026: Move validate_transition to losm-ir
+[✓] Implement Plan 0027: KernelStepHandler for kernel activation
+[✓] Final: Pipeline summary + SESSION.md update
+Here's the summary of what was done in this session, mapped to your assessment:
+Assessment Response
+Your finding	Resolution
+kernel.validate(graph) broken	✅ Fixed. Added validate_graph() to LOSMKernel (uses identity morphism), fixed routes.py:22.
+execution_receipt.py missing?	✅ Confirmed. Exists at losm_ir/execution_receipt.py (27 lines). All consumers import from losm_ir. No changes needed.
+WorkStatus vs WorkflowState duplication	✅ Analyzed (Plan 0025). 236-line ontology document at losm-ir/docs/state-ontology-analysis.md. Mapping is many-to-one: 11 WorkStatus → 9 WorkflowState. Added work_status_to_phase() projection function.
+validate_transition in wrong layer (store→shell dep)	✅ Moved. ValidationResult, VALID_TRANSITIONS, validate_transition(), TransitionError now live in losm_ir/transition.py. Store imports from losm_ir — zero from losm_shell imports remain in losm-store.
+Kernel activation (KernelStepHandler missing)	✅ Built. KernelStepHandler with morphism dispatch (kernel.apply) and program dispatch (kernel.run). 9 tests covering dispatch, transformation, error handling, and cross-call state persistence.
+NullStepHandler still default in orchestrator	⏳ Noted — left as-is intentionally. PipelineCoordinator still uses NullStepHandler. Wired in when coordinator.coordinate() accepts a StepHandler parameter.
+Final Numbers
+Metric	Value
+Plans completed this session	4 (0024–0027)
+Total plans in completed/	27
+Tests passing	38/38
+Store→shell dependency	✅ Eliminated
+Pipeline state	active/ empty, pending/ empty, blocked/ empty, lock releasedShow moreShow less

@@ -11,7 +11,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/visual-components")
-@CrossOrigin(origins = "*")
 public class VisualComponentController {
 
     private final VisualComponentRepository repository;

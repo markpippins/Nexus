@@ -1,0 +1,177 @@
+```
+{  "@context": {    "nexus": "https://nexus.local/ontology/topology#",    "TopologySnapshot": "nexus:TopologySnapshot",    "TopologyEntity": "nexus:TopologyEntity",    "TopologyEdge": "nexus:TopologyEdge",    "TopologyAssertion": "nexus:TopologyAssertion",    "TopologyEvidence": "nexus:TopologyEvidence",    "TopologyProjection": "nexus:TopologyProjection",    "TopologyPromotionDecision": "nexus:TopologyPromotionDecision",    "entityId": "@id",    "type": "@type",    "from": { "@id": "nexus:from", "@type": "@id" },    "to": { "@id": "nexus:to", "@type": "@id" },    "contains": { "@id": "nexus:contains", "@type": "@id" },    "dependsOn": { "@id": "nexus:dependsOn", "@type": "@id" },    "uses": { "@id": "nexus:uses", "@type": "@id" },    "optionalFor": { "@id": "nexus:optionalFor", "@type": "@id" },    "identityStatus": "nexus:identityStatus",    "entityKind": "nexus:entityKind",    "topologyRole": "nexus:topologyRole",    "confidence": "nexus:confidence",    "assertionKind": "nexus:assertionKind",    "evidenceKind": "nexus:evidenceKind",    "capturedAt": {      "@id": "nexus:capturedAt",      "@type": "http://www.w3.org/2001/XMLSchema#dateTime"    }  }}
+```
+
+---
+
+# 2. TypeSpec:nexus-topology.tsp
+
+This is youractual schema contract layer.
+
+```
+import "@typespec/json-schema";namespace Nexus.Topology {  // ----------------------------  // ENUMS  // ----------------------------  enum EntityKind {    system,    module,    service,    process,    runtime,    agent,    tool,    mcp,    schema,    ir,    memory_substrate,    capability_module,    harness_feature,    external_system,    ui_surface,    database,    projection,    snapshot,  }  enum IdentityStatus {    constitutive,    shared_substrate,    optional,    external_dependency,    experimental,    legacy,    unknown,  }  enum RelationshipType {    contains,    part_of,    depends_on,    uses,    invokes,    reads_from,    writes_to,    persists_to,    projects_to,    derived_from,    supersedes,    bridges_to,    optional_for,    required_for,    governed_by,    exposed_via,    mounted_into,  }  enum AssertionKind {    classification,    identity_boundary,    dependency_interpretation,    topology_claim,    responsibility_claim,    bridge_decision,    deprecation_claim,    uncertainty_claim,  }  enum EvidenceKind {    repo_scan,    import_graph,    runtime_observation,    config_observation,    document_passage,    transcript_quote,    change_log_event,    steward_annotation,    manual_note,  }  // ----------------------------  // CORE STRUCTURES  // ----------------------------  model TopologySnapshot {    snapshotId: string;    system: string;    capturedAt: utcDateTime;    scope: TopologyScope;    entityCount: int32;    edgeCount: int32;    assertionCount: int32;    confidenceScore: float32;    entities: TopologyEntity[];    edges: TopologyEdge[];    assertions: TopologyAssertion[];    evidence: TopologyEvidence[];    projections?: TopologyProjection[];    derivedFrom: string[];  }  model TopologyScope {    repos: string[];    branches?: string[];    workRequests?: string[];    harvestWindow?: HarvestWindow;  }  model HarvestWindow {    from: utcDateTime;    to: utcDateTime;  }  // ----------------------------  // ENTITY LAYER  // ----------------------------  model TopologyEntity {    id: string;    name: string;    entityKind: EntityKind;    identityStatus: IdentityStatus;    topologyRole?: string;    description?: string;    systemAffinity: string[];    implementedBy?: string[];    consumedVia?: string[];    ownedContracts?: string[];    runtimePlacement?: RuntimePlacement;    tags?: string[];  }  model RuntimePlacement {    placementKind: string;    host?: string;    external?: boolean;  }  // ----------------------------  // EDGE LAYER  // ----------------------------  model TopologyEdge {    id: string;    from: string;    to: string;    relationshipType: RelationshipType;    strength?: string;    cardinality?: string;    semanticMeaning?: string;    activationConditions?: string[];    evidenceRefs?: string[];  }  // ----------------------------  // ASSERTION LAYER  // ----------------------------  model TopologyAssertion {    id: string;    subject: string;    predicate: string;    object: string;    assertionKind: AssertionKind;    scope: string;    confidence: float32;    status: string; // provisional | accepted | rejected    rationale?: string;    supportedBy?: string[];    assertedBy: string;    assertedAt: utcDateTime;  }  // ----------------------------  // EVIDENCE LAYER  // ----------------------------  model TopologyEvidence {    id: string;    evidenceKind: EvidenceKind;    capturedAt: utcDateTime;    sourceRef: string;    summary: string;    supports: string[];    confidence: float32;  }  // ----------------------------  // PROJECTION LAYER  // ----------------------------  model TopologyProjection {    id: string;    name: string;    projectionKind: string;    focusEntities?: string[];    focusAssertions?: string[];    derivedFromSnapshot: string;  }  // ----------------------------  // PROMOTION / GOVERNANCE  // ----------------------------  model TopologyPromotionDecision {    id: string;    candidateAssertion: string;    decision: string; // accepted | rejected | deferred    decidedBy: string;    decidedAt: utcDateTime;    resultingAssertion?: string;    notes?: string;  }}
+```
+
+```
+import "@typespec/json-schema";namespace Nexus.Topology {  // ----------------------------  // ENUMS  // ----------------------------  enum EntityKind {    system,    module,    service,    process,    runtime,    agent,    tool,    mcp,    schema,    ir,    memory_substrate,    capability_module,    harness_feature,    external_system,    ui_surface,    database,    projection,    snapshot,  }  enum IdentityStatus {    constitutive,    shared_substrate,    optional,    external_dependency,    experimental,    legacy,    unknown,  }  enum RelationshipType {    contains,    part_of,    depends_on,    uses,    invokes,    reads_from,    writes_to,    persists_to,    projects_to,    derived_from,    supersedes,    bridges_to,    optional_for,    required_for,    governed_by,    exposed_via,    mounted_into,  }  enum AssertionKind {    classification,    identity_boundary,    dependency_interpretation,    topology_claim,    responsibility_claim,    bridge_decision,    deprecation_claim,    uncertainty_claim,  }  enum EvidenceKind {    repo_scan,    import_graph,    runtime_observation,    config_observation,    document_passage,    transcript_quote,    change_log_event,    steward_annotation,    manual_note,  }  // ----------------------------  // CORE STRUCTURES  // ----------------------------  model TopologySnapshot {    snapshotId: string;    system: string;    capturedAt: utcDateTime;    scope: TopologyScope;    entityCount: int32;    edgeCount: int32;    assertionCount: int32;    confidenceScore: float32;    entities: TopologyEntity[];    edges: TopologyEdge[];    assertions: TopologyAssertion[];    evidence: TopologyEvidence[];    projections?: TopologyProjection[];    derivedFrom: string[];  }  model TopologyScope {    repos: string[];    branches?: string[];    workRequests?: string[];    harvestWindow?: HarvestWindow;  }  model HarvestWindow {    from: utcDateTime;    to: utcDateTime;  }  // ----------------------------  // ENTITY LAYER  // ----------------------------  model TopologyEntity {    id: string;    name: string;    entityKind: EntityKind;    identityStatus: IdentityStatus;    topologyRole?: string;    description?: string;    systemAffinity: string[];    implementedBy?: string[];    consumedVia?: string[];    ownedContracts?: string[];    runtimePlacement?: RuntimePlacement;    tags?: string[];  }  model RuntimePlacement {    placementKind: string;    host?: string;    external?: boolean;  }  // ----------------------------  // EDGE LAYER  // ----------------------------  model TopologyEdge {    id: string;    from: string;    to: string;    relationshipType: RelationshipType;    strength?: string;    cardinality?: string;    semanticMeaning?: string;    activationConditions?: string[];    evidenceRefs?: string[];  }  // ----------------------------  // ASSERTION LAYER  // ----------------------------  model TopologyAssertion {    id: string;    subject: string;    predicate: string;    object: string;    assertionKind: AssertionKind;    scope: string;    confidence: float32;    status: string; // provisional | accepted | rejected    rationale?: string;    supportedBy?: string[];    assertedBy: string;    assertedAt: utcDateTime;  }  // ----------------------------  // EVIDENCE LAYER  // ----------------------------  model TopologyEvidence {    id: string;    evidenceKind: EvidenceKind;    capturedAt: utcDateTime;    sourceRef: string;    summary: string;    supports: string[];    confidence: float32;  }  // ----------------------------  // PROJECTION LAYER  // ----------------------------  model TopologyProjection {    id: string;    name: string;    projectionKind: string;    focusEntities?: string[];    focusAssertions?: string[];    derivedFromSnapshot: string;  }  // ----------------------------  // PROMOTION / GOVERNANCE  // ----------------------------  model TopologyPromotionDecision {    id: string;    candidateAssertion: string;    decision: string; // accepted | rejected | deferred    decidedBy: string;    decidedAt: utcDateTime;    resultingAssertion?: string;    notes?: string;  }}
+```
+
+---
+
+# 3. JSON-LD sample instance (LOSM example)
+
+This shows how the schema actuallybehavesas a graph.
+
+```
+{  "@context": "nexus-topology.context.jsonld",  "@type": "TopologyEntity",  "entityId": "entity:losm",  "name": "LOSM",  "entityKind": "capability_module",  "identityStatus": "optional",  "topologyRole": "semantic_execution_engine",  "systemAffinity": ["Nexus", "Assistance"],  "description": "Optional semantic execution engine used for graph-based reasoning and process orchestration.",  "implementedBy": [    "repo:losm-kernel",    "repo:losm-shell",    "repo:losm-host"  ],  "runtimePlacement": {    "placementKind": "external_process",    "external": true  }}
+```
+
+```
+{  "@context": "nexus-topology.context.jsonld",  "@type": "TopologyEntity",  "entityId": "entity:losm",  "name": "LOSM",  "entityKind": "capability_module",  "identityStatus": "optional",  "topologyRole": "semantic_execution_engine",  "systemAffinity": ["Nexus", "Assistance"],  "description": "Optional semantic execution engine used for graph-based reasoning and process orchestration.",  "implementedBy": [    "repo:losm-kernel",    "repo:losm-shell",    "repo:losm-host"  ],  "runtimePlacement": {    "placementKind": "external_process",    "external": true  }}
+```
+
+---
+
+# 4. What this buys you immediately
+
+This schema is not just representation — it gives youthree hard capabilities:
+
+---
+
+## 1. Self-inventory
+
+Nexus can answer:
+
+- what exists
+what exists
+
+- where it lives
+where it lives
+
+- what kind of thing it is
+what kind of thing it is
+
+---
+
+## 2. Self-interpretation
+
+Because of:
+
+- identityStatus
+identityStatus
+
+- TopologyAssertion
+TopologyAssertion
+
+- TopologyRole
+TopologyRole
+
+Nexus can say:
+
+- “LOSM is optional”
+“LOSM is optional”
+
+- “PEB is constitutive”
+“PEB is constitutive”
+
+- “OpenCode is external harness state”
+“OpenCode is external harness state”
+
+---
+
+## 3. Self-topology explanation
+
+Because of edges + assertions:
+
+- “what uses what”
+“what uses what”
+
+- “why it exists”
+“why it exists”
+
+- “what would break if removed”
+“what would break if removed”
+
+---
+
+# 5. The key design win (this is the important part)
+
+This schema cleanly separates:
+
+## Structure (truth)
+
+- entities
+entities
+
+- edges
+edges
+
+## Meaning (interpretation)
+
+- assertions
+assertions
+
+- identityStatus
+identityStatus
+
+- topologyRole
+topologyRole
+
+## Evidence (epistemology)
+
+- why we believe anything at all
+why we believe anything at all
+
+That separation is what makes:
+
+> “Nexus can tell us what it is and how it thinks about itself”
+
+“Nexus can tell us what it is and how it thinks about itself”
+
+actually work instead of becoming a static diagram.
+
+---
+
+If you want the next step, the natural continuation is:
+
+a query layer for this model(e.g. “show all optional capability modules and what they depend on” or “explain Nexus core identity boundary”), which is where it starts becoming a real introspection engine instead of just a schema.
+
+\ChatGPT can make mistakes. Check important info.
+
+\
+
+\
+
+\
+
+\
+
+\
+
+\
+
+\
+
+\
+
+\
+
+\
+
+\
+
+\
+
+\
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.

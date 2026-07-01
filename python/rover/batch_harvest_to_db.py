@@ -3,9 +3,10 @@
 Batch Harvest → DB
 
 Processes unprocessed HTML chat transcripts through the Rover harvest pipeline
-and writes the results directly into nebula.harvests via docker psql.
+and writes results into nebula.harvests via the nebula-srv REST API
+(POST /api/harvests).
 
-Pipeline: Dockling (deterministic) → Docling (source_text) → DB insert
+Pipeline: Dockling (deterministic) → API insert (with docklang)
 
 Usage:
     cd /home/codex/dev/nexus/python/rover
@@ -19,6 +20,8 @@ import logging
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 log = logging.getLogger("batch_harvest_db")
@@ -26,6 +29,9 @@ log = logging.getLogger("batch_harvest_db")
 PROJECT_ROOT = Path("/home/codex/dev")
 CHATS_DIR = PROJECT_ROOT / "chats"
 DOCKLING = PROJECT_ROOT / "nexus/audit/ROVER/bin/dockling.py"
+NEBULA_API = "http://localhost:3101"
+
+# Kept for fallback / read-only queries when API is unreachable
 DOCKER_PSQL = [
     "docker", "exec", "-i", "pgvector_db",
     "psql", "-U", "pguser", "-d", "nexus",
@@ -51,7 +57,19 @@ def psql(sql: str, timeout: int = 30) -> tuple[int, str]:
 
 
 def get_harvested_filenames() -> set[str]:
-    """Return set of source_filenames already in nebula.harvests."""
+    """Return set of source_filenames already in nebula.harvests (via API)."""
+    try:
+        req = urllib.request.Request(f"{NEBULA_API}/api/harvests")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        harvests = data.get("harvests", data) if isinstance(data, dict) else data
+        if isinstance(harvests, list):
+            return {h.get("source_filename", "") for h in harvests if h.get("source_filename")}
+        # Unexpected response structure — fall through to psql
+    except Exception as e:
+        log.warning("API unreachable for harvest list, falling back to psql: %s", e)
+
+    # Fallback: query via docker psql
     rc, out = psql("SELECT source_filename FROM nebula.harvests;")
     if rc != 0 or not out:
         return set()
@@ -84,40 +102,52 @@ def dockling_html_path(html_path: Path) -> dict | None:
 
 def insert_harvest(source_path: str, source_filename: str,
                    source_text: str | None, docklang: dict | None) -> bool:
-    """Insert a harvest record with docklang (no candidates)."""
-    tags = ["harvest", "rover", "dockling"]
-    metadata = json.dumps({"dockling_version": "v0.3"}, ensure_ascii=False)
-    docklang_json = json.dumps(docklang, ensure_ascii=False) if docklang else "NULL"
-    source_text_val = source_text or ""
+    """Insert a harvest record with docklang via POST /api/harvests."""
+    body = {
+        "sourcePath": source_path,
+        "sourceFilename": source_filename,
+        "model": "dockling",
+        "totalCandidates": 0,
+        "candidates": [],
+        "sourceText": source_text or "",
+        "tags": ["harvest", "rover", "dockling"],
+        "metadata": {"dockling_version": "v0.3"},
+        "docklang": docklang,
+    }
 
-    def sqe(val: str) -> str:
-        return "'" + str(val).replace("'", "''") + "'"
+    try:
+        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(
+            f"{NEBULA_API}/api/harvests",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
 
-    tag_literals = ", ".join(sqe(t) for t in tags)
+        if result.get("error"):
+            log.error("  → API error: %s", result["error"])
+            return False
 
-    sql = f"""
-    INSERT INTO nebula.harvests
-        (source_path, source_filename, model, total_candidates,
-         candidates, source_text, tags, metadata, docklang)
-    VALUES
-        ({sqe(source_path)},
-         {sqe(source_filename)},
-         'dockling',
-         0,
-         '[]'::jsonb,
-         {sqe(source_text_val)}::text,
-         ARRAY[{tag_literals}]::text[],
-         '{metadata}'::jsonb,
-         {docklang_json if docklang_json == 'NULL' else f"$${docklang_json}$$::jsonb"})
-    RETURNING id;
-    """
-
-    rc, out = psql(sql)
-    if rc == 0 and out:
-        log.info("  → DB harvest %s", out)
+        harvest_id = result.get("id", "?")
+        log.info("  → DB harvest %s", harvest_id)
         return True
-    log.error("  → INSERT failed (rc=%d): %s", rc, out[:200] if out else "(no output)")
-    return False
+
+    except urllib.error.HTTPError as e:
+        body_text = ""
+        try:
+            body_text = e.read().decode()[:300]
+        except Exception:
+            pass
+        log.error("  → API HTTP %d: %s", e.code, body_text)
+        return False
+    except urllib.error.URLError as e:
+        log.error("  → API unreachable: %s", e.reason)
+        return False
+    except Exception as e:
+        log.error("  → Unexpected error: %s", e)
+        return False
 
 
 def process_transcript(html_path: Path) -> bool:

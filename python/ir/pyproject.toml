@@ -1,0 +1,10 @@
+[project]
+name = "nexus-ir"
+version = "0.1.0"
+description = "Nexus IR — typed execution semantics (SM-IR, TEM-IR, RL-IR, LS-IR)"
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

@@ -1,0 +1,177 @@
+<html>
+<head><title>Kernel vs Projection: WRP Reduce Design Analysis</title></head>
+<body>
+
+<h1>Kernel vs Projection: WRP Reduce Design Analysis</h1>
+
+<h2>1. The Core Distinction</h2>
+
+<p>The WRP Kernel Reduce spec (Spec 2) defines a generic state machine:</p>
+
+<pre><code>function Reduce(state: KernelState, ir: LOSMIR): KernelState
+
+type KernelState = {
+  plans: Map&lt;PlanId, PlanState&gt;;
+  receipts: Map&lt;ReceiptId, ReceiptState&gt;;
+  transitions: TransitionLog[];
+  references: GraphIndex;
+  version: number;
+};
+</code></pre>
+
+<p>The existing conduit_wrp_reducer.py builds a projection, not kernel state:</p>
+
+<pre><code>WRPProjectionBuilder.reduce(plan_id, title, project, ..., receipts) -> WRPProjection
+
+type WRPProjection = {
+  planId: string;
+  wrpState: WRPState;
+  stateHistory: WRPEvent[];
+  abstractionLevel: AbstractionLevel;
+  chunks: StratifiedChunk[];
+  crossReferences: CrossReference[];
+  ...
+};
+</code></pre>
+
+<p><strong>Key insight:</strong> A projection is a <em>view</em> derived from kernel state. The kernel is the <em>source</em>. Currently there is no kernel — only projection builders that reconstruct state from raw receipts every time.</p>
+
+<h2>2. Architectural Analysis</h2>
+
+<h3>Existing code is already a partial kernel implementation</h3>
+
+<p>The existing conduit receipt pipeline already implements three of four Reduce phases:</p>
+
+<ul>
+  <li><strong>Receipt Materialization</strong> (Phase 1): Receipts are stored in SQLite/PostgreSQL with sequence, type, agent_role, etc.</li>
+  <li><strong>Plan State Construction</strong> (Phase 2): WRPProjectionBuilder.reduce() folds receipts into a WRPState per plan</li>
+  <li><strong>Transition Application</strong> (Phase 3): The adjacency matrix validates transitions; invalid ones are silently skipped</li>
+  <li><strong>Graph Index Update</strong> (Phase 4): NOT IMPLEMENTED — no cross-plan reference graph exists</li>
+</ul>
+
+<h3>What the spec adds that doesn't exist</h3>
+
+<ul>
+  <li><strong>Multi-plan KernelState</strong>: Currently one plan at a time. Spec says Map&lt;PlanId, PlanState&gt; — all plans in one state machine.</li>
+  <li><strong>GraphIndex</strong>: Cross-plan reference graph. The crossref_taxonomy.py defines 14 relation types but no graph structure exists.</li>
+  <li><strong>Version progression</strong>: state.version increments on each state-modifying IR.</li>
+  <li><strong>All-or-nothing semantics</strong>: Current code uses convergence (skip invalid). Spec says if any phase fails, no state change.</li>
+  <li><strong>LOSMIR as explicit input</strong>: Spec says Reduce takes LOSMIR. Current code takes raw receipt lists.</li>
+  <li><strong>TransitionLog[]</strong>: No explicit transition log in kernel state (though stateHistory exists in the projection).</li>
+</ul>
+
+<h2>3. Design Tensions</h2>
+
+<h3>Tension 1: All-or-nothing vs Convergence</h3>
+
+<p><strong>All-or-nothing</strong> (spec): If any transition is invalid, entire IR snapshot is rejected. State unchanged. Safer but fragile.</p>
+
+<p><strong>Convergence</strong> (existing): Invalid transitions are silently skipped. State stays at last valid position. Resilient but can lose events silently.</p>
+
+<p>Decision: For a kernel, all-or-nothing is architecturally correct — the calling layer decides how to handle rejection. For the projection builder, convergence is pragmatically useful. These can coexist if the kernel enforces strictness while the projection layer handles tolerance.</p>
+
+<h3>Tension 2: Single-plan vs Multi-plan KernelState</h3>
+
+<p>The spec says KernelState holds ALL plans. The existing code processes ONE plan at a time. A multi-plan kernel could detect cross-plan conflicts, enable the GraphIndex, and support temporal queries across plans. But it's more complex and requires loading all plans into memory.</p>
+
+<p>Decision: The kernel should operate on a per-plan basis internally (each Reduce invocation processes one plan's IR), but KernelState can hold multiple plans as a composite. This matches event sourcing: each event affects one aggregate, but the store holds all aggregates.</p>
+
+<h3>Tension 3: What is LOSMIR?</h3>
+
+<p>In the existing code, "LOSMIR" is a type system (losm-ir package) with WorkRequestDCO, PlanIR, SpecIR, ExecutionIR, ExecutionReceipt, etc. As kernel input, LOSMIR could be:</p>
+
+<ul>
+  <li><strong>A stream of Receipts</strong> (simplest — existing code already handles this)</li>
+  <li><strong>A WorkRequestDAG</strong> (richer — includes step dependencies and structure)</li>
+  <li><strong>An IRDeltaStream</strong> (from Spec 4 — but doesn't exist yet)</li>
+</ul>
+
+<p>Decision: Start with Receipt streams as the kernel input type. This maps cleanly to the existing conduit pipeline. Spec 4 (IRDeltaStream) can be implemented on top later as a richer input format.</p>
+
+<h3>Tension 4: GraphIndex structure</h3>
+
+<p>The spec says KernelState has references: GraphIndex. The available data is the crossref_taxonomy (14 types: wrp:depends_on, wrp:supersedes, ag:references_plan, kv:sourced_from, etc.). A GraphIndex could be:</p>
+
+<ul>
+  <li><strong>Adjacency list</strong>: Map&lt;string, CrossReference[]&gt; — simple but no traversal</li>
+  <li><strong>Property graph</strong>: Nodes with typed edges — supports k-hop traversal</li>
+  <li><strong>Separate index</strong>: A read-optimized structure built after phases 1-3</li>
+</ul>
+
+<p>Decision: The GraphIndex should be a simple adjacency list initially: Map&lt;string, List&lt;{relType, targetId, metadata}&gt;&gt;. This supports the Temporal Query Model (Spec 6) GraphSelector traversal. It can be enriched later.</p>
+
+<h2>4. Proposed Architecture: Two-Layer Reduce</h2>
+
+<p>Resolve the tensions by defining two layers:</p>
+
+<h3>Layer 1: Kernel Reduce (strict, generic)</h3>
+
+<pre><code>function Reduce(state: KernelState, ir: LOSMIR) -> KernelState
+
+// 4 explicit phases, all-or-nothing
+// Pure function, no IO, no side effects
+// Holds cross-plan GraphIndex
+// Map&lt;PlanId, PlanState&gt; with version tracking
+</code></pre>
+
+<h3>Layer 2: Projection Builder (derived, pragamatic)</h3>
+
+<pre><code>function BuildProjection(kernelState, planId, options) -> WRPProjection
+
+// Extracts one plan's view from KernelState
+// Applies stratification, chunk building, cross-ref filtering
+// Convergence semantics for display purposes
+// Disposable — can be rebuilt from kernel state at any time
+</pre></code>
+
+<h3>Connection to existing code</h3>
+
+<ul>
+  <li>Existing WRPProjectionBuilder.reduce() → becomes BuildProjection()</li>
+  <li>New module wrp_kernel.py → implements Reduce()</li>
+  <li>The existing reducer converges on invalid transitions; the kernel rejects them</li>
+  <li>The kernel holds Map&lt;PlanId, PlanState&gt;; each Reduce() invocation affects one plan</li>
+  <li>GraphIndex is built during Phase 4 by scanning cross-plan references</li>
+</ul>
+
+<h2>5. Implementation Strategy</h2>
+
+<h3>Phase 1: wrp_kernel.py — KernelState + Reduce()</h3>
+
+<ul>
+  <li>New pure Python module in nexus/python/conduit/wrp_kernel.py</li>
+  <li>KernelState dataclass with plans, receipts, transitions, references, version</li>
+  <li>Reduce() with 4 explicit phase methods: _materialize(), _construct(), _apply(), _updateGraph()</li>
+  <li>All-or-nothing: if any phase raises, KernelState is unchanged</li>
+  <li>LOSMIR input = List[ConduitReceipt] initially (upgradable to IRDeltaStream later)</li>
+  <li>GraphIndex = simple adjacency map built from crossref_taxonomy types</li>
+</ul>
+
+<h3>Phase 2: Refactor WRPProjectionBuilder on top of KernelState</h3>
+
+<ul>
+  <li>Existing WRPProjectionBuilder.reduce() becomes a projection over KernelState</li>
+  <li>Keeps convergence semantics for the projection layer</li>
+  <li>Stratification, chunk building, cross-ref building unchanged</li>
+</ul>
+
+<h3>Phase 3: Temporal Query Model (Spec 6) on top</h3>
+
+<ul>
+  <li>WRPQuery type with 5 selectors</li>
+  <li>Query execution resolves branch, replays kernel state, executes selector</li>
+  <li>Projection = Query(WRPQuery)</li>
+</ul>
+
+<h2>6. Open Questions for Implementation</h2>
+
+<ul>
+  <li><strong>Persistence</strong>: Is KernelState in-memory only, or persisted to SQLite? If persisted, do we snapshot KernelState or replay from receipts on restart?</li>
+  <li><strong>Concurrent access</strong>: Does the kernel need to handle concurrent Reduce() calls? If so, locking or immutable versioning?</li>
+  <li><strong>LOSMIR schema versioning</strong>: What happens when the LOSMIR type schema evolves? Kernel version field?</li>
+  <li><strong>GraphIndex traversal</strong>: Does the GraphIndex support the GraphSelector's depth parameter from Spec 6? k-hop or just direct edges?</li>
+  <li><strong>Error reporting</strong>: How does the kernel communicate which phase failed and why? Return type: KernelState | KernelError?</li>
+</ul>
+
+</body>
+</html>

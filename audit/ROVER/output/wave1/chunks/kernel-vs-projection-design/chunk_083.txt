@@ -1,0 +1,281 @@
+alright, and while were digressing, BP was digging. 
+
+Here's my complete analysis of the vertical slice — what exists, what's missing, and the design questions that need resolving before implementation.
+🗺️ What Already Exists
+Existing Reduce implementations (3 of them)
+File	What it does
+conduit_wrp_reducer.py	Conduit receipts → WRPProjection
+conduit-wrp-contract.ts	Same contract in TypeScript
+graph_reducer.py	GraphMutations → GraphState
+replay_engine.py	Event log → ExecutionState
+Existing state machine infra
+Artifact
+11-state WRP state machine
+16 receipt types
+Adjacency matrix
+Valid transition function
+Canonical ordering
+Cross-reference taxonomy (14 types)
+Existing LOSM IR types (available for kernel input)
+- WorkRequestDCO — Full decomposition
+- PlanIR, SpecIR, ExecutionIR — Plan/spec/execution models
+- ExecutionReceipt — Receipt model
+- WorkStatus / WorkflowState — State enums
+🔍 The Spec 2 (Kernel Reduce) vs Existing Code Gap
+The harvest spec defines:
+function Reduce(state: KernelState, ir: LOSMIR): KernelState
+
+type KernelState = {
+  plans: Map<PlanId, PlanState>;
+  receipts: Map<ReceiptId, ReceiptState>;
+  transitions: TransitionLog[];
+  references: GraphIndex;
+  version: number;
+};
+The existing code has:
+WRPProjectionBuilder.reduce(plan_id, title, project, goal, receipts) → WRPProjection
+These are fundamentally different interfaces:
+- Existing: project-specific builder, takes one plan's metadata + its receipts, produces a projection
+- Spec: generic kernel state machine, takes full KernelState + LOSMIR, produces new KernelState
+❓ Key Design Questions
+Q1: Kernel vs Projection — different abstractions
+The spec defines a kernel that holds all plans simultaneously (Map<PlanId, PlanState>). The existing code processes one plan at a time. The existing projection builder could be Phase 2 of the kernel (Plan State Construction). Should we build the full kernel, or extend the existing single-plan projection builder?
+Tradeoff: Full kernel is more architecturally complete but more work. Extending the projection builder is immediately useful for the conduit use case but doesn't give us the cross-plan GraphIndex.
+Q2: What is LOSMIR concretely?
+The spec says Reduce(state: KernelState, ir: LOSMIR). In the codebase, LOSMIR is an entire type system (losm-ir/ package). For the kernel, LOSMIR could be:
+- A Receipt stream (simplest — what the existing code already handles)
+- A WorkRequestDAG (richer — DAG of work requests with their steps)
+- An IRDeltaStream (what Spec 4 would produce — but doesn't exist yet)
+Tradeoff: Defining LOSMIR as receipts maps cleanly to the existing Conduit pipeline. Defining it as a DAG/Delta aligns with the long-term architecture but has no existing producing code.
+Q3: 4 explicit phases vs single fold?
+The spec says 4 phases: Receipt Materialization → Plan State Construction → Transition Application → Graph Index Update. The existing code does all of this in a single loop. Should we decompose into 4 explicit phases?
+Benefit: Easier to test, verify, and maintain each phase independently. Clear audit trace. Cost: More code structure, potential performance overhead for small input sets.
+Q4: All-or-nothing vs convergence semantics?
+Spec says
+If any phase fails, state unchanged, whole snapshot rejected
+Tension: All-or-nothing is safer (no partial state) but more fragile — a single bad receipt blocks all later processing. Convergence is more resilient but can silently lose events. Which semantics for the kernel?
+Q5: What is GraphIndex?
+The spec defines references: GraphIndex — a cross-plan reference graph. The existing crossref_taxonomy.py defines 14 relation types (wrp:depends_on, wrp:supersedes, etc.) but no GraphIndex structure exists. Is GraphIndex simply:
+- An adjacency list of (source_id, rel_type, target_id) triples?
+- The existing CrossReference[] collection from the projection?
+- Something richer with traversal capability?
+Q6: Where does KernelState live?
+In-memory? SQLite? PostgreSQL? The spec implies in-memory (it's a pure function), but to survive restarts it needs persistence. The existing conduit uses SQLite. The WRP Kernel could be:
+- Pure in-memory — loaded from receipt replay on startup (event sourcing)
+- Persisted — KernelState snapshots stored in SQLite/PostgreSQL
+Q7: Entry point — new module or extension?
+Should the WRP Kernel Reduce be:
+- A new Python module (e.g., nexus/python/conduit/wrp_kernel.py) with the pure function
+- An extension of the existing conduit_wrp_reducer.py (which is currently in absorb/html/, not in the active conduit codebase)
+The existing conduit_wrp_reducer.py is in absorb/html/ — an archive/historical directory, not part of the live conduit Python package at nexus/python/conduit/.
+💡 Key Insight: Existing code IS already a partial implementation
+The existing conduit_wrp_reducer.py + conduit-wrp-contract.ts already implement:
+- ✅ Receipt Materialization (takes receipts)
+- ✅ Plan State Construction (tracks one plan's state)
+- ✅ Transition Application (adjacency matrix validation + fold)
+- ✅ Stratification & chunk building (L1-L4, visibility scopes)
+- ✅ Cross-reference generation (wrp:depends_on, wrp:implements, etc.)
+What's missing for Spec 2 compliance:
+- ❌ Multi-plan KernelState (currently single-plan)
+- ❌ GraphIndex (cross-plan reference graph)
+- ❌ Explicit 4-phase decomposition
+- ❌ Version progression (state.version++)
+- ❌ All-or-nothing semantics (uses convergence instead)
+- ❌ LOSMIR as explicit input typeShow moreShow less
+
+alright, and while were digressing, BP was digging. 
+
+Here's my complete analysis of the vertical slice — what exists, what's missing, and the design questions that need resolving before implementation.
+🗺️ What Already Exists
+Existing Reduce implementations (3 of them)
+File	What it does
+conduit_wrp_reducer.py	Conduit receipts → WRPProjection
+conduit-wrp-contract.ts	Same contract in TypeScript
+graph_reducer.py	GraphMutations → GraphState
+replay_engine.py	Event log → ExecutionState
+Existing state machine infra
+Artifact
+11-state WRP state machine
+16 receipt types
+Adjacency matrix
+Valid transition function
+Canonical ordering
+Cross-reference taxonomy (14 types)
+Existing LOSM IR types (available for kernel input)
+- WorkRequestDCO — Full decomposition
+- PlanIR, SpecIR, ExecutionIR — Plan/spec/execution models
+- ExecutionReceipt — Receipt model
+- WorkStatus / WorkflowState — State enums
+🔍 The Spec 2 (Kernel Reduce) vs Existing Code Gap
+The harvest spec defines:
+function Reduce(state: KernelState, ir: LOSMIR): KernelState
+
+type KernelState = {
+  plans: Map<PlanId, PlanState>;
+  receipts: Map<ReceiptId, ReceiptState>;
+  transitions: TransitionLog[];
+  references: GraphIndex;
+  version: number;
+};
+The existing code has:
+WRPProjectionBuilder.reduce(plan_id, title, project, goal, receipts) → WRPProjection
+These are fundamentally different interfaces:
+- Existing: project-specific builder, takes one plan's metadata + its receipts, produces a projection
+- Spec: generic kernel state machine, takes full KernelState + LOSMIR, produces new KernelState
+❓ Key Design Questions
+Q1: Kernel vs Projection — different abstractions
+The spec defines a kernel that holds all plans simultaneously (Map<PlanId, PlanState>). The existing code processes one plan at a time. The existing projection builder could be Phase 2 of the kernel (Plan State Construction). Should we build the full kernel, or extend the existing single-plan projection builder?
+Tradeoff: Full kernel is more architecturally complete but more work. Extending the projection builder is immediately useful for the conduit use case but doesn't give us the cross-plan GraphIndex.
+Q2: What is LOSMIR concretely?
+The spec says Reduce(state: KernelState, ir: LOSMIR). In the codebase, LOSMIR is an entire type system (losm-ir/ package). For the kernel, LOSMIR could be:
+- A Receipt stream (simplest — what the existing code already handles)
+- A WorkRequestDAG (richer — DAG of work requests with their steps)
+- An IRDeltaStream (what Spec 4 would produce — but doesn't exist yet)
+Tradeoff: Defining LOSMIR as receipts maps cleanly to the existing Conduit pipeline. Defining it as a DAG/Delta aligns with the long-term architecture but has no existing producing code.
+Q3: 4 explicit phases vs single fold?
+The spec says 4 phases: Receipt Materialization → Plan State Construction → Transition Application → Graph Index Update. The existing code does all of this in a single loop. Should we decompose into 4 explicit phases?
+Benefit: Easier to test, verify, and maintain each phase independently. Clear audit trace. Cost: More code structure, potential performance overhead for small input sets.
+Q4: All-or-nothing vs convergence semantics?
+Spec says
+If any phase fails, state unchanged, whole snapshot rejected
+Tension: All-or-nothing is safer (no partial state) but more fragile — a single bad receipt blocks all later processing. Convergence is more resilient but can silently lose events. Which semantics for the kernel?
+Q5: What is GraphIndex?
+The spec defines references: GraphIndex — a cross-plan reference graph. The existing crossref_taxonomy.py defines 14 relation types (wrp:depends_on, wrp:supersedes, etc.) but no GraphIndex structure exists. Is GraphIndex simply:
+- An adjacency list of (source_id, rel_type, target_id) triples?
+- The existing CrossReference[] collection from the projection?
+- Something richer with traversal capability?
+Q6: Where does KernelState live?
+In-memory? SQLite? PostgreSQL? The spec implies in-memory (it's a pure function), but to survive restarts it needs persistence. The existing conduit uses SQLite. The WRP Kernel could be:
+- Pure in-memory — loaded from receipt replay on startup (event sourcing)
+- Persisted — KernelState snapshots stored in SQLite/PostgreSQL
+Q7: Entry point — new module or extension?
+Should the WRP Kernel Reduce be:
+- A new Python module (e.g., nexus/python/conduit/wrp_kernel.py) with the pure function
+- An extension of the existing conduit_wrp_reducer.py (which is currently in absorb/html/, not in the active conduit codebase)
+The existing conduit_wrp_reducer.py is in absorb/html/ — an archive/historical directory, not part of the live conduit Python package at nexus/python/conduit/.
+💡 Key Insight: Existing code IS already a partial implementation
+The existing conduit_wrp_reducer.py + conduit-wrp-contract.ts already implement:
+- ✅ Receipt Materialization (takes receipts)
+- ✅ Plan State Construction (tracks one plan's state)
+- ✅ Transition Application (adjacency matrix validation + fold)
+- ✅ Stratification & chunk building (L1-L4, visibility scopes)
+- ✅ Cross-reference generation (wrp:depends_on, wrp:implements, etc.)
+What's missing for Spec 2 compliance:
+- ❌ Multi-plan KernelState (currently single-plan)
+- ❌ GraphIndex (cross-plan reference graph)
+- ❌ Explicit 4-phase decomposition
+- ❌ Version progression (state.version++)
+- ❌ All-or-nothing semantics (uses convergence instead)
+- ❌ LOSMIR as explicit input typeShow moreShow less
+
+alright, and while were digressing, BP was digging. 
+
+Here's my complete analysis of the vertical slice — what exists, what's missing, and the design questions that need resolving before implementation.
+🗺️ What Already Exists
+Existing Reduce implementations (3 of them)
+File	What it does
+conduit_wrp_reducer.py	Conduit receipts → WRPProjection
+conduit-wrp-contract.ts	Same contract in TypeScript
+graph_reducer.py	GraphMutations → GraphState
+replay_engine.py	Event log → ExecutionState
+Existing state machine infra
+Artifact
+11-state WRP state machine
+16 receipt types
+Adjacency matrix
+Valid transition function
+Canonical ordering
+Cross-reference taxonomy (14 types)
+Existing LOSM IR types (available for kernel input)
+- WorkRequestDCO — Full decomposition
+- PlanIR, SpecIR, ExecutionIR — Plan/spec/execution models
+- ExecutionReceipt — Receipt model
+- WorkStatus / WorkflowState — State enums
+🔍 The Spec 2 (Kernel Reduce) vs Existing Code Gap
+The harvest spec defines:
+function Reduce(state: KernelState, ir: LOSMIR): KernelState
+
+type KernelState = {
+  plans: Map<PlanId, PlanState>;
+  receipts: Map<ReceiptId, ReceiptState>;
+  transitions: TransitionLog[];
+  references: GraphIndex;
+  version: number;
+};
+The existing code has:
+WRPProjectionBuilder.reduce(plan_id, title, project, goal, receipts) → WRPProjection
+These are fundamentally different interfaces:
+- Existing: project-specific builder, takes one plan's metadata + its receipts, produces a projection
+- Spec: generic kernel state machine, takes full KernelState + LOSMIR, produces new KernelState
+❓ Key Design Questions
+Q1: Kernel vs Projection — different abstractions
+The spec defines a kernel that holds all plans simultaneously (Map<PlanId, PlanState>). The existing code processes one plan at a time. The existing projection builder could be Phase 2 of the kernel (Plan State Construction). Should we build the full kernel, or extend the existing single-plan projection builder?
+Tradeoff: Full kernel is more architecturally complete but more work. Extending the projection builder is immediately useful for the conduit use case but doesn't give us the cross-plan GraphIndex.
+Q2: What is LOSMIR concretely?
+The spec says Reduce(state: KernelState, ir: LOSMIR). In the codebase, LOSMIR is an entire type system (losm-ir/ package). For the kernel, LOSMIR could be:
+- A Receipt stream (simplest — what the existing code already handles)
+- A WorkRequestDAG (richer — DAG of work requests with their steps)
+- An IRDeltaStream (what Spec 4 would produce — but doesn't exist yet)
+Tradeoff: Defining LOSMIR as receipts maps cleanly to the existing Conduit pipeline. Defining it as a DAG/Delta aligns with the long-term architecture but has no existing producing code.
+Q3: 4 explicit phases vs single fold?
+The spec says 4 phases: Receipt Materialization → Plan State Construction → Transition Application → Graph Index Update. The existing code does all of this in a single loop. Should we decompose into 4 explicit phases?
+Benefit: Easier to test, verify, and maintain each phase independently. Clear audit trace. Cost: More code structure, potential performance overhead for small input sets.
+Q4: All-or-nothing vs convergence semantics?
+Spec says
+If any phase fails, state unchanged, whole snapshot rejected
+Tension: All-or-nothing is safer (no partial state) but more fragile — a single bad receipt blocks all later processing. Convergence is more resilient but can silently lose events. Which semantics for the kernel?
+Q5: What is GraphIndex?
+The spec defines references: GraphIndex — a cross-plan reference graph. The existing crossref_taxonomy.py defines 14 relation types (wrp:depends_on, wrp:supersedes, etc.) but no GraphIndex structure exists. Is GraphIndex simply:
+- An adjacency list of (source_id, rel_type, target_id) triples?
+- The existing CrossReference[] collection from the projection?
+- Something richer with traversal capability?
+Q6: Where does KernelState live?
+In-memory? SQLite? PostgreSQL? The spec implies in-memory (it's a pure function), but to survive restarts it needs persistence. The existing conduit uses SQLite. The WRP Kernel could be:
+- Pure in-memory — loaded from receipt replay on startup (event sourcing)
+- Persisted — KernelState snapshots stored in SQLite/PostgreSQL
+Q7: Entry point — new module or extension?
+Should the WRP Kernel Reduce be:
+- A new Python module (e.g., nexus/python/conduit/wrp_kernel.py) with the pure function
+- An extension of the existing conduit_wrp_reducer.py (which is currently in absorb/html/, not in the active conduit codebase)
+The existing conduit_wrp_reducer.py is in absorb/html/ — an archive/historical directory, not part of the live conduit Python package at nexus/python/conduit/.
+💡 Key Insight: Existing code IS already a partial implementation
+The existing conduit_wrp_reducer.py + conduit-wrp-contract.ts already implement:
+- ✅ Receipt Materialization (takes receipts)
+- ✅ Plan State Construction (tracks one plan's state)
+- ✅ Transition Application (adjacency matrix validation + fold)
+- ✅ Stratification & chunk building (L1-L4, visibility scopes)
+- ✅ Cross-reference generation (wrp:depends_on, wrp:implements, etc.)
+What's missing for Spec 2 compliance:
+- ❌ Multi-plan KernelState (currently single-plan)
+- ❌ GraphIndex (cross-plan reference graph)
+- ❌ Explicit 4-phase decomposition
+- ❌ Version progression (state.version++)
+- ❌ All-or-nothing semantics (uses convergence instead)
+- ❌ LOSMIR as explicit input typeShow moreShow less
+
+alright, and while were digressing, BP was digging. 
+
+Here's my complete analysis of the vertical slice — what exists, what's missing, and the design questions that need resolving before implementation.
+🗺️ What Already Exists
+Existing Reduce implementations (3 of them)
+File	What it does
+conduit_wrp_reducer.py	Conduit receipts → WRPProjection
+conduit-wrp-contract.ts	Same contract in TypeScript
+graph_reducer.py	GraphMutations → GraphState
+replay_engine.py	Event log → ExecutionState
+Existing state machine infra
+Artifact
+11-state WRP state machine
+16 receipt types
+Adjacency matrix
+Valid transition function
+Canonical ordering
+Cross-reference taxonomy (14 types)
+Existing LOSM IR types (available for kernel input)
+- WorkRequestDCO — Full decomposition
+- PlanIR, SpecIR, ExecutionIR — Plan/spec/execution models
+- ExecutionReceipt — Receipt model
+- WorkStatus / WorkflowState — State enums
+🔍 The Spec 2 (Kernel Reduce) vs Existing Code Gap
+The harvest spec defines:
+function Reduce(state: KernelState, ir: LOSMIR): KernelState

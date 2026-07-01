@@ -1,0 +1,304 @@
+---
+
+# The right mental model is this
+
+# Steward is aquery rewriter / federated resolver / policy transform, not just a privileged search client.
+
+So the pipeline becomes:
+
+```
+Role  -> knowledge request      -> Steward recall boundary          -> inject transformation / federation plan              -> search graph + Nebula + evidence bridge + semantic projection                  -> apply role-weighting / provenance / policy shaping                      -> return result package
+```
+
+```
+Role  -> knowledge request      -> Steward recall boundary          -> inject transformation / federation plan              -> search graph + Nebula + evidence bridge + semantic projection                  -> apply role-weighting / provenance / policy shaping                      -> return result package
+```
+
+That means the other roles know:
+
+- how to ask
+how to ask
+
+- what kind of result to expect
+what kind of result to expect
+
+But they donotknow:
+
+- how the recall plan is assembled
+how the recall plan is assembled
+
+- how the evidence bridge is traversed
+how the evidence bridge is traversed
+
+- how embeddings are used
+how embeddings are used
+
+- how contradictions or duplicates are reconciled
+how contradictions or duplicates are reconciled
+
+- how the final answer is normalized into graph-safe output
+how the final answer is normalized into graph-safe output
+
+---
+
+# So I would change the implementation plan accordingly
+
+## Build 1–3 exactly as substrate
+
+But don’t frame them as “Steward-private tables nobody else can conceptually know about.”Frame them asSteward-owned internals behind a shared recall contract.
+
+---
+
+# Revised implementation shape
+
+## Shared public function
+
+Something like:
+
+```
+class KnowledgeRecallService(Protocol):    def recall(        self,        query: str,        requester_role: str,        scope: RecallScope,        purpose: str | None = None,        constraints: dict | None = None    ) -> RecallResult:        ...
+```
+
+```
+class KnowledgeRecallService(Protocol):    def recall(        self,        query: str,        requester_role: str,        scope: RecallScope,        purpose: str | None = None,        constraints: dict | None = None    ) -> RecallResult:        ...
+```
+
+Every role can call this.
+
+---
+
+# Steward internal pipeline behind that function
+
+```
+class StewardRecallOrchestrator:    def recall(self, request: KnowledgeRequest) -> RecallResult:        plan = self._build_recall_plan(request)        transformed = self._apply_role_transformations(request, plan)        raw_hits = self._execute_federated_search(transformed)        linked = self._attach_evidence_and_provenance(raw_hits, request)        shaped = self._shape_for_requester(linked, request)        return shaped
+```
+
+```
+class StewardRecallOrchestrator:    def recall(self, request: KnowledgeRequest) -> RecallResult:        plan = self._build_recall_plan(request)        transformed = self._apply_role_transformations(request, plan)        raw_hits = self._execute_federated_search(transformed)        linked = self._attach_evidence_and_provenance(raw_hits, request)        shaped = self._shape_for_requester(linked, request)        return shaped
+```
+
+## The important part
+
+### _apply_role_transformations(...)
+
+That’s the slot you just described.
+
+This is where Steward inserts the hidden function/transform into the request path.
+
+Examples of what belongs there:
+
+- “if Topologist asks about graph structure, bias graph entities first and attach migration history second”
+“if Topologist asks about graph structure, bias graph entities first and attach migration history second”
+
+- “if Builder asks for implementation guidance, suppress low-confidence harvest chatter and prefer accepted knowledge entities plus supporting evidence”
+“if Builder asks for implementation guidance, suppress low-confidence harvest chatter and prefer accepted knowledge entities plus supporting evidence”
+
+- “if Observer asks an open question, include contradictions and unresolved candidates”
+“if Observer asks an open question, include contradictions and unresolved candidates”
+
+- “if a query smells like runtime context retrieval, don’t dump Nebula wholesale; return a curated evidence packet”
+“if a query smells like runtime context retrieval, don’t dump Nebula wholesale; return a curated evidence packet”
+
+So yes:same query surface, different internal transformation.
+
+---
+
+# Then the first three linkages become Steward internals supporting that transform
+
+## 1. Evidence bridge
+
+Used by the transform to answer:
+
+- what harvest candidates support/refine this entity?
+what harvest candidates support/refine this entity?
+
+- what graph concepts are implicated by this Nebula material?
+what graph concepts are implicated by this Nebula material?
+
+## 2. Provenance bridge
+
+Used by the transform to answer:
+
+- where did this claim come from?
+where did this claim come from?
+
+- how much transcript backing exists?
+how much transcript backing exists?
+
+- should this be surfaced as evidence or just as a weak lead?
+should this be surfaced as evidence or just as a weak lead?
+
+## 3. Semantic projection / embeddings
+
+Used by the transform to answer:
+
+- what is semantically nearby across both curated and harvested material?
+what is semantically nearby across both curated and harvested material?
+
+- what should be pulled into the candidate set before policy shaping?
+what should be pulled into the candidate set before policy shaping?
+
+---
+
+# The boundary I would preserve
+
+## Roles know:
+
+- there is a recall function
+there is a recall function
+
+- it may search beyond the curated graph
+it may search beyond the curated graph
+
+- Steward mediates and shapes the answer
+Steward mediates and shapes the answer
+
+- returned answers are not raw DB dumps but knowledge responses
+returned answers are not raw DB dumps but knowledge responses
+
+## Roles do not know / do not own:
+
+- embedding store structure
+embedding store structure
+
+- bridge-table semantics
+bridge-table semantics
+
+- ranking heuristics
+ranking heuristics
+
+- federation plan construction
+federation plan construction
+
+- result filtering / weighting internals
+result filtering / weighting internals
+
+- mutation/reconciliation rules
+mutation/reconciliation rules
+
+That’s a very different kind of opacity than “you’re forbidden to ask.”
+
+---
+
+# So I’d revise my recommendation one more step
+
+## Don’t build a “Steward-only semantic search API.”
+
+Build asingle knowledge recall APIthat all roles use.
+
+But behind it, implement aSteward-owned recall enginewith these internal phases:
+
+### Phase 1 — Candidate acquisition
+
+- graph entity lookup
+graph entity lookup
+
+- steward semantic document search
+steward semantic document search
+
+- maybe provenance/source expansion
+maybe provenance/source expansion
+
+### Phase 2 — Evidence expansion
+
+- join toevidence_links
+join toevidence_links
+
+- join to provenance/source artifacts
+join to provenance/source artifacts
+
+- attach supporting/contradicting harvest candidates
+attach supporting/contradicting harvest candidates
+
+### Phase 3 — Role transform
+
+- requester-role-specific weighting
+requester-role-specific weighting
+
+- accepted vs proposed evidence filtering
+accepted vs proposed evidence filtering
+
+- graph-first vs evidence-first shaping
+graph-first vs evidence-first shaping
+
+- contradiction handling rules
+contradiction handling rules
+
+### Phase 4 — Response shaping
+
+- return a graph-safe knowledge packet
+return a graph-safe knowledge packet
+
+- not raw blended records
+not raw blended records
+
+---
+
+# Net: I think this is the correct correction
+
+You’re not buildingsearch privilege.You’re buildingshared recall with Steward-owned internal query transformation.
+
+That’s better because it matches the rest of the system you’ve been describing:
+
+- Steward is the sole semantic writer
+Steward is the sole semantic writer
+
+- roles can request knowledge
+roles can request knowledge
+
+- the request goes through a policy/reconciliation boundary
+the request goes through a policy/reconciliation boundary
+
+- Nebula stays evidence/cabinet, not canonical truth
+Nebula stays evidence/cabinet, not canonical truth
+
+- the graph remains the committed state, but the recall path can consult more than the graph
+the graph remains the committed state, but the recall path can consult more than the graph
+
+---
+
+If you want, I can now write the spec in the corrected form:
+
+# Steward Recall Transformation Layer Spec v0
+
+with:
+
+- shared publicKnowledgeRecallRequest/KnowledgeRecallResult
+shared publicKnowledgeRecallRequest/KnowledgeRecallResult
+
+- internalStewardRecallOrchestrator
+internalStewardRecallOrchestrator
+
+- evidence_links,source_artifacts,semantic_documents
+evidence_links,source_artifacts,semantic_documents
+
+- role-based transformation pipeline
+role-based transformation pipeline
+
+- accepted/proposed evidence handling
+accepted/proposed evidence handling
+
+- MCP contract for “everyone can ask, Steward mediates”
+MCP contract for “everyone can ask, Steward mediates”
+
+That’s probably the right artifact now, because the boundary has shifted fromwho may calltowhat gets injected into the call path.
+
+Sources
+
+Sources
+
+Sources
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.

@@ -1,0 +1,290 @@
+openapi: "3.0.3"
+info:
+  title: WRP API — WorkRequest Protocol
+  description: |
+    The WorkRequest Protocol (WRP) API provides four core endpoints for
+    lifecycle-driven execution of WorkRequest objects across distributed
+    cognitive runtimes. This API is the transport contract between agents
+    and the WRP runtime.
+  version: "1.0.0"
+  contact:
+    name: Nexus Architecture
+    url: https://nexus.local
+
+servers:
+  - url: /api/wrp/v1
+    description: WRP API v1 base path
+
+paths:
+  /work-requests:
+    post:
+      operationId: createWorkRequest
+      summary: Create a new WorkRequest
+      description: |
+        Ingests a new WorkRequest into the system. The WorkRequest is validated
+        against the schema and a wrp.created event is emitted. The WorkRequest
+        enters the CREATED state and immediately transitions to INTAKE.
+      tags: [WorkRequests]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkRequestPayload"
+      responses:
+        "201":
+          description: WorkRequest created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkRequestResponse"
+        "400":
+          description: Validation failure — request does not conform to schema
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict — WorkRequest with this ID already exists
+
+  /work-requests/{wrpId}/events:
+    post:
+      operationId: emitEvent
+      summary: Emit a WRP event
+      description: |
+        Emits a lifecycle event for an existing WorkRequest. The event triggers
+        a state transition per the WRP state machine adjacency matrix. If the
+        transition is invalid, the request is rejected with 422.
+      tags: [Events]
+      parameters:
+        - name: wrpId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: WorkRequest ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmitEventPayload"
+      responses:
+        "200":
+          description: Event accepted and state transition applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkRequestResponse"
+        "400":
+          description: Invalid event payload
+        "422":
+          description: Invalid state transition — adjacency matrix check failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: WorkRequest not found
+
+  /work-requests/{wrpId}:
+    get:
+      operationId: getWorkRequestState
+      summary: Get current WorkRequest state
+      description: |
+        Returns the current state of a WorkRequest, including its execution
+        status, version, event history, and full metadata. This is the
+        canonical read endpoint.
+      tags: [WorkRequests]
+      parameters:
+        - name: wrpId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: WorkRequest ID
+      responses:
+        "200":
+          description: Current WorkRequest state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkRequestResponse"
+        "404":
+          description: WorkRequest not found
+
+  /work-requests/{wrpId}/replay:
+    get:
+      operationId: replayWorkRequest
+      summary: Replay events to reconstruct state
+      description: |
+        Replays all events for a WorkRequest to reconstruct its state at a
+        given point in time. Supports snapshot-based replay for efficiency
+        and full replay for audit. The response includes both the reconstructed
+        state and the event sequence used.
+      tags: [Events]
+      parameters:
+        - name: wrpId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: WorkRequest ID
+        - name: atVersion
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: Optional — replay up to a specific version
+        - name: mode
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [full, snapshot]
+            default: snapshot
+          description: Replay mode — full (all events) or snapshot (use checkpoints)
+      responses:
+        "200":
+          description: Reconstructed state from event replay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplayResponse"
+        "404":
+          description: WorkRequest not found
+
+components:
+  schemas:
+    CreateWorkRequestPayload:
+      type: object
+      required: [intent]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Optional client-provided ID (server generates if omitted)
+        intent:
+          type: object
+          description: The originating intent
+          required: [problem_statement, desired_outcome]
+          properties:
+            problem_statement:
+              type: string
+            desired_outcome:
+              type: string
+            domain:
+              type: string
+            priority:
+              type: string
+              enum: [low, medium, high, critical]
+            abstraction_level:
+              type: string
+              enum: [L1, L2, L3, L4]
+        decomposition:
+          $ref: "work-request.schema.json#/properties/decomposition"
+        requirements:
+          $ref: "work-request.schema.json#/properties/requirements"
+        constraints:
+          $ref: "work-request.schema.json#/properties/constraints"
+        success_criteria:
+          $ref: "work-request.schema.json#/properties/success_criteria"
+        metadata:
+          $ref: "work-request.schema.json#/properties/metadata"
+
+    EmitEventPayload:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum:
+            - wrp.intaked
+            - wrp.planned
+            - wrp.critiqued
+            - wrp.specified
+            - wrp.approved
+            - wrp.queued
+            - wrp.executing
+            - wrp.completed
+            - wrp.archived
+            - wrp.failed
+            - wrp.note
+          description: Event type triggering state transition
+        causation_id:
+          type: string
+          format: uuid
+          description: Optional — ID of the event that caused this event
+        correlation_id:
+          type: string
+          format: uuid
+          description: Optional — correlation ID for grouping
+        payload:
+          type: object
+          properties:
+            reason:
+              type: string
+            actor:
+              type: string
+            details:
+              type: object
+
+    WorkRequestResponse:
+      type: object
+      properties:
+        work_request:
+          $ref: "work-request.schema.json"
+        event:
+          $ref: "wrp-event.schema.json"
+          description: The event that produced this state (if applicable)
+        events:
+          type: array
+          items:
+            $ref: "wrp-event.schema.json"
+          description: Recent event history
+
+    ReplayResponse:
+      type: object
+      properties:
+        work_request_id:
+          type: string
+          format: uuid
+        reconstructed_state:
+          type: object
+          properties:
+            status:
+              type: string
+            version:
+              type: integer
+            execution_state:
+              $ref: "work-request.schema.json#/properties/execution_state"
+        events_replayed:
+          type: integer
+          description: Number of events replayed
+        mode:
+          type: string
+          enum: [full, snapshot]
+        at_version:
+          type: integer
+        event_sequence:
+          type: array
+          items:
+            $ref: "wrp-event.schema.json"
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object

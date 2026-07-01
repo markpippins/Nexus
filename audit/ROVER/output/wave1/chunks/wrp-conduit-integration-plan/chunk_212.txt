@@ -1,0 +1,905 @@
+#### AssignL4when the chunk contains:
+
+- system-wide doctrine
+system-wide doctrine
+
+- ontology-level policy
+ontology-level policy
+
+- meta-rules for work modeling or architectural governance
+meta-rules for work modeling or architectural governance
+
+---
+
+# 29. Stage 6 — Cross-Reference Extraction
+
+Cross-references should be created from explicit and inferred signals.
+
+## 29.1 Explicit signals
+
+- markdown links
+markdown links
+
+- section references
+section references
+
+- “depends on”, “see also”, “constrained by”
+“depends on”, “see also”, “constrained by”
+
+- manually annotated relationships
+manually annotated relationships
+
+## 29.2 Inferred signals
+
+- artifact-key mentions
+artifact-key mentions
+
+- section-key references
+section-key references
+
+- protocol field names reused in traversal or migration docs
+protocol field names reused in traversal or migration docs
+
+- repeated formal identifiers likeExecutionContext,ExecutionReceipt,tenant_id,trace_id
+repeated formal identifiers likeExecutionContext,ExecutionReceipt,tenant_id,trace_id
+
+## 29.3 Required WRP reference classes
+
+The first pass must at least support:
+
+- protocol field ↔ DAG compilation rule
+protocol field ↔ DAG compilation rule
+
+- DAG node/edge semantics ↔ traversal behavior
+DAG node/edge semantics ↔ traversal behavior
+
+- traversal invariant ↔ migration constraint
+traversal invariant ↔ migration constraint
+
+- migration step ↔ affected WRP artifact
+migration step ↔ affected WRP artifact
+
+- WRP artifact ↔ Conduit plan implementing it
+WRP artifact ↔ Conduit plan implementing it
+
+---
+
+# 30. Stage 7 — Conduit Link Registration
+
+Each projected WRP artifact should retain a link to the Conduit execution packet(s) responsible for implementation.
+
+Minimum metadata to retain:
+
+- conduit_plan_id
+conduit_plan_id
+
+- conduit_project_key
+conduit_project_key
+
+- optional receipt trail / execution link row
+optional receipt trail / execution link row
+
+If one Nebula artifact maps to multiple Conduit plans, use:
+
+- document-level link to the primary umbrella plan
+document-level link to the primary umbrella plan
+
+- execution-link rows for subordinate plans
+execution-link rows for subordinate plans
+
+---
+
+# 31. Stage 8 — Open Question Extraction
+
+If a WRP document contains unresolved design questions, they should be extracted into either:
+
+- dedicatedopen_questionchunks, or
+dedicatedopen_questionchunks, or
+
+- a separatenebula_open_questionstable.
+a separatenebula_open_questionstable.
+
+Recommended fields for open questions:
+
+- artifact_key
+artifact_key
+
+- document_id
+document_id
+
+- chunk_id
+chunk_id
+
+- question_text
+question_text
+
+- status
+status
+
+- priority
+priority
+
+- owner_role
+owner_role
+
+This is especially relevant for migration uncertainties, protocol compatibility questions, and unresolved traversal policy decisions.
+
+---
+
+# 32. Conduit → Nebula Projection Rules
+
+This section defines how Conduit work packets map into Nebula when a WRP artifact is tracked for implementation.
+
+---
+
+# 33. Conduit as Execution Metadata, Not Architectural Authority
+
+A Conduit plan is not automatically a Nebula document. Conduit should only project enough information into Nebula to preserve execution traceability.
+
+That means:
+
+- Conduit ownsactive execution plan rowsacceptance criteriafile listsdependenciesexecution receipts
+Conduit owns
+
+- active execution plan rows
+active execution plan rows
+
+- acceptance criteria
+acceptance criteria
+
+- file lists
+file lists
+
+- dependencies
+dependencies
+
+- execution receipts
+execution receipts
+
+- Nebula ownsthe meaning of the WRP artifactthe long-form architecturecross-artifact relationshipsrationalechunk-level retrievability
+Nebula owns
+
+- the meaning of the WRP artifact
+the meaning of the WRP artifact
+
+- the long-form architecture
+the long-form architecture
+
+- cross-artifact relationships
+cross-artifact relationships
+
+- rationale
+rationale
+
+- chunk-level retrievability
+chunk-level retrievability
+
+---
+
+# 34. Minimal Projection of a Conduit Plan into Nebula
+
+For each Conduit WRP work packet, Nebula should store:
+
+- conduit_plan_id
+conduit_plan_id
+
+- artifact_key
+artifact_key
+
+- artifact_type
+artifact_type
+
+- status
+status
+
+- a short execution summary
+a short execution summary
+
+- links to the authoritative WRP spec document
+links to the authoritative WRP spec document
+
+- links to receipt or migration status if available
+links to receipt or migration status if available
+
+This can be represented either:
+
+- as metadata on the authoritative WRP document, or
+as metadata on the authoritative WRP document, or
+
+- as a small auxiliary Nebula document ofsource_kind = conduit_projection.
+as a small auxiliary Nebula document ofsource_kind = conduit_projection.
+
+The first option is preferred for the initial implementation.
+
+---
+
+# 35. Example Projection of the Initial WRP Packet
+
+Suppose Conduit contains four plans:
+
+- CDT-WRP-001— WRP v1.0 protocol formalization
+CDT-WRP-001— WRP v1.0 protocol formalization
+
+- CDT-WRP-002— WRP v1.1 DAG model and compilation pipeline
+CDT-WRP-002— WRP v1.1 DAG model and compilation pipeline
+
+- CDT-WRP-003— WRP v1.2 traversal engine
+CDT-WRP-003— WRP v1.2 traversal engine
+
+- CDT-WRP-004— WRP migration plan
+CDT-WRP-004— WRP migration plan
+
+Nebula should contain at least:
+
+## Document A
+
+- title:WRP v1.0 Protocol Formalization
+title:WRP v1.0 Protocol Formalization
+
+- artifact key:wrp-v1-protocol
+artifact key:wrp-v1-protocol
+
+- artifact type:wrp.protocol
+artifact type:wrp.protocol
+
+- level:L2
+level:L2
+
+- conduit_plan_id:CDT-WRP-001
+conduit_plan_id:CDT-WRP-001
+
+## Document B
+
+- title:WRP v1.1 DAG Data Model and Compilation Pipeline
+title:WRP v1.1 DAG Data Model and Compilation Pipeline
+
+- artifact key:wrp-v1_1-dag
+artifact key:wrp-v1_1-dag
+
+- artifact type:wrp.dag_model
+artifact type:wrp.dag_model
+
+- level:L2
+level:L2
+
+- conduit_plan_id:CDT-WRP-002
+conduit_plan_id:CDT-WRP-002
+
+## Document C
+
+- title:WRP v1.2 Execution Traversal Engine
+title:WRP v1.2 Execution Traversal Engine
+
+- artifact key:wrp-v1_2-traversal
+artifact key:wrp-v1_2-traversal
+
+- artifact type:wrp.execution_engine
+artifact type:wrp.execution_engine
+
+- level:L2
+level:L2
+
+- conduit_plan_id:CDT-WRP-003
+conduit_plan_id:CDT-WRP-003
+
+## Document D
+
+- title:WRP Migration Plan
+title:WRP Migration Plan
+
+- artifact key:wrp-migration-plan
+artifact key:wrp-migration-plan
+
+- artifact type:wrp.migration_plan
+artifact type:wrp.migration_plan
+
+- level:L3
+level:L3
+
+- conduit_plan_id:CDT-WRP-004
+conduit_plan_id:CDT-WRP-004
+
+And explicit cross-references such as:
+
+- wrp-v1_1-dagdepends_onwrp-v1-protocol
+wrp-v1_1-dagdepends_onwrp-v1-protocol
+
+- wrp-v1_2-traversalexecuteswrp-v1_1-dag
+wrp-v1_2-traversalexecuteswrp-v1_1-dag
+
+- wrp-migration-planmigrateswrp-v1-protocol
+wrp-migration-planmigrateswrp-v1-protocol
+
+- wrp-migration-planmigrateswrp-v1_1-dag
+wrp-migration-planmigrateswrp-v1_1-dag
+
+- wrp-migration-planmigrateswrp-v1_2-traversal
+wrp-migration-planmigrateswrp-v1_2-traversal
+
+---
+
+# 36. Required WRP Cross-Reference Patterns
+
+The first implementation should explicitly emit the following relation families.
+
+## 36.1 Protocol → DAG
+
+Examples:
+
+- protocol field or lifecycle state constrains DAG node construction
+protocol field or lifecycle state constrains DAG node construction
+
+- protocol dependency semantics compiled into edge semantics
+protocol dependency semantics compiled into edge semantics
+
+Relations:
+
+- defines
+defines
+
+- constrains
+constrains
+
+- compiled_into
+compiled_into
+
+## 36.2 DAG → Traversal
+
+Examples:
+
+- DAG node kinds determine traversal behavior
+DAG node kinds determine traversal behavior
+
+- DAG execution order constraints are enforced by traversal rules
+DAG execution order constraints are enforced by traversal rules
+
+Relations:
+
+- defines
+defines
+
+- executes
+executes
+
+- constrains
+constrains
+
+## 36.3 Traversal → Receipt / Validation
+
+Examples:
+
+- execution cursor produces execution receipt shape
+execution cursor produces execution receipt shape
+
+- traversal invariants determine receipt hierarchy or failure semantics
+traversal invariants determine receipt hierarchy or failure semantics
+
+Relations:
+
+- defines
+defines
+
+- validated_by
+validated_by
+
+## 36.4 Migration → All WRP Artifacts
+
+Examples:
+
+- migration phases refer to protocol changes, DAG compatibility, traversal rollout
+migration phases refer to protocol changes, DAG compatibility, traversal rollout
+
+Relations:
+
+- migrates
+migrates
+
+- supersedes
+supersedes
+
+- constrains
+constrains
+
+## 36.5 WRP Artifact → Conduit Plan
+
+Examples:
+
+- a Nebula artifact is being implemented by one or more Conduit plans
+a Nebula artifact is being implemented by one or more Conduit plans
+
+Relations:
+
+- implemented_by_plan
+implemented_by_plan
+
+- tracked_by_plan
+tracked_by_plan
+
+These may live innebula_execution_linksrather than the main cross-reference table if the execution linkage is operational rather than semantic.
+
+---
+
+# 37. Role-Based Retrieval Policy
+
+This is the operational reason for level stratification.
+
+---
+
+# 38. Builder Retrieval Profile
+
+## 38.1 Goal
+
+Provide concrete implementation guidance with only enough architectural context to avoid coding blind.
+
+## 38.2 Default retrieval policy
+
+- Primary levels:L1
+Primary levels:L1
+
+- Secondary levels:L2
+Secondary levels:L2
+
+- ExcludeL3/L4unless:the retrievedL1/L2chunk explicitly references an architectural invariant, orthe prompt requests rationale or migration context
+ExcludeL3/L4unless:
+
+- the retrievedL1/L2chunk explicitly references an architectural invariant, or
+the retrievedL1/L2chunk explicitly references an architectural invariant, or
+
+- the prompt requests rationale or migration context
+the prompt requests rationale or migration context
+
+## 38.3 Preferred chunk kinds
+
+- implementation_note
+implementation_note
+
+- data_model
+data_model
+
+- protocol_rule
+protocol_rule
+
+- algorithm
+algorithm
+
+- acceptance_criteria
+acceptance_criteria
+
+- migration_step
+migration_step
+
+## 38.4 Typical use cases
+
+- implement WRP protocol DTOs
+implement WRP protocol DTOs
+
+- build DAG compiler classes
+build DAG compiler classes
+
+- add traversal engine structures
+add traversal engine structures
+
+- write migration scripts and tests
+write migration scripts and tests
+
+---
+
+# 39. Architect Retrieval Profile
+
+## 39.1 Goal
+
+Provide subsystem design and cross-artifact reasoning without drowning in file-level implementation noise.
+
+## 39.2 Default retrieval policy
+
+- Primary levels:L2,L3
+Primary levels:L2,L3
+
+- Optional expansion toL1for concrete examples
+Optional expansion toL1for concrete examples
+
+- Optional expansion toL4for doctrine or ontology alignment
+Optional expansion toL4for doctrine or ontology alignment
+
+## 39.3 Preferred chunk kinds
+
+- overview
+overview
+
+- definition
+definition
+
+- data_model
+data_model
+
+- algorithm
+algorithm
+
+- invariant
+invariant
+
+- rationale
+rationale
+
+- open_question
+open_question
+
+## 39.4 Typical use cases
+
+- refine WRP semantics
+refine WRP semantics
+
+- understand why traversal is separated from DAG compilation
+understand why traversal is separated from DAG compilation
+
+- reason about Conduit/Nebula/LOSM alignment
+reason about Conduit/Nebula/LOSM alignment
+
+- evaluate migration sequence
+evaluate migration sequence
+
+---
+
+# 40. Inspector / Validator Retrieval Profile
+
+## 40.1 Goal
+
+Retrieve normative constraints, invariants, and compatibility conditions.
+
+## 40.2 Default retrieval policy
+
+- Primary levels:L2,L3
+Primary levels:L2,L3
+
+- IncludeL1only when validation depends on concrete schema or implementation details
+IncludeL1only when validation depends on concrete schema or implementation details
+
+## 40.3 Preferred chunk kinds
+
+- protocol_rule
+protocol_rule
+
+- invariant
+invariant
+
+- migration_step
+migration_step
+
+- acceptance_criteria
+acceptance_criteria
+
+- data_model
+data_model
+
+## 40.4 Normative preference
+
+Prefer chunks where:
+
+- normative_strength = required
+normative_strength = required
+
+- normative_strength = prohibited
+normative_strength = prohibited
+
+## 40.5 Typical use cases
+
+- verify WRP compatibility rules
+verify WRP compatibility rules
+
+- validate migration sequencing
+validate migration sequencing
+
+- enforce traversal invariants
+enforce traversal invariants
+
+- detect protocol / DAG / traversal mismatch
+detect protocol / DAG / traversal mismatch
+
+---
+
+# 41. Explorer Retrieval Profile
+
+## 41.1 Goal
+
+Support open-ended investigation across architecture, rationale, and unresolved questions.
+
+## 41.2 Default retrieval policy
+
+- Primary levels:L2,L3,L4
+Primary levels:L2,L3,L4
+
+- IncludeL1only if the search narrows to implementation mechanics
+IncludeL1only if the search narrows to implementation mechanics
+
+## 41.3 Preferred chunk kinds
+
+- overview
+overview
+
+- rationale
+rationale
+
+- open_question
+open_question
+
+- definition
+definition
+
+- example
+example
+
+---
+
+# 42. Suggested Retrieval Algorithm
+
+A role-aware retrieval query should combine:
+
+- artifact filteringe.g.artifact_type in ('wrp.protocol','wrp.dag_model')
+artifact filtering
+
+- e.g.artifact_type in ('wrp.protocol','wrp.dag_model')
+e.g.artifact_type in ('wrp.protocol','wrp.dag_model')
+
+- level filteringrole-dependent level set
+level filtering
+
+- role-dependent level set
+role-dependent level set
+
+- chunk kind weightingrole-specific preferred chunk kinds
+chunk kind weighting
+
+- role-specific preferred chunk kinds
+role-specific preferred chunk kinds
+
+- normative weightingfor validator/inspector profiles
+normative weighting
+
+- for validator/inspector profiles
+for validator/inspector profiles
+
+- cross-reference expansionbounded traversal across explicit edges
+cross-reference expansion
+
+- bounded traversal across explicit edges
+bounded traversal across explicit edges
+
+- execution recency boostoptional boost for artifacts actively being implemented in Conduit
+execution recency boost
+
+- optional boost for artifacts actively being implemented in Conduit
+optional boost for artifacts actively being implemented in Conduit
+
+Pseudo-policy:
+
+```
+candidate_chunks =    filter by artifact family / lexical relevance / embedding relevance    ∩ filter by allowed levels for role    weighted by chunk_kind preference    weighted by normative_strength where applicable    expanded by explicit cross-reference traversal depth <= N
+```
+
+```
+candidate_chunks =    filter by artifact family / lexical relevance / embedding relevance    ∩ filter by allowed levels for role    weighted by chunk_kind preference    weighted by normative_strength where applicable    expanded by explicit cross-reference traversal depth <= N
+```
+
+Recommended initial traversal depths:
+
+- Builder:N = 1
+Builder:N = 1
+
+- Architect:N = 2
+Architect:N = 2
+
+- Inspector:N = 2
+Inspector:N = 2
+
+- Explorer:N = 3
+Explorer:N = 3
+
+---
+
+# 43. Worked Example: Retrieval for WRP Traversal Implementation
+
+User intent:
+
+> “Implement the traversal engine for WRP v1.2.”
+
+“Implement the traversal engine for WRP v1.2.”
+
+## Builder profile should retrieve:
+
+- WRP v1.2chunks describingExecutionContext,ExecutionCursor,ExecutionReceipt
+WRP v1.2chunks describingExecutionContext,ExecutionCursor,ExecutionReceipt
+
+- traversal order semantics
+traversal order semantics
+
+- deterministic traversal default
+deterministic traversal default
+
+- isolation rule chunks
+isolation rule chunks
+
+- migration notes only if they affect implementation compatibility
+migration notes only if they affect implementation compatibility
+
+## Architect profile should additionally retrieve:
+
+- the WRP DAG document sections that define node and edge semantics
+the WRP DAG document sections that define node and edge semantics
+
+- rationale for why traversal is a separate stage
+rationale for why traversal is a separate stage
+
+- migration constraints affecting rollout
+migration constraints affecting rollout
+
+## Inspector profile should emphasize:
+
+- invariant chunks such as tenant isolation rules
+invariant chunks such as tenant isolation rules
+
+- failure semantics
+failure semantics
+
+- receipt completeness rules
+receipt completeness rules
+
+- compatibility constraints in the migration plan
+compatibility constraints in the migration plan
+
+---
+
+# 44. Worked Example: WRP v1.2 Chunking and Level Assignment
+
+Consider a traversal-engine document with these sections:
+
+- Overview
+Overview
+
+- ExecutionContext
+ExecutionContext
+
+- ExecutionCursor
+ExecutionCursor
+
+- Traversal order and pending queue semantics
+Traversal order and pending queue semantics
+
+- Tenant isolation
+Tenant isolation
+
+- Experimental policy mode
+Experimental policy mode
+
+- Why traversal is separate from DAG compilation
+Why traversal is separate from DAG compilation
+
+- Implementation checklist
+Implementation checklist
+
+Recommended chunking:
+
+SectionChunk KindLevelOverviewoverviewL2ExecutionContextdata_modelL2ExecutionCursordata_modelL2Traversal order and pending queue semanticsalgorithmL2Tenant isolationinvariantL2Experimental policy modedefinition/invariantL2Why traversal is separate from DAG compilationrationaleL3Implementation checklistimplementation_note/acceptance_criteriaL1
+
+SectionChunk KindLevelOverviewoverviewL2ExecutionContextdata_modelL2ExecutionCursordata_modelL2Traversal order and pending queue semanticsalgorithmL2Tenant isolationinvariantL2Experimental policy modedefinition/invariantL2Why traversal is separate from DAG compilationrationaleL3Implementation checklistimplementation_note/acceptance_criteriaL1
+
+---
+
+# 45. WRP-Specific Normative Marking
+
+To make validation retrieval effective, WRP chunks should mark normative strength where appropriate.
+
+Examples:
+
+## required
+
+- traversal must enforce tenant isolation at execution time
+traversal must enforce tenant isolation at execution time
+
+- protocol version must be present in every WRP root request
+protocol version must be present in every WRP root request
+
+- DAG compilation must reject cycles if the WRP graph is defined as acyclic
+DAG compilation must reject cycles if the WRP graph is defined as acyclic
+
+## prohibited
+
+- traversal must not execute a node under the wrong tenant context
+traversal must not execute a node under the wrong tenant context
+
+- migration must not remove legacy compatibility before the designated cutover phase
+migration must not remove legacy compatibility before the designated cutover phase
+
+## recommended
+
+- builders should prefer deterministic traversal order unless explicitly in experimental mode
+builders should prefer deterministic traversal order unless explicitly in experimental mode
+
+## informative
+
+- historical rationale and examples
+historical rationale and examples
+
+---
+
+# 46. Back-Projection from Execution into Nebula
+
+Once Conduit and runtime begin executing WRP work, Nebula should be updated with execution traceability.
+
+Examples:
+
+- a Conduit plan completes implementation ofwrp-v1_2-traversal
+a Conduit plan completes implementation ofwrp-v1_2-traversal
+
+- an execution receipt validates a traversal invariant
+an execution receipt validates a traversal invariant
+
+- a migration work request supersedes an older compatibility rule
+a migration work request supersedes an older compatibility rule
+
+These should produce:
+
+- document status updates,
+document status updates,
+
+- execution links,
+execution links,
+
+- optional new cross-references,
+optional new cross-references,
+
+- optional “implementation evidence” annotations.
+optional “implementation evidence” annotations.
+
+This should be append-only where possible; do not rewrite architectural history.
+
+---
+
+# 47. Initial Migration Plan for the Existing WRP Packet
+
+This section defines the first practical rollout for the four WRP artifacts already placed into Conduit.
+
+---
+
+# 48. Phase 1 — Register the Four WRP Artifacts
+
+Create Nebula artifact/document records for:
+
+- wrp-v1-protocol
+wrp-v1-protocol
+
+- wrp-v1_1-dag
+wrp-v1_1-dag
+
+- wrp-v1_2-traversal
+wrp-v1_2-traversal
+
+- wrp-migration-plan
+wrp-migration-plan
+
+At minimum, store:
+
+- title
+title
+
+- artifact type
+artifact type
+
+- artifact key
+artifact key
+
+- version
+version
+
+- default level
+default level
+
+- conduit plan id
+conduit plan id
+
+- source kind
+source kind
+
+- status
+status
+
+---

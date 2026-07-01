@@ -1,0 +1,166 @@
+What you’re wisely pushing against is this degeneracy:
+
+> “If something goes wrong, we downgrade execution back into proposal space”
+
+“If something goes wrong, we downgrade execution back into proposal space”
+
+That creates a dangerous loop:
+
+- plan is committed
+plan is committed
+
+- execution fails
+execution fails
+
+- plan is demoted to “proposed”
+plan is demoted to “proposed”
+
+- it re-enters reasoning space
+it re-enters reasoning space
+
+- it becomes mutable again
+it becomes mutable again
+
+- execution is re-derived
+execution is re-derived
+
+That collapses the entire semantic separation between:
+
+- what we decided
+what we decided
+
+- what went wrong
+what went wrong
+
+---
+
+## The cleaner model
+
+Instead of “demotion,” you want:
+
+### Commit is irreversible in meaning, even if execution is not
+
+So when things go wrong:
+
+Conduit does NOT say:
+
+- “this is a proposed plan again”
+“this is a proposed plan again”
+
+Conduit says:
+
+- “this committed plan produced a failure trace”
+“this committed plan produced a failure trace”
+
+And then emits:
+
+- PlanExecutionFailed
+PlanExecutionFailed
+
+- PlanQuarantined
+PlanQuarantined
+
+- RepairPlanCreated(in Nebula, if needed)
+RepairPlanCreated(in Nebula, if needed)
+
+Key idea:
+
+> You never undo commitment. You only add evidence that commitment failed.
+
+You never undo commitment. You only add evidence that commitment failed.
+
+---
+
+## Why your instinct is right about Nebula
+
+Your instinct that “proposed plans should never be visible in Conduit” is actually protecting this invariant:
+
+- Nebula =revision space
+Nebula =revision space
+
+- Conduit =irreversible event space
+Conduit =irreversible event space
+
+If proposed artifacts leak into Conduit, you implicitly make execution reversible in interpretation, even if not in mechanics.
+
+That’s where systems start to feel “soft” or inconsistent under load.
+
+---
+
+## The real architecture you’re converging on
+
+You’re essentially building a two-plane cognitive system:
+
+### Nebula
+
+- reversible
+reversible
+
+- reflective
+reflective
+
+- multi-hypothesis
+multi-hypothesis
+
+- stratified
+stratified
+
+- graph-mutating
+graph-mutating
+
+### Conduit
+
+- irreversible
+irreversible
+
+- event-sourced
+event-sourced
+
+- failure-tolerant but not revision-tolerant
+failure-tolerant but not revision-tolerant
+
+- strictly state-driven
+strictly state-driven
+
+And the boundary is:
+
+> commitment is a one-way projection from Nebula → Conduit
+
+commitment is a one-way projection from Nebula → Conduit
+
+Everything else is apost-mortem or repair flow, not a rollback into ambiguity.
+
+---
+
+If you want to formalize the next step, the most useful artifact now is probably:
+
+- afailure taxonomy for Conduitexecution failurevalidation failureenvironmental failuresemantic mismatch (Nebula → Conduit drift)
+afailure taxonomy for Conduit
+
+- execution failure
+execution failure
+
+- validation failure
+validation failure
+
+- environmental failure
+environmental failure
+
+- semantic mismatch (Nebula → Conduit drift)
+semantic mismatch (Nebula → Conduit drift)
+
+Because that determines whether your “unless things go wrong” clause becomes a controlled recovery system—or a hidden backdoor between cognition and execution.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.

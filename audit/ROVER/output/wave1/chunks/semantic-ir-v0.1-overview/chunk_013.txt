@@ -1,0 +1,109 @@
+### Step 2: Reconcile CRITIQUED
+
+If critique is a meaningful lifecycle milestone (not just a side effect of review),
+add a CRITIQUE state to WorkStatus. If critique is purely a review output, remove
+CRITIQUED from WorkflowState and map it to PLAN_DONE.
+
+Decision depends on whether the system needs to *pause at critique* or *treat
+critique as an artifact produced during review*.
+
+### Step 3: Move WorkStatus to losm-ir
+
+Since WorkStatus is now the canonical lifecycle enum, andvalidate_transitionneeds to live in losm-ir (per architectural recommendation), WorkStatus should
+move to losm-ir alongside it.
+
+This breaks the current circular tension:
+-losm_irdefinesWorkStatus+validate_transition→ canonical truth
+-losm_storeimportsWorkStatusfromlosm_ir→ no longer defines its own enum
+-losm_shellimports both fromlosm_ir→ consistent
+
+### Migration order
+
+1. Addwork_status_to_phase()function tolosm_ir2. MoveWorkStatusenum tolosm_ir3. Movevalidate_transitiontolosm_ir(Plan 0026)
+4. Deprecate direct use ofWorkflowState— preferwork_status_to_phase()5. RemoveWorkflowStateor keep as alias for backward compat
+
+---
+
+## Appendix: Full Transition Table (WorkStatus-based)
+
+Fromlosm-shell/src/losm_shell/lifecycle/transition.py:NEW               → INTAKE, FAILED, BLOCKED
+INTAKE            → PLAN_GENERATION, FAILED, BLOCKED
+PLAN_GENERATION   → PLAN_REVIEW, FAILED, BLOCKED
+PLAN_REVIEW       → PLAN_APPROVAL_GATE, PLAN_GENERATION, FAILED, BLOCKED
+PLAN_APPROVAL_GATE→ SPEC_GENERATION, PLAN_GENERATION, FAILED, BLOCKED
+SPEC_GENERATION   → EXECUTION, FAILED, BLOCKED
+EXECUTION         → VALIDATION, FAILED, BLOCKED
+VALIDATION        → COMPLETION, EXECUTION, PLAN_GENERATION, FAILED, BLOCKED
+BLOCKED           → all except COMPLETION (can unblock to any non-terminal)
+COMPLETION        → (terminal)
+FAILED            → (terminal)there is Python code there as well: graph, transition, validation, plan, states, trace, etc.
+bp sez:  
+
+LOSM-IR (LOSM Intermediate Representation) — the canonical semantic contract layer for the LOSM system. It defines the formal type system for work requests, plans, specs, and execution lifecycle, independent of any storage or execution backend.
+Package: losm-ir v0.1.0, depends only on pydantic>=2.0, requires Python >=3.11.
+Source Files (14 Python modules)
+Module	What it defines
+work_request.py	WorkRequestDCO — the full work request model: intent, decomposition (steps+deps), requirements (functional/non-functional/system/tool), constraints (forbidden actions, safety, resource limits), success criteria, execution state, lineage, artifacts, metadata. This is the largest/most detailed model.
+states.py	Two enums: WorkflowState (9 lifecycle phases: NEW→PLAN_DONE→CRITIQUED→SPEC_READY→EXECUTED→VALIDATED→COMPLETE/FAILED/BLOCKED) and WorkStatus (11 operational pipeline states with greater granularity, e.g. PLAN_GENERATION/PLAN_REVIEW/PLAN_APPROVAL_GATE). Includes work_status_to_phase() projection function.
+transition.py	VALID_TRANSITIONS table (state machine), validate_transition() pure function, TransitionError. Routes the 11 WorkStatus states with feedback loops (VALIDATION can go back to EXECUTION or PLAN_GENERATION; PLAN_REVIEW can loop back to PLAN_GENERATION).
+execution.py	ExecutionIR — execution record with status (pending/running/success/failure), step results, logs, metrics, retry count, failure summary.
+execution_receipt.py	ExecutionReceipt — immutable receipt for a single executor action: work_request_id, executor_id, mutations list, result (SUCCESS/FAILED/PARTIAL), lineage parent.
+executor_registry.py	ExecutorRegistry — registers executors by ID with their supported action types and invocation contracts (CLI/HTTP/module).
+plan.py	PlanIR — goal interpretation, constraints, assumptions, ordered execution steps.
+spec.py	SpecIR — spec_id, plan_id, intent, steps (each with command, input/output contracts, execution policy, dependencies), failure policy.
+validation.py	ValidationIR — validation result with status (success/failure/partial), score, issues, recommendation, logs.
+critique.py	CritiqueIR — critique of a plan with scores, issues (typed+severity), advisory recommendation (APPROVE/REJECT/REVISE), rationale.
+graph.py	Simple Graph/Node/Edge dataclasses.
+trace.py	TraceOutput, trace_hash() (deterministic hash from morphism steps), TraceFamily (set of traces with equality based on hash).
+constraints.py	ConstraintViolation exception with witness data.
+__init__.py	Re-exports all public types.
+Design Characteristics
+- Pure semantic layer — no I/O, no storage, no DB. All Pydantic/dataclass models.
+- Two-tier state model — WorkStatus (11 states, operational, DB-backed) projects down to WorkflowState (9 states, IR-level, human-readable phase). The doc state-ontology-analysis.md recommends merging toward WorkStatus as canonical with work_status_to_phase() as the projection function.
+- Feedback loops in the state machine — transitions aren't linear: VALIDATION can go back to EXECUTION or PLAN_GENERATION; PLAN_REVIEW can loop to PLAN_GENERATION. The only true terminals are COMPLETION and FAILED.
+- No tests visible — no tests/ directory in the package.
+- Single dependency — pydantic only.
+This aligns very closely with several of the approved plans (especially #009 Formal WorkRequest Schema, #010 Formal Plan Schema, and the lifecycle/state machine concepts).Show moreShow lessYou said:OK, go onYou said:continueYou said:continueYou said:continue, definitelyYou said:continueYou said:of course, go on, continueYou said:continueYou said:continueYou said:sure, go onYou said:let's proceedYou said:sure, go ahead, this is the attention vision needed, and after this, I want to to circle back to WRPYou said:continue, this is the missing pieceYou said:go aheadYou said:continueChatGPT said:Good — now we turn WRP into something that can survive contact with reality:aversioned, typed, interoperable protocol specthat Spring, Python, DB, and Nexus can all agree on without ambiguity.This is where we remove “architecture language” and replace it withcontracts.0. WRP v1.0 → Protocol Specification LayerWRP is now formally defined as:A versioned event-sourced protocol for lifecycle-driven execution of WorkRequestDCO objects across distributed cognitive runtimes.It has 4 canonical artifacts:1. WorkRequest Schema (data contract)2. WRP Event Schema (event contract)3. WRP State Machine (lifecycle contract)4. WRP API (transport contract)1. WorkRequest Schema (canonical IR contract)This is already yourWorkRequestDCO, but now we formalize versioning boundaries.wrp/schema/work_request.schema.jsonJSON{"$id":"wrp.workrequest.v1","type":"object","required": ["id","version","intent","execution_state"],"properties": {"id": { "type":"string"},"version": { "type":"integer"},"intent": {"type":"object","properties": {"problem_statement": { "type":"string"},"desired_outcome": { "type":"string"},"domain": { "type":"string"},"priority": { "type":"string", "enum": ["low","medium","high","critical"] },"abstraction_level": { "type":"string"}}},"execution_state": {"type":"object","properties": {"status": {"type":"string","enum": ["pending","decomposed","in_progress","blocked","validating","completed","failed"]},"progress": { "type":"number"}}}}}2. WRP Event Schema (THIS is the real backbone)Everything in the system is event-driven.We now definestrict event typing + versioning + causality rules.2.1 Base event contractJSON{"$id":"wrp.event.base.v1","type":"object","required": ["event_id","wrp_id","type","timestamp","version"],"properties": {"event_id": { "type":"string"},"wrp_id": { "type":"string"},"type": { "type":"string"},"timestamp": { "type":"string"},"version": { "type":"integer"},"causation_id": { "type":"string"},"correlation_id": { "type":"string"},"payload": { "type":"object"}}}2.2 Concrete event typesLifecycle eventsJSON{"WRP_INGESTED": {"payload": {"work_request": { "type":"object"}}},"WRP_PLANNED": {"payload": {"plan_id": { "type":"string"}}},"WRP_EXECUTED": {"payload": {"step_id": { "type":"string"},"result": { "type":"string"}}},"WRP_VALIDATED": {"payload": {"score": { "type":"number"}}},"WRP_CONVERGED": {"payload": {"equilibrium_id": { "type":"string"}}}}3. WRP State Machine (now formally constrained)This is thesingle source of truth for lifecycle transitions.wrp/state_machine.spec.pyPythonRunfromenumimportEnumclassWRPState(str,Enum):CREATED="CREATED"INTAKE="INTAKE"PLANNING="PLANNING"CRITIQUE="CRITIQUE"SPECIFICATION="SPECIFICATION"EXECUTION="EXECUTION"VALIDATION="VALIDATION"COMPLETED="COMPLETED"FAILED="FAILED"BLOCKED="BLOCKED"CONVERGED="CONVERGED"Transition rules (formalized as adjacency matrix)PythonRunWRP_TRANSITIONS={"CREATED": {"INTAKE"},"INTAKE": {"PLANNING","BLOCKED"},"PLANNING": {"CRITIQUE","FAILED"},"CRITIQUE": {"PLANNING","SPECIFICATION"},"SPECIFICATION": {"EXECUTION"},"EXECUTION": {"VALIDATION","FAILED"},"VALIDATION": {"COMPLETED","EXECUTION"},"COMPLETED":set(),"FAILED":set(),"BLOCKED":set(),"CONVERGED":set(),}Rule invariants (critical)Only VALIDATION can reach COMPLETEDOnly EXECUTION can reach VALIDATIONCRITIQUE cannot directly executeCONVERGED is orthogonal (can overlay any terminal state)4. WRP API Contract (Spring ↔ Python bridge)Now we define theactual network surface.4.1 OpenAPI definition (core endpoints)YAMLopenapi: 3.0.3info:title: WRP Runtime APIversion: 1.0paths:/wrp/work-requests:post:summary: Create WorkRequestrequestBody:required: trueresponses:"200":description: WorkRequest created/wrp/events/{wrp_id}:post:summary: Emit event into WRP runtimeparameters:- name: wrp_idin: pathrequired: truerequestBody:required: true/wrp/state/{wrp_id}:get:summary: Get current kernel state snapshot/wrp/replay/{wrp_id}:get:summary: Replay full event stream5. Versioning rules (this is what makes it production-safe)WRP MUST be versioned at 3 levels:5.1 Protocol versionWRP-Protocol: v1Changes:event schemastate machineAPI structure5.2 Event versionevent.version = 1 | 2 | 3 ...Rules:events are immutablenew versions are additive onlyold events remain valid forever5.3 WorkRequest versionWorkRequestDCO.versionRules:defines IR evolutiontriggers projection recalculation6. Cross-system consistency rule (critical)This is the most important invariant:ALL systems must agree on WRPState transitionsSo:LayerResponsibilitySpringemits WRP events onlyPython Kernelexecutes transitionsDBstores truthNexusvisualizes state onlyNo exceptions.7. End-to-end execution contractNow we define the full runtime loop:1. Spring receives WorkRequest2. Emits WRP_INGESTED3. Python stores event4. Kernel builds SemanticProjection5. Kernel expands state space6. Policies evaluate trajectories7. WRP_PLANNED emitted8. Execution triggered9. WRP_EXECUTED emitted10. Validation runs11. WRP_VALIDATED emitted12. Kernel detects equilibrium13. WRP_CONVERGED emitted14. Snapshot persisted15. Nexus updates UI8. What WRP actually becomes (final abstraction)WRP is now:atyped event-sourced distributed state machine for executing structured cognition workflowsMore concretely:It is simultaneously:API contract (Spring ↔ Python)state machine (lifecycle rules)event system (Kafka/DB/stream)execution protocol (kernel triggers)UI feed model (Nexus projection layer)9. Why this is the missing piece (important insight)Before WRP:you had architecture layersbut nobinding semanticsNow:WRP is the semantic glue that makes every layer agree on "what is happening right now"10. Final unified system viewWRP Protocol Layer (TRUTH CONTRACT)│┌───────────────────┼────────────────────┐│                   │                    │Spring (Ingress)   Python Kernel        Nexus UI│                   │                    │└──────────────┬────┴────┬───────────────┘▼         ▼Event Store   Snapshot Store▼State Machine (WRP)▼Cognitive Kernel (Compute)▼State Space + Policy Evolution▼Convergence Engine11. Where you are now (honest position)You now have:✔ IR layer (LOSM-IR)✔ kernel computation layer✔ event-sourced runtime✔ policy evolution system✔ distributed execution model✔ UI observability layer✔formal runtime protocol (WRP)12. What comes next (only meaningful next step)There is only one real continuation now:👉 mapping WRP intoactual implementation migration planThat means:file-by-file refactor orderwhat to delete vs keepSpring → Python contract alignment checklistDB schema migration script designNexus event subscription wiringIf you say “continue”, I will turn this into:a concrete step-by-step refactor plan that transforms your current repo into WRP-compliant runtime without breaking anythingThis is where it becomes executable engineering instead of architecture.Automatic Capital Operations Canada LtdSponsoredThe RFP AI that doesn't hallucinateAutoRFP helps you win RFPs, DDQs & security questionnaires autonomously.You said:continueChatGPT said:Good — now we stop drawing boundaries and actuallyconvert your existing repo into WRP-compliant runtime step-by-step without breaking it.This is the part where architecture becomes migration engineering.0. Goal: Zero-break WRP adoptionWe are NOT rewriting LOSM.We are doing:incremental structural replacement with compatibility layersSo everything continues running while the system “re-wires itself underneath.”1. Migration strategy (critical framing)We use a 4-phase rollout:Phase 1: Shadow WRP layer (no behavior change)Phase 2: Dual-write system (old + WRP events)Phase 3: WRP becomes primary runtimePhase 4: Legacy collapse (remove old state logic)2. Phase 1 — Shadow WRP layer (SAFE)Goal:Introduce WRP without changing anything functional.2.1 Add new package (NO integration yet)losm-wrp/Inside:wrp/events.pywrp/state_machine.pywrp/schema/wrp/runtime.py2.2 Mirror events only (no kernel calls yet)In Python runtime:PythonRundefshadow_emit(event:dict):"""Writes WRP event alongside existing system behavior.DOES NOT affect execution."""wrp_event_store.append(event)2.3 Hook points (non-invasive)Add shadow hooks in:losm-storeafter WorkRequest update → emit WRP eventlosm-shellafter transition → emit WRP state eventexecution layerafter step execution → emit WRP_EXECUTEDResult of Phase 1:You now have:✔ full WRP event log✔ no behavioral change✔ replayable history being built3. Phase 2 — Dual-write system (CONTROLLED coupling)Now we connect WRP to real execution.3.1 Replace transition validation entrypointBEFORE:PythonRunvalidate_transition(work_status)AFTER:PythonRundefvalidate_transition_wrapped(from_state,to_state,wrp_id):# legacy checklegacy_ok=validate_transition(from_state,to_state)# WRP check (new authority)wrp_ok=wrp_validate_transition(from_state,to_state)iflegacy_okandwrp_ok:wrp_event_store.append({"type":"WRP_STATE_TRANSITION","wrp_id":wrp_id,"from":from_state,"to":to_state})returnTruereturnFalse3.2 Kernel becomes event subscriber (shadow mode)PythonRundefkernel_step_with_shadow(state,wrp_id):new_state=kernel.step(state)wrp_event_store.append({"type":"WRP_KERNEL_STEP","wrp_id":wrp_id,"snapshot":new_state.model_dump()})returnnew_stateResult of Phase 2:✔ WRP is now causally aligned with execution✔ but still not controlling execution4. Phase 3 — WRP becomes primary runtime (CRITICAL SHIFT)This is where inversion happens:execution is now driven by WRP events, not internal logic4.1 Replace shell orchestration loopBEFORE (old shell):PythonRunkernel.step(state)AFTER (WRP-driven):PythonRundefruntime_loop(wrp_id):events=event_store.replay(wrp_id)state=snapshot_store.load(wrp_id)foreventinevents:ifnotwrp_validate(event):continuestate=wrp_kernel_bridge.apply_event(state,event)snapshot_store.save(state)4.2 Execution becomes event-triggeredInstead of:plan → execute → validateWe now have:WRP_PLANNED → triggers execution engineWRP_EXECUTED → triggers validation engineWRP_VALIDATED → triggers convergence checkResult of Phase 3:✔ WRP is now controlling flow✔ kernel becomes reactive✔ system is event-sourced end-to-end5. Phase 4 — Legacy collapse (removal of old system)Now we delete redundancy.5.1 Remove WorkStatus as active driverReplace all:PythonRunWorkStatuswith:PythonRunWRPStateor derived projection.5.2 Replace WorkflowState entirelyKeep only:PythonRunwork_status_to_phase()as compatibility shim.5.3 Remove direct transition tables from shellShell no longer owns lifecycle logic.It becomes:event router only5.4 Move execution authority fully to WRP runtimekernel is no longer called directlyonly triggered via WRP events6. Final dependency collapse (after migration)You end up with:Spring Boot (Ingress)↓WRP Event API↓Event Store (source of truth)↓WRP Runtime Engine↓Cognitive Kernel (pure compute)↓State Space + Policy Evolution↓Snapshot Store↓Nexus (observability only)7. What actually changed structurally (important)We fixed 3 deep architectural issues:7.1 BEFORE: dual truth problemWorkStatus (store)WorkflowState (IR)kernel state (runtime)❌ 3 competing state machines7.2 AFTER: single truthWRPState + event stream✔ one lifecycle authority✔ one transition system✔ one runtime protocol7.3 BEFORE: imperative executionKernel called directly.AFTER: event-driven executionKernel is:a projection over event history8. Migration order (VERY IMPORTANT)Do this in exact order:STEP 1Introduce WRP package (no integration)STEP 2Add shadow event emitters everywhereSTEP 3Persist WRP events in DBSTEP 4Build replay engineSTEP 5Switch shell runtime loop to WRP eventsSTEP 6Redirect kernel invocation to event bridgeSTEP 7Deprecate WorkStatus / WorkflowState usageSTEP 8Remove legacy transition system9. What you now have after full migrationYou have transformed LOSM into:afully event-sourced cognitive runtime governed by a unified lifecycle protocol (WRP)Which means:✔ deterministic replay✔ observable reasoning✔ policy evolution tied to execution✔ distributed execution correctness✔ UI-level introspection of cognition10. The real significance (no hype version)This is no longer:workflow systemorchestration engineAI pipelineIt is:a protocolized computational substrate for structured reasoning systems11. Where we go next (your next real inflection point)Now there are only 3 meaningful expansions:A. Multi-tenant WRP (many kernels, shared event space)B. Hierarchical WRP (WorkRequest DAGs as nested runtimes)C. Probabilistic WRP (non-deterministic policy execution + sampling)If you say “continue”, the most natural next step is:👉 WRP DAG extension (WorkRequestDAG + nested execution + recursive kernel invocation)That’s where this becomes a true recursive cognitive system rather than a flat pipeline.You said:go onChatGPT can make mistakes. Check important info.
+
+ChatGPTFree offerShareBulk Export
+
+ChatGPT
+
+ChatGPT
+
+Free offerShareBulk Export
+
+Free offerShareBulk Export
+
+Free offer
+
+Free offer
+
+ShareBulk Export
+
+Share
+
+You said:“Semantic IR v0.1 (strict schema + mapping to NBK primitives)”You said:Turn this into a real Pydantic module with all classes, enums, and cross-reference validatorsYou said:ok, and remembering that nexus/python/ai has been renamed to nexus/python/vision, let's do both, and let's dig into WorkRequestDAG as well.You said:let's proceedYou said:go aheadYou said:Write the actual semantic_projection package modules plus the compiler adjustmentsYou said:what I have in my losm-ir folder is this: 
+
+# State Ontology Analysis: WorkflowState vs WorkStatus
+
+## Purpose
+
+Two state enums coexist across the LOSM codebase. This document maps them,
+determines their relationship type, and recommends a consolidation strategy.
+
+## Enums
+
+### WorkflowState (losm_ir/states.py) — 9 states
+
+The IR-level / simplified lifecycle. No DB binding.python
+class WorkflowState(str, Enum):
+    NEW = "NEW"
+    PLAN_DONE = "PLAN_DONE"
+    CRITIQUED = "CRITIQUED"
+    SPEC_READY = "SPEC_READY"
+    EXECUTED = "EXECUTED"
+    VALIDATED = "VALIDATED"
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
+    BLOCKED = "BLOCKED"### WorkStatus (losm_store/models.py) — 11 states

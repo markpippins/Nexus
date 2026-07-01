@@ -19,10 +19,34 @@ import {
   undeletePlan,
   hardDeletePlan,
   updateSessionHeartbeat,
+  createWorkRequest,
+  appendEvent,
+  getEvents,
+  getAllEvents,
+  selectNextRunnable,
+  listWorkRequestStates,
 } from "./db";
+import {
+  validateCompilerOutput,
+  compilerOutputToEvent,
+  foldEvents,
+  decide,
+  validateTransition,
+  getDecisionPriority,
+  dbEventsToRuntimeEvents,
+  WorkRequestState,
+  WorkRequestStatus,
+  CompilerOutput,
+} from "./runtime-kernel";
 import fs from "fs";
 import path from "path";
 
+import {
+  validateImplementationPlan,
+  validateIpGoal,
+  validateNodeType,
+  validateEdgeType,
+} from "./ip-grammar-validator";
 import {
   AgentRole,
   AgentStatus,
@@ -424,6 +448,155 @@ export const toolDefinitions: MCPToolDefinition[] = [
         category: { type: "string", description: "Filter by category: committed, flagged, reviewed" },
       },
     },
+  },
+  // ── IP Grammar Validator tools ─────────────────────────────────
+  {
+    name: "validate_ip_goal",
+    description:
+      "Validate an Implementation Plan goal string against the WRP grammar. Checks for forbidden execution verbs, procedural language, tool leakage, and collapsibility to WorkRequest opcodes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        goal: { type: "string", description: "The goal string to validate" },
+      },
+      required: ["goal"],
+    },
+  },
+  {
+    name: "validate_implementation_plan",
+    description:
+      "Validate a full set of Implementation Plan fields against the WRP grammar. Returns findings for all rules and a cleanliness score (0-100).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Plan title" },
+        goal: { type: "string", description: "Plan goal" },
+        content: { type: "string", description: "Plan content / body" },
+        acceptanceCriteria: { type: "array", items: { type: "string" }, description: "Acceptance criteria" },
+        decompositionNodes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string", description: "Node type (DOMAIN_COMPONENT, CAPABILITY, CONSTRAINT, OPEN_QUESTION)" },
+              name: { type: "string" },
+              rationale: { type: "string" },
+            },
+          },
+          description: "Decomposition nodes",
+        },
+        openQuestions: { type: "array", items: { type: "string" }, description: "Open questions" },
+      },
+    },
+  },
+  // ── Runtime Kernel Tools ─────────────────────────────────────────
+  {
+    name: "runtime_submit_work_request",
+    description:
+      "Submit a validated CompilerOutput as a new WorkRequest. Enforces the compiler/runtime contract " +
+      "boundary — rejects any payload containing execution fields (status, worker, scheduling, etc.). " +
+      "Returns the initial folded state (DRAFT → VALIDATED).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        wrId: { type: "string", description: "Unique WorkRequest ID" },
+        intent: {
+          type: "object",
+          properties: {
+            type: { type: "string", description: "Intent type" },
+            inputs: { description: "Intent inputs (any)" },
+            objective: { type: "string", description: "Objective description" },
+          },
+          required: ["type", "objective"],
+          description: "Intent layer — what is desired",
+        },
+        constraints: {
+          type: "object",
+          properties: {
+            deterministic: { type: "boolean", description: "Whether this is deterministic" },
+            maxRetries: { type: "number", description: "Max retry hint" },
+            timeoutPolicy: { type: "string", description: "Timeout policy hint" },
+            resourceHints: { type: "array", items: { type: "string" }, description: "Resource hints" },
+          },
+          required: ["deterministic"],
+          description: "Constraint layer — what is allowed",
+        },
+        opTrace: {
+          type: "object",
+          properties: {
+            ipNodes: { type: "array", items: { type: "string" }, description: "IP node IDs" },
+            resolvedOps: { type: "array", items: { type: "string" }, description: "Resolved opcodes" },
+            registryVersion: { type: "string", description: "Registry version used" },
+          },
+          required: ["ipNodes", "resolvedOps", "registryVersion"],
+          description: "Op resolution trace",
+        },
+      },
+      required: ["wrId", "intent", "constraints", "opTrace"],
+    },
+  },
+  {
+    name: "runtime_get_work_request",
+    description: "Get the current folded state of a WorkRequest from its event log.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        wrId: { type: "string", description: "WorkRequest ID" },
+      },
+      required: ["wrId"],
+    },
+  },
+  {
+    name: "runtime_get_work_request_events",
+    description: "Get the raw event log for a WorkRequest (chronological).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        wrId: { type: "string", description: "WorkRequest ID" },
+      },
+      required: ["wrId"],
+    },
+  },
+  {
+    name: "runtime_list_work_requests",
+    description: "List all WorkRequests with their folded states. Optional status filter.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          description: "Optional status filter (e.g. VALIDATED, QUEUED, CLAIMED, SETTLED)",
+        },
+        limit: { type: "number", description: "Max results (default 50)" },
+      },
+    },
+  },
+  {
+    name: "runtime_transition",
+    description: "Apply a transition event to a WorkRequest. Validates against the state machine. " +
+      "Allowed types: WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        wrId: { type: "string", description: "WorkRequest ID" },
+        type: {
+          type: "string",
+          description: "Event type (WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED)",
+        },
+        payload: {
+          type: "object",
+          description: "Optional payload (e.g. { workerId, reason, error })",
+        },
+      },
+      required: ["wrId", "type"],
+    },
+  },
+  {
+    name: "runtime_tick",
+    description: "Run ONE tick of the causal decision loop. Scans for the next runnable WorkRequest " +
+      "(VALIDATED→QUEUED, QUEUED→CLAIMED, CLAIMED→ACKED), applies the transition, and returns the result. " +
+      "Call this on a loop or after event submission to advance the system.",
+    inputSchema: { type: "object", properties: {} },
   },
 ];
 
@@ -1680,6 +1853,173 @@ export function registerToolHandlers(
         ticketsCancelled,
         newStatus: "pending",
         timestamp: now,
+      };
+    },
+
+    // ── IP Grammar Validator handlers ────────────────────────────
+    validate_ip_goal: async (args: { goal: string }) => {
+      const errs = validate(args, [
+        { field: "goal", type: "string", required: true },
+      ]);
+      if (errs.length > 0)
+        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
+      const result = validateIpGoal(args.goal);
+      return {
+        valid: result.valid,
+        score: result.score,
+        findings: result.findings,
+        summary:
+          result.valid
+            ? "✓ Goal is clean — no IP grammar violations."
+            : `✗ ${result.findings.filter((f) => f.severity === "ERROR").length} error(s), ${result.findings.filter((f) => f.severity === "WARNING").length} warning(s)`,
+      };
+    },
+
+    validate_implementation_plan: async (args: {
+      title?: string;
+      goal?: string;
+      content?: string;
+      acceptanceCriteria?: string[];
+      decompositionNodes?: Array<{ type: string; name: string; rationale?: string }>;
+      openQuestions?: string[];
+    }) => {
+      const result = validateImplementationPlan(args);
+      return {
+        valid: result.valid,
+        score: result.score,
+        findings: result.findings,
+        summary:
+          result.valid
+            ? "✓ Implementation Plan passes all grammar checks."
+            : `✗ ${result.findings.filter((f) => f.severity === "ERROR").length} error(s), ${result.findings.filter((f) => f.severity === "WARNING").length} warning(s). Score: ${result.score}/100`,
+      };
+    },
+
+    validate_node_type: async (args: { type: string }) => {
+      const errs = validate(args, [
+        { field: "type", type: "string", required: true },
+      ]);
+      if (errs.length > 0)
+        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
+      const finding = validateNodeType(args.type);
+      return {
+        valid: finding === null,
+        type: args.type,
+        ...(finding ? { finding } : { message: `"${args.type}" is a valid node type.` }),
+      };
+    },
+
+    validate_edge_type: async (args: { type: string }) => {
+      const errs = validate(args, [
+        { field: "type", type: "string", required: true },
+      ]);
+      if (errs.length > 0)
+        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
+      const finding = validateEdgeType(args.type);
+      return {
+        valid: finding === null,
+        type: args.type,
+        ...(finding ? { finding } : { message: `"${args.type}" is a valid edge type.` }),
+      };
+    },
+
+    // ── Runtime Kernel Handlers ────────────────────────────────────
+
+    runtime_submit_work_request: async (args: any) => {
+      const errs = validate(args, [
+        { field: "wrId", type: "string", required: true },
+      ]);
+      if (errs.length > 0)
+        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
+      validateCompilerOutput(args);
+      const event = compilerOutputToEvent(args as CompilerOutput);
+      await createWorkRequest({
+        id: event.wrId,
+        dco_json: JSON.stringify(args),
+        context: { intent: args.intent, constraints: args.constraints, opTrace: args.opTrace },
+        status: "draft",
+      });
+      await appendEvent(event.wrId, event.type, event.payload as Record<string, unknown>);
+      const rawEvents = await getEvents(event.wrId);
+      const state = foldEvents(event.wrId, dbEventsToRuntimeEvents(rawEvents));
+      return { ok: true, state };
+    },
+
+    runtime_get_work_request: async (args: { wrId: string }) => {
+      const errs = validate(args, [
+        { field: "wrId", type: "string", required: true },
+      ]);
+      if (errs.length > 0)
+        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
+      const rawEvents = await getEvents(args.wrId);
+      if (rawEvents.length === 0)
+        throw createError("NOT_FOUND", `WorkRequest ${args.wrId} not found`);
+      const state = foldEvents(args.wrId, dbEventsToRuntimeEvents(rawEvents));
+      return { ok: true, state };
+    },
+
+    runtime_get_work_request_events: async (args: { wrId: string }) => {
+      const errs = validate(args, [
+        { field: "wrId", type: "string", required: true },
+      ]);
+      if (errs.length > 0)
+        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
+      const events = await getEvents(args.wrId);
+      if (events.length === 0)
+        throw createError("NOT_FOUND", `WorkRequest ${args.wrId} not found`);
+      return { ok: true, count: events.length, events };
+    },
+
+    runtime_list_work_requests: async (args: { status?: string; limit?: number }) => {
+      const rows = await listWorkRequestStates({
+        status: args.status,
+        limit: args.limit,
+      });
+      const states: WorkRequestState[] = [];
+      for (const row of rows) {
+        const rawEvents = await getEvents(row.work_request_uuid);
+        states.push(foldEvents(row.work_request_uuid, dbEventsToRuntimeEvents(rawEvents)));
+      }
+      return { ok: true, count: states.length, states };
+    },
+
+    runtime_transition: async (args: { wrId: string; type: string; payload?: Record<string, unknown> }) => {
+      const errs = validate(args, [
+        { field: "wrId", type: "string", required: true },
+        { field: "type", type: "string", required: true },
+      ]);
+      if (errs.length > 0)
+        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
+      const rawEvents = await getEvents(args.wrId);
+      if (rawEvents.length === 0)
+        throw createError("NOT_FOUND", `WorkRequest ${args.wrId} not found`);
+      const state = foldEvents(args.wrId, dbEventsToRuntimeEvents(rawEvents));
+      validateTransition(state.status, args.type as any);
+      await appendEvent(args.wrId, args.type, args.payload || {});
+      const rawNewEvents = await getEvents(args.wrId);
+      const newState = foldEvents(args.wrId, dbEventsToRuntimeEvents(rawNewEvents));
+      return { ok: true, state: newState };
+    },
+
+    runtime_tick: async () => {
+      const wr = await selectNextRunnable();
+      if (!wr)
+        return { ok: true, ticked: false, reason: "no runnable work requests" };
+      const rawEvents = await getEvents(wr.work_request_uuid);
+      const state = foldEvents(wr.work_request_uuid, dbEventsToRuntimeEvents(rawEvents));
+      const decision = decide(state);
+      if (!decision)
+        return { ok: true, ticked: false, reason: `state ${state.status} has no automatic transition` };
+      await appendEvent(decision.wrId, decision.type, decision.payload as Record<string, unknown>);
+      const rawNewEvents = await getEvents(wr.work_request_uuid);
+      const newState = foldEvents(wr.work_request_uuid, dbEventsToRuntimeEvents(rawNewEvents));
+      return {
+        ok: true, ticked: true,
+        wrId: wr.wr_id,
+        event: decision.type,
+        previousStatus: state.status,
+        currentStatus: newState.status,
+        state: newState,
       };
     },
   };

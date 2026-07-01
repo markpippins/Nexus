@@ -56,9 +56,8 @@ public class DatabaseSchemaValidator {
         }
     }
 
-    private void validateAndFixIdColumn(Connection conn, String tableName) throws SQLException {
-        String sql = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'id'";
+    private void validateAndFixIdColumn(Connection conn, String tableName) throws SQLException {            String sql = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                    "WHERE TABLE_SCHEMA = current_database() AND TABLE_NAME = ? AND COLUMN_NAME = 'id'";
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, tableName);
@@ -70,7 +69,7 @@ public class DatabaseSchemaValidator {
                 if (!dataType.equalsIgnoreCase("bigint")) {
                     log.warn("Fixing column type for {}.id: {} -> bigint", tableName, dataType);
 
-                    String alterSql = "ALTER TABLE " + tableName + " MODIFY COLUMN id BIGINT NOT NULL AUTO_INCREMENT";
+                    String alterSql = "ALTER TABLE " + tableName + " ALTER COLUMN id SET DATA TYPE BIGINT USING id::bigint";
                     try (PreparedStatement alterStmt = conn.prepareStatement(alterSql)) {
                         alterStmt.executeUpdate();
                         log.info("Successfully fixed {}.id column type to BIGINT", tableName);
@@ -117,7 +116,7 @@ public class DatabaseSchemaValidator {
     private void validateAndFixForeignKeyColumn(Connection conn, String tableName, String columnName)
             throws SQLException {
         String sql = "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+                "WHERE TABLE_SCHEMA = current_database() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
 
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, tableName);
@@ -130,7 +129,7 @@ public class DatabaseSchemaValidator {
                 if (!dataType.equalsIgnoreCase("bigint")) {
                     log.warn("Fixing column type for {}.{}: {} -> bigint", tableName, columnName, dataType);
 
-                    String alterSql = "ALTER TABLE " + tableName + " MODIFY COLUMN " + columnName + " BIGINT";
+                    String alterSql = "ALTER TABLE " + tableName + " ALTER COLUMN " + columnName + " SET DATA TYPE BIGINT USING " + columnName + "::bigint";
                     try (PreparedStatement alterStmt = conn.prepareStatement(alterSql)) {
                         alterStmt.executeUpdate();
                         log.info("Successfully fixed {}.{} column type to BIGINT", tableName, columnName);

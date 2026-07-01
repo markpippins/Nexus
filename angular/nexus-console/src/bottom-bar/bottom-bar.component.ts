@@ -1,6 +1,7 @@
-import { Component, ChangeDetectionStrategy, input, output, ViewEncapsulation } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, ViewEncapsulation, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { EXTERNAL_SITES } from '../components/external-site-selector/external-site-selector.component.js';
+import { MessageBoxService } from '../services/message-box.service.js';
 
 export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms';
 
@@ -28,6 +29,8 @@ export const NAV_ITEMS: NavItem[] = [
   encapsulation: ViewEncapsulation.None,
 })
 export class BottomBarComponent {
+  private mbox = inject(MessageBoxService);
+
   /** Status text shown on the left side of the bar */
   statusInfo = input<string>('Ready');
   /** Selection count text shown next to status */
@@ -35,11 +38,24 @@ export class BottomBarComponent {
   /** Base URL for the image server (used for site button icons via substitution scheme) */
   imageBaseUrl = input<string | null>(null);
 
+  /** Emitted when the AI config button is clicked */
+  aiconfigClick = output<void>();
+
   readonly navItems = NAV_ITEMS;
   readonly externalSites = EXTERNAL_SITES;
 
   openExternal(url: string): void {
     window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  /** Open a new chat messagebox instance */
+  openNewChat(): void {
+    this.mbox.open('Assistant');
+  }
+
+  /** Emit aiconfigClick event */
+  onAiconfigClick(): void {
+    this.aiconfigClick.emit();
   }
 
   /** Build an image URL for an external site using the same substitution scheme as the treeview. */

@@ -1,0 +1,177 @@
+version: "3.8"
+
+services:
+  # MCP Services
+  conduit-mcp:
+    build:
+      context: ./nexus/typescript/conduit-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "3100:3100"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://pguser:pgpass@postgres:5432/nexus
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - nexus
+
+  tackle-mcp:
+    build:
+      context: ./nexus/typescript/tackle-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "3101:3101"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://pguser:pgpass@postgres:5432/nexus
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - nexus
+
+  nebula-mcp:
+    build:
+      context: ./nexus/typescript/nebula-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "3102:3102"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://pguser:pgpass@postgres:5432/nexus
+    depends_on:
+      - postgres
+    networks:
+      - nexus
+
+  knowledge-mcp:
+    build:
+      context: ./nexus/typescript/knowledge-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "3103:3103"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://pguser:pgpass@postgres:5432/nexus
+    depends_on:
+      - postgres
+    networks:
+      - nexus
+
+  terrain-mcp:
+    build:
+      context: ./nexus/typescript/terrain-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "3104:3104"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://pguser:pgpass@postgres:5432/nexus
+    depends_on:
+      - postgres
+    networks:
+      - nexus
+
+  vision-mcp:
+    build:
+      context: ./nexus/typescript/vision-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "3105:3105"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://pguser:pgpass@postgres:5432/nexus
+    depends_on:
+      - postgres
+    networks:
+      - nexus
+
+  peb-mcp:
+    build:
+      context: ./nexus/typescript/peb-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "3106:3106"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://pguser:pgpass@postgres:5432/nexus
+    depends_on:
+      - postgres
+    networks:
+      - nexus
+
+  role-memory-srv:
+    build:
+      context: ./nexus/typescript/role-memory-srv
+      dockerfile: Dockerfile
+    ports:
+      - "3500:3500"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://pguser:pgpass@postgres:5432/nexus
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - nexus
+
+  # Tools Aggregator
+  tools-aggregator:
+    build:
+      context: ./nexus/typescript/tools-aggregator
+      dockerfile: Dockerfile
+    ports:
+      - "3200:3200"
+    environment:
+      - NODE_ENV=production
+      - TOOLS_AGGREGATOR_PORT=3200
+      - TOOLS_AGGREGATOR_HOST=0.0.0.0
+      - CONDUIT_MCP_URL=http://conduit-mcp:3100
+      - TACKLE_MCP_URL=http://tackle-mcp:3101
+      - NEBULA_MCP_URL=http://nebula-mcp:3102
+      - KNOWLEDGE_MCP_URL=http://knowledge-mcp:3103
+      - TERRAIN_MCP_URL=http://terrain-mcp:3104
+      - VISION_MCP_URL=http://vision-mcp:3105
+      - PEB_MCP_URL=http://peb-mcp:3106
+      - ROLE_MEMORY_URL=http://role-memory-srv:3500
+    depends_on:
+      - conduit-mcp
+      - tackle-mcp
+    networks:
+      - nexus
+
+  # Infrastructure
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=pguser
+      - POSTGRES_PASSWORD=pgpass
+      - POSTGRES_DB=nexus
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nexus
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - nexus
+
+networks:
+  nexus:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

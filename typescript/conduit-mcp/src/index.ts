@@ -1436,8 +1436,8 @@ app.get("/wr", async (req, res) => {
     // Fold events for each row to get the authoritative state
     const states: WorkRequestState[] = [];
     for (const row of rows) {
-      const events = dbEventsToRuntimeEvents(await getEvents(row.wr_id));
-      states.push(foldEvents(row.wr_id, events));
+      const events = dbEventsToRuntimeEvents(await getEvents(row.work_request_uuid));
+      states.push(foldEvents(row.work_request_uuid, events));
     }
     res.json({ ok: true, count: states.length, states });
   } catch (err: any) {
@@ -1543,21 +1543,18 @@ app.post("/wr/tick", async (_req, res) => {
       return;
     }
     // Get current state
-    const rawEvents = await getEvents(wr.wr_id);
+    const rawEvents = await getEvents(wr.work_request_uuid);
     const events = dbEventsToRuntimeEvents(rawEvents);
-    const state = foldEvents(wr.wr_id, events);
-    // Decide next action
+    const state = foldEvents(wr.work_request_uuid, events);
     const decision = decide(state);
     if (!decision) {
       res.json({ ok: true, ticked: false, reason: `state ${state.status} has no automatic transition` });
       return;
     }
-    // Emit the decision as an event
     await appendEvent(decision.wrId, decision.type, decision.payload as Record<string, unknown>);
-    // Return the result
-    const rawNewEvents = await getEvents(wr.wr_id);
+    const rawNewEvents = await getEvents(wr.work_request_uuid);
     const newEvents = dbEventsToRuntimeEvents(rawNewEvents);
-    const newState = foldEvents(wr.wr_id, newEvents);
+    const newState = foldEvents(wr.work_request_uuid, newEvents);
     // Broadcast SSE event
     const now = new Date().toISOString();
     watcher.emitToolEvent({

@@ -63,6 +63,7 @@ class UserAccessServiceE2ETest {
         UserRegistration newUser = new UserRegistration();
         newUser.setAlias("e2eTestUser");
         newUser.setEmail("e2e@test.com");
+        newUser.setIdentifier("testpass");
         newUser.setAdmin(false);
 
         // Save the user to the database
@@ -74,7 +75,7 @@ class UserAccessServiceE2ETest {
         assertEquals("e2e@test.com", savedUser.getEmail());
 
         // Step 2: Validate the user using the service
-        UserRegistrationDTO validatedUser = userAccessService.validateUser("e2eTestUser", "ignored");
+        UserRegistrationDTO validatedUser = userAccessService.validateUser("e2eTestUser", "testpass");
 
         // Verify the validation returned correct user data
         assertNotNull(validatedUser);
@@ -95,22 +96,25 @@ class UserAccessServiceE2ETest {
         UserRegistration user1 = new UserRegistration();
         user1.setAlias("user1");
         user1.setEmail("user1@test.com");
+        user1.setIdentifier("testpass");
         userRepository.save(user1);
 
         UserRegistration user2 = new UserRegistration();
         user2.setAlias("user2");
         user2.setEmail("user2@test.com");
+        user2.setIdentifier("testpass");
         userRepository.save(user2);
 
         UserRegistration user3 = new UserRegistration();
         user3.setAlias("user3");
         user3.setEmail("user3@test.com");
+        user3.setIdentifier("testpass");
         userRepository.save(user3);
 
         // Step 2: Validate each user individually
-        UserRegistrationDTO result1 = userAccessService.validateUser("user1", "ignored");
-        UserRegistrationDTO result2 = userAccessService.validateUser("user2", "ignored");
-        UserRegistrationDTO result3 = userAccessService.validateUser("user3", "ignored");
+        UserRegistrationDTO result1 = userAccessService.validateUser("user1", "testpass");
+        UserRegistrationDTO result2 = userAccessService.validateUser("user2", "testpass");
+        UserRegistrationDTO result3 = userAccessService.validateUser("user3", "testpass");
 
         // Verify all users were validated correctly
         assertNotNull(result1);
@@ -135,10 +139,11 @@ class UserAccessServiceE2ETest {
         UserRegistration user = new UserRegistration();
         user.setAlias("updateTestUser");
         user.setEmail("initial@test.com");
+        user.setIdentifier("testpass");
         UserRegistration savedUser = userRepository.save(user);
 
         // Step 2: Verify initial validation works
-        UserRegistrationDTO initialResult = userAccessService.validateUser("updateTestUser", "ignored");
+        UserRegistrationDTO initialResult = userAccessService.validateUser("updateTestUser", "testpass");
         assertNotNull(initialResult);
         assertEquals("initial@test.com", initialResult.getEmail());
 
@@ -147,7 +152,7 @@ class UserAccessServiceE2ETest {
         userRepository.save(savedUser);
 
         // Step 4: Verify validation works with updated information
-        UserRegistrationDTO updatedResult = userAccessService.validateUser("updateTestUser", "ignored");
+        UserRegistrationDTO updatedResult = userAccessService.validateUser("updateTestUser", "testpass");
         assertNotNull(updatedResult);
         assertEquals("updated@test.com", updatedResult.getEmail());
     }

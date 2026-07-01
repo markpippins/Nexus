@@ -1,0 +1,249 @@
+- Explorermight want them actively surfaced.
+Explorermight want them actively surfaced.
+
+- Buildermight want them only if the implementation target is blocked or underspecified.
+Buildermight want them only if the implementation target is blocked or underspecified.
+
+That would be a very useful knob once the open-question harvest starts growing.
+
+---
+
+# 4) Addcross-reference relation filtering, not just depth
+
+Right now the profile can say:
+
+- how deep to traverse
+how deep to traverse
+
+but not
+
+- which relation types are allowed/preferred
+which relation types are allowed/preferred
+
+That’s going to matter.
+
+Example:
+
+- Builder probably wants:DEPENDS_ONIMPLEMENTSmaybeCONSTRAINS
+Builder probably wants:
+
+- DEPENDS_ON
+DEPENDS_ON
+
+- IMPLEMENTS
+IMPLEMENTS
+
+- maybeCONSTRAINS
+maybeCONSTRAINS
+
+but not necessarily broadRAISES_QUESTIONorSUPERSEDEShistory.
+
+Whereas Explorer may absolutely want:
+
+- RAISES_QUESTION
+RAISES_QUESTION
+
+- ANSWERS_QUESTION
+ANSWERS_QUESTION
+
+- SUPERSEDES
+SUPERSEDES
+
+So I’d add:
+
+```
+"allowedRelationType": {  "@id": "retrieval:allowedRelationType",  "@type": "@id",  "@container": "@set"},"preferredRelationType": {  "@id": "retrieval:preferredRelationType",  "@type": "@id",  "@container": "@set"}
+```
+
+```
+"allowedRelationType": {  "@id": "retrieval:allowedRelationType",  "@type": "@id",  "@container": "@set"},"preferredRelationType": {  "@id": "retrieval:preferredRelationType",  "@type": "@id",  "@container": "@set"}
+```
+
+That’s one of the most important missing pieces.
+
+---
+
+# My recommendation for the very next artifact
+
+At this point we have:
+
+- Conduit → Nebula WRP projection doc
+Conduit → Nebula WRP projection doc
+
+- Nebula level / WRP artifact ontology
+Nebula level / WRP artifact ontology
+
+- WRP artifact bootstrap nodes
+WRP artifact bootstrap nodes
+
+- WRP artifact bootstrap cross-references
+WRP artifact bootstrap cross-references
+
+- Nebula retrieval profiles ontology
+Nebula retrieval profiles ontology
+
+The next thing I would write is the firstprocedural importer spec, because that’s what actually turns your markdown and plans into the graph you’ve just modeled.
+
+# Next doc:
+
+## docs/nebula/wrp-document-projection-rules.md
+
+That doc should be extremely concrete and implementation-facing. It should specify:
+
+---
+
+## A. markdown heading →sectionKey
+
+For example:
+
+- ## Identity and Versioninginwrp-v1-protocol.mdbecomeswrp.protocol.identity-and-versioning
+## Identity and Versioninginwrp-v1-protocol.mdbecomes
+
+- wrp.protocol.identity-and-versioning
+wrp.protocol.identity-and-versioning
+
+## B. chunking rules
+
+- split by heading block first
+split by heading block first
+
+- then by semantic subtype within a section
+then by semantic subtype within a section
+
+- don’t mix rationale + code checklist + invariants in one chunk
+don’t mix rationale + code checklist + invariants in one chunk
+
+## C. level assignment heuristics
+
+- if a chunk contains file paths / schema diffs / implementation checklists →L1
+if a chunk contains file paths / schema diffs / implementation checklists →L1
+
+- if it contains protocol semantics / graph rules / invariants →L2
+if it contains protocol semantics / graph rules / invariants →L2
+
+- if it contains tradeoffs / migration rationale / system positioning →L3
+if it contains tradeoffs / migration rationale / system positioning →L3
+
+- if it contains doctrine / ontology rules →L4
+if it contains doctrine / ontology rules →L4
+
+## D. chunk kind classification rules
+
+How to tag:
+
+- PROTOCOL_RULE
+PROTOCOL_RULE
+
+- DATA_MODEL
+DATA_MODEL
+
+- ALGORITHM
+ALGORITHM
+
+- INVARIANT
+INVARIANT
+
+- RATIONALE
+RATIONALE
+
+- MIGRATION_STEP
+MIGRATION_STEP
+
+- OPEN_QUESTION
+OPEN_QUESTION
+
+## E. normative strength extraction
+
+Heuristics for:
+
+- “must” →REQUIRED
+“must” →REQUIRED
+
+- “must not” / “shall not” →PROHIBITED
+“must not” / “shall not” →PROHIBITED
+
+- “should” →RECOMMENDED
+“should” →RECOMMENDED
+
+- descriptive prose →INFORMATIVE
+descriptive prose →INFORMATIVE
+
+## F. cross-reference extraction
+
+Rules for emitting edges from:
+
+- explicit markdown links
+explicit markdown links
+
+- artifactKeymentions
+artifactKeymentions
+
+- section references
+section references
+
+- recognized WRP identifiers likeExecutionContext,ExecutionReceipt, etc.
+recognized WRP identifiers likeExecutionContext,ExecutionReceipt, etc.
+
+## G. back-projection of Conduit metadata
+
+HowconduitPlanId, receipts, and implementation status get attached to documents/chunks/artifacts.
+
+---
+
+That’s the piece that would let the local Qwen/OpenCode work eventually land in Nebula without hand-curating every chunk.
+
+If you want, I’ll writedocs/nebula/wrp-document-projection-rules.mdnext as a full repo-ready spec.
+
+Sources
+
+Sources
+
+Sources
+
+People Data LabsSponsoredMillions of recordsOne clean API for people and company data
+
+People Data LabsSponsoredMillions of recordsOne clean API for people and company data
+
+People Data LabsSponsoredMillions of recordsOne clean API for people and company data
+
+People Data LabsSponsoredMillions of recordsOne clean API for people and company data
+
+People Data LabsSponsored
+
+People Data LabsSponsored
+
+People Data LabsSponsored
+
+People Data LabsSponsored
+
+People Data Labs
+
+Sponsored
+
+Millions of recordsOne clean API for people and company data
+
+Millions of recordsOne clean API for people and company data
+
+Millions of recordsOne clean API for people and company data
+
+Millions of records
+
+One clean API for people and company data
+
+You said:sure, go on, and then I have a question
+
+#### You said:
+
+sure, go on, and then I have a question
+
+sure, go on, and then I have a question
+
+sure, go on, and then I have a question
+
+sure, go on, and then I have a question
+
+sure, go on, and then I have a question
+
+sure, go on, and then I have a question
+
+sure, go on, and then I have a question

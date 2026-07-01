@@ -1,0 +1,360 @@
+Yes — and that’s the better immediate target than trying to freeze the Assistance boundary too early.
+
+What you want first isNexus self-description.
+
+Not a documentaboutNexus that you keep hand-updating, but a system that can answer, from its own artifacts and state:
+
+- what components exist
+what components exist
+
+- which ones are constitutive vs optional
+which ones are constitutive vs optional
+
+- what each component is used for
+what each component is used for
+
+- what depends on what
+what depends on what
+
+- what it believes its topology is right now
+what it believes its topology is right now
+
+- where its own uncertainty / drift / contradictions are
+where its own uncertainty / drift / contradictions are
+
+That’s a much more useful milestone than prematurely deciding the Assistance packaging.
+
+---
+
+# The real near-term objective
+
+You want Nexus to be able to produce something like:
+
+## “Current System Topology Report”
+
+with sections such as:
+
+### 1.Constitutive components
+
+“What Nexus currently believes itismade of”
+
+### 2.Consumed modules / optional capabilities
+
+“What Nexus uses but does not consider part of its core identity”
+
+### 3.Responsibility map
+
+“What each component is for”
+
+### 4.Dependency graph
+
+“Who calls whom / who depends on whom / what data crosses the boundary”
+
+### 5.Confidence / provenance
+
+“How Nexus knows this, and how sure it is”
+
+### 6.Known topology ambiguities
+
+“LOSM may be embedded vs externalized”, “OpenCode is harness-only”, etc.
+
+That’s the artifact that will actually let you cross the bridge cleanly later.
+
+---
+
+# I think this implies a pretty specific sequence
+
+## Phase 1 — Make Nexus observable to itself
+
+Before deciding what Assistance keeps, get Nexus to enumerate:
+
+- components
+components
+
+- roles of components
+roles of components
+
+- contracts / interfaces
+contracts / interfaces
+
+- dependencies
+dependencies
+
+- execution paths
+execution paths
+
+- “is/uses” distinctions
+“is/uses” distinctions
+
+This is basically:
+
+> self-inventory + self-topology + self-interpretation
+
+self-inventory + self-topology + self-interpretation
+
+---
+
+## Phase 2 — Let Nexus classify its own parts
+
+Once it can enumerate, it can start labeling things like:
+
+- core
+core
+
+- adapter
+adapter
+
+- external tool
+external tool
+
+- optional capability
+optional capability
+
+- legacy artifact
+legacy artifact
+
+- experimental subsystem
+experimental subsystem
+
+This is where LOSM starts getting identified as:
+
+> “used by Nexus” rather than “part of Nexus”
+
+“used by Nexus” rather than “part of Nexus”
+
+but you letNexus tell you that, rather than imposing it too early.
+
+---
+
+## Phase 3 — Use that self-description as Assistance input
+
+Then the Assistance bridge becomes grounded in evidence:
+
+- “Nexus says these are core”
+“Nexus says these are core”
+
+- “Nexus says these are optional”
+“Nexus says these are optional”
+
+- “these interfaces are stable enough to preserve”
+“these interfaces are stable enough to preserve”
+
+- “these modules are really external consumers/providers”
+“these modules are really external consumers/providers”
+
+That’s much better than deciding by intuition alone.
+
+---
+
+# What Nexus needs in order to tell you this
+
+For Nexus to answer “what do I contain / what do I use / what do I think my topology is?”, it needs at least three layers of representation:
+
+## 1.Inventory layer
+
+A registry of components/artifacts/modules/services/repos/processes.
+
+Questions it should answer:
+
+- what exists?
+what exists?
+
+- where does it live?
+where does it live?
+
+- what type of thing is it?
+what type of thing is it?
+
+---
+
+## 2.Relationship layer
+
+Links like:
+
+- contains
+contains
+
+- depends_on
+depends_on
+
+- calls
+calls
+
+- implements
+implements
+
+- generates
+generates
+
+- persists_to
+persists_to
+
+- reads_from
+reads_from
+
+- optional_for
+optional_for
+
+- consumes_service
+consumes_service
+
+- provides_capability
+provides_capability
+
+Questions it should answer:
+
+- what uses LOSM?
+what uses LOSM?
+
+- what depends on PGV?
+what depends on PGV?
+
+- is Vision mounted or constitutive?
+is Vision mounted or constitutive?
+
+---
+
+## 3.Interpretation layer
+
+A higher-level “what is this for?” view.
+
+Questions it should answer:
+
+- is this identity-defining or auxiliary?
+is this identity-defining or auxiliary?
+
+- is this runtime, storage, governance, cognition, UI, or integration?
+is this runtime, storage, governance, cognition, UI, or integration?
+
+- does Nexus believe this component is core, optional, experimental, or legacy?
+does Nexus believe this component is core, optional, experimental, or legacy?
+
+That’s the piece that turns a graph into a self-model.
+
+---
+
+# In other words: Nexus needs a topology self-model, not just a code graph
+
+A code graph can tell you:
+
+- imports
+imports
+
+- packages
+packages
+
+- files
+files
+
+- maybe service boundaries
+maybe service boundaries
+
+But it won’t reliably tell you:
+
+- “LOSM is optional”
+“LOSM is optional”
+
+- “PEB is being superseded conceptually by PGV”
+“PEB is being superseded conceptually by PGV”
+
+- “OpenCode is a harness concern, not a system role model”
+“OpenCode is a harness concern, not a system role model”
+
+- “this MCP is part of the integration surface, not the core ontology”
+“this MCP is part of the integration surface, not the core ontology”
+
+That requiresinterpretive metadata, not just structural extraction.
+
+---
+
+# So I’d phrase the milestone like this
+
+## Milestone: Nexus Topology Self-Awareness
+
+Nexus can generate a current, reviewable self-description of:
+
+- what it contains
+what it contains
+
+- what it uses
+what it uses
+
+- what each thing is for
+what each thing is for
+
+- how the pieces connect
+how the pieces connect
+
+- which pieces it considers core vs optional vs external
+which pieces it considers core vs optional vs external
+
+- how confident it is in those assertions
+how confident it is in those assertions
+
+Once that exists, Assistance planning gets much less speculative.
+
+---
+
+# And the nice part is: this aligns directly with Nebula / KG / harvested material
+
+Because the “Nexus tells us what it is” problem sounds like it can be assembled from exactly the stuff you’ve been building toward:
+
+- harvested docs and transcripts
+harvested docs and transcripts
+
+- repo scanning / code indexing
+repo scanning / code indexing
+
+- project records in Nebula
+project records in Nebula
+
+- KG / topology relationships
+KG / topology relationships
+
+- change logs / evolution history
+change logs / evolution history
+
+- role-specific interpretations layered over the same substrate
+role-specific interpretations layered over the same substrate
+
+So rather than writing a static architecture doc, you’re really aiming for aqueryable architectural self-model.
+
+That’s the right target.
+
+If you want, next step I cansketch theTopology Self-Model schemafor Nexus— not the final Assistance thing, but the intermediate model Nexus would need in Nebula/KG to answer:
+
+- “what am I?”
+“what am I?”
+
+- “what do I use?”
+“what do I use?”
+
+- “what is core vs optional?”
+“what is core vs optional?”
+
+- “what does component X do for me?”
+“what does component X do for me?”
+
+Sources
+
+Sources
+
+Sources
+
+You said:Sketch the Topology Self-Model schema for Nexus
+
+#### You said:
+
+Sketch the Topology Self-Model schema for Nexus
+
+Sketch the Topology Self-Model schema for Nexus
+
+Sketch the Topology Self-Model schema for Nexus
+
+Sketch the Topology Self-Model schema for Nexus
+
+Sketch the Topology Self-Model schema for Nexus
+
+Sketch the Topology Self-Model schema for Nexus
+
+Sketch the Topology Self-Model schema for Nexus

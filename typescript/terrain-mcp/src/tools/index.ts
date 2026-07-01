@@ -77,6 +77,67 @@ export function registerTools(server: McpServer) {
     }
   );
 
+  server.tool(
+    "terrain_register_cli_tool",
+    "Register or update a CLI tool / runnable script in the terrain topology. Creates if new, updates if name already exists.",
+    {
+      name: z.string().describe("Tool name (unique identifier, e.g. 'generate_docs')"),
+      tool_path: z.string().optional().describe("Filesystem path to the script (relative to workspace root, e.g. 'nexus/python/generate_docs.py')"),
+      description: z.string().optional().describe("Human-readable description of what the tool does"),
+      invocation: z.string().optional().describe("How to invoke the tool (e.g. 'python generate_docs.py <target>', 'node script.js')"),
+      language: z.string().optional().describe("Programming language (e.g. 'python', 'typescript', 'bash')"),
+      category: z.string().optional().describe("Functional category (e.g. 'migration', 'utility', 'docs', 'processing')"),
+      notes: z.string().optional().describe("Additional notes or usage details"),
+      startup: z.string().optional().describe("Startup command or entry point"),
+      health: z.string().optional().describe("Health check command or note"),
+      startup_script: z.string().optional().describe("Wrapper startup script path"),
+      build_command: z.string().optional().describe("Build command if applicable"),
+    },
+    async (args) => {
+      const existing = await query(
+        "SELECT id FROM terrain.cli_tools WHERE name = $1", [args.name]
+      );
+      let row: any;
+      if (existing.length > 0) {
+        const id = existing[0].id;
+        const sets: string[] = [];
+        const vals: any[] = [];
+        let i = 1;
+        const fields: (keyof typeof args)[] = ["tool_path", "description", "invocation", "language", "category", "notes", "startup", "health", "startup_script", "build_command"];
+        for (const f of fields) {
+          if (args[f] !== undefined) { sets.push(`${f} = $${i++}`); vals.push(args[f]); }
+        }
+        if (sets.length > 0) {
+          vals.push(id);
+          const result = await query(
+            `UPDATE terrain.cli_tools SET ${sets.join(", ")} WHERE id = $${i} RETURNING *`,
+            vals
+          );
+          row = result[0];
+        } else {
+          row = existing[0];
+        }
+      } else {
+        const cols = ["name"];
+        const placeholders = ["$1"];
+        const vals: any[] = [args.name];
+        let i = 2;
+        const fields: (keyof typeof args)[] = ["tool_path", "description", "invocation", "language", "category", "notes", "startup", "health", "startup_script", "build_command"];
+        for (const f of fields) {
+          if (args[f] !== undefined) { cols.push(f); placeholders.push(`$${i++}`); vals.push(args[f]); }
+        }
+        const result = await query(
+          `INSERT INTO terrain.cli_tools (${cols.join(", ")}) VALUES (${placeholders.join(", ")}) RETURNING *`,
+          vals
+        );
+        row = result[0];
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ registered: row, action: existing.length > 0 ? "updated" : "created" }, null, 2) }],
+      };
+    }
+  );
+
   // ════════════════════════════════════════════════════════════════
   //  SERVICE STATUS
   // ════════════════════════════════════════════════════════════════
@@ -190,7 +251,7 @@ export function registerTools(server: McpServer) {
            LEFT JOIN terrain.runnable_services rs_src ON sd.source_type = 'runnable_service' AND sd.source_id = rs_src.id
            LEFT JOIN terrain.runnable_services rs ON sd.target_type = 'runnable_service' AND sd.target_id = rs.id
            LEFT JOIN terrain.mcp_servers ms_tgt ON sd.target_type = 'mcp_server' AND sd.target_id = ms_tgt.id
-           ORDER BY sd.source_type, sd.source_name`
+           ORDER BY sd.source_type, source_name`
         ),
       ]);
 

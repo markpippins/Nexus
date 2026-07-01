@@ -1,0 +1,142 @@
+## I1 — Replayability
+
+Same DAG + same strategy → same receipts
+
+## I2 — Isolation
+
+No cross-tenant execution possible
+
+## I3 — Kernel purity
+
+Kernel remains unaware of DAG structure
+
+## I4 — Trace integrity
+
+Every receipt must map to:
+
+- node_id
+node_id
+
+- trace_id
+trace_id
+
+- tenant_id
+tenant_id
+
+---
+
+# 14. What actually changed in system meaning
+
+This is the important conceptual shift:
+
+### Before v1.2:
+
+- DAG is a representation
+DAG is a representation
+
+### After v1.2:
+
+- DAG is anexecution landscape
+DAG is anexecution landscape
+
+- traversal engine is the “agent walking the landscape”
+traversal engine is the “agent walking the landscape”
+
+- kernel is just a “local evaluator”
+kernel is just a “local evaluator”
+
+---
+
+# 15. What this unlocks next
+
+Once this exists, three things becomereal implementationsinstead of concepts:
+
+## 1. True recursion
+
+Nodes spawning executable subgraphs
+
+## 2. Controlled probabilistic cognition
+
+Sampling execution paths through DAG
+
+## 3. Multi-tenant cognitive isolation
+
+Parallel independent DAG universes
+
+---
+
+# 16. Natural next step
+
+At this point, the architecture is ready for the missing piece:
+
+## WRP v1.3 — Probabilistic Execution Layer
+
+Where:
+
+- traversal becomes stochastic policy-driven
+traversal becomes stochastic policy-driven
+
+- DAG paths become “possible futures”
+DAG paths become “possible futures”
+
+- execution becomes weighted path sampling
+execution becomes weighted path sampling
+
+OR alternatively:
+
+## WRP Multi-Tenant Runtime Isolation Layer
+
+Where:
+
+- multiple DAGs execute concurrently
+multiple DAGs execute concurrently
+
+- shared infrastructure, isolated cognition graphs
+shared infrastructure, isolated cognition graphs
+
+---
+
+# Bottom line
+
+You now have a complete staged evolution:
+
+- v1.0 → linear execution kernel
+v1.0 → linear execution kernel
+
+- v1.1 → compiled DAG representation
+v1.1 → compiled DAG representation
+
+- v1.2 → traversal-based execution engine
+v1.2 → traversal-based execution engine
+
+And critically:
+
+> You have built recursion as acontrolled runtime phenomenon, not a structural accident.
+
+You have built recursion as acontrolled runtime phenomenon, not a structural accident.
+
+---
+
+If you want next, the most interesting fork is:
+
+- make probability real (v1.3 cognitive branching)or
+make probability real (v1.3 cognitive branching)or
+
+- make multi-tenant isolation operational (system scaling layer)
+make multi-tenant isolation operational (system scaling layer)
+
+Both are sharp transitions in system behavior.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.

@@ -34,6 +34,11 @@ public class UserAccessService {
             return null;
         }
 
+        if (!password.equals(userReg.getIdentifier())) {
+            log.info("Password mismatch for user {}", alias);
+            return null;
+        }
+
         return userReg.toDTO();
     }
 }

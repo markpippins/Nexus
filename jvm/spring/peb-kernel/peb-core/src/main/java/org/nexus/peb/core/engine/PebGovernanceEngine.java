@@ -10,6 +10,25 @@ import org.nexus.peb.domain.dto.AdmissionResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * PEB Governance Engine — policy authoring and audit.
+ *
+ * <p>PEB is the policy authoring layer, NOT the enforcement gate.
+ * It defines what rules <em>should</em> apply to transitions. The
+ * PostgreSQL Semantic Kernel enforces those rules via its
+ * {@code trg_authorize_transition} trigger, which reads from the
+ * {@code policy_rule} table (compiled from CUE).
+ *
+ * <p><b>This engine does NOT call {@code kernel.sys_transition()}.</b>
+ * The kernel is the single authority on state transitions. PEB's job
+ * is to compile policy into SQL predicates that the kernel evaluates.
+ * See: {@code migration 010} and the {@code policy_rule} table.
+ *
+ * <p>The methods here record PEB's own audit trail — which policy
+ * was evaluated, what it decided, which capability tokens were checked.
+ * The kernel event log is the canonical record; PEB's audit is a
+ * domain-specific projection for governance analytics.
+ */
 @Service
 public class PebGovernanceEngine {
 
@@ -18,8 +37,8 @@ public class PebGovernanceEngine {
     private final PebViolationEngine violationEngine;
 
     public PebGovernanceEngine(PebTransactionEngine transactionEngine,
-                               InvariantValidator validator,
-                               PebViolationEngine violationEngine) {
+                                InvariantValidator validator,
+                                PebViolationEngine violationEngine) {
         this.transactionEngine = transactionEngine;
         this.validator = validator;
         this.violationEngine = violationEngine;
@@ -52,21 +71,13 @@ public class PebGovernanceEngine {
      *
      * Wrapped in {@link Transactional} so the full dispatch — validator, audit
      * save in {@code peb.transactions}, and first-class violation save in
-     * {@code peb.violations} — runs in ONE database transaction. Any
-     * RuntimeException (validator failure, malformed REPORT_VIOLATION, DB
-     * connection loss, idempotency-key collision) rolls back ALL writes, so
-     * the audit row never exists without a paired violation row, and a
-     * malformed violation report never leaves an audit-only orphan row.
+     * {@code peb.violations} — runs in ONE database transaction.
      */
     @Transactional
     public AdmissionResponse processForPath(PebTransaction request, AdmissionPath path) {
         boolean bypassValidator = (path == AdmissionPath.REPORT_VIOLATION);
         boolean validatorPassed = bypassValidator || validator.validate(request);
 
-        // Audit trail is always written so a denied or unknown-path request still
-        // leaves a row in peb.transactions. admission_result is REJECTED for
-        // REPORT_VIOLATION and for any validator denial; otherwise it falls back
-        // to the path's default (ALLOWED for VALIDATE/MUTATE, ROUTED for UNKNOWN).
         request.setAdmissionResult(
             (bypassValidator || !validatorPassed) ? AdmissionResult.REJECTED
                                                  : path.defaultAdmissionResult()
@@ -76,10 +87,6 @@ public class PebGovernanceEngine {
         transactionEngine.commitTransaction(tx);
 
         if (bypassValidator) {
-            // First-class violation row: structured columns alongside the
-            // JsonNode snapshot already on peb.transactions. Throws
-            // IllegalArgumentException on a malformed violation_type/severity,
-            // which the controller surfaces as a 4xx to the MCP client.
             violationEngine.ingest(tx);
             return AdmissionResponse.accepted("Violation recorded as REJECTED");
         }

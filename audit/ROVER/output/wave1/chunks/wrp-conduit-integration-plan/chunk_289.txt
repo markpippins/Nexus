@@ -1,0 +1,117 @@
+Good. This is the piece that turns everything you’ve built so far into something executable instead of just well-structured theory.This is youractual compiler spec.docs/nebula/wrp-projection-pseudocode.mdMarkdown# WRP → Nebula Projection Pseudocode**Status:** Draft**Owner:** Nebula ingestion / WRP compiler**Purpose:** Define deterministic algorithm for converting WRP markdown artifacts into Nebula artifacts, sections, chunks, review overlays, and cross-reference graphs.---# 1. OverviewThis document specifies the **projection compiler pipeline** that transforms WRP markdown documents into structured Nebula graph data.Input:- WRP markdown documentsOutput:- NebulaArtifacts- NebulaSections- NebulaChunks- NebulaCrossReferences- Review overlays (optional but supported)- Conduit links (if present)The pipeline is deterministic, idempotent, and replay-safe.---# 2. High-Level Pipelineparse_markdown()→ build_ast()→ resolve_artifact()→ build_section_tree()→ segment_chunks()→ classify_chunks()→ assign_levels()→ assign_review_overlay()→ extract_cross_references()→ emit_graph()→ upsert_store()---# 3. Core Data Structures (Logical)## ArtifactArtifact {idkeysource_pathstatus}## SectionSection {idartifact_idparent_section_idheadingordinal}## ChunkChunk {idsection_idordinaltextchunk_kindlevelnormative_strength}## ReviewOverlay (optional)ReviewOverlay {target_idreview_statusreview_priorityattention_reason[]}## CrossReferenceCrossReference {source_idtarget_idrelation_type}---# 4. Step 1 — Parse Markdown```pseudofunction parse_markdown(source_text):ast = MarkdownParser.parse(source_text)return astRules:preserve heading hierarchypreserve code blocks as atomic nodespreserve tables as atomic nodespreserve block quotes as semantic units5. Step 2 — Artifact Resolutionpseudofunction resolve_artifact(file_path, registry):if registry.contains(file_path):return registry.get(file_path)if STRICT_MODE:throw Error("Unknown artifact in strict mode")return create_artifact_from_path(file_path)Artifact key mapping:derived from filenamenormalized slug6. Step 3 — Build Section Treepseudofunction build_section_tree(ast):root = new SectionTree()current_stack = []for node in ast:if node.type == HEADING:level = node.levelwhile current_stack.top.level >= level:current_stack.pop()section = new Section(heading=node.text,parent=current_stack.top)current_stack.push(section)root.add(section)return rootRules:##→ Section###→ child section####+→ either nested section or flatten depending on config7. Step 4 — Chunk Segmentationpseudofunction segment_chunks(section):chunks = []buffer = []for block in section.blocks:if is_boundary(block, buffer):chunks.append(create_chunk(buffer))buffer = []buffer.append(block)if buffer not empty:chunks.append(create_chunk(buffer))return chunks7.1 Boundary rulespseudofunction is_boundary(block, buffer):if buffer.empty:return falseif block.type == HEADING_CHANGE:return trueif block.type == CODE_BLOCK and buffer.contains_non_code:return trueif semantic_shift(buffer.last, block):return trueif buffer.token_count > MAX_CHUNK_SIZE:return truereturn false7.2 Semantic shift heuristicpseudofunction semantic_shift(a, b):if a.kind != b.kind:return trueif switches_between("RATIONALE","IMPLEMENTATION","PROTOCOL_RULE"):return truereturn false8. Step 5 — Chunk Classificationpseudofunction classify_chunk(chunk):text = chunk.textif contains("must not", text):chunk.normative = PROHIBITEDelse if contains("must", text):chunk.normative = REQUIREDelse if contains("should", text):chunk.normative = RECOMMENDEDelse:chunk.normative = INFORMATIVEchunk.kind = classify_kind(text)return chunk8.1 Chunk kind classifierpseudofunction classify_kind(text):if matches_definition_pattern(text):return DEFINITIONif contains_protocol_keywords(text):return PROTOCOL_RULEif contains_invariant_keywords(text):return INVARIANTif contains_algorithm_structure(text):return ALGORITHMif contains_schema_fields(text):return DATA_MODELif contains_migration_language(text):return MIGRATION_STEPif contains_open_question_markers(text):return OPEN_QUESTIONif contains_rationale_markers(text):return RATIONALEif contains_example_markers(text):return EXAMPLEreturn OVERVIEW9. Step 6 — Level Assignmentpseudofunction assign_level(chunk):if chunk.kind in [ALGORITHM, DATA_MODEL, MIGRATION_STEP, ACCEPTANCE_CRITERIA]:return L1if chunk.kind in [PROTOCOL_RULE, INVARIANT, DEFINITION, EXAMPLE]:return L2if chunk.kind in [OVERVIEW, RATIONALE, OPEN_QUESTION]:return L3return L210. Step 7 — Review Overlay Assignmentpseudofunction assign_review_overlay(entity, context):overlay = new ReviewOverlay()if entity.is_new:overlay.status = UNREVIEWEDif contains_staleness_signals(entity):overlay.status = NEEDS_REVIEWif matches_current_focus_tags(entity):overlay.status = CURRENT_FOCUSif contains_conflict_signals(entity):overlay.status = QUESTIONEDif superseded_by_exists(entity):overlay.status = SUPERSEDED_CONFIRMEDreturn overlay11. Step 8 — Cross Reference Extractionpseudofunction extract_cross_references(chunk, registry):refs = []for token in chunk.text:if token matches artifact_key:refs.append(CrossReference(source=chunk.id,target=artifact_id(token),type=DEPENDS_ON))if token matches section_heading:refs.append(CrossReference(source=chunk.id,target=section_id(token),type=REFERENCES))if token matches known_concept:refs.append(CrossReference(source=chunk.id,target=concept_id(token),type=MENTIONS))return refs12. Step 9 — Emit Graphpseudofunction emit_graph(artifact, sections, chunks, refs):graph = NebulaGraph()graph.add(artifact)for section in sections:graph.add(section)for chunk in chunks:graph.add(chunk)for ref in refs:graph.add(ref)return graph13. Step 10 — Upsert Store (Idempotent)pseudofunction upsert_store(graph, db):for node in graph.nodes:db.upsert(node.id, node)for edge in graph.edges:db.upsert_edge(edge.source, edge.target, edge.type)Rules:idempotent writesstable IDs requiredno duplicate edges unless explicitly allowedpreserve existing review annotations unless overridden14. Determinism RulesProjection MUST be deterministic:same markdown → same AST → same sections → same chunksno LLM-based randomness in core pipelineonly heuristic classification allowedno sampling variabilityIf classifier improves:version bump requirednew projection run produces new revision lineage15. Failure Modes15.1 Unknown artifact→ fail in STRICT_MODE15.2 ambiguous chunk boundaries→ prefer splitting over merging15.3 classification uncertainty→ default to OVERVIEW + INFORMATIVE15.4 missing references→ ignore silently (do not fail pipeline)16. Minimal Implementation ContractA valid implementation MUST:parse markdown into structured ASTbuild deterministic section treesegment chunks deterministicallyclassify chunks without external LLM dependency (LLM optional later)assign level + kind to every chunkemit graph with stable IDssupport idempotent re-import17. SummaryThis pipeline defines Nebula’s core transformation:Markdown → structured semantic graphThe important shift is:documents are not storedsemantic nodes are storedEverything else (review, retrieval, roles, Conduit integration) operates on top of this graph, not the raw text.---# What you now have (important moment)You now have a complete **minimal compiler stack**:### 1. Review system (attention layer)- `nebula-review-state.jsonld`- `review-workflow.md`### 2. Semantic classification system- `nebula-chunk-kinds.jsonld`### 3. Execution pipeline- `wrp-projection-pseudocode.md`---# What this unlocks nextAt this point, Nebula is structurally capable of:- ingesting your WRP corpus- chunking it deterministically- classifying semantics- tracking review state- building a queryable graph- feeding Conduit execution planning---# The next natural step (if you want to continue)There are two obvious upgrades:### A. Retrieval layer specHow Builder / Architect / Inspector / Explorer actually query this graph### B. Conduit ↔ Nebula execution bindingHow WRP chunks become executable plans or DAG nodes---If you want to keep going, I’d recommend next:> “Nebula Retrieval & Role Scoring Model”That’s where the system starts behaving like a cognitive runtime instead of just a compiler.
+
+Good. This is the piece that turns everything you’ve built so far into something executable instead of just well-structured theory.This is youractual compiler spec.docs/nebula/wrp-projection-pseudocode.mdMarkdown# WRP → Nebula Projection Pseudocode**Status:** Draft**Owner:** Nebula ingestion / WRP compiler**Purpose:** Define deterministic algorithm for converting WRP markdown artifacts into Nebula artifacts, sections, chunks, review overlays, and cross-reference graphs.---# 1. OverviewThis document specifies the **projection compiler pipeline** that transforms WRP markdown documents into structured Nebula graph data.Input:- WRP markdown documentsOutput:- NebulaArtifacts- NebulaSections- NebulaChunks- NebulaCrossReferences- Review overlays (optional but supported)- Conduit links (if present)The pipeline is deterministic, idempotent, and replay-safe.---# 2. High-Level Pipelineparse_markdown()→ build_ast()→ resolve_artifact()→ build_section_tree()→ segment_chunks()→ classify_chunks()→ assign_levels()→ assign_review_overlay()→ extract_cross_references()→ emit_graph()→ upsert_store()---# 3. Core Data Structures (Logical)## ArtifactArtifact {idkeysource_pathstatus}## SectionSection {idartifact_idparent_section_idheadingordinal}## ChunkChunk {idsection_idordinaltextchunk_kindlevelnormative_strength}## ReviewOverlay (optional)ReviewOverlay {target_idreview_statusreview_priorityattention_reason[]}## CrossReferenceCrossReference {source_idtarget_idrelation_type}---# 4. Step 1 — Parse Markdown```pseudofunction parse_markdown(source_text):ast = MarkdownParser.parse(source_text)return astRules:preserve heading hierarchypreserve code blocks as atomic nodespreserve tables as atomic nodespreserve block quotes as semantic units5. Step 2 — Artifact Resolutionpseudofunction resolve_artifact(file_path, registry):if registry.contains(file_path):return registry.get(file_path)if STRICT_MODE:throw Error("Unknown artifact in strict mode")return create_artifact_from_path(file_path)Artifact key mapping:derived from filenamenormalized slug6. Step 3 — Build Section Treepseudofunction build_section_tree(ast):root = new SectionTree()current_stack = []for node in ast:if node.type == HEADING:level = node.levelwhile current_stack.top.level >= level:current_stack.pop()section = new Section(heading=node.text,parent=current_stack.top)current_stack.push(section)root.add(section)return rootRules:##→ Section###→ child section####+→ either nested section or flatten depending on config7. Step 4 — Chunk Segmentationpseudofunction segment_chunks(section):chunks = []buffer = []for block in section.blocks:if is_boundary(block, buffer):chunks.append(create_chunk(buffer))buffer = []buffer.append(block)if buffer not empty:chunks.append(create_chunk(buffer))return chunks7.1 Boundary rulespseudofunction is_boundary(block, buffer):if buffer.empty:return falseif block.type == HEADING_CHANGE:return trueif block.type == CODE_BLOCK and buffer.contains_non_code:return trueif semantic_shift(buffer.last, block):return trueif buffer.token_count > MAX_CHUNK_SIZE:return truereturn false7.2 Semantic shift heuristicpseudofunction semantic_shift(a, b):if a.kind != b.kind:return trueif switches_between("RATIONALE","IMPLEMENTATION","PROTOCOL_RULE"):return truereturn false8. Step 5 — Chunk Classificationpseudofunction classify_chunk(chunk):text = chunk.textif contains("must not", text):chunk.normative = PROHIBITEDelse if contains("must", text):chunk.normative = REQUIREDelse if contains("should", text):chunk.normative = RECOMMENDEDelse:chunk.normative = INFORMATIVEchunk.kind = classify_kind(text)return chunk8.1 Chunk kind classifierpseudofunction classify_kind(text):if matches_definition_pattern(text):return DEFINITIONif contains_protocol_keywords(text):return PROTOCOL_RULEif contains_invariant_keywords(text):return INVARIANTif contains_algorithm_structure(text):return ALGORITHMif contains_schema_fields(text):return DATA_MODELif contains_migration_language(text):return MIGRATION_STEPif contains_open_question_markers(text):return OPEN_QUESTIONif contains_rationale_markers(text):return RATIONALEif contains_example_markers(text):return EXAMPLEreturn OVERVIEW9. Step 6 — Level Assignmentpseudofunction assign_level(chunk):if chunk.kind in [ALGORITHM, DATA_MODEL, MIGRATION_STEP, ACCEPTANCE_CRITERIA]:return L1if chunk.kind in [PROTOCOL_RULE, INVARIANT, DEFINITION, EXAMPLE]:return L2if chunk.kind in [OVERVIEW, RATIONALE, OPEN_QUESTION]:return L3return L210. Step 7 — Review Overlay Assignmentpseudofunction assign_review_overlay(entity, context):overlay = new ReviewOverlay()if entity.is_new:overlay.status = UNREVIEWEDif contains_staleness_signals(entity):overlay.status = NEEDS_REVIEWif matches_current_focus_tags(entity):overlay.status = CURRENT_FOCUSif contains_conflict_signals(entity):overlay.status = QUESTIONEDif superseded_by_exists(entity):overlay.status = SUPERSEDED_CONFIRMEDreturn overlay11. Step 8 — Cross Reference Extractionpseudofunction extract_cross_references(chunk, registry):refs = []for token in chunk.text:if token matches artifact_key:refs.append(CrossReference(source=chunk.id,target=artifact_id(token),type=DEPENDS_ON))if token matches section_heading:refs.append(CrossReference(source=chunk.id,target=section_id(token),type=REFERENCES))if token matches known_concept:refs.append(CrossReference(source=chunk.id,target=concept_id(token),type=MENTIONS))return refs12. Step 9 — Emit Graphpseudofunction emit_graph(artifact, sections, chunks, refs):graph = NebulaGraph()graph.add(artifact)for section in sections:graph.add(section)for chunk in chunks:graph.add(chunk)for ref in refs:graph.add(ref)return graph13. Step 10 — Upsert Store (Idempotent)pseudofunction upsert_store(graph, db):for node in graph.nodes:db.upsert(node.id, node)for edge in graph.edges:db.upsert_edge(edge.source, edge.target, edge.type)Rules:idempotent writesstable IDs requiredno duplicate edges unless explicitly allowedpreserve existing review annotations unless overridden14. Determinism RulesProjection MUST be deterministic:same markdown → same AST → same sections → same chunksno LLM-based randomness in core pipelineonly heuristic classification allowedno sampling variabilityIf classifier improves:version bump requirednew projection run produces new revision lineage15. Failure Modes15.1 Unknown artifact→ fail in STRICT_MODE15.2 ambiguous chunk boundaries→ prefer splitting over merging15.3 classification uncertainty→ default to OVERVIEW + INFORMATIVE15.4 missing references→ ignore silently (do not fail pipeline)16. Minimal Implementation ContractA valid implementation MUST:parse markdown into structured ASTbuild deterministic section treesegment chunks deterministicallyclassify chunks without external LLM dependency (LLM optional later)assign level + kind to every chunkemit graph with stable IDssupport idempotent re-import17. SummaryThis pipeline defines Nebula’s core transformation:Markdown → structured semantic graphThe important shift is:documents are not storedsemantic nodes are storedEverything else (review, retrieval, roles, Conduit integration) operates on top of this graph, not the raw text.---# What you now have (important moment)You now have a complete **minimal compiler stack**:### 1. Review system (attention layer)- `nebula-review-state.jsonld`- `review-workflow.md`### 2. Semantic classification system- `nebula-chunk-kinds.jsonld`### 3. Execution pipeline- `wrp-projection-pseudocode.md`---# What this unlocks nextAt this point, Nebula is structurally capable of:- ingesting your WRP corpus- chunking it deterministically- classifying semantics- tracking review state- building a queryable graph- feeding Conduit execution planning---# The next natural step (if you want to continue)There are two obvious upgrades:### A. Retrieval layer specHow Builder / Architect / Inspector / Explorer actually query this graph### B. Conduit ↔ Nebula execution bindingHow WRP chunks become executable plans or DAG nodes---If you want to keep going, I’d recommend next:> “Nebula Retrieval & Role Scoring Model”That’s where the system starts behaving like a cognitive runtime instead of just a compiler.
+
+Good. This is the piece that turns everything you’ve built so far into something executable instead of just well-structured theory.
+
+This is youractual compiler spec.
+
+---
+
+# docs/nebula/wrp-projection-pseudocode.md
+
+```
+# WRP → Nebula Projection Pseudocode**Status:** Draft  **Owner:** Nebula ingestion / WRP compiler  **Purpose:** Define deterministic algorithm for converting WRP markdown artifacts into Nebula artifacts, sections, chunks, review overlays, and cross-reference graphs.---# 1. OverviewThis document specifies the **projection compiler pipeline** that transforms WRP markdown documents into structured Nebula graph data.Input:- WRP markdown documentsOutput:- NebulaArtifacts- NebulaSections- NebulaChunks- NebulaCrossReferences- Review overlays (optional but supported)- Conduit links (if present)The pipeline is deterministic, idempotent, and replay-safe.---# 2. High-Level Pipeline
+```
+
+```
+# WRP → Nebula Projection Pseudocode**Status:** Draft  **Owner:** Nebula ingestion / WRP compiler  **Purpose:** Define deterministic algorithm for converting WRP markdown artifacts into Nebula artifacts, sections, chunks, review overlays, and cross-reference graphs.---# 1. OverviewThis document specifies the **projection compiler pipeline** that transforms WRP markdown documents into structured Nebula graph data.Input:- WRP markdown documentsOutput:- NebulaArtifacts- NebulaSections- NebulaChunks- NebulaCrossReferences- Review overlays (optional but supported)- Conduit links (if present)The pipeline is deterministic, idempotent, and replay-safe.---# 2. High-Level Pipeline
+```
+
+parse_markdown()→ build_ast()→ resolve_artifact()→ build_section_tree()→ segment_chunks()→ classify_chunks()→ assign_levels()→ assign_review_overlay()→ extract_cross_references()→ emit_graph()→ upsert_store()
+
+```
+---# 3. Core Data Structures (Logical)## Artifact
+```
+
+```
+---# 3. Core Data Structures (Logical)## Artifact
+```
+
+Artifact {idkeysource_pathstatus}
+
+```
+## Section
+```
+
+```
+## Section
+```
+
+Section {idartifact_idparent_section_idheadingordinal}
+
+```
+## Chunk
+```
+
+```
+## Chunk
+```
+
+Chunk {idsection_idordinaltextchunk_kindlevelnormative_strength}
+
+```
+## ReviewOverlay (optional)
+```
+
+```
+## ReviewOverlay (optional)
+```
+
+ReviewOverlay {target_idreview_statusreview_priorityattention_reason[]}
+
+```
+## CrossReference
+```
+
+```
+## CrossReference
+```
+
+CrossReference {source_idtarget_idrelation_type}
+
+```
+---# 4. Step 1 — Parse Markdown```pseudofunction parse_markdown(source_text):    ast = MarkdownParser.parse(source_text)    return ast
+```
+
+```
+---# 4. Step 1 — Parse Markdown```pseudofunction parse_markdown(source_text):    ast = MarkdownParser.parse(source_text)    return ast
+```
+
+Rules:
+
+- preserve heading hierarchy
+preserve heading hierarchy
+
+- preserve code blocks as atomic nodes
+preserve code blocks as atomic nodes
+
+- preserve tables as atomic nodes
+preserve tables as atomic nodes
+
+- preserve block quotes as semantic units
+preserve block quotes as semantic units
+
+---
+
+# 5. Step 2 — Artifact Resolution
+
+```
+function resolve_artifact(file_path, registry):    if registry.contains(file_path):        return registry.get(file_path)    if STRICT_MODE:        throw Error("Unknown artifact in strict mode")    return create_artifact_from_path(file_path)
+```
+
+```
+function resolve_artifact(file_path, registry):    if registry.contains(file_path):        return registry.get(file_path)    if STRICT_MODE:        throw Error("Unknown artifact in strict mode")    return create_artifact_from_path(file_path)
+```
+
+Artifact key mapping:
+
+- derived from filename
+derived from filename
+
+- normalized slug
+normalized slug
+
+---
+
+# 6. Step 3 — Build Section Tree

@@ -16,7 +16,9 @@ public class CorsConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         // Allow all origins (for development)
-        config.setAllowedOriginPatterns(Arrays.asList("*"));
+        // Allow localhost origins (Angular dev server on port 4200, etc.)
+        // Using explicit pattern instead of "*" to avoid conflict with allowCredentials(true)
+        config.setAllowedOriginPatterns(Arrays.asList("http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"));
 
         // Allow all HTTP methods
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

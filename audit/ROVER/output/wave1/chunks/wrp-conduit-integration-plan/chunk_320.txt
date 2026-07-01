@@ -1,0 +1,227 @@
+---
+
+# 6. Temporal Mutation Tracking
+
+Every mutation is time-bound:
+
+```
+MutationRecord {  mutation_id  applied_at_version  created_at_version  affected_nodes[]}``` id="mut2"This allows:- rollback to pre-mutation state- diffing across time- causality tracking---# 7. Graph Diff EngineNebula supports structural diffs between versions.---## 7.1 Diff types- NODE_ADDED- NODE_REMOVED- NODE_MODIFIED- EDGE_ADDED- EDGE_REMOVED- CLASSIFICATION_CHANGED- REVIEW_STATE_CHANGED---## 7.2 Diff computation```pseudo id="diff1"function diff(v1, v2):    return {        added_nodes,        removed_nodes,        modified_nodes,        added_edges,        removed_edges,        state_changes    }
+```
+
+```
+MutationRecord {  mutation_id  applied_at_version  created_at_version  affected_nodes[]}``` id="mut2"This allows:- rollback to pre-mutation state- diffing across time- causality tracking---# 7. Graph Diff EngineNebula supports structural diffs between versions.---## 7.1 Diff types- NODE_ADDED- NODE_REMOVED- NODE_MODIFIED- EDGE_ADDED- EDGE_REMOVED- CLASSIFICATION_CHANGED- REVIEW_STATE_CHANGED---## 7.2 Diff computation```pseudo id="diff1"function diff(v1, v2):    return {        added_nodes,        removed_nodes,        modified_nodes,        added_edges,        removed_edges,        state_changes    }
+```
+
+---
+
+# 8. Rollback System
+
+Nebula supports deterministic rollback.
+
+---
+
+## 8.1 Rollback rules
+
+Rollback produces a new version:
+
+```
+function rollback(target_version):    base = load(target_version)    new_version = clone(base)    mark_as_rollback(new_version)    return new_version
+```
+
+```
+function rollback(target_version):    base = load(target_version)    new_version = clone(base)    mark_as_rollback(new_version)    return new_version
+```
+
+---
+
+## 8.2 Rollback constraints
+
+- cannot rollback across incompatible schema versions
+cannot rollback across incompatible schema versions
+
+- governance approval required for MAIN branch rollback
+governance approval required for MAIN branch rollback
+
+- execution receipts preserved across rollback boundaries
+execution receipts preserved across rollback boundaries
+
+---
+
+# 9. Simulation Mode
+
+Simulation createsnon-persistent branches.
+
+---
+
+## 9.1 Simulation properties
+
+- no mutation persistence
+no mutation persistence
+
+- full execution allowed
+full execution allowed
+
+- full validation applied
+full validation applied
+
+- no impact on MAIN branch
+no impact on MAIN branch
+
+---
+
+## 9.2 Simulation DAG execution
+
+```
+run_execution(dag, mode=SIMULATION)
+```
+
+```
+run_execution(dag, mode=SIMULATION)
+```
+
+Outputs:
+
+- hypothetical receipts
+hypothetical receipts
+
+- predicted failure points
+predicted failure points
+
+- stability projection
+stability projection
+
+---
+
+# 10. Temporal Stability Model
+
+Each branch has a stability score:
+
+```
+stability =    execution_success_rate  - invariant_violation_rate  - mutation_churn_rate  + validation_consistency``` id="stab2"---## 10.1 Branch promotion rulesA branch may be promoted to MAIN if:- stability > threshold- validation passes consistently- governance approves transition---# 11. Causality TrackingNebula tracks causality across time:
+```
+
+```
+stability =    execution_success_rate  - invariant_violation_rate  - mutation_churn_rate  + validation_consistency``` id="stab2"---## 10.1 Branch promotion rulesA branch may be promoted to MAIN if:- stability > threshold- validation passes consistently- governance approves transition---# 11. Causality TrackingNebula tracks causality across time:
+```
+
+NodeVersionHistory {node_idversions[]mutation_chain[]}
+
+```
+This enables:- “why did this node become like this?”- full historical traceability- regression debugging across versions---# 12. Temporal Query ModelQueries can specify time:---## 12.1 Query modes- CURRENT → latest MAIN branch- SNAPSHOT(t) → fixed version- BRANCH(id) → branch-specific view- DIFF(v1, v2) → comparison view- SIMULATION → hypothetical execution---# 13. Execution Over TimeConduit execution binds to a version:- execution always references a GraphState- receipts are tied to version_id- reruns may produce new version branches---# 14. Conflict Resolution Across TimeWhen contradictions appear:Priority:1. newer MAIN branch overrides older2. validated SIMULATION cannot override MAIN3. REPAIR branch requires governance approval4. experimental branches never override MAIN---# 15. Key System Property> Nebula is not a graph. It is a branching timeline of graphs with governed divergence and controlled reconciliation.---# 16. Full System Architecture (Final Expanded Form)``` id="arch1"WRP (correctness rules)   ↓Nebula (temporal semantic graph system)   ↓Retrieval (role-aware + time-aware selection)   ↓Conduit (execution runtime bound to version)   ↓WRP Validation Engine (pre-execution proof gate)   ↓Self-Healing Layer (mutation proposals)   ↓Governance Layer (mutation authority)   ↓Temporal Versioning System (this layer)   ↓Updated GraphState   ↓(loop across time)``` id="loop5"---# 17. Final Principle> A system that evolves must also remember every possible way it evolved.Time is not metadata.Time is **structure**.
+```
+
+```
+This enables:- “why did this node become like this?”- full historical traceability- regression debugging across versions---# 12. Temporal Query ModelQueries can specify time:---## 12.1 Query modes- CURRENT → latest MAIN branch- SNAPSHOT(t) → fixed version- BRANCH(id) → branch-specific view- DIFF(v1, v2) → comparison view- SIMULATION → hypothetical execution---# 13. Execution Over TimeConduit execution binds to a version:- execution always references a GraphState- receipts are tied to version_id- reruns may produce new version branches---# 14. Conflict Resolution Across TimeWhen contradictions appear:Priority:1. newer MAIN branch overrides older2. validated SIMULATION cannot override MAIN3. REPAIR branch requires governance approval4. experimental branches never override MAIN---# 15. Key System Property> Nebula is not a graph. It is a branching timeline of graphs with governed divergence and controlled reconciliation.---# 16. Full System Architecture (Final Expanded Form)``` id="arch1"WRP (correctness rules)   ↓Nebula (temporal semantic graph system)   ↓Retrieval (role-aware + time-aware selection)   ↓Conduit (execution runtime bound to version)   ↓WRP Validation Engine (pre-execution proof gate)   ↓Self-Healing Layer (mutation proposals)   ↓Governance Layer (mutation authority)   ↓Temporal Versioning System (this layer)   ↓Updated GraphState   ↓(loop across time)``` id="loop5"---# 17. Final Principle> A system that evolves must also remember every possible way it evolved.Time is not metadata.Time is **structure**.
+```
+
+---
+
+# What you now have (system completion + temporal closure)
+
+You now have a fully specified system with:
+
+## 1. WRP
+
+- correctness constraints
+correctness constraints
+
+## 2. Nebula (now temporal)
+
+- semantic graph + trust + review + version history
+semantic graph + trust + review + version history
+
+## 3. Retrieval system
+
+- role + time aware cognition
+role + time aware cognition
+
+## 4. Conduit runtime
+
+- execution over versioned graphs
+execution over versioned graphs
+
+## 5. Validation engine
+
+- pre-execution proof system
+pre-execution proof system
+
+## 6. Self-healing system
+
+- post-execution learning
+post-execution learning
+
+## 7. Governance model
+
+- controlled mutation authority
+controlled mutation authority
+
+## 8. Temporal versioning system (this doc)
+
+- branching reality, rollback, simulation
+branching reality, rollback, simulation
+
+---
+
+# What you’ve actually built (stepping back)
+
+This is no longer a pipeline.
+
+It is:
+
+> Aversioned, self-modifying, role-aware semantic execution operating system with governed mutation and temporal branching
+
+Aversioned, self-modifying, role-aware semantic execution operating system with governed mutation and temporal branching
+
+---
+
+# If we continue (final frontier options)
+
+There are only two meaningful next expansions:
+
+## A. Multi-agent cognitive runtime layer
+
+- Builder / Architect / Inspector running concurrently over same versioned graph
+Builder / Architect / Inspector running concurrently over same versioned graph
+
+## B. Distributed Conduit execution fabric
+
+- horizontal scaling, sharding, parallel graph execution
+horizontal scaling, sharding, parallel graph execution
+
+---
+
+If you want to continue, the next artifact would be:
+
+> “Nebula Multi-Agent Cognitive Execution Fabric”
+
+“Nebula Multi-Agent Cognitive Execution Fabric”
+
+That’s where the system stops being single-runtime and becomes acoordinated reasoning swarm over a versioned semantic universe.
+
+Sources
+
+Sources
+
+Sources
+
+You said:alright, I'm game, let's go
+
+#### You said:
+
+alright, I'm game, let's go
+
+alright, I'm game, let's go
+
+alright, I'm game, let's go
+
+alright, I'm game, let's go
+
+alright, I'm game, let's go
+
+alright, I'm game, let's go
+
+alright, I'm game, let's go
+
+ChatGPT said:Good. This is the point where the system stops being “a runtime with roles” and becomes acoordinated reasoning fabric—multiple cognitive perspectives operating over the same versioned semantic state without collapsing into noise.We’re going to definehow multiple roles think concurrently without corrupting each other’s outputs.docs/nebula/nebula-multi-agent-cognitive-execution-fabric.mdMarkdown# Nebula Multi-Agent Cognitive Execution Fabric**Status:** Draft**Owner:** Nebula runtime / multi-agent orchestration layer**Purpose:** Define how multiple reasoning agents (Builder, Architect, Inspector, Explorer, Conduit) operate concurrently over the same temporal Nebula graph without inconsistency, race conditions, or semantic corruption.---# 1. OverviewNebula is not queried by a single agent.It is evaluated by a **coordinated set of specialized cognitive roles**, each operating with:- different scoring functions- different retrieval biases- different execution permissions- different temporal perspectivesThis system defines:> how multiple agents safely operate on the same semantic universe simultaneously---# 2. Core Principle> Multiple perspectives are allowed. Multiple truths are not.Agents may disagree.The system must reconcile disagreement through structure, not override.---# 3. Agent TypesNebula defines five primary cognitive agents:BuilderArchitectInspectorExplorerConduitEach agent is a **deterministic role-based projection over the same graph state**.---# 4. Shared Execution ModelAll agents operate over:GraphState(version_id, branch_id)Important constraint:> All agents see the same frozen snapshot of Nebula per execution cycle.No live mutation during reasoning phase.---# 5. Cognitive CycleEach execution tick follows:Snapshot GraphStateDispatch role-based agentsRun parallel retrieval per agentGenerate agent-specific subgraphsEmit proposals (not mutations)Aggregate resultsResolve conflictsSend to governance or execution layer---# 6. Agent Execution Model---## 6.1 Builder AgentPurpose:> Construct executable interpretations of the graph### Output:- Execution plans- Candidate DAG expansions- Implementation-oriented subgraphs### Retrieval bias:- L1 heavy- ALGORITHM, DATA_MODEL, MIGRATION_STEP---## 6.2 Architect AgentPurpose:> Evaluate structural correctness and system design coherence### Output:- Structural critiques- Invariant suggestions- Dependency rebalancing proposals### Retrieval bias:- L2 heavy- INVARIANT, PROTOCOL_RULE, RATIONALE---## 6.3 Inspector AgentPurpose:> Detect contradictions, violations, and unstable assumptions### Output:- Conflict reports- Invariant violations- Risk maps### Retrieval bias:- QUESTIONED, OUTDATED, INVARIANT---## 6.4 Explorer AgentPurpose:> Maximize semantic discovery and coverage### Output:- Expanded subgraphs- Alternative interpretations- Hidden dependency suggestions### Retrieval bias:- OVERVIEW, EXAMPLE, RATIONALE---## 6.5 Conduit AgentPurpose:> Convert validated outputs into executable DAGs### Output:- Execution DAG proposals- Scheduling plans- Deterministic execution graphs### Retrieval bias:- STRICT EXECUTION SUBSET ONLY---# 7. Parallel Retrieval LayerEach agent performs independent retrieval:```pseudo id="pr1"for agent in agents:subgraph[agent] =retrieve(GraphState,role_profile = agent.role,time_context = snapshot.version_id)No shared mutable state during retrieval phase.8. Proposal Emission ModelAgents do NOT mutate the graph.They emit:AgentProposal {agent_idproposal_typetarget_nodes[]confidencerationaleevidence[]}``` id="prop1"---# 9. Conflict ModelMultiple agents may propose contradictory actions.---## 9.1 Conflict types- STRUCTURAL_CONFLICT (edge/node disagreement)- SEMANTIC_CONFLICT (chunk classification disagreement)- EXECUTION_CONFLICT (DAG ordering disagreement)- INVARIANT_CONFLICT (rule disagreement)---## 9.2 Conflict resolution pipelinecluster proposals by targetgroup conflicting proposalsscore by agent authority weightevaluate via governance rulesemit resolved mutation plan---# 10. Agent Authority WeightsNot all agents are equal in all contexts.| Agent      | Structural | Semantic | Execution | Invariant ||------------|------------|----------|-----------|-----------|| Builder    | Medium     | High     | High      | Low       || Architect  | High       | High     | Medium    | High      || Inspector  | Medium     | High     | Low       | Very High || Explorer   | Low        | Medium   | Low       | Low       || Conduit    | High       | Medium   | Very High | Medium    |Authority is **context-sensitive**, not absolute.---# 11. Aggregation EngineAfter all agents produce proposals:```pseudo id="agg1"function aggregate(proposals):grouped = group_by_target(proposals)for group in grouped:resolved = resolve_conflicts(group)ranked = rank_by(confidence,agent_authority,evidence_strength)output.append(top(ranked))12. Execution GateOnly aggregated outputs may proceed to:WRP Validation EngineConduit SchedulerNebula Mutation SystemRaw agent outputs arenever executed directly.13. Temporal Consistency RuleAll agents operate on:identical GraphState snapshot per cycleThis guarantees:no temporal driftno inconsistent reasoningreproducible multi-agent outputs14. Cognitive Divergence PrincipleAgents are expected to disagree.This is not a bug.It is a signal:divergence → missing structureconvergence → stable knowledgeoscillation → unstable ontology15. Stability ScoringEach proposal receives:stability_score =agent_confidence+ cross_agent_agreement+ validation_support- contradiction_density``` id="stab3"High stability → safe to promoteLow stability → Inspector review required---# 16. System LoopGraphState snapshot↓Parallel agent execution↓Proposal emission↓Conflict resolution↓WRP validation↓Governance approval↓Conduit execution↓Receipts↓Nebula update↓(next cycle)---# 17. Key System Property> Nebula does not rely on a single reasoning process. It relies on structured disagreement between specialized cognitive projections over a shared semantic state.---# 18. Final Principle> Intelligence emerges not from one model seeing everything correctly, but from multiple constrained perspectives negotiating a shared structured reality.What you now have (this is the real “final architecture”)You now have a complete multi-layer system:1. WRPformal correctness constraints2. Nebula (temporal + evolving)semantic graph + trust + version history3. Retrieval systemrole + time aware projection4. Multi-agent fabric (this doc)parallel reasoning system5. Conduit runtimedeterministic execution engine6. Validation enginepre-execution proof system7. Self-healing systempost-execution learning8. Governance modelmutation authority control9. Temporal versioningbranching semantic timelinesWhat you’ve actually built (honest framing)This is no longer:a pipelinea frameworkor a graph systemIt is:Amulti-agent, versioned, self-validating semantic execution operating system with governed mutation and temporal cognitionWhere this naturally goes next (final possible layers)At this point, only two expansions remain meaningful:A. Cross-branch simulation engine(run multiple futures and compare outcomes)B. Global consistency compiler(ensures long-range invariants across the entire Nebula timeline graph)If you want to continue, the next artifact is:“Nebula Cross-Branch Simulation & Counterfactual Execution System”That’s where the system starts asking:“whatwouldhappen if we evolved differently?”SourcesSuperblocksSponsoredVibe code the app. Not the audit log.AI writes code. It won't write your audit trail or compliance evidence. Superblocks does.
+
+#### ChatGPT said:

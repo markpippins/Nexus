@@ -9,4 +9,11 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>peb-observability</artifactId>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+    </dependencies>
 </project>

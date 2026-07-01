@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nexus.local/schema/wrp/state-machine/v1",
+  "title": "WRP State Machine",
+  "description": "Formal 11-state state machine definition for the WorkRequest Protocol. Defines all states, valid transitions, terminal states, and the adjacency matrix.",
+  "protocol_version": "1.0",
+
+  "states": {
+    "CREATED": {
+      "description": "WorkRequest has been created but not yet ingested into the system",
+      "category": "initial",
+      "transitions_to": ["INTAKE", "FAILED"]
+    },
+    "INTAKE": {
+      "description": "WorkRequest is being ingested — validated, parsed, assigned",
+      "category": "active",
+      "transitions_to": ["PLANNING", "FAILED"]
+    },
+    "PLANNING": {
+      "description": "Decomposition strategy is being defined — steps, dependencies, resources",
+      "category": "active",
+      "transitions_to": ["CRITIQUE", "FAILED"]
+    },
+    "CRITIQUE": {
+      "description": "Plan is being reviewed — feasibility, constraint checking, risk assessment",
+      "category": "active",
+      "transitions_to": ["SPECIFICATION", "PLANNING", "FAILED"]
+    },
+    "SPECIFICATION": {
+      "description": "Detailed specification is being produced — requirements, constraints, success criteria",
+      "category": "active",
+      "transitions_to": ["APPROVED", "CRITIQUE", "FAILED"]
+    },
+    "APPROVED": {
+      "description": "WorkRequest has been formally approved for execution",
+      "category": "gate",
+      "transitions_to": ["QUEUED", "SPECIFICATION", "FAILED"]
+    },
+    "QUEUED": {
+      "description": "WorkRequest is queued and waiting for an available executor",
+      "category": "active",
+      "transitions_to": ["EXECUTING", "FAILED"]
+    },
+    "EXECUTING": {
+      "description": "WorkRequest is actively being executed by an agent",
+      "category": "active",
+      "transitions_to": ["COMPLETED", "FAILED"]
+    },
+    "COMPLETED": {
+      "description": "WorkRequest has been successfully completed",
+      "category": "terminal",
+      "transitions_to": ["ARCHIVED"]
+    },
+    "ARCHIVED": {
+      "description": "WorkRequest has been archived — terminal, read-only",
+      "category": "terminal",
+      "transitions_to": []
+    },
+    "FAILED": {
+      "description": "WorkRequest has failed — terminal but may be retried via new version",
+      "category": "terminal",
+      "transitions_to": []
+    }
+  },
+
+  "adjacency_matrix": {
+    "description": "Formal state transition matrix. Rows = from_state, Columns = to_state. 1 = valid transition, 0 = invalid.",
+    "header": ["CREATED", "INTAKE", "PLANNING", "CRITIQUE", "SPECIFICATION", "APPROVED", "QUEUED", "EXECUTING", "COMPLETED", "ARCHIVED", "FAILED"],
+    "matrix": {
+      "CREATED":       [0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "INTAKE":        [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+      "PLANNING":      [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+      "CRITIQUE":      [0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1],
+      "SPECIFICATION": [0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1],
+      "APPROVED":      [0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
+      "QUEUED":        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1],
+      "EXECUTING":     [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+      "COMPLETED":     [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+      "ARCHIVED":      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "FAILED":        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    }
+  },
+
+  "categories": {
+    "initial": ["CREATED"],
+    "active": ["INTAKE", "PLANNING", "CRITIQUE", "SPECIFICATION", "QUEUED", "EXECUTING"],
+    "gate": ["APPROVED"],
+    "terminal": ["COMPLETED", "ARCHIVED", "FAILED"]
+  },
+
+  "normal_flow": [
+    "CREATED",
+    "INTAKE",
+    "PLANNING",
+    "CRITIQUE",
+    "SPECIFICATION",
+    "APPROVED",
+    "QUEUED",
+    "EXECUTING",
+    "COMPLETED",
+    "ARCHIVED"
+  ],
+
+  "failure_model": {
+    "description": "FAILED is reachable from any non-terminal, non-initial state",
+    "reachable_from": ["INTAKE", "PLANNING", "CRITIQUE", "SPECIFICATION", "APPROVED", "QUEUED", "EXECUTING"],
+    "recovery": "FAILED WorkRequests may be retried by creating a new version (version incremented, derived_from set to failed WorkRequest)"
+  },
+
+  "state_transition_rules": [
+    {
+      "id": "STR-001",
+      "rule": "Transitions must be validated against the adjacency matrix before execution",
+      "severity": "MANDATORY"
+    },
+    {
+      "id": "STR-002",
+      "rule": "Each transition MUST produce a WRP event recorded in the event store",
+      "severity": "MANDATORY"
+    },
+    {
+      "id": "STR-003",
+      "rule": "FAILED WorkRequests may be retried by creating a new version with incremented version field",
+      "severity": "MANDATORY"
+    },
+    {
+      "id": "STR-004",
+      "rule": "Terminal states (COMPLETED, ARCHIVED, FAILED) may not transition to any other state",
+      "severity": "MANDATORY"
+    },
+    {
+      "id": "STR-005",
+      "rule": "CRITIQUE may transition back to PLANNING for revision",
+      "severity": "RECOMMENDED"
+    },
+    {
+      "id": "STR-006",
+      "rule": "SPECIFICATION may transition back to CRITIQUE for re-review",
+      "severity": "RECOMMENDED"
+    },
+    {
+      "id": "STR-007",
+      "rule": "APPROVED may transition back to SPECIFICATION if changes are required",
+      "severity": "RECOMMENDED"
+    }
+  ]
+}

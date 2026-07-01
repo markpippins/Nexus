@@ -37,6 +37,7 @@ class UserAccessServiceTest {
         testUser = new UserRegistration();
         testUser.setAlias("testuser");
         testUser.setEmail("test@example.com");
+        testUser.setIdentifier("testpass");
         testUser.setId(1L);
     }
 
@@ -46,7 +47,7 @@ class UserAccessServiceTest {
         when(userRepository.findByAlias("testuser")).thenReturn(Optional.of(testUser));
 
         // When
-        UserRegistrationDTO result = userAccessService.validateUser("testuser", "ignored");
+        UserRegistrationDTO result = userAccessService.validateUser("testuser", "testpass");
 
         // Then
         assertNotNull(result);
@@ -80,5 +81,18 @@ class UserAccessServiceTest {
         // Then
         assertNull(result);
         verify(userRepository, times(1)).findByAlias(null);
+    }
+
+    @Test
+    void validateUser_WithWrongPassword_ShouldReturnNull() {
+        // Given
+        when(userRepository.findByAlias("testuser")).thenReturn(Optional.of(testUser));
+
+        // When
+        UserRegistrationDTO result = userAccessService.validateUser("testuser", "wrongpass");
+
+        // Then
+        assertNull(result);
+        verify(userRepository, times(1)).findByAlias("testuser");
     }
 }

@@ -1,0 +1,546 @@
+New chatSearch chatsPinnedRecentsChat historyNew chatCtrlShiftOSearch chatsCtrlKLibraryAppsMorePinnedLinkedInNexus Work Request PipelineNodeMessage Normalization & TrajectoriesEvent Pipeline EvaluationSelf-Extending Architecture ConceptBuzzwords by LayerAI Engineering Survival SkillsProjectsPrompt Architect / LERONexus Active StepNexushomelabPythonShow moreChatsSemantic IR v0.1 OverviewIRL IR Interaction SystemRole-Addressable Cognitive FilesystemSystem Evolution and NamingNexus Console StructureStrontium as cognition nodeMulti-Stage Semantic CompilerService Broker Pattern DebateService Broker Pattern ClarificationTopology Server EfficiencyEvent-Driven CLI AgentsFederated Self-Evolving SystemsNebula Audit Organization TipsWork Artifact IR DefinitionDynamic UI CompositionNexus Product DefinitionReport Schema AnalysisCognitive Projection ModelPlurality in CognitionCodex Session PlanningCoPilot Context OverloadCognitive CPU SchedulerModel Verification MigrationTerrain service registryEAV Schema AnalysisDistributed Cognition DesignNebula as Jira SystemSelf-Regulating Software OntologyFreeBuff Autonomy ModelsAG-UI MessageBox MCP StartDistributed Cognition ArchitectureWorker Context and DriftKnowledge Steward and kg-mcpLOSM-Lang OverviewClosed Epistemic LoopNexus Control Sandbox ExplanationNexus Mood ModulationDiscovery to ConsolidationNexus Console Usage ShiftCIR v2 Invariant ViolationPEB Kernel GovernanceAbsorb Terminology UpdateMulti-runtime Semantic CoherenceMultireality in System DesignTicket Claiming without TemporalRules Based LayerDeepSeek and DocLing GapGovernance-Preserving Transport PlanAudit Data MilestoneWorkRequest MCP Conduit DesignSplitting Conduit FunctionalityDocLing Parser ArchitectureTrading Systems and Stochastic OutcomesUnit of Update AnalysisGemini and Conduit ArchitectureSystem Documentation EvolutionMark PippinsFreeClaim offer
+
+New chatSearch chatsPinnedRecentsChat historyNew chatCtrlShiftOSearch chatsCtrlKLibraryAppsMorePinnedLinkedInNexus Work Request PipelineNodeMessage Normalization & TrajectoriesEvent Pipeline EvaluationSelf-Extending Architecture ConceptBuzzwords by LayerAI Engineering Survival SkillsProjectsPrompt Architect / LERONexus Active StepNexushomelabPythonShow moreChatsSemantic IR v0.1 OverviewIRL IR Interaction SystemRole-Addressable Cognitive FilesystemSystem Evolution and NamingNexus Console StructureStrontium as cognition nodeMulti-Stage Semantic CompilerService Broker Pattern DebateService Broker Pattern ClarificationTopology Server EfficiencyEvent-Driven CLI AgentsFederated Self-Evolving SystemsNebula Audit Organization TipsWork Artifact IR DefinitionDynamic UI CompositionNexus Product DefinitionReport Schema AnalysisCognitive Projection ModelPlurality in CognitionCodex Session PlanningCoPilot Context OverloadCognitive CPU SchedulerModel Verification MigrationTerrain service registryEAV Schema AnalysisDistributed Cognition DesignNebula as Jira SystemSelf-Regulating Software OntologyFreeBuff Autonomy ModelsAG-UI MessageBox MCP StartDistributed Cognition ArchitectureWorker Context and DriftKnowledge Steward and kg-mcpLOSM-Lang OverviewClosed Epistemic LoopNexus Control Sandbox ExplanationNexus Mood ModulationDiscovery to ConsolidationNexus Console Usage ShiftCIR v2 Invariant ViolationPEB Kernel GovernanceAbsorb Terminology UpdateMulti-runtime Semantic CoherenceMultireality in System DesignTicket Claiming without TemporalRules Based LayerDeepSeek and DocLing GapGovernance-Preserving Transport PlanAudit Data MilestoneWorkRequest MCP Conduit DesignSplitting Conduit FunctionalityDocLing Parser ArchitectureTrading Systems and Stochastic OutcomesUnit of Update AnalysisGemini and Conduit ArchitectureSystem Documentation EvolutionMark PippinsFreeClaim offer
+
+New chatSearch chatsPinnedRecents
+
+New chat
+
+Search chats
+
+Pinned
+
+Recents
+
+Chat historyNew chatCtrlShiftOSearch chatsCtrlKLibraryAppsMorePinnedLinkedInNexus Work Request PipelineNodeMessage Normalization & TrajectoriesEvent Pipeline EvaluationSelf-Extending Architecture ConceptBuzzwords by LayerAI Engineering Survival SkillsProjectsPrompt Architect / LERONexus Active StepNexushomelabPythonShow moreChatsSemantic IR v0.1 OverviewIRL IR Interaction SystemRole-Addressable Cognitive FilesystemSystem Evolution and NamingNexus Console StructureStrontium as cognition nodeMulti-Stage Semantic CompilerService Broker Pattern DebateService Broker Pattern ClarificationTopology Server EfficiencyEvent-Driven CLI AgentsFederated Self-Evolving SystemsNebula Audit Organization TipsWork Artifact IR DefinitionDynamic UI CompositionNexus Product DefinitionReport Schema AnalysisCognitive Projection ModelPlurality in CognitionCodex Session PlanningCoPilot Context OverloadCognitive CPU SchedulerModel Verification MigrationTerrain service registryEAV Schema AnalysisDistributed Cognition DesignNebula as Jira SystemSelf-Regulating Software OntologyFreeBuff Autonomy ModelsAG-UI MessageBox MCP StartDistributed Cognition ArchitectureWorker Context and DriftKnowledge Steward and kg-mcpLOSM-Lang OverviewClosed Epistemic LoopNexus Control Sandbox ExplanationNexus Mood ModulationDiscovery to ConsolidationNexus Console Usage ShiftCIR v2 Invariant ViolationPEB Kernel GovernanceAbsorb Terminology UpdateMulti-runtime Semantic CoherenceMultireality in System DesignTicket Claiming without TemporalRules Based LayerDeepSeek and DocLing GapGovernance-Preserving Transport PlanAudit Data MilestoneWorkRequest MCP Conduit DesignSplitting Conduit FunctionalityDocLing Parser ArchitectureTrading Systems and Stochastic OutcomesUnit of Update AnalysisGemini and Conduit ArchitectureSystem Documentation EvolutionMark PippinsFreeClaim offer
+
+## Chat history
+
+New chatCtrlShiftOSearch chatsCtrlKLibraryAppsMorePinnedLinkedInNexus Work Request PipelineNodeMessage Normalization & TrajectoriesEvent Pipeline EvaluationSelf-Extending Architecture ConceptBuzzwords by LayerAI Engineering Survival SkillsProjectsPrompt Architect / LERONexus Active StepNexushomelabPythonShow moreChatsSemantic IR v0.1 OverviewIRL IR Interaction SystemRole-Addressable Cognitive FilesystemSystem Evolution and NamingNexus Console StructureStrontium as cognition nodeMulti-Stage Semantic CompilerService Broker Pattern DebateService Broker Pattern ClarificationTopology Server EfficiencyEvent-Driven CLI AgentsFederated Self-Evolving SystemsNebula Audit Organization TipsWork Artifact IR DefinitionDynamic UI CompositionNexus Product DefinitionReport Schema AnalysisCognitive Projection ModelPlurality in CognitionCodex Session PlanningCoPilot Context OverloadCognitive CPU SchedulerModel Verification MigrationTerrain service registryEAV Schema AnalysisDistributed Cognition DesignNebula as Jira SystemSelf-Regulating Software OntologyFreeBuff Autonomy ModelsAG-UI MessageBox MCP StartDistributed Cognition ArchitectureWorker Context and DriftKnowledge Steward and kg-mcpLOSM-Lang OverviewClosed Epistemic LoopNexus Control Sandbox ExplanationNexus Mood ModulationDiscovery to ConsolidationNexus Console Usage ShiftCIR v2 Invariant ViolationPEB Kernel GovernanceAbsorb Terminology UpdateMulti-runtime Semantic CoherenceMultireality in System DesignTicket Claiming without TemporalRules Based LayerDeepSeek and DocLing GapGovernance-Preserving Transport PlanAudit Data MilestoneWorkRequest MCP Conduit DesignSplitting Conduit FunctionalityDocLing Parser ArchitectureTrading Systems and Stochastic OutcomesUnit of Update AnalysisGemini and Conduit ArchitectureSystem Documentation EvolutionMark PippinsFreeClaim offer
+
+New chatCtrlShiftOSearch chatsCtrlK
+
+- New chatCtrlShiftO
+New chat
+
+New chat
+
+New chat
+
+CtrlShiftO
+
+CtrlShiftO
+
+- Search chatsCtrlK
+Search chats
+
+Search chats
+
+Search chats
+
+CtrlK
+
+CtrlK
+
+Library
+
+Library
+
+Apps
+
+Apps
+
+More
+
+More
+
+More
+
+More
+
+PinnedLinkedInNexus Work Request PipelineNodeMessage Normalization & TrajectoriesEvent Pipeline EvaluationSelf-Extending Architecture ConceptBuzzwords by LayerAI Engineering Survival Skills
+
+Pinned
+
+## Pinned
+
+- LinkedIn
+LinkedIn
+
+LinkedIn
+
+LinkedIn
+
+LinkedIn
+
+- Nexus Work Request Pipeline
+Nexus Work Request Pipeline
+
+Nexus Work Request Pipeline
+
+Nexus Work Request Pipeline
+
+Nexus Work Request Pipeline
+
+- Node
+Node
+
+Node
+
+Node
+
+Node
+
+- Message Normalization & Trajectories
+Message Normalization & Trajectories
+
+Message Normalization & Trajectories
+
+Message Normalization & Trajectories
+
+- Event Pipeline Evaluation
+Event Pipeline Evaluation
+
+Event Pipeline Evaluation
+
+Event Pipeline Evaluation
+
+- Self-Extending Architecture Concept
+Self-Extending Architecture Concept
+
+Self-Extending Architecture Concept
+
+Self-Extending Architecture Concept
+
+- Buzzwords by Layer
+Buzzwords by Layer
+
+Buzzwords by Layer
+
+Buzzwords by Layer
+
+- AI Engineering Survival Skills
+AI Engineering Survival Skills
+
+AI Engineering Survival Skills
+
+AI Engineering Survival Skills
+
+ProjectsPrompt Architect / LERONexus Active StepNexushomelabPythonShow more
+
+Projects
+
+## Projects
+
+- Prompt Architect / LERO
+Prompt Architect / LERO
+
+Prompt Architect / LERO
+
+Prompt Architect / LERO
+
+Prompt Architect / LERO
+
+- Nexus Active Step
+Nexus Active Step
+
+Nexus Active Step
+
+Nexus Active Step
+
+Nexus Active Step
+
+- Nexus
+Nexus
+
+Nexus
+
+Nexus
+
+Nexus
+
+- homelab
+homelab
+
+homelab
+
+homelab
+
+homelab
+
+- Python
+Python
+
+Python
+
+Python
+
+Python
+
+- Show more
+Show more
+
+Show more
+
+ChatsSemantic IR v0.1 OverviewIRL IR Interaction SystemRole-Addressable Cognitive FilesystemSystem Evolution and NamingNexus Console StructureStrontium as cognition nodeMulti-Stage Semantic CompilerService Broker Pattern DebateService Broker Pattern ClarificationTopology Server EfficiencyEvent-Driven CLI AgentsFederated Self-Evolving SystemsNebula Audit Organization TipsWork Artifact IR DefinitionDynamic UI CompositionNexus Product DefinitionReport Schema AnalysisCognitive Projection ModelPlurality in CognitionCodex Session PlanningCoPilot Context OverloadCognitive CPU SchedulerModel Verification MigrationTerrain service registryEAV Schema AnalysisDistributed Cognition DesignNebula as Jira SystemSelf-Regulating Software OntologyFreeBuff Autonomy ModelsAG-UI MessageBox MCP StartDistributed Cognition ArchitectureWorker Context and DriftKnowledge Steward and kg-mcpLOSM-Lang OverviewClosed Epistemic LoopNexus Control Sandbox ExplanationNexus Mood ModulationDiscovery to ConsolidationNexus Console Usage ShiftCIR v2 Invariant ViolationPEB Kernel GovernanceAbsorb Terminology UpdateMulti-runtime Semantic CoherenceMultireality in System DesignTicket Claiming without TemporalRules Based LayerDeepSeek and DocLing GapGovernance-Preserving Transport PlanAudit Data MilestoneWorkRequest MCP Conduit DesignSplitting Conduit FunctionalityDocLing Parser ArchitectureTrading Systems and Stochastic OutcomesUnit of Update AnalysisGemini and Conduit ArchitectureSystem Documentation Evolution
+
+Chats
+
+## Chats
+
+Semantic IR v0.1 OverviewIRL IR Interaction SystemRole-Addressable Cognitive FilesystemSystem Evolution and NamingNexus Console StructureStrontium as cognition nodeMulti-Stage Semantic CompilerService Broker Pattern DebateService Broker Pattern ClarificationTopology Server EfficiencyEvent-Driven CLI AgentsFederated Self-Evolving SystemsNebula Audit Organization TipsWork Artifact IR DefinitionDynamic UI CompositionNexus Product DefinitionReport Schema AnalysisCognitive Projection ModelPlurality in CognitionCodex Session PlanningCoPilot Context OverloadCognitive CPU SchedulerModel Verification MigrationTerrain service registryEAV Schema AnalysisDistributed Cognition DesignNebula as Jira SystemSelf-Regulating Software OntologyFreeBuff Autonomy ModelsAG-UI MessageBox MCP StartDistributed Cognition ArchitectureWorker Context and DriftKnowledge Steward and kg-mcpLOSM-Lang OverviewClosed Epistemic LoopNexus Control Sandbox ExplanationNexus Mood ModulationDiscovery to ConsolidationNexus Console Usage ShiftCIR v2 Invariant ViolationPEB Kernel GovernanceAbsorb Terminology UpdateMulti-runtime Semantic CoherenceMultireality in System DesignTicket Claiming without TemporalRules Based LayerDeepSeek and DocLing GapGovernance-Preserving Transport PlanAudit Data MilestoneWorkRequest MCP Conduit DesignSplitting Conduit FunctionalityDocLing Parser ArchitectureTrading Systems and Stochastic OutcomesUnit of Update AnalysisGemini and Conduit ArchitectureSystem Documentation Evolution
+
+- Semantic IR v0.1 Overview
+Semantic IR v0.1 Overview
+
+Semantic IR v0.1 Overview
+
+- IRL IR Interaction System
+IRL IR Interaction System
+
+IRL IR Interaction System
+
+- Role-Addressable Cognitive Filesystem
+Role-Addressable Cognitive Filesystem
+
+Role-Addressable Cognitive Filesystem
+
+- System Evolution and Naming
+System Evolution and Naming
+
+System Evolution and Naming
+
+- Nexus Console Structure
+Nexus Console Structure
+
+Nexus Console Structure
+
+- Strontium as cognition node
+Strontium as cognition node
+
+Strontium as cognition node
+
+- Multi-Stage Semantic Compiler
+Multi-Stage Semantic Compiler
+
+Multi-Stage Semantic Compiler
+
+- Service Broker Pattern Debate
+Service Broker Pattern Debate
+
+Service Broker Pattern Debate
+
+- Service Broker Pattern Clarification
+Service Broker Pattern Clarification
+
+Service Broker Pattern Clarification
+
+- Topology Server Efficiency
+Topology Server Efficiency
+
+Topology Server Efficiency
+
+- Event-Driven CLI Agents
+Event-Driven CLI Agents
+
+Event-Driven CLI Agents
+
+- Federated Self-Evolving Systems
+Federated Self-Evolving Systems
+
+Federated Self-Evolving Systems
+
+- Nebula Audit Organization Tips
+Nebula Audit Organization Tips
+
+Nebula Audit Organization Tips
+
+- Work Artifact IR Definition
+Work Artifact IR Definition
+
+Work Artifact IR Definition
+
+- Dynamic UI Composition
+Dynamic UI Composition
+
+Dynamic UI Composition
+
+- Nexus Product Definition
+Nexus Product Definition
+
+Nexus Product Definition
+
+- Report Schema Analysis
+Report Schema Analysis
+
+Report Schema Analysis
+
+- Cognitive Projection Model
+Cognitive Projection Model
+
+Cognitive Projection Model
+
+- Plurality in Cognition
+Plurality in Cognition
+
+Plurality in Cognition
+
+- Codex Session Planning
+Codex Session Planning
+
+Codex Session Planning
+
+- CoPilot Context Overload
+CoPilot Context Overload
+
+CoPilot Context Overload
+
+- Cognitive CPU Scheduler
+Cognitive CPU Scheduler
+
+Cognitive CPU Scheduler
+
+- Model Verification Migration
+Model Verification Migration
+
+Model Verification Migration
+
+- Terrain service registry
+Terrain service registry
+
+Terrain service registry
+
+- EAV Schema Analysis
+EAV Schema Analysis
+
+EAV Schema Analysis
+
+- Distributed Cognition Design
+Distributed Cognition Design
+
+Distributed Cognition Design
+
+- Nebula as Jira System
+Nebula as Jira System
+
+Nebula as Jira System
+
+- Self-Regulating Software Ontology
+Self-Regulating Software Ontology
+
+Self-Regulating Software Ontology
+
+- FreeBuff Autonomy Models
+FreeBuff Autonomy Models
+
+FreeBuff Autonomy Models
+
+- AG-UI MessageBox MCP Start
+AG-UI MessageBox MCP Start
+
+AG-UI MessageBox MCP Start
+
+- Distributed Cognition Architecture
+Distributed Cognition Architecture
+
+Distributed Cognition Architecture
+
+- Worker Context and Drift
+Worker Context and Drift
+
+Worker Context and Drift
+
+- Knowledge Steward and kg-mcp
+Knowledge Steward and kg-mcp
+
+Knowledge Steward and kg-mcp
+
+- LOSM-Lang Overview
+LOSM-Lang Overview
+
+LOSM-Lang Overview
+
+- Closed Epistemic Loop
+Closed Epistemic Loop
+
+Closed Epistemic Loop
+
+- Nexus Control Sandbox Explanation
+Nexus Control Sandbox Explanation
+
+Nexus Control Sandbox Explanation
+
+- Nexus Mood Modulation
+Nexus Mood Modulation
+
+Nexus Mood Modulation
+
+- Discovery to Consolidation
+Discovery to Consolidation
+
+Discovery to Consolidation
+
+- Nexus Console Usage Shift
+Nexus Console Usage Shift
+
+Nexus Console Usage Shift
+
+- CIR v2 Invariant Violation
+CIR v2 Invariant Violation
+
+CIR v2 Invariant Violation
+
+- PEB Kernel Governance
+PEB Kernel Governance
+
+PEB Kernel Governance
+
+- Absorb Terminology Update
+Absorb Terminology Update
+
+Absorb Terminology Update
+
+- Multi-runtime Semantic Coherence
+Multi-runtime Semantic Coherence
+
+Multi-runtime Semantic Coherence
+
+- Multireality in System Design
+Multireality in System Design
+
+Multireality in System Design
+
+- Ticket Claiming without Temporal
+Ticket Claiming without Temporal
+
+Ticket Claiming without Temporal
+
+- Rules Based Layer
+Rules Based Layer
+
+Rules Based Layer
+
+- DeepSeek and DocLing Gap
+DeepSeek and DocLing Gap
+
+DeepSeek and DocLing Gap
+
+- Governance-Preserving Transport Plan
+Governance-Preserving Transport Plan
+
+Governance-Preserving Transport Plan
+
+- Audit Data Milestone
+Audit Data Milestone
+
+Audit Data Milestone
+
+- WorkRequest MCP Conduit Design
+WorkRequest MCP Conduit Design
+
+WorkRequest MCP Conduit Design
+
+- Splitting Conduit Functionality
+Splitting Conduit Functionality
+
+Splitting Conduit Functionality
+
+- DocLing Parser Architecture
+DocLing Parser Architecture
+
+DocLing Parser Architecture
+
+- Trading Systems and Stochastic Outcomes
+Trading Systems and Stochastic Outcomes
+
+Trading Systems and Stochastic Outcomes
+
+- Unit of Update Analysis
+Unit of Update Analysis
+
+Unit of Update Analysis
+
+- Gemini and Conduit Architecture
+Gemini and Conduit Architecture
+
+Gemini and Conduit Architecture
+
+- System Documentation Evolution
+System Documentation Evolution
+
+System Documentation Evolution
+
+Mark PippinsFreeClaim offer
+
+Mark PippinsFreeClaim offer
+
+Mark PippinsFree
+
+Mark PippinsFree
+
+Mark PippinsFree
+
+Mark Pippins
+
+Mark Pippins
+
+Free
+
+Claim offer
+
+ChatGPTFree offerShareBulk ExportYou said:“Semantic IR v0.1 (strict schema + mapping to NBK primitives)”You said:Turn this into a real Pydantic module with all classes, enums, and cross-reference validatorsYou said:ok, and remembering that nexus/python/ai has been renamed to nexus/python/vision, let's do both, and let's dig into WorkRequestDAG as well.You said:let's proceedYou said:go aheadYou said:Write the actual semantic_projection package modules plus the compiler adjustmentsYou said:what I have in my losm-ir folder is this: 
+
+# State Ontology Analysis: WorkflowState vs WorkStatus
+
+## Purpose
+
+Two state enums coexist across the LOSM codebase. This document maps them,
+determines their relationship type, and recommends a consolidation strategy.
+
+## Enums
+
+### WorkflowState (losm_ir/states.py) — 9 states
+
+The IR-level / simplified lifecycle. No DB binding.python
+class WorkflowState(str, Enum):
+    NEW = "NEW"
+    PLAN_DONE = "PLAN_DONE"
+    CRITIQUED = "CRITIQUED"
+    SPEC_READY = "SPEC_READY"
+    EXECUTED = "EXECUTED"
+    VALIDATED = "VALIDATED"
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
+    BLOCKED = "BLOCKED"### WorkStatus (losm_store/models.py) — 11 states
+
+The operational pipeline position. DB-backed column (work_requests.status).python
+class WorkStatus(str, Enum):
+    NEW = "NEW"
+    INTAKE = "INTAKE"
+    PLAN_GENERATION = "PLAN_GENERATION"
+    PLAN_REVIEW = "PLAN_REVIEW"
+    PLAN_APPROVAL_GATE = "PLAN_APPROVAL_GATE"
+    SPEC_GENERATION = "SPEC_GENERATION"
+    EXECUTION = "EXECUTION"
+    VALIDATION = "VALIDATION"
+    COMPLETION = "COMPLETION"
+    BLOCKED = "BLOCKED"
+    FAILED = "FAILED"---
+
+## Side-by-Side Comparison
+
+### Pipeline phases — forward flow
+
+| Phase | WorkStatus | WorkflowState | Notes |
+|-------|-----------|---------------|-------|
+| Entry | NEW, INTAKE | NEW | Intake is an operational detail; the IR sees both as "not yet planned" |
+| Planning | PLAN_GENERATION, PLAN_REVIEW, PLAN_APPROVAL_GATE | PLAN_DONE | The operational pipeline splits planning into 3 sub-steps; the IR condenses to "planning complete" |
+| Critique | _(no distinct state)_ | CRITIQUED | Critique is a side effect of PLAN_REVIEW — no separate operational state exists |
+| Spec | SPEC_GENERATION | SPEC_READY | Spec generation produces "spec ready" |
+| Execution | EXECUTION | EXECUTED | Direct equivalent at different naming style |
+| Validation | VALIDATION | VALIDATED | Direct equivalent at different naming style |
+| Completion | COMPLETION | COMPLETE | Direct equivalent at different naming style |
+| Terminal | BLOCKED | BLOCKED | Identical |
+| Terminal | FAILED | FAILED | Identical |
+
+### Feedback states

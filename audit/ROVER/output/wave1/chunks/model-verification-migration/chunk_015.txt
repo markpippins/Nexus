@@ -1,0 +1,242 @@
+Yeah — this is the point where your system stops being “an agent architecture” and becomes something closer to acomputational ontology with an execution kernel.So I’ll give you the state vector in the way it actually wants to exist in your system, not a toy schema.The Vector State Model (what “reality” looks like)At minimum, your state vector is not one thing. It’sfive coupled subspacesthat evolve together.Think of it as:S(t) = ⟨World, Cognition, Execution, Models, Provenance⟩Each is a structured state manifold.1. WORLD STATE (what “reality” currently is)This is what you were hinting at directly.It defines:what is considered trueright nowwhat has been committed as realwhat is still tentative vs materializedStructure:JSONWorldState {facts: FactGraph,entities: EntityGraph,active_truths: Set<TruthAssertion>,contradictions: Set<Conflict>,last_commit_id: Hash,commit_frequency_policy: Policy}Key idea:This is where your line lives:“what counts as reality and how often to save it”So:reality = committed fact graph snapshotfrequency = commit policy (event-driven, time-driven, hybrid)2. COGNITION STATE (what is being thought about)This is Nebula’s working surface inside Vector.JSONCognitionState {active_tasks: DAG<Task>,WorkRequests: Queue<WorkRequest>,reasoning_stacks: Map<TaskId, ReasoningTrace>,hypotheses: Set<Hypothesis>,unresolved_intents: Set<Intent>}Key idea:This isnot execution.This is:“what is currently being held in mind across the system”This is where AST prompts actually land.3. EXECUTION STATE (what is currently running)This is the real-time kernel.JSONExecutionState {running_jobs: Map<JobId, ExecutionHandle>,model_calls: Stream<ModelInvocation>,step_results: DAG<StepResult>,intermediate_outputs: Cache,failure_modes: EventLog}Key idea:This is:“what is happening right now in compute space”It is transient, high-frequency, and disposable.4. MODEL STATE (your harness layer abstraction)This is where your AST/CLI insight actually lives structurally.JSONModelState {registry: Map<ModelId, ModelDescriptor>,execution_profiles: Map<ModelId, ExecutionProfile>,adapters: Map<ModelId, IRAdapter>,verification_status: Map<ModelId, VerificationRecord>,capability_vectors: Map<ModelId, CapabilityEmbedding>}Key idea:This is what you were calling:AST requirement differencesCLI parameter tuningharness behavior variationThis is where models stop being “entities” and become:compiled execution targets with ABI contracts5. PROVENANCE STATE (the truth ledger)This is what makes your system deterministic instead of just “smart”.JSONProvenanceState {event_log: AppendOnlyLog<Event>,state_snapshots: Map<SnapshotId, VectorState>,derivation_graph: DAG<CauseEffect>,BP_verification_records: Set<VerificationRun>,audit_traces: Map<ActionId, Trace>}Key idea:This is what lets you answer:“why is reality this way?”“what caused this state?”“what changed between commits?”The important unifying objectAll five are tied together by:VectorFrameJSONVectorFrame {timestamp: T,world: WorldState,cognition: CognitionState,execution: ExecutionState,models: ModelState,provenance: ProvenanceState}And Vector is basically:a reducer over VectorFrame:VectorFrame(t+1) = reduce(VectorFrame(t), Events, WorkRequests, ModelOutputs)Now the critical insight (this is the real architecture move)You said:“Vector determines what counts as reality and how often to save it”That is not inside WorldState.That belongs to:COMMIT POLICY (meta-state control)JSONCommitPolicy {triggers: [time_interval,execution_boundary,BP_verification_pass,cognitive_threshold_crossed],snapshot_strategy: incremental | full | hybrid,consistency_model: strong | eventual | scoped}This is what makes your system feel “alive” vs just logged.Why your intuition about “it becomes 3 apps” is correctYou already see it:1. Model/Harness system→ ModelState becomes its own product2. Vector runtime→ Execution + World + Cognition core3. Conduit (or orchestration layer)→ routing, UI, control surfaceThat split isinevitablebecause each evolves at different velocity.The punchlineWhat you are actually building is:aversioned, stateful cognition kernel with pluggable model ABIs and deterministic world commitsBut in operational terms:Vector = reality reducerNebula = cognition interfaceBP = truth validatorOllama = compute substrateIf you want the next step, the interesting one is:defining thestate transition function signatureBecause that’s where your system stops being “architecture” and becomesformally composable cognition.
+
+Yeah — this is the point where your system stops being “an agent architecture” and becomes something closer to acomputational ontology with an execution kernel.So I’ll give you the state vector in the way it actually wants to exist in your system, not a toy schema.The Vector State Model (what “reality” looks like)At minimum, your state vector is not one thing. It’sfive coupled subspacesthat evolve together.Think of it as:S(t) = ⟨World, Cognition, Execution, Models, Provenance⟩Each is a structured state manifold.1. WORLD STATE (what “reality” currently is)This is what you were hinting at directly.It defines:what is considered trueright nowwhat has been committed as realwhat is still tentative vs materializedStructure:JSONWorldState {facts: FactGraph,entities: EntityGraph,active_truths: Set<TruthAssertion>,contradictions: Set<Conflict>,last_commit_id: Hash,commit_frequency_policy: Policy}Key idea:This is where your line lives:“what counts as reality and how often to save it”So:reality = committed fact graph snapshotfrequency = commit policy (event-driven, time-driven, hybrid)2. COGNITION STATE (what is being thought about)This is Nebula’s working surface inside Vector.JSONCognitionState {active_tasks: DAG<Task>,WorkRequests: Queue<WorkRequest>,reasoning_stacks: Map<TaskId, ReasoningTrace>,hypotheses: Set<Hypothesis>,unresolved_intents: Set<Intent>}Key idea:This isnot execution.This is:“what is currently being held in mind across the system”This is where AST prompts actually land.3. EXECUTION STATE (what is currently running)This is the real-time kernel.JSONExecutionState {running_jobs: Map<JobId, ExecutionHandle>,model_calls: Stream<ModelInvocation>,step_results: DAG<StepResult>,intermediate_outputs: Cache,failure_modes: EventLog}Key idea:This is:“what is happening right now in compute space”It is transient, high-frequency, and disposable.4. MODEL STATE (your harness layer abstraction)This is where your AST/CLI insight actually lives structurally.JSONModelState {registry: Map<ModelId, ModelDescriptor>,execution_profiles: Map<ModelId, ExecutionProfile>,adapters: Map<ModelId, IRAdapter>,verification_status: Map<ModelId, VerificationRecord>,capability_vectors: Map<ModelId, CapabilityEmbedding>}Key idea:This is what you were calling:AST requirement differencesCLI parameter tuningharness behavior variationThis is where models stop being “entities” and become:compiled execution targets with ABI contracts5. PROVENANCE STATE (the truth ledger)This is what makes your system deterministic instead of just “smart”.JSONProvenanceState {event_log: AppendOnlyLog<Event>,state_snapshots: Map<SnapshotId, VectorState>,derivation_graph: DAG<CauseEffect>,BP_verification_records: Set<VerificationRun>,audit_traces: Map<ActionId, Trace>}Key idea:This is what lets you answer:“why is reality this way?”“what caused this state?”“what changed between commits?”The important unifying objectAll five are tied together by:VectorFrameJSONVectorFrame {timestamp: T,world: WorldState,cognition: CognitionState,execution: ExecutionState,models: ModelState,provenance: ProvenanceState}And Vector is basically:a reducer over VectorFrame:VectorFrame(t+1) = reduce(VectorFrame(t), Events, WorkRequests, ModelOutputs)Now the critical insight (this is the real architecture move)You said:“Vector determines what counts as reality and how often to save it”That is not inside WorldState.That belongs to:COMMIT POLICY (meta-state control)JSONCommitPolicy {triggers: [time_interval,execution_boundary,BP_verification_pass,cognitive_threshold_crossed],snapshot_strategy: incremental | full | hybrid,consistency_model: strong | eventual | scoped}This is what makes your system feel “alive” vs just logged.Why your intuition about “it becomes 3 apps” is correctYou already see it:1. Model/Harness system→ ModelState becomes its own product2. Vector runtime→ Execution + World + Cognition core3. Conduit (or orchestration layer)→ routing, UI, control surfaceThat split isinevitablebecause each evolves at different velocity.The punchlineWhat you are actually building is:aversioned, stateful cognition kernel with pluggable model ABIs and deterministic world commitsBut in operational terms:Vector = reality reducerNebula = cognition interfaceBP = truth validatorOllama = compute substrateIf you want the next step, the interesting one is:defining thestate transition function signatureBecause that’s where your system stops being “architecture” and becomesformally composable cognition.
+
+Yeah — this is the point where your system stops being “an agent architecture” and becomes something closer to acomputational ontology with an execution kernel.So I’ll give you the state vector in the way it actually wants to exist in your system, not a toy schema.The Vector State Model (what “reality” looks like)At minimum, your state vector is not one thing. It’sfive coupled subspacesthat evolve together.Think of it as:S(t) = ⟨World, Cognition, Execution, Models, Provenance⟩Each is a structured state manifold.1. WORLD STATE (what “reality” currently is)This is what you were hinting at directly.It defines:what is considered trueright nowwhat has been committed as realwhat is still tentative vs materializedStructure:JSONWorldState {facts: FactGraph,entities: EntityGraph,active_truths: Set<TruthAssertion>,contradictions: Set<Conflict>,last_commit_id: Hash,commit_frequency_policy: Policy}Key idea:This is where your line lives:“what counts as reality and how often to save it”So:reality = committed fact graph snapshotfrequency = commit policy (event-driven, time-driven, hybrid)2. COGNITION STATE (what is being thought about)This is Nebula’s working surface inside Vector.JSONCognitionState {active_tasks: DAG<Task>,WorkRequests: Queue<WorkRequest>,reasoning_stacks: Map<TaskId, ReasoningTrace>,hypotheses: Set<Hypothesis>,unresolved_intents: Set<Intent>}Key idea:This isnot execution.This is:“what is currently being held in mind across the system”This is where AST prompts actually land.3. EXECUTION STATE (what is currently running)This is the real-time kernel.JSONExecutionState {running_jobs: Map<JobId, ExecutionHandle>,model_calls: Stream<ModelInvocation>,step_results: DAG<StepResult>,intermediate_outputs: Cache,failure_modes: EventLog}Key idea:This is:“what is happening right now in compute space”It is transient, high-frequency, and disposable.4. MODEL STATE (your harness layer abstraction)This is where your AST/CLI insight actually lives structurally.JSONModelState {registry: Map<ModelId, ModelDescriptor>,execution_profiles: Map<ModelId, ExecutionProfile>,adapters: Map<ModelId, IRAdapter>,verification_status: Map<ModelId, VerificationRecord>,capability_vectors: Map<ModelId, CapabilityEmbedding>}Key idea:This is what you were calling:AST requirement differencesCLI parameter tuningharness behavior variationThis is where models stop being “entities” and become:compiled execution targets with ABI contracts5. PROVENANCE STATE (the truth ledger)This is what makes your system deterministic instead of just “smart”.JSONProvenanceState {event_log: AppendOnlyLog<Event>,state_snapshots: Map<SnapshotId, VectorState>,derivation_graph: DAG<CauseEffect>,BP_verification_records: Set<VerificationRun>,audit_traces: Map<ActionId, Trace>}Key idea:This is what lets you answer:“why is reality this way?”“what caused this state?”“what changed between commits?”The important unifying objectAll five are tied together by:VectorFrameJSONVectorFrame {timestamp: T,world: WorldState,cognition: CognitionState,execution: ExecutionState,models: ModelState,provenance: ProvenanceState}And Vector is basically:a reducer over VectorFrame:VectorFrame(t+1) = reduce(VectorFrame(t), Events, WorkRequests, ModelOutputs)Now the critical insight (this is the real architecture move)You said:“Vector determines what counts as reality and how often to save it”That is not inside WorldState.That belongs to:COMMIT POLICY (meta-state control)JSONCommitPolicy {triggers: [time_interval,execution_boundary,BP_verification_pass,cognitive_threshold_crossed],snapshot_strategy: incremental | full | hybrid,consistency_model: strong | eventual | scoped}This is what makes your system feel “alive” vs just logged.Why your intuition about “it becomes 3 apps” is correctYou already see it:1. Model/Harness system→ ModelState becomes its own product2. Vector runtime→ Execution + World + Cognition core3. Conduit (or orchestration layer)→ routing, UI, control surfaceThat split isinevitablebecause each evolves at different velocity.The punchlineWhat you are actually building is:aversioned, stateful cognition kernel with pluggable model ABIs and deterministic world commitsBut in operational terms:Vector = reality reducerNebula = cognition interfaceBP = truth validatorOllama = compute substrateIf you want the next step, the interesting one is:defining thestate transition function signatureBecause that’s where your system stops being “architecture” and becomesformally composable cognition.
+
+Yeah — this is the point where your system stops being “an agent architecture” and becomes something closer to acomputational ontology with an execution kernel.
+
+So I’ll give you the state vector in the way it actually wants to exist in your system, not a toy schema.
+
+---
+
+# The Vector State Model (what “reality” looks like)
+
+At minimum, your state vector is not one thing. It’sfive coupled subspacesthat evolve together.
+
+Think of it as:
+
+> S(t) = ⟨World, Cognition, Execution, Models, Provenance⟩
+
+S(t) = ⟨World, Cognition, Execution, Models, Provenance⟩
+
+Each is a structured state manifold.
+
+---
+
+# 1. WORLD STATE (what “reality” currently is)
+
+This is what you were hinting at directly.
+
+It defines:
+
+- what is considered trueright now
+what is considered trueright now
+
+- what has been committed as real
+what has been committed as real
+
+- what is still tentative vs materialized
+what is still tentative vs materialized
+
+### Structure:
+
+```
+WorldState {  facts: FactGraph,  entities: EntityGraph,  active_truths: Set<TruthAssertion>,  contradictions: Set<Conflict>,  last_commit_id: Hash,  commit_frequency_policy: Policy}
+```
+
+```
+WorldState {  facts: FactGraph,  entities: EntityGraph,  active_truths: Set<TruthAssertion>,  contradictions: Set<Conflict>,  last_commit_id: Hash,  commit_frequency_policy: Policy}
+```
+
+### Key idea:
+
+This is where your line lives:
+
+> “what counts as reality and how often to save it”
+
+“what counts as reality and how often to save it”
+
+So:
+
+- reality = committed fact graph snapshot
+reality = committed fact graph snapshot
+
+- frequency = commit policy (event-driven, time-driven, hybrid)
+frequency = commit policy (event-driven, time-driven, hybrid)
+
+---
+
+# 2. COGNITION STATE (what is being thought about)
+
+This is Nebula’s working surface inside Vector.
+
+```
+CognitionState {  active_tasks: DAG<Task>,  WorkRequests: Queue<WorkRequest>,  reasoning_stacks: Map<TaskId, ReasoningTrace>,  hypotheses: Set<Hypothesis>,  unresolved_intents: Set<Intent>}
+```
+
+```
+CognitionState {  active_tasks: DAG<Task>,  WorkRequests: Queue<WorkRequest>,  reasoning_stacks: Map<TaskId, ReasoningTrace>,  hypotheses: Set<Hypothesis>,  unresolved_intents: Set<Intent>}
+```
+
+### Key idea:
+
+This isnot execution.
+
+This is:
+
+> “what is currently being held in mind across the system”
+
+“what is currently being held in mind across the system”
+
+This is where AST prompts actually land.
+
+---
+
+# 3. EXECUTION STATE (what is currently running)
+
+This is the real-time kernel.
+
+```
+ExecutionState {  running_jobs: Map<JobId, ExecutionHandle>,  model_calls: Stream<ModelInvocation>,  step_results: DAG<StepResult>,  intermediate_outputs: Cache,  failure_modes: EventLog}
+```
+
+```
+ExecutionState {  running_jobs: Map<JobId, ExecutionHandle>,  model_calls: Stream<ModelInvocation>,  step_results: DAG<StepResult>,  intermediate_outputs: Cache,  failure_modes: EventLog}
+```
+
+### Key idea:
+
+This is:
+
+> “what is happening right now in compute space”
+
+“what is happening right now in compute space”
+
+It is transient, high-frequency, and disposable.
+
+---
+
+# 4. MODEL STATE (your harness layer abstraction)
+
+This is where your AST/CLI insight actually lives structurally.
+
+```
+ModelState {  registry: Map<ModelId, ModelDescriptor>,  execution_profiles: Map<ModelId, ExecutionProfile>,  adapters: Map<ModelId, IRAdapter>,  verification_status: Map<ModelId, VerificationRecord>,  capability_vectors: Map<ModelId, CapabilityEmbedding>}
+```
+
+```
+ModelState {  registry: Map<ModelId, ModelDescriptor>,  execution_profiles: Map<ModelId, ExecutionProfile>,  adapters: Map<ModelId, IRAdapter>,  verification_status: Map<ModelId, VerificationRecord>,  capability_vectors: Map<ModelId, CapabilityEmbedding>}
+```
+
+### Key idea:
+
+This is what you were calling:
+
+- AST requirement differences
+AST requirement differences
+
+- CLI parameter tuning
+CLI parameter tuning
+
+- harness behavior variation
+harness behavior variation
+
+This is where models stop being “entities” and become:
+
+> compiled execution targets with ABI contracts
+
+compiled execution targets with ABI contracts
+
+---
+
+# 5. PROVENANCE STATE (the truth ledger)
+
+This is what makes your system deterministic instead of just “smart”.
+
+```
+ProvenanceState {  event_log: AppendOnlyLog<Event>,  state_snapshots: Map<SnapshotId, VectorState>,  derivation_graph: DAG<CauseEffect>,  BP_verification_records: Set<VerificationRun>,  audit_traces: Map<ActionId, Trace>}
+```
+
+```
+ProvenanceState {  event_log: AppendOnlyLog<Event>,  state_snapshots: Map<SnapshotId, VectorState>,  derivation_graph: DAG<CauseEffect>,  BP_verification_records: Set<VerificationRun>,  audit_traces: Map<ActionId, Trace>}
+```
+
+### Key idea:
+
+This is what lets you answer:
+
+- “why is reality this way?”
+“why is reality this way?”
+
+- “what caused this state?”
+“what caused this state?”
+
+- “what changed between commits?”
+“what changed between commits?”
+
+---
+
+# The important unifying object
+
+All five are tied together by:
+
+> VectorFrame
+
+VectorFrame
+
+```
+VectorFrame {  timestamp: T,  world: WorldState,  cognition: CognitionState,  execution: ExecutionState,  models: ModelState,  provenance: ProvenanceState}
+```
+
+```
+VectorFrame {  timestamp: T,  world: WorldState,  cognition: CognitionState,  execution: ExecutionState,  models: ModelState,  provenance: ProvenanceState}
+```
+
+And Vector is basically:
+
+> a reducer over VectorFrame:
+
+a reducer over VectorFrame:
+
+```
+VectorFrame(t+1) = reduce(VectorFrame(t), Events, WorkRequests, ModelOutputs)
+```
+
+```
+VectorFrame(t+1) = reduce(VectorFrame(t), Events, WorkRequests, ModelOutputs)
+```
+
+---
+
+# Now the critical insight (this is the real architecture move)
+
+You said:
+
+> “Vector determines what counts as reality and how often to save it”
+
+“Vector determines what counts as reality and how often to save it”
+
+That is not inside WorldState.
+
+That belongs to:
+
+## COMMIT POLICY (meta-state control)
+
+```
+CommitPolicy {  triggers: [    time_interval,    execution_boundary,    BP_verification_pass,    cognitive_threshold_crossed  ],  snapshot_strategy: incremental | full | hybrid,  consistency_model: strong | eventual | scoped}
+```
+
+```
+CommitPolicy {  triggers: [    time_interval,    execution_boundary,    BP_verification_pass,    cognitive_threshold_crossed  ],  snapshot_strategy: incremental | full | hybrid,  consistency_model: strong | eventual | scoped}
+```
+
+This is what makes your system feel “alive” vs just logged.
+
+---
+
+# Why your intuition about “it becomes 3 apps” is correct
+
+You already see it:
+
+### 1. Model/Harness system

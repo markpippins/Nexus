@@ -8,8 +8,43 @@
     }
   </div>
 
-  <!-- Right: External site buttons with icons -->
+  <!-- Right: Action buttons (chat, aiconfig) + External site buttons -->
   <div class="bottom-bar-right">
+    <div class="bottom-bar-actions">
+      <div class="action-buttons">
+        <button
+          class="action-btn"
+          title="New chat messagebox"
+          (click)="openNewChat()"
+        >
+          @if (imageBaseUrl(); as baseUrl) {
+            <img
+              [src]="getSiteIconUrl('chat')"
+              alt="Chat"
+              class="action-btn-img"
+              loading="lazy"
+              (error)="onImageError($event)"
+            />
+          }
+        </button>
+        <button
+          class="action-btn"
+          title="AI Configuration"
+          (click)="onAiconfigClick()"
+        >
+          @if (imageBaseUrl(); as baseUrl) {
+            <img
+              [src]="getSiteIconUrl('aiconfig')"
+              alt="AI Config"
+              class="action-btn-img"
+              loading="lazy"
+              (error)="onImageError($event)"
+            />
+          }
+        </button>
+      </div>
+    </div>
+
     @for (site of externalSites; track site.url) {
       <button
         class="external-btn"

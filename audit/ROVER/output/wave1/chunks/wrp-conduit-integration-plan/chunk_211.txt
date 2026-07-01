@@ -1,0 +1,870 @@
+- concrete data structures / storage tables / code mapping →L1
+concrete data structures / storage tables / code mapping →L1
+
+- rationale for DAG compilation as separate phase →L3
+rationale for DAG compilation as separate phase →L3
+
+## 11.3 WRP v1.2 Execution Traversal Engine
+
+Default document level:L2
+
+Typical chunk-level overrides:
+
+- ExecutionContext,ExecutionCursor,ExecutionReceiptstructures →L1orL2depending on specificity
+ExecutionContext,ExecutionCursor,ExecutionReceiptstructures →L1orL2depending on specificity
+
+- traversal invariants / isolation rules →L2
+traversal invariants / isolation rules →L2
+
+- rationale for deterministic traversal and experimental modes →L3
+rationale for deterministic traversal and experimental modes →L3
+
+## 11.4 WRP Migration Plan
+
+Default document level:L3
+
+Reasoning:
+
+- migration is a cross-cutting architectural transition strategy;
+migration is a cross-cutting architectural transition strategy;
+
+- the document explains sequencing, compatibility, and rollout discipline.
+the document explains sequencing, compatibility, and rollout discipline.
+
+Typical chunk-level overrides:
+
+- actual migration tasks and repo changes →L1
+actual migration tasks and repo changes →L1
+
+- compatibility matrix / rollout constraints →L2
+compatibility matrix / rollout constraints →L2
+
+- migration philosophy and sequencing rationale →L3
+migration philosophy and sequencing rationale →L3
+
+---
+
+# 12. Nebula Data Model Extensions
+
+This section defines the required schema extensions to Nebula’s markdown-derived corpus.
+
+---
+
+# 13. Target Nebula Entities
+
+The projection model assumes the following logical entities exist or will exist:
+
+- nebula_documents
+nebula_documents
+
+- nebula_chunks
+nebula_chunks
+
+- nebula_cross_references
+nebula_cross_references
+
+Optionally:
+
+- nebula_artifacts
+nebula_artifacts
+
+- nebula_open_questions
+nebula_open_questions
+
+- nebula_execution_links
+nebula_execution_links
+
+This document does not require a specific SQL dialect, but examples assume a relational store.
+
+---
+
+# 14. Required Additions tonebula_documents
+
+## 14.1 New fields
+
+```
+ALTER TABLE nebula_documents    ADD COLUMN level VARCHAR(8) NOT NULL DEFAULT 'L2',    ADD COLUMN artifact_type VARCHAR(128),    ADD COLUMN artifact_key VARCHAR(255),    ADD COLUMN artifact_version VARCHAR(64),    ADD COLUMN conduit_plan_id VARCHAR(255),    ADD COLUMN conduit_project_key VARCHAR(255),    ADD COLUMN source_kind VARCHAR(64),    ADD COLUMN status VARCHAR(64),    ADD COLUMN supersedes_document_id BIGINT NULL;
+```
+
+```
+ALTER TABLE nebula_documents    ADD COLUMN level VARCHAR(8) NOT NULL DEFAULT 'L2',    ADD COLUMN artifact_type VARCHAR(128),    ADD COLUMN artifact_key VARCHAR(255),    ADD COLUMN artifact_version VARCHAR(64),    ADD COLUMN conduit_plan_id VARCHAR(255),    ADD COLUMN conduit_project_key VARCHAR(255),    ADD COLUMN source_kind VARCHAR(64),    ADD COLUMN status VARCHAR(64),    ADD COLUMN supersedes_document_id BIGINT NULL;
+```
+
+## 14.2 Field semantics
+
+### level
+
+Primary abstraction level of the document.Allowed values:
+
+- L1
+L1
+
+- L2
+L2
+
+- L3
+L3
+
+- L4
+L4
+
+### artifact_type
+
+Stable WRP artifact family identifier, e.g.:
+
+- wrp.protocol
+wrp.protocol
+
+- wrp.dag_model
+wrp.dag_model
+
+- wrp.execution_engine
+wrp.execution_engine
+
+- wrp.migration_plan
+wrp.migration_plan
+
+### artifact_key
+
+Stable logical identifier for the artifact, e.g.:
+
+- wrp-v1-protocol
+wrp-v1-protocol
+
+- wrp-v1_1-dag
+wrp-v1_1-dag
+
+- wrp-v1_2-traversal
+wrp-v1_2-traversal
+
+- wrp-migration-plan
+wrp-migration-plan
+
+### artifact_version
+
+Human-visible version identifier, e.g.:
+
+- 1.0
+1.0
+
+- 1.1
+1.1
+
+- 1.2
+1.2
+
+- 2026-06
+2026-06
+
+### conduit_plan_id
+
+Optional link to the Conduit execution plan primarily associated with the document.
+
+### conduit_project_key
+
+Optional grouping key for Conduit project membership.
+
+### source_kind
+
+Describes origin:
+
+- markdown
+markdown
+
+- generated_spec
+generated_spec
+
+- conduit_projection
+conduit_projection
+
+- imported_transcript
+imported_transcript
+
+- manual_note
+manual_note
+
+### status
+
+Document lifecycle:
+
+- draft
+draft
+
+- candidate
+candidate
+
+- approved
+approved
+
+- superseded
+superseded
+
+- archived
+archived
+
+### supersedes_document_id
+
+Optional pointer to the prior document version.
+
+---
+
+# 15. Required Additions tonebula_chunks
+
+## 15.1 New fields
+
+```
+ALTER TABLE nebula_chunks    ADD COLUMN level VARCHAR(8),    ADD COLUMN artifact_type VARCHAR(128),    ADD COLUMN chunk_kind VARCHAR(64),    ADD COLUMN normative_strength VARCHAR(32),    ADD COLUMN section_key VARCHAR(255);
+```
+
+```
+ALTER TABLE nebula_chunks    ADD COLUMN level VARCHAR(8),    ADD COLUMN artifact_type VARCHAR(128),    ADD COLUMN chunk_kind VARCHAR(64),    ADD COLUMN normative_strength VARCHAR(32),    ADD COLUMN section_key VARCHAR(255);
+```
+
+## 15.2 Field semantics
+
+### level
+
+Chunk-level override. If null, inherit from the parent document.
+
+### artifact_type
+
+Optional denormalized copy of the parent artifact type for faster filtering.
+
+### chunk_kind
+
+Classifies the chunk’s semantic role. Recommended values:
+
+- overview
+overview
+
+- definition
+definition
+
+- protocol_rule
+protocol_rule
+
+- data_model
+data_model
+
+- algorithm
+algorithm
+
+- invariant
+invariant
+
+- migration_step
+migration_step
+
+- acceptance_criteria
+acceptance_criteria
+
+- open_question
+open_question
+
+- example
+example
+
+- rationale
+rationale
+
+- implementation_note
+implementation_note
+
+### normative_strength
+
+Optional normative marker for validation-oriented retrieval:
+
+- informative
+informative
+
+- recommended
+recommended
+
+- required
+required
+
+- prohibited
+prohibited
+
+### section_key
+
+Stable section identity, e.g.:
+
+- wrp.protocol.identity-and-versioning
+wrp.protocol.identity-and-versioning
+
+- wrp.dag.compilation-invariants
+wrp.dag.compilation-invariants
+
+- wrp.traversal.execution-context
+wrp.traversal.execution-context
+
+- wrp.migration.phase-2-cutover
+wrp.migration.phase-2-cutover
+
+---
+
+# 16. Required Additions tonebula_cross_references
+
+## 16.1 New fields
+
+```
+ALTER TABLE nebula_cross_references    ADD COLUMN relation_type VARCHAR(64) NOT NULL DEFAULT 'references',    ADD COLUMN source_level VARCHAR(8),    ADD COLUMN target_level VARCHAR(8),    ADD COLUMN weight DECIMAL(8,4),    ADD COLUMN evidence_kind VARCHAR(64),    ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'active';
+```
+
+```
+ALTER TABLE nebula_cross_references    ADD COLUMN relation_type VARCHAR(64) NOT NULL DEFAULT 'references',    ADD COLUMN source_level VARCHAR(8),    ADD COLUMN target_level VARCHAR(8),    ADD COLUMN weight DECIMAL(8,4),    ADD COLUMN evidence_kind VARCHAR(64),    ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'active';
+```
+
+## 16.2 Why not a singlelevelon the edge?
+
+Because the edge itself is not the primary abstraction bearer. The useful information is usually:
+
+- what level the source is,
+what level the source is,
+
+- what level the target is,
+what level the target is,
+
+- what relation binds them.
+what relation binds them.
+
+Therefore, the preferred model is to carry:
+
+- source_level
+source_level
+
+- target_level
+target_level
+
+as denormalized convenience fields rather than treating the edge as an independently stratified knowledge unit.
+
+## 16.3 Field semantics
+
+### relation_type
+
+Recommended initial relation types:
+
+- references
+references
+
+- depends_on
+depends_on
+
+- implements
+implements
+
+- constrains
+constrains
+
+- defines
+defines
+
+- compiled_into
+compiled_into
+
+- executes
+executes
+
+- migrates
+migrates
+
+- supersedes
+supersedes
+
+- validated_by
+validated_by
+
+- raises_question
+raises_question
+
+- answers_question
+answers_question
+
+### source_level,target_level
+
+Optional denormalized values copied from the linked nodes for efficient querying.
+
+### weight
+
+Optional confidence or importance score.
+
+### evidence_kind
+
+How the edge was created:
+
+- explicit_markdown_link
+explicit_markdown_link
+
+- manual_annotation
+manual_annotation
+
+- artifact_projection
+artifact_projection
+
+- semantic_match
+semantic_match
+
+- receipt_backlink
+receipt_backlink
+
+### status
+
+- active
+active
+
+- superseded
+superseded
+
+- tentative
+tentative
+
+---
+
+# 17. Optional New Table:nebula_artifacts
+
+If WRP artifacts need to be treated as first-class entities independent of document versions, add a registry table.
+
+```
+CREATE TABLE nebula_artifacts (    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,    artifact_key VARCHAR(255) NOT NULL UNIQUE,    artifact_type VARCHAR(128) NOT NULL,    current_version VARCHAR(64),    current_document_id BIGINT,    status VARCHAR(64) NOT NULL DEFAULT 'active',    created_at TIMESTAMP NOT NULL,    updated_at TIMESTAMP NOT NULL);
+```
+
+```
+CREATE TABLE nebula_artifacts (    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,    artifact_key VARCHAR(255) NOT NULL UNIQUE,    artifact_type VARCHAR(128) NOT NULL,    current_version VARCHAR(64),    current_document_id BIGINT,    status VARCHAR(64) NOT NULL DEFAULT 'active',    created_at TIMESTAMP NOT NULL,    updated_at TIMESTAMP NOT NULL);
+```
+
+Purpose:
+
+- stable artifact identity across multiple document revisions,
+stable artifact identity across multiple document revisions,
+
+- single lookup point for “the current WRP traversal spec,”
+single lookup point for “the current WRP traversal spec,”
+
+- easier version navigation and supersession tracking.
+easier version navigation and supersession tracking.
+
+---
+
+# 18. Optional New Table:nebula_execution_links
+
+This table binds Nebula knowledge to execution artifacts and receipts.
+
+```
+CREATE TABLE nebula_execution_links (    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,    artifact_key VARCHAR(255) NOT NULL,    document_id BIGINT,    chunk_id BIGINT,    conduit_plan_id VARCHAR(255),    wrp_work_request_id VARCHAR(255),    receipt_id VARCHAR(255),    link_type VARCHAR(64) NOT NULL,    created_at TIMESTAMP NOT NULL);
+```
+
+```
+CREATE TABLE nebula_execution_links (    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,    artifact_key VARCHAR(255) NOT NULL,    document_id BIGINT,    chunk_id BIGINT,    conduit_plan_id VARCHAR(255),    wrp_work_request_id VARCHAR(255),    receipt_id VARCHAR(255),    link_type VARCHAR(64) NOT NULL,    created_at TIMESTAMP NOT NULL);
+```
+
+Recommendedlink_typevalues:
+
+- implemented_by_plan
+implemented_by_plan
+
+- tracked_by_plan
+tracked_by_plan
+
+- validated_by_receipt
+validated_by_receipt
+
+- superseded_by_plan
+superseded_by_plan
+
+- migrated_by_request
+migrated_by_request
+
+This table is not required for the first pass, but it becomes useful as soon as execution receipts start flowing back into Nebula.
+
+---
+
+# 19. WRP Artifact Taxonomy
+
+Each WRP artifact projected into Nebula must declare a stable type.
+
+## 19.1 Initial artifact types
+
+Artifact TypeMeaningwrp.protocolFormal WRP protocol definitionwrp.dag_modelDAG representation and compilation pipelinewrp.execution_engineTraversal / execution engine semanticswrp.migration_planWRP migration and rollout strategy
+
+Artifact TypeMeaningwrp.protocolFormal WRP protocol definitionwrp.dag_modelDAG representation and compilation pipelinewrp.execution_engineTraversal / execution engine semanticswrp.migration_planWRP migration and rollout strategy
+
+## 19.2 Future extension types
+
+Examples of likely future additions:
+
+Artifact TypeMeaningwrp.validation_rulesCross-artifact validation and policy ruleswrp.compatibility_matrixVersion compatibility / migration compatibilitywrp.receipt_modelFormal execution receipt modelwrp.role_contractsRole-specific work request / execution constraints
+
+Artifact TypeMeaningwrp.validation_rulesCross-artifact validation and policy ruleswrp.compatibility_matrixVersion compatibility / migration compatibilitywrp.receipt_modelFormal execution receipt modelwrp.role_contractsRole-specific work request / execution constraints
+
+---
+
+# 20. Canonical WRP Artifact Keys
+
+The initial corpus should use stable artifact keys.
+
+Artifact KeyArtifact TypeVersionwrp-v1-protocolwrp.protocol1.0wrp-v1_1-dagwrp.dag_model1.1wrp-v1_2-traversalwrp.execution_engine1.2wrp-migration-planwrp.migration_plan2026-06
+
+Artifact KeyArtifact TypeVersionwrp-v1-protocolwrp.protocol1.0wrp-v1_1-dagwrp.dag_model1.1wrp-v1_2-traversalwrp.execution_engine1.2wrp-migration-planwrp.migration_plan2026-06
+
+These keys should remain stable even if the underlying document path changes.
+
+---
+
+# 21. Projection Model
+
+This section defines how WRP material moves from authored docs / Conduit plans into Nebula entities.
+
+---
+
+# 22. Projection Sources
+
+A WRP artifact may enter Nebula from one of three sources.
+
+## Source A — Markdown-authored spec
+
+The preferred source. A curated markdown spec exists under the repo and is imported into Nebula.
+
+## Source B — Conduit plan projection
+
+A Conduit plan or work packet is projected into Nebula as a lightweight execution-facing document when no richer Nebula document exists yet.
+
+## Source C — Manual or generated synthesis
+
+A generated or manually synthesized architecture note is imported and later normalized.
+
+The preferred order is:
+
+- Markdown spec
+Markdown spec
+
+- Generated synthesis
+Generated synthesis
+
+- Conduit projection fallback
+Conduit projection fallback
+
+---
+
+# 23. Projection Pipeline Stages
+
+Every WRP artifact projection follows the same high-level pipeline.
+
+```
+Source artifact  → artifact registration  → document ingestion  → section extraction  → chunk creation  → level assignment  → cross-reference extraction  → Conduit link registration  → optional open-question extraction
+```
+
+```
+Source artifact  → artifact registration  → document ingestion  → section extraction  → chunk creation  → level assignment  → cross-reference extraction  → Conduit link registration  → optional open-question extraction
+```
+
+---
+
+# 24. Stage 1 — Artifact Registration
+
+Input:
+
+- artifact key
+artifact key
+
+- artifact type
+artifact type
+
+- version
+version
+
+- source path or source identifier
+source path or source identifier
+
+Output:
+
+- canonical artifact registration record
+canonical artifact registration record
+
+- link to the current Nebula document version
+link to the current Nebula document version
+
+Rules:
+
+- artifact keys must be stable;
+artifact keys must be stable;
+
+- new versions should supersede, not overwrite, old document rows;
+new versions should supersede, not overwrite, old document rows;
+
+- the current version should be discoverable by artifact key.
+the current version should be discoverable by artifact key.
+
+---
+
+# 25. Stage 2 — Document Ingestion
+
+The source markdown/spec is stored as a Nebula document.
+
+Required metadata:
+
+- artifact_type
+artifact_type
+
+- artifact_key
+artifact_key
+
+- artifact_version
+artifact_version
+
+- source_kind
+source_kind
+
+- status
+status
+
+- defaultlevel
+defaultlevel
+
+Document title should remain human-readable, e.g.:
+
+- WRP v1.0 Protocol Formalization
+WRP v1.0 Protocol Formalization
+
+- WRP v1.1 DAG Data Model and Compilation Pipeline
+WRP v1.1 DAG Data Model and Compilation Pipeline
+
+- WRP v1.2 Execution Traversal Engine
+WRP v1.2 Execution Traversal Engine
+
+- WRP Migration Plan
+WRP Migration Plan
+
+---
+
+# 26. Stage 3 — Section Extraction
+
+Sections should be extracted from headings and stable heading anchors.
+
+Recommended section key convention:
+
+```
+<artifact family>.<major section slug>[.<subsection slug>...]
+```
+
+```
+<artifact family>.<major section slug>[.<subsection slug>...]
+```
+
+Examples:
+
+- wrp.protocol.overview
+wrp.protocol.overview
+
+- wrp.protocol.identity-and-versioning
+wrp.protocol.identity-and-versioning
+
+- wrp.dag.node-types
+wrp.dag.node-types
+
+- wrp.dag.compilation-pipeline
+wrp.dag.compilation-pipeline
+
+- wrp.traversal.execution-context
+wrp.traversal.execution-context
+
+- wrp.traversal.isolation-rules
+wrp.traversal.isolation-rules
+
+- wrp.migration.phase-1-parallel-support
+wrp.migration.phase-1-parallel-support
+
+---
+
+# 27. Stage 4 — Chunk Creation
+
+Chunks should be created with semantic sensitivity rather than purely fixed token windows.
+
+Recommended chunk boundaries:
+
+- section intro / overview paragraph groups
+section intro / overview paragraph groups
+
+- data model definitions
+data model definitions
+
+- invariant blocks
+invariant blocks
+
+- algorithm descriptions
+algorithm descriptions
+
+- migration phase steps
+migration phase steps
+
+- examples
+examples
+
+- acceptance criteria sections
+acceptance criteria sections
+
+- open questions sections
+open questions sections
+
+A chunk should not mix:
+
+- a high-level architectural rationale paragraph,
+a high-level architectural rationale paragraph,
+
+- a concrete SQL alteration block,
+a concrete SQL alteration block,
+
+- and an execution acceptance checklist.
+and an execution acceptance checklist.
+
+Those should become separate chunks with different levels andchunk_kindvalues.
+
+---
+
+# 28. Stage 5 — Level Assignment
+
+Level assignment occurs in two passes.
+
+## Pass A — Document default level
+
+Assign the document’s dominant level based on artifact type and overall intent.
+
+## Pass B — Chunk override level
+
+Override chunk level when a section clearly belongs to another abstraction layer.
+
+### Heuristic examples
+
+#### AssignL1when the chunk contains:
+
+- repository paths
+repository paths
+
+- method signatures
+method signatures
+
+- schema alteration steps
+schema alteration steps
+
+- explicit implementation task sequences
+explicit implementation task sequences
+
+- acceptance criteria / test instructions
+acceptance criteria / test instructions
+
+- field-by-field code mapping
+field-by-field code mapping
+
+#### AssignL2when the chunk contains:
+
+- formal subsystem structures
+formal subsystem structures
+
+- execution algorithms
+execution algorithms
+
+- graph semantics
+graph semantics
+
+- state transition rules
+state transition rules
+
+- normative subsystem invariants
+normative subsystem invariants
+
+#### AssignL3when the chunk contains:
+
+- design rationale
+design rationale
+
+- cross-subsystem tradeoffs
+cross-subsystem tradeoffs
+
+- migration sequencing rationale
+migration sequencing rationale
+
+- architectural positioning of WRP relative to Conduit/Nebula/LOSM
+architectural positioning of WRP relative to Conduit/Nebula/LOSM
+
+#### AssignL4when the chunk contains:
+
+- system-wide doctrine
+system-wide doctrine
+
+- ontology-level policy
+ontology-level policy
+
+- meta-rules for work modeling or architectural governance
+meta-rules for work modeling or architectural governance
+
+---
+
+# 29. Stage 6 — Cross-Reference Extraction
+
+Cross-references should be created from explicit and inferred signals.
+
+## 29.1 Explicit signals
+
+- markdown links
+markdown links
+
+- section references
+section references
+
+- “depends on”, “see also”, “constrained by”
+“depends on”, “see also”, “constrained by”
+
+- manually annotated relationships
+manually annotated relationships
+
+## 29.2 Inferred signals
+
+- artifact-key mentions
+artifact-key mentions
+
+- section-key references
+section-key references
+
+- protocol field names reused in traversal or migration docs
+protocol field names reused in traversal or migration docs
+
+- repeated formal identifiers likeExecutionContext,ExecutionReceipt,tenant_id,trace_id
+repeated formal identifiers likeExecutionContext,ExecutionReceipt,tenant_id,trace_id
+
+## 29.3 Required WRP reference classes
+
+The first pass must at least support:
+
+- protocol field ↔ DAG compilation rule
+protocol field ↔ DAG compilation rule
+
+- DAG node/edge semantics ↔ traversal behavior
+DAG node/edge semantics ↔ traversal behavior
+
+- traversal invariant ↔ migration constraint
+traversal invariant ↔ migration constraint
+
+- migration step ↔ affected WRP artifact
+migration step ↔ affected WRP artifact
+
+- WRP artifact ↔ Conduit plan implementing it
+WRP artifact ↔ Conduit plan implementing it
+
+---
+
+# 30. Stage 7 — Conduit Link Registration
+
+Each projected WRP artifact should retain a link to the Conduit execution packet(s) responsible for implementation.
+
+Minimum metadata to retain:
+
+- conduit_plan_id
+conduit_plan_id
+
+- conduit_project_key
+conduit_project_key
+
+- optional receipt trail / execution link row
+optional receipt trail / execution link row
+
+If one Nebula artifact maps to multiple Conduit plans, use:

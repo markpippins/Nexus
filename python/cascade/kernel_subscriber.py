@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import os
+import select
 import signal
 import sys
 import time
@@ -141,7 +142,12 @@ def run_kernel_subscriber() -> None:
     # ── Main notification loop ──
     try:
         while _running:
-            if conn.notifies:
+            # Poll PostgreSQL connection for incoming notifications.
+            # Without select() + conn.poll(), conn.notifies stays empty.
+            ready = select.select([conn], [], [], 0.5)
+            if ready[0]:
+                conn.poll()
+            while conn.notifies:
                 notify = conn.notifies.pop(0)
                 try:
                     payload: dict[str, Any] = json.loads(notify.payload)
@@ -151,18 +157,36 @@ def run_kernel_subscriber() -> None:
                     print(f"[kernel_subscriber] Transition committed: "
                           f"{event_type} ({payload.get('event_id', '?')})")
 
-                    # Build cascade-style event dict and enqueue
-                    event_dict = _build_envelope(payload)
-
-                    # Use try_enqueue_event (which wraps in CanonicalEnvelope)
+                    # ── Build a CanonicalEnvelope and publish directly ──
+                    # We use enqueue_publish() instead of try_enqueue_event()
+                    # to control the subject namespace. try_enqueue_event
+                    # routes through cascade's workflow subject mapper,
+                    # which would turn kernel events into cascade subjects
+                    # (nexus.cascade.v1.workflow.*). Kernel events must
+                    # stay in the kernel namespace (nexus.kernel.v1.transition.*).
                     try:
-                        from nats_publisher import try_enqueue_event
-                        try_enqueue_event(
-                            event_dict,
+                        from nats_publisher import enqueue_publish
+                        from nats_envelope.envelope import CanonicalEnvelope, Classification
+
+                        event_dict = _build_envelope(payload)
+
+                        envelope = CanonicalEnvelope(
+                            event_id=payload.get("event_id", ""),
+                            event_type=event_type,
+                            occurred_at=payload.get("timestamp", ""),
+                            origin_component="kernel",
+                            domain="kernel",
                             correlation_id=payload.get("event_id"),
+                            causation_id=None,
+                            classification=Classification.INTERNAL,
+                            subject=subject,
+                            payload=event_dict,
                         )
-                    except ImportError:
+                        enqueue_publish(subject, envelope)
+                    except ImportError as e:
                         # Fallback: print to stdout
+                        print(f"[kernel_subscriber] Enqueue import error: {e}",
+                              file=sys.stderr)
                         print(f"[kernel_subscriber] [EVENT] {subject}")
                         print(json.dumps(payload, indent=2))
                     except Exception as e:
@@ -172,10 +196,6 @@ def run_kernel_subscriber() -> None:
                 except json.JSONDecodeError as e:
                     print(f"[kernel_subscriber] Invalid NOTIFY payload: "
                           f"{e}", file=sys.stderr)
-
-            # Wait for notifications (checks every 500ms for shutdown signal)
-            if _running:
-                time.sleep(0.5)
     finally:
         cur.close()
         conn.close()

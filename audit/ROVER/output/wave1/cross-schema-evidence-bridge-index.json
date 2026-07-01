@@ -1,0 +1,318 @@
+{
+  "source": "Cross-schema evidence bridge.html",
+  "slug": "cross-schema-evidence-bridge",
+  "total_chunks": 62,
+  "total_chars": 737465,
+  "chunks": [
+    {
+      "index": 1,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_001.txt",
+      "size": 15
+    },
+    {
+      "index": 2,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_002.txt",
+      "size": 6258
+    },
+    {
+      "index": 3,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_003.txt",
+      "size": 19996
+    },
+    {
+      "index": 4,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_004.txt",
+      "size": 9702
+    },
+    {
+      "index": 5,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_005.txt",
+      "size": 6258
+    },
+    {
+      "index": 6,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_006.txt",
+      "size": 19996
+    },
+    {
+      "index": 7,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_007.txt",
+      "size": 9702
+    },
+    {
+      "index": 8,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_008.txt",
+      "size": 6258
+    },
+    {
+      "index": 9,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_009.txt",
+      "size": 19996
+    },
+    {
+      "index": 10,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_010.txt",
+      "size": 9702
+    },
+    {
+      "index": 11,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_011.txt",
+      "size": 6258
+    },
+    {
+      "index": 12,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_012.txt",
+      "size": 19996
+    },
+    {
+      "index": 13,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_013.txt",
+      "size": 9702
+    },
+    {
+      "index": 14,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_014.txt",
+      "size": 10145
+    },
+    {
+      "index": 15,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_015.txt",
+      "size": 5156
+    },
+    {
+      "index": 16,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_016.txt",
+      "size": 19996
+    },
+    {
+      "index": 17,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_017.txt",
+      "size": 9702
+    },
+    {
+      "index": 18,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_018.txt",
+      "size": 5156
+    },
+    {
+      "index": 19,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_019.txt",
+      "size": 19996
+    },
+    {
+      "index": 20,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_020.txt",
+      "size": 9702
+    },
+    {
+      "index": 21,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_021.txt",
+      "size": 5156
+    },
+    {
+      "index": 22,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_022.txt",
+      "size": 19996
+    },
+    {
+      "index": 23,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_023.txt",
+      "size": 9702
+    },
+    {
+      "index": 24,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_024.txt",
+      "size": 156
+    },
+    {
+      "index": 25,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_025.txt",
+      "size": 5123
+    },
+    {
+      "index": 26,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_026.txt",
+      "size": 19996
+    },
+    {
+      "index": 27,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_027.txt",
+      "size": 9702
+    },
+    {
+      "index": 28,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_028.txt",
+      "size": 5123
+    },
+    {
+      "index": 29,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_029.txt",
+      "size": 19996
+    },
+    {
+      "index": 30,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_030.txt",
+      "size": 9702
+    },
+    {
+      "index": 31,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_031.txt",
+      "size": 5123
+    },
+    {
+      "index": 32,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_032.txt",
+      "size": 19996
+    },
+    {
+      "index": 33,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_033.txt",
+      "size": 9702
+    },
+    {
+      "index": 34,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_034.txt",
+      "size": 5123
+    },
+    {
+      "index": 35,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_035.txt",
+      "size": 19996
+    },
+    {
+      "index": 36,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_036.txt",
+      "size": 9654
+    },
+    {
+      "index": 37,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_037.txt",
+      "size": 5123
+    },
+    {
+      "index": 38,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_038.txt",
+      "size": 19996
+    },
+    {
+      "index": 39,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_039.txt",
+      "size": 9654
+    },
+    {
+      "index": 40,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_040.txt",
+      "size": 5123
+    },
+    {
+      "index": 41,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_041.txt",
+      "size": 19996
+    },
+    {
+      "index": 42,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_042.txt",
+      "size": 9654
+    },
+    {
+      "index": 43,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_043.txt",
+      "size": 15572
+    },
+    {
+      "index": 44,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_044.txt",
+      "size": 15547
+    },
+    {
+      "index": 45,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_045.txt",
+      "size": 15547
+    },
+    {
+      "index": 46,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_046.txt",
+      "size": 10328
+    },
+    {
+      "index": 47,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_047.txt",
+      "size": 19445
+    },
+    {
+      "index": 48,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_048.txt",
+      "size": 19437
+    },
+    {
+      "index": 49,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_049.txt",
+      "size": 19402
+    },
+    {
+      "index": 50,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_050.txt",
+      "size": 19908
+    },
+    {
+      "index": 51,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_051.txt",
+      "size": 18751
+    },
+    {
+      "index": 52,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_052.txt",
+      "size": 10131
+    },
+    {
+      "index": 53,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_053.txt",
+      "size": 10111
+    },
+    {
+      "index": 54,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_054.txt",
+      "size": 10104
+    },
+    {
+      "index": 55,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_055.txt",
+      "size": 10104
+    },
+    {
+      "index": 56,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_056.txt",
+      "size": 10104
+    },
+    {
+      "index": 57,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_057.txt",
+      "size": 19972
+    },
+    {
+      "index": 58,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_058.txt",
+      "size": 18521
+    },
+    {
+      "index": 59,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_059.txt",
+      "size": 14660
+    },
+    {
+      "index": 60,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_060.txt",
+      "size": 14644
+    },
+    {
+      "index": 61,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_061.txt",
+      "size": 19819
+    },
+    {
+      "index": 62,
+      "path": "chunks/cross-schema-evidence-bridge/chunk_062.txt",
+      "size": 9475
+    }
+  ]
+}

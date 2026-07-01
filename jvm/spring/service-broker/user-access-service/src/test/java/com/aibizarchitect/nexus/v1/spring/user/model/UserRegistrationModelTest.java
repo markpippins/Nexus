@@ -21,12 +21,14 @@ class UserRegistrationModelTest {
         user.setId(123L);
         user.setAlias("testuser");
         user.setEmail("test@example.com");
+        user.setIdentifier("mypassword");
         user.setAdmin(true);
 
         // Then
         assertEquals(Long.valueOf(123L), user.getId());
         assertEquals("testuser", user.getAlias());
         assertEquals("test@example.com", user.getEmail());
+        assertEquals("mypassword", user.getIdentifier());
         assertTrue(user.isAdmin());
     }
 
@@ -38,6 +40,18 @@ class UserRegistrationModelTest {
         // Then
         assertEquals("testuser", user.getAlias());
         assertEquals("test@example.com", user.getEmail());
+        assertEquals("", user.getIdentifier());
+    }
+
+    @Test
+    void userRegistration_WithIdentifierConstructor_ShouldInitializeCorrectly() {
+        // When
+        UserRegistration user = new UserRegistration("testuser", "test@example.com", "mypassword");
+
+        // Then
+        assertEquals("testuser", user.getAlias());
+        assertEquals("test@example.com", user.getEmail());
+        assertEquals("mypassword", user.getIdentifier());
     }
 
     @Test

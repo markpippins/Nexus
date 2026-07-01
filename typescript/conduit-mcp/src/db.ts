@@ -558,7 +558,7 @@ async function createSchema(
       UNIQUE(role, model_id)
     );
 
-    DROP VIEW IF EXISTS ${PG_SCHEMA}.plans_by_status;
+    DROP VIEW IF EXISTS ${PG_SCHEMA}.plans_by_status CASCADE;
     DROP VIEW IF EXISTS ${PG_SCHEMA}.plan_status CASCADE;
     CREATE VIEW ${PG_SCHEMA}.plan_status AS
     SELECT 
@@ -1052,6 +1052,359 @@ const migrations: Migration[] = [
     description: "Add last_heartbeat_at TEXT column to sessions for agent-liveness tracking",
     up: async (exec) => {
       await exec(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_heartbeat_at TEXT`);
+    },
+  },
+  {
+    version: 17,
+    description: "Add work_request_events table for Runtime Kernel event-sourced state machine",
+    up: async (exec) => {
+      // The event log is the source of truth for WorkRequest lifecycle.
+      // State = fold(events), never direct mutation.
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${PG_SCHEMA}.work_request_events (
+          id          BIGSERIAL PRIMARY KEY,
+          wr_id       TEXT NOT NULL REFERENCES ${VISION_SCHEMA}.work_requests(wr_id),
+          event_type  TEXT NOT NULL,
+          payload     JSONB NOT NULL DEFAULT '{}',
+          created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_wre_wr_id ON ${PG_SCHEMA}.work_request_events(wr_id);
+        CREATE INDEX IF NOT EXISTS idx_wre_event_type ON ${PG_SCHEMA}.work_request_events(event_type);
+        CREATE INDEX IF NOT EXISTS idx_wre_created_at ON ${PG_SCHEMA}.work_request_events(created_at);
+      `);
+      // Backfill event log for existing pending work requests.
+      // Every existing WR with status 'pending' gets a synthetic WR_SUBMITTED event
+      // so the fold produces VALIDATED state, making them eligible for the decision loop.
+      await exec(`
+        INSERT INTO ${PG_SCHEMA}.work_request_events (wr_id, event_type, payload, created_at)
+        SELECT wr_id, 'WR_SUBMITTED',
+               jsonb_build_object('backfill', true, 'original_status', status),
+               recorded_on_dt
+        FROM ${VISION_SCHEMA}.work_requests
+        WHERE status = 'pending'
+          AND wr_id NOT IN (
+            SELECT wr_id FROM ${PG_SCHEMA}.work_request_events WHERE event_type = 'WR_SUBMITTED'
+          )
+      `);
+      // Also ensure the work_requests cache status reflects the initial folded state
+      await exec(`
+        UPDATE ${VISION_SCHEMA}.work_requests wr
+        SET status = 'validated'
+        WHERE wr.status = 'pending'
+          AND wr.wr_id IN (
+            SELECT wre.wr_id FROM ${PG_SCHEMA}.work_request_events wre
+            WHERE wre.event_type = 'WR_SUBMITTED'
+              AND wr.wr_id = wre.wr_id
+          )
+      `);
+    },
+  },
+  {
+    version: 18,
+    description: "Event-Sourcing Foundation: WorkRequest Event Store, State Projection, and Replay Engine (plan 1052)",
+    up: async (exec) => {
+      await exec(`DROP TABLE IF EXISTS ${PG_SCHEMA}.work_request_events CASCADE`);
+
+      await exec(`
+        CREATE TABLE ${PG_SCHEMA}.work_request_events (
+          event_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          work_request_id   UUID NOT NULL,
+          event_type        TEXT NOT NULL
+            CHECK(event_type IN (
+              'WORKREQUEST.CREATED','VISION.IR_PRODUCED',
+              'STATE.TRANSITION_PROPOSED','STATE.TRANSITION_APPROVED','STATE.TRANSITION_COMMITTED',
+              'EXECUTION.STARTED','EXECUTION.COMPLETED','EXECUTION.FAILED',
+              'SYSTEM.CRON_TRIGGERED'
+            )),
+          event_version     INTEGER NOT NULL DEFAULT 1,
+          correlation_id    UUID,
+          causation_id      UUID,
+          occurred_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          payload           JSONB NOT NULL DEFAULT '{}'::jsonb,
+          actor_type        TEXT NOT NULL DEFAULT 'system',
+          actor_id          TEXT NOT NULL DEFAULT '',
+          sequence_number   BIGSERIAL NOT NULL
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_wre_wr_seq
+          ON ${PG_SCHEMA}.work_request_events(work_request_id, sequence_number);
+        CREATE INDEX IF NOT EXISTS idx_wre_wr_occurred
+          ON ${PG_SCHEMA}.work_request_events(work_request_id, occurred_at);
+        CREATE INDEX IF NOT EXISTS idx_wre_event_type
+          ON ${PG_SCHEMA}.work_request_events(event_type);
+        CREATE INDEX IF NOT EXISTS idx_wre_correlation
+          ON ${PG_SCHEMA}.work_request_events(correlation_id);
+        CREATE INDEX IF NOT EXISTS idx_wre_payload
+          ON ${PG_SCHEMA}.work_request_events USING GIN(payload);
+      `);
+
+      await exec(`
+        CREATE TABLE ${PG_SCHEMA}.work_request_state (
+          work_request_id   UUID PRIMARY KEY,
+          current_state     TEXT NOT NULL DEFAULT 'PROPOSED'
+            CHECK(current_state IN (
+              'PROPOSED','PLANNING','PENDING','IMPLEMENTING','REVIEW','COMPLETED','FAILED','CANCELLED'
+            )),
+          vision_stage      TEXT
+            CHECK(vision_stage IN ('PLAN_IR','SPEC_IR','EXECUTION_IR','VALIDATION_IR')),
+          vision_ir_version INTEGER NOT NULL DEFAULT 0,
+          last_event_id     UUID,
+          updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_wrs_current_state
+          ON ${PG_SCHEMA}.work_request_state(current_state);
+      `);
+
+      await exec(`
+        CREATE TABLE ${VISION_SCHEMA}.vision_ir_artifacts (
+          artifact_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          work_request_id   UUID NOT NULL,
+          event_id          UUID NOT NULL,
+          ir_stage          TEXT NOT NULL
+            CHECK(ir_stage IN ('PLAN_IR','SPEC_IR','EXECUTION_IR','VALIDATION_IR')),
+          ir_version        INTEGER NOT NULL DEFAULT 1,
+          artifact_type     TEXT NOT NULL,
+          content           JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_vision_ir_wr_stage_ver
+          ON ${VISION_SCHEMA}.vision_ir_artifacts(work_request_id, ir_stage, ir_version);
+        CREATE INDEX IF NOT EXISTS idx_vision_ir_stage
+          ON ${VISION_SCHEMA}.vision_ir_artifacts(ir_stage);
+        CREATE INDEX IF NOT EXISTS idx_vision_ir_content
+          ON ${VISION_SCHEMA}.vision_ir_artifacts USING GIN(content);
+      `);
+
+      await exec(`
+        CREATE OR REPLACE FUNCTION ${PG_SCHEMA}.enforce_state_transition()
+        RETURNS TRIGGER AS $TRIG$
+        BEGIN
+          IF NEW.event_type != 'STATE.TRANSITION_COMMITTED' THEN
+            IF EXISTS (
+              SELECT 1 FROM ${PG_SCHEMA}.work_request_state
+              WHERE work_request_id = NEW.work_request_id
+              AND current_state != NEW.payload->>'new_state'
+            ) THEN
+              RAISE EXCEPTION 'STATE_MUTATION_FORBIDDEN: only STATE.TRANSITION_COMMITTED may mutate state';
+            END IF;
+          END IF;
+          RETURN NEW;
+        END;
+        $TRIG$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS trg_enforce_state_transition ON ${PG_SCHEMA}.work_request_events;
+        CREATE TRIGGER trg_enforce_state_transition
+        BEFORE INSERT ON ${PG_SCHEMA}.work_request_events
+        FOR EACH ROW
+        EXECUTE FUNCTION ${PG_SCHEMA}.enforce_state_transition();
+      `);
+
+      await exec(`
+        CREATE OR REPLACE FUNCTION ${PG_SCHEMA}.update_work_request_state()
+        RETURNS TRIGGER AS $TRIG$
+        BEGIN
+          IF NEW.event_type = 'STATE.TRANSITION_COMMITTED' THEN
+            INSERT INTO ${PG_SCHEMA}.work_request_state
+              (work_request_id, current_state, last_event_id, updated_at)
+            VALUES (
+              NEW.work_request_id,
+              COALESCE(NEW.payload->>'new_state', 'PROPOSED'),
+              NEW.event_id,
+              NEW.occurred_at
+            )
+            ON CONFLICT (work_request_id) DO UPDATE SET
+              current_state = EXCLUDED.current_state,
+              last_event_id = EXCLUDED.last_event_id,
+              updated_at = EXCLUDED.updated_at;
+          END IF;
+
+          IF NEW.event_type = 'VISION.IR_PRODUCED' THEN
+            INSERT INTO ${PG_SCHEMA}.work_request_state
+              (work_request_id, vision_stage, vision_ir_version, last_event_id, updated_at)
+            VALUES (
+              NEW.work_request_id,
+              NEW.payload->>'ir_stage',
+              COALESCE((NEW.payload->>'ir_version')::integer, 1),
+              NEW.event_id,
+              NEW.occurred_at
+            )
+            ON CONFLICT (work_request_id) DO UPDATE SET
+              vision_stage = EXCLUDED.vision_stage,
+              vision_ir_version = EXCLUDED.vision_ir_version,
+              last_event_id = EXCLUDED.last_event_id,
+              updated_at = EXCLUDED.updated_at;
+          END IF;
+
+          IF NEW.event_type = 'WORKREQUEST.CREATED' THEN
+            INSERT INTO ${PG_SCHEMA}.work_request_state
+              (work_request_id, current_state, last_event_id, updated_at)
+            VALUES (NEW.work_request_id, 'PROPOSED', NEW.event_id, NEW.occurred_at)
+            ON CONFLICT (work_request_id) DO UPDATE SET
+              last_event_id = EXCLUDED.last_event_id,
+              updated_at = EXCLUDED.updated_at;
+          END IF;
+
+          RETURN NEW;
+        END;
+        $TRIG$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS trg_update_wr_state ON ${PG_SCHEMA}.work_request_events;
+        CREATE TRIGGER trg_update_wr_state
+        AFTER INSERT ON ${PG_SCHEMA}.work_request_events
+        FOR EACH ROW
+        EXECUTE FUNCTION ${PG_SCHEMA}.update_work_request_state();
+      `);
+
+      await exec(`
+        CREATE OR REPLACE FUNCTION ${PG_SCHEMA}.replay_work_request_events(p_wr_id UUID)
+        RETURNS TABLE (
+          event_id UUID,
+          event_type TEXT,
+          event_version INTEGER,
+          sequence_number BIGINT,
+          occurred_at TIMESTAMPTZ,
+          payload JSONB,
+          actor_type TEXT,
+          actor_id TEXT
+        ) AS $FUNC$
+        BEGIN
+          RETURN QUERY
+          SELECT e.event_id, e.event_type, e.event_version, e.sequence_number,
+                 e.occurred_at, e.payload, e.actor_type, e.actor_id
+          FROM ${PG_SCHEMA}.work_request_events e
+          WHERE e.work_request_id = p_wr_id
+          ORDER BY e.sequence_number ASC;
+        END;
+        $FUNC$ LANGUAGE plpgsql;
+
+        CREATE OR REPLACE FUNCTION ${PG_SCHEMA}.replay_from_checkpoint(p_wr_id UUID, p_checkpoint BIGINT)
+        RETURNS TABLE (
+          event_id UUID,
+          event_type TEXT,
+          event_version INTEGER,
+          sequence_number BIGINT,
+          occurred_at TIMESTAMPTZ,
+          payload JSONB,
+          actor_type TEXT,
+          actor_id TEXT
+        ) AS $FUNC$
+        BEGIN
+          RETURN QUERY
+          SELECT e.event_id, e.event_type, e.event_version, e.sequence_number,
+                 e.occurred_at, e.payload, e.actor_type, e.actor_id
+          FROM ${PG_SCHEMA}.work_request_events e
+          WHERE e.work_request_id = p_wr_id
+            AND e.sequence_number > p_checkpoint
+          ORDER BY e.sequence_number ASC;
+        END;
+        $FUNC$ LANGUAGE plpgsql;
+
+        CREATE OR REPLACE FUNCTION ${PG_SCHEMA}.rebuild_work_request_state(p_wr_id UUID)
+        RETURNS TEXT AS $FUNC$
+        DECLARE
+          v_event RECORD;
+          v_state TEXT := 'PROPOSED';
+          v_stage TEXT := NULL;
+          v_ir_ver INTEGER := 0;
+          v_last_event UUID := NULL;
+          v_last_at TIMESTAMPTZ := NOW();
+        BEGIN
+          FOR v_event IN
+            SELECT * FROM ${PG_SCHEMA}.work_request_events
+            WHERE work_request_id = p_wr_id
+            ORDER BY sequence_number ASC
+          LOOP
+            IF v_event.event_type = 'WORKREQUEST.CREATED' THEN
+              v_state := 'PROPOSED';
+            END IF;
+            IF v_event.event_type = 'STATE.TRANSITION_COMMITTED' THEN
+              v_state := COALESCE(v_event.payload->>'new_state', v_state);
+            END IF;
+            IF v_event.event_type = 'VISION.IR_PRODUCED' THEN
+              v_stage := v_event.payload->>'ir_stage';
+              v_ir_ver := COALESCE((v_event.payload->>'ir_version')::integer, v_ir_ver);
+            END IF;
+            v_last_event := v_event.event_id;
+            v_last_at := v_event.occurred_at;
+          END LOOP;
+
+          INSERT INTO ${PG_SCHEMA}.work_request_state
+            (work_request_id, current_state, vision_stage, vision_ir_version, last_event_id, updated_at)
+          VALUES (p_wr_id, v_state, v_stage, v_ir_ver, v_last_event, v_last_at)
+          ON CONFLICT (work_request_id) DO UPDATE SET
+            current_state = EXCLUDED.current_state,
+            vision_stage = EXCLUDED.vision_stage,
+            vision_ir_version = EXCLUDED.vision_ir_version,
+            last_event_id = EXCLUDED.last_event_id,
+            updated_at = EXCLUDED.updated_at;
+
+          RETURN v_state;
+        END;
+        $FUNC$ LANGUAGE plpgsql;
+
+        CREATE OR REPLACE FUNCTION ${PG_SCHEMA}.rebuild_all_state_projections()
+        RETURNS INTEGER AS $FUNC$
+        DECLARE
+          v_count INTEGER := 0;
+          v_wr_id UUID;
+        BEGIN
+          TRUNCATE ${PG_SCHEMA}.work_request_state;
+          FOR v_wr_id IN
+            SELECT DISTINCT work_request_id FROM ${PG_SCHEMA}.work_request_events
+          LOOP
+            PERFORM ${PG_SCHEMA}.rebuild_work_request_state(v_wr_id);
+            v_count := v_count + 1;
+          END LOOP;
+          RETURN v_count;
+        END;
+        $FUNC$ LANGUAGE plpgsql;
+      `);
+
+      await exec(`
+        CREATE OR REPLACE FUNCTION ${VISION_SCHEMA}.auto_update_vision_ir_artifact()
+        RETURNS TRIGGER AS $TRIG$
+        BEGIN
+          IF NEW.ir_version IS NULL OR NEW.ir_version = 0 THEN
+            SELECT COALESCE(MAX(a.ir_version), 0) + 1
+            INTO NEW.ir_version
+            FROM ${VISION_SCHEMA}.vision_ir_artifacts a
+            WHERE a.work_request_id = NEW.work_request_id
+              AND a.ir_stage = NEW.ir_stage;
+          END IF;
+          RETURN NEW;
+        END;
+        $TRIG$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS trg_auto_ir_version ON ${VISION_SCHEMA}.vision_ir_artifacts;
+        CREATE TRIGGER trg_auto_ir_version
+        BEFORE INSERT ON ${VISION_SCHEMA}.vision_ir_artifacts
+        FOR EACH ROW
+        EXECUTE FUNCTION ${VISION_SCHEMA}.auto_update_vision_ir_artifact();
+      `);
+    },
+  },
+  {
+    version: 19,
+    description: "Broaden work_request_events CHECK constraint to accept runtime kernel WR_* event types alongside existing Vision event types",
+    up: async (exec) => {
+      await exec(`
+        ALTER TABLE ${PG_SCHEMA}.work_request_events
+        DROP CONSTRAINT IF EXISTS work_request_events_event_type_check;
+      `);
+      await exec(`
+        ALTER TABLE ${PG_SCHEMA}.work_request_events
+        ADD CONSTRAINT work_request_events_event_type_check
+        CHECK(event_type IN (
+          'WORKREQUEST.CREATED','VISION.IR_PRODUCED',
+          'STATE.TRANSITION_PROPOSED','STATE.TRANSITION_APPROVED','STATE.TRANSITION_COMMITTED',
+          'EXECUTION.STARTED','EXECUTION.COMPLETED','EXECUTION.FAILED',
+          'SYSTEM.CRON_TRIGGERED',
+          'WR_SUBMITTED','WR_VALIDATED','WR_QUEUED','WR_CLAIMED','WR_ACKED','WR_SETTLED',
+          'WR_REJECTED','WR_FAILED','WR_NOOP','WR_DEFERRED'
+        ));
+      `);
     },
   },
 ];
@@ -2033,6 +2386,259 @@ export async function listWorkRequests(filters: {
   return qAll(
     `SELECT * FROM ${VISION_SCHEMA}.work_requests ${where} ORDER BY recorded_on_dt DESC LIMIT ${limit}`,
     params
+  );
+}
+
+// ── Runtime Kernel Event Log ───────────────────────────────────────
+
+export async function resolveWrUuid(wrIdOrUuid: string): Promise<string> {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(wrIdOrUuid)) return wrIdOrUuid;
+  const row = await qOne(
+    `SELECT work_request_uuid FROM ${VISION_SCHEMA}.work_requests WHERE wr_id = @wrId`,
+    { wrId: wrIdOrUuid },
+  );
+  if (!row) return wrIdOrUuid;
+  return row.work_request_uuid;
+}
+
+export interface WorkRequestEventRow {
+  event_id: string;
+  work_request_id: string;
+  event_type: string;
+  event_version: number;
+  correlation_id: string | null;
+  causation_id: string | null;
+  occurred_at: string;
+  payload: any;
+  actor_type: string;
+  actor_id: string;
+  sequence_number: number;
+}
+
+export async function appendEvent(
+  wrId: string,
+  eventType: string,
+  payload: Record<string, unknown> = {},
+): Promise<void> {
+  const uuid = await resolveWrUuid(wrId);
+  const eventId = crypto.randomUUID();
+  await q(
+    `INSERT INTO ${PG_SCHEMA}.work_request_events
+       (event_id, work_request_id, event_type, payload, actor_type, actor_id)
+     VALUES (@eventId::uuid, @uuid::uuid, @eventType, @payload::jsonb, 'system', '')`,
+    { eventId, uuid, eventType, payload: JSON.stringify(payload) },
+  );
+
+  const statusMap: Record<string, string> = {
+    WR_SUBMITTED: "validated",
+    WR_VALIDATED: "queued",
+    WR_QUEUED: "claimed",
+    WR_CLAIMED: "acked",
+    WR_ACKED: "settled",
+    WR_SETTLED: "settled",
+    WR_REJECTED: "rejected",
+    WR_FAILED: "failed",
+    WR_NOOP: "noop",
+    WR_DEFERRED: "deferred",
+    "WORKREQUEST.CREATED": "proposed",
+    "STATE.TRANSITION_COMMITTED": (payload.new_state as string)?.toLowerCase() || "pending",
+    "EXECUTION.STARTED": "implementing",
+    "EXECUTION.COMPLETED": "completed",
+    "EXECUTION.FAILED": "failed",
+  };
+  const newStatus = statusMap[eventType] || "pending";
+  await q(
+    `UPDATE ${VISION_SCHEMA}.work_requests SET status = @newStatus WHERE work_request_uuid = @uuid`,
+    { newStatus, uuid },
+  );
+}
+
+export async function appendLedgerEvent(
+  workRequestId: string,
+  eventType: string,
+  payload: Record<string, unknown> = {},
+  opts: {
+    correlationId?: string;
+    causationId?: string;
+    actorType?: string;
+    actorId?: string;
+    eventVersion?: number;
+  } = {},
+): Promise<string> {
+  const eventId = crypto.randomUUID();
+  await q(
+    `INSERT INTO ${PG_SCHEMA}.work_request_events
+       (event_id, work_request_id, event_type, event_version,
+        correlation_id, causation_id, payload, actor_type, actor_id)
+     VALUES (@eventId::uuid, @workRequestId::uuid, @eventType, @eventVersion,
+        @correlationId::uuid, @causationId::uuid, @payload::jsonb, @actorType, @actorId)`,
+    {
+      eventId,
+      workRequestId,
+      eventType,
+      eventVersion: opts.eventVersion ?? 1,
+      correlationId: opts.correlationId || null,
+      causationId: opts.causationId || null,
+      payload: JSON.stringify(payload),
+      actorType: opts.actorType ?? "system",
+      actorId: opts.actorId ?? "",
+    },
+  );
+  return eventId;
+}
+
+export async function getEvents(wrId: string): Promise<WorkRequestEventRow[]> {
+  const uuid = await resolveWrUuid(wrId);
+  return qAll(
+    `SELECT * FROM ${PG_SCHEMA}.work_request_events
+     WHERE work_request_id = @uuid::uuid
+     ORDER BY sequence_number ASC`,
+    { uuid },
+  );
+}
+
+export async function getAllEvents(filters?: {
+  eventType?: string;
+  limit?: number;
+}): Promise<WorkRequestEventRow[]> {
+  const conditions: string[] = [];
+  const params: Record<string, any> = {};
+  if (filters?.eventType) {
+    conditions.push("event_type = @eventType");
+    params.eventType = filters.eventType;
+  }
+  const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+  const limit = filters?.limit ?? 200;
+  return qAll(
+    `SELECT * FROM ${PG_SCHEMA}.work_request_events ${where} ORDER BY occurred_at DESC, sequence_number DESC LIMIT ${limit}`,
+    params,
+  );
+}
+
+export async function replayEvents(workRequestId: string): Promise<WorkRequestEventRow[]> {
+  return qAll(
+    `SELECT * FROM ${PG_SCHEMA}.replay_work_request_events(@workRequestId::uuid)`,
+    { workRequestId },
+  );
+}
+
+export async function replayFromCheckpoint(
+  workRequestId: string,
+  checkpoint: number,
+): Promise<WorkRequestEventRow[]> {
+  return qAll(
+    `SELECT * FROM ${PG_SCHEMA}.replay_from_checkpoint(@workRequestId::uuid, @checkpoint)`,
+    { workRequestId, checkpoint },
+  );
+}
+
+export async function rebuildState(workRequestId: string): Promise<string> {
+  const row = await qOne(
+    `SELECT ${PG_SCHEMA}.rebuild_work_request_state(@workRequestId::uuid) AS state`,
+    { workRequestId },
+  );
+  return row?.state ?? "PROPOSED";
+}
+
+export async function rebuildAllStateProjections(): Promise<number> {
+  const row = await qOne(
+    `SELECT ${PG_SCHEMA}.rebuild_all_state_projections() AS count`,
+  );
+  return row?.count ?? 0;
+}
+
+export async function getWorkRequestStateRow(
+  workRequestId: string,
+): Promise<any | undefined> {
+  return qOne(
+    `SELECT * FROM ${PG_SCHEMA}.work_request_state WHERE work_request_id = @workRequestId::uuid`,
+    { workRequestId },
+  );
+}
+
+export async function insertVisionIRArtifact(
+  input: {
+    workRequestId: string;
+    eventId: string;
+    irStage: string;
+    irVersion?: number;
+    artifactType: string;
+    content: any;
+  },
+): Promise<string> {
+  const artifactId = crypto.randomUUID();
+  await q(
+    `INSERT INTO ${VISION_SCHEMA}.vision_ir_artifacts
+       (artifact_id, work_request_id, event_id, ir_stage, ir_version, artifact_type, content)
+     VALUES (@artifactId::uuid, @workRequestId::uuid, @eventId::uuid, @irStage, @irVersion, @artifactType, @content::jsonb)`,
+    {
+      artifactId,
+      workRequestId: input.workRequestId,
+      eventId: input.eventId,
+      irStage: input.irStage,
+      irVersion: input.irVersion ?? 0,
+      artifactType: input.artifactType,
+      content: JSON.stringify(input.content),
+    },
+  );
+  return artifactId;
+}
+
+export async function getVisionIRArtifacts(
+  workRequestId: string,
+  irStage?: string,
+): Promise<any[]> {
+  if (irStage) {
+    return qAll(
+      `SELECT * FROM ${VISION_SCHEMA}.vision_ir_artifacts
+       WHERE work_request_id = @workRequestId::uuid AND ir_stage = @irStage
+       ORDER BY ir_version ASC`,
+      { workRequestId, irStage },
+    );
+  }
+  return qAll(
+    `SELECT * FROM ${VISION_SCHEMA}.vision_ir_artifacts
+     WHERE work_request_id = @workRequestId::uuid
+     ORDER BY ir_stage, ir_version ASC`,
+    { workRequestId },
+  );
+}
+
+export async function selectNextRunnable(): Promise<WorkRequestRow | undefined> {
+  for (const status of ["validated", "queued", "claimed", "acked"]) {
+    const row = await qOne(
+      `SELECT * FROM ${VISION_SCHEMA}.work_requests
+       WHERE status = @status
+       ORDER BY recorded_on_dt ASC
+       LIMIT 1`,
+      { status },
+    );
+    if (row) return row;
+  }
+  return undefined;
+}
+
+export async function listWorkRequestStates(filters?: {
+  status?: string;
+  limit?: number;
+}): Promise<any[]> {
+  const conditions: string[] = [];
+  const params: Record<string, any> = {};
+  if (filters?.status) {
+    conditions.push("wr.status = @status");
+    params.status = filters.status;
+  }
+  const where = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+  const limit = filters?.limit ?? 50;
+  return qAll(
+    `SELECT wr.*,
+            (SELECT count(*) FROM ${PG_SCHEMA}.work_request_events e WHERE e.work_request_id = wr.work_request_uuid::uuid) AS event_count
+     FROM ${VISION_SCHEMA}.work_requests wr
+     ${where}
+     ORDER BY wr.recorded_on_dt DESC
+     LIMIT ${limit}`,
+    params,
   );
 }
 

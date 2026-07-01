@@ -1,0 +1,420 @@
+- migration must not remove legacy compatibility before the designated cutover phase
+migration must not remove legacy compatibility before the designated cutover phase
+
+## recommended
+
+- builders should prefer deterministic traversal order unless explicitly in experimental mode
+builders should prefer deterministic traversal order unless explicitly in experimental mode
+
+## informative
+
+- historical rationale and examples
+historical rationale and examples
+
+---
+
+# 46. Back-Projection from Execution into Nebula
+
+Once Conduit and runtime begin executing WRP work, Nebula should be updated with execution traceability.
+
+Examples:
+
+- a Conduit plan completes implementation ofwrp-v1_2-traversal
+a Conduit plan completes implementation ofwrp-v1_2-traversal
+
+- an execution receipt validates a traversal invariant
+an execution receipt validates a traversal invariant
+
+- a migration work request supersedes an older compatibility rule
+a migration work request supersedes an older compatibility rule
+
+These should produce:
+
+- document status updates,
+document status updates,
+
+- execution links,
+execution links,
+
+- optional new cross-references,
+optional new cross-references,
+
+- optional “implementation evidence” annotations.
+optional “implementation evidence” annotations.
+
+This should be append-only where possible; do not rewrite architectural history.
+
+---
+
+# 47. Initial Migration Plan for the Existing WRP Packet
+
+This section defines the first practical rollout for the four WRP artifacts already placed into Conduit.
+
+---
+
+# 48. Phase 1 — Register the Four WRP Artifacts
+
+Create Nebula artifact/document records for:
+
+- wrp-v1-protocol
+wrp-v1-protocol
+
+- wrp-v1_1-dag
+wrp-v1_1-dag
+
+- wrp-v1_2-traversal
+wrp-v1_2-traversal
+
+- wrp-migration-plan
+wrp-migration-plan
+
+At minimum, store:
+
+- title
+title
+
+- artifact type
+artifact type
+
+- artifact key
+artifact key
+
+- version
+version
+
+- default level
+default level
+
+- conduit plan id
+conduit plan id
+
+- source kind
+source kind
+
+- status
+status
+
+---
+
+# 49. Phase 2 — Import the Authoritative WRP Markdown Documents
+
+For each artifact, import the corresponding markdown spec into Nebula.
+
+If a markdown spec does not yet exist in repo form, use a temporary generated or manually curated document, but treat that as a stopgap. The target steady state is:
+
+> WRP architectural material lives as markdown/spec documents in Nebula, not only as Conduit plan descriptions.
+
+WRP architectural material lives as markdown/spec documents in Nebula, not only as Conduit plan descriptions.
+
+---
+
+# 50. Phase 3 — Chunk and Level the Documents
+
+Run the markdown importer with:
+
+- section extraction
+section extraction
+
+- semantic chunking
+semantic chunking
+
+- chunk kind assignment
+chunk kind assignment
+
+- chunk-level level override assignment
+chunk-level level override assignment
+
+- normative strength tagging for invariant sections
+normative strength tagging for invariant sections
+
+Do not leave WRP material as giant undifferentiated chunks.
+
+---
+
+# 51. Phase 4 — Emit Required Cross References
+
+At minimum, emit:
+
+- protocol → DAG edges
+protocol → DAG edges
+
+- DAG → traversal edges
+DAG → traversal edges
+
+- migration → protocol/DAG/traversal edges
+migration → protocol/DAG/traversal edges
+
+- WRP artifact → Conduit plan links
+WRP artifact → Conduit plan links
+
+---
+
+# 52. Phase 5 — Add Role-Aware Retrieval Filters
+
+Add query support for:
+
+- allowed levels
+allowed levels
+
+- preferred chunk kinds
+preferred chunk kinds
+
+- optional normative strength weighting
+optional normative strength weighting
+
+- bounded cross-reference expansion
+bounded cross-reference expansion
+
+This is the point where “Builder sees implementation detail; Architect sees architecture” becomes real.
+
+---
+
+# 53. Phase 6 — Backfill Execution Links
+
+Once Conduit begins implementing the packet, attach:
+
+- plan IDs
+plan IDs
+
+- receipt trails
+receipt trails
+
+- status updates
+status updates
+
+- implementation evidence links
+implementation evidence links
+
+to the corresponding WRP artifacts in Nebula.
+
+---
+
+# 54. Recommended Physical Repo Layout
+
+This section is illustrative; adjust exact paths to the current repo layout.
+
+```
+docs/  conduit/    nebula-wrp-projection-and-level-stratification.md  wrp/    wrp-v1-protocol.md    wrp-v1_1-dag-model-and-compilation-pipeline.md    wrp-v1_2-execution-traversal-engine.md    wrp-migration-plan.mdschemas/  nebula/    nebula-document-levels.md    nebula-cross-reference-relations.md
+```
+
+```
+docs/  conduit/    nebula-wrp-projection-and-level-stratification.md  wrp/    wrp-v1-protocol.md    wrp-v1_1-dag-model-and-compilation-pipeline.md    wrp-v1_2-execution-traversal-engine.md    wrp-migration-plan.mdschemas/  nebula/    nebula-document-levels.md    nebula-cross-reference-relations.md
+```
+
+If the WRP docs already live elsewhere, keep the artifact keys stable and only changesource_path.
+
+---
+
+# 55. Suggested Application-Level Types
+
+The following are reference shapes for the application layer.
+
+## 55.1 Document level enum
+
+```
+public enum KnowledgeLevel {    L1, // execution/build detail    L2, // subsystem design    L3, // architecture/rationale    L4  // doctrine/ontology}
+```
+
+```
+public enum KnowledgeLevel {    L1, // execution/build detail    L2, // subsystem design    L3, // architecture/rationale    L4  // doctrine/ontology}
+```
+
+## 55.2 Artifact type enum
+
+```
+public enum ArtifactType {    WRP_PROTOCOL,    WRP_DAG_MODEL,    WRP_EXECUTION_ENGINE,    WRP_MIGRATION_PLAN}
+```
+
+```
+public enum ArtifactType {    WRP_PROTOCOL,    WRP_DAG_MODEL,    WRP_EXECUTION_ENGINE,    WRP_MIGRATION_PLAN}
+```
+
+## 55.3 Chunk kind enum
+
+```
+public enum ChunkKind {    OVERVIEW,    DEFINITION,    PROTOCOL_RULE,    DATA_MODEL,    ALGORITHM,    INVARIANT,    MIGRATION_STEP,    ACCEPTANCE_CRITERIA,    OPEN_QUESTION,    EXAMPLE,    RATIONALE,    IMPLEMENTATION_NOTE}
+```
+
+```
+public enum ChunkKind {    OVERVIEW,    DEFINITION,    PROTOCOL_RULE,    DATA_MODEL,    ALGORITHM,    INVARIANT,    MIGRATION_STEP,    ACCEPTANCE_CRITERIA,    OPEN_QUESTION,    EXAMPLE,    RATIONALE,    IMPLEMENTATION_NOTE}
+```
+
+## 55.4 Normative strength enum
+
+```
+public enum NormativeStrength {    INFORMATIVE,    RECOMMENDED,    REQUIRED,    PROHIBITED}
+```
+
+```
+public enum NormativeStrength {    INFORMATIVE,    RECOMMENDED,    REQUIRED,    PROHIBITED}
+```
+
+---
+
+# 56. Suggested Projection DTOs
+
+```
+public record NebulaArtifactRegistration(    String artifactKey,    ArtifactType artifactType,    String artifactVersion,    String sourcePath,    String sourceKind,    String conduitPlanId,    String conduitProjectKey,    KnowledgeLevel defaultLevel) {}
+```
+
+```
+public record NebulaArtifactRegistration(    String artifactKey,    ArtifactType artifactType,    String artifactVersion,    String sourcePath,    String sourceKind,    String conduitPlanId,    String conduitProjectKey,    KnowledgeLevel defaultLevel) {}
+```
+
+```
+public record NebulaChunkProjection(    Long documentId,    String sectionKey,    ChunkKind chunkKind,    KnowledgeLevel level,    NormativeStrength normativeStrength,    String content) {}
+```
+
+```
+public record NebulaChunkProjection(    Long documentId,    String sectionKey,    ChunkKind chunkKind,    KnowledgeLevel level,    NormativeStrength normativeStrength,    String content) {}
+```
+
+```
+public record NebulaCrossReferenceProjection(    String sourceSectionKey,    String targetSectionKey,    String relationType,    KnowledgeLevel sourceLevel,    KnowledgeLevel targetLevel,    String evidenceKind,    Double weight) {}
+```
+
+```
+public record NebulaCrossReferenceProjection(    String sourceSectionKey,    String targetSectionKey,    String relationType,    KnowledgeLevel sourceLevel,    KnowledgeLevel targetLevel,    String evidenceKind,    Double weight) {}
+```
+
+---
+
+# 57. Invariants
+
+The following invariants apply to the Conduit → Nebula WRP projection model.
+
+## I1. Nebula is the authoritative long-form memory for WRP
+
+Conduit may track execution, but architectural WRP meaning must remain represented in Nebula.
+
+## I2. Every WRP artifact must have a stable artifact key
+
+Paths may change; artifact identity must not.
+
+## I3. Every Nebula document and chunk must have a deterministic effective level
+
+A chunk either declares a level or inherits from its document.
+
+## I4. Cross-reference edges are level-neutral by default
+
+The source and target nodes carry the abstraction semantics.
+
+## I5. The initial WRP packet must be explicitly cross-linked
+
+Protocol, DAG, traversal, and migration documents must not exist as isolated documents.
+
+## I6. Role-aware retrieval must filter by level before broad cross-reference expansion
+
+Otherwise the stratification model loses value.
+
+## I7. Execution traceability must be additive, not destructive
+
+Implementation evidence and receipts should enrich architectural records rather than overwrite them.
+
+---
+
+# 58. What This Unlocks Next
+
+Once this projection and stratification layer exists, the system can do all of the following coherently:
+
+- Treat the WRP packet in Conduit as first-class Nebula knowledgerather than four disconnected implementation tasks.
+Treat the WRP packet in Conduit as first-class Nebula knowledgerather than four disconnected implementation tasks.
+
+- Retrieve different WRP context for different rolesso Builder, Architect, and Inspector stop stepping on each other.
+Retrieve different WRP context for different rolesso Builder, Architect, and Inspector stop stepping on each other.
+
+- Project future WRP work automaticallyfrom Nebula-authored docs into execution-facing Conduit work requests.
+Project future WRP work automaticallyfrom Nebula-authored docs into execution-facing Conduit work requests.
+
+- Back-link implementation evidenceso WRP architectural docs can show what has actually been built.
+Back-link implementation evidenceso WRP architectural docs can show what has actually been built.
+
+- Use Nebula as the long-term architectural substratewhile Conduit remains focused on execution.
+Use Nebula as the long-term architectural substratewhile Conduit remains focused on execution.
+
+---
+
+# 59. Bottom Line
+
+The four WRP plans now sitting in Conduit should be treated as theexecution packetfor a broader WRP knowledge corpus. The missing piece is a projection layer that makes those artifacts durable and queryable inside Nebula.
+
+The core model is simple:
+
+- Nebula stores the long-form WRP knowledge
+Nebula stores the long-form WRP knowledge
+
+- Conduit stores the executable work packet
+Conduit stores the executable work packet
+
+- WRP artifacts provide the stable identity between them
+WRP artifacts provide the stable identity between them
+
+- levelstratification controls who sees what
+levelstratification controls who sees what
+
+- cross-references turn the four documents into a navigable WRP knowledge graph
+cross-references turn the four documents into a navigable WRP knowledge graph
+
+That is the foundation required before WRP can function as a real architectural substrate rather than just a set of implementation plans.
+
+```
+---## What I’d do immediately after this oneSince those four WRP plans are now in Conduit and will take a bit to implement under your local Ollama/OpenCode/Qwen setup, the next companion spec I’d write is the **actual Nebula schema/ontology patch** for this document, not another prose architecture note.Specifically:# `schemas/core/nebula-level-stratification-and-wrp-artifacts.jsonld`That doc should formalize, in machine-oriented ontology form:- `KnowledgeLevel`- `ArtifactType`- `ChunkKind`- `NormativeStrength`- `CrossReferenceRelationType`- `NebulaDocument`- `NebulaChunk`- `NebulaArtifact`- `NebulaExecutionLink`and the exact fields/relationships implied by the markdown spec above.If you want, I’ll go straight into that next and make it **repo-ready JSON-LD** rather than another markdown doc.
+```
+
+```
+---## What I’d do immediately after this oneSince those four WRP plans are now in Conduit and will take a bit to implement under your local Ollama/OpenCode/Qwen setup, the next companion spec I’d write is the **actual Nebula schema/ontology patch** for this document, not another prose architecture note.Specifically:# `schemas/core/nebula-level-stratification-and-wrp-artifacts.jsonld`That doc should formalize, in machine-oriented ontology form:- `KnowledgeLevel`- `ArtifactType`- `ChunkKind`- `NormativeStrength`- `CrossReferenceRelationType`- `NebulaDocument`- `NebulaChunk`- `NebulaArtifact`- `NebulaExecutionLink`and the exact fields/relationships implied by the markdown spec above.If you want, I’ll go straight into that next and make it **repo-ready JSON-LD** rather than another markdown doc.
+```
+
+Sources
+
+Sources
+
+Sources
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.
+
+Sponsored
+
+Company Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Company Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Company Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Company Knowledge, Now Searchable by AI
+
+Helpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+You said:go on
+
+#### You said:
+
+go on
+
+go on
+
+go on
+
+go on
+
+go on
+
+go on
+
+go on

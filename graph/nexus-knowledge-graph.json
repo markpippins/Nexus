@@ -5,13 +5,13 @@
   "version": "2.1.0",
   "sources": [
     "nexus/ANALYSIS.md (28 sections, 2123 lines)",
-    "nexus/graph/cognitive-integrity-rule-system.md (30+ rules, 10 families)",
+    "nexus/audit/SPECS/cognitive-integrity-rule-system.md (30+ rules, 10 families)",
     "nexus/graph/schema/projection-ir.md (11 IR rules, adapter layer, synthesis layer)",
     "nexus/graph/schema/projection-algebra.md (6 operators, 6 invariants, 4 appendices)",
-    "nexus/graph/dev-runtime-manifest.md (mount semantics, agent instantiation model)",
-    "nexus/graph/atten-spec.md (7 invariants, projection envelope schema)",
-    "nexus/graph/peb-mcp-spec.md (v2, admission control, transaction kernel)",
-    "nexus/graph/peb-spring-boot-spec.md (Phase 1, module layout, PostgreSQL schema)",
+    "nexus/audit/SPECS/dev-runtime-manifest.md (mount semantics, agent instantiation model)",
+    "nexus/audit/SPECS/atten-spec.md (7 invariants, projection envelope schema)",
+    "nexus/audit/SPECS/peb-mcp-spec.md (v2, admission control, transaction kernel)",
+    "nexus/audit/SPECS/peb-spring-boot-spec.md (Phase 1, module layout, PostgreSQL schema)",
     "dev/chats/Nebula System Info Expansion.html (capability decomposition, typed process graph over Atten, 4 domain patterns)",
     "dev/chats/Plurality and Agent Disagreement.html (Transform type evolution v0-v4, Context as rule system, Premise/Conclusion as typed artifacts)",
     "dev/chats/Semantic Adapter Layer.html (ExecutionMode, RoleMappingStrategy, SemanticOperation types, harness-as-data pattern)",
@@ -494,16 +494,29 @@
       "id": "conduit",
       "name": "Conduit",
       "type": "runtime",
-      "status": "active",
-      "description": "Temporal orchestrator + TypeScript MCP server. Active execution fabric for work objects. Temporary scaffolding for Nexus WRP development.",
+      "status": "active",      "description": "Express MCP server + cron-driven Python pipeline manager. Active execution fabric for work objects using ticket-based lifecycle, circuit breaker, session management, and receipt system. The TypeScript conduit-mcp runs on port 3100 with JSON-RPC, SSE, and REST endpoints for session/session management, ticket lifecycle, circuit breaker control, failure recovery configuration, governance events, and vision WRP bridge. The Python conduit/main.py is a cron-driven scheduler that dispatches role executors (builder, reviewer, planner, critic) with rate-limit retry, budget checks, orphan cleanup, and DCO normalization from plans.",
       "runtime": "Python + TypeScript",
-      "consumes": ["work_request"],
-      "produces": ["execution_trace", "execution_receipt"],
-      "governed_by": ["cirs-core", "cirs-ir-05", "cirs-ir-09"],
+      "consumes": [
+        "plan",
+        "work_request",
+        "harness_config"
+      ],
+      "produces": [
+        "execution_receipt",
+        "session_log",
+        "circuit_breaker_event",
+        "ticket_lifecycle_event",
+        "governance_event"
+      ],
+      "governed_by": [
+        "cirs-core",
+        "cirs-ir-05",
+        "cirs-ir-09"
+      ],
       "mount_type": "execution",
       "references": [
-        "legacy/python/conduit/main.py",
-        "typescript/conduit-mcp/"
+        "nexus/legacy/python/conduit/main.py",
+        "nexus/typescript/conduit-mcp/"
       ]
     },
     {
@@ -520,8 +533,8 @@
       "governed_by": ["cirs-ir-04", "cirs-ir-10"],
       "mount_type": "epistemic",
       "references": [
-        "typescript/nebula-srv/",
-        "angular/nebula-ui/"
+        "nexus/typescript/nebula-srv/",
+        "nexus/angular/nebula-ui/"
       ]
     },
     {
@@ -538,10 +551,10 @@
         "losm-kernel"
       ],
       "references": [
-        "python/vision/losm-ir/",
-        "python/vision/losm-store/",
-        "python/vision/losm-host/",
-        "python/vision/losm-kernel/"
+        "nexus/python/vision/losm-ir/",
+        "nexus/python/vision/losm-store/",
+        "nexus/python/vision/losm-host/",
+        "nexus/python/vision/losm-kernel/"
       ]
     },
     {
@@ -551,10 +564,10 @@
       "status": "reference_impl_not_wired",
       "description": "Go + Rust reference implementation for the WorkRequest Pipeline. Not wired into any active pipeline.",
       "runtime": "Go + Rust",
-      "references": [
-        "go/wrp/ccnf-ref/",
-        "rust/wrp/ccnf-verifier/"
-      ]
+  "references": [
+    "nexus/go/wrp/ccnf-ref/",
+    "nexus/rust/wrp/ccnf-verifier/"
+  ]
     },
     {
       "id": "peb_governance_engine",
@@ -574,8 +587,8 @@
       "consumes": ["work_request", "invariant_records"],
       "produces": ["constraint_satisfaction", "violation_report", "capability_token", "merkle_proof"],
       "references": [
-        "graph/peb-mcp-spec.md",
-        "graph/peb-spring-boot-spec.md"
+        "nexus/audit/SPECS/peb-mcp-spec.md",
+        "nexus/audit/SPECS/peb-spring-boot-spec.md"
       ]
     },
     {
@@ -598,14 +611,14 @@
       ],
       "governed_by": ["cirs-ir-01", "cirs-ir-04", "cirs-ir-07"],
       "invariants": ["atten-i1", "atten-i2", "atten-i3", "atten-i4", "atten-i5", "atten-i6", "atten-i7"],
-      "references": ["graph/atten-spec.md"]
+      "references": ["nexus/audit/SPECS/atten-spec.md"]
     },
     {
       "id": "throttler",
       "name": "Throttler",
       "type": "projection_operator",
-      "status": "has_code",
-      "description": "Filesystem scope projection operator. Detects .magnet sentinel files to determine which folders are in scope for search.",
+      "status": "no_code_found",
+      "description": "Filesystem scope projection operator that detects .magnet sentinel files to determine which folders are in scope for search. Originally implemented in angular/nexus-console, but that directory was not found in this workspace. The code may have been removed, archived, or relocated. The 'file-system-server' reference is also unresolved.",
       "domain": "physical",
       "source_domain": "filesystem_tree",
       "consumes": ["filesystem_state"],
@@ -613,7 +626,7 @@
       "passes_through_canonicalizer": false,
       "governed_by": ["cirs-ir-01", "cirs-ir-04"],
       "references": [
-        "angular/nexus-console/src/services/remote-file-system.service.ts",
+        "nexus/angular/nexus-console/src/services/remote-file-system.service.ts",
         "file-system-server"
       ]
     },
@@ -621,8 +634,8 @@
       "id": "search_operator",
       "name": "Search",
       "type": "projection_operator",
-      "status": "has_code",
-      "description": "Query/result projection operator. Full-text search, faceted filtering, relevance ranking.",
+      "status": "no_code_found",
+      "description": "Query/result projection operator. Full-text search, faceted filtering, relevance ranking. Originally referenced code in moleculer/search/ and jvm/spring/service-broker/search-service/, but neither directory was found in this workspace. The code may have been removed or archived.",
       "domain": "epistemic",
       "source_domain": "search_index",
       "consumes": ["search_index", "query_parameters"],
@@ -630,20 +643,20 @@
       "passes_through_canonicalizer": false,
       "governed_by": ["cirs-ir-04"],
       "references": [
-        "moleculer/search/",
-        "jvm/spring/service-broker/search-service/"
+        "nexus/moleculer/search/",
+        "nexus/jvm/spring/service-broker/search-service/"
       ]
     },
     {
       "id": "nexus_console",
       "name": "Nexus Console",
       "type": "operator_plane",
-      "status": "active",
-      "description": "JVM/Spring operator plane. Active system running on ports 8085, 8084, 8081. Bridge to Nexus WRP does not exist.",
-      "runtime": "JVM / Spring Boot",
-      "ports": [8085, 8084, 8081],
+      "status": "archived",
+      "description": "This workspace contains no JVM/Spring source code in jvm/spring/ — the service may have been removed, archived, or runs externally. The KG entry is preserved for historical reference. JVM/Spring operator plane formerly on ports 8085, 8084, 8081. Bridge to Nexus WRP does not exist.",
+      "runtime": "unknown (source not found)",
+      "ports": [],
       "mount_type": "governance",
-      "references": ["jvm/spring/"]
+      "references": ["nexus/jvm/spring/"]
     },
     {
       "id": "observer",
@@ -907,6 +920,131 @@
       "description": "Execution binding stage: generates stubs, registrations, and executable placeholders. Uses staged realization mode (faster iteration on resolvable existence). Stage 7 of the 8-stage generative pipeline.",
       "consumes": ["topology_artifact", "branch_selection"],
       "produces": ["runtime_stub", "binding_registration"]
+    },
+    {
+      "id": "voyager",
+      "name": "Voyager (Filesystem Acquisition Layer)",
+      "type": "python_service",
+      "status": "active",
+      "description": "Filesystem acquisition layer with Scanner, TopologyEngine, and Publisher components. Walks filesystems under observation, emits CanonicalEnvelope observations to NATS JetStream, and uses DedupeCache (Redis fs:cache:* prefix) for change detection. DedupeCache falls back to in-memory dict when Redis unavailable. TopologyEngine detects vanishing directories, evolution signals, containment, and adjacency patterns.",
+      "runtime": "Python",
+      "port": "CLI tool (argparse)",
+      "consumes": ["filesystem_state"],
+      "produces": ["file_observation", "directory_observation", "topology_signal", "observation_edge_hint"],
+      "data_stores": [
+        "Redis (fs:cache:{path} — DedupeCache, not dedupe:*)",
+        "NATS JetStream (nexus.fs.v1.observation, nexus.fs.v1.topology, nexus.fs.v1.span, nexus.fs.v1.hint)"
+      ],
+      "mount_type": "acquisition",
+      "references": [
+        "nexus/python/voyager/src/main.py",
+        "nexus/python/voyager/src/fs_crawler_v2/scanner.py",
+        "nexus/python/voyager/src/fs_crawler_v2/topology.py",
+        "nexus/python/voyager/src/fs_crawler_v2/cache.py",
+        "nexus/python/voyager/src/fs_crawler_v2/publisher.py"
+      ]
+    },
+    {
+      "id": "media_metadata_service",
+      "name": "FS / Media Metadata Service (fs-crawler)",
+      "type": "python_service",
+      "status": "active",
+      "description": "Media Metadata Indexing Service running on FastAPI at port 8004. Scans media file libraries (audio, video, images, documents), extracts metadata, detects duplicates via fingerprint and content hash, and manages deletion rules. Uses three databases: Redis (scan:state:* for resume, system:status/config for startup, lock:*/temp:* for cleanup), MongoDB (file_metadata, directory_metadata, duplicate_resolutions, deletion_rules), and MySQL (library paths, file types, handlers). Note: actual MongoDB collection names are file_metadata and directory_metadata (not files/directories as sometimes documented).",
+      "runtime": "Python / FastAPI",
+      "port": 8004,
+      "consumes": ["filesystem_state", "library_paths"],
+      "produces": ["file_metadata", "directory_metadata", "duplicate_resolution", "deletion_rule"],
+      "data_stores": [
+        "Redis (scan:state:*, system:status, system:config, system:startup_time, lock:*, temp:*)",
+        "MongoDB (file_metadata, directory_metadata, duplicate_resolutions, deletion_rules)",
+        "MySQL (library_paths, file_types, metadata_handlers)"
+      ],
+      "mount_type": "indexing",
+      "references": [
+        "nexus/python/fs/fs-crawler/app/main.py",
+        "nexus/python/fs/fs-crawler/app/services/scanner.py",
+        "nexus/python/fs/fs-crawler/app/services/startup.py",
+        "nexus/python/fs/fs-crawler/app/services/duplicate_detector.py",
+        "nexus/python/fs/fs-crawler/app/database.py"
+      ]
+    },
+    {
+      "id": "knowledge_steward",
+      "name": "Knowledge Steward (Graph Migration)",
+      "type": "python_service",
+      "status": "active",
+      "description": "Knowledge graph migration tool that reads nexus/graph/nexus-knowledge-graph.json and inserts entities, edges, and cross-references into the knowledge schema in PostgreSQL (knowledge.graph_entities, knowledge.graph_edges, knowledge.graph_cross_references). Runs as a CLI tool with argparse, supports dry-run mode for validation without DB writes, and tracks migration history via knowledge.graph_migrations. Exclusive write access to the knowledge graph tables — all other agents are read-only.",
+      "runtime": "Python",
+      "port": "CLI tool (argparse)",
+      "consumes": ["knowledge_graph_json"],
+      "produces": ["graph_migration_record"],
+      "data_stores": [
+        "PostgreSQL (knowledge.graph_entities, knowledge.graph_edges, knowledge.graph_cross_references)"
+      ],
+      "mount_type": "data_governance",
+      "references": [
+        "nexus/python/steward/migrate_graph.py"
+      ]
+    },
+    {
+      "id": "rover",
+      "name": "Rover (Transcript Harvesting Pipeline)",
+      "type": "python_service",
+      "status": "active",
+      "description": "MCP server for harvesting chat transcripts. Ingests HTML chat transcripts, converts via Docling to clean Markdown, splits into chunks via RecursiveCharacterTextSplitter, and extracts structured SpecificationCandidate items via Ollama/Qwen3.5:4b with a strict Pydantic schema. Provides 5 MCP tools: rover_submit_transcript, rover_get_pending_chunk, rover_submit_extraction, rover_compile_agenda, rover_job_status. Outputs consolidated Markdown specification agendas with harvested code blocks attached to their design context. Runs on stdio via FastMCP with in-memory job store.",
+      "runtime": "Python / FastMCP",
+      "port": "MCP stdio server",
+      "consumes": ["html_transcript", "ollama_llm"],
+      "produces": ["specification_agenda", "harvested_markdown"],
+      "data_stores": [],
+      "mount_type": "harvesting",
+      "references": [
+        "nexus/python/rover/rover_mcp_server.py",
+        "nexus/python/rover/harvest_pipeline.py",
+        "nexus/python/rover/schemas.py",
+        "nexus/python/rover/SPEC.md"
+      ]
+    },
+    {
+      "id": "absorb",
+      "name": "Absorb (HTML Chat Transcript Importer)",
+      "type": "python_service",
+      "status": "active",
+      "description": "HTML/Markdown chat transcript importer that extracts normalized messages from multiple source formats (ChatGPT, Microsoft Copilot, Markdown, Google Gemini). Uses a pluggable parser architecture with @register_parser decorator for adding new sources. Built on Docling for document conversion from HTML, PDF, DOCX, MD, and other formats. Has two output modes: 'messages' (normalized flat NormalizedMessage records with timestamp provenance) and 'graph' (semantic relationship graphs with trajectory reconstruction, diff computation, kernel processing via FSMController, and validation passes).",
+      "runtime": "Python",
+      "port": "CLI tool (argparse)",
+      "consumes": ["html_transcript", "pdf_doc", "markdown_doc"],
+      "produces": ["normalized_message", "conversation_metadata", "semantic_graph"],
+      "mount_type": "ingestion",
+      "references": [
+        "nexus/python/absorb/html/main.py",
+        "nexus/python/absorb/html/base_parser.py",
+        "nexus/python/absorb/html/parsers/",
+        "nexus/python/absorb/html/models.py",
+        "nexus/python/absorb/html/SPEC.md"
+      ]
+    },
+    {
+      "id": "cascade",
+      "name": "Cascade (Event Bus)",
+      "type": "python_service",
+      "status": "active",
+      "description": "Pure event bus that reads flat event JSON files from the events/ directory, validates them structurally via validators/loader.py, sequences by timestamp, tracks processed offsets via offset.json, and publishes events via NATS using CanonicalEnvelope format. Includes a NATS subscriber (inference_subscriber) that bridges Cascade events to Tackle inference by resolving model/harness configs and invoking subprocess inference. Event subjects follow nexus.cascade.v1.* pattern. NATS publish sidecar runs in a background thread with thread-safe queue and graceful fallback to logging.",
+      "runtime": "Python",
+      "port": "CLI daemon (NATS_URL env)",
+      "consumes": ["event_json", "nats_message"],
+      "produces": ["canonical_envelope", "inference_completed_event"],
+      "data_stores": [
+        "Filesystem (events/ directory, offset.json)",
+        "NATS JetStream (nexus.cascade.v1.* subjects)"
+      ],
+      "mount_type": "event_bus",
+      "references": [
+        "nexus/python/cascade/main.py",
+        "nexus/python/cascade/nats_publisher.py",
+        "nexus/python/cascade/inference_subscriber.py",
+        "nexus/python/cascade/envelope_adapter.py"
+      ]
     }
   ],
   "epistemic_types": [
@@ -1420,6 +1558,26 @@
       "id": "typespec_as_contract_surface",
       "observation": "The Self-audit transcript defines TypeSpec as the contract surface that mirrors the JVM enforcement layer. TypeSpec → OpenAPI → Java types makes invalid transitions unrepresentable at compile time. Conduit exposes ONLY WorkRequest at the HTTP boundary (POST /v1/workrequest). Observation/Projection/IR/SynthesizedView never appear in Conduit-facing schema — they do not exist in the TypeSpec namespace for Conduit. This is not a runtime enforcement system — it is a compile-time type constraint that makes illegal transitions structurally impossible.",
       "corresponds_to_decision": "dec-typespec-contract-surface"
+    },
+    {
+      "id": "voyager_redis_key_prefix_discrepancy",
+      "observation": "The SERVICE_TOPOLOGY.md documentation originally listed voyager's Redis key prefix as 'dedupe:*' (from the class name DedupeCache), but the actual source code in nexus/python/voyager/src/fs_crawler_v2/cache.py uses 'fs:cache:{path}' as the key pattern. The prefix was corrected during an audit of the documentation against source code. The knowledge graph actor entry for voyager now correctly documents the prefix as 'fs:cache:{path} — DedupeCache, not dedupe:*'."
+    },
+    {
+      "id": "fs_mongodb_collection_names_discrepancy",
+      "observation": "The SERVICE_TOPOLOGY.md documentation originally listed the fs-crawler (media-metadata) MongoDB collections as 'files', 'directories', 'metadata', 'duplicates', 'categories', and 'file_types' (based on the legacy media.sql schema), but the actual FastAPI v2 service uses 'file_metadata', 'directory_metadata', 'duplicate_resolutions', and 'deletion_rules'. The discrepancy was found during a source code audit of nexus/python/fs/fs-crawler/app/services/. The knowledge graph actor entry now correctly documents the actual collection names."
+    },
+    {
+      "id": "mcp_server_standalone_discrepancies",
+      "observation": "SERVICE_TOPOLOGY.md listed three MCP servers as standalone entries that do not exist as separate servers: nebula-mcp-sse (:3102) is actually an SSE module within nebula-mcp/src/sse.ts, not a standalone server; vision-mcp-py (stdio → :8003) does not exist as a separate project — vision-mcp is the sole MCP server; wrp-kernel (:3103) is listed as a standalone MCP server but is a Python module at python/conduit/wrp_kernel/engine.py within conduit, not a separate process. These entries were removed from the MCP Server Layer diagram and port allocation."
+    },
+    {
+      "id": "service_path_corrections",
+      "observation": "SERVICE_TOPOLOGY.md had incorrect path references for several services that were corrected during an audit: agent-chat (:3017) exists at python/tackle/agent_chat.py not python/agent-chat/; quarkus-gateway (:8090) exists at jvm/quarkus/broker-gateway/ not jvm/spring/quarkus-gateway/; helidon-user-access (:9093) exists at jvm/helidon/user-access-service/ not jvm/spring/helidon-user-access/; broker-gateway (:8081) is nested under spring/service-broker/broker-gateway/ not a top-level service. The documentation was updated to reflect the correct source paths."
+    },
+    {
+      "id": "schema_annotation_corrections",
+      "observation": "SERVICE_TOPOLOGY.md's Data Store Schema Reference had stale '(no runtime source)' annotations on two PostgreSQL schemas that actually have source code: the peb schema (owned by peb-kernel at jvm/spring/peb-kernel/) and the registry schema (owned by service-registry at jvm/spring/service-registry/). The annotations were removed during a source code audit, as both projects have active source code with pom.xml and Java classes."
     }
   ],
   "cross_references": {

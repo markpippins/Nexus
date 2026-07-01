@@ -24,10 +24,12 @@ import httpx
 from mcp.server.fastmcp import FastMCP
 
 from harvest_pipeline import (
+    convert_to_markdown,
+)
+from qwen_extract import (
     CODE_HARVESTER_PROMPT,
     agenda_to_markdown,
     chunk_text,
-    convert_to_markdown,
 )
 from schemas import SpecificationAgenda
 

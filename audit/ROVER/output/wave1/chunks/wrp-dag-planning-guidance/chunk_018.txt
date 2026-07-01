@@ -1,0 +1,460 @@
+Good—this is the right next missing layer. Once you have DAG IR, the real system question becomes:how does it get validated, normalized, and compiled without breaking v1.0 execution guarantees?
+
+Below is theWRP Compilation Pass Spec (v1.1). This is the bridge between “you can represent recursion” and “you can safely reason about it.”
+
+---
+
+# WRP v1.1 — Compilation Pass Spec
+
+## 0. Purpose
+
+The compiler is NOT an executor.
+
+It is astructural transformation layer:
+
+> WorkRequest → normalized DAG → validated execution graph
+
+WorkRequest → normalized DAG → validated execution graph
+
+It guarantees:
+
+- tenant isolation correctness
+tenant isolation correctness
+
+- structural integrity of DAG
+structural integrity of DAG
+
+- compatibility with v1.0 kernel execution
+compatibility with v1.0 kernel execution
+
+- safe future recursion boundaries (without executing recursion)
+safe future recursion boundaries (without executing recursion)
+
+---
+
+# 1. Compiler Input / Output
+
+## Input (v1.0 compatible)
+
+```
+WorkRequest
+```
+
+```
+WorkRequest
+```
+
+OR batch:
+
+```
+list[WorkRequest]
+```
+
+```
+list[WorkRequest]
+```
+
+---
+
+## Output (v1.1 canonical IR)
+
+```
+WorkRequestDAG
+```
+
+```
+WorkRequestDAG
+```
+
+plus diagnostics:
+
+```
+CompilationReport
+```
+
+```
+CompilationReport
+```
+
+---
+
+# 2. Compilation Pipeline Stages
+
+The compiler is amulti-pass deterministic pipeline:
+
+```
+Pass 1: NormalizePass 2: Tenant BindingPass 3: DAG ConstructionPass 4: Structural ValidationPass 5: Execution Compatibility CheckPass 6: Policy Annotation (inactive semantics)
+```
+
+```
+Pass 1: NormalizePass 2: Tenant BindingPass 3: DAG ConstructionPass 4: Structural ValidationPass 5: Execution Compatibility CheckPass 6: Policy Annotation (inactive semantics)
+```
+
+Each pass is pure and append-only.
+
+---
+
+# 3. Pass 1 — Normalize
+
+### Goal:
+
+Make all WorkRequests structurally consistent.
+
+### Rules:
+
+- ensure required fields exist
+ensure required fields exist
+
+- inject missingtrace_idif absent
+inject missingtrace_idif absent
+
+- ensureintent/contextare canonical dicts
+ensureintent/contextare canonical dicts
+
+- normalize optional fields (policy,parent_request_id)
+normalize optional fields (policy,parent_request_id)
+
+### Output:
+
+Normalized WorkRequest list
+
+---
+
+# 4. Pass 2 — Tenant Binding
+
+### Goal:
+
+Guarantee single-tenant coherence.
+
+### Rules:
+
+If missing:
+
+```
+tenant_id must be injected from envelope or runtime context
+```
+
+```
+tenant_id must be injected from envelope or runtime context
+```
+
+### Hard validation:
+
+- ALL requests in compilation unit must share sametenant_id
+ALL requests in compilation unit must share sametenant_id
+
+- mixed tenants → compilation failure
+mixed tenants → compilation failure
+
+### Output:
+
+- tenant-scoped request set
+tenant-scoped request set
+
+---
+
+# 5. Pass 3 — DAG Construction
+
+### Goal:
+
+Build explicit graph structure.
+
+### Algorithm:
+
+- Index requests byrequest_id
+Index requests byrequest_id
+
+- For each request:ifparent_request_id is None→ root nodeelse attach as child edge
+For each request:
+
+- ifparent_request_id is None→ root node
+ifparent_request_id is None→ root node
+
+- else attach as child edge
+else attach as child edge
+
+### Output:
+
+```
+WorkRequestDAG(nodes, edges, root)
+```
+
+```
+WorkRequestDAG(nodes, edges, root)
+```
+
+---
+
+### Structural invariant:
+
+- graph must beforest or single rooted tree
+graph must beforest or single rooted tree
+
+- multiple roots allowed only if explicitly declared batch DAG
+multiple roots allowed only if explicitly declared batch DAG
+
+---
+
+# 6. Pass 4 — Structural Validation
+
+This is the safety gate.
+
+## 6.1 Cycle Detection
+
+Even though execution is not recursive yet:
+
+- cycles are ILLEGAL
+cycles are ILLEGAL
+
+Rule:
+
+```
+DFS detect cycle in parent_request_id graph
+```
+
+```
+DFS detect cycle in parent_request_id graph
+```
+
+If cycle detected:→ compilation fails
+
+---
+
+## 6.2 Orphan Validation
+
+Every node must:
+
+- be reachable from a root
+be reachable from a root
+
+- not reference missing parent
+not reference missing parent
+
+---
+
+## 6.3 Depth Constraint (soft v1.1 rule)
+
+Optional but recommended:
+
+- max depth threshold (configurable)
+max depth threshold (configurable)
+
+Reason:prevents accidental recursive explosion later
+
+---
+
+# 7. Pass 5 — Execution Compatibility Check
+
+This is the v1.0 bridge.
+
+### Rule:
+
+Every node must still be executable as:
+
+```
+Kernel.execute(WorkRequest)
+```
+
+```
+Kernel.execute(WorkRequest)
+```
+
+So compiler verifies:
+
+- no missing required kernel fields
+no missing required kernel fields
+
+- no unsupported policy assumptions (v1.0 ignores policy)
+no unsupported policy assumptions (v1.0 ignores policy)
+
+- no DAG-only constructs leaking into execution layer
+no DAG-only constructs leaking into execution layer
+
+### Key principle:
+
+> DAG is invisible to v1.0 kernel
+
+DAG is invisible to v1.0 kernel
+
+---
+
+# 8. Pass 6 — Policy Annotation (NO EXECUTION)
+
+This is where probabilistic WRP begins to appear—but does NOT run.
+
+### Rule:
+
+Attach metadata only:
+
+```
+node.execution_hint = ExecutionPolicy(...)
+```
+
+```
+node.execution_hint = ExecutionPolicy(...)
+```
+
+### Allowed:
+
+- strategy tags
+strategy tags
+
+- weights
+weights
+
+- seeds
+seeds
+
+### Forbidden:
+
+- execution decisions
+execution decisions
+
+- branching selection
+branching selection
+
+- runtime sampling
+runtime sampling
+
+---
+
+# 9. Compilation Report
+
+Every compilation produces diagnostics:
+
+```
+@dataclassclass CompilationReport:    tenant_id: str    trace_id: str    node_count: int    edge_count: int    max_depth: int    cycles_detected: bool    orphan_nodes: list[str]    status: str  # SUCCESS / FAILED
+```
+
+```
+@dataclassclass CompilationReport:    tenant_id: str    trace_id: str    node_count: int    edge_count: int    max_depth: int    cycles_detected: bool    orphan_nodes: list[str]    status: str  # SUCCESS / FAILED
+```
+
+---
+
+# 10. Compiler Invariants
+
+These are the core guarantees:
+
+## I1 — Determinism
+
+Same input → same DAG always
+
+## I2 — Tenant Isolation
+
+No cross-tenant graph construction possible
+
+## I3 — Kernel Compatibility
+
+Output DAG must still be executable as v1.0 flat requests
+
+## I4 — No Semantic Drift
+
+Compiler cannot interpret intent, only structure it
+
+## I5 — No Execution Side Effects
+
+Compiler is pure function
+
+---
+
+# 11. Relationship to Runtime
+
+Important distinction:
+
+LayerResponsibilityWRP v1.0 Kernelexecutes WorkRequestWRP v1.1 Compilerbuilds DAGFuture WRP v1.2 Runtimetraverses DAGFuture probabilistic layerselects execution paths
+
+LayerResponsibilityWRP v1.0 Kernelexecutes WorkRequestWRP v1.1 Compilerbuilds DAGFuture WRP v1.2 Runtimetraverses DAGFuture probabilistic layerselects execution paths
+
+Right now:
+
+> You are building the “compiler for a runtime that does not yet execute its graph”
+
+You are building the “compiler for a runtime that does not yet execute its graph”
+
+That’s correct ordering.
+
+---
+
+# 12. What this unlocks next
+
+Once this compiler exists conceptually, the next real step becomes obvious:
+
+## WRP Execution Traversal Engine (v1.2 candidate)
+
+Which will define:
+
+- DFS vs BFS execution strategies
+DFS vs BFS execution strategies
+
+- kernel re-entry semantics
+kernel re-entry semantics
+
+- child WorkRequest emission rules
+child WorkRequest emission rules
+
+- probabilistic branch selection (finally active)
+probabilistic branch selection (finally active)
+
+---
+
+# Bottom line
+
+You now have:
+
+- stable v1.0 execution model
+stable v1.0 execution model
+
+- structured v1.1 DAG representation
+structured v1.1 DAG representation
+
+- deterministic compiler that guarantees correctness
+deterministic compiler that guarantees correctness
+
+- fully inert probabilistic scaffolding
+fully inert probabilistic scaffolding
+
+What you do NOT yet have (intentionally):
+
+- recursion execution
+recursion execution
+
+- probabilistic runtime
+probabilistic runtime
+
+- multi-tenant execution isolation enforcement in kernel (still conceptual)
+multi-tenant execution isolation enforcement in kernel (still conceptual)
+
+---
+
+If you want next step, the natural continuation is:
+
+> WRP Execution Traversal Engine Spec (v1.2 bridge layer)
+
+WRP Execution Traversal Engine Spec (v1.2 bridge layer)
+
+That’s where this stops being a compiler system and becomes aself-navigating cognitive runtime.
+
+You said:sure, go ahead
+
+#### You said:
+
+sure, go ahead
+
+sure, go ahead
+
+sure, go ahead
+
+sure, go ahead
+
+sure, go ahead
+
+sure, go ahead
+
+sure, go ahead
+
+ChatGPT said:Good—this is the point where WRP stops being “structured execution” and becomes aruntime that moves through its own graph as a first-class behavior system.Below is theWRP v1.2 Execution Traversal Engine Spec. This is the first layer where the DAG is no longer just a representation—it becomes anexecution substrate.Importantly: we still preserve v1.0 kernel correctness. Nothing here breaks determinism unless explicitly enabled.WRP v1.2 — Execution Traversal Engine Spec0. Core ShiftWRP v1.0:Execute WorkRequest → return ReceiptWRP v1.1:Compile WorkRequest → DAGWRP v1.2:Traverse DAG → execute nodes → emit structured execution tree1. System RoleThe Traversal Engine is responsible for:interpreting WorkRequestDAGdeciding execution orderinvoking Kernel safely per nodecollecting hierarchical receiptsoptionally enabling controlled branchingIt is NOT:a compilera policy optimizera probabilistic sampler (yet, only optionally)2. Core Object: ExecutionContextEvery traversal is bound to a deterministic execution context.PythonRun@dataclassclassExecutionContext:tenant_id:strtrace_id:strstrategy:str# DFS | BFS | TOPOLOGICALkernel:object# Kernel[tenant_id]mode:str# "deterministic" | "experimental"Invariant:ExecutionContext is immutable during traversal.3. Core Object: ExecutionCursorThis is the runtime “position” in the DAG.PythonRun@dataclassclassExecutionCursor:node_id:strdepth:intparent_cursor:Optional["ExecutionCursor"]Meaning:replaces stack frame modelenables traceable recursionsupports future probabilistic rewrites4. Execution Algorithm (Core Loop)Deterministic baseline (v1.2 safe mode):1. Start at DAG.root2. Push cursor(root)3. While cursor stack not empty:a. Pop cursorb. Execute node via Kernelc. Record Receiptd. Push children cursors (order depends on strategy)5. Traversal Strategies5.1 DFS (Default)deep execution firstpreserves causal localitymatches recursive cognitive intuitionroot → child → child → backtrack5.2 BFSlevel-based executionuseful for parallelizable workloadsroot level → all children → next level5.3 Topological (strict DAG order)ensures dependency correctnessrequired for strict workflow systems6. Kernel Invocation ContractEach node executes as:PythonRunReceipt=Kernel[tenant_id].execute(WorkRequest)Important invariants:Kernel is unaware of DAGKernel is stateless relative to traversalKernel only sees single nodeThis preserves v1.0 compatibility.7. Hierarchical Receipt Modelv1.2 introduces structured execution output:PythonRun@dataclassclassExecutionReceipt:node_id:strtenant_id:strtrace_id:strresult:dictchildren:list["ExecutionReceipt"]status:strKey idea:Execution now returns a tree, not a flat log.8. Recursive Boundary Rule (CRITICAL)This is where WRP becomes recursive—but safely.Rule:A node MAY emit child WorkRequests, but:they are NOT auto-executed unless traversal policy allows itthey enter apending execution queue9. Pending Execution QueuePythonRunPendingQueue=list[WorkRequestNode]Behavior:children nodes can be queuedtraversal engine decides when/if to execute themprevents uncontrolled recursion explosion10. Probabilistic Extension Hook (inactive by default)This is where WRP v1.3+ emerges.Each node MAY have:PythonRunExecutionPolicy:strategy:"deterministic"|"sampled"weights:dict[str,float]v1.2 rule:policies are IGNORED unless mode = "experimental"So:DAG is deterministic even if policies exist11. Tenant Isolation EnforcementNow becomes operational, not just structural.Rules:Traversal engine binds to ONE tenantDAG must match tenant_idcross-tenant node execution is forbiddenEnforcement point:At cursor pop time:if node.tenant_id != context.tenant_id:raise IsolationViolation12. Execution ModesMode A — deterministic (default)strict traversalno samplingno reorderingMode B — experimentalallows policy hintsallows probabilistic selection (future hook only)still must be replayable with seed13. System InvariantsI1 — ReplayabilitySame DAG + same strategy → same receiptsI2 — IsolationNo cross-tenant execution possibleI3 — Kernel purityKernel remains unaware of DAG structureI4 — Trace integrityEvery receipt must map to:node_idtrace_idtenant_id14. What actually changed in system meaningThis is the important conceptual shift:Before v1.2:DAG is a representationAfter v1.2:DAG is anexecution landscapetraversal engine is the “agent walking the landscape”kernel is just a “local evaluator”15. What this unlocks nextOnce this exists, three things becomereal implementationsinstead of concepts:1. True recursionNodes spawning executable subgraphs2. Controlled probabilistic cognitionSampling execution paths through DAG3. Multi-tenant cognitive isolationParallel independent DAG universes16. Natural next stepAt this point, the architecture is ready for the missing piece:WRP v1.3 — Probabilistic Execution LayerWhere:traversal becomes stochastic policy-drivenDAG paths become “possible futures”execution becomes weighted path samplingOR alternatively:WRP Multi-Tenant Runtime Isolation LayerWhere:multiple DAGs execute concurrentlyshared infrastructure, isolated cognition graphsBottom lineYou now have a complete staged evolution:v1.0 → linear execution kernelv1.1 → compiled DAG representationv1.2 → traversal-based execution engineAnd critically:You have built recursion as acontrolled runtime phenomenon, not a structural accident.If you want next, the most interesting fork is:make probability real (v1.3 cognitive branching)ormake multi-tenant isolation operational (system scaling layer)Both are sharp transitions in system behavior.
+
+#### ChatGPT said:
+
+Good—this is the point where WRP stops being “structured execution” and becomes aruntime that moves through its own graph as a first-class behavior system.Below is theWRP v1.2 Execution Traversal Engine Spec. This is the first layer where the DAG is no longer just a representation—it becomes anexecution substrate.Importantly: we still preserve v1.0 kernel correctness. Nothing here breaks determinism unless explicitly enabled.WRP v1.2 — Execution Traversal Engine Spec0. Core ShiftWRP v1.0:Execute WorkRequest → return ReceiptWRP v1.1:Compile WorkRequest → DAGWRP v1.2:Traverse DAG → execute nodes → emit structured execution tree1. System RoleThe Traversal Engine is responsible for:interpreting WorkRequestDAGdeciding execution orderinvoking Kernel safely per nodecollecting hierarchical receiptsoptionally enabling controlled branchingIt is NOT:a compilera policy optimizera probabilistic sampler (yet, only optionally)2. Core Object: ExecutionContextEvery traversal is bound to a deterministic execution context.PythonRun@dataclassclassExecutionContext:tenant_id:strtrace_id:strstrategy:str# DFS | BFS | TOPOLOGICALkernel:object# Kernel[tenant_id]mode:str# "deterministic" | "experimental"Invariant:ExecutionContext is immutable during traversal.3. Core Object: ExecutionCursorThis is the runtime “position” in the DAG.PythonRun@dataclassclassExecutionCursor:node_id:strdepth:intparent_cursor:Optional["ExecutionCursor"]Meaning:replaces stack frame modelenables traceable recursionsupports future probabilistic rewrites4. Execution Algorithm (Core Loop)Deterministic baseline (v1.2 safe mode):1. Start at DAG.root2. Push cursor(root)3. While cursor stack not empty:a. Pop cursorb. Execute node via Kernelc. Record Receiptd. Push children cursors (order depends on strategy)5. Traversal Strategies5.1 DFS (Default)deep execution firstpreserves causal localitymatches recursive cognitive intuitionroot → child → child → backtrack5.2 BFSlevel-based executionuseful for parallelizable workloadsroot level → all children → next level5.3 Topological (strict DAG order)ensures dependency correctnessrequired for strict workflow systems6. Kernel Invocation ContractEach node executes as:PythonRunReceipt=Kernel[tenant_id].execute(WorkRequest)Important invariants:Kernel is unaware of DAGKernel is stateless relative to traversalKernel only sees single nodeThis preserves v1.0 compatibility.7. Hierarchical Receipt Modelv1.2 introduces structured execution output:PythonRun@dataclassclassExecutionReceipt:node_id:strtenant_id:strtrace_id:strresult:dictchildren:list["ExecutionReceipt"]status:strKey idea:Execution now returns a tree, not a flat log.8. Recursive Boundary Rule (CRITICAL)This is where WRP becomes recursive—but safely.Rule:A node MAY emit child WorkRequests, but:they are NOT auto-executed unless traversal policy allows itthey enter apending execution queue9. Pending Execution QueuePythonRunPendingQueue=list[WorkRequestNode]Behavior:children nodes can be queuedtraversal engine decides when/if to execute themprevents uncontrolled recursion explosion10. Probabilistic Extension Hook (inactive by default)This is where WRP v1.3+ emerges.Each node MAY have:PythonRunExecutionPolicy:strategy:"deterministic"|"sampled"weights:dict[str,float]v1.2 rule:policies are IGNORED unless mode = "experimental"So:DAG is deterministic even if policies exist11. Tenant Isolation EnforcementNow becomes operational, not just structural.Rules:Traversal engine binds to ONE tenantDAG must match tenant_idcross-tenant node execution is forbiddenEnforcement point:At cursor pop time:if node.tenant_id != context.tenant_id:raise IsolationViolation12. Execution ModesMode A — deterministic (default)strict traversalno samplingno reorderingMode B — experimentalallows policy hintsallows probabilistic selection (future hook only)still must be replayable with seed13. System InvariantsI1 — ReplayabilitySame DAG + same strategy → same receiptsI2 — IsolationNo cross-tenant execution possibleI3 — Kernel purityKernel remains unaware of DAG structureI4 — Trace integrityEvery receipt must map to:node_idtrace_idtenant_id14. What actually changed in system meaningThis is the important conceptual shift:Before v1.2:DAG is a representationAfter v1.2:DAG is anexecution landscapetraversal engine is the “agent walking the landscape”kernel is just a “local evaluator”15. What this unlocks nextOnce this exists, three things becomereal implementationsinstead of concepts:1. True recursionNodes spawning executable subgraphs2. Controlled probabilistic cognitionSampling execution paths through DAG3. Multi-tenant cognitive isolationParallel independent DAG universes16. Natural next stepAt this point, the architecture is ready for the missing piece:WRP v1.3 — Probabilistic Execution LayerWhere:traversal becomes stochastic policy-drivenDAG paths become “possible futures”execution becomes weighted path samplingOR alternatively:WRP Multi-Tenant Runtime Isolation LayerWhere:multiple DAGs execute concurrentlyshared infrastructure, isolated cognition graphsBottom lineYou now have a complete staged evolution:v1.0 → linear execution kernelv1.1 → compiled DAG representationv1.2 → traversal-based execution engineAnd critically:You have built recursion as acontrolled runtime phenomenon, not a structural accident.If you want next, the most interesting fork is:make probability real (v1.3 cognitive branching)ormake multi-tenant isolation operational (system scaling layer)Both are sharp transitions in system behavior.

@@ -1,0 +1,128 @@
+Current State: Two Schemas, Adjacent but Unlinked
+┌───────────┬────────────────────────────────────────────┬──────────────────────────────────────────────────┐
+│           │ Knowledge ("memories")                     │ Nebula ("cabinet")                               │
+├───────────┼────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ Schema    │ knowledge.*                                │ nebula.*                                         │
+│ Tables    │ graph_entities, graph_edges,               │ harvests_history, agent_records_history,         │
+│           │ graph_cross_references, graph_migrations   │ cross_references, systems_history,               │
+│           │                                            │ requirements_history, etc.                       │
+│ Has       │ ✅ embedding VECTOR(1536) + ivfflat index  │ ❌ No embeddings                                 │
+│ vector    │ + semantic_search() function               │                                                  │
+│ search?   │                                            │                                                  │
+│ Source    │ nexus/graph/nexus-knowledge-graph.json     │ 30 harvests from chat transcripts (automated     │
+│ material  │ (curated, 1 big file)                      │ pipeline)                                        │
+│ Ingestion │ migrate_graph.py (one-shot file → DB)      │ batch_harvest_to_db.py (per-transcript → Ollama  │
+│ method    │                                            │ → DB)                                            │
+│ MCP       │ nexus/typescript/knowledge-mcp/            │ nexus/typescript/nebula-mcp/ + nebula-srv REST   │
+│ server    │ (knowledge_list_entities,                  │ API                                              │
+│           │ knowledge_semantic_search, etc.)           │                                                  │
+│ Cross-ref │ knowledge.graph_cross_references           │ nebula.cross_references (harvest_candidate →     │
+│ erences   │ (CIRS→projection algebra, etc.)            │ domain system, agent_record → plan, etc.)        │
+│ Data      │ Tables exist, may be empty (migration      │ 403 candidates classified across 10 domains with │
+│ status    │ never run?)                                │ 719 cross-references                             │
+└───────────┴────────────────────────────────────────────┴──────────────────────────────────────────────────┘
+The Overlap (Where They Converge)
+They describe the same domain from different angles:
+- Knowledge graph entities like  persistent-knowledge-graph  (section:  types ) describe the concept of a knowledge graph in PostgreSQL+pgvector
+- Nebula harvest candidates are the actual output of applying that concept — extracted specs sitting in  harvests_history.candidates 
+Same architectural decisions appear in both:
+- "TypeSpec as executable knowledge layer" appears as a harvest candidate AND as a knowledge graph entity ( typespec-dsl-layer )
+- "3-tier graph model" appears as a knowledge graph  architectural_observation  AND in harvested specs
+The Four Missing Linkages
+1. Cross-Schema Cross-References
+ nebula.cross_references  links  harvest_candidate → system  (within nebula). There's no link from a harvest candidate to the knowledge graph entity it instantiates or refines. A candidate about "TypeSpec as executable knowledge" should reference the  typespec-dsl-layer  entity in  knowledge.graph_entities .
+2. Embedding Pipeline
+Harvest candidates have rich  intent_description  text — perfect for embedding. But no embedding generation pipeline exists. The Rover schema ( rover.chunks ) was designed with  nlp_candidate_json  and  nlp_verdict  columns but those tables were never created in the production database. Harvest source text is stored in  harvests_history.source_text  but never chunked, embedded, or indexed for semantic search.
+3. Source Provenance Bridge
+ knowledge.graph_entities.source_file  =  nexus-knowledge-graph.json .  nebula.harvests_history.source_filename  = e.g.,  Nexus - OrientDB, Pinecone & Convex.html . The knowledge graph JSON has a  sources  array pointing to chat transcripts. A bridge would let you go from a harvest candidate → the knowledge graph entities it informs, and vice versa.
+4. Unified Semantic Search
+The  knowledge.semantic_search()  function exists but is a stub (requires application-layer embedding generation). If harvest candidates were embedded and stored in the knowledge schema (or had a vector column in nebula), you could run: "find all harvest candidates semantically related to 'TypeSpec contract-first architecture'" — and get results from both the curated knowledge graph AND the automated harvest pipeline.
+────────────────────────────────────────────────────────────────────────────────
+Bottom line: The schemas exist side-by-side. The MCP servers exist. The data exists. What's missing is the bridge — cross-schema references, embeddings on harvest data, and a unified semantic search that spans both "memories" (curated graph) and "cabinet contents" (harvested transcripts).
+Want me to start building any of these linkages?Show moreShow less
+
+Current State: Two Schemas, Adjacent but Unlinked
+┌───────────┬────────────────────────────────────────────┬──────────────────────────────────────────────────┐
+│           │ Knowledge ("memories")                     │ Nebula ("cabinet")                               │
+├───────────┼────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ Schema    │ knowledge.*                                │ nebula.*                                         │
+│ Tables    │ graph_entities, graph_edges,               │ harvests_history, agent_records_history,         │
+│           │ graph_cross_references, graph_migrations   │ cross_references, systems_history,               │
+│           │                                            │ requirements_history, etc.                       │
+│ Has       │ ✅ embedding VECTOR(1536) + ivfflat index  │ ❌ No embeddings                                 │
+│ vector    │ + semantic_search() function               │                                                  │
+│ search?   │                                            │                                                  │
+│ Source    │ nexus/graph/nexus-knowledge-graph.json     │ 30 harvests from chat transcripts (automated     │
+│ material  │ (curated, 1 big file)                      │ pipeline)                                        │
+│ Ingestion │ migrate_graph.py (one-shot file → DB)      │ batch_harvest_to_db.py (per-transcript → Ollama  │
+│ method    │                                            │ → DB)                                            │
+│ MCP       │ nexus/typescript/knowledge-mcp/            │ nexus/typescript/nebula-mcp/ + nebula-srv REST   │
+│ server    │ (knowledge_list_entities,                  │ API                                              │
+│           │ knowledge_semantic_search, etc.)           │                                                  │
+│ Cross-ref │ knowledge.graph_cross_references           │ nebula.cross_references (harvest_candidate →     │
+│ erences   │ (CIRS→projection algebra, etc.)            │ domain system, agent_record → plan, etc.)        │
+│ Data      │ Tables exist, may be empty (migration      │ 403 candidates classified across 10 domains with │
+│ status    │ never run?)                                │ 719 cross-references                             │
+└───────────┴────────────────────────────────────────────┴──────────────────────────────────────────────────┘
+The Overlap (Where They Converge)
+They describe the same domain from different angles:
+- Knowledge graph entities like  persistent-knowledge-graph  (section:  types ) describe the concept of a knowledge graph in PostgreSQL+pgvector
+- Nebula harvest candidates are the actual output of applying that concept — extracted specs sitting in  harvests_history.candidates 
+Same architectural decisions appear in both:
+- "TypeSpec as executable knowledge layer" appears as a harvest candidate AND as a knowledge graph entity ( typespec-dsl-layer )
+- "3-tier graph model" appears as a knowledge graph  architectural_observation  AND in harvested specs
+The Four Missing Linkages
+1. Cross-Schema Cross-References
+ nebula.cross_references  links  harvest_candidate → system  (within nebula). There's no link from a harvest candidate to the knowledge graph entity it instantiates or refines. A candidate about "TypeSpec as executable knowledge" should reference the  typespec-dsl-layer  entity in  knowledge.graph_entities .
+2. Embedding Pipeline
+Harvest candidates have rich  intent_description  text — perfect for embedding. But no embedding generation pipeline exists. The Rover schema ( rover.chunks ) was designed with  nlp_candidate_json  and  nlp_verdict  columns but those tables were never created in the production database. Harvest source text is stored in  harvests_history.source_text  but never chunked, embedded, or indexed for semantic search.
+3. Source Provenance Bridge
+ knowledge.graph_entities.source_file  =  nexus-knowledge-graph.json .  nebula.harvests_history.source_filename  = e.g.,  Nexus - OrientDB, Pinecone & Convex.html . The knowledge graph JSON has a  sources  array pointing to chat transcripts. A bridge would let you go from a harvest candidate → the knowledge graph entities it informs, and vice versa.
+4. Unified Semantic Search
+The  knowledge.semantic_search()  function exists but is a stub (requires application-layer embedding generation). If harvest candidates were embedded and stored in the knowledge schema (or had a vector column in nebula), you could run: "find all harvest candidates semantically related to 'TypeSpec contract-first architecture'" — and get results from both the curated knowledge graph AND the automated harvest pipeline.
+────────────────────────────────────────────────────────────────────────────────
+Bottom line: The schemas exist side-by-side. The MCP servers exist. The data exists. What's missing is the bridge — cross-schema references, embeddings on harvest data, and a unified semantic search that spans both "memories" (curated graph) and "cabinet contents" (harvested transcripts).
+Want me to start building any of these linkages?Show moreShow less
+
+Current State: Two Schemas, Adjacent but Unlinked
+┌───────────┬────────────────────────────────────────────┬──────────────────────────────────────────────────┐
+│           │ Knowledge ("memories")                     │ Nebula ("cabinet")                               │
+├───────────┼────────────────────────────────────────────┼──────────────────────────────────────────────────┤
+│ Schema    │ knowledge.*                                │ nebula.*                                         │
+│ Tables    │ graph_entities, graph_edges,               │ harvests_history, agent_records_history,         │
+│           │ graph_cross_references, graph_migrations   │ cross_references, systems_history,               │
+│           │                                            │ requirements_history, etc.                       │
+│ Has       │ ✅ embedding VECTOR(1536) + ivfflat index  │ ❌ No embeddings                                 │
+│ vector    │ + semantic_search() function               │                                                  │
+│ search?   │                                            │                                                  │
+│ Source    │ nexus/graph/nexus-knowledge-graph.json     │ 30 harvests from chat transcripts (automated     │
+│ material  │ (curated, 1 big file)                      │ pipeline)                                        │
+│ Ingestion │ migrate_graph.py (one-shot file → DB)      │ batch_harvest_to_db.py (per-transcript → Ollama  │
+│ method    │                                            │ → DB)                                            │
+│ MCP       │ nexus/typescript/knowledge-mcp/            │ nexus/typescript/nebula-mcp/ + nebula-srv REST   │
+│ server    │ (knowledge_list_entities,                  │ API                                              │
+│           │ knowledge_semantic_search, etc.)           │                                                  │
+│ Cross-ref │ knowledge.graph_cross_references           │ nebula.cross_references (harvest_candidate →     │
+│ erences   │ (CIRS→projection algebra, etc.)            │ domain system, agent_record → plan, etc.)        │
+│ Data      │ Tables exist, may be empty (migration      │ 403 candidates classified across 10 domains with │
+│ status    │ never run?)                                │ 719 cross-references                             │
+└───────────┴────────────────────────────────────────────┴──────────────────────────────────────────────────┘
+The Overlap (Where They Converge)
+They describe the same domain from different angles:
+- Knowledge graph entities like  persistent-knowledge-graph  (section:  types ) describe the concept of a knowledge graph in PostgreSQL+pgvector
+- Nebula harvest candidates are the actual output of applying that concept — extracted specs sitting in  harvests_history.candidates 
+Same architectural decisions appear in both:
+- "TypeSpec as executable knowledge layer" appears as a harvest candidate AND as a knowledge graph entity ( typespec-dsl-layer )
+- "3-tier graph model" appears as a knowledge graph  architectural_observation  AND in harvested specs
+The Four Missing Linkages
+1. Cross-Schema Cross-References
+ nebula.cross_references  links  harvest_candidate → system  (within nebula). There's no link from a harvest candidate to the knowledge graph entity it instantiates or refines. A candidate about "TypeSpec as executable knowledge" should reference the  typespec-dsl-layer  entity in  knowledge.graph_entities .
+2. Embedding Pipeline
+Harvest candidates have rich  intent_description  text — perfect for embedding. But no embedding generation pipeline exists. The Rover schema ( rover.chunks ) was designed with  nlp_candidate_json  and  nlp_verdict  columns but those tables were never created in the production database. Harvest source text is stored in  harvests_history.source_text  but never chunked, embedded, or indexed for semantic search.
+3. Source Provenance Bridge
+ knowledge.graph_entities.source_file  =  nexus-knowledge-graph.json .  nebula.harvests_history.source_filename  = e.g.,  Nexus - OrientDB, Pinecone & Convex.html . The knowledge graph JSON has a  sources  array pointing to chat transcripts. A bridge would let you go from a harvest candidate → the knowledge graph entities it informs, and vice versa.
+4. Unified Semantic Search
+The  knowledge.semantic_search()  function exists but is a stub (requires application-layer embedding generation). If harvest candidates were embedded and stored in the knowledge schema (or had a vector column in nebula), you could run: "find all harvest candidates semantically related to 'TypeSpec contract-first architecture'" — and get results from both the curated knowledge graph AND the automated harvest pipeline.
+────────────────────────────────────────────────────────────────────────────────
+Bottom line: The schemas exist side-by-side. The MCP servers exist. The data exists. What's missing is the bridge — cross-schema references, embeddings on harvest data, and a unified semantic search that spans both "memories" (curated graph) and "cabinet contents" (harvested transcripts).
+Want me to start building any of these linkages?Show moreShow less

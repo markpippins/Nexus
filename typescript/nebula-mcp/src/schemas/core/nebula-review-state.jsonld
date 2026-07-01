@@ -1,0 +1,98 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "nx": "https://nexus.local/schema/",
+
+    "rv": "https://nexus.local/schema/core/review-state/",
+    "id": "@id",
+    "type": "@type",
+    "comment": {"@id": "http://www.w3.org/2000/01/rdf-schema#comment"},
+
+    "ReviewState":            "rv:ReviewState",
+    "ReviewAnnotation":       "rv:ReviewAnnotation",
+    "ReviewStatus":           "rv:ReviewStatus",
+    "ReviewPriority":         "rv:ReviewPriority",
+    "AttentionReason":        "rv:AttentionReason",
+
+    "reviewStatus":       "rv:reviewStatus",
+    "reviewPriority":     "rv:reviewPriority",
+    "needsAttention":     {"@id": "rv:needsAttention", "@type": "xsd:boolean"},
+    "lastReviewedAt":     {"@id": "rv:lastReviewedAt", "@type": "xsd:dateTime"},
+    "reviewSummary":      "rv:reviewSummary",
+    "attentionReasons":   {"@id": "rv:attentionReasons", "@container": "@set"},
+
+    "annotationId":       "rv:annotationId",
+    "targetArtifactId":   "rv:targetArtifactId",
+    "targetArtifactType": "rv:targetArtifactType",
+    "annotatorRole":      "rv:annotatorRole",
+    "annotationNote":     "rv:annotationNote",
+    "previousStatus":     "rv:previousStatus",
+    "newStatus":          "rv:newStatus",
+    "annotationTimestamp": {"@id": "rv:annotationTimestamp", "@type": "xsd:dateTime"},
+
+    "UNREVIEWED":             "rv:UNREVIEWED",
+    "NEEDS_REVIEW":           "rv:NEEDS_REVIEW",
+    "UNDER_REVIEW":           "rv:UNDER_REVIEW",
+    "REVIEWED":               "rv:REVIEWED",
+    "CURRENT_FOCUS":          "rv:CURRENT_FOCUS",
+    "OUTDATED":               "rv:OUTDATED",
+    "QUESTIONED":             "rv:QUESTIONED",
+    "SUPERSEDED_CONFIRMED":   "rv:SUPERSEDED_CONFIRMED",
+
+    "CRITICAL":  "rv:CRITICAL",
+    "HIGH":      "rv:HIGH",
+    "MEDIUM":    "rv:MEDIUM",
+    "LOW":       "rv:LOW",
+
+    "BLOCKING_IMPLEMENTATION":         "rv:BLOCKING_IMPLEMENTATION",
+    "OUT_OF_DATE_WITH_RUNTIME":        "rv:OUT_OF_DATE_WITH_RUNTIME",
+    "OUT_OF_DATE_WITH_ARCHITECTURE":   "rv:OUT_OF_DATE_WITH_ARCHITECTURE",
+    "CONFLICTS_WITH_OTHER_SPEC":       "rv:CONFLICTS_WITH_OTHER_SPEC",
+    "MISSING_ACCEPTANCE_CRITERIA":     "rv:MISSING_ACCEPTANCE_CRITERIA",
+    "AMBIGUOUS_REQUIREMENTS":          "rv:AMBIGUOUS_REQUIREMENTS",
+    "DEPENDENCY_CHANGED":              "rv:DEPENDENCY_CHANGED",
+    "SUPERSEDED_BY":                   "rv:SUPERSEDED_BY"
+  },
+
+  "@graph": [
+    {
+      "@id": "rv:ReviewState",
+      "@type": "rdfs:Class",
+      "subClassOf": {"@id": "nx:ReviewState"},
+      "comment": "Orthogonal review-state overlay on Nebula artifacts and chunks. Independent from artifact lifecycle status.",
+      "properties": [
+        "rv:reviewStatus", "rv:reviewPriority", "rv:needsAttention",
+        "rv:lastReviewedAt", "rv:reviewSummary", "rv:attentionReasons"
+      ]
+    },
+    {
+      "@id": "rv:ReviewAnnotation",
+      "@type": "rdfs:Class",
+      "comment": "Immutable historical record of a review-state transition on an artifact.",
+      "properties": [
+        "rv:annotationId", "rv:targetArtifactId", "rv:targetArtifactType",
+        "rv:annotatorRole", "rv:annotationNote",
+        "rv:previousStatus", "rv:newStatus",
+        "rv:annotationTimestamp", "nx:createdAt"
+      ]
+    },
+    {
+      "@id": "rv:ReviewStatus",
+      "@type": "rdfs:Class",
+      "comment": "Enumeration of review statuses orthogonal to artifact lifecycle.",
+      "properties": []
+    },
+    {
+      "@id": "rv:ReviewPriority",
+      "@type": "rdfs:Class",
+      "comment": "Priority levels for review attention.",
+      "properties": []
+    },
+    {
+      "@id": "rv:AttentionReason",
+      "@type": "rdfs:Class",
+      "comment": "Reasons why an artifact needs attention during corpus triage.",
+      "properties": []
+    }
+  ]
+}

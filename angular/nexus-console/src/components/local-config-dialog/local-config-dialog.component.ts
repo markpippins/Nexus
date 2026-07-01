@@ -18,7 +18,7 @@ export class LocalConfigDialogComponent implements OnInit {
   close = output<void>();
   save = output<LocalConfig>();
 
-  formState = signal<LocalConfig>({ sessionName: '', defaultImageUrl: '', logBrokerMessages: false, healthCheckDelayMinutes: 3 });
+  formState = signal<LocalConfig>({ sessionName: '', defaultImageUrl: '', terrainServerUrl: 'http://localhost:8084', logBrokerMessages: false, healthCheckDelayMinutes: 3 });
 
   ngOnInit(): void {
     this.formState.set(this.localConfigService.currentConfig());

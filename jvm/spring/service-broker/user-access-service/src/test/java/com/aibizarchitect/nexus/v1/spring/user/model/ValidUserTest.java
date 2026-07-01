@@ -23,6 +23,16 @@ class ValidUserTest {
 
         assertEquals("testAlias", user.getAlias());
         assertEquals("test@example.com", user.getEmail());
+        assertEquals("", user.getIdentifier());
+    }
+
+    @Test
+    void testConstructorWithIdentifier() {
+        UserRegistration user = new UserRegistration("testAlias", "test@example.com", "mypassword");
+
+        assertEquals("testAlias", user.getAlias());
+        assertEquals("test@example.com", user.getEmail());
+        assertEquals("mypassword", user.getIdentifier());
     }
 
     @Test
@@ -47,6 +57,14 @@ class ValidUserTest {
         validUser.setEmail(expectedEmail);
 
         assertEquals(expectedEmail, validUser.getEmail());
+    }
+
+    @Test
+    void testIdentifier() {
+        String expectedIdentifier = "mypassword";
+        validUser.setIdentifier(expectedIdentifier);
+
+        assertEquals(expectedIdentifier, validUser.getIdentifier());
     }
 
     @Test

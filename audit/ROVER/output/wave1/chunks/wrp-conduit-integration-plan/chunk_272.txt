@@ -1,0 +1,295 @@
+---
+
+# What this schema is doing conceptually
+
+It gives Nebula areview overlaythat isindependent of lifecycle status.
+
+That means an artifact can simultaneously be:
+
+- status = nebula:ACTIVE
+status = nebula:ACTIVE
+
+- reviewStatus = review:NEEDS_REVIEW
+reviewStatus = review:NEEDS_REVIEW
+
+or:
+
+- status = nebula:SUPERSEDED
+status = nebula:SUPERSEDED
+
+- reviewStatus = review:SUPERSEDED_CONFIRMED
+reviewStatus = review:SUPERSEDED_CONFIRMED
+
+Those are not redundant; they answer different questions:
+
+- status→ what is this artifact in the corpus lifecycle?
+status→ what is this artifact in the corpus lifecycle?
+
+- reviewStatus→ what attention should we pay to it right now?
+reviewStatus→ what attention should we pay to it right now?
+
+That split is the core reason to do this as a separate schema instead of just stuffing more enum values intostatus.
+
+---
+
+# The one modeling change I would make immediately
+
+The JSON-LD above defines review properties in the vocabulary, but I would also makeReviewAnnotationa first-class node pattern, not just “extra columns on artifacts.”
+
+In other words, I’d supportbothof these:
+
+## A. denormalized convenience fields onnebula_artifact
+
+- review_status
+review_status
+
+- review_priority
+review_priority
+
+- last_reviewed_at
+last_reviewed_at
+
+- review_summary
+review_summary
+
+- needs_attention
+needs_attention
+
+## B. normalized review annotation records
+
+Something like:
+
+```
+{  "id": "review:annotation/wrp-v1-protocol/2026-06-21",  "type": "ReviewAnnotation",  "appliesTo": "wrp:artifact/wrp-v1-protocol",  "reviewStatus": "review:CURRENT_FOCUS",  "reviewPriority": "review:HIGH",  "attentionReason": [    "review:BLOCKING_IMPLEMENTATION"  ],  "needsAttention": true,  "lastReviewedAt": "2026-06-21T13:00:00Z",  "reviewedBy": "role:architect",  "reviewSummary": "Protocol remains active and central, but execution-related sections should be checked against the traversal split."}
+```
+
+```
+{  "id": "review:annotation/wrp-v1-protocol/2026-06-21",  "type": "ReviewAnnotation",  "appliesTo": "wrp:artifact/wrp-v1-protocol",  "reviewStatus": "review:CURRENT_FOCUS",  "reviewPriority": "review:HIGH",  "attentionReason": [    "review:BLOCKING_IMPLEMENTATION"  ],  "needsAttention": true,  "lastReviewedAt": "2026-06-21T13:00:00Z",  "reviewedBy": "role:architect",  "reviewSummary": "Protocol remains active and central, but execution-related sections should be checked against the traversal split."}
+```
+
+Why I think you want both:
+
+- artifact columnsmake filtering and dashboards easy
+artifact columnsmake filtering and dashboards easy
+
+- annotation nodespreserve review history, multiple opinions, and section/chunk review later
+annotation nodespreserve review history, multiple opinions, and section/chunk review later
+
+So my rule would be:
+
+- the artifact table stores thecurrent effective review state
+the artifact table stores thecurrent effective review state
+
+- review annotations store thehistory / evidence / per-scope detail
+review annotations store thehistory / evidence / per-scope detail
+
+---
+
+# How I’d wire this into the SQL side immediately
+
+If you want the simplest operational thing, I’d add these columns toboth:
+
+## nebula_artifact
+
+- review_status
+review_status
+
+- review_priority
+review_priority
+
+- needs_attention
+needs_attention
+
+- last_reviewed_at
+last_reviewed_at
+
+- review_summary
+review_summary
+
+- focus_score
+focus_score
+
+## nebula_chunk
+
+- same fields, nullable
+same fields, nullable
+
+I wouldnotbother withnebula_sectionon day one unless you know you want section-level review in the UI immediately.
+
+Then add a new table:
+
+## nebula_review_annotation
+
+with fields like:
+
+- id
+id
+
+- target_type(artifact,chunk, maybesection)
+target_type(artifact,chunk, maybesection)
+
+- target_id
+target_id
+
+- review_status
+review_status
+
+- review_priority
+review_priority
+
+- attention_reason_json
+attention_reason_json
+
+- needs_attention
+needs_attention
+
+- reviewed_by
+reviewed_by
+
+- review_summary
+review_summary
+
+- created_at
+created_at
+
+That gives you both the cheap operational path and the richer future path.
+
+---
+
+# What the next doc should do
+
+The schema above gives the vocabulary, but thebehaviorstill needs to be pinned down. So the next document should be:
+
+# docs/nebula/review-workflow.md
+
+That doc should define:
+
+## 1. who can set review state
+
+For example:
+
+- you manually
+you manually
+
+- Inspector role recommendations
+Inspector role recommendations
+
+- Builder/Architect proposals
+Builder/Architect proposals
+
+- Conduit import hooks maybe, but not as final authority
+Conduit import hooks maybe, but not as final authority
+
+## 2. effective-state precedence
+
+If:
+
+- artifact saysREVIEWED
+artifact saysREVIEWED
+
+- but one chunk saysQUESTIONED
+but one chunk saysQUESTIONED
+
+- and a newer annotation saysCURRENT_FOCUS
+and a newer annotation saysCURRENT_FOCUS
+
+what wins?
+
+## 3. how review state affects retrieval
+
+For example:
+
+- default retrieval demotesOUTDATED
+default retrieval demotesOUTDATED
+
+- Explorer can include superseded material
+Explorer can include superseded material
+
+- Inspector may boostQUESTIONED
+Inspector may boostQUESTIONED
+
+## 4. how supersession interacts with review
+
+Examples:
+
+- ifsupersededByis set, shouldreviewStatusauto-flip toSUPERSEDED_CONFIRMED?
+ifsupersededByis set, shouldreviewStatusauto-flip toSUPERSEDED_CONFIRMED?
+
+- or only after manual confirmation?
+or only after manual confirmation?
+
+## 5. how “current focus” is maintained
+
+Because you probably don’t want 40 things marked current focus forever.
+
+---
+
+# After that, we return to the two deferred docs
+
+So the updated sequence is now:
+
+## Review-governance insertion
+
+- schemas/core/nebula-review-state.jsonld← done above
+schemas/core/nebula-review-state.jsonld← done above
+
+- docs/nebula/review-workflow.md
+docs/nebula/review-workflow.md
+
+## Then the two deferred docs
+
+- schemas/core/nebula-chunk-kinds.jsonld
+schemas/core/nebula-chunk-kinds.jsonld
+
+- docs/nebula/wrp-projection-pseudocode.md
+docs/nebula/wrp-projection-pseudocode.md
+
+If you want, I’ll go straight intodocs/nebula/review-workflow.mdnext.
+
+Read AI, Inc.SponsoredMeeting Notes in ChatGPTAI meeting notes with integrated ChatGPT app
+
+Read AI, Inc.SponsoredMeeting Notes in ChatGPTAI meeting notes with integrated ChatGPT app
+
+Read AI, Inc.SponsoredMeeting Notes in ChatGPTAI meeting notes with integrated ChatGPT app
+
+Read AI, Inc.SponsoredMeeting Notes in ChatGPTAI meeting notes with integrated ChatGPT app
+
+Read AI, Inc.Sponsored
+
+Read AI, Inc.Sponsored
+
+Read AI, Inc.Sponsored
+
+Read AI, Inc.Sponsored
+
+Read AI, Inc.
+
+Sponsored
+
+Meeting Notes in ChatGPTAI meeting notes with integrated ChatGPT app
+
+Meeting Notes in ChatGPTAI meeting notes with integrated ChatGPT app
+
+Meeting Notes in ChatGPTAI meeting notes with integrated ChatGPT app
+
+Meeting Notes in ChatGPT
+
+AI meeting notes with integrated ChatGPT app
+
+You said:let's continue
+
+#### You said:
+
+let's continue
+
+let's continue
+
+let's continue
+
+let's continue
+
+let's continue
+
+let's continue
+
+let's continue

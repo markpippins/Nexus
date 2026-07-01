@@ -1,0 +1,651 @@
+Absolutely. Given that Conduit is execution-oriented and the real long-form knowledge belongs in Nebula, I’d treat this as thebridge specbetween the four WRP implementation plans now sitting in Conduit and the stratified knowledge corpus Nebula needs to become.
+
+Below is arepo-ready docin the style we’ve been using.
+
+---
+
+# docs/conduit/nebula-wrp-projection-and-level-stratification.md
+
+```
+# Conduit → Nebula WRP Projection and Level Stratification**Status:** Draft  **Owner:** Architecture / Nebula / Conduit  **Last Updated:** 2026-06-21---# 1. PurposeThis document defines how **WRP artifacts managed through Conduit** are projected into the **Nebula knowledge graph / document corpus**, and how those artifacts are stratified by **abstraction level** so that different roles and agents can retrieve the right amount of context.The immediate goal is to support the first WRP work packet now tracked in Conduit:1. **WRP v1.0** — protocol formalization2. **WRP v1.1** — DAG data model & compilation pipeline3. **WRP v1.2** — execution traversal engine4. **WRP migration plan**These four artifacts must not remain isolated implementation plans. They must become **queryable architectural knowledge** inside Nebula so that:- builders can retrieve concrete implementation guidance,- architects can retrieve subsystem rationale and relationships,- inspectors/validators can retrieve invariants and migration constraints,- future harvests and work requests can cross-reference WRP material directly.This document therefore specifies:- the **projection model** from Conduit/WRP artifacts into Nebula;- the **`level` stratification model** for Nebula documents, chunks, and references;- the **artifact taxonomy** for WRP knowledge units;- the **retrieval policy** by role;- the **migration strategy** for the initial WRP corpus.---# 2. Context and Position in the StackThe working architectural chain is:```textNebula → WRP → Conduit → LOSM / runtime implementation
+```
+
+```
+# Conduit → Nebula WRP Projection and Level Stratification**Status:** Draft  **Owner:** Architecture / Nebula / Conduit  **Last Updated:** 2026-06-21---# 1. PurposeThis document defines how **WRP artifacts managed through Conduit** are projected into the **Nebula knowledge graph / document corpus**, and how those artifacts are stratified by **abstraction level** so that different roles and agents can retrieve the right amount of context.The immediate goal is to support the first WRP work packet now tracked in Conduit:1. **WRP v1.0** — protocol formalization2. **WRP v1.1** — DAG data model & compilation pipeline3. **WRP v1.2** — execution traversal engine4. **WRP migration plan**These four artifacts must not remain isolated implementation plans. They must become **queryable architectural knowledge** inside Nebula so that:- builders can retrieve concrete implementation guidance,- architects can retrieve subsystem rationale and relationships,- inspectors/validators can retrieve invariants and migration constraints,- future harvests and work requests can cross-reference WRP material directly.This document therefore specifies:- the **projection model** from Conduit/WRP artifacts into Nebula;- the **`level` stratification model** for Nebula documents, chunks, and references;- the **artifact taxonomy** for WRP knowledge units;- the **retrieval policy** by role;- the **migration strategy** for the initial WRP corpus.---# 2. Context and Position in the StackThe working architectural chain is:```textNebula → WRP → Conduit → LOSM / runtime implementation
+```
+
+with the following responsibilities:
+
+- Nebulalong-form architectural memorymarkdown-authored specificationschunked knowledge corpuscross-reference graphopen questions / unresolved decisionsretrieval substrate for planning and implementation
+Nebula
+
+- long-form architectural memory
+long-form architectural memory
+
+- markdown-authored specifications
+markdown-authored specifications
+
+- chunked knowledge corpus
+chunked knowledge corpus
+
+- cross-reference graph
+cross-reference graph
+
+- open questions / unresolved decisions
+open questions / unresolved decisions
+
+- retrieval substrate for planning and implementation
+retrieval substrate for planning and implementation
+
+- WRP (Work Request Protocol / Work Request Package)canonical execution-facing representation of workprotocol, DAG model, traversal semantics, migration disciplinethe bridge between long-form intent and executable work
+WRP (Work Request Protocol / Work Request Package)
+
+- canonical execution-facing representation of work
+canonical execution-facing representation of work
+
+- protocol, DAG model, traversal semantics, migration discipline
+protocol, DAG model, traversal semantics, migration discipline
+
+- the bridge between long-form intent and executable work
+the bridge between long-form intent and executable work
+
+- Conduitexecution-oriented work managerreceives concrete plans / work requeststracks dependencies, acceptance criteria, receipts, affected filesis not the authoritative home for large concept documents
+Conduit
+
+- execution-oriented work manager
+execution-oriented work manager
+
+- receives concrete plans / work requests
+receives concrete plans / work requests
+
+- tracks dependencies, acceptance criteria, receipts, affected files
+tracks dependencies, acceptance criteria, receipts, affected files
+
+- is not the authoritative home for large concept documents
+is not the authoritative home for large concept documents
+
+- LOSM / runtimeexecution engine, orchestration, persistence, validation, receipts
+LOSM / runtime
+
+- execution engine, orchestration, persistence, validation, receipts
+execution engine, orchestration, persistence, validation, receipts
+
+The practical rule is:
+
+> Nebula owns long-form architectural knowledge. Conduit owns executable work tracking. WRP is the formal bridge between the two.
+
+Nebula owns long-form architectural knowledge. Conduit owns executable work tracking. WRP is the formal bridge between the two.
+
+This document defines how that bridge is materialized in storage and retrieval.
+
+---
+
+# 3. Design Goals
+
+The projection and stratification model must satisfy the following goals.
+
+## G1. Preserve long-form WRP knowledge in Nebula
+
+The WRP packet tracked in Conduit must be represented in Nebula as durable, queryable, versioned knowledge.
+
+## G2. Preserve execution alignment with Conduit
+
+Nebula entries must retain enough metadata to map back to the Conduit work packet(s) that implement them.
+
+## G3. Support role-specific retrieval
+
+The same corpus must serve multiple retrieval surfaces:
+
+- Builder / implementer
+Builder / implementer
+
+- Architect / planner
+Architect / planner
+
+- Inspector / validator
+Inspector / validator
+
+- Explorer / researcher
+Explorer / researcher
+
+## G4. Separate abstraction levels cleanly
+
+Implementation details should not drown architectural reasoning, and architectural rationale should not flood implementation prompts unless explicitly requested.
+
+## G5. Preserve explicit cross-references
+
+Protocol rules, DAG semantics, traversal rules, migration tasks, invariants, and open questions must be linked explicitly rather than relying only on embedding similarity.
+
+## G6. Remain compatible with the existing Nebula markdown-ingestion pipeline
+
+This design should extend the existing markdown import / chunk / cross-reference model rather than replacing it.
+
+---
+
+# 4. Core Decision
+
+## 4.1 Canonical rule
+
+WRP artifacts are authored or curated as Nebula documents, then projected into Conduit as executable work packages.
+
+Conduit may hold the immediate execution plans, but Nebula remains the authoritative architectural memory for:
+
+- protocol definitions,
+protocol definitions,
+
+- subsystem specs,
+subsystem specs,
+
+- migration rationale,
+migration rationale,
+
+- invariants,
+invariants,
+
+- open questions,
+open questions,
+
+- design history.
+design history.
+
+## 4.2 Projection direction
+
+There are two distinct projection paths:
+
+### A. Authoritative knowledge projection
+
+```
+Nebula markdown/spec document    → Nebula document rows / chunks / cross references    → optional WRP artifact registration    → Conduit plan / work request generation
+```
+
+```
+Nebula markdown/spec document    → Nebula document rows / chunks / cross references    → optional WRP artifact registration    → Conduit plan / work request generation
+```
+
+### B. Execution trace back-projection
+
+```
+Conduit plan / execution receipt / implementation status    → WRP artifact linkage    → Nebula document metadata updates    → cross-linked execution references
+```
+
+```
+Conduit plan / execution receipt / implementation status    → WRP artifact linkage    → Nebula document metadata updates    → cross-linked execution references
+```
+
+So the system is not one-way. The long-form knowledge projects downward into executable work, and execution status projects upward into Nebula metadata and trace links.
+
+---
+
+# 5. Scope of WRP Artifacts Covered by This Spec
+
+This document covers the initial WRP corpus:
+
+## WRP-1 — WRP v1.0 Protocol Formalization
+
+Defines the formal work request protocol, message shape, identity, versioning, semantics, and lifecycle assumptions.
+
+## WRP-2 — WRP v1.1 DAG Data Model & Compilation Pipeline
+
+Defines the DAG representation of work, node/edge semantics, compilation from protocol-level requests into executable graph structures, and compilation invariants.
+
+## WRP-3 — WRP v1.2 Execution Traversal Engine
+
+Defines the traversal/execution model over the WRP DAG, execution context, cursor/receipt semantics, deterministic traversal defaults, and isolation rules.
+
+## WRP-4 — WRP Migration Plan
+
+Defines how existing work representations, legacy plans, or runtime workflows migrate into the WRP model with compatibility constraints and staged rollout.
+
+The schema and rules in this document are generic enough to apply to future WRP artifacts as well.
+
+---
+
+# 6. Terminology
+
+## 6.1 Conduit Plan
+
+An execution-oriented item managed by Conduit, typically containing:
+
+- title
+title
+
+- project
+project
+
+- affected files
+affected files
+
+- acceptance criteria
+acceptance criteria
+
+- dependencies
+dependencies
+
+- receipt trail
+receipt trail
+
+## 6.2 WRP Artifact
+
+A versioned architectural / protocol artifact in the WRP family, such as:
+
+- protocol spec
+protocol spec
+
+- DAG model spec
+DAG model spec
+
+- traversal engine spec
+traversal engine spec
+
+- migration plan
+migration plan
+
+- future validation / governance extensions
+future validation / governance extensions
+
+## 6.3 Nebula Document
+
+A markdown-origin or spec-origin long-form document stored in Nebula.
+
+## 6.4 Nebula Chunk
+
+A chunked section or paragraph group extracted from a Nebula document for retrieval and cross-referencing.
+
+## 6.5 Cross Reference
+
+An explicit semantic edge connecting one document/chunk/artifact to another, such as:
+
+- “depends on”
+“depends on”
+
+- “implements”
+“implements”
+
+- “constrains”
+“constrains”
+
+- “supersedes”
+“supersedes”
+
+- “migrates”
+“migrates”
+
+- “explains”
+“explains”
+
+- “references protocol field”
+“references protocol field”
+
+- “defines traversal invariant”
+“defines traversal invariant”
+
+## 6.6 Level
+
+A stratification marker describing the abstraction level of a knowledge item.
+
+---
+
+# 7. Level Stratification Model
+
+---
+
+# 8. Rationale for Level Stratification
+
+Without level stratification, a retrieval system operating over mixed architectural and implementation material tends to collapse the distinction between:
+
+- “what the protocol means,”
+“what the protocol means,”
+
+- “how the DAG is represented,”
+“how the DAG is represented,”
+
+- “what code needs to change this week,”
+“what code needs to change this week,”
+
+- “why the migration strategy was chosen.”
+“why the migration strategy was chosen.”
+
+That leads to three recurring failures:
+
+- Builders get too much theoryimplementation prompts fill with architecture prose and migration history.
+Builders get too much theory
+
+- implementation prompts fill with architecture prose and migration history.
+implementation prompts fill with architecture prose and migration history.
+
+- Architects get too much local detailsubsystem reasoning is polluted by file-level implementation instructions.
+Architects get too much local detail
+
+- subsystem reasoning is polluted by file-level implementation instructions.
+subsystem reasoning is polluted by file-level implementation instructions.
+
+- Inspectors miss normative constraintsinvariants and compatibility rules are not distinguished from general descriptive prose.
+Inspectors miss normative constraints
+
+- invariants and compatibility rules are not distinguished from general descriptive prose.
+invariants and compatibility rules are not distinguished from general descriptive prose.
+
+A level field provides a stable, queryable abstraction boundary.
+
+---
+
+# 9. Level Definitions
+
+The first version of the level system usesfour levels.
+
+## Level 1 — Execution / Build Detail (L1)
+
+Concrete implementation guidance and execution-facing material.
+
+Typical content:
+
+- file-level implementation tasks
+file-level implementation tasks
+
+- endpoint contracts
+endpoint contracts
+
+- dataclass / schema details
+dataclass / schema details
+
+- method signatures
+method signatures
+
+- SQL changes
+SQL changes
+
+- acceptance criteria
+acceptance criteria
+
+- test cases
+test cases
+
+- migration scripts
+migration scripts
+
+- precise repository change instructions
+precise repository change instructions
+
+- “do this in package X” content
+“do this in package X” content
+
+Primary consumers:
+
+- Builder
+Builder
+
+- Conduit executor
+Conduit executor
+
+- implementation-focused coding agents
+implementation-focused coding agents
+
+## Level 2 — Subsystem Design (L2)
+
+Subsystem mechanics and technical design for a bounded domain.
+
+Typical content:
+
+- DAG node/edge semantics
+DAG node/edge semantics
+
+- compilation pipeline structure
+compilation pipeline structure
+
+- traversal algorithm design
+traversal algorithm design
+
+- execution receipt structure
+execution receipt structure
+
+- role-specific service boundaries
+role-specific service boundaries
+
+- storage mappings for a specific subsystem
+storage mappings for a specific subsystem
+
+- formal state transitions inside one bounded domain
+formal state transitions inside one bounded domain
+
+Primary consumers:
+
+- Builder (secondary)
+Builder (secondary)
+
+- Architect
+Architect
+
+- Inspector
+Inspector
+
+## Level 3 — Architecture / Rationale (L3)
+
+Higher-order architectural reasoning, system relationships, and design justification.
+
+Typical content:
+
+- why WRP exists
+why WRP exists
+
+- why DAG compilation is separate from traversal
+why DAG compilation is separate from traversal
+
+- how Conduit, Nebula, and LOSM relate
+how Conduit, Nebula, and LOSM relate
+
+- migration philosophy and rollout strategy
+migration philosophy and rollout strategy
+
+- cross-subsystem responsibilities
+cross-subsystem responsibilities
+
+- long-form tradeoff analysis
+long-form tradeoff analysis
+
+- architectural invariants spanning multiple packages
+architectural invariants spanning multiple packages
+
+Primary consumers:
+
+- Architect
+Architect
+
+- Explorer
+Explorer
+
+- Inspector
+Inspector
+
+## Level 4 — Meta / Doctrine / Ontology (L4)
+
+Cross-cutting design doctrine, system philosophy, and ontology-level governance.
+
+Typical content:
+
+- methodology rules
+methodology rules
+
+- role doctrine
+role doctrine
+
+- architectural constitution / invariants of invariants
+architectural constitution / invariants of invariants
+
+- ontology rules for work, memory, or cognition
+ontology rules for work, memory, or cognition
+
+- global modeling principles
+global modeling principles
+
+- cross-project strategic doctrine
+cross-project strategic doctrine
+
+Primary consumers:
+
+- Architect
+Architect
+
+- Explorer
+Explorer
+
+- strategic planner
+strategic planner
+
+---
+
+# 10. Level Assignment Rules
+
+## 10.1 Canonical rule
+
+Level belongs primarily to the content node, not to the retrieval query and not to the edge.
+
+That means:
+
+- documents have levels,
+documents have levels,
+
+- chunks have levels,
+chunks have levels,
+
+- references may optionally have level metadata, but level is not primarily an edge property.
+references may optionally have level metadata, but level is not primarily an edge property.
+
+## 10.2 Single-primary-level rule
+
+Every document and every chunk must haveone primary level.
+
+This avoids ambiguous retrieval behavior and keeps filtering deterministic.
+
+## 10.3 Mixed documents
+
+A long document may contain sections at different abstraction levels. Therefore:
+
+- thedocumentreceives a default or dominant level;
+thedocumentreceives a default or dominant level;
+
+- chunksmay override the document level when section content clearly belongs to a different level.
+chunksmay override the document level when section content clearly belongs to a different level.
+
+Example:
+
+- a WRP migration document may be primarilyL3,
+a WRP migration document may be primarilyL3,
+
+- but its implementation checklist section may be chunked asL1.
+but its implementation checklist section may be chunked asL1.
+
+## 10.4 Edge neutrality rule
+
+Cross-reference edges should belevel-neutral by default.The edge describes the relationship; the source and target nodes carry the abstraction level.
+
+---
+
+# 11. Recommended Level Mapping for the Initial WRP Corpus
+
+## 11.1 WRP v1.0 Protocol Formalization
+
+Default document level:L2
+
+Reasoning:
+
+- it defines subsystem protocol semantics and normative message shape;
+it defines subsystem protocol semantics and normative message shape;
+
+- it is not merely implementation detail;
+it is not merely implementation detail;
+
+- it is narrower than whole-system doctrine.
+it is narrower than whole-system doctrine.
+
+Typical chunk-level overrides:
+
+- formal field definitions / JSON examples / schema tables →L1
+formal field definitions / JSON examples / schema tables →L1
+
+- rationale for protocol boundaries →L3
+rationale for protocol boundaries →L3
+
+## 11.2 WRP v1.1 DAG Data Model & Compilation Pipeline
+
+Default document level:L2
+
+Typical chunk-level overrides:
+
+- compilation algorithm pseudocode →L2
+compilation algorithm pseudocode →L2
+
+- concrete data structures / storage tables / code mapping →L1
+concrete data structures / storage tables / code mapping →L1
+
+- rationale for DAG compilation as separate phase →L3
+rationale for DAG compilation as separate phase →L3
+
+## 11.3 WRP v1.2 Execution Traversal Engine
+
+Default document level:L2
+
+Typical chunk-level overrides:
+
+- ExecutionContext,ExecutionCursor,ExecutionReceiptstructures →L1orL2depending on specificity
+ExecutionContext,ExecutionCursor,ExecutionReceiptstructures →L1orL2depending on specificity
+
+- traversal invariants / isolation rules →L2
+traversal invariants / isolation rules →L2
+
+- rationale for deterministic traversal and experimental modes →L3
+rationale for deterministic traversal and experimental modes →L3
+
+## 11.4 WRP Migration Plan
+
+Default document level:L3
+
+Reasoning:
+
+- migration is a cross-cutting architectural transition strategy;
+migration is a cross-cutting architectural transition strategy;
+
+- the document explains sequencing, compatibility, and rollout discipline.
+the document explains sequencing, compatibility, and rollout discipline.
+
+Typical chunk-level overrides:
+
+- actual migration tasks and repo changes →L1
+actual migration tasks and repo changes →L1
+
+- compatibility matrix / rollout constraints →L2
+compatibility matrix / rollout constraints →L2
+
+- migration philosophy and sequencing rationale →L3
+migration philosophy and sequencing rationale →L3
+
+---
+
+# 12. Nebula Data Model Extensions
+
+This section defines the required schema extensions to Nebula’s markdown-derived corpus.
+
+---
+
+# 13. Target Nebula Entities
+
+The projection model assumes the following logical entities exist or will exist:
+
+- nebula_documents
+nebula_documents
+
+- nebula_chunks
+nebula_chunks
+
+- nebula_cross_references
+nebula_cross_references
+
+Optionally:
+
+- nebula_artifacts
+nebula_artifacts
+
+- nebula_open_questions
+nebula_open_questions
+
+- nebula_execution_links
+nebula_execution_links

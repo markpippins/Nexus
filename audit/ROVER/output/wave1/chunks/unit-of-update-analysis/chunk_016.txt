@@ -1,0 +1,236 @@
+I think this isthearchitectural question underneath everything you've been building.There are several candidates, and they produce radically different systems.Unit of UpdateWhat ChangesConsequenceDocumentintent.md, architecture.md, etc.Easy, but loses causalityFactIndividual KG triplesGood retrieval, weak execution historyThoughtA reasoning artifactHard to validate, very model-dependentEventSomething happenedExcellent auditability, poor semantic structure aloneDecisionArchitectural conclusion changedCaptures governance but not implementationWorkRequestIntent to perform workCaptures planning but not resulting stateState ProjectionMaterialized view of realityEasy to consume, hard to explain provenanceWhat I've noticed from your recent evolution is that you're drifting toward a very specific answer:The unit of storage is not the same as the unit of update.Most systems accidentally conflate those.Event Sourcing AnswerIf you follow the CIR/phantom/resolution path, the natural update unit is:EventEvent├─ observed├─ inferred├─ decided├─ executed└─ verifiedEvery mutation becomes an append.But you've already discovered the limitation:A million events doesn't tell you what matters.Governance AnswerPEB/PGE is increasingly about governance.From that perspective:Decisionis the unit of update.Decision:D-1024Statement:Service Broker owns request routing.Status:approvedSupersedes:D-1008Everything else becomes evidence.This is essentially ADRs turned into a living graph.The problem:You lose operational history.Execution AnswerThe WorkRequest discussions point somewhere else.Intent↓WorkRequest↓Plan↓Execution↓ReceiptA WorkRequest is the smallest thing that can explainwhysomething happened.Events explainwhathappened.WorkRequests explainwhy.That is a profound distinction.The Answer I Think You're CirclingIf I map everything you've described over the last few days:PGE = governance memoryExecution Context = causal historyWorkRequest IR = executable intentCIRs = unresolved semantic pressureReceipts = proofThen the actual update unit is probably:WorkRequest LifecycleNot the WorkRequest document itself.Something like:WR-847 createdWR-847 plannedWR-847 approvedWR-847 executedWR-847 verifiedWR-847 supersededEvery transition emits events.Every transition may create decisions.Every transition may mutate documents.Every transition may update projections.But the thing you're really tracking is:"The state evolution of an intention."That's why I suspect renaming PEB → PGE matters.A "brain" updates thoughts.A governance engine updates commitments.And commitments are represented by WorkRequests.Which leads to a possible formulation:Storage Unit:EventSemantic Unit:FactGovernance Unit:DecisionExecution Unit:WorkRequestUpdate Unit:WorkRequest State TransitionIf you adopt that model, a lot of the recent pieces suddenly line up:CIR appears↓WorkRequest created↓Plan generated↓Decision approved↓Execution occurs↓Receipt recorded↓PGE projections updatedAnd now every update in the system can be reduced to a single invariant:The only thing that actually changes the system is a transition in the lifecycle of a WorkRequest.Everything else becomes evidence, projection, or derived state. That feels very close to where your architecture has been converging over the last week.
+
+I think this isthearchitectural question underneath everything you've been building.
+
+There are several candidates, and they produce radically different systems.
+
+Unit of UpdateWhat ChangesConsequenceDocumentintent.md, architecture.md, etc.Easy, but loses causalityFactIndividual KG triplesGood retrieval, weak execution historyThoughtA reasoning artifactHard to validate, very model-dependentEventSomething happenedExcellent auditability, poor semantic structure aloneDecisionArchitectural conclusion changedCaptures governance but not implementationWorkRequestIntent to perform workCaptures planning but not resulting stateState ProjectionMaterialized view of realityEasy to consume, hard to explain provenance
+
+Unit of UpdateWhat ChangesConsequenceDocumentintent.md, architecture.md, etc.Easy, but loses causalityFactIndividual KG triplesGood retrieval, weak execution historyThoughtA reasoning artifactHard to validate, very model-dependentEventSomething happenedExcellent auditability, poor semantic structure aloneDecisionArchitectural conclusion changedCaptures governance but not implementationWorkRequestIntent to perform workCaptures planning but not resulting stateState ProjectionMaterialized view of realityEasy to consume, hard to explain provenance
+
+What I've noticed from your recent evolution is that you're drifting toward a very specific answer:
+
+> The unit of storage is not the same as the unit of update.
+
+The unit of storage is not the same as the unit of update.
+
+Most systems accidentally conflate those.
+
+---
+
+### Event Sourcing Answer
+
+If you follow the CIR/phantom/resolution path, the natural update unit is:
+
+Event
+
+```
+Event ├─ observed ├─ inferred ├─ decided ├─ executed └─ verified
+```
+
+```
+Event ├─ observed ├─ inferred ├─ decided ├─ executed └─ verified
+```
+
+Every mutation becomes an append.
+
+But you've already discovered the limitation:
+
+A million events doesn't tell you what matters.
+
+---
+
+### Governance Answer
+
+PEB/PGE is increasingly about governance.
+
+From that perspective:
+
+Decisionis the unit of update.
+
+```
+Decision:  D-1024Statement:  Service Broker owns request routing.Status:  approvedSupersedes:  D-1008
+```
+
+```
+Decision:  D-1024Statement:  Service Broker owns request routing.Status:  approvedSupersedes:  D-1008
+```
+
+Everything else becomes evidence.
+
+This is essentially ADRs turned into a living graph.
+
+The problem:
+
+You lose operational history.
+
+---
+
+### Execution Answer
+
+The WorkRequest discussions point somewhere else.
+
+```
+Intent  ↓WorkRequest  ↓Plan  ↓Execution  ↓Receipt
+```
+
+```
+Intent  ↓WorkRequest  ↓Plan  ↓Execution  ↓Receipt
+```
+
+A WorkRequest is the smallest thing that can explainwhysomething happened.
+
+Events explainwhathappened.
+
+WorkRequests explainwhy.
+
+That is a profound distinction.
+
+---
+
+### The Answer I Think You're Circling
+
+If I map everything you've described over the last few days:
+
+- PGE = governance memory
+PGE = governance memory
+
+- Execution Context = causal history
+Execution Context = causal history
+
+- WorkRequest IR = executable intent
+WorkRequest IR = executable intent
+
+- CIRs = unresolved semantic pressure
+CIRs = unresolved semantic pressure
+
+- Receipts = proof
+Receipts = proof
+
+Then the actual update unit is probably:
+
+```
+WorkRequest Lifecycle
+```
+
+```
+WorkRequest Lifecycle
+```
+
+Not the WorkRequest document itself.
+
+Something like:
+
+```
+WR-847 createdWR-847 plannedWR-847 approvedWR-847 executedWR-847 verifiedWR-847 superseded
+```
+
+```
+WR-847 createdWR-847 plannedWR-847 approvedWR-847 executedWR-847 verifiedWR-847 superseded
+```
+
+Every transition emits events.
+
+Every transition may create decisions.
+
+Every transition may mutate documents.
+
+Every transition may update projections.
+
+But the thing you're really tracking is:
+
+> "The state evolution of an intention."
+
+"The state evolution of an intention."
+
+---
+
+That's why I suspect renaming PEB → PGE matters.
+
+A "brain" updates thoughts.
+
+A governance engine updates commitments.
+
+And commitments are represented by WorkRequests.
+
+Which leads to a possible formulation:
+
+```
+Storage Unit:    EventSemantic Unit:    FactGovernance Unit:    DecisionExecution Unit:    WorkRequestUpdate Unit:    WorkRequest State Transition
+```
+
+```
+Storage Unit:    EventSemantic Unit:    FactGovernance Unit:    DecisionExecution Unit:    WorkRequestUpdate Unit:    WorkRequest State Transition
+```
+
+If you adopt that model, a lot of the recent pieces suddenly line up:
+
+```
+CIR appears    ↓WorkRequest created    ↓Plan generated    ↓Decision approved    ↓Execution occurs    ↓Receipt recorded    ↓PGE projections updated
+```
+
+```
+CIR appears    ↓WorkRequest created    ↓Plan generated    ↓Decision approved    ↓Execution occurs    ↓Receipt recorded    ↓PGE projections updated
+```
+
+And now every update in the system can be reduced to a single invariant:
+
+> The only thing that actually changes the system is a transition in the lifecycle of a WorkRequest.
+
+The only thing that actually changes the system is a transition in the lifecycle of a WorkRequest.
+
+Everything else becomes evidence, projection, or derived state. That feels very close to where your architecture has been converging over the last week.
+
+Gravitee Topco LimitedSponsoredGovern MCP Tool AccessSecure MCP access. Enforce identity, policy, and visibility for every agent with Gravitee.
+
+Gravitee Topco LimitedSponsoredGovern MCP Tool AccessSecure MCP access. Enforce identity, policy, and visibility for every agent with Gravitee.
+
+Gravitee Topco LimitedSponsoredGovern MCP Tool AccessSecure MCP access. Enforce identity, policy, and visibility for every agent with Gravitee.
+
+Gravitee Topco LimitedSponsoredGovern MCP Tool AccessSecure MCP access. Enforce identity, policy, and visibility for every agent with Gravitee.
+
+Gravitee Topco LimitedSponsored
+
+Gravitee Topco LimitedSponsored
+
+Gravitee Topco LimitedSponsored
+
+Gravitee Topco LimitedSponsored
+
+Gravitee Topco Limited
+
+Sponsored
+
+Govern MCP Tool AccessSecure MCP access. Enforce identity, policy, and visibility for every agent with Gravitee.
+
+Govern MCP Tool AccessSecure MCP access. Enforce identity, policy, and visibility for every agent with Gravitee.
+
+Govern MCP Tool AccessSecure MCP access. Enforce identity, policy, and visibility for every agent with Gravitee.
+
+Govern MCP Tool Access
+
+Secure MCP access. Enforce identity, policy, and visibility for every agent with Gravitee.
+
+You said:OK, so we got the harness thing straight, working out Temporal Worker stuff now.
+
+#### You said:
+
+OK, so we got the harness thing straight, working out Temporal Worker stuff now.
+
+OK, so we got the harness thing straight, working out Temporal Worker stuff now.
+
+OK, so we got the harness thing straight, working out Temporal Worker stuff now.
+
+OK, so we got the harness thing straight, working out Temporal Worker stuff now.
+
+OK, so we got the harness thing straight, working out Temporal Worker stuff now.
+
+OK, so we got the harness thing straight, working out Temporal Worker stuff now.
+
+OK, so we got the harness thing straight, working out Temporal Worker stuff now.
+
+ChatGPT said:Good—Temporal is actually a pretty clean way toforcethe answer you just asked.If you squint at Temporal, it already makes a decision for you:The unit of update is theWorkflow Event History, not your domain objects.But you don’t want to stop there—you want to map it to your system model.1. The key alignmentTemporal gives you three layers:Workflow (state machine over time)Activities (side effects)Event History (append-only truth)Your system already has:WorkRequest (intent object)Execution Receipt (proof)PGE/PEB (governance memory)CIRs (semantic pressure events)So the clean mapping is:Your systemTemporal equivalentWorkRequestWorkflowPlan stepChild workflow / deterministic decisionExecution stepActivityReceiptActivity result eventPGE updateWorkflow state snapshot projectionCIRExternal signal / workflow signal2. The real answer hiding inside TemporalTemporal quietly enforces this invariant:Theonly mutable thing is workflow state, and it changes only via events.So your “unit of update” inside a Temporal-backed system becomes:Workflow Event (append-only transition)But that’s still too low-level for your architecture.So you lift it:3. Your system’s correct abstraction layerGiven everything you’ve been building, the clean stack becomes:Level 0 — Physical truthTemporal Event HistoryLevel 1 — Execution truthActivity completion / failuredeterministic workflow transitionsLevel 2 — Domain truth (this is your key layer)WorkRequest State TransitionLevel 3 — Governance truthDecision (PGE / PEB updates)4. The important design insightTemporalwantsyou to think:“What is the workflow doing?”Your systemwants:“What is the intention doing over its lifecycle?”So you actually get a very sharp conclusion:Your unit of update is:A WorkRequest state transition, materialized as a Temporal workflow eventEverything else is derivation.5. Where this gets interesting (for your architecture)This is where your previous “harness” thinking locks in:If your harness sits above Temporal workers, it should NOT:mutate state directlywrite to PGE directlyinterpret execution results directlyInstead it should only:emit or interpretWorkRequest transitionsSo your harness becomes:Harness→ starts workflow (WorkRequest created)→ triggers plan (transition)→ triggers execution (activity)→ records receipt (transition)→ emits governance update (derived)6. One subtle but important correctionA lot of people make this mistake with Temporal:“Workflow history is the unit of truth”In your system that is incomplete.Because you also have:semantic reconciliation (CIR resolution)governance updates (PGE)multi-agent interpretationSo the corrected statement is:Workflow history is themechanism, not thesemantic unitBottom lineIf you anchor it cleanly:The unit of update is aWorkRequest lifecycle transition, implemented as aTemporal workflow event, and projected into multiple views (execution, governance, knowledge).Everything else in your architecture becomes consistent once that is fixed.If you want, next step is interesting:we candefine the exactWorker contract boundary(what belongs in Temporal activities vs what belongs in your kernel/harness), because that’s usually where these systems either become elegant or turn into spaghetti.Sources
+
+#### ChatGPT said:
+
+Good—Temporal is actually a pretty clean way toforcethe answer you just asked.If you squint at Temporal, it already makes a decision for you:The unit of update is theWorkflow Event History, not your domain objects.But you don’t want to stop there—you want to map it to your system model.1. The key alignmentTemporal gives you three layers:Workflow (state machine over time)Activities (side effects)Event History (append-only truth)Your system already has:WorkRequest (intent object)Execution Receipt (proof)PGE/PEB (governance memory)CIRs (semantic pressure events)So the clean mapping is:Your systemTemporal equivalentWorkRequestWorkflowPlan stepChild workflow / deterministic decisionExecution stepActivityReceiptActivity result eventPGE updateWorkflow state snapshot projectionCIRExternal signal / workflow signal2. The real answer hiding inside TemporalTemporal quietly enforces this invariant:Theonly mutable thing is workflow state, and it changes only via events.So your “unit of update” inside a Temporal-backed system becomes:Workflow Event (append-only transition)But that’s still too low-level for your architecture.So you lift it:3. Your system’s correct abstraction layerGiven everything you’ve been building, the clean stack becomes:Level 0 — Physical truthTemporal Event HistoryLevel 1 — Execution truthActivity completion / failuredeterministic workflow transitionsLevel 2 — Domain truth (this is your key layer)WorkRequest State TransitionLevel 3 — Governance truthDecision (PGE / PEB updates)4. The important design insightTemporalwantsyou to think:“What is the workflow doing?”Your systemwants:“What is the intention doing over its lifecycle?”So you actually get a very sharp conclusion:Your unit of update is:A WorkRequest state transition, materialized as a Temporal workflow eventEverything else is derivation.5. Where this gets interesting (for your architecture)This is where your previous “harness” thinking locks in:If your harness sits above Temporal workers, it should NOT:mutate state directlywrite to PGE directlyinterpret execution results directlyInstead it should only:emit or interpretWorkRequest transitionsSo your harness becomes:Harness→ starts workflow (WorkRequest created)→ triggers plan (transition)→ triggers execution (activity)→ records receipt (transition)→ emits governance update (derived)6. One subtle but important correctionA lot of people make this mistake with Temporal:“Workflow history is the unit of truth”In your system that is incomplete.Because you also have:semantic reconciliation (CIR resolution)governance updates (PGE)multi-agent interpretationSo the corrected statement is:Workflow history is themechanism, not thesemantic unitBottom lineIf you anchor it cleanly:The unit of update is aWorkRequest lifecycle transition, implemented as aTemporal workflow event, and projected into multiple views (execution, governance, knowledge).Everything else in your architecture becomes consistent once that is fixed.If you want, next step is interesting:we candefine the exactWorker contract boundary(what belongs in Temporal activities vs what belongs in your kernel/harness), because that’s usually where these systems either become elegant or turn into spaghetti.Sources

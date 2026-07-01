@@ -1,0 +1,113 @@
+{
+  "source": "WRP DAG Planning Guidance.html",
+  "slug": "wrp-dag-planning-guidance",
+  "total_chunks": 21,
+  "total_chars": 322924,
+  "chunks": [
+    {
+      "index": 1,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_001.txt",
+      "size": 16031
+    },
+    {
+      "index": 2,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_002.txt",
+      "size": 16014
+    },
+    {
+      "index": 3,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_003.txt",
+      "size": 16014
+    },
+    {
+      "index": 4,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_004.txt",
+      "size": 19431
+    },
+    {
+      "index": 5,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_005.txt",
+      "size": 8042
+    },
+    {
+      "index": 6,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_006.txt",
+      "size": 16854
+    },
+    {
+      "index": 7,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_007.txt",
+      "size": 15055
+    },
+    {
+      "index": 8,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_008.txt",
+      "size": 15022
+    },
+    {
+      "index": 9,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_009.txt",
+      "size": 14864
+    },
+    {
+      "index": 10,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_010.txt",
+      "size": 14864
+    },
+    {
+      "index": 11,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_011.txt",
+      "size": 14816
+    },
+    {
+      "index": 12,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_012.txt",
+      "size": 14816
+    },
+    {
+      "index": 13,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_013.txt",
+      "size": 19184
+    },
+    {
+      "index": 14,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_014.txt",
+      "size": 17358
+    },
+    {
+      "index": 15,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_015.txt",
+      "size": 16799
+    },
+    {
+      "index": 16,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_016.txt",
+      "size": 16724
+    },
+    {
+      "index": 17,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_017.txt",
+      "size": 19992
+    },
+    {
+      "index": 18,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_018.txt",
+      "size": 19375
+    },
+    {
+      "index": 19,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_019.txt",
+      "size": 16510
+    },
+    {
+      "index": 20,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_020.txt",
+      "size": 19930
+    },
+    {
+      "index": 21,
+      "path": "chunks/wrp-dag-planning-guidance/chunk_021.txt",
+      "size": 2859
+    }
+  ]
+}

@@ -1,0 +1,868 @@
+New chatCtrlShiftOSearch chatsCtrlK
+
+- New chatCtrlShiftO
+New chat
+
+New chat
+
+New chat
+
+CtrlShiftO
+
+CtrlShiftO
+
+- Search chatsCtrlK
+Search chats
+
+Search chats
+
+Search chats
+
+CtrlK
+
+CtrlK
+
+Library
+
+Library
+
+Apps
+
+Apps
+
+More
+
+More
+
+More
+
+More
+
+PinnedLinkedInNexus Work Request PipelineNodeMessage Normalization & TrajectoriesLOSM Architecture AssessmentEvent Pipeline EvaluationSelf-Extending Architecture ConceptBuzzwords by LayerAI Engineering Survival Skills
+
+Pinned
+
+## Pinned
+
+- LinkedIn
+LinkedIn
+
+LinkedIn
+
+LinkedIn
+
+LinkedIn
+
+- Nexus Work Request Pipeline
+Nexus Work Request Pipeline
+
+Nexus Work Request Pipeline
+
+Nexus Work Request Pipeline
+
+Nexus Work Request Pipeline
+
+- Node
+Node
+
+Node
+
+Node
+
+Node
+
+- Message Normalization & Trajectories
+Message Normalization & Trajectories
+
+Message Normalization & Trajectories
+
+Message Normalization & Trajectories
+
+- LOSM Architecture Assessment
+LOSM Architecture Assessment
+
+LOSM Architecture Assessment
+
+LOSM Architecture Assessment
+
+- Event Pipeline Evaluation
+Event Pipeline Evaluation
+
+Event Pipeline Evaluation
+
+Event Pipeline Evaluation
+
+- Self-Extending Architecture Concept
+Self-Extending Architecture Concept
+
+Self-Extending Architecture Concept
+
+Self-Extending Architecture Concept
+
+- Buzzwords by Layer
+Buzzwords by Layer
+
+Buzzwords by Layer
+
+Buzzwords by Layer
+
+- AI Engineering Survival Skills
+AI Engineering Survival Skills
+
+AI Engineering Survival Skills
+
+AI Engineering Survival Skills
+
+ProjectsPrompt Architect / LERONexus Active StepNexushomelabPythonShow more
+
+Projects
+
+## Projects
+
+- Prompt Architect / LERO
+Prompt Architect / LERO
+
+Prompt Architect / LERO
+
+Prompt Architect / LERO
+
+Prompt Architect / LERO
+
+- Nexus Active Step
+Nexus Active Step
+
+Nexus Active Step
+
+Nexus Active Step
+
+Nexus Active Step
+
+- Nexus
+Nexus
+
+Nexus
+
+Nexus
+
+Nexus
+
+- homelab
+homelab
+
+homelab
+
+homelab
+
+homelab
+
+- Python
+Python
+
+Python
+
+Python
+
+Python
+
+- Show more
+Show more
+
+Show more
+
+ChatsUnit of Update AnalysisGemini and Conduit ArchitectureSystem Documentation EvolutionQwen as EngineerTester Role in QABigPickle and NebulaBP Knowledge Graph StoreBP Analysis Role InsightsSelf-audit in Agent RuntimePro Flash Planning ModelPEB MCP Server DesignNebula System Info ExpansionCross-modal Reference DetectionPEB Cognitive GovernanceAgenda Generator for DeepSeekCognitive Compiler ArchitectureNebula Architecture EvolutionStatistical Sampling BiasFirst Day GuidanceLean as Spec ToolWhiteboard to SpecSemantically Encoded MarkdownAI vs Code StructureEvent System DesignTemporal in Conduit IntegrationATDD OverviewWireframe for Voyager and OthersAI Naming StrategiesBug Tracking ArchitectureAG-UI and Nexus IntegrationSpaCy in NexusQwen3.5:27b BenefitsBoundary Contract MismatchCoffee and Migration CheckOllama Performance AdvancesAttenArchitecture Missteps and SolutionsConvex to Postgres TestConduit and WRP IntegrationDocLang AI StandardDeepSeek critique analysisState Triangulation ProblemWork Requests and PlansFile Sync vs DatabaseAI Societies and GovernanceConduit Refactoring DiscussionPlurality and Agent DisagreementConduit EvolutionCompany Name FeedbackNexus Conduit MigrationDeterminism vs Probabilism in AIChatbox Development ChallengesPrometheux Concepts APIAgent-initiated ConversationsConduit RGEM SpecModel Role AssignmentInference and Persistent LearningSemantic Adapter LayerNexus Avatar Design IdeasCLI Agent PersistenceOpenCode Process LeakSystem Accretion CascadeWorkflow Engine vs AgentsUses of LuaContract Firewall ExplanationProvenance Engine RefinementResume gap narrativeNext Phase Prioritiesfs-crawler-v2-implementationGrounded Semantic Indexingpipeline-manager-updatesNexus development focusNaming Spring AI HostRate limit strategiesSliding Window Rate LimiterKanban UI for Loose PipesCCNF Normalization vs ParsingParser updates and normalizationNATS to LOSM MorphismLOSM Morphism EvolutionChat Backup SolutionsToken Usage Increase FactorsChat Event Models AnalysisReimplementing with Solr.Inference vs Deterministic WorkflowsSOPs vs Decision TreesClaude 4.8 Tool IssueAI Deployment ROI AnalysisTech System ConstraintsLLM as Nexus UserSystem Architecture ProgressAgent Governance InsightsCodex Token Usage InsightsMicrosoft Fabric Cost ReasonsService Registry Cleanupmultiuser and authfs-crawler-v2Rux Language Release InsightsGovernance and AI InsightsAI Governance and ArchitectureTDD for Complex SystemsGovernance over Recursive AutonomyJSON-LD for DSIDECodex and Universal AutomationSystem Architecture ComparisonLangGraph vs TemporalLangChain in RAGVenture Capital GuidancePDF Analysis RequestDeployment Properties InferenceLOSM Architecture AssessmentAI Adoption and ConstraintsUnifying Overlapping DisciplinesEvent-Sourced CoreRoebuck Content AnalysisSubscription Choice ComparisonAI Interaction ContinuityBuilding Competence through ActionEnterprise Integration in BallerinaCode Review ImplicationsAI Governance DriftMultiuser Pipeline StrategyAI Model OrchestrationProject Folder Date IssueGemini Behavior AnalysisBounded Semantic ProjectionKernel Validation and InvariantsLOSM Architecture AnalysisSerialCron and DataSaverRouta GitHub AnalysisAI Career BootcampsPi Integration and WorkflowAgent Development ChallengesSBC Cluster InventoryArchitect-Builder Pattern InsightsAgentic System ArchitectureCompiler Design CoursesModel behavior and promptsCopilotKit and AI IntegrationResume Entry Improvement
+
+Chats
+
+## Chats
+
+Unit of Update AnalysisGemini and Conduit ArchitectureSystem Documentation EvolutionQwen as EngineerTester Role in QABigPickle and NebulaBP Knowledge Graph StoreBP Analysis Role InsightsSelf-audit in Agent RuntimePro Flash Planning ModelPEB MCP Server DesignNebula System Info ExpansionCross-modal Reference DetectionPEB Cognitive GovernanceAgenda Generator for DeepSeekCognitive Compiler ArchitectureNebula Architecture EvolutionStatistical Sampling BiasFirst Day GuidanceLean as Spec ToolWhiteboard to SpecSemantically Encoded MarkdownAI vs Code StructureEvent System DesignTemporal in Conduit IntegrationATDD OverviewWireframe for Voyager and OthersAI Naming StrategiesBug Tracking ArchitectureAG-UI and Nexus IntegrationSpaCy in NexusQwen3.5:27b BenefitsBoundary Contract MismatchCoffee and Migration CheckOllama Performance AdvancesAttenArchitecture Missteps and SolutionsConvex to Postgres TestConduit and WRP IntegrationDocLang AI StandardDeepSeek critique analysisState Triangulation ProblemWork Requests and PlansFile Sync vs DatabaseAI Societies and GovernanceConduit Refactoring DiscussionPlurality and Agent DisagreementConduit EvolutionCompany Name FeedbackNexus Conduit MigrationDeterminism vs Probabilism in AIChatbox Development ChallengesPrometheux Concepts APIAgent-initiated ConversationsConduit RGEM SpecModel Role AssignmentInference and Persistent LearningSemantic Adapter LayerNexus Avatar Design IdeasCLI Agent PersistenceOpenCode Process LeakSystem Accretion CascadeWorkflow Engine vs AgentsUses of LuaContract Firewall ExplanationProvenance Engine RefinementResume gap narrativeNext Phase Prioritiesfs-crawler-v2-implementationGrounded Semantic Indexingpipeline-manager-updatesNexus development focusNaming Spring AI HostRate limit strategiesSliding Window Rate LimiterKanban UI for Loose PipesCCNF Normalization vs ParsingParser updates and normalizationNATS to LOSM MorphismLOSM Morphism EvolutionChat Backup SolutionsToken Usage Increase FactorsChat Event Models AnalysisReimplementing with Solr.Inference vs Deterministic WorkflowsSOPs vs Decision TreesClaude 4.8 Tool IssueAI Deployment ROI AnalysisTech System ConstraintsLLM as Nexus UserSystem Architecture ProgressAgent Governance InsightsCodex Token Usage InsightsMicrosoft Fabric Cost ReasonsService Registry Cleanupmultiuser and authfs-crawler-v2Rux Language Release InsightsGovernance and AI InsightsAI Governance and ArchitectureTDD for Complex SystemsGovernance over Recursive AutonomyJSON-LD for DSIDECodex and Universal AutomationSystem Architecture ComparisonLangGraph vs TemporalLangChain in RAGVenture Capital GuidancePDF Analysis RequestDeployment Properties InferenceLOSM Architecture AssessmentAI Adoption and ConstraintsUnifying Overlapping DisciplinesEvent-Sourced CoreRoebuck Content AnalysisSubscription Choice ComparisonAI Interaction ContinuityBuilding Competence through ActionEnterprise Integration in BallerinaCode Review ImplicationsAI Governance DriftMultiuser Pipeline StrategyAI Model OrchestrationProject Folder Date IssueGemini Behavior AnalysisBounded Semantic ProjectionKernel Validation and InvariantsLOSM Architecture AnalysisSerialCron and DataSaverRouta GitHub AnalysisAI Career BootcampsPi Integration and WorkflowAgent Development ChallengesSBC Cluster InventoryArchitect-Builder Pattern InsightsAgentic System ArchitectureCompiler Design CoursesModel behavior and promptsCopilotKit and AI IntegrationResume Entry Improvement
+
+- Unit of Update Analysis
+Unit of Update Analysis
+
+Unit of Update Analysis
+
+- Gemini and Conduit Architecture
+Gemini and Conduit Architecture
+
+Gemini and Conduit Architecture
+
+- System Documentation Evolution
+System Documentation Evolution
+
+System Documentation Evolution
+
+- Qwen as Engineer
+Qwen as Engineer
+
+Qwen as Engineer
+
+- Tester Role in QA
+Tester Role in QA
+
+Tester Role in QA
+
+- BigPickle and Nebula
+BigPickle and Nebula
+
+BigPickle and Nebula
+
+- BP Knowledge Graph Store
+BP Knowledge Graph Store
+
+BP Knowledge Graph Store
+
+- BP Analysis Role Insights
+BP Analysis Role Insights
+
+BP Analysis Role Insights
+
+- Self-audit in Agent Runtime
+Self-audit in Agent Runtime
+
+Self-audit in Agent Runtime
+
+- Pro Flash Planning Model
+Pro Flash Planning Model
+
+Pro Flash Planning Model
+
+- PEB MCP Server Design
+PEB MCP Server Design
+
+PEB MCP Server Design
+
+- Nebula System Info Expansion
+Nebula System Info Expansion
+
+Nebula System Info Expansion
+
+- Cross-modal Reference Detection
+Cross-modal Reference Detection
+
+Cross-modal Reference Detection
+
+- PEB Cognitive Governance
+PEB Cognitive Governance
+
+PEB Cognitive Governance
+
+- Agenda Generator for DeepSeek
+Agenda Generator for DeepSeek
+
+Agenda Generator for DeepSeek
+
+- Cognitive Compiler Architecture
+Cognitive Compiler Architecture
+
+Cognitive Compiler Architecture
+
+- Nebula Architecture Evolution
+Nebula Architecture Evolution
+
+Nebula Architecture Evolution
+
+- Statistical Sampling Bias
+Statistical Sampling Bias
+
+Statistical Sampling Bias
+
+- First Day Guidance
+First Day Guidance
+
+First Day Guidance
+
+- Lean as Spec Tool
+Lean as Spec Tool
+
+Lean as Spec Tool
+
+- Whiteboard to Spec
+Whiteboard to Spec
+
+Whiteboard to Spec
+
+- Semantically Encoded Markdown
+Semantically Encoded Markdown
+
+Semantically Encoded Markdown
+
+- AI vs Code Structure
+AI vs Code Structure
+
+AI vs Code Structure
+
+- Event System Design
+Event System Design
+
+Event System Design
+
+- Temporal in Conduit Integration
+Temporal in Conduit Integration
+
+Temporal in Conduit Integration
+
+- ATDD Overview
+ATDD Overview
+
+ATDD Overview
+
+- Wireframe for Voyager and Others
+Wireframe for Voyager and Others
+
+Wireframe for Voyager and Others
+
+- AI Naming Strategies
+AI Naming Strategies
+
+AI Naming Strategies
+
+- Bug Tracking Architecture
+Bug Tracking Architecture
+
+Bug Tracking Architecture
+
+- AG-UI and Nexus Integration
+AG-UI and Nexus Integration
+
+AG-UI and Nexus Integration
+
+- SpaCy in Nexus
+SpaCy in Nexus
+
+SpaCy in Nexus
+
+- Qwen3.5:27b Benefits
+Qwen3.5:27b Benefits
+
+Qwen3.5:27b Benefits
+
+- Boundary Contract Mismatch
+Boundary Contract Mismatch
+
+Boundary Contract Mismatch
+
+- Coffee and Migration Check
+Coffee and Migration Check
+
+Coffee and Migration Check
+
+- Ollama Performance Advances
+Ollama Performance Advances
+
+Ollama Performance Advances
+
+- Atten
+Atten
+
+Atten
+
+- Architecture Missteps and Solutions
+Architecture Missteps and Solutions
+
+Architecture Missteps and Solutions
+
+- Convex to Postgres Test
+Convex to Postgres Test
+
+Convex to Postgres Test
+
+- Conduit and WRP Integration
+Conduit and WRP Integration
+
+Conduit and WRP Integration
+
+- DocLang AI Standard
+DocLang AI Standard
+
+DocLang AI Standard
+
+- DeepSeek critique analysis
+DeepSeek critique analysis
+
+DeepSeek critique analysis
+
+- State Triangulation Problem
+State Triangulation Problem
+
+State Triangulation Problem
+
+- Work Requests and Plans
+Work Requests and Plans
+
+Work Requests and Plans
+
+- File Sync vs Database
+File Sync vs Database
+
+File Sync vs Database
+
+- AI Societies and Governance
+AI Societies and Governance
+
+AI Societies and Governance
+
+- Conduit Refactoring Discussion
+Conduit Refactoring Discussion
+
+Conduit Refactoring Discussion
+
+- Plurality and Agent Disagreement
+Plurality and Agent Disagreement
+
+Plurality and Agent Disagreement
+
+- Conduit Evolution
+Conduit Evolution
+
+Conduit Evolution
+
+- Company Name Feedback
+Company Name Feedback
+
+Company Name Feedback
+
+- Nexus Conduit Migration
+Nexus Conduit Migration
+
+Nexus Conduit Migration
+
+- Determinism vs Probabilism in AI
+Determinism vs Probabilism in AI
+
+Determinism vs Probabilism in AI
+
+- Chatbox Development Challenges
+Chatbox Development Challenges
+
+Chatbox Development Challenges
+
+- Prometheux Concepts API
+Prometheux Concepts API
+
+Prometheux Concepts API
+
+- Agent-initiated Conversations
+Agent-initiated Conversations
+
+Agent-initiated Conversations
+
+- Conduit RGEM Spec
+Conduit RGEM Spec
+
+Conduit RGEM Spec
+
+- Model Role Assignment
+Model Role Assignment
+
+Model Role Assignment
+
+- Inference and Persistent Learning
+Inference and Persistent Learning
+
+Inference and Persistent Learning
+
+- Semantic Adapter Layer
+Semantic Adapter Layer
+
+Semantic Adapter Layer
+
+- Nexus Avatar Design Ideas
+Nexus Avatar Design Ideas
+
+Nexus Avatar Design Ideas
+
+- CLI Agent Persistence
+CLI Agent Persistence
+
+CLI Agent Persistence
+
+- OpenCode Process Leak
+OpenCode Process Leak
+
+OpenCode Process Leak
+
+- System Accretion Cascade
+System Accretion Cascade
+
+System Accretion Cascade
+
+- Workflow Engine vs Agents
+Workflow Engine vs Agents
+
+Workflow Engine vs Agents
+
+- Uses of Lua
+Uses of Lua
+
+Uses of Lua
+
+- Contract Firewall Explanation
+Contract Firewall Explanation
+
+Contract Firewall Explanation
+
+- Provenance Engine Refinement
+Provenance Engine Refinement
+
+Provenance Engine Refinement
+
+- Resume gap narrative
+Resume gap narrative
+
+Resume gap narrative
+
+- Next Phase Priorities
+Next Phase Priorities
+
+Next Phase Priorities
+
+- fs-crawler-v2-implementation
+fs-crawler-v2-implementation
+
+fs-crawler-v2-implementation
+
+- Grounded Semantic Indexing
+Grounded Semantic Indexing
+
+Grounded Semantic Indexing
+
+- pipeline-manager-updates
+pipeline-manager-updates
+
+pipeline-manager-updates
+
+- Nexus development focus
+Nexus development focus
+
+Nexus development focus
+
+- Naming Spring AI Host
+Naming Spring AI Host
+
+Naming Spring AI Host
+
+- Rate limit strategies
+Rate limit strategies
+
+Rate limit strategies
+
+- Sliding Window Rate Limiter
+Sliding Window Rate Limiter
+
+Sliding Window Rate Limiter
+
+- Kanban UI for Loose Pipes
+Kanban UI for Loose Pipes
+
+Kanban UI for Loose Pipes
+
+- CCNF Normalization vs Parsing
+CCNF Normalization vs Parsing
+
+CCNF Normalization vs Parsing
+
+- Parser updates and normalization
+Parser updates and normalization
+
+Parser updates and normalization
+
+- NATS to LOSM Morphism
+NATS to LOSM Morphism
+
+NATS to LOSM Morphism
+
+- LOSM Morphism Evolution
+LOSM Morphism Evolution
+
+LOSM Morphism Evolution
+
+- Chat Backup Solutions
+Chat Backup Solutions
+
+Chat Backup Solutions
+
+- Token Usage Increase Factors
+Token Usage Increase Factors
+
+Token Usage Increase Factors
+
+- Chat Event Models Analysis
+Chat Event Models Analysis
+
+Chat Event Models Analysis
+
+- Reimplementing with Solr.
+Reimplementing with Solr.
+
+Reimplementing with Solr.
+
+- Inference vs Deterministic Workflows
+Inference vs Deterministic Workflows
+
+Inference vs Deterministic Workflows
+
+- SOPs vs Decision Trees
+SOPs vs Decision Trees
+
+SOPs vs Decision Trees
+
+- Claude 4.8 Tool Issue
+Claude 4.8 Tool Issue
+
+Claude 4.8 Tool Issue
+
+- AI Deployment ROI Analysis
+AI Deployment ROI Analysis
+
+AI Deployment ROI Analysis
+
+- Tech System Constraints
+Tech System Constraints
+
+Tech System Constraints
+
+- LLM as Nexus User
+LLM as Nexus User
+
+LLM as Nexus User
+
+- System Architecture Progress
+System Architecture Progress
+
+System Architecture Progress
+
+- Agent Governance Insights
+Agent Governance Insights
+
+Agent Governance Insights
+
+- Codex Token Usage Insights
+Codex Token Usage Insights
+
+Codex Token Usage Insights
+
+- Microsoft Fabric Cost Reasons
+Microsoft Fabric Cost Reasons
+
+Microsoft Fabric Cost Reasons
+
+- Service Registry Cleanup
+Service Registry Cleanup
+
+Service Registry Cleanup
+
+- multiuser and auth
+multiuser and auth
+
+multiuser and auth
+
+- fs-crawler-v2
+fs-crawler-v2
+
+fs-crawler-v2
+
+- Rux Language Release Insights
+Rux Language Release Insights
+
+Rux Language Release Insights
+
+- Governance and AI Insights
+Governance and AI Insights
+
+Governance and AI Insights
+
+- AI Governance and Architecture
+AI Governance and Architecture
+
+AI Governance and Architecture
+
+- TDD for Complex Systems
+TDD for Complex Systems
+
+TDD for Complex Systems
+
+- Governance over Recursive Autonomy
+Governance over Recursive Autonomy
+
+Governance over Recursive Autonomy
+
+- JSON-LD for DSIDE
+JSON-LD for DSIDE
+
+JSON-LD for DSIDE
+
+- Codex and Universal Automation
+Codex and Universal Automation
+
+Codex and Universal Automation
+
+- System Architecture Comparison
+System Architecture Comparison
+
+System Architecture Comparison
+
+- LangGraph vs Temporal
+LangGraph vs Temporal
+
+LangGraph vs Temporal
+
+- LangChain in RAG
+LangChain in RAG
+
+LangChain in RAG
+
+- Venture Capital Guidance
+Venture Capital Guidance
+
+Venture Capital Guidance
+
+- PDF Analysis Request
+PDF Analysis Request
+
+PDF Analysis Request
+
+- Deployment Properties Inference
+Deployment Properties Inference
+
+Deployment Properties Inference
+
+- LOSM Architecture Assessment
+LOSM Architecture Assessment
+
+LOSM Architecture Assessment
+
+- AI Adoption and Constraints
+AI Adoption and Constraints
+
+AI Adoption and Constraints
+
+- Unifying Overlapping Disciplines
+Unifying Overlapping Disciplines
+
+Unifying Overlapping Disciplines
+
+- Event-Sourced Core
+Event-Sourced Core
+
+Event-Sourced Core
+
+- Roebuck Content Analysis
+Roebuck Content Analysis
+
+Roebuck Content Analysis
+
+- Subscription Choice Comparison
+Subscription Choice Comparison
+
+Subscription Choice Comparison
+
+- AI Interaction Continuity
+AI Interaction Continuity
+
+AI Interaction Continuity
+
+- Building Competence through Action
+Building Competence through Action
+
+Building Competence through Action
+
+- Enterprise Integration in Ballerina
+Enterprise Integration in Ballerina
+
+Enterprise Integration in Ballerina
+
+- Code Review Implications
+Code Review Implications
+
+Code Review Implications
+
+- AI Governance Drift
+AI Governance Drift
+
+AI Governance Drift
+
+- Multiuser Pipeline Strategy
+Multiuser Pipeline Strategy
+
+Multiuser Pipeline Strategy
+
+- AI Model Orchestration
+AI Model Orchestration
+
+AI Model Orchestration
+
+- Project Folder Date Issue
+Project Folder Date Issue
+
+Project Folder Date Issue
+
+- Gemini Behavior Analysis
+Gemini Behavior Analysis
+
+Gemini Behavior Analysis
+
+- Bounded Semantic Projection
+Bounded Semantic Projection
+
+Bounded Semantic Projection
+
+- Kernel Validation and Invariants
+Kernel Validation and Invariants
+
+Kernel Validation and Invariants
+
+- LOSM Architecture Analysis
+LOSM Architecture Analysis
+
+LOSM Architecture Analysis
+
+- SerialCron and DataSaver
+SerialCron and DataSaver
+
+SerialCron and DataSaver
+
+- Routa GitHub Analysis
+Routa GitHub Analysis
+
+Routa GitHub Analysis
+
+- AI Career Bootcamps
+AI Career Bootcamps
+
+AI Career Bootcamps
+
+- Pi Integration and Workflow
+Pi Integration and Workflow
+
+Pi Integration and Workflow
+
+- Agent Development Challenges
+Agent Development Challenges
+
+Agent Development Challenges
+
+- SBC Cluster Inventory
+SBC Cluster Inventory
+
+SBC Cluster Inventory
+
+- Architect-Builder Pattern Insights
+Architect-Builder Pattern Insights
+
+Architect-Builder Pattern Insights
+
+- Agentic System Architecture
+Agentic System Architecture
+
+Agentic System Architecture
+
+- Compiler Design Courses
+Compiler Design Courses
+
+Compiler Design Courses
+
+- Model behavior and prompts
+Model behavior and prompts
+
+Model behavior and prompts

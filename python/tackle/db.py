@@ -51,18 +51,18 @@ def _http_get(path: str) -> Any:
         return None
 
 
-# ── Role config cache (TTL-based) ──────────────────────────────────
+# ── Role config cache (per-role TTL-based) ─────────────────────────
+#
+# Cache entries: { role: {"data": cfg_dict, "time": timestamp} }
+# Each role has its own TTL so accessing one role never masks another.
 
-_RoleConfigCache: Optional[Dict[str, Any]] = None
-_RoleConfigCacheTime: float = 0
+_RoleConfigCache: Dict[str, Dict[str, Any]] = {}
 _ROLE_CONFIG_TTL: int = 60  # seconds
 
 
 def _invalidate_cache():
     """Force the cache to refresh on the next lookup."""
-    global _RoleConfigCache, _RoleConfigCacheTime
-    _RoleConfigCache = None
-    _RoleConfigCacheTime = 0
+    _RoleConfigCache.clear()
 
 
 # ── Role config lookup ─────────────────────────────────────────────
@@ -76,29 +76,29 @@ def get_role_config(role: str) -> Optional[Dict[str, Any]]:
         fallback_models (list of dicts)
 
     Or ``None`` if no config is found.
-    Results are cached for ``_ROLE_CONFIG_TTL`` seconds.
+    Results are cached per-role for ``_ROLE_CONFIG_TTL`` seconds.
     """
-    global _RoleConfigCache, _RoleConfigCacheTime
     now = time.time()
 
-    # Check cache first
-    if _RoleConfigCache is not None and (now - _RoleConfigCacheTime) < _ROLE_CONFIG_TTL:
-        return _RoleConfigCache.get(role)
+    # Check per-role cache first
+    cached = _RoleConfigCache.get(role)
+    if cached is not None and (now - cached["time"]) < _ROLE_CONFIG_TTL:
+        return cached["data"]
 
     # Cache miss — fetch the resolved config
     data = _http_get(f"/config/ai/resolve/{role}")
     if data is None:
-        # Tackle-mcp may be down — try returning stale cache
-        if _RoleConfigCache is not None:
-            cached = _RoleConfigCache.get(role)
-            if cached is not None:
-                _log.warning("get_role_config: tackle-mcp unreachable, returning stale cache for role=%s", role)
-                return cached
+        # Tackle-mcp may be down — try returning stale cache for this role
+        if cached is not None:
+            _log.warning("get_role_config: tackle-mcp unreachable, returning stale cache for role=%s", role)
+            return cached["data"]
         return None
 
     # Reshape to match what agent_chat expects
     cfg = {
         "model_identifier": data.get("model_identifier", ""),
+        "provider_id": data.get("provider_id", ""),
+        "provider_name": data.get("provider_name", ""),
         "provider_type": data.get("provider_type", ""),
         "api_key": data.get("api_key") or "",
         "endpoint_url": data.get("endpoint_url") or "",
@@ -107,11 +107,8 @@ def get_role_config(role: str) -> Optional[Dict[str, Any]]:
         "fallback_models": data.get("fallback_models", []),
     }
 
-    # Update cache with this single role (backward compat: cache is role -> config)
-    if _RoleConfigCache is None:
-        _RoleConfigCache = {}
-    _RoleConfigCache[role] = cfg
-    _RoleConfigCacheTime = now
+    # Per-role cache entry with its own timestamp
+    _RoleConfigCache[role] = {"data": cfg, "time": now}
 
     return cfg
 
@@ -119,11 +116,11 @@ def get_role_config(role: str) -> Optional[Dict[str, Any]]:
 def get_all_role_configs() -> Dict[str, Any]:
     """Return all cached role configs, or empty dict if nothing cached.
 
-    Note: unlike the old conduit approach, this module caches per-role
-    (lazy-loads on first access).  Calling this method will return only
-    roles that have been accessed since the last cache reset.
+    Note: this module caches per-role (lazy-loads on first access).
+    Calling this method will return only roles that have been accessed
+    since the last cache reset or TTL expiry.
     """
-    return _RoleConfigCache or {}
+    return {r: e["data"] for r, e in _RoleConfigCache.items()}
 
 
 # ── Fallback model lookup ──────────────────────────────────────────

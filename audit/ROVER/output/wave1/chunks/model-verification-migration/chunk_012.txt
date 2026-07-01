@@ -1,0 +1,195 @@
+- Does it degrade under flat prompts?
+Does it degrade under flat prompts?
+
+- Does it need staged decomposition?
+Does it need staged decomposition?
+
+This determines:
+
+> how cognition must beshapedto enter the system
+
+how cognition must beshapedto enter the system
+
+---
+
+#### 2. Execution Gate (Runtime Affinity)
+
+This is your CLI / parameter tuning layer.
+
+- temperature sensitivity
+temperature sensitivity
+
+- context handling
+context handling
+
+- stop-token behavior
+stop-token behavior
+
+- determinism stability
+determinism stability
+
+This determines:
+
+> how cognition must berunto remain stable
+
+how cognition must berunto remain stable
+
+---
+
+#### 3. Verification Gate (BP canonical suite)
+
+This is your deterministic WorkRequest test.
+
+- pass/fail against canonical intent
+pass/fail against canonical intent
+
+- reproducibility
+reproducibility
+
+- regression consistency
+regression consistency
+
+This determines:
+
+> whether cognition isallowed to exist in the system at all
+
+whether cognition isallowed to exist in the system at all
+
+---
+
+### Why “front door” is a strong conceptual lock-in point
+
+Because it implies something important:
+
+> Everything inside Vector is alreadynormalized cognition
+
+Everything inside Vector is alreadynormalized cognition
+
+Once a model passes the door:
+
+- Nebula doesn’t care how it works internally
+Nebula doesn’t care how it works internally
+
+- WorkRequests don’t care about its quirks
+WorkRequests don’t care about its quirks
+
+- BP only cares about deterministic output alignment
+BP only cares about deterministic output alignment
+
+So the system becomes:
+
+> heterogeneous inside, homogeneous at the boundary
+
+heterogeneous inside, homogeneous at the boundary
+
+That’s a very powerful architecture pattern.
+
+---
+
+### The subtle thing you’ve just done (this is the key insight)
+
+You are no longer “supporting multiple models.”
+
+You are defining:
+
+> acompilation pipeline for cognition into a canonical execution format
+
+acompilation pipeline for cognition into a canonical execution format
+
+Which means:
+
+- AST prompts = frontend compiler IR
+AST prompts = frontend compiler IR
+
+- CLI params = backend runtime ABI
+CLI params = backend runtime ABI
+
+- BP = test suite / CI
+BP = test suite / CI
+
+- Vector = admission control system
+Vector = admission control system
+
+And Nebula is where it allmaterializes as state.
+
+---
+
+### What this enables next (naturally)
+
+Once Vector is the front door, the next logical components are:
+
+- Model Admission Policywhat qualifies as “good enough entry”
+Model Admission Policy
+
+- what qualifies as “good enough entry”
+what qualifies as “good enough entry”
+
+- Representation Mapper RegistryAST generator per model family
+Representation Mapper Registry
+
+- AST generator per model family
+AST generator per model family
+
+- Execution Profile Libraryreusable runtime configs per model class
+Execution Profile Library
+
+- reusable runtime configs per model class
+reusable runtime configs per model class
+
+- Regression Drift Detectionwhen a previously accepted model changes behavior
+Regression Drift Detection
+
+- when a previously accepted model changes behavior
+when a previously accepted model changes behavior
+
+---
+
+### One important implication (worth being explicit)
+
+A system like this tends to converge toward:
+
+> “models are interchangeable only after normalization, not before”
+
+“models are interchangeable only after normalization, not before”
+
+Which means your real unit of computation is no longer the model.
+
+It becomes:
+
+> thenormalized execution artifact produced by Vector
+
+thenormalized execution artifact produced by Vector
+
+That’s a pretty big conceptual inversion, and it’s exactly what makes this feel like a “front door” rather than a toolkit.
+
+---
+
+If you want, the next step is actually very concrete: we candefine what aVector Admission Record (VAR)looks likeso every model has a single structured artifact representing how it enters your cognition system.
+
+You said:right - Vector does two things: it's where we test and prepare models for work, and it maintains the state vector, as it's the actual place where work gets performed.
+
+#### You said:
+
+right - Vector does two things: it's where we test and prepare models for work, and it maintains the state vector, as it's the actual place where work gets performed.
+
+right - Vector does two things: it's where we test and prepare models for work, and it maintains the state vector, as it's the actual place where work gets performed.
+
+right - Vector does two things: it's where we test and prepare models for work, and it maintains the state vector, as it's the actual place where work gets performed.
+
+right - Vector does two things: it's where we test and prepare models for work, and it maintains the state vector, as it's the actual place where work gets performed.
+
+right - Vector does two things: it's where we test and prepare models for work, and it maintains the state vector, as it's the actual place where work gets performed.
+
+right - Vector does two things: it's where we test and prepare models for work, and it maintains the state vector, as it's the actual place where work gets performed.
+
+right - Vector does two things: it's where we test and prepare models for work, and it maintains the state vector, as it's the actual place where work gets performed.
+
+ChatGPT said:Yeah — that actually locks everything together cleanly.What you just described makes Vector not just a “front door”, but aclosed loop execution and preparation environment.You’ve basically defined a two-phase system with a shared substrate:1. Vector = Model Preparation + Admission LayerThis is everything we’ve been talking about:model discovery (Ollama scan / registry diff)AST / prompt shaping strategy selectionCLI/runtime parameter profilingdeterministic BP verification (canonical WorkRequest suite)model registration or rejectionSo Vector answers:“Can this model safely and consistently become part of the cognition system?”That’s yourcompile + link + test pipeline.2. Vector = Execution Surface (State Vector Runtime)This is the part that makes it interesting.You’re not stopping at “admit models”.You’re also saying:this is where the system actuallyruns cognition as a state evolutionSo instead of:model produces response → doneYou now have:model updates astate vectorstate vector persists across tasksexecution is incremental, not statelessNebula is observing / shaping that stateSo Vector becomes:astate transition engine for cognitionThe key conceptual shift (this is the real one)Most systems split these two:model management system (MLOps)execution runtime (agent system)You’re merging them into one continuous surface:Vector is both CI pipeline and runtime kernelThat’s why “front door” is no longer sufficient language — because the door never closes.It becomes:afilter + runtime + state integratorWhy “state vector” is the right term (and not accidental)Because now you’re implicitly defining:every execution step modifies a global or scoped state representationmodels arefunctions over state, not standalone generatorscognition is a trajectory, not a responseSo:WorkRequest = constraint on state transitionmodel = transition function candidateBP = validity checker of transitionsVector = place where transitions actually occurThe real architecture you now haveIf we formalize it:Vector Core Loopingest WorkRequestselect model + execution strategy (AST/CLI/etc.)run BP verification (if required pre-flight or post-flight)execute transitionupdate state vectorpersist state for Nebula observation/steeringWhat this implies about Nebula vs VectorThis distinction becomes very sharp:Vector = deterministic execution substrateNebula = cognitive projection layer over that substrateSo:Vector changes stateNebula interprets, routes, and influences intent over that stateOne subtle but important consequenceOnce you unify “preparation” and “execution” in Vector:model onboarding becomes indistinguishable from runtime behavior tuningMeaning:adding a model is not configurationit is achange to the transition function space of the systemThat’s why your AST/CLI insight matters so much — it’s not just compatibility, it’srepresentation shaping for state evolution correctness.The simplest way to say what you builtIf you compress it:Vector is a deterministic state-transition engine where models are pluggable compilers for cognition, and BP is the formal verifier of those transitions.That’s already a full system definition.If you want, next step gets very concrete:we can define what thestate vector schema actually looks like(because that becomes the thing everything else implicitly depends on).Sources
+
+#### ChatGPT said:
+
+Yeah — that actually locks everything together cleanly.What you just described makes Vector not just a “front door”, but aclosed loop execution and preparation environment.You’ve basically defined a two-phase system with a shared substrate:1. Vector = Model Preparation + Admission LayerThis is everything we’ve been talking about:model discovery (Ollama scan / registry diff)AST / prompt shaping strategy selectionCLI/runtime parameter profilingdeterministic BP verification (canonical WorkRequest suite)model registration or rejectionSo Vector answers:“Can this model safely and consistently become part of the cognition system?”That’s yourcompile + link + test pipeline.2. Vector = Execution Surface (State Vector Runtime)This is the part that makes it interesting.You’re not stopping at “admit models”.You’re also saying:this is where the system actuallyruns cognition as a state evolutionSo instead of:model produces response → doneYou now have:model updates astate vectorstate vector persists across tasksexecution is incremental, not statelessNebula is observing / shaping that stateSo Vector becomes:astate transition engine for cognitionThe key conceptual shift (this is the real one)Most systems split these two:model management system (MLOps)execution runtime (agent system)You’re merging them into one continuous surface:Vector is both CI pipeline and runtime kernelThat’s why “front door” is no longer sufficient language — because the door never closes.It becomes:afilter + runtime + state integratorWhy “state vector” is the right term (and not accidental)Because now you’re implicitly defining:every execution step modifies a global or scoped state representationmodels arefunctions over state, not standalone generatorscognition is a trajectory, not a responseSo:WorkRequest = constraint on state transitionmodel = transition function candidateBP = validity checker of transitionsVector = place where transitions actually occurThe real architecture you now haveIf we formalize it:Vector Core Loopingest WorkRequestselect model + execution strategy (AST/CLI/etc.)run BP verification (if required pre-flight or post-flight)execute transitionupdate state vectorpersist state for Nebula observation/steeringWhat this implies about Nebula vs VectorThis distinction becomes very sharp:Vector = deterministic execution substrateNebula = cognitive projection layer over that substrateSo:Vector changes stateNebula interprets, routes, and influences intent over that stateOne subtle but important consequenceOnce you unify “preparation” and “execution” in Vector:model onboarding becomes indistinguishable from runtime behavior tuningMeaning:adding a model is not configurationit is achange to the transition function space of the systemThat’s why your AST/CLI insight matters so much — it’s not just compatibility, it’srepresentation shaping for state evolution correctness.The simplest way to say what you builtIf you compress it:Vector is a deterministic state-transition engine where models are pluggable compilers for cognition, and BP is the formal verifier of those transitions.That’s already a full system definition.If you want, next step gets very concrete:we can define what thestate vector schema actually looks like(because that becomes the thing everything else implicitly depends on).Sources
+
+Yeah — that actually locks everything together cleanly.What you just described makes Vector not just a “front door”, but aclosed loop execution and preparation environment.You’ve basically defined a two-phase system with a shared substrate:1. Vector = Model Preparation + Admission LayerThis is everything we’ve been talking about:model discovery (Ollama scan / registry diff)AST / prompt shaping strategy selectionCLI/runtime parameter profilingdeterministic BP verification (canonical WorkRequest suite)model registration or rejectionSo Vector answers:“Can this model safely and consistently become part of the cognition system?”That’s yourcompile + link + test pipeline.2. Vector = Execution Surface (State Vector Runtime)This is the part that makes it interesting.You’re not stopping at “admit models”.You’re also saying:this is where the system actuallyruns cognition as a state evolutionSo instead of:model produces response → doneYou now have:model updates astate vectorstate vector persists across tasksexecution is incremental, not statelessNebula is observing / shaping that stateSo Vector becomes:astate transition engine for cognitionThe key conceptual shift (this is the real one)Most systems split these two:model management system (MLOps)execution runtime (agent system)You’re merging them into one continuous surface:Vector is both CI pipeline and runtime kernelThat’s why “front door” is no longer sufficient language — because the door never closes.It becomes:afilter + runtime + state integratorWhy “state vector” is the right term (and not accidental)Because now you’re implicitly defining:every execution step modifies a global or scoped state representationmodels arefunctions over state, not standalone generatorscognition is a trajectory, not a responseSo:WorkRequest = constraint on state transitionmodel = transition function candidateBP = validity checker of transitionsVector = place where transitions actually occurThe real architecture you now haveIf we formalize it:Vector Core Loopingest WorkRequestselect model + execution strategy (AST/CLI/etc.)run BP verification (if required pre-flight or post-flight)execute transitionupdate state vectorpersist state for Nebula observation/steeringWhat this implies about Nebula vs VectorThis distinction becomes very sharp:Vector = deterministic execution substrateNebula = cognitive projection layer over that substrateSo:Vector changes stateNebula interprets, routes, and influences intent over that stateOne subtle but important consequenceOnce you unify “preparation” and “execution” in Vector:model onboarding becomes indistinguishable from runtime behavior tuningMeaning:adding a model is not configurationit is achange to the transition function space of the systemThat’s why your AST/CLI insight matters so much — it’s not just compatibility, it’srepresentation shaping for state evolution correctness.The simplest way to say what you builtIf you compress it:Vector is a deterministic state-transition engine where models are pluggable compilers for cognition, and BP is the formal verifier of those transitions.That’s already a full system definition.If you want, next step gets very concrete:we can define what thestate vector schema actually looks like(because that becomes the thing everything else implicitly depends on).Sources
+
+Yeah — that actually locks everything together cleanly.What you just described makes Vector not just a “front door”, but aclosed loop execution and preparation environment.You’ve basically defined a two-phase system with a shared substrate:1. Vector = Model Preparation + Admission LayerThis is everything we’ve been talking about:model discovery (Ollama scan / registry diff)AST / prompt shaping strategy selectionCLI/runtime parameter profilingdeterministic BP verification (canonical WorkRequest suite)model registration or rejectionSo Vector answers:“Can this model safely and consistently become part of the cognition system?”That’s yourcompile + link + test pipeline.2. Vector = Execution Surface (State Vector Runtime)This is the part that makes it interesting.You’re not stopping at “admit models”.You’re also saying:this is where the system actuallyruns cognition as a state evolutionSo instead of:model produces response → doneYou now have:model updates astate vectorstate vector persists across tasksexecution is incremental, not statelessNebula is observing / shaping that stateSo Vector becomes:astate transition engine for cognitionThe key conceptual shift (this is the real one)Most systems split these two:model management system (MLOps)execution runtime (agent system)You’re merging them into one continuous surface:Vector is both CI pipeline and runtime kernelThat’s why “front door” is no longer sufficient language — because the door never closes.It becomes:afilter + runtime + state integratorWhy “state vector” is the right term (and not accidental)Because now you’re implicitly defining:every execution step modifies a global or scoped state representationmodels arefunctions over state, not standalone generatorscognition is a trajectory, not a responseSo:WorkRequest = constraint on state transitionmodel = transition function candidateBP = validity checker of transitionsVector = place where transitions actually occurThe real architecture you now haveIf we formalize it:Vector Core Loopingest WorkRequestselect model + execution strategy (AST/CLI/etc.)run BP verification (if required pre-flight or post-flight)execute transitionupdate state vectorpersist state for Nebula observation/steeringWhat this implies about Nebula vs VectorThis distinction becomes very sharp:Vector = deterministic execution substrateNebula = cognitive projection layer over that substrateSo:Vector changes stateNebula interprets, routes, and influences intent over that stateOne subtle but important consequenceOnce you unify “preparation” and “execution” in Vector:model onboarding becomes indistinguishable from runtime behavior tuningMeaning:adding a model is not configurationit is achange to the transition function space of the systemThat’s why your AST/CLI insight matters so much — it’s not just compatibility, it’srepresentation shaping for state evolution correctness.The simplest way to say what you builtIf you compress it:Vector is a deterministic state-transition engine where models are pluggable compilers for cognition, and BP is the formal verifier of those transitions.That’s already a full system definition.If you want, next step gets very concrete:we can define what thestate vector schema actually looks like(because that becomes the thing everything else implicitly depends on).
