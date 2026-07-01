@@ -61,11 +61,12 @@ class UserAccessServiceIntegrationTest {
         UserRegistration user = new UserRegistration();
         user.setAlias("testuser");
         user.setEmail("test@example.com");
+        user.setIdentifier("testpass");
         user.setAdmin(true);
         userRepository.save(user);
 
         // When
-        UserRegistrationDTO result = userAccessService.validateUser("testuser", "ignored");
+        UserRegistrationDTO result = userAccessService.validateUser("testuser", "testpass");
 
         // Then
         assertNotNull(result);
@@ -89,11 +90,12 @@ class UserAccessServiceIntegrationTest {
         UserRegistration user = new UserRegistration();
         user.setAlias("integrationTestUser");
         user.setEmail("integration@test.com");
+        user.setIdentifier("testpass");
         user.setAdmin(false);
         UserRegistration savedUser = userRepository.save(user);
 
         // When
-        UserRegistrationDTO result = userAccessService.validateUser("integrationTestUser", "ignored");
+        UserRegistrationDTO result = userAccessService.validateUser("integrationTestUser", "testpass");
 
         // Then
         assertNotNull(result);

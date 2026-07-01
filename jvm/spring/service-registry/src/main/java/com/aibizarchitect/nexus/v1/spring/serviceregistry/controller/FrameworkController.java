@@ -6,7 +6,6 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,7 +22,6 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkRe
 
 @RestController
 @RequestMapping("/api/v1/frameworks")
-@CrossOrigin(origins = "*")
 public class FrameworkController {
 
     private static final Logger log = LoggerFactory.getLogger(FrameworkController.class);

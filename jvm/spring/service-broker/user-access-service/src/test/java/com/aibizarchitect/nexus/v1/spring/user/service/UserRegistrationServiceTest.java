@@ -32,13 +32,14 @@ class UserRegistrationServiceTest {
         validUser.setId(123L);
         validUser.setAlias("testUser");
         validUser.setEmail("test@example.com");
+        validUser.setIdentifier("testpass");
     }
 
     @Test
     void testLoginSuccess() {
         when(userRepository.findByAlias("testUser")).thenReturn(Optional.of(validUser));
 
-        UserRegistrationDTO result = userAccessService.validateUser("testUser", "ignored");
+        UserRegistrationDTO result = userAccessService.validateUser("testUser", "testpass");
 
         assertNotNull(result);
         assertEquals("123", result.getId());

@@ -39,6 +39,9 @@ public class UserRegistration implements Serializable {
     @Email(message = "Email should be valid")
     private String email;
 
+    @Column(nullable = false, length = 255)
+    private String identifier;
+
     @Column(nullable = false)
     private boolean admin = false;
 
@@ -71,11 +74,19 @@ public class UserRegistration implements Serializable {
     }
 
     public UserRegistration() {
+        this.identifier = "";
     }
 
     public UserRegistration(String alias, String email) {
         setAlias(alias);
         setEmail(email);
+        this.identifier = "";
+    }
+
+    public UserRegistration(String alias, String email, String identifier) {
+        setAlias(alias);
+        setEmail(email);
+        setIdentifier(identifier);
     }
 
     // Getters and Setters
@@ -117,6 +128,14 @@ public class UserRegistration implements Serializable {
 
     public void setCreatedAt(java.util.Date createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getIdentifier() {
+        return identifier;
+    }
+
+    public void setIdentifier(String identifier) {
+        this.identifier = identifier;
     }
 
     public java.util.Date getUpdatedAt() {
