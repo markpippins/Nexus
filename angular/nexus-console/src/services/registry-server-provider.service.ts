@@ -143,7 +143,6 @@ export class RegistryServerProvider implements TreeProvider {
             const terrainUrl = this.localConfigService.terrainServerUrl();
 
             // Always include System Health (connects directly to terrain server, no profile needed)
-            // and Data Dictionary (uses terrain for lookup tables).
             const nodes: TreeNode[] = [
                 {
                     id: `platform-health-terrain`,
@@ -157,16 +156,6 @@ export class RegistryServerProvider implements TreeProvider {
                         managementType: 'system-health',
                         baseUrl: terrainUrl
                     },
-                    lastUpdated: new Date()
-                },
-                {
-                    id: `platform-dictionary-terrain`,
-                    name: 'Data Dictionary',
-                    type: NodeType.FOLDER,
-                    icon: 'library_books',
-                    hasChildren: true,
-                    operations: [],
-                    metadata: {},
                     lastUpdated: new Date()
                 }
             ];
@@ -216,6 +205,16 @@ export class RegistryServerProvider implements TreeProvider {
                         hasChildren: false,
                         operations: ['manage-services'],
                         metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/services`, managementType: 'services' },
+                        lastUpdated: new Date()
+                    },
+                    {
+                        id: `platform-dictionary-${profile.id}`,
+                        name: 'Data Dictionary',
+                        type: NodeType.FOLDER,
+                        icon: 'library_books',
+                        hasChildren: true,
+                        operations: [],
+                        metadata: { hostProfileId: profile.id },
                         lastUpdated: new Date()
                     }
                 );
