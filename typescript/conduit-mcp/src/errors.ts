@@ -8,7 +8,8 @@ export type ErrorCode =
   | "PLAN_NOT_FOUND"
   | "TITLE_MISMATCH"
   | "PARSE_ERROR"
-  | "NEBULA_UNAVAILABLE";
+  | "NEBULA_UNAVAILABLE"
+  | "NOT_FOUND";
 
 export interface AppError {
   error: {
