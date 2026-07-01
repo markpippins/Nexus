@@ -1,8 +1,0 @@
-{
-  "service": "user-service",
-  "operation": "getUser",
-  "params": {
-    "id": "12345"
-  },
-  "requestId": "example-request-001"
-}
