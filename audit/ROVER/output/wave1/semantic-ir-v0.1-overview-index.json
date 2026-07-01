@@ -1,0 +1,213 @@
+{
+  "source": "Semantic IR v0.1 Overview.html",
+  "slug": "semantic-ir-v0.1-overview",
+  "total_chunks": 41,
+  "total_chars": 594379,
+  "chunks": [
+    {
+      "index": 1,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_001.txt",
+      "size": 11403
+    },
+    {
+      "index": 2,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_002.txt",
+      "size": 18441
+    },
+    {
+      "index": 3,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_003.txt",
+      "size": 11386
+    },
+    {
+      "index": 4,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_004.txt",
+      "size": 18441
+    },
+    {
+      "index": 5,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_005.txt",
+      "size": 11386
+    },
+    {
+      "index": 6,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_006.txt",
+      "size": 18441
+    },
+    {
+      "index": 7,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_007.txt",
+      "size": 11386
+    },
+    {
+      "index": 8,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_008.txt",
+      "size": 18441
+    },
+    {
+      "index": 9,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_009.txt",
+      "size": 19959
+    },
+    {
+      "index": 10,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_010.txt",
+      "size": 8751
+    },
+    {
+      "index": 11,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_011.txt",
+      "size": 19627
+    },
+    {
+      "index": 12,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_012.txt",
+      "size": 9509
+    },
+    {
+      "index": 13,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_013.txt",
+      "size": 19752
+    },
+    {
+      "index": 14,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_014.txt",
+      "size": 9634
+    },
+    {
+      "index": 15,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_015.txt",
+      "size": 19594
+    },
+    {
+      "index": 16,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_016.txt",
+      "size": 9476
+    },
+    {
+      "index": 17,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_017.txt",
+      "size": 19594
+    },
+    {
+      "index": 18,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_018.txt",
+      "size": 9476
+    },
+    {
+      "index": 19,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_019.txt",
+      "size": 19594
+    },
+    {
+      "index": 20,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_020.txt",
+      "size": 9476
+    },
+    {
+      "index": 21,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_021.txt",
+      "size": 19991
+    },
+    {
+      "index": 22,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_022.txt",
+      "size": 9476
+    },
+    {
+      "index": 23,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_023.txt",
+      "size": 19991
+    },
+    {
+      "index": 24,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_024.txt",
+      "size": 9476
+    },
+    {
+      "index": 25,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_025.txt",
+      "size": 19881
+    },
+    {
+      "index": 26,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_026.txt",
+      "size": 19816
+    },
+    {
+      "index": 27,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_027.txt",
+      "size": 19334
+    },
+    {
+      "index": 28,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_028.txt",
+      "size": 19945
+    },
+    {
+      "index": 29,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_029.txt",
+      "size": 19885
+    },
+    {
+      "index": 30,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_030.txt",
+      "size": 19727
+    },
+    {
+      "index": 31,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_031.txt",
+      "size": 19964
+    },
+    {
+      "index": 32,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_032.txt",
+      "size": 19663
+    },
+    {
+      "index": 33,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_033.txt",
+      "size": 16526
+    },
+    {
+      "index": 34,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_034.txt",
+      "size": 15941
+    },
+    {
+      "index": 35,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_035.txt",
+      "size": 13757
+    },
+    {
+      "index": 36,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_036.txt",
+      "size": 13602
+    },
+    {
+      "index": 37,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_037.txt",
+      "size": 19989
+    },
+    {
+      "index": 38,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_038.txt",
+      "size": 15612
+    },
+    {
+      "index": 39,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_039.txt",
+      "size": 16915
+    },
+    {
+      "index": 40,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_040.txt",
+      "size": 19971
+    },
+    {
+      "index": 41,
+      "path": "chunks/semantic-ir-v0.1-overview/chunk_041.txt",
+      "size": 2889
+    }
+  ]
+}

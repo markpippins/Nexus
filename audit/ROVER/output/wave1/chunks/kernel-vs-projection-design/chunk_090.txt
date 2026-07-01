@@ -1,0 +1,115 @@
+```
+1. validate PlanIR consistency2. reconcile cross-plan edges3. resolve identity conflicts4. construct global graph5. commit version bump
+```
+
+---
+
+# 🔒 9. Failure semantics (this ties back to your Q4)
+
+Now we can formalize it properly:
+
+## Plan failure
+
+- isolate to PlanIR
+isolate to PlanIR
+
+- does NOT affect Kernel
+does NOT affect Kernel
+
+## Kernel failure
+
+- aborts entire commit
+aborts entire commit
+
+- no partial global state
+no partial global state
+
+So:
+
+```
+PlanIR = tolerant foldKernelState = strict transactional fold
+```
+
+```
+PlanIR = tolerant foldKernelState = strict transactional fold
+```
+
+---
+
+# 🧠 10. Final mental model (the important one)
+
+Think of it like this:
+
+```
+LOSMIR      = source code (messy, redundant, partial)PlanIR      = compiled module (per namespace)KernelState = linked program (whole system)
+```
+
+```
+LOSMIR      = source code (messy, redundant, partial)PlanIR      = compiled module (per namespace)KernelState = linked program (whole system)
+```
+
+---
+
+# 🚀 Where this becomes interesting next
+
+Now that boundaries are clear, the next step (if you want to continue) is:
+
+### Define the actual KernelReducer signature:
+
+We can specify:
+
+```
+KernelReduce(  prev: KernelState,  delta: LOSMIR[]) → KernelState
+```
+
+```
+KernelReduce(  prev: KernelState,  delta: LOSMIR[]) → KernelState
+```
+
+AND:
+
+- incremental vs full recompute strategy
+incremental vs full recompute strategy
+
+- snapshotting strategy
+snapshotting strategy
+
+- GraphIndex incremental update rules
+GraphIndex incremental update rules
+
+- PlanIR cache invalidation rules
+PlanIR cache invalidation rules
+
+---
+
+If you want, the next move is where this stops being architecture and becomesengine design:
+
+> incremental kernel folding (the difference between “works” and “scales”)
+
+incremental kernel folding (the difference between “works” and “scales”)
+
+You said:ok, go on
+
+#### You said:
+
+ok, go on
+
+ok, go on
+
+ok, go on
+
+ok, go on
+
+ok, go on
+
+ok, go on
+
+ok, go on
+
+ChatGPT said:Good — this is the point where the design stops being conceptual and becomes an execution engine.We’re going to definehow KernelReduce actually runs incrementally, because without that, everything we just defined collapses into “nice but expensive recomputation.”⚙️ 1. The real constraint you’re hittingIf you implement KernelReduce naively:KernelState = reduce(all LOSMIR every time)you get:correct systemunusable performance past trivial scaleSo the real question becomes:How do we make KernelReduce behave like a compiler withincremental builds, not batch recompilation?🧠 2. Key shift: KernelReduce is NOT a functionIt is astateful incremental engine with a pure coreSplit it:Pure core:    KernelReduce(snapshot, delta) → KernelState'Engine:       manages caching, invalidation, reuseSo we now have:pure semantics (deterministic)incremental execution layer (performance + caching)🧱 3. Introduce Kernel Delta Model (this is missing piece)Right now LOSMIR is just a stream.We refine it intoKernelDelta batches:TypeScripttypeKernelDelta={receipts:Receipt[];invalidations: {plans:PlanId[];nodes:NodeId[];edges:EdgeId[];};priority:"low"|"normal"|"high";};Why this mattersInstead of:recompute everythingyou now say:recompute only what was invalidated🔁 4. Incremental KernelReduce algorithmHere is the actual execution loop:KernelReduceEngine:input:prev KernelStatedelta KernelDeltasteps:1. Identify impacted PlanIds2. Invalidate PlanIR cache for those plans3. Rebuild only affected PlanIRs4. Merge PlanIR diff into KernelState5. Update GraphIndex incrementally6. Validate invariants7. Commit new KernelState version🧠 5. The critical optimization: PlanIR cachingYou do NOT recompute all PlanIRs every time.You maintain:TypeScriptPlanCache=Map<PlanId, {planIR:PlanIR,hash:string,receiptVersion:number}>So:If nothing changed in a plan:→ reuse PlanIR directly⚡ 6. Incremental PlanIR rebuild ruleOnly rebuild a PlanIR when:- new receipts exist for PlanId- cross-plan dependency invalidated it- upstream node superseded itThis is your first realdependency-aware cache invalidation system.🌐 7. Incremental GraphIndex (this is where most systems fail)Naive approach:→ rebuild graph every timeCorrect approach:→ apply edge diffsGraphDelta modelTypeScripttypeGraphDelta={addEdges:Edge[];removeEdges:Edge[];};GraphIndex update:GraphIndex(t+1) =GraphIndex(t)+ addEdges- removeEdgesNo traversal recomputation required.🧩 8. Kernel execution model (full pipeline)Now the system becomes:LOSMIR stream↓KernelDelta builder↓KernelReduceEngine↓┌─────────────────────────────┐│ 1. Impact Analysis           ││ 2. PlanIR cache reuse        ││ 3. Partial PlanIR rebuild    ││ 4. Graph delta apply         ││ 5. KernelState merge         ││ 6. invariant validation      │└─────────────────────────────┘↓KernelState (versioned)🔒 9. Versioning model (this fixes your Q6 properly)Now versioning is not just:version++It becomes structured:TypeScripttypeKernelVersion={major:number;// invariant changesminor:number;// structural changespatch:number;// delta-only updates}Rule:Change typeVersion bumpreceipt ingestionpatchplan structure changeminorinvariant violation changemajor🧠 10. Invalid state handling (important upgrade)Instead of “fail everything immediately,” you now get:TypeScripttypeKernelValidationResult={valid:boolean;errors:KernelError[];partialState?:KernelState;}BUT commit rule remains strict:only valid states are committedSo you get:diagnosticsbut no corruption🧭 11. The most important conceptual upgradeYou are no longer building:a reducerYou are building:aself-invalidating incremental semantic compilerKernelReduce is basically:Type-checker (PlanIR validation)Linker (GraphIndex)Optimizer (cache reuse)Runtime (state materialization)🚨 12. Where your existing code fits nowThis is the key alignment:Your WRPProjectionBuilder becomes:PlanIR builder (Phase 2 of Kernel pipeline)It does NOT change.It just becomes acacheable compiler stage.Your existing graph reducer becomes:GraphDelta producer (not full graph system)Your replay_engine becomes:LOSMIR → KernelDelta source🧠 Final mental model (this is the anchor)If you remember nothing else:LOSMIR        = input logPlanIR        = cached compilation unitKernelState   = linked global programKernelReduce  = incremental build system🚀 Next step (if you want to continue)Now we are at the point where the next meaningful layer is:👉 identity + cross-plan resolution modelThat’s where:supersession chainsentity mergingduplicate plan detectioncausal lineage graphsstart to matter.Or, if you prefer implementation direction:we can design:exact Python module layoutdataclass definitions for KernelDelta / GraphDeltaintegration path into your existing conduit reducerJust tell me which direction you want to push next.
+
+#### ChatGPT said:
+
+Good — this is the point where the design stops being conceptual and becomes an execution engine.We’re going to definehow KernelReduce actually runs incrementally, because without that, everything we just defined collapses into “nice but expensive recomputation.”⚙️ 1. The real constraint you’re hittingIf you implement KernelReduce naively:KernelState = reduce(all LOSMIR every time)you get:correct systemunusable performance past trivial scaleSo the real question becomes:How do we make KernelReduce behave like a compiler withincremental builds, not batch recompilation?🧠 2. Key shift: KernelReduce is NOT a functionIt is astateful incremental engine with a pure coreSplit it:Pure core:    KernelReduce(snapshot, delta) → KernelState'Engine:       manages caching, invalidation, reuseSo we now have:pure semantics (deterministic)incremental execution layer (performance + caching)🧱 3. Introduce Kernel Delta Model (this is missing piece)Right now LOSMIR is just a stream.We refine it intoKernelDelta batches:TypeScripttypeKernelDelta={receipts:Receipt[];invalidations: {plans:PlanId[];nodes:NodeId[];edges:EdgeId[];};priority:"low"|"normal"|"high";};Why this mattersInstead of:recompute everythingyou now say:recompute only what was invalidated🔁 4. Incremental KernelReduce algorithmHere is the actual execution loop:KernelReduceEngine:input:prev KernelStatedelta KernelDeltasteps:1. Identify impacted PlanIds2. Invalidate PlanIR cache for those plans3. Rebuild only affected PlanIRs4. Merge PlanIR diff into KernelState5. Update GraphIndex incrementally6. Validate invariants7. Commit new KernelState version🧠 5. The critical optimization: PlanIR cachingYou do NOT recompute all PlanIRs every time.You maintain:TypeScriptPlanCache=Map<PlanId, {planIR:PlanIR,hash:string,receiptVersion:number}>So:If nothing changed in a plan:→ reuse PlanIR directly⚡ 6. Incremental PlanIR rebuild ruleOnly rebuild a PlanIR when:- new receipts exist for PlanId- cross-plan dependency invalidated it- upstream node superseded itThis is your first realdependency-aware cache invalidation system.🌐 7. Incremental GraphIndex (this is where most systems fail)Naive approach:→ rebuild graph every timeCorrect approach:→ apply edge diffsGraphDelta modelTypeScripttypeGraphDelta={addEdges:Edge[];removeEdges:Edge[];};GraphIndex update:GraphIndex(t+1) =GraphIndex(t)+ addEdges- removeEdgesNo traversal recomputation required.🧩 8. Kernel execution model (full pipeline)Now the system becomes:LOSMIR stream↓KernelDelta builder↓KernelReduceEngine↓┌─────────────────────────────┐│ 1. Impact Analysis           ││ 2. PlanIR cache reuse        ││ 3. Partial PlanIR rebuild    ││ 4. Graph delta apply         ││ 5. KernelState merge         ││ 6. invariant validation      │└─────────────────────────────┘↓KernelState (versioned)🔒 9. Versioning model (this fixes your Q6 properly)Now versioning is not just:version++It becomes structured:TypeScripttypeKernelVersion={major:number;// invariant changesminor:number;// structural changespatch:number;// delta-only updates}Rule:Change typeVersion bumpreceipt ingestionpatchplan structure changeminorinvariant violation changemajor🧠 10. Invalid state handling (important upgrade)Instead of “fail everything immediately,” you now get:TypeScripttypeKernelValidationResult={valid:boolean;errors:KernelError[];partialState?:KernelState;}BUT commit rule remains strict:only valid states are committedSo you get:diagnosticsbut no corruption🧭 11. The most important conceptual upgradeYou are no longer building:a reducerYou are building:aself-invalidating incremental semantic compilerKernelReduce is basically:Type-checker (PlanIR validation)Linker (GraphIndex)Optimizer (cache reuse)Runtime (state materialization)🚨 12. Where your existing code fits nowThis is the key alignment:Your WRPProjectionBuilder becomes:PlanIR builder (Phase 2 of Kernel pipeline)It does NOT change.It just becomes acacheable compiler stage.Your existing graph reducer becomes:GraphDelta producer (not full graph system)Your replay_engine becomes:LOSMIR → KernelDelta source🧠 Final mental model (this is the anchor)If you remember nothing else:LOSMIR        = input logPlanIR        = cached compilation unitKernelState   = linked global programKernelReduce  = incremental build system🚀 Next step (if you want to continue)Now we are at the point where the next meaningful layer is:👉 identity + cross-plan resolution modelThat’s where:supersession chainsentity mergingduplicate plan detectioncausal lineage graphsstart to matter.Or, if you prefer implementation direction:we can design:exact Python module layoutdataclass definitions for KernelDelta / GraphDeltaintegration path into your existing conduit reducerJust tell me which direction you want to push next.
+
+Good — this is the point where the design stops being conceptual and becomes an execution engine.We’re going to definehow KernelReduce actually runs incrementally, because without that, everything we just defined collapses into “nice but expensive recomputation.”⚙️ 1. The real constraint you’re hittingIf you implement KernelReduce naively:KernelState = reduce(all LOSMIR every time)you get:correct systemunusable performance past trivial scaleSo the real question becomes:How do we make KernelReduce behave like a compiler withincremental builds, not batch recompilation?🧠 2. Key shift: KernelReduce is NOT a functionIt is astateful incremental engine with a pure coreSplit it:Pure core:    KernelReduce(snapshot, delta) → KernelState'Engine:       manages caching, invalidation, reuseSo we now have:pure semantics (deterministic)incremental execution layer (performance + caching)🧱 3. Introduce Kernel Delta Model (this is missing piece)Right now LOSMIR is just a stream.We refine it intoKernelDelta batches:TypeScripttypeKernelDelta={receipts:Receipt[];invalidations: {plans:PlanId[];nodes:NodeId[];edges:EdgeId[];};priority:"low"|"normal"|"high";};Why this mattersInstead of:recompute everythingyou now say:recompute only what was invalidated🔁 4. Incremental KernelReduce algorithmHere is the actual execution loop:KernelReduceEngine:input:prev KernelStatedelta KernelDeltasteps:1. Identify impacted PlanIds2. Invalidate PlanIR cache for those plans3. Rebuild only affected PlanIRs4. Merge PlanIR diff into KernelState5. Update GraphIndex incrementally6. Validate invariants7. Commit new KernelState version🧠 5. The critical optimization: PlanIR cachingYou do NOT recompute all PlanIRs every time.You maintain:TypeScriptPlanCache=Map<PlanId, {planIR:PlanIR,hash:string,receiptVersion:number}>So:If nothing changed in a plan:→ reuse PlanIR directly⚡ 6. Incremental PlanIR rebuild ruleOnly rebuild a PlanIR when:- new receipts exist for PlanId- cross-plan dependency invalidated it- upstream node superseded itThis is your first realdependency-aware cache invalidation system.🌐 7. Incremental GraphIndex (this is where most systems fail)Naive approach:→ rebuild graph every timeCorrect approach:→ apply edge diffsGraphDelta modelTypeScripttypeGraphDelta={addEdges:Edge[];removeEdges:Edge[];};GraphIndex update:GraphIndex(t+1) =GraphIndex(t)+ addEdges- removeEdgesNo traversal recomputation required.🧩 8. Kernel execution model (full pipeline)Now the system becomes:LOSMIR stream↓KernelDelta builder↓KernelReduceEngine↓┌─────────────────────────────┐│ 1. Impact Analysis           ││ 2. PlanIR cache reuse        ││ 3. Partial PlanIR rebuild    ││ 4. Graph delta apply         ││ 5. KernelState merge         ││ 6. invariant validation      │└─────────────────────────────┘↓KernelState (versioned)🔒 9. Versioning model (this fixes your Q6 properly)Now versioning is not just:version++It becomes structured:TypeScripttypeKernelVersion={major:number;// invariant changesminor:number;// structural changespatch:number;// delta-only updates}Rule:Change typeVersion bumpreceipt ingestionpatchplan structure changeminorinvariant violation changemajor🧠 10. Invalid state handling (important upgrade)Instead of “fail everything immediately,” you now get:TypeScripttypeKernelValidationResult={valid:boolean;errors:KernelError[];partialState?:KernelState;}BUT commit rule remains strict:only valid states are committedSo you get:diagnosticsbut no corruption🧭 11. The most important conceptual upgradeYou are no longer building:a reducerYou are building:aself-invalidating incremental semantic compilerKernelReduce is basically:Type-checker (PlanIR validation)Linker (GraphIndex)Optimizer (cache reuse)Runtime (state materialization)🚨 12. Where your existing code fits nowThis is the key alignment:Your WRPProjectionBuilder becomes:PlanIR builder (Phase 2 of Kernel pipeline)It does NOT change.It just becomes acacheable compiler stage.Your existing graph reducer becomes:GraphDelta producer (not full graph system)Your replay_engine becomes:LOSMIR → KernelDelta source🧠 Final mental model (this is the anchor)If you remember nothing else:LOSMIR        = input logPlanIR        = cached compilation unitKernelState   = linked global programKernelReduce  = incremental build system🚀 Next step (if you want to continue)Now we are at the point where the next meaningful layer is:👉 identity + cross-plan resolution modelThat’s where:supersession chainsentity mergingduplicate plan detectioncausal lineage graphsstart to matter.Or, if you prefer implementation direction:we can design:exact Python module layoutdataclass definitions for KernelDelta / GraphDeltaintegration path into your existing conduit reducerJust tell me which direction you want to push next.

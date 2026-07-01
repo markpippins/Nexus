@@ -1,0 +1,271 @@
+- chunk classification
+chunk classification
+
+- normative strength
+normative strength
+
+- cross-reference relation types
+cross-reference relation types
+
+- execution links
+execution links
+
+### 2. Canonical interpretation rules
+
+- NebulaArtifact= stable logical identity across document revisions
+NebulaArtifact= stable logical identity across document revisions
+
+- NebulaDocument= versioned authored/ingested long-form content
+NebulaDocument= versioned authored/ingested long-form content
+
+- NebulaChunk= retrievable semantic subdivision of a document
+NebulaChunk= retrievable semantic subdivision of a document
+
+- NebulaCrossReference= explicit semantic edge
+NebulaCrossReference= explicit semantic edge
+
+- NebulaExecutionLink= operational backlink into Conduit / receipts
+NebulaExecutionLink= operational backlink into Conduit / receipts
+
+### 3. Level rules
+
+- documents have default levels
+documents have default levels
+
+- chunks may override levels
+chunks may override levels
+
+- cross-reference edges donotown abstraction level semantically;sourceLevel/targetLevelare denormalized convenience projections
+cross-reference edges donotown abstraction level semantically;sourceLevel/targetLevelare denormalized convenience projections
+
+### 4. WRP artifact registry obligations
+
+- artifact keys are stable
+artifact keys are stable
+
+- document revisions supersede prior documents rather than mutating them in place
+document revisions supersede prior documents rather than mutating them in place
+
+- currentDocumentonNebulaArtifactpoints to the active canonical doc revision
+currentDocumentonNebulaArtifactpoints to the active canonical doc revision
+
+### 5. Retrieval implications
+
+- Builder → L1 + selective L2
+Builder → L1 + selective L2
+
+- Architect → L2/L3
+Architect → L2/L3
+
+- Inspector → L2/L3 + normative chunks
+Inspector → L2/L3 + normative chunks
+
+- Explorer → L2/L3/L4
+Explorer → L2/L3/L4
+
+---
+
+# A couple of things I would tighten in this JSON-LD before you wire it into code
+
+There aretwo immediate refinementsI’d make, because they’ll matter once you start projecting real WRP docs into Nebula.
+
+---
+
+# 1) Split ontology classes from seed instances
+
+Right now, for convenience, I included both:
+
+- theschema vocabulary
+theschema vocabulary
+
+- and theinitial four WRP artifact instances
+and theinitial four WRP artifact instances
+
+in one file.
+
+For the actual repo, I’d split that into:
+
+## A.schemas/core/nebula-level-stratification-and-wrp-artifacts.jsonld
+
+Only classes + properties + enums
+
+and then
+
+## B.data/nebula/bootstrap/wrp-artifacts.jsonld
+
+The four seeded artifact instances
+
+- wrp-v1-protocol
+wrp-v1-protocol
+
+- wrp-v1_1-dag
+wrp-v1_1-dag
+
+- wrp-v1_2-traversal
+wrp-v1_2-traversal
+
+- wrp-migration-plan
+wrp-migration-plan
+
+That separation is cleaner because the schema remains stable while the bootstrap artifact registry evolves.
+
+---
+
+# 2) Add an explicit retrieval-profile ontology
+
+Because you’ve now got a real level model, the next useful machine-readable layer is therole/query projection surface.
+
+I would make the next schema:
+
+# schemas/core/nebula-retrieval-profiles.jsonld
+
+with classes like:
+
+- RetrievalProfile
+RetrievalProfile
+
+- BuilderProfile
+BuilderProfile
+
+- ArchitectProfile
+ArchitectProfile
+
+- InspectorProfile
+InspectorProfile
+
+- ExplorerProfile
+ExplorerProfile
+
+and properties like:
+
+- allowedLevel
+allowedLevel
+
+- preferredChunkKind
+preferredChunkKind
+
+- preferredNormativeStrength
+preferredNormativeStrength
+
+- crossReferenceExpansionDepth
+crossReferenceExpansionDepth
+
+- allowExecutionRecencyBoost
+allowExecutionRecencyBoost
+
+- allowOpenQuestions
+allowOpenQuestions
+
+- allowRationaleChunks
+allowRationaleChunks
+
+That would let the “Inspector cares about JSON-LD” instinct become concrete: not just a role in prose, but a formal retrieval/projection contract over Nebula.
+
+---
+
+# My recommended next sequence from here
+
+Since you’ve already got the four WRP plans cooking in Conduit, I’d keep the companion artifacts tightly scoped and move in this order:
+
+## Next 1
+
+### data/nebula/bootstrap/wrp-artifacts.jsonld
+
+Seed the four WRP artifact instances separately from the ontology.
+
+## Next 2
+
+### schemas/core/nebula-retrieval-profiles.jsonld
+
+Formalize Builder / Architect / Inspector / Explorer retrieval profiles.
+
+## Next 3
+
+### docs/nebula/wrp-document-projection-rules.md
+
+A concrete importer spec:
+
+- markdown heading →sectionKey
+markdown heading →sectionKey
+
+- chunking rules
+chunking rules
+
+- level assignment heuristics
+level assignment heuristics
+
+- normative strength extraction
+normative strength extraction
+
+- cross-reference extraction rules
+cross-reference extraction rules
+
+## Next 4
+
+### schemas/core/nebula-cross-reference-relations.jsonld
+
+If you want the relation system to grow beyond WRP, pull relation types into their own ontology file.
+
+---
+
+If you want, I’ll go straight to the next one and writedata/nebula/bootstrap/wrp-artifacts.jsonldfirst, then the retrieval profile ontology after that.
+
+Sources
+
+Sources
+
+Sources
+
+ApryseSponsoredPreprocess Documents for RAG PipelinesTurn PDFs into clean structured data for retrieval-augmented generation pipelines.
+
+ApryseSponsoredPreprocess Documents for RAG PipelinesTurn PDFs into clean structured data for retrieval-augmented generation pipelines.
+
+ApryseSponsoredPreprocess Documents for RAG PipelinesTurn PDFs into clean structured data for retrieval-augmented generation pipelines.
+
+ApryseSponsoredPreprocess Documents for RAG PipelinesTurn PDFs into clean structured data for retrieval-augmented generation pipelines.
+
+ApryseSponsored
+
+ApryseSponsored
+
+ApryseSponsored
+
+ApryseSponsored
+
+Apryse
+
+Sponsored
+
+Preprocess Documents for RAG PipelinesTurn PDFs into clean structured data for retrieval-augmented generation pipelines.
+
+Preprocess Documents for RAG PipelinesTurn PDFs into clean structured data for retrieval-augmented generation pipelines.
+
+Preprocess Documents for RAG PipelinesTurn PDFs into clean structured data for retrieval-augmented generation pipelines.
+
+Preprocess Documents for RAG Pipelines
+
+Turn PDFs into clean structured data for retrieval-augmented generation pipelines.
+
+You said:sounds good, go ahead
+
+#### You said:
+
+sounds good, go ahead
+
+sounds good, go ahead
+
+sounds good, go ahead
+
+sounds good, go ahead
+
+sounds good, go ahead
+
+sounds good, go ahead
+
+sounds good, go ahead
+
+ChatGPT said:Perfect. I’ll do the next one as theseed/bootstrap artifact registry, keeping it cleanly separate from the ontology vocabulary.Below is arepo-ready first passfor:data/nebula/bootstrap/wrp-artifacts.jsonldJSON{"@context": {"@version":1.1,"id":"@id","type":"@type","xsd":"http://www.w3.org/2001/XMLSchema#","schema":"https://schema.org/","nebula":"https://nexus.example/schema/nebula/","wrp":"https://nexus.example/schema/wrp/","conduit":"https://nexus.example/schema/conduit/","title":"schema:name","text":"schema:text","createdAt": {"@id":"schema:dateCreated","@type":"xsd:dateTime"},"updatedAt": {"@id":"schema:dateModified","@type":"xsd:dateTime"},"NebulaArtifact":"nebula:NebulaArtifact","WRPProtocolArtifact":"wrp:WRPProtocolArtifact","WRPDagModelArtifact":"wrp:WRPDagModelArtifact","WRPExecutionEngineArtifact":"wrp:WRPExecutionEngineArtifact","WRPMigrationPlanArtifact":"wrp:WRPMigrationPlanArtifact","hasArtifactType": {"@id":"nebula:hasArtifactType","@type":"@id"},"artifactKey":"nebula:artifactKey","artifactVersion":"nebula:artifactVersion","defaultLevel": {"@id":"nebula:defaultLevel","@type":"@id"},"status": {"@id":"nebula:status","@type":"@id"},"currentDocument": {"@id":"nebula:currentDocument","@type":"@id"},"supersedes": {"@id":"nebula:supersedes","@type":"@id"},"conduitPlanId":"conduit:planId","conduitProjectKey":"conduit:projectKey","documentPath":"nebula:documentPath","notes":"nebula:notes"},"@graph": [{"id":"wrp:artifact/wrp-v1-protocol","type":"WRPProtocolArtifact","title":"WRP v1.0 Protocol Formalization","artifactKey":"wrp-v1-protocol","artifactVersion":"1.0","hasArtifactType":"nebula:WRP_PROTOCOL","defaultLevel":"nebula:L2","status":"nebula:ACTIVE","conduitPlanId":"CDT-WRP-001","conduitProjectKey":"WRP","documentPath":"docs/wrp/wrp-v1-protocol.md","notes":"Formal definition of WRP message shape, identity, versioning, semantics, and lifecycle assumptions."},{"id":"wrp:artifact/wrp-v1_1-dag","type":"WRPDagModelArtifact","title":"WRP v1.1 DAG Data Model and Compilation Pipeline","artifactKey":"wrp-v1_1-dag","artifactVersion":"1.1","hasArtifactType":"nebula:WRP_DAG_MODEL","defaultLevel":"nebula:L2","status":"nebula:ACTIVE","conduitPlanId":"CDT-WRP-002","conduitProjectKey":"WRP","documentPath":"docs/wrp/wrp-v1_1-dag-model-and-compilation-pipeline.md","notes":"Defines WRP DAG node/edge semantics, compilation from protocol requests into executable graph structures, and compilation invariants."},{"id":"wrp:artifact/wrp-v1_2-traversal","type":"WRPExecutionEngineArtifact","title":"WRP v1.2 Execution Traversal Engine","artifactKey":"wrp-v1_2-traversal","artifactVersion":"1.2","hasArtifactType":"nebula:WRP_EXECUTION_ENGINE","defaultLevel":"nebula:L2","status":"nebula:ACTIVE","conduitPlanId":"CDT-WRP-003","conduitProjectKey":"WRP","documentPath":"docs/wrp/wrp-v1_2-execution-traversal-engine.md","notes":"Defines traversal/execution semantics over the WRP DAG, including execution context, cursor/receipt behavior, deterministic traversal defaults, and isolation rules."},{"id":"wrp:artifact/wrp-migration-plan","type":"WRPMigrationPlanArtifact","title":"WRP Migration Plan","artifactKey":"wrp-migration-plan","artifactVersion":"2026-06","hasArtifactType":"nebula:WRP_MIGRATION_PLAN","defaultLevel":"nebula:L3","status":"nebula:ACTIVE","conduitPlanId":"CDT-WRP-004","conduitProjectKey":"WRP","documentPath":"docs/wrp/wrp-migration-plan.md","notes":"Defines staged migration of legacy work representations and runtime workflows into WRP, including compatibility constraints and rollout sequencing."}]}What I would tighten before wiring this into the importerThis seed file is good enough as abootstrap registry, but I’d makethree concrete adjustmentsbefore you treat it as durable input to the Nebula projector.1) Stop treatingconduitPlanIdas singularRight now I used:conduitPlanId: "CDT-WRP-001"That’s fine for the current four-plan packet, but it will age badly because one artifact will almost certainly end up being implemented bymultiple Conduit plans.For example:the traversal engine may split intotraversal corereceipt emissionvalidator hooksmigration shimsSo I would change the ontology and the bootstrap data to supportplural plan links:replaceJSON"conduitPlanId":"CDT-WRP-003"with something likeJSON"conduitPlanIds": ["CDT-WRP-003"]or, even better, keepartifact seed data free of execution multiplicityand push execution bindings intoNebulaExecutionLinkinstances.My preference is:artifact registry = stable artifact metadataexecution links = operational Conduit/receipt bindingsSo the more future-proof shape is:removeconduitPlanIdfrom the artifact registry entirelyortreat it only as an initial “primary seed plan” field2) AddartifactFamilyandversionLineYou’re already thinking in terms of WRPas a living protocol family, not just one-off documents. So I’d make that explicit.I’d add fields like:JSON"artifactFamily":"wrp","versionLine":"v1"That gives you a clean grouping dimension for:all WRP artifactsall WRP v1 artifactsfuture WRP v2 work if the protocol or execution model evolvesSo an artifact instance might become:JSON{"artifactKey":"wrp-v1_2-traversal","artifactFamily":"wrp","versionLine":"v1","artifactVersion":"1.2"}That is much easier to query than inferring family/version-line by parsing keys.3) Seed explicit artifact-to-artifact dependency edges tooRight now this file only seeds the four artifacts as isolated nodes. But the relationships between them are already known and stable enough that I’d probably seed those at bootstrap time too.I would either:Option A — keep this file node-onlyand add a second file:data/nebula/bootstrap/wrp-artifact-cross-references.jsonldwith edges like:DAGdepends_onProtocolTraversalexecutes / constrains / depends_onDAGMigrationmigratesProtocolMigrationmigratesDAGMigrationmigratesTraversalorOption B — includeNebulaCrossReferenceseed instances in this same fileI preferOption A, because it keeps:artifact registry= stable node identitiesrelationship registry= explicit edge graphThat separation will make importer logic cleaner too.So the next artifact I’d produce is this:data/nebula/bootstrap/wrp-artifact-cross-references.jsonldIt should seed the initial WRP graph edges such as:wrp-v1_1-dag→wrp-v1-protocol(depends_on)wrp-v1_2-traversal→wrp-v1_1-dag(executes)wrp-v1_2-traversal→wrp-v1-protocol(constrainsordepends_on, depending on how tight you want that coupling modeled)wrp-migration-plan→wrp-v1-protocol(migrates)wrp-migration-plan→wrp-v1_1-dag(migrates)wrp-migration-plan→wrp-v1_2-traversal(migrates)and I’d probably also add:edge-levelnotesstatusevidenceKind = artifact_projectionoptionalsourceLevel/targetLevelIf you want, I’ll go straight into that file next.SourcesStonlySponsoredKnowledge Base With AI AnswersInteractive knowledge base with AI answers and guides for agents at scale. Get a demo.
+
+#### ChatGPT said:
+
+Perfect. I’ll do the next one as theseed/bootstrap artifact registry, keeping it cleanly separate from the ontology vocabulary.Below is arepo-ready first passfor:data/nebula/bootstrap/wrp-artifacts.jsonldJSON{"@context": {"@version":1.1,"id":"@id","type":"@type","xsd":"http://www.w3.org/2001/XMLSchema#","schema":"https://schema.org/","nebula":"https://nexus.example/schema/nebula/","wrp":"https://nexus.example/schema/wrp/","conduit":"https://nexus.example/schema/conduit/","title":"schema:name","text":"schema:text","createdAt": {"@id":"schema:dateCreated","@type":"xsd:dateTime"},"updatedAt": {"@id":"schema:dateModified","@type":"xsd:dateTime"},"NebulaArtifact":"nebula:NebulaArtifact","WRPProtocolArtifact":"wrp:WRPProtocolArtifact","WRPDagModelArtifact":"wrp:WRPDagModelArtifact","WRPExecutionEngineArtifact":"wrp:WRPExecutionEngineArtifact","WRPMigrationPlanArtifact":"wrp:WRPMigrationPlanArtifact","hasArtifactType": {"@id":"nebula:hasArtifactType","@type":"@id"},"artifactKey":"nebula:artifactKey","artifactVersion":"nebula:artifactVersion","defaultLevel": {"@id":"nebula:defaultLevel","@type":"@id"},"status": {"@id":"nebula:status","@type":"@id"},"currentDocument": {"@id":"nebula:currentDocument","@type":"@id"},"supersedes": {"@id":"nebula:supersedes","@type":"@id"},"conduitPlanId":"conduit:planId","conduitProjectKey":"conduit:projectKey","documentPath":"nebula:documentPath","notes":"nebula:notes"},"@graph": [{"id":"wrp:artifact/wrp-v1-protocol","type":"WRPProtocolArtifact","title":"WRP v1.0 Protocol Formalization","artifactKey":"wrp-v1-protocol","artifactVersion":"1.0","hasArtifactType":"nebula:WRP_PROTOCOL","defaultLevel":"nebula:L2","status":"nebula:ACTIVE","conduitPlanId":"CDT-WRP-001","conduitProjectKey":"WRP","documentPath":"docs/wrp/wrp-v1-protocol.md","notes":"Formal definition of WRP message shape, identity, versioning, semantics, and lifecycle assumptions."},{"id":"wrp:artifact/wrp-v1_1-dag","type":"WRPDagModelArtifact","title":"WRP v1.1 DAG Data Model and Compilation Pipeline","artifactKey":"wrp-v1_1-dag","artifactVersion":"1.1","hasArtifactType":"nebula:WRP_DAG_MODEL","defaultLevel":"nebula:L2","status":"nebula:ACTIVE","conduitPlanId":"CDT-WRP-002","conduitProjectKey":"WRP","documentPath":"docs/wrp/wrp-v1_1-dag-model-and-compilation-pipeline.md","notes":"Defines WRP DAG node/edge semantics, compilation from protocol requests into executable graph structures, and compilation invariants."},{"id":"wrp:artifact/wrp-v1_2-traversal","type":"WRPExecutionEngineArtifact","title":"WRP v1.2 Execution Traversal Engine","artifactKey":"wrp-v1_2-traversal","artifactVersion":"1.2","hasArtifactType":"nebula:WRP_EXECUTION_ENGINE","defaultLevel":"nebula:L2","status":"nebula:ACTIVE","conduitPlanId":"CDT-WRP-003","conduitProjectKey":"WRP","documentPath":"docs/wrp/wrp-v1_2-execution-traversal-engine.md","notes":"Defines traversal/execution semantics over the WRP DAG, including execution context, cursor/receipt behavior, deterministic traversal defaults, and isolation rules."},{"id":"wrp:artifact/wrp-migration-plan","type":"WRPMigrationPlanArtifact","title":"WRP Migration Plan","artifactKey":"wrp-migration-plan","artifactVersion":"2026-06","hasArtifactType":"nebula:WRP_MIGRATION_PLAN","defaultLevel":"nebula:L3","status":"nebula:ACTIVE","conduitPlanId":"CDT-WRP-004","conduitProjectKey":"WRP","documentPath":"docs/wrp/wrp-migration-plan.md","notes":"Defines staged migration of legacy work representations and runtime workflows into WRP, including compatibility constraints and rollout sequencing."}]}What I would tighten before wiring this into the importerThis seed file is good enough as abootstrap registry, but I’d makethree concrete adjustmentsbefore you treat it as durable input to the Nebula projector.1) Stop treatingconduitPlanIdas singularRight now I used:conduitPlanId: "CDT-WRP-001"That’s fine for the current four-plan packet, but it will age badly because one artifact will almost certainly end up being implemented bymultiple Conduit plans.For example:the traversal engine may split intotraversal corereceipt emissionvalidator hooksmigration shimsSo I would change the ontology and the bootstrap data to supportplural plan links:replaceJSON"conduitPlanId":"CDT-WRP-003"with something likeJSON"conduitPlanIds": ["CDT-WRP-003"]or, even better, keepartifact seed data free of execution multiplicityand push execution bindings intoNebulaExecutionLinkinstances.My preference is:artifact registry = stable artifact metadataexecution links = operational Conduit/receipt bindingsSo the more future-proof shape is:removeconduitPlanIdfrom the artifact registry entirelyortreat it only as an initial “primary seed plan” field2) AddartifactFamilyandversionLineYou’re already thinking in terms of WRPas a living protocol family, not just one-off documents. So I’d make that explicit.I’d add fields like:JSON"artifactFamily":"wrp","versionLine":"v1"That gives you a clean grouping dimension for:all WRP artifactsall WRP v1 artifactsfuture WRP v2 work if the protocol or execution model evolvesSo an artifact instance might become:JSON{"artifactKey":"wrp-v1_2-traversal","artifactFamily":"wrp","versionLine":"v1","artifactVersion":"1.2"}That is much easier to query than inferring family/version-line by parsing keys.3) Seed explicit artifact-to-artifact dependency edges tooRight now this file only seeds the four artifacts as isolated nodes. But the relationships between them are already known and stable enough that I’d probably seed those at bootstrap time too.I would either:Option A — keep this file node-onlyand add a second file:data/nebula/bootstrap/wrp-artifact-cross-references.jsonldwith edges like:DAGdepends_onProtocolTraversalexecutes / constrains / depends_onDAGMigrationmigratesProtocolMigrationmigratesDAGMigrationmigratesTraversalorOption B — includeNebulaCrossReferenceseed instances in this same fileI preferOption A, because it keeps:artifact registry= stable node identitiesrelationship registry= explicit edge graphThat separation will make importer logic cleaner too.So the next artifact I’d produce is this:data/nebula/bootstrap/wrp-artifact-cross-references.jsonldIt should seed the initial WRP graph edges such as:wrp-v1_1-dag→wrp-v1-protocol(depends_on)wrp-v1_2-traversal→wrp-v1_1-dag(executes)wrp-v1_2-traversal→wrp-v1-protocol(constrainsordepends_on, depending on how tight you want that coupling modeled)wrp-migration-plan→wrp-v1-protocol(migrates)wrp-migration-plan→wrp-v1_1-dag(migrates)wrp-migration-plan→wrp-v1_2-traversal(migrates)and I’d probably also add:edge-levelnotesstatusevidenceKind = artifact_projectionoptionalsourceLevel/targetLevelIf you want, I’ll go straight into that file next.SourcesStonlySponsoredKnowledge Base With AI AnswersInteractive knowledge base with AI answers and guides for agents at scale. Get a demo.

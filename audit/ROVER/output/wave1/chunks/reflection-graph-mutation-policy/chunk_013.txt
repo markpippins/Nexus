@@ -1,0 +1,382 @@
+Yes — if reflection is allowed to mutate the graph arbitrarily, it stops being “reflection” and becomes an uncontrolled second planner. You want abounded graph-delta policyper reflection cycle.The clean way to think about it is:A reflection cycle should be allowed to produce only a constrained patch against the world model, not a wholesale rewrite of it.I’d formalize that as aReflection Mutation Budgetwith three layers:1. Reflection should emit aGraphPatch, not directly rewrite the graphInstead of “reflection edits the graph,” make reflection produce a typed patch:TypeScriptinterfaceReflectionGraphPatch{cycle_id:string;source_task_id:string;patch_scope:"local"|"neighborhood"|"global";operations:GraphPatchOp[];rationale:string[];confidence:number;requires_promotion:boolean;}typeGraphPatchOp=|{ op:"add_node"; node:GraphNode}|{ op:"update_node"; node_id:string; changes:Partial<GraphNode> }|{ op:"add_edge"; edge:GraphEdge}|{ op:"update_edge"; edge_id:string; changes:Partial<GraphEdge> }|{ op:"close_loop"; loop_id:string; resolution:string}|{ op:"spawn_task"; task:TaskIntentRef}|{ op:"propose_hypothesis"; hypothesis:HypothesisNode};The important move is:reflection proposes a patch; Arbiter/GraphGovernor decides whether it lands.2. Put a hard cap onhow far from the triggering taskreflection may reachThis is the core heuristic. A reflection pass should mostly operate in thecausal neighborhoodof the task that just completed.Suggested scope tiersTier A — Local patch (default; cheap; always allowed)Reflection can touch only:the task node just executedartifacts produced by that taskimmediate predecessor/successor nodesopen loops explicitly linked to that taskat mostNnew tasks inferred from completionExample allowed changes:mark assumptions invalidatedadd “follow-up task needed”attach artifact summariescreate 1–3 missing dependency edgesupdate confidence/status on nearby nodesRule of thumbRadius = 1 hopfrom the completed task.Tier B — Neighborhood patch (allowed if evidence is strong)Reflection can touch:local neighborhood plussiblings under the same parent objectivetasks sharing the same resource / file / workstream / user requestnodes linked through “same unresolved issue” or “same hypothesis”Rule of thumbRadius = 2 hops, but only within the sameworkstream / objective / episode.This is where “while I’m here, I also meant to…” lives.Tier C — Global patch (rare; escalation only)Reflection wants to do things like:reclassify a bunch of prior tasksmerge duplicate subgraphs across workstreamsrevise a major assumption in the planspawn a new objective treerewrite priorities globallychange ontology or invariantsThis shouldnever happen inline in ordinary task reflection. It should emit apromotion candidatefor a separate maintenance/planning cycle.3. Budget reflection bydelta size, not just by scopeYou want a quantitative “too much changed” threshold. I’d use a weighted mutation score.Reflection Mutation BudgetFor each reflection cycle, compute:TypeScriptmutation_score=1*nodes_added+1*nodes_updated+0.5*edges_added+0.5*edges_updated+2*tasks_spawned+3*hypotheses_added+5*cross_objective_links+8*reparent_operations+13*global_priority_changesThen define policy bands.Example bandsBand 1 — Inline reflectionscore <= 8Allowed automatically.Typical examples:update task outcomeadd 1 follow-up taskadd a note that a dependency was discoveredlink produced artifact to taskBand 2 — Local expansion8 < score <= 20Allowed only if:patch scope is stilllocalorneighborhoodall touched nodes are inside same workstream / same parent objectiveno reparenting of existing task treesBand 3 — Promotion requiredscore > 20orpatch includes any “structural” op:reparent existing tasksmodify objective hierarchyalter priority of unrelated tasksmerge distant graph regionsinvalidate accepted plan assumptionscreate more than X spawned taskstouch nodes outside causal neighborhoodThen reflection stops and emits:TypeScript{kind:"reflection_escalation",reason:"graph_delta_exceeded",candidate_patch,suggested_followup:"run_planning_reconciliation"}4. Distinguishobservational updatesfromstructural changesThis is a big one. Not all graph changes are equally dangerous.Safe / cheap changes (reflection can do these freely)These areobservational:attach evidence/artifact produced by the taskmark task status/resultupdate confidence scoresrecord “discovered during execution”add a note or hypothesisadd a follow-up task suggestionmark an open loop as resolved or still-openThese should be cheap.Dangerous changes (reflection should not do casually)These arestructural:changing parent/child relationshipsreprioritizing unrelated workrewriting goalsmerging nodes across distant contextsinvalidating plan branchesdeleting nodeschanging ontology / semantic typebulk deduping / collapsing task treesThose should require promotion.So the heuristic is not only “how much changed” butwhat kind of change.5. Use acausal neighborhood testbefore accepting the patchBefore a reflection patch lands, ask:“Can every touched node be explained by the task that just ran?”Concretely:A touched node is allowed if it satisfies one of:It is the task itself.It is an artifact/input/output directly attached to the task.It is withinkhops of the task in the active workstream subgraph.It shares the same parent objective / episode / conversation turn cluster.It was explicitly referenced during execution or in the result artifact.If not, reflection is probably wandering.That gives you a practical governor:TypeScriptiftouched_node notincausal_neighborhood(task,radius=2):require_promotion=true6. Limit task spawning separately from graph mutationThe most dangerous thing reflection does is not usually editing edges — it’screating work.So I’d give it a dedicated cap:Reflection task spawn heuristicPer completed task, reflection may:auto-spawn0–2child follow-up tasksauto-spawnup to 1sibling repair taskneverauto-spawn a new top-level objectiveneverauto-spawn more thanspawn_budget_per_cycleIf it thinks 8 new tasks are implied, that’s a signal for aplanning pass, not inline reflection.7. Add a “surprise threshold”Reflection exists because execution reveals reality. But some revelations are bigger than others.So every reflection output should estimate:Outcome deviation: how far actual result diverged from expected resultPlan impact: how many downstream tasks/objectives are affectedConfidence: how certain the inference isIf deviation × impact is high, reflection should stop trying to “fix it itself” and instead raise areplan event.Example:TypeScriptifoutcome_deviation>=HIGH&&downstream_impact>=MEDIUM:emit ReplanRequiredThat prevents a small post-task reflection loop from silently rearchitecting the roadmap.8. My recommended concrete policyIf I were wiring this into your scheduler / graph governor, I’d use something like this:Reflection Graph Mutation PolicyDefault reflection budgetFor each completed task, reflection may:update unlimited metadata on the completed task nodeupdate up to5 nearby nodesadd up to3 edgesspawn up to2 new child tasksadd up to1 hypothesis nodeclose up to3 open loopstouch only nodes within2 hopsof the completed task and within the sameobjective/workstreamForbidden without escalationReflection may not directly:reparent existing tasksdelete nodesmerge subgraphs across objectivesreprioritize tasks outside current workstreamcreate a new top-level objectivealter system invariants / ontologytouch more than10 total nodesexceed mutation score thresholdEscalate to planning/reconciliation whenAny of these are true:mutation_score > 20touched nodes cross objective boundarymore than 2 follow-up tasks are implieda core assumption of the current plan is invalidatedreflection wants to modify already-approved roadmap structurereflection confidence is low but impact is high9. The key architectural splitI think the clean split is:Reflection cycle =micro-repair + local inferenceIts job is to say:what happened?what nearby assumptions changed?what immediate follow-up is now required?did this close or open a loop?Planning / reconciliation cycle =structural graph changeIts job is to say:does the objective tree need reshaping?should priorities move?are these two workstreams actually one?did this execution result invalidate the broader plan?That boundary keeps reflection useful without letting it become a runaway graph mutator.My preferred formal heuristic in one sentenceA reflection cycle may only commit low-cost observational and local structural updates within the causal neighborhood of the triggering task; any patch that crosses workstream boundaries, spawns substantial new work, or changes existing graph topology must be promoted to a separate reconciliation/planning pass.If you want, I can turn this into a repo-ready artifact — something like:REFLECTION_MUTATION_POLICY.mdReflectionGraphPatch/GraphMutationBudgetTypeSpec or JSON schemaArbiter pseudocode forevaluateReflectionPatch(patch, graph, taskContext)
+
+Yes — if reflection is allowed to mutate the graph arbitrarily, it stops being “reflection” and becomes an uncontrolled second planner. You want abounded graph-delta policyper reflection cycle.
+
+The clean way to think about it is:
+
+> A reflection cycle should be allowed to produce only a constrained patch against the world model, not a wholesale rewrite of it.
+
+A reflection cycle should be allowed to produce only a constrained patch against the world model, not a wholesale rewrite of it.
+
+I’d formalize that as aReflection Mutation Budgetwith three layers:
+
+---
+
+# 1. Reflection should emit aGraphPatch, not directly rewrite the graph
+
+Instead of “reflection edits the graph,” make reflection produce a typed patch:
+
+```
+interface ReflectionGraphPatch {  cycle_id: string;  source_task_id: string;  patch_scope: "local" | "neighborhood" | "global";  operations: GraphPatchOp[];  rationale: string[];  confidence: number;  requires_promotion: boolean;}type GraphPatchOp =  | { op: "add_node"; node: GraphNode }  | { op: "update_node"; node_id: string; changes: Partial<GraphNode> }  | { op: "add_edge"; edge: GraphEdge }  | { op: "update_edge"; edge_id: string; changes: Partial<GraphEdge> }  | { op: "close_loop"; loop_id: string; resolution: string }  | { op: "spawn_task"; task: TaskIntentRef }  | { op: "propose_hypothesis"; hypothesis: HypothesisNode };
+```
+
+```
+interface ReflectionGraphPatch {  cycle_id: string;  source_task_id: string;  patch_scope: "local" | "neighborhood" | "global";  operations: GraphPatchOp[];  rationale: string[];  confidence: number;  requires_promotion: boolean;}type GraphPatchOp =  | { op: "add_node"; node: GraphNode }  | { op: "update_node"; node_id: string; changes: Partial<GraphNode> }  | { op: "add_edge"; edge: GraphEdge }  | { op: "update_edge"; edge_id: string; changes: Partial<GraphEdge> }  | { op: "close_loop"; loop_id: string; resolution: string }  | { op: "spawn_task"; task: TaskIntentRef }  | { op: "propose_hypothesis"; hypothesis: HypothesisNode };
+```
+
+The important move is:reflection proposes a patch; Arbiter/GraphGovernor decides whether it lands.
+
+---
+
+# 2. Put a hard cap onhow far from the triggering taskreflection may reach
+
+This is the core heuristic. A reflection pass should mostly operate in thecausal neighborhoodof the task that just completed.
+
+## Suggested scope tiers
+
+## Tier A — Local patch (default; cheap; always allowed)
+
+Reflection can touch only:
+
+- the task node just executed
+the task node just executed
+
+- artifacts produced by that task
+artifacts produced by that task
+
+- immediate predecessor/successor nodes
+immediate predecessor/successor nodes
+
+- open loops explicitly linked to that task
+open loops explicitly linked to that task
+
+- at mostNnew tasks inferred from completion
+at mostNnew tasks inferred from completion
+
+Example allowed changes:
+
+- mark assumptions invalidated
+mark assumptions invalidated
+
+- add “follow-up task needed”
+add “follow-up task needed”
+
+- attach artifact summaries
+attach artifact summaries
+
+- create 1–3 missing dependency edges
+create 1–3 missing dependency edges
+
+- update confidence/status on nearby nodes
+update confidence/status on nearby nodes
+
+### Rule of thumb
+
+Radius = 1 hopfrom the completed task.
+
+---
+
+## Tier B — Neighborhood patch (allowed if evidence is strong)
+
+Reflection can touch:
+
+- local neighborhood plus
+local neighborhood plus
+
+- siblings under the same parent objective
+siblings under the same parent objective
+
+- tasks sharing the same resource / file / workstream / user request
+tasks sharing the same resource / file / workstream / user request
+
+- nodes linked through “same unresolved issue” or “same hypothesis”
+nodes linked through “same unresolved issue” or “same hypothesis”
+
+### Rule of thumb
+
+Radius = 2 hops, but only within the sameworkstream / objective / episode.
+
+This is where “while I’m here, I also meant to…” lives.
+
+---
+
+## Tier C — Global patch (rare; escalation only)
+
+Reflection wants to do things like:
+
+- reclassify a bunch of prior tasks
+reclassify a bunch of prior tasks
+
+- merge duplicate subgraphs across workstreams
+merge duplicate subgraphs across workstreams
+
+- revise a major assumption in the plan
+revise a major assumption in the plan
+
+- spawn a new objective tree
+spawn a new objective tree
+
+- rewrite priorities globally
+rewrite priorities globally
+
+- change ontology or invariants
+change ontology or invariants
+
+This shouldnever happen inline in ordinary task reflection. It should emit apromotion candidatefor a separate maintenance/planning cycle.
+
+---
+
+# 3. Budget reflection bydelta size, not just by scope
+
+You want a quantitative “too much changed” threshold. I’d use a weighted mutation score.
+
+---
+
+# Reflection Mutation Budget
+
+For each reflection cycle, compute:
+
+```
+mutation_score =  1 * nodes_added +  1 * nodes_updated +  0.5 * edges_added +  0.5 * edges_updated +  2 * tasks_spawned +  3 * hypotheses_added +  5 * cross_objective_links +  8 * reparent_operations +  13 * global_priority_changes
+```
+
+```
+mutation_score =  1 * nodes_added +  1 * nodes_updated +  0.5 * edges_added +  0.5 * edges_updated +  2 * tasks_spawned +  3 * hypotheses_added +  5 * cross_objective_links +  8 * reparent_operations +  13 * global_priority_changes
+```
+
+Then define policy bands.
+
+## Example bands
+
+### Band 1 — Inline reflection
+
+score <= 8
+
+Allowed automatically.
+
+Typical examples:
+
+- update task outcome
+update task outcome
+
+- add 1 follow-up task
+add 1 follow-up task
+
+- add a note that a dependency was discovered
+add a note that a dependency was discovered
+
+- link produced artifact to task
+link produced artifact to task
+
+### Band 2 — Local expansion
+
+8 < score <= 20
+
+Allowed only if:
+
+- patch scope is stilllocalorneighborhood
+patch scope is stilllocalorneighborhood
+
+- all touched nodes are inside same workstream / same parent objective
+all touched nodes are inside same workstream / same parent objective
+
+- no reparenting of existing task trees
+no reparenting of existing task trees
+
+### Band 3 — Promotion required
+
+score > 20orpatch includes any “structural” op:
+
+- reparent existing tasks
+reparent existing tasks
+
+- modify objective hierarchy
+modify objective hierarchy
+
+- alter priority of unrelated tasks
+alter priority of unrelated tasks
+
+- merge distant graph regions
+merge distant graph regions
+
+- invalidate accepted plan assumptions
+invalidate accepted plan assumptions
+
+- create more than X spawned tasks
+create more than X spawned tasks
+
+- touch nodes outside causal neighborhood
+touch nodes outside causal neighborhood
+
+Then reflection stops and emits:
+
+```
+{  kind: "reflection_escalation",  reason: "graph_delta_exceeded",  candidate_patch,  suggested_followup: "run_planning_reconciliation"}
+```
+
+```
+{  kind: "reflection_escalation",  reason: "graph_delta_exceeded",  candidate_patch,  suggested_followup: "run_planning_reconciliation"}
+```
+
+---
+
+# 4. Distinguishobservational updatesfromstructural changes
+
+This is a big one. Not all graph changes are equally dangerous.
+
+## Safe / cheap changes (reflection can do these freely)
+
+These areobservational:
+
+- attach evidence/artifact produced by the task
+attach evidence/artifact produced by the task
+
+- mark task status/result
+mark task status/result
+
+- update confidence scores
+update confidence scores
+
+- record “discovered during execution”
+record “discovered during execution”
+
+- add a note or hypothesis
+add a note or hypothesis
+
+- add a follow-up task suggestion
+add a follow-up task suggestion
+
+- mark an open loop as resolved or still-open
+mark an open loop as resolved or still-open
+
+These should be cheap.
+
+## Dangerous changes (reflection should not do casually)
+
+These arestructural:
+
+- changing parent/child relationships
+changing parent/child relationships
+
+- reprioritizing unrelated work
+reprioritizing unrelated work
+
+- rewriting goals
+rewriting goals
+
+- merging nodes across distant contexts
+merging nodes across distant contexts
+
+- invalidating plan branches
+invalidating plan branches
+
+- deleting nodes
+deleting nodes
+
+- changing ontology / semantic type
+changing ontology / semantic type
+
+- bulk deduping / collapsing task trees
+bulk deduping / collapsing task trees
+
+Those should require promotion.
+
+So the heuristic is not only “how much changed” butwhat kind of change.
+
+---
+
+# 5. Use acausal neighborhood testbefore accepting the patch
+
+Before a reflection patch lands, ask:
+
+## “Can every touched node be explained by the task that just ran?”
+
+Concretely:
+
+A touched node is allowed if it satisfies one of:
+
+- It is the task itself.
+It is the task itself.
+
+- It is an artifact/input/output directly attached to the task.
+It is an artifact/input/output directly attached to the task.
+
+- It is withinkhops of the task in the active workstream subgraph.
+It is withinkhops of the task in the active workstream subgraph.
+
+- It shares the same parent objective / episode / conversation turn cluster.
+It shares the same parent objective / episode / conversation turn cluster.
+
+- It was explicitly referenced during execution or in the result artifact.
+It was explicitly referenced during execution or in the result artifact.
+
+If not, reflection is probably wandering.
+
+That gives you a practical governor:
+
+```
+if touched_node not in causal_neighborhood(task, radius=2):    require_promotion = true
+```
+
+```
+if touched_node not in causal_neighborhood(task, radius=2):    require_promotion = true
+```
+
+---
+
+# 6. Limit task spawning separately from graph mutation
+
+The most dangerous thing reflection does is not usually editing edges — it’screating work.
+
+So I’d give it a dedicated cap:
+
+## Reflection task spawn heuristic
+
+Per completed task, reflection may:
+
+- auto-spawn0–2child follow-up tasks
+auto-spawn0–2child follow-up tasks
+
+- auto-spawnup to 1sibling repair task
+auto-spawnup to 1sibling repair task
+
+- neverauto-spawn a new top-level objective
+neverauto-spawn a new top-level objective
+
+- neverauto-spawn more thanspawn_budget_per_cycle
+neverauto-spawn more thanspawn_budget_per_cycle
+
+If it thinks 8 new tasks are implied, that’s a signal for aplanning pass, not inline reflection.
+
+---
+
+# 7. Add a “surprise threshold”
+
+Reflection exists because execution reveals reality. But some revelations are bigger than others.
+
+So every reflection output should estimate:
+
+- Outcome deviation: how far actual result diverged from expected result
+Outcome deviation: how far actual result diverged from expected result
+
+- Plan impact: how many downstream tasks/objectives are affected
+Plan impact: how many downstream tasks/objectives are affected
+
+- Confidence: how certain the inference is
+Confidence: how certain the inference is
+
+If deviation × impact is high, reflection should stop trying to “fix it itself” and instead raise areplan event.
+
+Example:
+
+```
+if outcome_deviation >= HIGH && downstream_impact >= MEDIUM:    emit ReplanRequired
+```
+
+```
+if outcome_deviation >= HIGH && downstream_impact >= MEDIUM:    emit ReplanRequired
+```
+
+That prevents a small post-task reflection loop from silently rearchitecting the roadmap.
+
+---

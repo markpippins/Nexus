@@ -1,0 +1,310 @@
+Absolutely. The next clean companion is thebootstrap edge registryso the initial WRP packet enters Nebula as aconnected graphrather than four isolated artifact nodes.
+
+Below is arepo-ready first passfor:
+
+# data/nebula/bootstrap/wrp-artifact-cross-references.jsonld
+
+```
+{  "@context": {    "@version": 1.1,    "id": "@id",    "type": "@type",    "xsd": "http://www.w3.org/2001/XMLSchema#",    "schema": "https://schema.org/",    "nebula": "https://nexus.example/schema/nebula/",    "wrp": "https://nexus.example/schema/wrp/",    "title": "schema:name",    "text": "schema:text",    "createdAt": {      "@id": "schema:dateCreated",      "@type": "xsd:dateTime"    },    "updatedAt": {      "@id": "schema:dateModified",      "@type": "xsd:dateTime"    },    "NebulaCrossReference": "nebula:NebulaCrossReference",    "sourceNode": {      "@id": "nebula:sourceNode",      "@type": "@id"    },    "targetNode": {      "@id": "nebula:targetNode",      "@type": "@id"    },    "relationType": {      "@id": "nebula:relationType",      "@type": "@id"    },    "sourceLevel": {      "@id": "nebula:sourceLevel",      "@type": "@id"    },    "targetLevel": {      "@id": "nebula:targetLevel",      "@type": "@id"    },    "weight": {      "@id": "nebula:weight",      "@type": "xsd:decimal"    },    "evidenceKind": {      "@id": "nebula:evidenceKind",      "@type": "@id"    },    "status": {      "@id": "nebula:status",      "@type": "@id"    },    "notes": "nebula:notes"  },  "@graph": [    {      "id": "wrp:xref/wrp-v1_1-dag-depends-on-wrp-v1-protocol",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-v1_1-dag",      "targetNode": "wrp:artifact/wrp-v1-protocol",      "relationType": "nebula:DEPENDS_ON",      "sourceLevel": "nebula:L2",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The WRP DAG data model and compilation pipeline depend on the formal WRP protocol shape, identity model, version semantics, and lifecycle assumptions."    },    {      "id": "wrp:xref/wrp-v1_2-traversal-executes-wrp-v1_1-dag",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-v1_2-traversal",      "targetNode": "wrp:artifact/wrp-v1_1-dag",      "relationType": "nebula:EXECUTES",      "sourceLevel": "nebula:L2",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The traversal engine executes the graph structures and execution semantics defined by the WRP DAG model."    },    {      "id": "wrp:xref/wrp-v1_2-traversal-depends-on-wrp-v1-protocol",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-v1_2-traversal",      "targetNode": "wrp:artifact/wrp-v1-protocol",      "relationType": "nebula:DEPENDS_ON",      "sourceLevel": "nebula:L2",      "targetLevel": "nebula:L2",      "weight": 0.85,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "Traversal semantics are ultimately constrained by WRP protocol identity, version, lifecycle, and execution-facing request semantics, even though traversal primarily operates over the compiled DAG."    },    {      "id": "wrp:xref/wrp-v1_2-traversal-constrains-wrp-v1_1-dag",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-v1_2-traversal",      "targetNode": "wrp:artifact/wrp-v1_1-dag",      "relationType": "nebula:CONSTRAINS",      "sourceLevel": "nebula:L2",      "targetLevel": "nebula:L2",      "weight": 0.75,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "Traversal requirements may impose constraints on DAG node/edge representation, readiness semantics, receipt granularity, or execution-order metadata needed by the traversal engine."    },    {      "id": "wrp:xref/wrp-migration-plan-migrates-wrp-v1-protocol",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-migration-plan",      "targetNode": "wrp:artifact/wrp-v1-protocol",      "relationType": "nebula:MIGRATES",      "sourceLevel": "nebula:L3",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The WRP migration plan governs how existing work representations or runtime workflows are brought into compatibility with the formal WRP protocol."    },    {      "id": "wrp:xref/wrp-migration-plan-migrates-wrp-v1_1-dag",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-migration-plan",      "targetNode": "wrp:artifact/wrp-v1_1-dag",      "relationType": "nebula:MIGRATES",      "sourceLevel": "nebula:L3",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The migration plan defines how legacy plan/workflow structures are transformed or adapted into the WRP DAG representation and compilation pipeline."    },    {      "id": "wrp:xref/wrp-migration-plan-migrates-wrp-v1_2-traversal",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-migration-plan",      "targetNode": "wrp:artifact/wrp-v1_2-traversal",      "relationType": "nebula:MIGRATES",      "sourceLevel": "nebula:L3",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The migration plan defines how execution of legacy work structures is cut over to the WRP traversal engine, including compatibility constraints and staged rollout."    }  ]}
+```
+
+```
+{  "@context": {    "@version": 1.1,    "id": "@id",    "type": "@type",    "xsd": "http://www.w3.org/2001/XMLSchema#",    "schema": "https://schema.org/",    "nebula": "https://nexus.example/schema/nebula/",    "wrp": "https://nexus.example/schema/wrp/",    "title": "schema:name",    "text": "schema:text",    "createdAt": {      "@id": "schema:dateCreated",      "@type": "xsd:dateTime"    },    "updatedAt": {      "@id": "schema:dateModified",      "@type": "xsd:dateTime"    },    "NebulaCrossReference": "nebula:NebulaCrossReference",    "sourceNode": {      "@id": "nebula:sourceNode",      "@type": "@id"    },    "targetNode": {      "@id": "nebula:targetNode",      "@type": "@id"    },    "relationType": {      "@id": "nebula:relationType",      "@type": "@id"    },    "sourceLevel": {      "@id": "nebula:sourceLevel",      "@type": "@id"    },    "targetLevel": {      "@id": "nebula:targetLevel",      "@type": "@id"    },    "weight": {      "@id": "nebula:weight",      "@type": "xsd:decimal"    },    "evidenceKind": {      "@id": "nebula:evidenceKind",      "@type": "@id"    },    "status": {      "@id": "nebula:status",      "@type": "@id"    },    "notes": "nebula:notes"  },  "@graph": [    {      "id": "wrp:xref/wrp-v1_1-dag-depends-on-wrp-v1-protocol",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-v1_1-dag",      "targetNode": "wrp:artifact/wrp-v1-protocol",      "relationType": "nebula:DEPENDS_ON",      "sourceLevel": "nebula:L2",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The WRP DAG data model and compilation pipeline depend on the formal WRP protocol shape, identity model, version semantics, and lifecycle assumptions."    },    {      "id": "wrp:xref/wrp-v1_2-traversal-executes-wrp-v1_1-dag",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-v1_2-traversal",      "targetNode": "wrp:artifact/wrp-v1_1-dag",      "relationType": "nebula:EXECUTES",      "sourceLevel": "nebula:L2",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The traversal engine executes the graph structures and execution semantics defined by the WRP DAG model."    },    {      "id": "wrp:xref/wrp-v1_2-traversal-depends-on-wrp-v1-protocol",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-v1_2-traversal",      "targetNode": "wrp:artifact/wrp-v1-protocol",      "relationType": "nebula:DEPENDS_ON",      "sourceLevel": "nebula:L2",      "targetLevel": "nebula:L2",      "weight": 0.85,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "Traversal semantics are ultimately constrained by WRP protocol identity, version, lifecycle, and execution-facing request semantics, even though traversal primarily operates over the compiled DAG."    },    {      "id": "wrp:xref/wrp-v1_2-traversal-constrains-wrp-v1_1-dag",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-v1_2-traversal",      "targetNode": "wrp:artifact/wrp-v1_1-dag",      "relationType": "nebula:CONSTRAINS",      "sourceLevel": "nebula:L2",      "targetLevel": "nebula:L2",      "weight": 0.75,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "Traversal requirements may impose constraints on DAG node/edge representation, readiness semantics, receipt granularity, or execution-order metadata needed by the traversal engine."    },    {      "id": "wrp:xref/wrp-migration-plan-migrates-wrp-v1-protocol",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-migration-plan",      "targetNode": "wrp:artifact/wrp-v1-protocol",      "relationType": "nebula:MIGRATES",      "sourceLevel": "nebula:L3",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The WRP migration plan governs how existing work representations or runtime workflows are brought into compatibility with the formal WRP protocol."    },    {      "id": "wrp:xref/wrp-migration-plan-migrates-wrp-v1_1-dag",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-migration-plan",      "targetNode": "wrp:artifact/wrp-v1_1-dag",      "relationType": "nebula:MIGRATES",      "sourceLevel": "nebula:L3",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The migration plan defines how legacy plan/workflow structures are transformed or adapted into the WRP DAG representation and compilation pipeline."    },    {      "id": "wrp:xref/wrp-migration-plan-migrates-wrp-v1_2-traversal",      "type": "NebulaCrossReference",      "sourceNode": "wrp:artifact/wrp-migration-plan",      "targetNode": "wrp:artifact/wrp-v1_2-traversal",      "relationType": "nebula:MIGRATES",      "sourceLevel": "nebula:L3",      "targetLevel": "nebula:L2",      "weight": 1.0,      "evidenceKind": "nebula:ARTIFACT_PROJECTION",      "status": "nebula:ACTIVE",      "notes": "The migration plan defines how execution of legacy work structures is cut over to the WRP traversal engine, including compatibility constraints and staged rollout."    }  ]}
+```
+
+---
+
+# What I’d refine before freezing this
+
+This is the rightshape, but before you treat it as the stable bootstrap graph, I’d makethree modeling decisions explicitly.
+
+---
+
+# 1) Decide whetherEXECUTESis the right relation from Traversal → DAG
+
+Right now I modeled:
+
+- wrp-v1_2-traversalEXECUTESwrp-v1_1-dag
+wrp-v1_2-traversalEXECUTESwrp-v1_1-dag
+
+That is directionally sensible if you read it as:
+
+> “the traversal engine executes graphs defined by the DAG model.”
+
+“the traversal engine executes graphs defined by the DAG model.”
+
+But there are reallythree different semantic relationshipshiding in there:
+
+## A. structural dependency
+
+Traversaldepends onthe DAG representation.
+
+## B. runtime operation
+
+Traversalexecutesgraph instances that conform to the DAG model.
+
+## C. representation pressure
+
+Traversalconstrainswhat metadata the DAG must expose.
+
+So if you want the bootstrap graph to stay conceptually crisp, I’d keepall threebut treat them differently:
+
+### Recommended minimal stable set
+
+- Traversal → DAG =DEPENDS_ON
+Traversal → DAG =DEPENDS_ON
+
+- Traversal → DAG =CONSTRAINS
+Traversal → DAG =CONSTRAINS
+
+### Optional if you want runtime semantics in the knowledge graph
+
+- Traversal → DAG =EXECUTES
+Traversal → DAG =EXECUTES
+
+My instinct is:
+
+- keepEXECUTESifNebula is going to model operational semantics and not just design dependency
+keepEXECUTESifNebula is going to model operational semantics and not just design dependency
+
+- drop itifyou want the bootstrap graph to stay mostly architectural and static
+drop itifyou want the bootstrap graph to stay mostly architectural and static
+
+If I were normalizing this for long-term use, I’d probably keep:
+
+- DEPENDS_ON
+DEPENDS_ON
+
+- CONSTRAINS
+CONSTRAINS
+
+and reserveEXECUTESfor either:
+
+- chunk-level references, or
+chunk-level references, or
+
+- actual runtime execution-link semantics later.
+actual runtime execution-link semantics later.
+
+---
+
+# 2) Add edge identifiers that are independent of English phrasing
+
+The current IDs are readable, but they’re basically sentence fragments:
+
+- wrp:xref/wrp-v1_2-traversal-constrains-wrp-v1_1-dag
+wrp:xref/wrp-v1_2-traversal-constrains-wrp-v1_1-dag
+
+That’s fine for bootstrap, but if you want them to stay stable across wording changes, I’d introduce a more structured ID convention like:
+
+```
+wrp:xref/<source-artifact-key>/<relation>/<target-artifact-key>
+```
+
+```
+wrp:xref/<source-artifact-key>/<relation>/<target-artifact-key>
+```
+
+So for example:
+
+- wrp:xref/wrp-v1_2-traversal/depends_on/wrp-v1_1-dag
+wrp:xref/wrp-v1_2-traversal/depends_on/wrp-v1_1-dag
+
+- wrp:xref/wrp-v1_2-traversal/constrains/wrp-v1_1-dag
+wrp:xref/wrp-v1_2-traversal/constrains/wrp-v1_1-dag
+
+- wrp:xref/wrp-migration-plan/migrates/wrp-v1_2-traversal
+wrp:xref/wrp-migration-plan/migrates/wrp-v1_2-traversal
+
+That makes parsing and deduplication easier.
+
+---
+
+# 3) Add one more edge: Migration Plan → TraversalCONSTRAINS
+
+Right now the migration plan onlymigratesthe traversal artifact. But in practice the migration plan will almost certainly alsoconstrainthe traversal engine design, because rollout compatibility affects:
+
+- fallback behavior
+fallback behavior
+
+- dual-mode execution
+dual-mode execution
+
+- legacy request adapters
+legacy request adapters
+
+- receipt compatibility
+receipt compatibility
+
+- cutover toggles / feature flags
+cutover toggles / feature flags
+
+So I would probably add:
+
+- wrp-migration-plan→wrp-v1_2-traversal=CONSTRAINS
+wrp-migration-plan→wrp-v1_2-traversal=CONSTRAINS
+
+and maybe also:
+
+- wrp-migration-plan→wrp-v1_1-dag=CONSTRAINS
+wrp-migration-plan→wrp-v1_1-dag=CONSTRAINS
+
+because migration can force temporary DAG compatibility shims too.
+
+That gives you a cleaner distinction:
+
+- MIGRATES= “this artifact is part of the migration target set”
+MIGRATES= “this artifact is part of the migration target set”
+
+- CONSTRAINS= “the migration strategy places design limits on this artifact”
+CONSTRAINS= “the migration strategy places design limits on this artifact”
+
+---
+
+# My recommended normalized bootstrap edge set
+
+If I were turning this into the first stable graph, I’d probably normalize it to something like:
+
+## Protocol / DAG
+
+- DAG → Protocol =DEPENDS_ON
+DAG → Protocol =DEPENDS_ON
+
+## Traversal / DAG / Protocol
+
+- Traversal → DAG =DEPENDS_ON
+Traversal → DAG =DEPENDS_ON
+
+- Traversal → DAG =CONSTRAINS
+Traversal → DAG =CONSTRAINS
+
+- Traversal → Protocol =DEPENDS_ON
+Traversal → Protocol =DEPENDS_ON
+
+## Migration → all WRP artifacts
+
+- Migration → Protocol =MIGRATES
+Migration → Protocol =MIGRATES
+
+- Migration → DAG =MIGRATES
+Migration → DAG =MIGRATES
+
+- Migration → Traversal =MIGRATES
+Migration → Traversal =MIGRATES
+
+## Migration as design pressure
+
+- Migration → DAG =CONSTRAINS
+Migration → DAG =CONSTRAINS
+
+- Migration → Traversal =CONSTRAINS
+Migration → Traversal =CONSTRAINS
+
+That’s a pretty good initial semantic skeleton.
+
+---
+
+# So the next artifact I’d write is the one you flagged a moment ago as the real operational prize:
+
+# schemas/core/nebula-retrieval-profiles.jsonld
+
+That’s where the level system stops being passive metadata and starts drivingBuilder / Architect / Inspector / Explorerretrieval behavior.
+
+I’d make it define:
+
+- RetrievalProfile
+RetrievalProfile
+
+- BuilderRetrievalProfile
+BuilderRetrievalProfile
+
+- ArchitectRetrievalProfile
+ArchitectRetrievalProfile
+
+- InspectorRetrievalProfile
+InspectorRetrievalProfile
+
+- ExplorerRetrievalProfile
+ExplorerRetrievalProfile
+
+with fields like:
+
+- allowedLevel
+allowedLevel
+
+- preferredChunkKind
+preferredChunkKind
+
+- preferredNormativeStrength
+preferredNormativeStrength
+
+- crossReferenceExpansionDepth
+crossReferenceExpansionDepth
+
+- includeRationale
+includeRationale
+
+- includeOpenQuestions
+includeOpenQuestions
+
+- preferActiveArtifacts
+preferActiveArtifacts
+
+- allowExecutionLinks
+allowExecutionLinks
+
+If you want, I’ll go straight into that next and make it repo-ready JSON-LD plus the initial four seeded retrieval profiles.
+
+Sources
+
+Sources
+
+Sources
+
+Kanaries Data Inc.SponsoredAI Agent in JupyterEdit cells, run code, inspect outputs, and debug notebooks directly inside JupyterLab.
+
+Kanaries Data Inc.SponsoredAI Agent in JupyterEdit cells, run code, inspect outputs, and debug notebooks directly inside JupyterLab.
+
+Kanaries Data Inc.SponsoredAI Agent in JupyterEdit cells, run code, inspect outputs, and debug notebooks directly inside JupyterLab.
+
+Kanaries Data Inc.SponsoredAI Agent in JupyterEdit cells, run code, inspect outputs, and debug notebooks directly inside JupyterLab.
+
+Kanaries Data Inc.Sponsored
+
+Kanaries Data Inc.Sponsored
+
+Kanaries Data Inc.Sponsored
+
+Kanaries Data Inc.Sponsored
+
+Kanaries Data Inc.
+
+Sponsored
+
+AI Agent in JupyterEdit cells, run code, inspect outputs, and debug notebooks directly inside JupyterLab.
+
+AI Agent in JupyterEdit cells, run code, inspect outputs, and debug notebooks directly inside JupyterLab.
+
+AI Agent in JupyterEdit cells, run code, inspect outputs, and debug notebooks directly inside JupyterLab.
+
+AI Agent in Jupyter
+
+Edit cells, run code, inspect outputs, and debug notebooks directly inside JupyterLab.
+
+You said:OK, go on
+
+#### You said:
+
+OK, go on
+
+OK, go on
+
+OK, go on
+
+OK, go on
+
+OK, go on
+
+OK, go on
+
+OK, go on

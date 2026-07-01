@@ -1,0 +1,28 @@
+Skip to content
+
+New chatSearch chatsPinnedRecentsChat historyNew chatCtrlShiftOSearch chatsCtrlKLibraryAppsMorePinnedLinkedInNexus Work Request PipelineNodeMessage Normalization & TrajectoriesEvent Pipeline EvaluationSelf-Extending Architecture ConceptBuzzwords by LayerAI Engineering Survival SkillsProjectsPrompt Architect / LERONexus Active StepNexushomelabPythonShow moreChatsKernel vs Projection DesignCascade Architectural ViolationKnowledge Representation ConceptsFable Mythos vs ChatGPTProjection Bridge ArchitectureRuntime orchestration failurePlan Verification ShiftAGI and Scaling ModelsInformation Architecture FeedbackLLM Context CompactionAI Tools vs GamblingChange Impact AnalysisSemantic Organizational MemoryMulti-stage Control SystemMongoDB and Documentation HasslesGlobal Change Log DesignNebula Block SegmentationOrb in Console ToolbarWorkRequest and CCNF IntegrationPlans Table DecisionTemporal vs Conduit IntegrationCompeting Intentions ModelHVE Core Bundle OverviewNebula Harvest TriageHypervelocity Engineering ModelOpenClaw for OllamaBranch · Buzzwords by LayerNexus V1 to V2 RewriteMark PippinsFreeClaim offerChatGPTFree offerShareBulk ExportYou said:alright, and while were digressing, BP was digging. 
+
+Here's my complete analysis of the vertical slice — what exists, what's missing, and the design questions that need resolving before implementation.
+🗺️ What Already Exists
+Existing Reduce implementations (3 of them)
+File	What it does
+conduit_wrp_reducer.py	Conduit receipts → WRPProjection
+conduit-wrp-contract.ts	Same contract in TypeScript
+graph_reducer.py	GraphMutations → GraphState
+replay_engine.py	Event log → ExecutionState
+Existing state machine infra
+Artifact
+11-state WRP state machine
+16 receipt types
+Adjacency matrix
+Valid transition function
+Canonical ordering
+Cross-reference taxonomy (14 types)
+Existing LOSM IR types (available for kernel input)
+- WorkRequestDCO — Full decomposition
+- PlanIR, SpecIR, ExecutionIR — Plan/spec/execution models
+- ExecutionReceipt — Receipt model
+- WorkStatus / WorkflowState — State enums
+🔍 The Spec 2 (Kernel Reduce) vs Existing Code Gap
+The harvest spec defines:
+function Reduce(state: KernelState, ir: LOSMIR): KernelState

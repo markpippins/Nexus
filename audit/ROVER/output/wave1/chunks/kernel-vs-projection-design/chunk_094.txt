@@ -1,0 +1,161 @@
+Good — this is the right place to lock structure. Once these dataclasses exist, everything else (incremental reduce, caching, invalidation) becomes mechanically implementable.I’ll keep this aligned with your LOSM/WRP style: explicit, replayable, and diff-friendly rather than “OO convenient.”🧱 Core design principleBoth of these must behave like:versioned, appendable semantic diffs over a global system stateSo:no hidden mutation semanticsno implicit traversal logic inside the data modeleverything is explicit intent⚙️ 1. KernelDelta (system-level incremental input)This is the unit of work for KernelReduceEngine.Key idea:KernelDelta is not “new state”It is:“what changed in the system since last commit”Dataclass definition (Python)PythonRunfromdataclassesimportdataclass,fieldfromtypingimportList,Optional,Dict,SetfromenumimportEnum# ----------------------------# Core identifiers (minimal placeholders)# ----------------------------@dataclass(frozen=True)classPlanId:value:str@dataclass(frozen=True)classReceiptId:value:str@dataclass(frozen=True)classNodeId:value:str@dataclass(frozen=True)classEdgeId:value:str# ----------------------------# KernelDelta# ----------------------------@dataclassclassKernelDelta:"""Incremental change set applied to KernelState.This is the ONLY input to KernelReduceEngine besides snapshot state."""# New or updated receipts entering systemreceipts:List[dict]=field(default_factory=list)# (you can tighten 'dict' to ExecutionReceipt / LOSMIR union later)# Plans explicitly affected by this deltaaffected_plans:Set[PlanId]=field(default_factory=set)# Explicit invalidation signals (beyond inference)invalidated_plans:Set[PlanId]=field(default_factory=set)invalidated_receipts:Set[ReceiptId]=field(default_factory=set)# Structural hints (optional optimization signals)priority:str="normal"# low | normal | high# Optional causality linkage (for audit/debug)causality_trace_id:Optional[str]=None# Source grouping (useful for batching ingestion)batch_id:Optional[str]=NoneWhy these fields matteraffected_planscomputed by router/indexing layerused for cache targetinginvalidated_plansexplicit override (hard invalidation)causality_trace_idties kernel evolution to execution trace systemcritical for your LOSM/PEB architecture later🌐 2. GraphDelta (pure structural diff model)This is the incremental update to GraphIndex.Key idea:GraphIndex is never recomputed — only patchedSo GraphDelta must befully explicit edge operationsDataclass definitionPythonRunfromdataclassesimportdataclass,fieldfromtypingimportList,Optional@dataclass(frozen=True)classGraphEdge:source:strtarget:strrelation:str# e.g. wrp:depends_on, wrp:supersedesweight:float=1.0metadata:Optional[dict]=None@dataclass(frozen=True)classGraphEdgeRemoval:source:strtarget:strrelation:str# ----------------------------# GraphDelta# ----------------------------@dataclassclassGraphDelta:"""Incremental update to Kernel GraphIndex.This avoids full recomputation of cross-plan graph state."""add_edges:List[GraphEdge]=field(default_factory=list)remove_edges:List[GraphEdgeRemoval]=field(default_factory=list)# Optional: nodes introduced or removed explicitlyadd_nodes:List[str]=field(default_factory=list)remove_nodes:List[str]=field(default_factory=list)# Origin tracking (important for debugging cross-plan causality)source_plan_id:Optional[str]=Nonebatch_id:Optional[str]=None🧠 3. Design constraints (important invariants)These are not optional — they define correctness.KernelDelta invariantsKD1: receipts must be append-onlyKD2: invalidations override inferenceKD3: affected_plans must include all touched PlanIdsKD4: delta must be replayable deterministicallyGraphDelta invariantsGD1: add_edges and remove_edges are mutually exclusive per edge identityGD2: no implicit node creation from edges aloneGD3: edge identity = (source, target, relation)GD4: graph updates must be order-independent within a delta batch🔁 4. How these two interact in KernelReduceThis is the important wiring:PythonRundefreduce_kernel(state:KernelState,delta:KernelDelta):# 1. derive impacted plansplans=resolve_affected_plans(delta)# 2. rebuild or reuse PlanIRplan_ir_updates=build_or_reuse_plan_ir(state,plans)# 3. derive graph changes from plan diffsgraph_delta=build_graph_delta(plan_ir_updates)# 4. apply graph delta incrementallystate.graph=apply_graph_delta(state.graph,graph_delta)# 5. merge plan updates into kernelstate.plans.update(plan_ir_updates)# 6. validate invariantsvalidate_kernel(state)returnstate🧩 5. Why this design works (important conceptual point)This structure gives you three layers of separation:1. Intent layer (KernelDelta)“Something changed”2. Structural layer (GraphDelta)“Relationships changed”3. Semantic layer (KernelState)“System meaning after reconciliation”⚡ 6. Upgrade path (so you don’t get stuck later)These dataclasses are intentionally extensible toward:Future Kernel v2 additions:- causal edges (not just structural edges)- weighted inference propagation- conflict resolution metadata- multi-authority identity resolution🧠 Final compressionIf you reduce this entire design to its essence:KernelDelta  = what changed in the worldGraphDelta   = what changed in relationshipsKernelState  = what the world becomes after reconciliationIf you want next step, the natural continuation is:👉 “define KernelReduceEngine as a typed state machine (with cache + invalidation rules)”That’s where this becomes executable infrastructure instead of architecture.
+
+Good — this is the right place to lock structure. Once these dataclasses exist, everything else (incremental reduce, caching, invalidation) becomes mechanically implementable.I’ll keep this aligned with your LOSM/WRP style: explicit, replayable, and diff-friendly rather than “OO convenient.”🧱 Core design principleBoth of these must behave like:versioned, appendable semantic diffs over a global system stateSo:no hidden mutation semanticsno implicit traversal logic inside the data modeleverything is explicit intent⚙️ 1. KernelDelta (system-level incremental input)This is the unit of work for KernelReduceEngine.Key idea:KernelDelta is not “new state”It is:“what changed in the system since last commit”Dataclass definition (Python)PythonRunfromdataclassesimportdataclass,fieldfromtypingimportList,Optional,Dict,SetfromenumimportEnum# ----------------------------# Core identifiers (minimal placeholders)# ----------------------------@dataclass(frozen=True)classPlanId:value:str@dataclass(frozen=True)classReceiptId:value:str@dataclass(frozen=True)classNodeId:value:str@dataclass(frozen=True)classEdgeId:value:str# ----------------------------# KernelDelta# ----------------------------@dataclassclassKernelDelta:"""Incremental change set applied to KernelState.This is the ONLY input to KernelReduceEngine besides snapshot state."""# New or updated receipts entering systemreceipts:List[dict]=field(default_factory=list)# (you can tighten 'dict' to ExecutionReceipt / LOSMIR union later)# Plans explicitly affected by this deltaaffected_plans:Set[PlanId]=field(default_factory=set)# Explicit invalidation signals (beyond inference)invalidated_plans:Set[PlanId]=field(default_factory=set)invalidated_receipts:Set[ReceiptId]=field(default_factory=set)# Structural hints (optional optimization signals)priority:str="normal"# low | normal | high# Optional causality linkage (for audit/debug)causality_trace_id:Optional[str]=None# Source grouping (useful for batching ingestion)batch_id:Optional[str]=NoneWhy these fields matteraffected_planscomputed by router/indexing layerused for cache targetinginvalidated_plansexplicit override (hard invalidation)causality_trace_idties kernel evolution to execution trace systemcritical for your LOSM/PEB architecture later🌐 2. GraphDelta (pure structural diff model)This is the incremental update to GraphIndex.Key idea:GraphIndex is never recomputed — only patchedSo GraphDelta must befully explicit edge operationsDataclass definitionPythonRunfromdataclassesimportdataclass,fieldfromtypingimportList,Optional@dataclass(frozen=True)classGraphEdge:source:strtarget:strrelation:str# e.g. wrp:depends_on, wrp:supersedesweight:float=1.0metadata:Optional[dict]=None@dataclass(frozen=True)classGraphEdgeRemoval:source:strtarget:strrelation:str# ----------------------------# GraphDelta# ----------------------------@dataclassclassGraphDelta:"""Incremental update to Kernel GraphIndex.This avoids full recomputation of cross-plan graph state."""add_edges:List[GraphEdge]=field(default_factory=list)remove_edges:List[GraphEdgeRemoval]=field(default_factory=list)# Optional: nodes introduced or removed explicitlyadd_nodes:List[str]=field(default_factory=list)remove_nodes:List[str]=field(default_factory=list)# Origin tracking (important for debugging cross-plan causality)source_plan_id:Optional[str]=Nonebatch_id:Optional[str]=None🧠 3. Design constraints (important invariants)These are not optional — they define correctness.KernelDelta invariantsKD1: receipts must be append-onlyKD2: invalidations override inferenceKD3: affected_plans must include all touched PlanIdsKD4: delta must be replayable deterministicallyGraphDelta invariantsGD1: add_edges and remove_edges are mutually exclusive per edge identityGD2: no implicit node creation from edges aloneGD3: edge identity = (source, target, relation)GD4: graph updates must be order-independent within a delta batch🔁 4. How these two interact in KernelReduceThis is the important wiring:PythonRundefreduce_kernel(state:KernelState,delta:KernelDelta):# 1. derive impacted plansplans=resolve_affected_plans(delta)# 2. rebuild or reuse PlanIRplan_ir_updates=build_or_reuse_plan_ir(state,plans)# 3. derive graph changes from plan diffsgraph_delta=build_graph_delta(plan_ir_updates)# 4. apply graph delta incrementallystate.graph=apply_graph_delta(state.graph,graph_delta)# 5. merge plan updates into kernelstate.plans.update(plan_ir_updates)# 6. validate invariantsvalidate_kernel(state)returnstate🧩 5. Why this design works (important conceptual point)This structure gives you three layers of separation:1. Intent layer (KernelDelta)“Something changed”2. Structural layer (GraphDelta)“Relationships changed”3. Semantic layer (KernelState)“System meaning after reconciliation”⚡ 6. Upgrade path (so you don’t get stuck later)These dataclasses are intentionally extensible toward:Future Kernel v2 additions:- causal edges (not just structural edges)- weighted inference propagation- conflict resolution metadata- multi-authority identity resolution🧠 Final compressionIf you reduce this entire design to its essence:KernelDelta  = what changed in the worldGraphDelta   = what changed in relationshipsKernelState  = what the world becomes after reconciliationIf you want next step, the natural continuation is:👉 “define KernelReduceEngine as a typed state machine (with cache + invalidation rules)”That’s where this becomes executable infrastructure instead of architecture.
+
+Good — this is the right place to lock structure. Once these dataclasses exist, everything else (incremental reduce, caching, invalidation) becomes mechanically implementable.
+
+I’ll keep this aligned with your LOSM/WRP style: explicit, replayable, and diff-friendly rather than “OO convenient.”
+
+---
+
+# 🧱 Core design principle
+
+Both of these must behave like:
+
+> versioned, appendable semantic diffs over a global system state
+
+versioned, appendable semantic diffs over a global system state
+
+So:
+
+- no hidden mutation semantics
+no hidden mutation semantics
+
+- no implicit traversal logic inside the data model
+no implicit traversal logic inside the data model
+
+- everything is explicit intent
+everything is explicit intent
+
+---
+
+# ⚙️ 1. KernelDelta (system-level incremental input)
+
+This is the unit of work for KernelReduceEngine.
+
+### Key idea:
+
+KernelDelta is not “new state”It is:
+
+> “what changed in the system since last commit”
+
+“what changed in the system since last commit”
+
+---
+
+## Dataclass definition (Python)
+
+```
+from dataclasses import dataclass, fieldfrom typing import List, Optional, Dict, Setfrom enum import Enum# ----------------------------# Core identifiers (minimal placeholders)# ----------------------------@dataclass(frozen=True)class PlanId:    value: str@dataclass(frozen=True)class ReceiptId:    value: str@dataclass(frozen=True)class NodeId:    value: str@dataclass(frozen=True)class EdgeId:    value: str# ----------------------------# KernelDelta# ----------------------------@dataclassclass KernelDelta:    """    Incremental change set applied to KernelState.    This is the ONLY input to KernelReduceEngine besides snapshot state.    """    # New or updated receipts entering system    receipts: List[dict] = field(default_factory=list)    # (you can tighten 'dict' to ExecutionReceipt / LOSMIR union later)    # Plans explicitly affected by this delta    affected_plans: Set[PlanId] = field(default_factory=set)    # Explicit invalidation signals (beyond inference)    invalidated_plans: Set[PlanId] = field(default_factory=set)    invalidated_receipts: Set[ReceiptId] = field(default_factory=set)    # Structural hints (optional optimization signals)    priority: str = "normal"  # low | normal | high    # Optional causality linkage (for audit/debug)    causality_trace_id: Optional[str] = None    # Source grouping (useful for batching ingestion)    batch_id: Optional[str] = None
+```
+
+```
+from dataclasses import dataclass, fieldfrom typing import List, Optional, Dict, Setfrom enum import Enum# ----------------------------# Core identifiers (minimal placeholders)# ----------------------------@dataclass(frozen=True)class PlanId:    value: str@dataclass(frozen=True)class ReceiptId:    value: str@dataclass(frozen=True)class NodeId:    value: str@dataclass(frozen=True)class EdgeId:    value: str# ----------------------------# KernelDelta# ----------------------------@dataclassclass KernelDelta:    """    Incremental change set applied to KernelState.    This is the ONLY input to KernelReduceEngine besides snapshot state.    """    # New or updated receipts entering system    receipts: List[dict] = field(default_factory=list)    # (you can tighten 'dict' to ExecutionReceipt / LOSMIR union later)    # Plans explicitly affected by this delta    affected_plans: Set[PlanId] = field(default_factory=set)    # Explicit invalidation signals (beyond inference)    invalidated_plans: Set[PlanId] = field(default_factory=set)    invalidated_receipts: Set[ReceiptId] = field(default_factory=set)    # Structural hints (optional optimization signals)    priority: str = "normal"  # low | normal | high    # Optional causality linkage (for audit/debug)    causality_trace_id: Optional[str] = None    # Source grouping (useful for batching ingestion)    batch_id: Optional[str] = None
+```
+
+---
+
+## Why these fields matter
+
+### affected_plans
+
+- computed by router/indexing layer
+computed by router/indexing layer
+
+- used for cache targeting
+used for cache targeting
+
+### invalidated_plans
+
+- explicit override (hard invalidation)
+explicit override (hard invalidation)
+
+### causality_trace_id
+
+- ties kernel evolution to execution trace system
+ties kernel evolution to execution trace system
+
+- critical for your LOSM/PEB architecture later
+critical for your LOSM/PEB architecture later
+
+---
+
+# 🌐 2. GraphDelta (pure structural diff model)
+
+This is the incremental update to GraphIndex.
+
+### Key idea:
+
+> GraphIndex is never recomputed — only patched
+
+GraphIndex is never recomputed — only patched
+
+So GraphDelta must befully explicit edge operations
+
+---
+
+## Dataclass definition
+
+```
+from dataclasses import dataclass, fieldfrom typing import List, Optional@dataclass(frozen=True)class GraphEdge:    source: str    target: str    relation: str  # e.g. wrp:depends_on, wrp:supersedes    weight: float = 1.0    metadata: Optional[dict] = None@dataclass(frozen=True)class GraphEdgeRemoval:    source: str    target: str    relation: str# ----------------------------# GraphDelta# ----------------------------@dataclassclass GraphDelta:    """    Incremental update to Kernel GraphIndex.    This avoids full recomputation of cross-plan graph state.    """    add_edges: List[GraphEdge] = field(default_factory=list)    remove_edges: List[GraphEdgeRemoval] = field(default_factory=list)    # Optional: nodes introduced or removed explicitly    add_nodes: List[str] = field(default_factory=list)    remove_nodes: List[str] = field(default_factory=list)    # Origin tracking (important for debugging cross-plan causality)    source_plan_id: Optional[str] = None    batch_id: Optional[str] = None
+```
+
+```
+from dataclasses import dataclass, fieldfrom typing import List, Optional@dataclass(frozen=True)class GraphEdge:    source: str    target: str    relation: str  # e.g. wrp:depends_on, wrp:supersedes    weight: float = 1.0    metadata: Optional[dict] = None@dataclass(frozen=True)class GraphEdgeRemoval:    source: str    target: str    relation: str# ----------------------------# GraphDelta# ----------------------------@dataclassclass GraphDelta:    """    Incremental update to Kernel GraphIndex.    This avoids full recomputation of cross-plan graph state.    """    add_edges: List[GraphEdge] = field(default_factory=list)    remove_edges: List[GraphEdgeRemoval] = field(default_factory=list)    # Optional: nodes introduced or removed explicitly    add_nodes: List[str] = field(default_factory=list)    remove_nodes: List[str] = field(default_factory=list)    # Origin tracking (important for debugging cross-plan causality)    source_plan_id: Optional[str] = None    batch_id: Optional[str] = None
+```
+
+---
+
+# 🧠 3. Design constraints (important invariants)
+
+These are not optional — they define correctness.
+
+---
+
+## KernelDelta invariants
+
+```
+KD1: receipts must be append-onlyKD2: invalidations override inferenceKD3: affected_plans must include all touched PlanIdsKD4: delta must be replayable deterministically
+```
+
+```
+KD1: receipts must be append-onlyKD2: invalidations override inferenceKD3: affected_plans must include all touched PlanIdsKD4: delta must be replayable deterministically
+```
+
+---
+
+## GraphDelta invariants
+
+```
+GD1: add_edges and remove_edges are mutually exclusive per edge identityGD2: no implicit node creation from edges aloneGD3: edge identity = (source, target, relation)GD4: graph updates must be order-independent within a delta batch
+```
+
+```
+GD1: add_edges and remove_edges are mutually exclusive per edge identityGD2: no implicit node creation from edges aloneGD3: edge identity = (source, target, relation)GD4: graph updates must be order-independent within a delta batch
+```
+
+---
+
+# 🔁 4. How these two interact in KernelReduce
+
+This is the important wiring:
+
+```
+def reduce_kernel(state: KernelState, delta: KernelDelta):    # 1. derive impacted plans    plans = resolve_affected_plans(delta)    # 2. rebuild or reuse PlanIR    plan_ir_updates = build_or_reuse_plan_ir(state, plans)    # 3. derive graph changes from plan diffs    graph_delta = build_graph_delta(plan_ir_updates)    # 4. apply graph delta incrementally    state.graph = apply_graph_delta(state.graph, graph_delta)    # 5. merge plan updates into kernel    state.plans.update(plan_ir_updates)    # 6. validate invariants    validate_kernel(state)    return state
+```
+
+```
+def reduce_kernel(state: KernelState, delta: KernelDelta):    # 1. derive impacted plans    plans = resolve_affected_plans(delta)    # 2. rebuild or reuse PlanIR    plan_ir_updates = build_or_reuse_plan_ir(state, plans)    # 3. derive graph changes from plan diffs    graph_delta = build_graph_delta(plan_ir_updates)    # 4. apply graph delta incrementally    state.graph = apply_graph_delta(state.graph, graph_delta)    # 5. merge plan updates into kernel    state.plans.update(plan_ir_updates)    # 6. validate invariants    validate_kernel(state)    return state
+```
+
+---
+
+# 🧩 5. Why this design works (important conceptual point)
+
+This structure gives you three layers of separation:
+
+---
+
+## 1. Intent layer (KernelDelta)
+
+> “Something changed”

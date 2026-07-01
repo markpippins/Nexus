@@ -1,0 +1,357 @@
+```
+---## 3.1 L0 — Execution Layer (Conduit)### Permissions:- emit ExecutionReceipts- propose GraphMutationPlans### Restrictions:- cannot directly mutate Nebula graph- cannot modify WRP rules- cannot alter validation logic### Role:> Observes reality, does not define it---## 3.2 L1 — Learning Layer (Self-Healing)### Permissions:- propose chunk reclassification- propose edge modifications- propose review state updates- propose stability recalibration### Restrictions:- cannot finalize mutations- cannot override invariants- cannot modify protocol rules### Role:> Suggests evolution based on evidence---## 3.3 L2 — Validation Layer (WRP Engine)### Permissions:- accept/reject mutation proposals- mark violations- adjust invariant strictness (bounded)- trigger review escalation### Restrictions:- cannot directly mutate execution graph- cannot create new semantic chunks### Role:> Enforces correctness constraints---## 3.4 L3 — Governance Layer (Authority Controller)### Permissions:- approve or deny all mutations- resolve conflicting proposals- enforce schema-level changes- modify chunk kind definitions (controlled)- approve WRP invariant changes### Role:> Final arbiter of truth changes---# 4. Mutation TypesAll graph mutations fall into controlled categories:---## 4.1 Structural mutations- ADD_EDGE- REMOVE_EDGE- MODIFY_EDGE- SPLIT_NODE- MERGE_NODE---## 4.2 Semantic mutations- RECLASSIFY_CHUNK_KIND- UPDATE_LEVEL- MARK_SUPERSEDED- UPDATE_REVIEW_STATE---## 4.3 Governance mutations- ADD_INVARIANT- MODIFY_INVARIANT- UPDATE_EXECUTION_POLICY- CHANGE_VALIDATION_STRICTNESS---# 5. Mutation Permission Matrix| Mutation Type         | L0 | L1 | L2 | L3 ||----------------------|----|----|----|----|| Emit Proposal        | ✔  | ✔  | ✖  | ✖  || Structural Change    | ✖  | ✔  | ✖  | ✔* || Semantic Change      | ✖  | ✔  | ✔  | ✔* || Validation Change    | ✖  | ✖  | ✔  | ✔  || Invariant Change     | ✖  | ✖  | ✔  | ✔  |\* only via approved mutation pipeline---# 6. Mutation PipelineNo mutation is applied directly.All mutations follow this process:
+```
+
+proposal→ validation check→ conflict analysis→ governance evaluation→ approval decision→ application→ audit logging
+
+```
+---# 7. Mutation Proposal Format```json id="mp2"MutationProposal {  id  source_layer  target_node  mutation_type  rationale  confidence  evidence[]  affected_nodes[]}
+```
+
+```
+---# 7. Mutation Proposal Format```json id="mp2"MutationProposal {  id  source_layer  target_node  mutation_type  rationale  confidence  evidence[]  affected_nodes[]}
+```
+
+---
+
+# 8. Conflict Resolution System
+
+When multiple mutation proposals conflict:
+
+---
+
+## 8.1 Priority ordering
+
+- WRP invariant-preserving mutations
+WRP invariant-preserving mutations
+
+- Execution-failure-driven corrections
+Execution-failure-driven corrections
+
+- High-frequency failure corrections
+High-frequency failure corrections
+
+- Structural consistency repairs
+Structural consistency repairs
+
+- Optimization-only mutations
+Optimization-only mutations
+
+---
+
+## 8.2 Tie-breaking rules
+
+If equal priority:
+
+- prefer minimal graph change
+prefer minimal graph change
+
+- prefer localized mutation
+prefer localized mutation
+
+- prefer reversible mutation
+prefer reversible mutation
+
+- prefer validation-backed mutation
+prefer validation-backed mutation
+
+---
+
+# 9. Safety Constraints
+
+---
+
+## 9.1 No uncontrolled mutation
+
+```
+if mutation.source not in APPROVED_LAYERS:    reject(mutation)
+```
+
+```
+if mutation.source not in APPROVED_LAYERS:    reject(mutation)
+```
+
+---
+
+## 9.2 Invariant lock rule
+
+If mutation violates CRITICAL invariant:
+
+- reject immediately
+reject immediately
+
+- escalate to L3 governance review
+escalate to L3 governance review
+
+---
+
+## 9.3 Stability threshold rule
+
+If node stability < threshold:
+
+- allow mutation proposals
+allow mutation proposals
+
+- but require dual approval (L1 + L3)
+but require dual approval (L1 + L3)
+
+---
+
+# 10. Mutation Audit Trail
+
+Every accepted mutation produces an immutable record:
+
+```
+MutationRecord {  mutation_id  applied_by  timestamp  before_state  after_state  justification  validation_result}
+```
+
+```
+MutationRecord {  mutation_id  applied_by  timestamp  before_state  after_state  justification  validation_result}
+```
+
+Stored in Nebula ashistorical truth layer.
+
+---
+
+# 11. Governance Decision Engine
+
+L3 uses a deterministic scoring system:
+
+```
+score(mutation) =    evidence_strength  + validation_support  + execution_failure_correlation  - risk_score  - graph_impact_radius
+```
+
+```
+score(mutation) =    evidence_strength  + validation_support  + execution_failure_correlation  - risk_score  - graph_impact_radius
+```
+
+Approval thresholds:
+
+- ≥ 0.75 → approved
+≥ 0.75 → approved
+
+- 0.5–0.75 → review required
+0.5–0.75 → review required
+
+- < 0.5 → rejected
+< 0.5 → rejected
+
+---
+
+# 12. Execution vs Truth Separation
+
+Critical system rule:
+
+> Execution success does not automatically imply truth correctness.
+
+Execution success does not automatically imply truth correctness.
+
+And:
+
+> Truth correction does not automatically imply execution change.
+
+Truth correction does not automatically imply execution change.
+
+They are decoupled intentionally.
+
+---
+
+# 13. Recovery Mode
+
+If system instability is detected:
+
+- L1 freezes mutation generation
+L1 freezes mutation generation
+
+- L2 tightens validation rules
+L2 tightens validation rules
+
+- L3 enters manual review mode
+L3 enters manual review mode
+
+- Conduit continues only on VERIFIED subgraph
+Conduit continues only on VERIFIED subgraph
+
+---
+
+# 14. System Stability Model
+
+Nebula tracks:
+
+- mutation frequency
+mutation frequency
+
+- rollback frequency
+rollback frequency
+
+- invariant violation density
+invariant violation density
+
+- graph churn rate
+graph churn rate
+
+High churn triggers:
+
+- stricter governance
+stricter governance
+
+- reduced L1 autonomy
+reduced L1 autonomy
+
+- increased validation strictness
+increased validation strictness
+
+---
+
+# 15. Key System Property
+
+> Nebula is self-modifying, but not self-authorizing.
+
+Nebula is self-modifying, but not self-authorizing.
+
+Modification and authorization are permanently separated.
+
+---
+
+# 16. Full System Architecture (Final Form)
+
+```
+WRP (rules of correctness)   ↓Nebula (semantic + trust graph)   ↓Retrieval (role-based cognition)   ↓Conduit (execution runtime)   ↓WRP Validation Engine (proof gate)   ↓Self-Healing Layer (mutation proposals)   ↓Governance Layer (mutation authority)   ↓Approved Graph Mutation   ↓Updated Nebula   ↓(loop)``` id="loop4"---# 17. Final Principle> A system that can change itself must also define who is allowed to change it.Without governance, self-modification becomes noise.With governance, it becomes **controlled evolution of a semantic system of truth**.
+```
+
+```
+WRP (rules of correctness)   ↓Nebula (semantic + trust graph)   ↓Retrieval (role-based cognition)   ↓Conduit (execution runtime)   ↓WRP Validation Engine (proof gate)   ↓Self-Healing Layer (mutation proposals)   ↓Governance Layer (mutation authority)   ↓Approved Graph Mutation   ↓Updated Nebula   ↓(loop)``` id="loop4"---# 17. Final Principle> A system that can change itself must also define who is allowed to change it.Without governance, self-modification becomes noise.With governance, it becomes **controlled evolution of a semantic system of truth**.
+```
+
+---
+
+# What you now have (this is essentially system completion)
+
+You’ve now defined a full operating architecture:
+
+## 1. WRP
+
+- formal correctness system
+formal correctness system
+
+## 2. Nebula
+
+- semantic graph + trust + review
+semantic graph + trust + review
+
+## 3. Retrieval system
+
+- role-aware cognitive selection
+role-aware cognitive selection
+
+## 4. Conduit runtime
+
+- execution scheduler + DAG runtime
+execution scheduler + DAG runtime
+
+## 5. Validation engine
+
+- pre-execution proof gate
+pre-execution proof gate
+
+## 6. Self-healing system
+
+- post-execution learning
+post-execution learning
+
+## 7. Governance model (this doc)
+
+- authority + mutation control
+authority + mutation control
+
+---
+
+# What this actually is (stepping back)
+
+You’ve constructed:
+
+> A self-evolving, role-aware, validated semantic execution system with bounded authority mutation.
+
+A self-evolving, role-aware, validated semantic execution system with bounded authority mutation.
+
+Or more simply:
+
+> A controlled cognitive operating system for structured knowledge and execution.
+
+A controlled cognitive operating system for structured knowledge and execution.
+
+---
+
+# If we continue (optional final expansions)
+
+There are only two remaining “advanced system layers”:
+
+## A. Multi-agent reasoning fabric
+
+(Builder / Architect / Inspector running concurrently over the same graph)
+
+## B. Temporal versioning & branching system
+
+(“Nebula forks”, time-travel, scenario simulation, rollback branches)
+
+---
+
+If you want to continue, the next natural artifact is:
+
+> “Nebula Temporal Graph Versioning & Branching Model”
+
+“Nebula Temporal Graph Versioning & Branching Model”
+
+That’s where this system gainshistory, parallel futures, and simulation capability.
+
+AttioSponsoredBeyond AffinityRelationship intelligence plus everything else. Try Attio Free.
+
+AttioSponsoredBeyond AffinityRelationship intelligence plus everything else. Try Attio Free.
+
+AttioSponsoredBeyond AffinityRelationship intelligence plus everything else. Try Attio Free.
+
+AttioSponsoredBeyond AffinityRelationship intelligence plus everything else. Try Attio Free.
+
+AttioSponsored
+
+AttioSponsored
+
+AttioSponsored
+
+AttioSponsored
+
+Attio
+
+Sponsored
+
+Beyond AffinityRelationship intelligence plus everything else. Try Attio Free.
+
+Beyond AffinityRelationship intelligence plus everything else. Try Attio Free.
+
+Beyond AffinityRelationship intelligence plus everything else. Try Attio Free.
+
+Beyond Affinity
+
+Relationship intelligence plus everything else. Try Attio Free.
+
+You said:alright, let's continue
+
+#### You said:
+
+alright, let's continue
+
+alright, let's continue
+
+alright, let's continue
+
+alright, let's continue
+
+alright, let's continue
+
+alright, let's continue
+
+alright, let's continue
+
+ChatGPT said:Good. This is the point where the system stops being “a knowledge graph that evolves” and becomes something closer to aversioned semantic reality engine.If you don’t define time properly here, everything you built earlier starts quietly breaking in subtle ways (especially self-healing + governance).So now we lock in:how Nebula represents change over time, forks, simulations, and rollback realitydocs/nebula/nebula-temporal-graph-versioning-and-branching.mdMarkdown# Nebula Temporal Graph Versioning & Branching Model**Status:** Draft**Owner:** Nebula core / temporal graph subsystem**Purpose:** Define how Nebula represents time, versioning, branching, rollback, and parallel semantic realities across evolving graphs.---# 1. OverviewNebula is not a static graph.It is a **temporal semantic system** where:- nodes evolve- edges change- classifications drift- invariants strengthen or weaken- execution outcomes reshape structureThis requires a formal model of:> time, versioning, and branching realities---# 2. Core Principle> There is no single “current” Nebula.There are only:- versions of the graph- branches of interpretation- and execution-consistent timelines---# 3. Temporal ModelNebula introduces a **versioned graph timeline**:t0 → t1 → t2 → t3 → ...Each timestamp represents a **graph snapshot state**.---## 3.1 Temporal Graph DefinitionGraphState {version_idparent_version_idtimestampnodes[]edges[]review_state_snapshotvalidation_snapshot}---# 4. Branching ModelA branch represents divergence in semantic evolution.---## 4.1 Branch structureBranch {branch_idbase_version_idhead_version_idpurposestability_score}---## 4.2 Branch types### MAIN- canonical system state- production execution source### EXPERIMENTAL- used for testing mutations or new invariants- unsafe execution allowed### REPAIR- used for healing inconsistent or broken graphs### SIMULATION- hypothetical execution paths- no real mutations applied---# 5. Version Creation RulesA new version is created when:- a mutation is approved- a validation change occurs- a structural repair is applied- a significant execution cycle completes- governance updates are applied---## 5.1 Version creation pipeline```pseudo id="ver1"function create_version(previous_state, mutations):new_state = clone(previous_state)apply_mutations(new_state, mutations)validate(new_state)assign_version_id(new_state)link_to_parent(previous_state, new_state)return new_state6. Temporal Mutation TrackingEvery mutation is time-bound:MutationRecord {mutation_idapplied_at_versioncreated_at_versionaffected_nodes[]}``` id="mut2"This allows:- rollback to pre-mutation state- diffing across time- causality tracking---# 7. Graph Diff EngineNebula supports structural diffs between versions.---## 7.1 Diff types- NODE_ADDED- NODE_REMOVED- NODE_MODIFIED- EDGE_ADDED- EDGE_REMOVED- CLASSIFICATION_CHANGED- REVIEW_STATE_CHANGED---## 7.2 Diff computation```pseudo id="diff1"function diff(v1, v2):return {added_nodes,removed_nodes,modified_nodes,added_edges,removed_edges,state_changes}8. Rollback SystemNebula supports deterministic rollback.8.1 Rollback rulesRollback produces a new version:pseudofunction rollback(target_version):base = load(target_version)new_version = clone(base)mark_as_rollback(new_version)return new_version8.2 Rollback constraintscannot rollback across incompatible schema versionsgovernance approval required for MAIN branch rollbackexecution receipts preserved across rollback boundaries9. Simulation ModeSimulation createsnon-persistent branches.9.1 Simulation propertiesno mutation persistencefull execution allowedfull validation appliedno impact on MAIN branch9.2 Simulation DAG executionpseudorun_execution(dag, mode=SIMULATION)Outputs:hypothetical receiptspredicted failure pointsstability projection10. Temporal Stability ModelEach branch has a stability score:stability =execution_success_rate- invariant_violation_rate- mutation_churn_rate+ validation_consistency``` id="stab2"---## 10.1 Branch promotion rulesA branch may be promoted to MAIN if:- stability > threshold- validation passes consistently- governance approves transition---# 11. Causality TrackingNebula tracks causality across time:NodeVersionHistory {node_idversions[]mutation_chain[]}This enables:- “why did this node become like this?”- full historical traceability- regression debugging across versions---# 12. Temporal Query ModelQueries can specify time:---## 12.1 Query modes- CURRENT → latest MAIN branch- SNAPSHOT(t) → fixed version- BRANCH(id) → branch-specific view- DIFF(v1, v2) → comparison view- SIMULATION → hypothetical execution---# 13. Execution Over TimeConduit execution binds to a version:- execution always references a GraphState- receipts are tied to version_id- reruns may produce new version branches---# 14. Conflict Resolution Across TimeWhen contradictions appear:Priority:1. newer MAIN branch overrides older2. validated SIMULATION cannot override MAIN3. REPAIR branch requires governance approval4. experimental branches never override MAIN---# 15. Key System Property> Nebula is not a graph. It is a branching timeline of graphs with governed divergence and controlled reconciliation.---# 16. Full System Architecture (Final Expanded Form)``` id="arch1"WRP (correctness rules)↓Nebula (temporal semantic graph system)↓Retrieval (role-aware + time-aware selection)↓Conduit (execution runtime bound to version)↓WRP Validation Engine (pre-execution proof gate)↓Self-Healing Layer (mutation proposals)↓Governance Layer (mutation authority)↓Temporal Versioning System (this layer)↓Updated GraphState↓(loop across time)``` id="loop5"---# 17. Final Principle> A system that evolves must also remember every possible way it evolved.Time is not metadata.Time is **structure**.What you now have (system completion + temporal closure)You now have a fully specified system with:1. WRPcorrectness constraints2. Nebula (now temporal)semantic graph + trust + review + version history3. Retrieval systemrole + time aware cognition4. Conduit runtimeexecution over versioned graphs5. Validation enginepre-execution proof system6. Self-healing systempost-execution learning7. Governance modelcontrolled mutation authority8. Temporal versioning system (this doc)branching reality, rollback, simulationWhat you’ve actually built (stepping back)This is no longer a pipeline.It is:Aversioned, self-modifying, role-aware semantic execution operating system with governed mutation and temporal branchingIf we continue (final frontier options)There are only two meaningful next expansions:A. Multi-agent cognitive runtime layerBuilder / Architect / Inspector running concurrently over same versioned graphB. Distributed Conduit execution fabrichorizontal scaling, sharding, parallel graph executionIf you want to continue, the next artifact would be:“Nebula Multi-Agent Cognitive Execution Fabric”That’s where the system stops being single-runtime and becomes acoordinated reasoning swarm over a versioned semantic universe.Sources
+
+#### ChatGPT said:

@@ -1,0 +1,572 @@
+Whiteboard to Spec
+
+- Semantically Encoded Markdown
+Semantically Encoded Markdown
+
+Semantically Encoded Markdown
+
+- AI vs Code Structure
+AI vs Code Structure
+
+AI vs Code Structure
+
+- Event System Design
+Event System Design
+
+Event System Design
+
+- Temporal in Conduit Integration
+Temporal in Conduit Integration
+
+Temporal in Conduit Integration
+
+- ATDD Overview
+ATDD Overview
+
+ATDD Overview
+
+- Wireframe for Voyager and Others
+Wireframe for Voyager and Others
+
+Wireframe for Voyager and Others
+
+- AI Naming Strategies
+AI Naming Strategies
+
+AI Naming Strategies
+
+- Bug Tracking Architecture
+Bug Tracking Architecture
+
+Bug Tracking Architecture
+
+- AG-UI and Nexus Integration
+AG-UI and Nexus Integration
+
+AG-UI and Nexus Integration
+
+- SpaCy in Nexus
+SpaCy in Nexus
+
+SpaCy in Nexus
+
+- Qwen3.5:27b Benefits
+Qwen3.5:27b Benefits
+
+Qwen3.5:27b Benefits
+
+- Boundary Contract Mismatch
+Boundary Contract Mismatch
+
+Boundary Contract Mismatch
+
+- Coffee and Migration Check
+Coffee and Migration Check
+
+Coffee and Migration Check
+
+- Ollama Performance Advances
+Ollama Performance Advances
+
+Ollama Performance Advances
+
+- Atten
+Atten
+
+Atten
+
+- Architecture Missteps and Solutions
+Architecture Missteps and Solutions
+
+Architecture Missteps and Solutions
+
+- Convex to Postgres Test
+Convex to Postgres Test
+
+Convex to Postgres Test
+
+- Conduit and WRP Integration
+Conduit and WRP Integration
+
+Conduit and WRP Integration
+
+- DocLang AI Standard
+DocLang AI Standard
+
+DocLang AI Standard
+
+- DeepSeek critique analysis
+DeepSeek critique analysis
+
+DeepSeek critique analysis
+
+- State Triangulation Problem
+State Triangulation Problem
+
+State Triangulation Problem
+
+- Work Requests and Plans
+Work Requests and Plans
+
+Work Requests and Plans
+
+- File Sync vs Database
+File Sync vs Database
+
+File Sync vs Database
+
+- AI Societies and Governance
+AI Societies and Governance
+
+AI Societies and Governance
+
+- Conduit Refactoring Discussion
+Conduit Refactoring Discussion
+
+Conduit Refactoring Discussion
+
+- Plurality and Agent Disagreement
+Plurality and Agent Disagreement
+
+Plurality and Agent Disagreement
+
+- Conduit Evolution
+Conduit Evolution
+
+Conduit Evolution
+
+- Company Name Feedback
+Company Name Feedback
+
+Company Name Feedback
+
+- Nexus Conduit Migration
+Nexus Conduit Migration
+
+Nexus Conduit Migration
+
+- Determinism vs Probabilism in AI
+Determinism vs Probabilism in AI
+
+Determinism vs Probabilism in AI
+
+- Chatbox Development Challenges
+Chatbox Development Challenges
+
+Chatbox Development Challenges
+
+- Prometheux Concepts API
+Prometheux Concepts API
+
+Prometheux Concepts API
+
+- Agent-initiated Conversations
+Agent-initiated Conversations
+
+Agent-initiated Conversations
+
+- Conduit RGEM Spec
+Conduit RGEM Spec
+
+Conduit RGEM Spec
+
+- Model Role Assignment
+Model Role Assignment
+
+Model Role Assignment
+
+- Inference and Persistent Learning
+Inference and Persistent Learning
+
+Inference and Persistent Learning
+
+- Semantic Adapter Layer
+Semantic Adapter Layer
+
+Semantic Adapter Layer
+
+- Nexus Avatar Design Ideas
+Nexus Avatar Design Ideas
+
+Nexus Avatar Design Ideas
+
+- CLI Agent Persistence
+CLI Agent Persistence
+
+CLI Agent Persistence
+
+- OpenCode Process Leak
+OpenCode Process Leak
+
+OpenCode Process Leak
+
+- System Accretion Cascade
+System Accretion Cascade
+
+System Accretion Cascade
+
+- Workflow Engine vs Agents
+Workflow Engine vs Agents
+
+Workflow Engine vs Agents
+
+- Uses of Lua
+Uses of Lua
+
+Uses of Lua
+
+- Contract Firewall Explanation
+Contract Firewall Explanation
+
+Contract Firewall Explanation
+
+- Provenance Engine Refinement
+Provenance Engine Refinement
+
+Provenance Engine Refinement
+
+- Resume gap narrative
+Resume gap narrative
+
+Resume gap narrative
+
+- Next Phase Priorities
+Next Phase Priorities
+
+Next Phase Priorities
+
+- fs-crawler-v2-implementation
+fs-crawler-v2-implementation
+
+fs-crawler-v2-implementation
+
+- Grounded Semantic Indexing
+Grounded Semantic Indexing
+
+Grounded Semantic Indexing
+
+- pipeline-manager-updates
+pipeline-manager-updates
+
+pipeline-manager-updates
+
+- Nexus development focus
+Nexus development focus
+
+Nexus development focus
+
+- Naming Spring AI Host
+Naming Spring AI Host
+
+Naming Spring AI Host
+
+- Rate limit strategies
+Rate limit strategies
+
+Rate limit strategies
+
+- Sliding Window Rate Limiter
+Sliding Window Rate Limiter
+
+Sliding Window Rate Limiter
+
+- Kanban UI for Loose Pipes
+Kanban UI for Loose Pipes
+
+Kanban UI for Loose Pipes
+
+- CCNF Normalization vs Parsing
+CCNF Normalization vs Parsing
+
+CCNF Normalization vs Parsing
+
+- Parser updates and normalization
+Parser updates and normalization
+
+Parser updates and normalization
+
+- NATS to LOSM Morphism
+NATS to LOSM Morphism
+
+NATS to LOSM Morphism
+
+- LOSM Morphism Evolution
+LOSM Morphism Evolution
+
+LOSM Morphism Evolution
+
+- Chat Backup Solutions
+Chat Backup Solutions
+
+Chat Backup Solutions
+
+- Token Usage Increase Factors
+Token Usage Increase Factors
+
+Token Usage Increase Factors
+
+- Chat Event Models Analysis
+Chat Event Models Analysis
+
+Chat Event Models Analysis
+
+- Reimplementing with Solr.
+Reimplementing with Solr.
+
+Reimplementing with Solr.
+
+- Inference vs Deterministic Workflows
+Inference vs Deterministic Workflows
+
+Inference vs Deterministic Workflows
+
+- SOPs vs Decision Trees
+SOPs vs Decision Trees
+
+SOPs vs Decision Trees
+
+- Claude 4.8 Tool Issue
+Claude 4.8 Tool Issue
+
+Claude 4.8 Tool Issue
+
+- AI Deployment ROI Analysis
+AI Deployment ROI Analysis
+
+AI Deployment ROI Analysis
+
+- Tech System Constraints
+Tech System Constraints
+
+Tech System Constraints
+
+- LLM as Nexus User
+LLM as Nexus User
+
+LLM as Nexus User
+
+- System Architecture Progress
+System Architecture Progress
+
+System Architecture Progress
+
+- Agent Governance Insights
+Agent Governance Insights
+
+Agent Governance Insights
+
+- Codex Token Usage Insights
+Codex Token Usage Insights
+
+Codex Token Usage Insights
+
+- Microsoft Fabric Cost Reasons
+Microsoft Fabric Cost Reasons
+
+Microsoft Fabric Cost Reasons
+
+- Service Registry Cleanup
+Service Registry Cleanup
+
+Service Registry Cleanup
+
+- multiuser and auth
+multiuser and auth
+
+multiuser and auth
+
+- fs-crawler-v2
+fs-crawler-v2
+
+fs-crawler-v2
+
+- Rux Language Release Insights
+Rux Language Release Insights
+
+Rux Language Release Insights
+
+- Governance and AI Insights
+Governance and AI Insights
+
+Governance and AI Insights
+
+- AI Governance and Architecture
+AI Governance and Architecture
+
+AI Governance and Architecture
+
+- TDD for Complex Systems
+TDD for Complex Systems
+
+TDD for Complex Systems
+
+- Governance over Recursive Autonomy
+Governance over Recursive Autonomy
+
+Governance over Recursive Autonomy
+
+- JSON-LD for DSIDE
+JSON-LD for DSIDE
+
+JSON-LD for DSIDE
+
+- Codex and Universal Automation
+Codex and Universal Automation
+
+Codex and Universal Automation
+
+- System Architecture Comparison
+System Architecture Comparison
+
+System Architecture Comparison
+
+- LangGraph vs Temporal
+LangGraph vs Temporal
+
+LangGraph vs Temporal
+
+- LangChain in RAG
+LangChain in RAG
+
+LangChain in RAG
+
+- Venture Capital Guidance
+Venture Capital Guidance
+
+Venture Capital Guidance
+
+- PDF Analysis Request
+PDF Analysis Request
+
+PDF Analysis Request
+
+- Deployment Properties Inference
+Deployment Properties Inference
+
+Deployment Properties Inference
+
+- LOSM Architecture Assessment
+LOSM Architecture Assessment
+
+LOSM Architecture Assessment
+
+- AI Adoption and Constraints
+AI Adoption and Constraints
+
+AI Adoption and Constraints
+
+- Unifying Overlapping Disciplines
+Unifying Overlapping Disciplines
+
+Unifying Overlapping Disciplines
+
+- Event-Sourced Core
+Event-Sourced Core
+
+Event-Sourced Core
+
+- Roebuck Content Analysis
+Roebuck Content Analysis
+
+Roebuck Content Analysis
+
+- Subscription Choice Comparison
+Subscription Choice Comparison
+
+Subscription Choice Comparison
+
+- AI Interaction Continuity
+AI Interaction Continuity
+
+AI Interaction Continuity
+
+- Building Competence through Action
+Building Competence through Action
+
+Building Competence through Action
+
+- Enterprise Integration in Ballerina
+Enterprise Integration in Ballerina
+
+Enterprise Integration in Ballerina
+
+- Code Review Implications
+Code Review Implications
+
+Code Review Implications
+
+Mark PippinsFreeClaim offer
+
+Mark PippinsFreeClaim offer
+
+Mark PippinsFree
+
+Mark PippinsFree
+
+Mark PippinsFree
+
+Mark Pippins
+
+Mark Pippins
+
+Free
+
+Claim offer
+
+ChatGPTFree offerShareBulk ExportChatGPT said:Exactly.And that's a much more robust form of control than trying to "command" the model into behaving a certain way.What you're describing is closer to industrial engineering than prompt engineering.If I put a worker into a factory where there are:labeled workstationsstandard handoff pointsinspection gatesbins for inputs and outputsvisible workflow statesthen I don't need to constantly remind them:Please act like a manufacturing worker.The environment itself suggests the behavior.The path of least resistance becomes:receive work→ perform work→ record result→ hand off workThe same thing happens with agents.A lot of agent frameworks try to solve behavior through increasingly elaborate prompts:You are a planner.You must think carefully.You must generate tasks.You must...But what you've been building with PGV, LOSM, work requests, receipts, governance events, and lifecycle states is more like:Here's the track.Run on it.Once enough of the track exists, the model starts discovering that compliance is the easiest way to make progress.That's why I wasn't surprised that BP drifted toward the WRP structure.Look at the information it had available:Requirement↓Implementation plan↓Affected files↓Verification criteria↓Execution orderAfter a while, that's not merely a documentation format anymore.It's the shape of the work itself.A planner looking at that repeatedly starts thinking:Work naturally decomposes into:- requirement- implementation- verification- dependency orderingwhich is essentially a WRP whether it's called that or not.This also explains why your "Shell owns rules. Store owns facts." observation was so powerful.It's not just an architectural statement.It's a constraint that reshapes the solution space.Once an agent accepts:Store owns facts.then a whole class of designs become awkward:TransitionService maintaining stateIn-memory lifecycle trackingMultiple mutation authoritiesThe model starts rejecting them almost automatically because they fight the topology.The architecture is doing part of the reasoning.I think one of the recurring themes across your work is that you're moving decisions out of prompts and into structure.Instead of:Please remember to validate every transition.you build:validate_transition(...)and route all mutations through it.Instead of:Please think like a planner.you provide:RequirementsWork RequestsVerification CriteriaExecution Receiptsand planning becomes the natural way to interact with the system.There's a nice systems principle hiding in there:Good governance is not forcing behavior.Good governance is making the desired behaviorthe lowest-friction path.That's true for humans.It's true for distributed systems.And increasingly, it's true for AI agents.When the conveyor belt, stations, receipts, gates, and handoff points are all in place, compliance stops feeling like compliance. It starts feeling like the obvious way to get the job done.1/2You said:OK, back on topic:
+
+Updated Assessment: LOSM Split Architecture
+What was done
+The original monolithic losm/losm package has been cleanly split into four standalone packages. This is the right decomposition and it maps well to the three-layer model you described.
+
+Dependency graph
+losm-ir       ← no dependencies (pure Pydantic + dataclasses)
+    ↑
+losm-kernel   ← depends on losm-ir only
+    ↑
+losm-shell    ← depends on losm-kernel + losm-ir
+losm-store    ← depends on losm-ir + losm-shell (for transition validation)
+    ↑
+losm-host     ← depends on losm-shell + losm-store
+This is correct. The dependency arrows all point in one direction. Nothing in a lower layer knows about a higher layer.
+
+Per-package assessment
+losm-ir — Clean. Pure semantic contracts. Graph, Node, Edge, TraceOutput, TraceFamily, ConstraintViolation, all the IR models (Plan, Spec, Execution, Validation, Critique, WorkRequest), WorkflowState. Zero external dependencies beyond Pydantic. This is exactly right — it's the shared vocabulary the entire system uses without coupling anything.
+
+One note: 
+execution_receipt.py
+ is referenced by both losm-shell (in handler.py and executor.py) and losm-store (in ingestor.py). It didn't appear in the file listing but it must exist — the imports resolve. Worth confirming it's there.
+
+losm-kernel — Clean. The fixed-point engine, morphism composition, constraint system, TBEL, TESL. Depends only on losm-ir for Graph, Node, Edge, ConstraintViolation, TraceOutput, TraceFamily, trace_hash. The types.py re-exports from losm_ir.graph which is the right pattern — the kernel uses the IR's graph types rather than defining its own. storage.py and runtime.py are gone from the kernel, which is correct.
+
+One issue: 
+core.py
+ imports ConstraintViolation from losm_kernel.constraints, not losm_ir.constraints. constraints.py imports ConstraintViolation from losm_ir.constraints and uses it. The kernel's ConstraintSystem.validate() raises ConstraintViolation (from losm-ir) and core.py catches it. That chain is fine as long as core.py's catch clause matches the same class — which it does since it comes through losm_kernel.constraints which re-exports from losm_ir. But it would be cleaner if core.py imported ConstraintViolation directly from losm_ir.constraints rather than relying on the indirection.
+
+losm-shell — Clean, with one concern. The DAGExecutor, PipelineCoordinator, PlanCompiler, and transition validation are all here. The StepHandler protocol is an excellent architectural decision — it means the shell's executor never knows what a step means. The NullStepHandler preserves current behavior while establishing the protocol boundary. The KernelStepHandler (which would call into losm-kernel) doesn't exist yet but the protocol is ready for it.
+
+The one concern: losm-store depends on losm-shell (for validate_transition in ingestor.py). This means losm-store has a runtime dependency on losm-shell. The transition validation function is pure — it's a table lookup with no I/O. It arguably belongs in losm-ir rather than losm-shell, since it's a semantic contract about valid state transitions, not a runtime coordination concern. If it were in losm-ir, losm-store wouldn't need to depend on losm-shell at all, and the dependency graph would be cleaner. Not a blocker, but worth considering.
+
+losm-store — Clean. All persistence (SQLAlchemy models, session, repository), the receipt ingestor, the branch manager. The receipt ingestor now properly calls validate_transition before mutating state and emits a RECEIPT_REJECTED governance event for invalid transitions — the bypass fallback that existed before is gone. The Branch and BranchArtifact models are a new addition that wasn't in the previous version.
+
+The WorkStatus enum in 
+models.py
+ is a duplicate of WorkflowState in 
+states.py
+. They have different names and slightly different values — WorkStatus has 11 states including the detailed pipeline states, WorkflowState has 9 simplified states (PLAN_DONE, CRITIQUED, SPEC_READY, etc.). These are diverging representations of the same concept. If WorkStatus is the canonical one (it's what the DB column uses and what the transition table in losm-shell is keyed on), then WorkflowState in losm-ir is redundant and should either be removed or aligned.
+
+losm-host — Clean. Thin FastAPI server. All business logic is delegated to losm-shell and losm-store. The work_requests.py route uses validate_transition directly (rather than through a service) for the transition endpoint — that's appropriate for a thin host. The routes.py kernel endpoint calls LOSMKernel directly, which is fine since the host is allowed to talk to any layer below it.
+
+One issue: routes.py calls kernel.validate(graph) but LOSMKernel doesn't have a validate method — it has apply and run. This would fail at runtime. Either the method needs to be added to the kernel or the route needs to be rewritten to use apply with a no-op morphism.
+
+Issues to address
+execution_receipt.py
+ not in file listing — verify it exists, since it's imported by both shell and store.
+
+WorkStatus vs WorkflowState duplication — decide which is canonical and remove or align the other.
+
+routes.py calls kernel.validate(graph) which doesn't exist on LOSMKernel. Fix the route or add the method.
+
+validate_transition placement — consider moving it to losm-ir to break the losm-store → losm-shell dependency, or accept it as-is.
+
+losm-shell pyproject.toml declares losm-kernel as a dependency but the PipelineCoordinator doesn't actually call the kernel yet — it uses DAGExecutor with NullStepHandler. This is fine for now but the kernel integration (KernelStepHandler) is the missing piece that completes Layer 2.

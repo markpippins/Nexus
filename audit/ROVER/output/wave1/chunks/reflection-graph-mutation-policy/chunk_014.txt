@@ -1,0 +1,232 @@
+If not, reflection is probably wandering.
+
+That gives you a practical governor:
+
+```
+if touched_node not in causal_neighborhood(task, radius=2):    require_promotion = true
+```
+
+```
+if touched_node not in causal_neighborhood(task, radius=2):    require_promotion = true
+```
+
+---
+
+# 6. Limit task spawning separately from graph mutation
+
+The most dangerous thing reflection does is not usually editing edges — it’screating work.
+
+So I’d give it a dedicated cap:
+
+## Reflection task spawn heuristic
+
+Per completed task, reflection may:
+
+- auto-spawn0–2child follow-up tasks
+auto-spawn0–2child follow-up tasks
+
+- auto-spawnup to 1sibling repair task
+auto-spawnup to 1sibling repair task
+
+- neverauto-spawn a new top-level objective
+neverauto-spawn a new top-level objective
+
+- neverauto-spawn more thanspawn_budget_per_cycle
+neverauto-spawn more thanspawn_budget_per_cycle
+
+If it thinks 8 new tasks are implied, that’s a signal for aplanning pass, not inline reflection.
+
+---
+
+# 7. Add a “surprise threshold”
+
+Reflection exists because execution reveals reality. But some revelations are bigger than others.
+
+So every reflection output should estimate:
+
+- Outcome deviation: how far actual result diverged from expected result
+Outcome deviation: how far actual result diverged from expected result
+
+- Plan impact: how many downstream tasks/objectives are affected
+Plan impact: how many downstream tasks/objectives are affected
+
+- Confidence: how certain the inference is
+Confidence: how certain the inference is
+
+If deviation × impact is high, reflection should stop trying to “fix it itself” and instead raise areplan event.
+
+Example:
+
+```
+if outcome_deviation >= HIGH && downstream_impact >= MEDIUM:    emit ReplanRequired
+```
+
+```
+if outcome_deviation >= HIGH && downstream_impact >= MEDIUM:    emit ReplanRequired
+```
+
+That prevents a small post-task reflection loop from silently rearchitecting the roadmap.
+
+---
+
+# 8. My recommended concrete policy
+
+If I were wiring this into your scheduler / graph governor, I’d use something like this:
+
+---
+
+## Reflection Graph Mutation Policy
+
+### Default reflection budget
+
+For each completed task, reflection may:
+
+- update unlimited metadata on the completed task node
+update unlimited metadata on the completed task node
+
+- update up to5 nearby nodes
+update up to5 nearby nodes
+
+- add up to3 edges
+add up to3 edges
+
+- spawn up to2 new child tasks
+spawn up to2 new child tasks
+
+- add up to1 hypothesis node
+add up to1 hypothesis node
+
+- close up to3 open loops
+close up to3 open loops
+
+- touch only nodes within2 hopsof the completed task and within the sameobjective/workstream
+touch only nodes within2 hopsof the completed task and within the sameobjective/workstream
+
+### Forbidden without escalation
+
+Reflection may not directly:
+
+- reparent existing tasks
+reparent existing tasks
+
+- delete nodes
+delete nodes
+
+- merge subgraphs across objectives
+merge subgraphs across objectives
+
+- reprioritize tasks outside current workstream
+reprioritize tasks outside current workstream
+
+- create a new top-level objective
+create a new top-level objective
+
+- alter system invariants / ontology
+alter system invariants / ontology
+
+- touch more than10 total nodes
+touch more than10 total nodes
+
+- exceed mutation score threshold
+exceed mutation score threshold
+
+### Escalate to planning/reconciliation when
+
+Any of these are true:
+
+- mutation_score > 20
+mutation_score > 20
+
+- touched nodes cross objective boundary
+touched nodes cross objective boundary
+
+- more than 2 follow-up tasks are implied
+more than 2 follow-up tasks are implied
+
+- a core assumption of the current plan is invalidated
+a core assumption of the current plan is invalidated
+
+- reflection wants to modify already-approved roadmap structure
+reflection wants to modify already-approved roadmap structure
+
+- reflection confidence is low but impact is high
+reflection confidence is low but impact is high
+
+---
+
+# 9. The key architectural split
+
+I think the clean split is:
+
+## Reflection cycle =micro-repair + local inference
+
+Its job is to say:
+
+- what happened?
+what happened?
+
+- what nearby assumptions changed?
+what nearby assumptions changed?
+
+- what immediate follow-up is now required?
+what immediate follow-up is now required?
+
+- did this close or open a loop?
+did this close or open a loop?
+
+## Planning / reconciliation cycle =structural graph change
+
+Its job is to say:
+
+- does the objective tree need reshaping?
+does the objective tree need reshaping?
+
+- should priorities move?
+should priorities move?
+
+- are these two workstreams actually one?
+are these two workstreams actually one?
+
+- did this execution result invalidate the broader plan?
+did this execution result invalidate the broader plan?
+
+That boundary keeps reflection useful without letting it become a runaway graph mutator.
+
+---
+
+# My preferred formal heuristic in one sentence
+
+> A reflection cycle may only commit low-cost observational and local structural updates within the causal neighborhood of the triggering task; any patch that crosses workstream boundaries, spawns substantial new work, or changes existing graph topology must be promoted to a separate reconciliation/planning pass.
+
+A reflection cycle may only commit low-cost observational and local structural updates within the causal neighborhood of the triggering task; any patch that crosses workstream boundaries, spawns substantial new work, or changes existing graph topology must be promoted to a separate reconciliation/planning pass.
+
+If you want, I can turn this into a repo-ready artifact — something like:
+
+- REFLECTION_MUTATION_POLICY.md
+REFLECTION_MUTATION_POLICY.md
+
+- ReflectionGraphPatch/GraphMutationBudgetTypeSpec or JSON schema
+ReflectionGraphPatch/GraphMutationBudgetTypeSpec or JSON schema
+
+- Arbiter pseudocode forevaluateReflectionPatch(patch, graph, taskContext)
+Arbiter pseudocode forevaluateReflectionPatch(patch, graph, taskContext)
+
+Sources
+
+Sources
+
+Sources
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.
+
+ChatGPT can make mistakes. Check important info.

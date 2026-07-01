@@ -229,6 +229,34 @@ CANDIDATES: tuple[Candidate, ...] = (
         workspace_path="nexus/jvm/spring/terrain",
     ),
     Candidate(
+        name="image-server",
+        port=9081,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:9081/health",
+        description=(
+            "Static image server. Serves images from multiple search "
+            "locations (device/, logo/, ui/shared/, ui/3d-fluency/, "
+            "ui/neon/, ui/plastina-3d)."
+        ),
+        startup="cd typescript/image-server && npm run start",
+        workspace_path="nexus/typescript/image-server",
+    ),
+    Candidate(
+        name="file-system-server",
+        port=4040,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:4040/health",
+        description=(
+            "Node.js file system proxy server. Provides CRUD operations "
+            "over a remote filesystem root directory (ls, cd, mkdir, rmdir, "
+            "newfile, deletefile, rename, copy, move)."
+        ),
+        startup="cd typescript/file-system-server && bash start.sh",
+        workspace_path="nexus/typescript/file-system-server",
+    ),
+    Candidate(
         name="terrain-mcp",
         port=None,
         kind="mcp_server",

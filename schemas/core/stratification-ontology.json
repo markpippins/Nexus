@@ -1,0 +1,206 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://nexus.local/schema/core/stratification/v1",
+  "title": "Nebula Knowledge Stratification Ontology",
+  "description": "Formal two-axis knowledge stratification ontology for Nebula. Controls how agents access the knowledge graph via abstraction level and visibility scope. Every document and chunk carries these two independent attributes.",
+
+  "abstraction_levels": {
+    "description": "Axis 1: Abstraction Level (L1–L4). Single-primary-level per chunk — no multi-level ambiguity.",
+    "levels": {
+      "L1": {
+        "name": "Raw / operational",
+        "description": "Build details, APIs, schemas, method contracts, error codes, config values",
+        "primary_consumers": ["builder"]
+      },
+      "L2": {
+        "name": "Structured / intermediate",
+        "description": "Subsystem design, DAG semantics, traversal behavior, data models",
+        "primary_consumers": ["builder", "architect"],
+        "notes": "Builder secondary, Architect primary"
+      },
+      "L3": {
+        "name": "Planning / architectural",
+        "description": "Why systems exist, migration philosophy, architectural rationale, trade-offs",
+        "primary_consumers": ["architect", "inspector"]
+      },
+      "L4": {
+        "name": "Meta / system reasoning",
+        "description": "Cross-system doctrine, ontology definitions, role boundaries, governance rules",
+        "primary_consumers": ["architect"],
+        "notes": "Architect opt-in only"
+      }
+    },
+    "rules": [
+      "SINGLE_PRIMARY_LEVEL: A chunk targets exactly one abstraction level — no multi-level ambiguity",
+      "CHUNK_CAN_OVERRIDE_DOCUMENT: Chunks can override their parent document's dominant level when content diverges",
+      "CONTENT_NODE_OWNS_LEVEL: Content nodes own the abstraction level — cross-reference edges remain level-neutral"
+    ]
+  },
+
+  "chunk_kinds": {
+    "description": "The 12 ChunkKind enum values classify the type of content within a chunk.",
+    "enum": [
+      {
+        "value": "OVERVIEW",
+        "description": "High-level summary of a topic or system"
+      },
+      {
+        "value": "DEFINITION",
+        "description": "Formal definition of a concept, term, or entity"
+      },
+      {
+        "value": "PROTOCOL_RULE",
+        "description": "Protocol invariant, transition rule, or governance constraint"
+      },
+      {
+        "value": "DATA_MODEL",
+        "description": "Schema definition, type system, field specification"
+      },
+      {
+        "value": "ALGORITHM",
+        "description": "Algorithm description, pseudocode, traversal logic"
+      },
+      {
+        "value": "INVARIANT",
+        "description": "System invariant that must hold across states"
+      },
+      {
+        "value": "MIGRATION_STEP",
+        "description": "Step in a migration or rollout plan"
+      },
+      {
+        "value": "ACCEPTANCE_CRITERIA",
+        "description": "Measurable condition for acceptance"
+      },
+      {
+        "value": "OPEN_QUESTION",
+        "description": "Unresolved question requiring future resolution"
+      },
+      {
+        "value": "EXAMPLE",
+        "description": "Illustrative example of a concept in use"
+      },
+      {
+        "value": "RATIONALE",
+        "description": "Design rationale or trade-off analysis"
+      },
+      {
+        "value": "IMPLEMENTATION_NOTE",
+        "description": "Implementation-specific detail or caveat"
+      }
+    ]
+  },
+
+  "normative_strength": {
+    "description": "NormativeStrength enum — how binding a statement is.",
+    "enum": [
+      {
+        "value": "INFORMATIVE",
+        "description": "For reference only — no compliance required"
+      },
+      {
+        "value": "RECOMMENDED",
+        "description": "Should be followed; deviation requires documented justification"
+      },
+      {
+        "value": "REQUIRED",
+        "description": "Must be followed — violation is a compliance issue"
+      },
+      {
+        "value": "PROHIBITED",
+        "description": "Must not be done — violation is a compliance issue"
+      }
+    ]
+  },
+
+  "visibility_scopes": {
+    "description": "Axis 2: Visibility Scope. Controls which roles can see a given chunk.",
+    "scopes": {
+      "builder": {
+        "description": "Visible to builder role only"
+      },
+      "architect": {
+        "description": "Visible to architect role only"
+      },
+      "planner": {
+        "description": "Visible to planner role only"
+      },
+      "reviewer": {
+        "description": "Visible to reviewer role only"
+      },
+      "analyst": {
+        "description": "Visible to analyst role only"
+      },
+      "inspector": {
+        "description": "Visible to inspector role only"
+      },
+      "all": {
+        "description": "Visible to all roles"
+      }
+    }
+  },
+
+  "role_query_filters": {
+    "description": "Per-role query filters that control access projections over the single shared knowledge graph.",
+    "roles": {
+      "builder": {
+        "level_filter": {
+          "primary": "level ≤ 1",
+          "secondary": "level ≤ 2"
+        },
+        "visibility_filter": ["builder", "all"],
+        "cross_reference_expansion": "conditional",
+        "cross_reference_detail": "Only when blocked or asked for context — e.g., 'why does this API exist?' expands to L2 rationale"
+      },
+      "architect": {
+        "level_filter": {
+          "primary": "level ≤ 3",
+          "allowed": "level = 4"
+        },
+        "visibility_filter": ["architect", "all"],
+        "cross_reference_expansion": "default",
+        "cross_reference_detail": "Expanded for design context — traces design lineage via cross-references"
+      },
+      "planner": {
+        "level_filter": {
+          "primary": "level ≤ 2",
+          "allowed": "level ≤ 3"
+        },
+        "visibility_filter": ["planner", "all"],
+        "cross_reference_expansion": "conditional",
+        "cross_reference_detail": "Only when scoping a plan"
+      },
+      "reviewer": {
+        "level_filter": "level ≤ 2",
+        "visibility_filter": ["reviewer", "builder", "all"],
+        "cross_reference_expansion": "conditional",
+        "cross_reference_detail": "Cross-ref to verify implementation matches spec"
+      },
+      "inspector": {
+        "level_filter": "level ≤ 3 with preference for normative chunks",
+        "visibility_filter": ["all"],
+        "cross_reference_expansion": "default",
+        "cross_reference_detail": "Aggressive cross-ref expansion for compliance auditing — lineage tracing"
+      },
+      "analyst": {
+        "level_filter": "level ≤ 3",
+        "visibility_filter": ["analyst", "all"],
+        "cross_reference_expansion": "default",
+        "cross_reference_detail": "Full context for gap analysis"
+      }
+    }
+  },
+
+  "cross_reference_semantics": {
+    "description": "Cross-references are a conditional expansion operator, not a default join. They create edges between artifacts that are traversed only when the agent's context demands it.",
+    "guiding_principle": "We distribute access projections over a single knowledge graph, not distribute the knowledge itself. Every agent sees a filtered view of the same graph, tuned to their role's abstraction level and visibility scope. Cross-references are the mechanism for expanding that view when context demands it."
+  },
+
+  "integration": {
+    "description": "This ontology layer sits above the existing DDL infrastructure. It provides the semantic classification rules that the DDL implements as columns and constraints.",
+    "ddl_columns": {
+      "documents": ["level (L1|L2|L3|L4)", "visibility_scope (TEXT)"],
+      "chunks": ["level (L1|L2|L3|L4)", "chunk_kind (ChunkKind)", "normative_strength (NormativeStrength)", "visibility_scope (TEXT)"]
+    }
+  }
+}

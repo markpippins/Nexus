@@ -1,0 +1,216 @@
+Skip to content
+
+New chatSearch chatsPinnedRecentsChat historyNew chatCtrlShiftOSearch chatsCtrlKLibraryAppsMorePinnedLinkedInNexus Work Request PipelineNodeMessage Normalization & TrajectoriesEvent Pipeline EvaluationSelf-Extending Architecture ConceptBuzzwords by LayerAI Engineering Survival SkillsProjectsPrompt Architect / LERONexus Active StepNexushomelabPythonShow moreChatsSemantic IR v0.1 OverviewIRL IR Interaction SystemRole-Addressable Cognitive FilesystemSystem Evolution and NamingNexus Console StructureStrontium as cognition nodeMulti-Stage Semantic CompilerService Broker Pattern DebateService Broker Pattern ClarificationTopology Server EfficiencyEvent-Driven CLI AgentsFederated Self-Evolving SystemsNebula Audit Organization TipsWork Artifact IR DefinitionDynamic UI CompositionNexus Product DefinitionReport Schema AnalysisCognitive Projection ModelPlurality in CognitionCodex Session PlanningCoPilot Context OverloadCognitive CPU SchedulerModel Verification MigrationTerrain service registryEAV Schema AnalysisDistributed Cognition DesignNebula as Jira SystemSelf-Regulating Software OntologyFreeBuff Autonomy ModelsAG-UI MessageBox MCP StartDistributed Cognition ArchitectureWorker Context and DriftKnowledge Steward and kg-mcpLOSM-Lang OverviewClosed Epistemic LoopNexus Control Sandbox ExplanationNexus Mood ModulationDiscovery to ConsolidationNexus Console Usage ShiftCIR v2 Invariant ViolationPEB Kernel GovernanceAbsorb Terminology UpdateMulti-runtime Semantic CoherenceMultireality in System DesignTicket Claiming without TemporalRules Based LayerDeepSeek and DocLing GapGovernance-Preserving Transport PlanAudit Data MilestoneWorkRequest MCP Conduit DesignSplitting Conduit FunctionalityDocLing Parser ArchitectureTrading Systems and Stochastic OutcomesUnit of Update AnalysisGemini and Conduit ArchitectureSystem Documentation EvolutionMark PippinsFreeClaim offerChatGPTFree offerShareBulk ExportYou said:“Semantic IR v0.1 (strict schema + mapping to NBK primitives)”You said:Turn this into a real Pydantic module with all classes, enums, and cross-reference validatorsYou said:ok, and remembering that nexus/python/ai has been renamed to nexus/python/vision, let's do both, and let's dig into WorkRequestDAG as well.You said:let's proceedYou said:go aheadYou said:Write the actual semantic_projection package modules plus the compiler adjustmentsYou said:what I have in my losm-ir folder is this: 
+
+# State Ontology Analysis: WorkflowState vs WorkStatus
+
+## Purpose
+
+Two state enums coexist across the LOSM codebase. This document maps them,
+determines their relationship type, and recommends a consolidation strategy.
+
+## Enums
+
+### WorkflowState (losm_ir/states.py) — 9 states
+
+The IR-level / simplified lifecycle. No DB binding.python
+class WorkflowState(str, Enum):
+    NEW = "NEW"
+    PLAN_DONE = "PLAN_DONE"
+    CRITIQUED = "CRITIQUED"
+    SPEC_READY = "SPEC_READY"
+    EXECUTED = "EXECUTED"
+    VALIDATED = "VALIDATED"
+    COMPLETE = "COMPLETE"
+    FAILED = "FAILED"
+    BLOCKED = "BLOCKED"### WorkStatus (losm_store/models.py) — 11 states
+
+The operational pipeline position. DB-backed column (work_requests.status).python
+class WorkStatus(str, Enum):
+    NEW = "NEW"
+    INTAKE = "INTAKE"
+    PLAN_GENERATION = "PLAN_GENERATION"
+    PLAN_REVIEW = "PLAN_REVIEW"
+    PLAN_APPROVAL_GATE = "PLAN_APPROVAL_GATE"
+    SPEC_GENERATION = "SPEC_GENERATION"
+    EXECUTION = "EXECUTION"
+    VALIDATION = "VALIDATION"
+    COMPLETION = "COMPLETION"
+    BLOCKED = "BLOCKED"
+    FAILED = "FAILED"---
+
+## Side-by-Side Comparison
+
+### Pipeline phases — forward flow
+
+| Phase | WorkStatus | WorkflowState | Notes |
+|-------|-----------|---------------|-------|
+| Entry | NEW, INTAKE | NEW | Intake is an operational detail; the IR sees both as "not yet planned" |
+| Planning | PLAN_GENERATION, PLAN_REVIEW, PLAN_APPROVAL_GATE | PLAN_DONE | The operational pipeline splits planning into 3 sub-steps; the IR condenses to "planning complete" |
+| Critique | _(no distinct state)_ | CRITIQUED | Critique is a side effect of PLAN_REVIEW — no separate operational state exists |
+| Spec | SPEC_GENERATION | SPEC_READY | Spec generation produces "spec ready" |
+| Execution | EXECUTION | EXECUTED | Direct equivalent at different naming style |
+| Validation | VALIDATION | VALIDATED | Direct equivalent at different naming style |
+| Completion | COMPLETION | COMPLETE | Direct equivalent at different naming style |
+| Terminal | BLOCKED | BLOCKED | Identical |
+| Terminal | FAILED | FAILED | Identical |
+
+### Feedback states
+
+| WorkStatus state | Allowed next states (per transition table) | WorkflowState equivalent(s) |
+|---|---|---|
+| VALIDATION | COMPLETION, EXECUTION, PLAN_GENERATION, FAILED, BLOCKED | VALIDATED (or back to PLAN_DONE/EXECUTED) |
+| EXECUTION | VALIDATION, FAILED, BLOCKED | EXECUTED |
+| PLAN_REVIEW | PLAN_APPROVAL_GATE, PLAN_GENERATION, FAILED, BLOCKED | PLAN_DONE |
+| PLAN_APPROVAL_GATE | SPEC_GENERATION, PLAN_GENERATION, FAILED, BLOCKED | PLAN_DONE |
+
+### Summary mapping
+
+| WorkflowState | WorkStatus | Mapping type |
+|---|---|---|
+| NEW | NEW, INTAKE | one WorkflowState → two WorkStatus (one-to-many) |
+| PLAN_DONE | PLAN_GENERATION, PLAN_REVIEW, PLAN_APPROVAL_GATE | one WorkflowState → three WorkStatus |
+| CRITIQUED | _(no direct equivalent)_ | WorkflowState-only state |
+| SPEC_READY | SPEC_GENERATION | one-to-one (but naming differs) |
+| EXECUTED | EXECUTION | one-to-one (but naming differs) |
+| VALIDATED | VALIDATION | one-to-one (but naming differs) |
+| COMPLETE | COMPLETION | one-to-one (but naming differs) |
+| BLOCKED | BLOCKED | one-to-one (identical) |
+| FAILED | FAILED | one-to-one (identical) |
+
+---
+
+## Mapping Type Determination
+
+### Primary finding: Many-to-one (conceptual compression)
+
+The relationship is **many-to-one from WorkStatus to WorkflowState**:WorkStatus (operational, 11 states)
+    → compressed into →
+WorkflowState (semantic/IR, 9 states)The compression is concentrated in the *planning phase* where 3 WorkStatus states
+(PLAN_GENERATION, PLAN_REVIEW, PLAN_APPROVAL_GATE) collapse into 1 WorkflowState
+(PLAN_DONE), and the entry phase where 2 WorkStatus states (NEW, INTAKE) collapse
+into 1 WorkflowState (NEW).
+
+### Secondary finding: One divergence
+
+CRITIQUED exists only in WorkflowState — no WorkStatus counterpart. This means:
+
+- Either critique is modeled differently in the operational pipeline (it happens
+  as a side effect of PLAN_REVIEW rather than as a distinct state), or
+- The operational pipeline should add a CRITIQUE state for fidelity.
+
+### Tertiary finding: Style divergence only for middle states
+
+The terminal states (BLOCKED, FAILED, COMPLETE/COMPLETION) are essentially
+identical. The middle pipeline states differ only in naming convention:
+- WorkflowState uses past-participle style: EXECUTED, VALIDATED
+- WorkStatus uses gerund/noun style: EXECUTION, VALIDATION
+
+This is purely cosmetic but indicates independent evolution.
+
+---
+
+## Semantic Role Analysis
+
+### WorkflowState: The lifecycle phase model
+
+What it represents: **What phase of the lifecycle the work request is in.**
+
+The states describe *semantic completion*: "planning is done", "spec is ready",
+"execution is done". This is the model you'd show a human to explain where a
+work request is in its lifecycle.
+
+Designed for:
+- IR-level reasoning about work request progression
+- High-level status reporting
+- Protocol contracts between layers
+
+### WorkStatus: The operational pipeline model
+
+What it represents: **Where in the processing pipeline the work request sits.**
+
+The states describe *operational position*: "the system is generating a plan",
+"the plan is under review", "the spec is being generated". This is the model
+the machine uses to decide what step to execute next.
+
+Designed for:
+- DB persistence (it's a SQLAlchemy column)
+- Pipeline step routing (what action to take now)
+- Transition validation (the transition table is keyed on these)
+
+### Are they different views of the same lifecycle, or different lifecycles?
+
+**Same lifecycle, different abstraction levels.**
+
+Both enums describe the same underlying process — a work request being created,
+planned, reviewed, specified, executed, validated, and completed. The difference
+is granularity, not semantics.
+
+WorkStatus decomposes the "planning" phase into 3 operational sub-steps and the
+"entry" phase into 2 sub-steps. WorkflowState treats each of these phases as
+atomic.
+
+The transition table (VALID_TRANSITIONSintransition.py) uses WorkStatus
+values because it routes operational decisions. It would not make sense to
+validate transitions at the WorkflowState granularity — you'd lose the ability
+to distinguish "allow re-plan from review" vs "allow re-plan from approval gate."
+
+---
+
+## Recommendation
+
+### Step 1: Merge WorkflowState into a derived property
+
+Do not keep two independent enums. Instead:
+
+- **WorkStatus remains the canonical enum** — it's what the DB stores, what the
+  transition table uses, and what the pipeline routes on. It has higher fidelity.
+- **WorkflowState becomes a computed projection** — a functionwork_status_to_phase(s: WorkStatus) -> WorkflowStatethat compresses the 11
+  operational states into the 9 lifecycle phases.
+
+This means:
+-losm_ir.states.WorkflowStatestays in losm-ir but is no longer a "parallel
+  truth" — it's a view on top of WorkStatus.
+-losm_store.models.WorkStatusstays in losm-store (it's tied to SQLAlchemy),
+  or optionally moves to losm-ir if all enum definitions should live together.
+
+### Step 2: Reconcile CRITIQUED
+
+If critique is a meaningful lifecycle milestone (not just a side effect of review),
+add a CRITIQUE state to WorkStatus. If critique is purely a review output, remove
+CRITIQUED from WorkflowState and map it to PLAN_DONE.
+
+Decision depends on whether the system needs to *pause at critique* or *treat
+critique as an artifact produced during review*.
+
+### Step 3: Move WorkStatus to losm-ir
+
+Since WorkStatus is now the canonical lifecycle enum, andvalidate_transitionneeds to live in losm-ir (per architectural recommendation), WorkStatus should
+move to losm-ir alongside it.
+
+This breaks the current circular tension:
+-losm_irdefinesWorkStatus+validate_transition→ canonical truth
+-losm_storeimportsWorkStatusfromlosm_ir→ no longer defines its own enum
+-losm_shellimports both fromlosm_ir→ consistent
+
+### Migration order
+
+1. Addwork_status_to_phase()function tolosm_ir2. MoveWorkStatusenum tolosm_ir3. Movevalidate_transitiontolosm_ir(Plan 0026)
+4. Deprecate direct use ofWorkflowState— preferwork_status_to_phase()5. RemoveWorkflowStateor keep as alias for backward compat
+
+---
+
+## Appendix: Full Transition Table (WorkStatus-based)
+
+Fromlosm-shell/src/losm_shell/lifecycle/transition.py:NEW               → INTAKE, FAILED, BLOCKED
+INTAKE            → PLAN_GENERATION, FAILED, BLOCKED
+PLAN_GENERATION   → PLAN_REVIEW, FAILED, BLOCKED
+PLAN_REVIEW       → PLAN_APPROVAL_GATE, PLAN_GENERATION, FAILED, BLOCKED
+PLAN_APPROVAL_GATE→ SPEC_GENERATION, PLAN_GENERATION, FAILED, BLOCKED
+SPEC_GENERATION   → EXECUTION, FAILED, BLOCKED
+EXECUTION         → VALIDATION, FAILED, BLOCKED
+VALIDATION        → COMPLETION, EXECUTION, PLAN_GENERATION, FAILED, BLOCKED
+BLOCKED           → all except COMPLETION (can unblock to any non-terminal)
+COMPLETION        → (terminal)
+FAILED            → (terminal)there is Python code there as well: graph, transition, validation, plan, states, trace, etc.
+bp sez:

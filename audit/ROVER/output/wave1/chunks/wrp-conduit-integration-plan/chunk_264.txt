@@ -1,0 +1,218 @@
+---
+
+# 1)schemas/core/nebula-review-state.jsonld
+
+This defines the vocabulary for:
+
+- review statuses
+review statuses
+
+- priorities
+priorities
+
+- attention reasons
+attention reasons
+
+- review annotations
+review annotations
+
+I’d make it cover both artifacts and chunks, even if you only use artifact-level initially.
+
+---
+
+# 2)data/nebula/bootstrap/review-queue-seed.jsonld
+
+This is optional, but useful if you want to start immediately by hand-tagging the WRP docs you just created.
+
+For example, you could seed something like:
+
+- wrp-v1-protocol→CURRENT_FOCUS
+wrp-v1-protocol→CURRENT_FOCUS
+
+- wrp-v1_1-dag→CURRENT_FOCUS
+wrp-v1_1-dag→CURRENT_FOCUS
+
+- wrp-v1_2-traversal→CURRENT_FOCUS
+wrp-v1_2-traversal→CURRENT_FOCUS
+
+- wrp-migration-plan→NEEDS_REVIEW
+wrp-migration-plan→NEEDS_REVIEW
+
+or whatever is true for you.
+
+That would give you a live queue right away.
+
+---
+
+# My recommended concrete statuses
+
+If you want a clean first set, I’d use exactly these:
+
+## Review statuses
+
+- UNREVIEWED
+UNREVIEWED
+
+- NEEDS_REVIEW
+NEEDS_REVIEW
+
+- UNDER_REVIEW
+UNDER_REVIEW
+
+- REVIEWED
+REVIEWED
+
+- CURRENT_FOCUS
+CURRENT_FOCUS
+
+- OUTDATED
+OUTDATED
+
+- QUESTIONED
+QUESTIONED
+
+- SUPERSEDED_CONFIRMED
+SUPERSEDED_CONFIRMED
+
+## Priorities
+
+- CRITICAL
+CRITICAL
+
+- HIGH
+HIGH
+
+- MEDIUM
+MEDIUM
+
+- LOW
+LOW
+
+## Attention reasons
+
+- BLOCKING_IMPLEMENTATION
+BLOCKING_IMPLEMENTATION
+
+- OUT_OF_DATE_WITH_RUNTIME
+OUT_OF_DATE_WITH_RUNTIME
+
+- OUT_OF_DATE_WITH_ARCHITECTURE
+OUT_OF_DATE_WITH_ARCHITECTURE
+
+- CONFLICTS_WITH_NEW_MODEL
+CONFLICTS_WITH_NEW_MODEL
+
+- REQUIRES_MIGRATION
+REQUIRES_MIGRATION
+
+- DUPLICATED_ELSEWHERE
+DUPLICATED_ELSEWHERE
+
+- NEEDS_LEVEL_REVIEW
+NEEDS_LEVEL_REVIEW
+
+- NEEDS_CHUNKING_REVIEW
+NEEDS_CHUNKING_REVIEW
+
+That’s enough to be useful immediately.
+
+---
+
+# My answer to the core question
+
+> is it possible for me to do the simplest thing: as I review the corpus of specs and documentation, categorize them as needing review, outdated, superseded, etc., to focus everyone’s attention on priorities?
+
+is it possible for me to do the simplest thing: as I review the corpus of specs and documentation, categorize them as needing review, outdated, superseded, etc., to focus everyone’s attention on priorities?
+
+Yes — and I think you should do itbeforethe rest of Nebula gets much more elaborate.
+
+Because without that layer, Nebula can tell you what exists, but notwhat deserves attention now.
+
+With it, Nebula becomes not just a knowledge graph but aliving engineering review board.
+
+---
+
+# What I suggest we do next
+
+I’d change the order of the next docs.
+
+Before the chunk-kinds ontology and importer pseudocode, I would write thesetwo:
+
+- schemas/core/nebula-review-state.jsonld
+schemas/core/nebula-review-state.jsonld
+
+- docs/nebula/review-workflow.md
+docs/nebula/review-workflow.md
+
+The workflow doc would specify exactly how you, Builder, Architect, Inspector, Explorer, and Conduit interact with review status:
+
+- who can set it
+who can set it
+
+- what it means
+what it means
+
+- how it affects retrieval
+how it affects retrieval
+
+- how supersession is marked
+how supersession is marked
+
+- how review state rolls from artifact → section → chunk
+how review state rolls from artifact → section → chunk
+
+Then after that, we do the two we parked:3.schemas/core/nebula-chunk-kinds.jsonld4.docs/nebula/wrp-projection-pseudocode.md
+
+If you want, I’ll go straight intoschemas/core/nebula-review-state.jsonldnext and make it repo-ready.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.
+
+Sponsored
+
+Company Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Company Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Company Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Company Knowledge, Now Searchable by AI
+
+Helpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+You said:OK, those were the two that we deferred? go on.
+
+#### You said:
+
+OK, those were the two that we deferred? go on.
+
+OK, those were the two that we deferred? go on.
+
+OK, those were the two that we deferred? go on.
+
+OK, those were the two that we deferred? go on.
+
+OK, those were the two that we deferred? go on.
+
+OK, those were the two that we deferred? go on.
+
+OK, those were the two that we deferred? go on.
+
+ChatGPT said:Yes — the two we deferred were:schemas/core/nebula-chunk-kinds.jsonlddocs/nebula/wrp-projection-pseudocode.mdWhat I’m proposing is that weinsert two review-governance artifacts ahead of them, because they’re lower effort and immediately useful for triaging the corpus:schemas/core/nebula-review-state.jsonlddocs/nebula/review-workflow.mdThen we come back to the two deferred docs right after.So the sequence becomes:review-state schemareview workflow docchunk-kinds ontology(deferred item #1)projection pseudocode(deferred item #2)I’ll go ahead with the first of those now.schemas/core/nebula-review-state.jsonldJSON{"@context": {"@version":1.1,"id":"@id","type":"@type","xsd":"http://www.w3.org/2001/XMLSchema#","rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#","rdfs":"http://www.w3.org/2000/01/rdf-schema#","schema":"https://schema.org/","nebula":"https://nexus.example/schema/nebula/","review":"https://nexus.example/schema/review/","label":"rdfs:label","comment":"rdfs:comment","title":"schema:name","text":"schema:text","createdAt": {"@id":"schema:dateCreated","@type":"xsd:dateTime"},"updatedAt": {"@id":"schema:dateModified","@type":"xsd:dateTime"},"ReviewStatus":"review:ReviewStatus","ReviewPriority":"review:ReviewPriority","AttentionReason":"review:AttentionReason","ReviewAnnotation":"review:ReviewAnnotation","reviewStatus": {"@id":"review:reviewStatus","@type":"@id"},"reviewPriority": {"@id":"review:reviewPriority","@type":"@id"},"attentionReason": {"@id":"review:attentionReason","@type":"@id","@container":"@set"},"needsAttention": {"@id":"review:needsAttention","@type":"xsd:boolean"},"lastReviewedAt": {"@id":"review:lastReviewedAt","@type":"xsd:dateTime"},"reviewedBy": {"@id":"review:reviewedBy"},"reviewSummary":"review:reviewSummary","appliesTo": {"@id":"review:appliesTo","@type":"@id"},"supersededBy": {"@id":"nebula:supersededBy","@type":"@id"},"supersedes": {"@id":"nebula:supersedes","@type":"@id"},"focusScore": {"@id":"review:focusScore","@type":"xsd:decimal"},"reviewScope": {"@id":"review:reviewScope"},"reviewDisposition": {"@id":"review:reviewDisposition"}},"@graph": [{"id":"review:ReviewStatus","type":"rdfs:Class","label":"Review Status","comment":"A workflow-oriented review state used to triage and prioritize artifacts, sections, and chunks independently of their lifecycle status."},{"id":"review:ReviewPriority","type":"rdfs:Class","label":"Review Priority","comment":"A priority level used to order review and remediation work."},{"id":"review:AttentionReason","type":"rdfs:Class","label":"Attention Reason","comment":"A reason why an artifact, section, or chunk requires attention."},{"id":"review:ReviewAnnotation","type":"rdfs:Class","label":"Review Annotation","comment":"A structured annotation capturing review state, rationale, priority, and review metadata for a Nebula artifact, section, or chunk."},{"id":"review:reviewStatus","type":"rdf:Property","label":"review status"},{"id":"review:reviewPriority","type":"rdf:Property","label":"review priority"},{"id":"review:attentionReason","type":"rdf:Property","label":"attention reason"},{"id":"review:needsAttention","type":"rdf:Property","label":"needs attention"},{"id":"review:lastReviewedAt","type":"rdf:Property","label":"last reviewed at"},{"id":"review:reviewedBy","type":"rdf:Property","label":"reviewed by"},{"id":"review:reviewSummary","type":"rdf:Property","label":"review summary"},{"id":"review:appliesTo","type":"rdf:Property","label":"applies to"},{"id":"review:focusScore","type":"rdf:Property","label":"focus score"},{"id":"review:reviewScope","type":"rdf:Property","label":"review scope"},{"id":"review:reviewDisposition","type":"rdf:Property","label":"review disposition"},// -----------------------------// Review Status vocabulary// -----------------------------{"id":"review:UNREVIEWED","type":"ReviewStatus","label":"Unreviewed","comment":"The artifact or chunk has not yet been reviewed for current validity, relevance, or priority."},{"id":"review:NEEDS_REVIEW","type":"ReviewStatus","label":"Needs Review","comment":"The item should be reviewed soon because it may be stale, incomplete, or important to current work."},{"id":"review:UNDER_REVIEW","type":"ReviewStatus","label":"Under Review","comment":"The item is actively being reviewed or rewritten."},{"id":"review:REVIEWED","type":"ReviewStatus","label":"Reviewed","comment":"The item has been reviewed and is currently believed to be accurate enough for normal use."},{"id":"review:CURRENT_FOCUS","type":"ReviewStatus","label":"Current Focus","comment":"The item is a current work focus and should be surfaced prominently in retrieval and dashboards."},{"id":"review:OUTDATED","type":"ReviewStatus","label":"Outdated","comment":"The item contains material that is known to be out of date relative to the current architecture, code, or process."},{"id":"review:QUESTIONED","type":"ReviewStatus","label":"Questioned","comment":"The item contains claims, assumptions, or structure whose correctness is in doubt."},{"id":"review:SUPERSEDED_CONFIRMED","type":"ReviewStatus","label":"Superseded Confirmed","comment":"The item has been superseded by a newer artifact or chunk and should normally be excluded from default retrieval."},// -----------------------------// Priority vocabulary// -----------------------------{"id":"review:CRITICAL","type":"ReviewPriority","label":"Critical","comment":"Immediate attention required because the item blocks implementation, risks incorrect work, or is central to current execution."},{"id":"review:HIGH","type":"ReviewPriority","label":"High","comment":"Important review work that should be addressed soon."},{"id":"review:MEDIUM","type":"ReviewPriority","label":"Medium","comment":"Useful review work, but not urgent."},{"id":"review:LOW","type":"ReviewPriority","label":"Low","comment":"Backlog review work with low immediate operational impact."},// -----------------------------// Attention reasons// -----------------------------{"id":"review:BLOCKING_IMPLEMENTATION","type":"AttentionReason","label":"Blocking Implementation","comment":"The item is blocking or materially slowing active implementation work."},{"id":"review:OUT_OF_DATE_WITH_RUNTIME","type":"AttentionReason","label":"Out of Date with Runtime","comment":"The item no longer matches the current runtime behavior or execution model."},{"id":"review:OUT_OF_DATE_WITH_ARCHITECTURE","type":"AttentionReason","label":"Out of Date with Architecture","comment":"The item no longer reflects the current architectural decomposition, boundaries, or design intent."},{"id":"review:CONFLICTS_WITH_NEW_MODEL","type":"AttentionReason","label":"Conflicts with New Model","comment":"The item conflicts with a newer ontology, protocol, or system model."},{"id":"review:REQUIRES_MIGRATION","type":"AttentionReason","label":"Requires Migration","comment":"The item must be updated or replaced as part of a migration or cutover plan."},{"id":"review:DUPLICATED_ELSEWHERE","type":"AttentionReason","label":"Duplicated Elsewhere","comment":"The item duplicates content now represented more authoritatively elsewhere."},{"id":"review:NEEDS_LEVEL_REVIEW","type":"AttentionReason","label":"Needs Level Review","comment":"The item’s chunk levels or abstraction boundaries are suspect and should be reviewed."},{"id":"review:NEEDS_CHUNKING_REVIEW","type":"AttentionReason","label":"Needs Chunking Review","comment":"The item’s section or chunk segmentation should be revisited."},// -----------------------------// Optional review-scope vocabulary// -----------------------------{"id":"review:ARTIFACT_SCOPE","type":"schema:DefinedTerm","label":"Artifact Scope"},{"id":"review:SECTION_SCOPE","type":"schema:DefinedTerm","label":"Section Scope"},{"id":"review:CHUNK_SCOPE","type":"schema:DefinedTerm","label":"Chunk Scope"}]}What this schema is doing conceptuallyIt gives Nebula areview overlaythat isindependent of lifecycle status.That means an artifact can simultaneously be:status = nebula:ACTIVEreviewStatus = review:NEEDS_REVIEWor:status = nebula:SUPERSEDEDreviewStatus = review:SUPERSEDED_CONFIRMEDThose are not redundant; they answer different questions:status→ what is this artifact in the corpus lifecycle?reviewStatus→ what attention should we pay to it right now?That split is the core reason to do this as a separate schema instead of just stuffing more enum values intostatus.The one modeling change I would make immediatelyThe JSON-LD above defines review properties in the vocabulary, but I would also makeReviewAnnotationa first-class node pattern, not just “extra columns on artifacts.”In other words, I’d supportbothof these:A. denormalized convenience fields onnebula_artifactreview_statusreview_prioritylast_reviewed_atreview_summaryneeds_attentionB. normalized review annotation recordsSomething like:JSON{"id":"review:annotation/wrp-v1-protocol/2026-06-21","type":"ReviewAnnotation","appliesTo":"wrp:artifact/wrp-v1-protocol","reviewStatus":"review:CURRENT_FOCUS","reviewPriority":"review:HIGH","attentionReason": ["review:BLOCKING_IMPLEMENTATION"],"needsAttention":true,"lastReviewedAt":"2026-06-21T13:00:00Z","reviewedBy":"role:architect","reviewSummary":"Protocol remains active and central, but execution-related sections should be checked against the traversal split."}Why I think you want both:artifact columnsmake filtering and dashboards easyannotation nodespreserve review history, multiple opinions, and section/chunk review laterSo my rule would be:the artifact table stores thecurrent effective review statereview annotations store thehistory / evidence / per-scope detailHow I’d wire this into the SQL side immediatelyIf you want the simplest operational thing, I’d add these columns toboth:nebula_artifactreview_statusreview_priorityneeds_attentionlast_reviewed_atreview_summaryfocus_scorenebula_chunksame fields, nullableI wouldnotbother withnebula_sectionon day one unless you know you want section-level review in the UI immediately.Then add a new table:nebula_review_annotationwith fields like:idtarget_type(artifact,chunk, maybesection)target_idreview_statusreview_priorityattention_reason_jsonneeds_attentionreviewed_byreview_summarycreated_atThat gives you both the cheap operational path and the richer future path.What the next doc should doThe schema above gives the vocabulary, but thebehaviorstill needs to be pinned down. So the next document should be:docs/nebula/review-workflow.mdThat doc should define:1. who can set review stateFor example:you manuallyInspector role recommendationsBuilder/Architect proposalsConduit import hooks maybe, but not as final authority2. effective-state precedenceIf:artifact saysREVIEWEDbut one chunk saysQUESTIONEDand a newer annotation saysCURRENT_FOCUSwhat wins?3. how review state affects retrievalFor example:default retrieval demotesOUTDATEDExplorer can include superseded materialInspector may boostQUESTIONED4. how supersession interacts with reviewExamples:ifsupersededByis set, shouldreviewStatusauto-flip toSUPERSEDED_CONFIRMED?or only after manual confirmation?5. how “current focus” is maintainedBecause you probably don’t want 40 things marked current focus forever.After that, we return to the two deferred docsSo the updated sequence is now:Review-governance insertionschemas/core/nebula-review-state.jsonld← done abovedocs/nebula/review-workflow.mdThen the two deferred docsschemas/core/nebula-chunk-kinds.jsonlddocs/nebula/wrp-projection-pseudocode.mdIf you want, I’ll go straight intodocs/nebula/review-workflow.mdnext.Read AI, Inc.SponsoredMeeting Notes in ChatGPTAI meeting notes with integrated ChatGPT app
+
+#### ChatGPT said:

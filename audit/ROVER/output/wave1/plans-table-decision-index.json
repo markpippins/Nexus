@@ -1,0 +1,88 @@
+{
+  "source": "Plans Table Decision.html",
+  "slug": "plans-table-decision",
+  "total_chunks": 16,
+  "total_chars": 229613,
+  "chunks": [
+    {
+      "index": 1,
+      "path": "chunks/plans-table-decision/chunk_001.txt",
+      "size": 11141
+    },
+    {
+      "index": 2,
+      "path": "chunks/plans-table-decision/chunk_002.txt",
+      "size": 11124
+    },
+    {
+      "index": 3,
+      "path": "chunks/plans-table-decision/chunk_003.txt",
+      "size": 11124
+    },
+    {
+      "index": 4,
+      "path": "chunks/plans-table-decision/chunk_004.txt",
+      "size": 19989
+    },
+    {
+      "index": 5,
+      "path": "chunks/plans-table-decision/chunk_005.txt",
+      "size": 13228
+    },
+    {
+      "index": 6,
+      "path": "chunks/plans-table-decision/chunk_006.txt",
+      "size": 10026
+    },
+    {
+      "index": 7,
+      "path": "chunks/plans-table-decision/chunk_007.txt",
+      "size": 10184
+    },
+    {
+      "index": 8,
+      "path": "chunks/plans-table-decision/chunk_008.txt",
+      "size": 10151
+    },
+    {
+      "index": 9,
+      "path": "chunks/plans-table-decision/chunk_009.txt",
+      "size": 19988
+    },
+    {
+      "index": 10,
+      "path": "chunks/plans-table-decision/chunk_010.txt",
+      "size": 19892
+    },
+    {
+      "index": 11,
+      "path": "chunks/plans-table-decision/chunk_011.txt",
+      "size": 18934
+    },
+    {
+      "index": 12,
+      "path": "chunks/plans-table-decision/chunk_012.txt",
+      "size": 17910
+    },
+    {
+      "index": 13,
+      "path": "chunks/plans-table-decision/chunk_013.txt",
+      "size": 19156
+    },
+    {
+      "index": 14,
+      "path": "chunks/plans-table-decision/chunk_014.txt",
+      "size": 19288
+    },
+    {
+      "index": 15,
+      "path": "chunks/plans-table-decision/chunk_015.txt",
+      "size": 19992
+    },
+    {
+      "index": 16,
+      "path": "chunks/plans-table-decision/chunk_016.txt",
+      "size": 3513
+    }
+  ]
+}

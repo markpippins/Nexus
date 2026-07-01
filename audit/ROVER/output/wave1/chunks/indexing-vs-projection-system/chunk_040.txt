@@ -1,0 +1,278 @@
+You said:Woah. I'm starting to get interesting suggestions from DeepSeek. It offered to index the latest harvest data, and since that isn't a concept beyond cross-referrences, I asked it how it would go about that - mostly to see what it wanted to do.
+
+Good question. Here's how I'd approach it:
+Strategy: Query → Classify → Store
+1. Pull raw data from the canonical store
+All 124 candidates are already in nebula's  harvests  table. I'd pull them in one shot:
+// bash
+curl -s http://localhost:3101/api/harvests | python3 -c "
+import sys, json
+harvests = json.load(sys.stdin)['harvests']
+for h in harvests:
+    for c in h['candidates']:
+        print(json.dumps({
+            'title': c['title'],
+            'status': c['status'],
+            'source': h['source_filename'],
+            'tags': h.get('tags', [])
+        }))
+"
+2. Classify into domains
+This is the core step. I see two viable paths:
+Path A — LLM classification (preferred): Feed all 124 candidate titles + descriptions through an inference pass (either myself or a lightweight model). The prompt would define domain taxonomy and ask for classification:
+You are classifying 124 harvested architectural specification candidates into domains.
+Domains: Broker/Mesh, Governance/Policy/Constitution, TypeSpec/Contracts/CodeGen,
+Agent Architecture/Leases, Knowledge Infrastructure, Formal Verification (TLA+/CUE),
+Capability/Intent Graph, Event-Driven Architecture, Service Validation, UI/Component Spec.
+ 
+For each candidate, return: { "title": "...", "domains": ["...", "..."], "confidence": 0.8 }
+Each candidate can belong to multiple domains (e.g., a broker contract spec touches both "Broker/Mesh" and "TypeSpec/Contracts").
+Path B — Keyword heuristics (faster, less accurate): A Python script with regex/term matching:
+-  broker|pipeline|gateway|mesh  → Broker/Mesh
+-  constitution|governance|policy|civic  → Governance/Policy
+-  typespec|openapi|contract|schema|generator  → TypeSpec/Contracts
+-  lease|agent|scheduler|orchestrator  → Agent Architecture
+-  tla|cue|invariant|proof  → Formal Verification
+-  capability|intent|graph  → Capability/Intent Graph
+-  event|stream|kafka|log  → Event-Driven Architecture
+-  knowledge|ontology|glossary|index  → Knowledge Infrastructure
+3. Store the index
+Three options, depending on how you want to consume it:
+┌─────────────┬─────────────────────────────────────────────────────────────────────┬───────────────────────┐
+│ Option      │ Mechanism                                                           │ Best for              │
+├─────────────┼─────────────────────────────────────────────────────────────────────┼───────────────────────┤
+│ nebula      │ POST /api/projections — SQL query grouping candidates by domain     │ Readable,             │
+│ projection  │ tag, rendered to nexus/audit/DOMAIN_INDEX.md                        │ regeneratable         │
+│             │                                                                     │ markdown              │
+│ agent_recor │ nebula_create_agent_record with recordType: "analysis", tags        │ Queryable, versioned  │
+│ d           │ ["domain-index"]                                                    │ in DB                 │
+│ cross-refer │ nebula_create_cross_reference linking each candidate to a domain    │ Graph-traversable,    │
+│ ences       │ System entity                                                       │ most structured       │
+└─────────────┴─────────────────────────────────────────────────────────────────────┴───────────────────────┘
+I'd combine all three: store the domain taxonomy as Systems in nebula, create cross-references from each candidate to its domains, then project the index to markdown.
+4. Keep it live
+The key insight: don't make this a one-off script. Wire it into the harvest pipeline so every new harvest run auto-classifies its candidates. The domain index stays current without manual re-indexingShow moreShow less
+
+#### You said:
+
+Woah. I'm starting to get interesting suggestions from DeepSeek. It offered to index the latest harvest data, and since that isn't a concept beyond cross-referrences, I asked it how it would go about that - mostly to see what it wanted to do.
+
+Good question. Here's how I'd approach it:
+Strategy: Query → Classify → Store
+1. Pull raw data from the canonical store
+All 124 candidates are already in nebula's  harvests  table. I'd pull them in one shot:
+// bash
+curl -s http://localhost:3101/api/harvests | python3 -c "
+import sys, json
+harvests = json.load(sys.stdin)['harvests']
+for h in harvests:
+    for c in h['candidates']:
+        print(json.dumps({
+            'title': c['title'],
+            'status': c['status'],
+            'source': h['source_filename'],
+            'tags': h.get('tags', [])
+        }))
+"
+2. Classify into domains
+This is the core step. I see two viable paths:
+Path A — LLM classification (preferred): Feed all 124 candidate titles + descriptions through an inference pass (either myself or a lightweight model). The prompt would define domain taxonomy and ask for classification:
+You are classifying 124 harvested architectural specification candidates into domains.
+Domains: Broker/Mesh, Governance/Policy/Constitution, TypeSpec/Contracts/CodeGen,
+Agent Architecture/Leases, Knowledge Infrastructure, Formal Verification (TLA+/CUE),
+Capability/Intent Graph, Event-Driven Architecture, Service Validation, UI/Component Spec.
+ 
+For each candidate, return: { "title": "...", "domains": ["...", "..."], "confidence": 0.8 }
+Each candidate can belong to multiple domains (e.g., a broker contract spec touches both "Broker/Mesh" and "TypeSpec/Contracts").
+Path B — Keyword heuristics (faster, less accurate): A Python script with regex/term matching:
+-  broker|pipeline|gateway|mesh  → Broker/Mesh
+-  constitution|governance|policy|civic  → Governance/Policy
+-  typespec|openapi|contract|schema|generator  → TypeSpec/Contracts
+-  lease|agent|scheduler|orchestrator  → Agent Architecture
+-  tla|cue|invariant|proof  → Formal Verification
+-  capability|intent|graph  → Capability/Intent Graph
+-  event|stream|kafka|log  → Event-Driven Architecture
+-  knowledge|ontology|glossary|index  → Knowledge Infrastructure
+3. Store the index
+Three options, depending on how you want to consume it:
+┌─────────────┬─────────────────────────────────────────────────────────────────────┬───────────────────────┐
+│ Option      │ Mechanism                                                           │ Best for              │
+├─────────────┼─────────────────────────────────────────────────────────────────────┼───────────────────────┤
+│ nebula      │ POST /api/projections — SQL query grouping candidates by domain     │ Readable,             │
+│ projection  │ tag, rendered to nexus/audit/DOMAIN_INDEX.md                        │ regeneratable         │
+│             │                                                                     │ markdown              │
+│ agent_recor │ nebula_create_agent_record with recordType: "analysis", tags        │ Queryable, versioned  │
+│ d           │ ["domain-index"]                                                    │ in DB                 │
+│ cross-refer │ nebula_create_cross_reference linking each candidate to a domain    │ Graph-traversable,    │
+│ ences       │ System entity                                                       │ most structured       │
+└─────────────┴─────────────────────────────────────────────────────────────────────┴───────────────────────┘
+I'd combine all three: store the domain taxonomy as Systems in nebula, create cross-references from each candidate to its domains, then project the index to markdown.
+4. Keep it live
+The key insight: don't make this a one-off script. Wire it into the harvest pipeline so every new harvest run auto-classifies its candidates. The domain index stays current without manual re-indexingShow moreShow less
+
+Woah. I'm starting to get interesting suggestions from DeepSeek. It offered to index the latest harvest data, and since that isn't a concept beyond cross-referrences, I asked it how it would go about that - mostly to see what it wanted to do.
+
+Good question. Here's how I'd approach it:
+Strategy: Query → Classify → Store
+1. Pull raw data from the canonical store
+All 124 candidates are already in nebula's  harvests  table. I'd pull them in one shot:
+// bash
+curl -s http://localhost:3101/api/harvests | python3 -c "
+import sys, json
+harvests = json.load(sys.stdin)['harvests']
+for h in harvests:
+    for c in h['candidates']:
+        print(json.dumps({
+            'title': c['title'],
+            'status': c['status'],
+            'source': h['source_filename'],
+            'tags': h.get('tags', [])
+        }))
+"
+2. Classify into domains
+This is the core step. I see two viable paths:
+Path A — LLM classification (preferred): Feed all 124 candidate titles + descriptions through an inference pass (either myself or a lightweight model). The prompt would define domain taxonomy and ask for classification:
+You are classifying 124 harvested architectural specification candidates into domains.
+Domains: Broker/Mesh, Governance/Policy/Constitution, TypeSpec/Contracts/CodeGen,
+Agent Architecture/Leases, Knowledge Infrastructure, Formal Verification (TLA+/CUE),
+Capability/Intent Graph, Event-Driven Architecture, Service Validation, UI/Component Spec.
+ 
+For each candidate, return: { "title": "...", "domains": ["...", "..."], "confidence": 0.8 }
+Each candidate can belong to multiple domains (e.g., a broker contract spec touches both "Broker/Mesh" and "TypeSpec/Contracts").
+Path B — Keyword heuristics (faster, less accurate): A Python script with regex/term matching:
+-  broker|pipeline|gateway|mesh  → Broker/Mesh
+-  constitution|governance|policy|civic  → Governance/Policy
+-  typespec|openapi|contract|schema|generator  → TypeSpec/Contracts
+-  lease|agent|scheduler|orchestrator  → Agent Architecture
+-  tla|cue|invariant|proof  → Formal Verification
+-  capability|intent|graph  → Capability/Intent Graph
+-  event|stream|kafka|log  → Event-Driven Architecture
+-  knowledge|ontology|glossary|index  → Knowledge Infrastructure
+3. Store the index
+Three options, depending on how you want to consume it:
+┌─────────────┬─────────────────────────────────────────────────────────────────────┬───────────────────────┐
+│ Option      │ Mechanism                                                           │ Best for              │
+├─────────────┼─────────────────────────────────────────────────────────────────────┼───────────────────────┤
+│ nebula      │ POST /api/projections — SQL query grouping candidates by domain     │ Readable,             │
+│ projection  │ tag, rendered to nexus/audit/DOMAIN_INDEX.md                        │ regeneratable         │
+│             │                                                                     │ markdown              │
+│ agent_recor │ nebula_create_agent_record with recordType: "analysis", tags        │ Queryable, versioned  │
+│ d           │ ["domain-index"]                                                    │ in DB                 │
+│ cross-refer │ nebula_create_cross_reference linking each candidate to a domain    │ Graph-traversable,    │
+│ ences       │ System entity                                                       │ most structured       │
+└─────────────┴─────────────────────────────────────────────────────────────────────┴───────────────────────┘
+I'd combine all three: store the domain taxonomy as Systems in nebula, create cross-references from each candidate to its domains, then project the index to markdown.
+4. Keep it live
+The key insight: don't make this a one-off script. Wire it into the harvest pipeline so every new harvest run auto-classifies its candidates. The domain index stays current without manual re-indexingShow moreShow less
+
+Woah. I'm starting to get interesting suggestions from DeepSeek. It offered to index the latest harvest data, and since that isn't a concept beyond cross-referrences, I asked it how it would go about that - mostly to see what it wanted to do.
+
+Good question. Here's how I'd approach it:
+Strategy: Query → Classify → Store
+1. Pull raw data from the canonical store
+All 124 candidates are already in nebula's  harvests  table. I'd pull them in one shot:
+// bash
+curl -s http://localhost:3101/api/harvests | python3 -c "
+import sys, json
+harvests = json.load(sys.stdin)['harvests']
+for h in harvests:
+    for c in h['candidates']:
+        print(json.dumps({
+            'title': c['title'],
+            'status': c['status'],
+            'source': h['source_filename'],
+            'tags': h.get('tags', [])
+        }))
+"
+2. Classify into domains
+This is the core step. I see two viable paths:
+Path A — LLM classification (preferred): Feed all 124 candidate titles + descriptions through an inference pass (either myself or a lightweight model). The prompt would define domain taxonomy and ask for classification:
+You are classifying 124 harvested architectural specification candidates into domains.
+Domains: Broker/Mesh, Governance/Policy/Constitution, TypeSpec/Contracts/CodeGen,
+Agent Architecture/Leases, Knowledge Infrastructure, Formal Verification (TLA+/CUE),
+Capability/Intent Graph, Event-Driven Architecture, Service Validation, UI/Component Spec.
+ 
+For each candidate, return: { "title": "...", "domains": ["...", "..."], "confidence": 0.8 }
+Each candidate can belong to multiple domains (e.g., a broker contract spec touches both "Broker/Mesh" and "TypeSpec/Contracts").
+Path B — Keyword heuristics (faster, less accurate): A Python script with regex/term matching:
+-  broker|pipeline|gateway|mesh  → Broker/Mesh
+-  constitution|governance|policy|civic  → Governance/Policy
+-  typespec|openapi|contract|schema|generator  → TypeSpec/Contracts
+-  lease|agent|scheduler|orchestrator  → Agent Architecture
+-  tla|cue|invariant|proof  → Formal Verification
+-  capability|intent|graph  → Capability/Intent Graph
+-  event|stream|kafka|log  → Event-Driven Architecture
+-  knowledge|ontology|glossary|index  → Knowledge Infrastructure
+3. Store the index
+Three options, depending on how you want to consume it:
+┌─────────────┬─────────────────────────────────────────────────────────────────────┬───────────────────────┐
+│ Option      │ Mechanism                                                           │ Best for              │
+├─────────────┼─────────────────────────────────────────────────────────────────────┼───────────────────────┤
+│ nebula      │ POST /api/projections — SQL query grouping candidates by domain     │ Readable,             │
+│ projection  │ tag, rendered to nexus/audit/DOMAIN_INDEX.md                        │ regeneratable         │
+│             │                                                                     │ markdown              │
+│ agent_recor │ nebula_create_agent_record with recordType: "analysis", tags        │ Queryable, versioned  │
+│ d           │ ["domain-index"]                                                    │ in DB                 │
+│ cross-refer │ nebula_create_cross_reference linking each candidate to a domain    │ Graph-traversable,    │
+│ ences       │ System entity                                                       │ most structured       │
+└─────────────┴─────────────────────────────────────────────────────────────────────┴───────────────────────┘
+I'd combine all three: store the domain taxonomy as Systems in nebula, create cross-references from each candidate to its domains, then project the index to markdown.
+4. Keep it live
+The key insight: don't make this a one-off script. Wire it into the harvest pipeline so every new harvest run auto-classifies its candidates. The domain index stays current without manual re-indexingShow moreShow less
+
+Woah. I'm starting to get interesting suggestions from DeepSeek. It offered to index the latest harvest data, and since that isn't a concept beyond cross-referrences, I asked it how it would go about that - mostly to see what it wanted to do.
+
+Good question. Here's how I'd approach it:
+Strategy: Query → Classify → Store
+1. Pull raw data from the canonical store
+All 124 candidates are already in nebula's  harvests  table. I'd pull them in one shot:
+// bash
+curl -s http://localhost:3101/api/harvests | python3 -c "
+import sys, json
+harvests = json.load(sys.stdin)['harvests']
+for h in harvests:
+    for c in h['candidates']:
+        print(json.dumps({
+            'title': c['title'],
+            'status': c['status'],
+            'source': h['source_filename'],
+            'tags': h.get('tags', [])
+        }))
+"
+2. Classify into domains
+This is the core step. I see two viable paths:
+Path A — LLM classification (preferred): Feed all 124 candidate titles + descriptions through an inference pass (either myself or a lightweight model). The prompt would define domain taxonomy and ask for classification:
+You are classifying 124 harvested architectural specification candidates into domains.
+Domains: Broker/Mesh, Governance/Policy/Constitution, TypeSpec/Contracts/CodeGen,
+Agent Architecture/Leases, Knowledge Infrastructure, Formal Verification (TLA+/CUE),
+Capability/Intent Graph, Event-Driven Architecture, Service Validation, UI/Component Spec.
+ 
+For each candidate, return: { "title": "...", "domains": ["...", "..."], "confidence": 0.8 }
+Each candidate can belong to multiple domains (e.g., a broker contract spec touches both "Broker/Mesh" and "TypeSpec/Contracts").
+Path B — Keyword heuristics (faster, less accurate): A Python script with regex/term matching:
+-  broker|pipeline|gateway|mesh  → Broker/Mesh
+-  constitution|governance|policy|civic  → Governance/Policy
+-  typespec|openapi|contract|schema|generator  → TypeSpec/Contracts
+-  lease|agent|scheduler|orchestrator  → Agent Architecture
+-  tla|cue|invariant|proof  → Formal Verification
+-  capability|intent|graph  → Capability/Intent Graph
+-  event|stream|kafka|log  → Event-Driven Architecture
+-  knowledge|ontology|glossary|index  → Knowledge Infrastructure
+3. Store the index
+Three options, depending on how you want to consume it:
+┌─────────────┬─────────────────────────────────────────────────────────────────────┬───────────────────────┐
+│ Option      │ Mechanism                                                           │ Best for              │
+├─────────────┼─────────────────────────────────────────────────────────────────────┼───────────────────────┤
+│ nebula      │ POST /api/projections — SQL query grouping candidates by domain     │ Readable,             │
+│ projection  │ tag, rendered to nexus/audit/DOMAIN_INDEX.md                        │ regeneratable         │
+│             │                                                                     │ markdown              │
+│ agent_recor │ nebula_create_agent_record with recordType: "analysis", tags        │ Queryable, versioned  │
+│ d           │ ["domain-index"]                                                    │ in DB                 │
+│ cross-refer │ nebula_create_cross_reference linking each candidate to a domain    │ Graph-traversable,    │
+│ ences       │ System entity                                                       │ most structured       │
+└─────────────┴─────────────────────────────────────────────────────────────────────┴───────────────────────┘
+I'd combine all three: store the domain taxonomy as Systems in nebula, create cross-references from each candidate to its domains, then project the index to markdown.
+4. Keep it live
+The key insight: don't make this a one-off script. Wire it into the harvest pipeline so every new harvest run auto-classifies its candidates. The domain index stays current without manual re-indexingShow moreShow less
+
+Woah. I'm starting to get interesting suggestions from DeepSeek. It offered to index the latest harvest data, and since that isn't a concept beyond cross-referrences, I asked it how it would go about that - mostly to see what it wanted to do.

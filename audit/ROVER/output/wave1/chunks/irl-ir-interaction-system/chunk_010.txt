@@ -1,0 +1,283 @@
+New chatSearch chatsPinnedRecentsChat historyNew chatCtrlShiftOSearch chatsCtrlKLibraryAppsMorePinnedLinkedInNexus Work Request PipelineNodeMessage Normalization & TrajectoriesEvent Pipeline EvaluationSelf-Extending Architecture ConceptBuzzwords by LayerAI Engineering Survival SkillsProjectsPrompt Architect / LERONexus Active StepNexushomelabPythonShow moreChatsSemantic IR v0.1 OverviewRole-Addressable Cognitive FilesystemSystem Evolution and NamingNexus Console StructureStrontium as cognition nodeIRL IR Interaction SystemMulti-Stage Semantic CompilerService Broker Pattern DebateService Broker Pattern ClarificationTopology Server EfficiencyEvent-Driven CLI AgentsFederated Self-Evolving SystemsNebula Audit Organization TipsWork Artifact IR DefinitionDynamic UI CompositionNexus Product DefinitionReport Schema AnalysisCognitive Projection ModelPlurality in CognitionCodex Session PlanningCoPilot Context OverloadCognitive CPU SchedulerModel Verification MigrationTerrain service registryEAV Schema AnalysisDistributed Cognition DesignNebula as Jira SystemSelf-Regulating Software OntologyMark PippinsFreeClaim offerChatGPTFree offerShareBulk ExportYou said:so, because the last thing I posted was an attachment, I need to start a new thread with the rest, but I know that you've got the first piece in context.
+
+These things also exist:
+
+15. IRL (Interaction Reasoning Layer)
+
+Canonical definition: nexus_irl_taxonomy.md
+
+Probabilistic, constraint-aware semantic classification layer. Answers "what kind of interaction is this?" using 8 probabilistic archetypes. Layer A of the three-layer system.
+
+| File | Relationship |
+
+| --- | --- |
+
+| nexus_irl_taxonomy.md | Canonical definition — 8 probabilistic archetypes |
+
+| nexus_interaction_taxonomy.md | IR-side companion — 9 deterministic archetypes |
+
+16. IR Interaction Archetypes (Deterministic)
+
+Canonical definition: nexus_interaction_taxonomy.md
+
+Closed contract governing how the deterministic Append-Only Object Registry (IR) is permitted to evolve. 9 archetypes: Construction, Execution, Reflection, Reconciliation, Revision, Counterfactual, Audit, Compression, Constraint Injection.
+
+| File | Relationship |
+
+| --- | --- |
+
+| nexus_interaction_taxonomy.md | Canonical definition — 9 closed-contract archetypes |
+
+| nexus_irl_taxonomy.md | IRL-side companion — 8 probabilistic archetypes |
+
+| AUTHORITY_GRAPH_IR.md | Append-Only Object Registry (IR) governed by these archetypes |
+
+| VALIDATOR_SPEC.md | AEI validation enforces these constraints |
+
+19. Taxonomy / Terminology
+
+| File | Relationship |
+
+| --- | --- |
+
+| nexus_irl_taxonomy.md | IRL probabilistic archetypes (8) |
+
+| nexus_interaction_taxonomy.md | IR deterministic archetypes (9) |
+
+| terminology-audit.md | Service Registry / Host Server terminology audit |
+
+| ARCHITECTURE/message-semantic-taxonomy.md | Message semantic role taxonomy |
+
+| EVENT_GRAMMAR.md | Event type taxonomy |
+
+| VALIDATOR_SPEC.md | F-class failure taxonomy |
+
+| mildred-datamodel-critique.md | Typed ontology / taxonomy system |
+
+20. Specification Compiler (Phase 1)
+
+Canonical definition: PHASE1_SPECIFICATION_COMPILER.md
+
+Transforms prompts into requirements or WorkRequests. Functions like a compiler front-end/optimizer.
+
+| File | Relationship |
+
+| --- | --- |
+
+| PHASE1_SPECIFICATION_COMPILER.md | Canonical definition |
+
+| COMPILER_ARCHITECTURE.md | Phase 1 in four-phase architecture |
+
+| WORKREQUEST_SPEC.md | Output: WorkRequestGraph |
+
+| LOWERING_PASS.md | Phase 1.5 receives Phase 1 output |
+
+| EXECUTION_GRAPH_SCHEMA.md | Phase 1 produces WorkRequestGraph |
+
+| OBSERVATION_MODEL.md | Pipeline: Phase 1 → WorkRequestGraph |
+
+| ANALYSIS/operator-plane-gap-analysis.md | Phase 1 spec reference |
+
+21. Execution Runtime (Phase 2)
+
+Canonical definition: PHASE2_EXECUTION_RUNTIME.md
+
+Takes a frozen ExecutionGraph and interprets it as a program via a deterministic Scheduler. The event stream is the verifiable causal trace.
+
+| File | Relationship |
+
+| --- | --- |
+
+| PHASE2_EXECUTION_RUNTIME.md | Canonical definition |
+
+| COMPILER_ARCHITECTURE.md | Phase 2 in four-phase architecture |
+
+| EXECUTION_GRAPH_SCHEMA.md | Input: frozen ExecutionGraph |
+
+| LOWERING_PASS.md | Phase 1.5 produces Phase 2 input |
+
+| VALIDATOR_SPEC.md | Runtime validation (R1–R10) |
+
+| DISTRIBUTED_SCHEDULER.md | Multi-node scheduler extension |
+
+| REPLAY_ENGINE.md | Temporal reconstruction from execution events |
+
+22. Observation Model (Phase 3)
+
+Canonical definition: OBSERVATION_MODEL.md
+
+Pure projection layer over (ExecutionGraph + EventLog + ReplayState) that produces derived semantic views for inspection, analysis, and debugging. Views are ephemeral, session-bound.
+
+| File | Relationship |
+
+| --- | --- |
+
+| OBSERVATION_MODEL.md | Canonical definition |
+
+| COMPILER_ARCHITECTURE.md | Phase 3 in four-phase architecture |
+
+| REPLAY_ENGINE.md | Observation Engine uses replay for reconstruction |
+
+| EXECUTION_GRAPH_SCHEMA.md | Primary inputs: ExecutionGraph + EventLog |
+
+| EVENT_GRAMMAR.md | Event types consumed by observation |
+
+| CER_SPEC.md | entity_key for stable entity resolution |
+
+24. Authority Graph
+
+Canonical definition: AUTHORITY_GRAPH_IR.md
+
+The Append-Only Object Registry (IR) — foundational deterministic structural graph for Nexus. Governed by a "Closed Contract" of interaction archetypes.
+
+| File | Relationship |
+
+| --- | --- |
+
+| AUTHORITY_GRAPH_IR.md | Canonical definition |
+
+| VALIDATOR_SPEC.md | AEI validation dimensions (AEI1–AEI4) |
+
+| nexus_interaction_taxonomy.md | Closed contract governing IR evolution |
+
+| LOWERING_PASS.md | validate_authority() pre-lowering gate |
+
+25. Distributed Scheduler
+
+Canonical definition: DISTRIBUTED_SCHEDULER.md
+
+Multi-host AST interpreter for distributed execution. Each scheduler independently rehydrates and replays the CER event log to compute current ExecutionGraph state.
+
+| File | Relationship |
+
+| --- | --- |
+
+| DISTRIBUTED_SCHEDULER.md | Canonical definition |
+
+| PHASE2_EXECUTION_RUNTIME.md | Single-host runtime — this extends to multi-host |
+
+| EXECUTION_GRAPH_SCHEMA.md | ExecutionGraph consumed by scheduler |
+
+| VALIDATOR_SPEC.md | Runtime validation (R2, R3, R8) |
+
+| CER_SPEC.md | State derivation via CER event log |
+
+| REPLAY_ENGINE.md | Replay integration for distributed logs |
+
+32. Determinism as System Invariant
+
+Phrase reuse: "deterministic", "deterministic reconstruction", "replayable", "same input always produces same output"
+
+The determinism invariant runs through nearly every spec document. It is the single most reused phrase in the corpus.
+
+| File | Relationship |
+
+| --- | --- |
+
+| COMPILER_ARCHITECTURE.md | §2 System Invariant: Artifacts = State, Events = Causal Trace |
+
+| PHASE1_SPECIFICATION_COMPILER.md | §5: Fully deterministic and replayable |
+
+| PHASE2_EXECUTION_RUNTIME.md | §9: Determinism of trace, observability, reproducibility |
+
+| LOWERING_PASS.md | §7.1 Determinism: same WorkRequestGraph → identical ExecutionGraph |
+
+| EXECUTION_GRAPH_SCHEMA.md | §3.1 Deterministic evaluation invariant |
+
+| DISTRIBUTED_SCHEDULER.md | §13: same event log ⇒ same execution result |
+
+| REPLAY_ENGINE.md | §3.3: apply(state, event) is pure |
+
+| CER_CCNF.md | §10: CCNF is pure, total, idempotent, cross-host identical |
+
+| CCNF_FAILURE_MODES.md | FM#4: Hidden State Leakage — pure function enforcement |
+
+| VALIDATOR_SPEC.md | V6: Same input → same validation result |
+
+| ANALYSIS.md | §11.1: Systems converge toward determinism |
+
+33. Append-Only / Immutable Event Log
+
+Phrase reuse: "append-only", "immutable", "never modified after emission", "events are facts"
+
+The append-only invariant for the event log is repeated across CER, Event Grammar, Replay, and the ANALYSIS synthesis.
+
+| File | Relationship |
+
+| --- | --- |
+
+| CER_SPEC.md | §0: Events are append-only, immutable, identity-stable |
+
+| EVENT_GRAMMAR.md | §1: Events never own truth. Append-only, immutable, referential |
+
+| REPLAY_ENGINE.md | §7: EventLog is source of truth, append-only |
+
+| DISTRIBUTED_SCHEDULER.md | §5: Event log is authoritative. Append-only, partitionable |
+
+| COMPILER_ARCHITECTURE.md | §5: Events are append-only, referential, reconstructible |
+
+| ARCHITECTURE/messagebox-core-architecture.md | Ledger append-only semantics |
+
+| ANALYSIS.md | §27: Hash→Lookup→Projection — append-only identity model |
+
+34. CER Identity Resolution (entity_key)
+
+Phrase reuse: "entity_key", "collapse_key", "alias_keys", "canonical entity signature", "identity collapse"
+
+The three-layer identity system (entity_key → collapse_key → alias_keys) is defined in CER_SPEC and CER_CCNF, then referenced across the observation and scheduler layers.
+
+| File | Relationship |
+
+| --- | --- |
+
+| CER_SPEC.md | §3: Identity Collapse System — 3 layers, 4 rules |
+
+| CER_CCNF.md | §4: Identity Derivation — entity_key = SHA256(canonical_entity_signature) |
+
+| CCNF_FAILURE_MODES.md | FM#3: Identity Key Instability — forbidden inputs to signature |
+
+| OBSERVATION_MODEL.md | §12: CER Identity Resolution in Views — per-view identity rules |
+
+| DISTRIBUTED_SCHEDULER.md | §X: entity_key as global node identity in distributed mode |
+
+| REPLAY_ENGINE.md | §17: Rehydration resolves identity via collapse engine |
+
+35. Frozen ExecutionGraph / Freeze Invariant
+
+Phrase reuse: "frozen", "freeze", "topology immutable", "topology locked", "no nodes added or removed after freezing"
+
+The freeze invariant is a boundary between compilation and execution. It appears in the Lowering Pass, Execution Graph Schema, Phase 2 Runtime, and Validator.
+
+| File | Relationship |
+
+| --- | --- |
+
+| LOWERING_PASS.md | §5.11: Step 8 — Freeze. Graph topology locked after validation |
+
+| EXECUTION_GRAPH_SCHEMA.md | §3.1: Immutable topology rule — only lifecycle_state, outputs, event_refs MAY mutate |
+
+| PHASE2_EXECUTION_RUNTIME.md | §2: Frozen ExecutionGraph as input to scheduler |
+
+| COMPILER_ARCHITECTURE.md | §4.3: Output must be frozen (topology immutable) |
+
+| VALIDATOR_SPEC.md | S9: Frozen Topology Rule — mutability flag |
+
+36. Snapshots as Derived Compression
+
+Phrase reuse: "snapshot", "derived compression", "deletable, regenerable", "fast replay start", "NOT canonical truth"
+
+Snapshots are explicitly NOT canonical truth — they are derived compression artifacts of CER history. This framing appears in CER_SPEC, CER_SNAPSHOT_ENGINE, and REPLAY_ENGINE.
+
+| File | Relationship |
+
+| --- | --- |
+
+| CER_SNAPSHOT_ENGINE.md | Canonical definition — trigger model, triple-version lock |
+
+| CER_SPEC.md | §5: Snapshot Triggers (4 conditions) |
+
+| REPLAY_ENGINE.md | §8: Snapshot Model — derived compression, not checkpoints |
+
+| CER_CCNF.md | §12: Version Anchoring — snapshot validity requires triple-version lock |
+
+| CCNF_FAILURE_MODES.md | FM#9: Version Skew — triple-version lock enforcement |

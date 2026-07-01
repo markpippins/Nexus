@@ -1,0 +1,183 @@
+Good. This is the point where the system stops being a pipelinethat runs correctlyand becomes a system thatimproves its own structure based on what happens when it runs.We’re now defining the missing feedback axis:Execution → Observation → Graph mutation → Revalidation → Better executiondocs/nebula/nebula-self-healing-and-feedback-learning.mdMarkdown# Nebula Self-Healing & Feedback Learning System**Status:** Draft**Owner:** Nebula runtime / learning loop subsystem**Purpose:** Define how execution receipts from Conduit are used to update Nebula’s semantic graph, review states, and future retrieval and validation behavior.---# 1. OverviewNebula is not static knowledge storage.It is a **stateful evolving semantic graph**.This system defines how Nebula:- learns from execution outcomes- updates trust signals (review state)- detects structural drift- improves chunk classification- refines retrieval scoring- repairs inconsistencies in WRP-derived structures---# 2. Core Principle> Every execution is an experiment on the correctness of the graph.Execution results are not just logs.They are **ground truth feedback signals** about the validity of:- chunk semantics- dependency structure- invariants- execution assumptions---# 3. Feedback Pipelineexecution_receipt→ outcome_classification→ semantic_diff_analysis→ graph_update_plan→ review_state_update→ cross_reference_adjustment→ validation_feedback_loop→ nebula_mutation---# 4. Input: Execution ReceiptsEach receipt contains:```json id="rcpt3"{"node_id": "...","status": "SUCCESS | FAILED | SKIPPED","inputs": [],"outputs": [],"validation_ref": "...","execution_trace": []}Receipts are immutable. They arefacts, not suggestions.5. Outcome ClassificationEach receipt is classified into a semantic outcome category:5.1 SUCCESSExecution succeeded without deviation.Implication:graph likely correctchunk classification likely validdependencies likely sound5.2 FAIL_TRANSIENTTemporary failure:networkresourceexternal dependencyImplication:no graph mutationpossible retry scheduling adjustment5.3 FAIL_SEMANTICExecution failed due to logic or structural mismatch.Implication:chunk likely misclassifiedWRP assumption violateddependency graph potentially incorrect5.4 FAIL_INVARIANTA WRP invariant was violated.Implication:critical structural issuerequires Inspector reviewmay invalidate subgraph5.5 SKIPPEDExecution intentionally skipped.Implication:graph may be over-specifieddependency edges may be too strict6. Semantic Diff AnalysisWhen execution diverges from expected behavior:pseudofunction semantic_diff(receipt, expected_behavior):diff = compare(expected_inputs,actual_inputs,expected_outputs,actual_outputs)return diff6.1 Types of semantic driftA. Input driftNode received unexpected inputs→ suggests incorrect dependency edgesB. Output driftNode produced unexpected outputs→ suggests wrong chunk kind classificationC. Control-flow driftExecution order violated expectations→ suggests DAG ordering issueD. Invariant driftInvariant violated during execution→ suggests WRP model mismatch7. Graph Update PlanningNebula does NOT mutate immediately.It generates amutation plan.7.1 Mutation plan structureJSONGraphMutationPlan {target_node_idmutation_typereasonconfidenceproposed_change}7.2 Mutation typesRECLASSIFY_CHUNK_KINDUPDATE_REVIEW_STATEMODIFY_EDGEADD_EDGEREMOVE_EDGEPROMOTE_LEVELDEMOTE_LEVELMARK_SUPERSEDEDSPLIT_CHUNKMERGE_CHUNK8. Review State UpdatesExecution directly influences trust model:8.1 SUCCESS influenceIf node repeatedly succeeds:OUTDATED → REVIEWEDREVIEWED → CURRENT_FOCUS candidate (if frequently used)NEEDS_REVIEW → REVIEWED8.2 FAIL_SEMANTIC influenceREVIEWED → QUESTIONEDCURRENT_FOCUS → NEEDS_REVIEWchunk_kind marked suspect8.3 FAIL_INVARIANT influencenode → QUESTIONED (immediate)parent section → NEEDS_REVIEWrelated dependencies → flagged8.4 REPEATED FAILURE RULEIf node fails ≥ N times:pseudomark(node, OUTDATED)propagate_to_dependents(node)9. Cross-Reference AdjustmentExecution reveals incorrect or missing edges.9.1 Missing dependency discoveryIf runtime shows implicit dependency:pseudoif runtime_dependency_detected and no_edge_exists:add_edge(source, target, type=DEPENDS_ON)9.2 Broken dependency pruningIf dependency never used:downgrade to MENTIONSor remove edge entirely9.3 Over-constrained graph correctionIf SKIPPED nodes are frequent:dependency edges may be too strictdowngrade to soft references10. Chunk Reclassification EngineExecution results refine chunk taxonomy.10.1 Heuristic correction rulespseudoif ALGORITHM fails frequently:reconsider_chunk_kind(node)if PROTOCOL_RULE causes mutation logic:split_into(PROTOCOL_RULE, ALGORITHM)if RATIONALE is executed:likely misclassified → promote to PROTOCOL_RULE or DATA_MODEL11. Validation Feedback LoopValidation engine and runtime co-evolve.11.1 Rule reinforcementIf invariant is repeatedly violated:strengthen WRP invariantupdate validation engineincrease strictness11.2 Rule relaxationIf invariant blocks correct execution repeatedly:downgrade severityor refine condition expression12. Self-Healing ActionsNebula can automatically propose:12.1 Structural repairfix DAG cyclesre-order dependenciesisolate unstable subgraphs12.2 Semantic repairfix chunk misclassificationsplit overloaded chunksmerge redundant definitions12.3 Trust repairadjust review statesrecalibrate retrieval scoring weightsre-evaluate CURRENT_FOCUS artifacts13. Learning SignalsNebula tracks:failure frequency per chunk kindfailure frequency per artifactinvariant violation hotspotshigh-risk dependency edgesunstable execution pathsThese becomemeta-knowledge signals.14. Stability ModelEach node gets a stability score:pseudostability =success_rate- failure_rate- invariant_violation_rate+ reuse_frequency14.1 Stability interpretationhigh stability → REVIEWED / trustedmedium stability → NEEDS_REVIEWlow stability → QUESTIONED or OUTDATED candidate15. Closed Feedback LoopNebula graph↓Retrieval (role-based selection)↓Conduit execution↓Receipts↓Validation engine↓Self-healing system↓Graph mutation↓Improved Nebula↓(repeat)``` id="loop3"---# 16. Key System Property> The system is not only executable — it is continuously self-correcting based on execution reality.---# 17. Final Principle> Truth in Nebula is not declared. It is inferred from execution behavior over time.The graph becomes more accurate not because it is edited, but because it is **tested against itself repeatedly**.What you now have (this is the full cognitive loop)You now have a completeself-evolving system architecture:1. WRPdefines correctness constraints2. Nebulastores semantic structure + trust model3. Retrieval enginerole-based cognition4. Conduit runtimeexecution engine + scheduler5. Validation enginepre-execution proof gate6. Self-healing system (this doc)post-execution learning + mutationYou’ve now built:A closed-loop semantic operating system that compiles, executes, validates, and improves itself over time.At this point, there are only two “final form” extensions left:A. Global governance model (who/what can mutate truth)→ prevents runaway self-modificationB. Multi-agent orchestration layer→ Inspector/Builder/Architect as concurrent reasoning actors inside the runtimeIf you want to continue, the next most important artifact is:“Nebula Governance & Mutation Authority Model”That’s where you definewhat is allowed to change the system’s own truth layer.
+
+Good. This is the point where the system stops being a pipelinethat runs correctlyand becomes a system thatimproves its own structure based on what happens when it runs.We’re now defining the missing feedback axis:Execution → Observation → Graph mutation → Revalidation → Better executiondocs/nebula/nebula-self-healing-and-feedback-learning.mdMarkdown# Nebula Self-Healing & Feedback Learning System**Status:** Draft**Owner:** Nebula runtime / learning loop subsystem**Purpose:** Define how execution receipts from Conduit are used to update Nebula’s semantic graph, review states, and future retrieval and validation behavior.---# 1. OverviewNebula is not static knowledge storage.It is a **stateful evolving semantic graph**.This system defines how Nebula:- learns from execution outcomes- updates trust signals (review state)- detects structural drift- improves chunk classification- refines retrieval scoring- repairs inconsistencies in WRP-derived structures---# 2. Core Principle> Every execution is an experiment on the correctness of the graph.Execution results are not just logs.They are **ground truth feedback signals** about the validity of:- chunk semantics- dependency structure- invariants- execution assumptions---# 3. Feedback Pipelineexecution_receipt→ outcome_classification→ semantic_diff_analysis→ graph_update_plan→ review_state_update→ cross_reference_adjustment→ validation_feedback_loop→ nebula_mutation---# 4. Input: Execution ReceiptsEach receipt contains:```json id="rcpt3"{"node_id": "...","status": "SUCCESS | FAILED | SKIPPED","inputs": [],"outputs": [],"validation_ref": "...","execution_trace": []}Receipts are immutable. They arefacts, not suggestions.5. Outcome ClassificationEach receipt is classified into a semantic outcome category:5.1 SUCCESSExecution succeeded without deviation.Implication:graph likely correctchunk classification likely validdependencies likely sound5.2 FAIL_TRANSIENTTemporary failure:networkresourceexternal dependencyImplication:no graph mutationpossible retry scheduling adjustment5.3 FAIL_SEMANTICExecution failed due to logic or structural mismatch.Implication:chunk likely misclassifiedWRP assumption violateddependency graph potentially incorrect5.4 FAIL_INVARIANTA WRP invariant was violated.Implication:critical structural issuerequires Inspector reviewmay invalidate subgraph5.5 SKIPPEDExecution intentionally skipped.Implication:graph may be over-specifieddependency edges may be too strict6. Semantic Diff AnalysisWhen execution diverges from expected behavior:pseudofunction semantic_diff(receipt, expected_behavior):diff = compare(expected_inputs,actual_inputs,expected_outputs,actual_outputs)return diff6.1 Types of semantic driftA. Input driftNode received unexpected inputs→ suggests incorrect dependency edgesB. Output driftNode produced unexpected outputs→ suggests wrong chunk kind classificationC. Control-flow driftExecution order violated expectations→ suggests DAG ordering issueD. Invariant driftInvariant violated during execution→ suggests WRP model mismatch7. Graph Update PlanningNebula does NOT mutate immediately.It generates amutation plan.7.1 Mutation plan structureJSONGraphMutationPlan {target_node_idmutation_typereasonconfidenceproposed_change}7.2 Mutation typesRECLASSIFY_CHUNK_KINDUPDATE_REVIEW_STATEMODIFY_EDGEADD_EDGEREMOVE_EDGEPROMOTE_LEVELDEMOTE_LEVELMARK_SUPERSEDEDSPLIT_CHUNKMERGE_CHUNK8. Review State UpdatesExecution directly influences trust model:8.1 SUCCESS influenceIf node repeatedly succeeds:OUTDATED → REVIEWEDREVIEWED → CURRENT_FOCUS candidate (if frequently used)NEEDS_REVIEW → REVIEWED8.2 FAIL_SEMANTIC influenceREVIEWED → QUESTIONEDCURRENT_FOCUS → NEEDS_REVIEWchunk_kind marked suspect8.3 FAIL_INVARIANT influencenode → QUESTIONED (immediate)parent section → NEEDS_REVIEWrelated dependencies → flagged8.4 REPEATED FAILURE RULEIf node fails ≥ N times:pseudomark(node, OUTDATED)propagate_to_dependents(node)9. Cross-Reference AdjustmentExecution reveals incorrect or missing edges.9.1 Missing dependency discoveryIf runtime shows implicit dependency:pseudoif runtime_dependency_detected and no_edge_exists:add_edge(source, target, type=DEPENDS_ON)9.2 Broken dependency pruningIf dependency never used:downgrade to MENTIONSor remove edge entirely9.3 Over-constrained graph correctionIf SKIPPED nodes are frequent:dependency edges may be too strictdowngrade to soft references10. Chunk Reclassification EngineExecution results refine chunk taxonomy.10.1 Heuristic correction rulespseudoif ALGORITHM fails frequently:reconsider_chunk_kind(node)if PROTOCOL_RULE causes mutation logic:split_into(PROTOCOL_RULE, ALGORITHM)if RATIONALE is executed:likely misclassified → promote to PROTOCOL_RULE or DATA_MODEL11. Validation Feedback LoopValidation engine and runtime co-evolve.11.1 Rule reinforcementIf invariant is repeatedly violated:strengthen WRP invariantupdate validation engineincrease strictness11.2 Rule relaxationIf invariant blocks correct execution repeatedly:downgrade severityor refine condition expression12. Self-Healing ActionsNebula can automatically propose:12.1 Structural repairfix DAG cyclesre-order dependenciesisolate unstable subgraphs12.2 Semantic repairfix chunk misclassificationsplit overloaded chunksmerge redundant definitions12.3 Trust repairadjust review statesrecalibrate retrieval scoring weightsre-evaluate CURRENT_FOCUS artifacts13. Learning SignalsNebula tracks:failure frequency per chunk kindfailure frequency per artifactinvariant violation hotspotshigh-risk dependency edgesunstable execution pathsThese becomemeta-knowledge signals.14. Stability ModelEach node gets a stability score:pseudostability =success_rate- failure_rate- invariant_violation_rate+ reuse_frequency14.1 Stability interpretationhigh stability → REVIEWED / trustedmedium stability → NEEDS_REVIEWlow stability → QUESTIONED or OUTDATED candidate15. Closed Feedback LoopNebula graph↓Retrieval (role-based selection)↓Conduit execution↓Receipts↓Validation engine↓Self-healing system↓Graph mutation↓Improved Nebula↓(repeat)``` id="loop3"---# 16. Key System Property> The system is not only executable — it is continuously self-correcting based on execution reality.---# 17. Final Principle> Truth in Nebula is not declared. It is inferred from execution behavior over time.The graph becomes more accurate not because it is edited, but because it is **tested against itself repeatedly**.What you now have (this is the full cognitive loop)You now have a completeself-evolving system architecture:1. WRPdefines correctness constraints2. Nebulastores semantic structure + trust model3. Retrieval enginerole-based cognition4. Conduit runtimeexecution engine + scheduler5. Validation enginepre-execution proof gate6. Self-healing system (this doc)post-execution learning + mutationYou’ve now built:A closed-loop semantic operating system that compiles, executes, validates, and improves itself over time.At this point, there are only two “final form” extensions left:A. Global governance model (who/what can mutate truth)→ prevents runaway self-modificationB. Multi-agent orchestration layer→ Inspector/Builder/Architect as concurrent reasoning actors inside the runtimeIf you want to continue, the next most important artifact is:“Nebula Governance & Mutation Authority Model”That’s where you definewhat is allowed to change the system’s own truth layer.
+
+Good. This is the point where the system stops being a pipelinethat runs correctlyand becomes a system thatimproves its own structure based on what happens when it runs.
+
+We’re now defining the missing feedback axis:
+
+> Execution → Observation → Graph mutation → Revalidation → Better execution
+
+Execution → Observation → Graph mutation → Revalidation → Better execution
+
+---
+
+# docs/nebula/nebula-self-healing-and-feedback-learning.md
+
+```
+# Nebula Self-Healing & Feedback Learning System**Status:** Draft  **Owner:** Nebula runtime / learning loop subsystem  **Purpose:** Define how execution receipts from Conduit are used to update Nebula’s semantic graph, review states, and future retrieval and validation behavior.---# 1. OverviewNebula is not static knowledge storage.It is a **stateful evolving semantic graph**.This system defines how Nebula:- learns from execution outcomes- updates trust signals (review state)- detects structural drift- improves chunk classification- refines retrieval scoring- repairs inconsistencies in WRP-derived structures---# 2. Core Principle> Every execution is an experiment on the correctness of the graph.Execution results are not just logs.They are **ground truth feedback signals** about the validity of:- chunk semantics- dependency structure- invariants- execution assumptions---# 3. Feedback Pipeline
+```
+
+```
+# Nebula Self-Healing & Feedback Learning System**Status:** Draft  **Owner:** Nebula runtime / learning loop subsystem  **Purpose:** Define how execution receipts from Conduit are used to update Nebula’s semantic graph, review states, and future retrieval and validation behavior.---# 1. OverviewNebula is not static knowledge storage.It is a **stateful evolving semantic graph**.This system defines how Nebula:- learns from execution outcomes- updates trust signals (review state)- detects structural drift- improves chunk classification- refines retrieval scoring- repairs inconsistencies in WRP-derived structures---# 2. Core Principle> Every execution is an experiment on the correctness of the graph.Execution results are not just logs.They are **ground truth feedback signals** about the validity of:- chunk semantics- dependency structure- invariants- execution assumptions---# 3. Feedback Pipeline
+```
+
+execution_receipt→ outcome_classification→ semantic_diff_analysis→ graph_update_plan→ review_state_update→ cross_reference_adjustment→ validation_feedback_loop→ nebula_mutation
+
+```
+---# 4. Input: Execution ReceiptsEach receipt contains:```json id="rcpt3"{  "node_id": "...",  "status": "SUCCESS | FAILED | SKIPPED",  "inputs": [],  "outputs": [],  "validation_ref": "...",  "execution_trace": []}
+```
+
+```
+---# 4. Input: Execution ReceiptsEach receipt contains:```json id="rcpt3"{  "node_id": "...",  "status": "SUCCESS | FAILED | SKIPPED",  "inputs": [],  "outputs": [],  "validation_ref": "...",  "execution_trace": []}
+```
+
+Receipts are immutable. They arefacts, not suggestions.
+
+---
+
+# 5. Outcome Classification
+
+Each receipt is classified into a semantic outcome category:
+
+---
+
+## 5.1 SUCCESS
+
+Execution succeeded without deviation.
+
+Implication:
+
+- graph likely correct
+graph likely correct
+
+- chunk classification likely valid
+chunk classification likely valid
+
+- dependencies likely sound
+dependencies likely sound
+
+---
+
+## 5.2 FAIL_TRANSIENT
+
+Temporary failure:
+
+- network
+network
+
+- resource
+resource
+
+- external dependency
+external dependency
+
+Implication:
+
+- no graph mutation
+no graph mutation
+
+- possible retry scheduling adjustment
+possible retry scheduling adjustment
+
+---
+
+## 5.3 FAIL_SEMANTIC
+
+Execution failed due to logic or structural mismatch.
+
+Implication:
+
+- chunk likely misclassified
+chunk likely misclassified
+
+- WRP assumption violated
+WRP assumption violated
+
+- dependency graph potentially incorrect
+dependency graph potentially incorrect
+
+---
+
+## 5.4 FAIL_INVARIANT
+
+A WRP invariant was violated.
+
+Implication:
+
+- critical structural issue
+critical structural issue
+
+- requires Inspector review
+requires Inspector review
+
+- may invalidate subgraph
+may invalidate subgraph
+
+---
+
+## 5.5 SKIPPED
+
+Execution intentionally skipped.
+
+Implication:
+
+- graph may be over-specified
+graph may be over-specified
+
+- dependency edges may be too strict
+dependency edges may be too strict
+
+---
+
+# 6. Semantic Diff Analysis
+
+When execution diverges from expected behavior:
+
+```
+function semantic_diff(receipt, expected_behavior):    diff = compare(        expected_inputs,        actual_inputs,        expected_outputs,        actual_outputs    )    return diff
+```
+
+```
+function semantic_diff(receipt, expected_behavior):    diff = compare(        expected_inputs,        actual_inputs,        expected_outputs,        actual_outputs    )    return diff
+```
+
+---
+
+## 6.1 Types of semantic drift
+
+### A. Input drift
+
+Node received unexpected inputs
+
+→ suggests incorrect dependency edges
+
+---
+
+### B. Output drift
+
+Node produced unexpected outputs
+
+→ suggests wrong chunk kind classification
+
+---
+
+### C. Control-flow drift
+
+Execution order violated expectations
+
+→ suggests DAG ordering issue
+
+---
+
+### D. Invariant drift
+
+Invariant violated during execution
+
+→ suggests WRP model mismatch
+
+---
+
+# 7. Graph Update Planning
+
+Nebula does NOT mutate immediately.

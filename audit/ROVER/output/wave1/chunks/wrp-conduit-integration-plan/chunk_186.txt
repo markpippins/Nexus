@@ -1,0 +1,349 @@
+Good. That gives us a clean WRP packet in Conduit:
+
+- WRP v1.0 — protocol formalization
+WRP v1.0 — protocol formalization
+
+- WRP v1.1 — DAG data model & compilation pipeline
+WRP v1.1 — DAG data model & compilation pipeline
+
+- WRP v1.2 — execution traversal engine
+WRP v1.2 — execution traversal engine
+
+- WRP migration plan
+WRP migration plan
+
+So the WRP side is no longer “floating design notes”; it’s a proper tracked workstream.
+
+Given where we left off, the next move I’d make isnot another WRP doc. I’d pivot to theConduit/Nebula integration layerso those WRP artifacts can actually become stratified, queryable planning knowledge instead of just stored plans.
+
+## The next concrete step
+
+I’d doone repo-ready Conduit/Nebula specthat covers:
+
+# Conduit → Nebula Projection & Knowledge Stratification
+
+### Scope
+
+- how Conduit plan artifacts are projected into Nebula tables
+how Conduit plan artifacts are projected into Nebula tables
+
+- how WRP docs become addressable knowledge units
+how WRP docs become addressable knowledge units
+
+- howlevelis represented on both the markdown-derived content tables and the cross-reference table
+howlevelis represented on both the markdown-derived content tables and the cross-reference table
+
+- how builders vs architects query the same corpus differently
+how builders vs architects query the same corpus differently
+
+- how WRP documents link to execution artifacts, migration tasks, and future harvests
+how WRP documents link to execution artifacts, migration tasks, and future harvests
+
+## Specifically, I’d make it define:
+
+### 1) The projection target for the four WRP artifacts
+
+For each of:
+
+- protocol formalization
+protocol formalization
+
+- DAG model/pipeline
+DAG model/pipeline
+
+- traversal engine
+traversal engine
+
+- migration plan
+migration plan
+
+define how Conduit stores or emits them into Nebula as:
+
+- document
+document
+
+- section/chunk
+section/chunk
+
+- cross-reference edges
+cross-reference edges
+
+- work item / implementation target
+work item / implementation target
+
+- optionalopen questions / unresolved decisions
+optionalopen questions / unresolved decisions
+
+### 2)levelsemantics in Nebula
+
+This is the part you brought up a few minutes ago and I think it now becomes the immediate bridge between “plans in Conduit” and “usable agent context”.
+
+I’d lock down something like:
+
+- L1 — build/execution detailconcrete implementation tasksAPIs, schemas, method contracts, repo changes
+L1 — build/execution detail
+
+- concrete implementation tasks
+concrete implementation tasks
+
+- APIs, schemas, method contracts, repo changes
+APIs, schemas, method contracts, repo changes
+
+- L2 — subsystem designWRP DAG semantics, traversal behavior, migration sequencing
+L2 — subsystem design
+
+- WRP DAG semantics, traversal behavior, migration sequencing
+WRP DAG semantics, traversal behavior, migration sequencing
+
+- L3 — architecture / rationalewhy WRP exists, why DAG, why traversal separation, migration philosophy
+L3 — architecture / rationale
+
+- why WRP exists, why DAG, why traversal separation, migration philosophy
+why WRP exists, why DAG, why traversal separation, migration philosophy
+
+- L4 — meta / strategy / ontologylong-range design principles, role boundaries, cross-system doctrine
+L4 — meta / strategy / ontology
+
+- long-range design principles, role boundaries, cross-system doctrine
+long-range design principles, role boundaries, cross-system doctrine
+
+And then define:
+
+- nebula_documents.level
+nebula_documents.level
+
+- nebula_chunks.level
+nebula_chunks.level
+
+- cross_references.source_level
+cross_references.source_level
+
+- cross_references.target_levelor a simplercross_references.levelpolicy if you want the edge itself stratified
+cross_references.target_levelor a simplercross_references.levelpolicy if you want the edge itself stratified
+
+My bias is still:
+
+- content nodes own the abstraction level
+content nodes own the abstraction level
+
+- cross-reference edges stay mostly neutral, with query-time filteringunless you have a specific reason to make the edge itself level-bearing.
+cross-reference edges stay mostly neutral, with query-time filteringunless you have a specific reason to make the edge itself level-bearing.
+
+### 3) Query profiles by role
+
+This is where the WRP docs become operational.
+
+Define query modes like:
+
+## Builder context injection
+
+- primary retrieval fromL1
+primary retrieval fromL1
+
+- optionally pull directly linkedL2chunks
+optionally pull directly linkedL2chunks
+
+- never auto-expand to broad architectural material unless blocked
+never auto-expand to broad architectural material unless blocked
+
+## Architect context injection
+
+- retrieve fromL2/L3
+retrieve fromL2/L3
+
+- allow traversal across cross-references
+allow traversal across cross-references
+
+- include migration-plan links, rationale sections, and protocol constraints
+include migration-plan links, rationale sections, and protocol constraints
+
+## Inspector / validator context injection
+
+- emphasize invariants, state transitions, schema rules, migration constraints
+emphasize invariants, state transitions, schema rules, migration constraints
+
+- prefer sections tagged with “must”, “invariant”, “compatibility”, “deprecation”
+prefer sections tagged with “must”, “invariant”, “compatibility”, “deprecation”
+
+That gives you exactly what you were aiming at earlier: same corpus, different access surfaces.
+
+### 4) Conduit artifact typing for WRP
+
+I’d also define a stable artifact taxonomy so Conduit isn’t just storing “plans”, but typed plans:
+
+- wrp.protocol
+wrp.protocol
+
+- wrp.dag_model
+wrp.dag_model
+
+- wrp.execution_engine
+wrp.execution_engine
+
+- wrp.migration_plan
+wrp.migration_plan
+
+with shared fields like:
+
+- artifact_id
+artifact_id
+
+- version
+version
+
+- status
+status
+
+- source_path
+source_path
+
+- conduit_plan_id
+conduit_plan_id
+
+- projected_document_id
+projected_document_id
+
+- supersedes
+supersedes
+
+- depends_on
+depends_on
+
+### 5) WRP-aware cross references
+
+This is the part that will matter later when the system starts pulling context automatically.
+
+Examples:
+
+- migration step → affected protocol rule
+migration step → affected protocol rule
+
+- traversal engine section → DAG node type definition
+traversal engine section → DAG node type definition
+
+- protocol message field → compilation pipeline rule
+protocol message field → compilation pipeline rule
+
+- execution state transition → migration compatibility note
+execution state transition → migration compatibility note
+
+So Nebula isn’t just “document chunks with embeddings”; it becomes aWRP knowledge graph with explicit navigable dependencies.
+
+---
+
+# What I would produce next
+
+If you want to keep the momentum, I’d write the next document as:
+
+## docs/conduit/nebula-wrp-projection-and-level-stratification.md
+
+with sections:
+
+- Purpose
+Purpose
+
+- Relationship between Conduit, WRP, and Nebula
+Relationship between Conduit, WRP, and Nebula
+
+- Artifact taxonomy for WRP documents
+Artifact taxonomy for WRP documents
+
+- Nebula schema changescontent tableslevelcross-reference strategymetadata fields
+Nebula schema changes
+
+- content tableslevel
+content tableslevel
+
+- cross-reference strategy
+cross-reference strategy
+
+- metadata fields
+metadata fields
+
+- Projection pipelineConduit artifact → Nebula document/chunks/edges
+Projection pipeline
+
+- Conduit artifact → Nebula document/chunks/edges
+Conduit artifact → Nebula document/chunks/edges
+
+- Role-based retrieval policiesbuilder / architect / inspector
+Role-based retrieval policies
+
+- builder / architect / inspector
+builder / architect / inspector
+
+- Migration of existing WRP documents into Nebula
+Migration of existing WRP documents into Nebula
+
+- Worked example using the four WRP artifacts
+Worked example using the four WRP artifacts
+
+- Implementation notes / SQLAlchemy or JPA shape if needed
+Implementation notes / SQLAlchemy or JPA shape if needed
+
+That feels like the right follow-on because it connects:
+
+- theWRP packet now in Conduit
+theWRP packet now in Conduit
+
+- theNebula level stratification idea
+theNebula level stratification idea
+
+- and the eventualagent-context retrieval behavior
+and the eventualagent-context retrieval behavior
+
+If you want, I can just go straight into writing that full repo-ready doc now.
+
+Sources
+
+Sources
+
+Sources
+
+SalesforceSponsoredReduce AI Agent SprawlCoordinate multi-agent workflows with MuleSoft Agent Fabric.
+
+SalesforceSponsoredReduce AI Agent SprawlCoordinate multi-agent workflows with MuleSoft Agent Fabric.
+
+SalesforceSponsoredReduce AI Agent SprawlCoordinate multi-agent workflows with MuleSoft Agent Fabric.
+
+SalesforceSponsoredReduce AI Agent SprawlCoordinate multi-agent workflows with MuleSoft Agent Fabric.
+
+SalesforceSponsored
+
+SalesforceSponsored
+
+SalesforceSponsored
+
+SalesforceSponsored
+
+Salesforce
+
+Sponsored
+
+Reduce AI Agent SprawlCoordinate multi-agent workflows with MuleSoft Agent Fabric.
+
+Reduce AI Agent SprawlCoordinate multi-agent workflows with MuleSoft Agent Fabric.
+
+Reduce AI Agent SprawlCoordinate multi-agent workflows with MuleSoft Agent Fabric.
+
+Reduce AI Agent Sprawl
+
+Coordinate multi-agent workflows with MuleSoft Agent Fabric.
+
+You said:go ahead - I'm using ollama/opencode/qwen2.5-coder in Conduit locally, so it's going to take a little while to implement those four plans.
+
+#### You said:
+
+go ahead - I'm using ollama/opencode/qwen2.5-coder in Conduit locally, so it's going to take a little while to implement those four plans.
+
+go ahead - I'm using ollama/opencode/qwen2.5-coder in Conduit locally, so it's going to take a little while to implement those four plans.
+
+go ahead - I'm using ollama/opencode/qwen2.5-coder in Conduit locally, so it's going to take a little while to implement those four plans.
+
+go ahead - I'm using ollama/opencode/qwen2.5-coder in Conduit locally, so it's going to take a little while to implement those four plans.
+
+go ahead - I'm using ollama/opencode/qwen2.5-coder in Conduit locally, so it's going to take a little while to implement those four plans.
+
+go ahead - I'm using ollama/opencode/qwen2.5-coder in Conduit locally, so it's going to take a little while to implement those four plans.
+
+go ahead - I'm using ollama/opencode/qwen2.5-coder in Conduit locally, so it's going to take a little while to implement those four plans.

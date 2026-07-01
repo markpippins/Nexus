@@ -1,0 +1,403 @@
+```
+---# 3. Core Data Structures (Logical)## Artifact
+```
+
+```
+---# 3. Core Data Structures (Logical)## Artifact
+```
+
+Artifact {idkeysource_pathstatus}
+
+```
+## Section
+```
+
+```
+## Section
+```
+
+Section {idartifact_idparent_section_idheadingordinal}
+
+```
+## Chunk
+```
+
+```
+## Chunk
+```
+
+Chunk {idsection_idordinaltextchunk_kindlevelnormative_strength}
+
+```
+## ReviewOverlay (optional)
+```
+
+```
+## ReviewOverlay (optional)
+```
+
+ReviewOverlay {target_idreview_statusreview_priorityattention_reason[]}
+
+```
+## CrossReference
+```
+
+```
+## CrossReference
+```
+
+CrossReference {source_idtarget_idrelation_type}
+
+```
+---# 4. Step 1 — Parse Markdown```pseudofunction parse_markdown(source_text):    ast = MarkdownParser.parse(source_text)    return ast
+```
+
+```
+---# 4. Step 1 — Parse Markdown```pseudofunction parse_markdown(source_text):    ast = MarkdownParser.parse(source_text)    return ast
+```
+
+Rules:
+
+- preserve heading hierarchy
+preserve heading hierarchy
+
+- preserve code blocks as atomic nodes
+preserve code blocks as atomic nodes
+
+- preserve tables as atomic nodes
+preserve tables as atomic nodes
+
+- preserve block quotes as semantic units
+preserve block quotes as semantic units
+
+---
+
+# 5. Step 2 — Artifact Resolution
+
+```
+function resolve_artifact(file_path, registry):    if registry.contains(file_path):        return registry.get(file_path)    if STRICT_MODE:        throw Error("Unknown artifact in strict mode")    return create_artifact_from_path(file_path)
+```
+
+```
+function resolve_artifact(file_path, registry):    if registry.contains(file_path):        return registry.get(file_path)    if STRICT_MODE:        throw Error("Unknown artifact in strict mode")    return create_artifact_from_path(file_path)
+```
+
+Artifact key mapping:
+
+- derived from filename
+derived from filename
+
+- normalized slug
+normalized slug
+
+---
+
+# 6. Step 3 — Build Section Tree
+
+```
+function build_section_tree(ast):    root = new SectionTree()    current_stack = []    for node in ast:        if node.type == HEADING:            level = node.level            while current_stack.top.level >= level:                current_stack.pop()            section = new Section(                heading=node.text,                parent=current_stack.top            )            current_stack.push(section)            root.add(section)    return root
+```
+
+```
+function build_section_tree(ast):    root = new SectionTree()    current_stack = []    for node in ast:        if node.type == HEADING:            level = node.level            while current_stack.top.level >= level:                current_stack.pop()            section = new Section(                heading=node.text,                parent=current_stack.top            )            current_stack.push(section)            root.add(section)    return root
+```
+
+Rules:
+
+- ##→ Section
+##→ Section
+
+- ###→ child section
+###→ child section
+
+- ####+→ either nested section or flatten depending on config
+####+→ either nested section or flatten depending on config
+
+---
+
+# 7. Step 4 — Chunk Segmentation
+
+```
+function segment_chunks(section):    chunks = []    buffer = []    for block in section.blocks:        if is_boundary(block, buffer):            chunks.append(create_chunk(buffer))            buffer = []        buffer.append(block)    if buffer not empty:        chunks.append(create_chunk(buffer))    return chunks
+```
+
+```
+function segment_chunks(section):    chunks = []    buffer = []    for block in section.blocks:        if is_boundary(block, buffer):            chunks.append(create_chunk(buffer))            buffer = []        buffer.append(block)    if buffer not empty:        chunks.append(create_chunk(buffer))    return chunks
+```
+
+---
+
+## 7.1 Boundary rules
+
+```
+function is_boundary(block, buffer):    if buffer.empty:        return false    if block.type == HEADING_CHANGE:        return true    if block.type == CODE_BLOCK and buffer.contains_non_code:        return true    if semantic_shift(buffer.last, block):        return true    if buffer.token_count > MAX_CHUNK_SIZE:        return true    return false
+```
+
+```
+function is_boundary(block, buffer):    if buffer.empty:        return false    if block.type == HEADING_CHANGE:        return true    if block.type == CODE_BLOCK and buffer.contains_non_code:        return true    if semantic_shift(buffer.last, block):        return true    if buffer.token_count > MAX_CHUNK_SIZE:        return true    return false
+```
+
+---
+
+## 7.2 Semantic shift heuristic
+
+```
+function semantic_shift(a, b):    if a.kind != b.kind:        return true    if switches_between(        "RATIONALE",        "IMPLEMENTATION",        "PROTOCOL_RULE"    ):        return true    return false
+```
+
+```
+function semantic_shift(a, b):    if a.kind != b.kind:        return true    if switches_between(        "RATIONALE",        "IMPLEMENTATION",        "PROTOCOL_RULE"    ):        return true    return false
+```
+
+---
+
+# 8. Step 5 — Chunk Classification
+
+```
+function classify_chunk(chunk):    text = chunk.text    if contains("must not", text):        chunk.normative = PROHIBITED    else if contains("must", text):        chunk.normative = REQUIRED    else if contains("should", text):        chunk.normative = RECOMMENDED    else:        chunk.normative = INFORMATIVE    chunk.kind = classify_kind(text)    return chunk
+```
+
+```
+function classify_chunk(chunk):    text = chunk.text    if contains("must not", text):        chunk.normative = PROHIBITED    else if contains("must", text):        chunk.normative = REQUIRED    else if contains("should", text):        chunk.normative = RECOMMENDED    else:        chunk.normative = INFORMATIVE    chunk.kind = classify_kind(text)    return chunk
+```
+
+---
+
+## 8.1 Chunk kind classifier
+
+```
+function classify_kind(text):    if matches_definition_pattern(text):        return DEFINITION    if contains_protocol_keywords(text):        return PROTOCOL_RULE    if contains_invariant_keywords(text):        return INVARIANT    if contains_algorithm_structure(text):        return ALGORITHM    if contains_schema_fields(text):        return DATA_MODEL    if contains_migration_language(text):        return MIGRATION_STEP    if contains_open_question_markers(text):        return OPEN_QUESTION    if contains_rationale_markers(text):        return RATIONALE    if contains_example_markers(text):        return EXAMPLE    return OVERVIEW
+```
+
+```
+function classify_kind(text):    if matches_definition_pattern(text):        return DEFINITION    if contains_protocol_keywords(text):        return PROTOCOL_RULE    if contains_invariant_keywords(text):        return INVARIANT    if contains_algorithm_structure(text):        return ALGORITHM    if contains_schema_fields(text):        return DATA_MODEL    if contains_migration_language(text):        return MIGRATION_STEP    if contains_open_question_markers(text):        return OPEN_QUESTION    if contains_rationale_markers(text):        return RATIONALE    if contains_example_markers(text):        return EXAMPLE    return OVERVIEW
+```
+
+---
+
+# 9. Step 6 — Level Assignment
+
+```
+function assign_level(chunk):    if chunk.kind in [ALGORITHM, DATA_MODEL, MIGRATION_STEP, ACCEPTANCE_CRITERIA]:        return L1    if chunk.kind in [PROTOCOL_RULE, INVARIANT, DEFINITION, EXAMPLE]:        return L2    if chunk.kind in [OVERVIEW, RATIONALE, OPEN_QUESTION]:        return L3    return L2
+```
+
+```
+function assign_level(chunk):    if chunk.kind in [ALGORITHM, DATA_MODEL, MIGRATION_STEP, ACCEPTANCE_CRITERIA]:        return L1    if chunk.kind in [PROTOCOL_RULE, INVARIANT, DEFINITION, EXAMPLE]:        return L2    if chunk.kind in [OVERVIEW, RATIONALE, OPEN_QUESTION]:        return L3    return L2
+```
+
+---
+
+# 10. Step 7 — Review Overlay Assignment
+
+```
+function assign_review_overlay(entity, context):    overlay = new ReviewOverlay()    if entity.is_new:        overlay.status = UNREVIEWED    if contains_staleness_signals(entity):        overlay.status = NEEDS_REVIEW    if matches_current_focus_tags(entity):        overlay.status = CURRENT_FOCUS    if contains_conflict_signals(entity):        overlay.status = QUESTIONED    if superseded_by_exists(entity):        overlay.status = SUPERSEDED_CONFIRMED    return overlay
+```
+
+```
+function assign_review_overlay(entity, context):    overlay = new ReviewOverlay()    if entity.is_new:        overlay.status = UNREVIEWED    if contains_staleness_signals(entity):        overlay.status = NEEDS_REVIEW    if matches_current_focus_tags(entity):        overlay.status = CURRENT_FOCUS    if contains_conflict_signals(entity):        overlay.status = QUESTIONED    if superseded_by_exists(entity):        overlay.status = SUPERSEDED_CONFIRMED    return overlay
+```
+
+---
+
+# 11. Step 8 — Cross Reference Extraction
+
+```
+function extract_cross_references(chunk, registry):    refs = []    for token in chunk.text:        if token matches artifact_key:            refs.append(                CrossReference(                    source=chunk.id,                    target=artifact_id(token),                    type=DEPENDS_ON                )            )        if token matches section_heading:            refs.append(                CrossReference(                    source=chunk.id,                    target=section_id(token),                    type=REFERENCES                )            )        if token matches known_concept:            refs.append(                CrossReference(                    source=chunk.id,                    target=concept_id(token),                    type=MENTIONS                )            )    return refs
+```
+
+```
+function extract_cross_references(chunk, registry):    refs = []    for token in chunk.text:        if token matches artifact_key:            refs.append(                CrossReference(                    source=chunk.id,                    target=artifact_id(token),                    type=DEPENDS_ON                )            )        if token matches section_heading:            refs.append(                CrossReference(                    source=chunk.id,                    target=section_id(token),                    type=REFERENCES                )            )        if token matches known_concept:            refs.append(                CrossReference(                    source=chunk.id,                    target=concept_id(token),                    type=MENTIONS                )            )    return refs
+```
+
+---
+
+# 12. Step 9 — Emit Graph
+
+```
+function emit_graph(artifact, sections, chunks, refs):    graph = NebulaGraph()    graph.add(artifact)    for section in sections:        graph.add(section)    for chunk in chunks:        graph.add(chunk)    for ref in refs:        graph.add(ref)    return graph
+```
+
+```
+function emit_graph(artifact, sections, chunks, refs):    graph = NebulaGraph()    graph.add(artifact)    for section in sections:        graph.add(section)    for chunk in chunks:        graph.add(chunk)    for ref in refs:        graph.add(ref)    return graph
+```
+
+---
+
+# 13. Step 10 — Upsert Store (Idempotent)
+
+```
+function upsert_store(graph, db):    for node in graph.nodes:        db.upsert(node.id, node)    for edge in graph.edges:        db.upsert_edge(edge.source, edge.target, edge.type)
+```
+
+```
+function upsert_store(graph, db):    for node in graph.nodes:        db.upsert(node.id, node)    for edge in graph.edges:        db.upsert_edge(edge.source, edge.target, edge.type)
+```
+
+Rules:
+
+- idempotent writes
+idempotent writes
+
+- stable IDs required
+stable IDs required
+
+- no duplicate edges unless explicitly allowed
+no duplicate edges unless explicitly allowed
+
+- preserve existing review annotations unless overridden
+preserve existing review annotations unless overridden
+
+---
+
+# 14. Determinism Rules
+
+Projection MUST be deterministic:
+
+- same markdown → same AST → same sections → same chunks
+same markdown → same AST → same sections → same chunks
+
+- no LLM-based randomness in core pipeline
+no LLM-based randomness in core pipeline
+
+- only heuristic classification allowed
+only heuristic classification allowed
+
+- no sampling variability
+no sampling variability
+
+If classifier improves:
+
+- version bump required
+version bump required
+
+- new projection run produces new revision lineage
+new projection run produces new revision lineage
+
+---
+
+# 15. Failure Modes
+
+## 15.1 Unknown artifact
+
+→ fail in STRICT_MODE
+
+## 15.2 ambiguous chunk boundaries
+
+→ prefer splitting over merging
+
+## 15.3 classification uncertainty
+
+→ default to OVERVIEW + INFORMATIVE
+
+## 15.4 missing references
+
+→ ignore silently (do not fail pipeline)
+
+---
+
+# 16. Minimal Implementation Contract
+
+A valid implementation MUST:
+
+- parse markdown into structured AST
+parse markdown into structured AST
+
+- build deterministic section tree
+build deterministic section tree
+
+- segment chunks deterministically
+segment chunks deterministically
+
+- classify chunks without external LLM dependency (LLM optional later)
+classify chunks without external LLM dependency (LLM optional later)
+
+- assign level + kind to every chunk
+assign level + kind to every chunk
+
+- emit graph with stable IDs
+emit graph with stable IDs
+
+- support idempotent re-import
+support idempotent re-import
+
+---
+
+# 17. Summary
+
+This pipeline defines Nebula’s core transformation:
+
+> Markdown → structured semantic graph
+
+Markdown → structured semantic graph
+
+The important shift is:
+
+- documents are not stored
+documents are not stored
+
+- semantic nodes are stored
+semantic nodes are stored
+
+Everything else (review, retrieval, roles, Conduit integration) operates on top of this graph, not the raw text.
+
+```
+---# What you now have (important moment)You now have a complete **minimal compiler stack**:### 1. Review system (attention layer)- `nebula-review-state.jsonld`- `review-workflow.md`### 2. Semantic classification system- `nebula-chunk-kinds.jsonld`### 3. Execution pipeline- `wrp-projection-pseudocode.md`---# What this unlocks nextAt this point, Nebula is structurally capable of:- ingesting your WRP corpus- chunking it deterministically- classifying semantics- tracking review state- building a queryable graph- feeding Conduit execution planning---# The next natural step (if you want to continue)There are two obvious upgrades:### A. Retrieval layer specHow Builder / Architect / Inspector / Explorer actually query this graph### B. Conduit ↔ Nebula execution bindingHow WRP chunks become executable plans or DAG nodes---If you want to keep going, I’d recommend next:> “Nebula Retrieval & Role Scoring Model”That’s where the system starts behaving like a cognitive runtime instead of just a compiler.
+```
+
+```
+---# What you now have (important moment)You now have a complete **minimal compiler stack**:### 1. Review system (attention layer)- `nebula-review-state.jsonld`- `review-workflow.md`### 2. Semantic classification system- `nebula-chunk-kinds.jsonld`### 3. Execution pipeline- `wrp-projection-pseudocode.md`---# What this unlocks nextAt this point, Nebula is structurally capable of:- ingesting your WRP corpus- chunking it deterministically- classifying semantics- tracking review state- building a queryable graph- feeding Conduit execution planning---# The next natural step (if you want to continue)There are two obvious upgrades:### A. Retrieval layer specHow Builder / Architect / Inspector / Explorer actually query this graph### B. Conduit ↔ Nebula execution bindingHow WRP chunks become executable plans or DAG nodes---If you want to keep going, I’d recommend next:> “Nebula Retrieval & Role Scoring Model”That’s where the system starts behaving like a cognitive runtime instead of just a compiler.
+```
+
+Sources
+
+Sources
+
+Sources
+
+ApryseSponsoredPDFjs Alternative | Out of the box solutionBring accurate PDF viewing, annotating, editing to any web, mobile, desktop or framework.
+
+ApryseSponsoredPDFjs Alternative | Out of the box solutionBring accurate PDF viewing, annotating, editing to any web, mobile, desktop or framework.
+
+ApryseSponsoredPDFjs Alternative | Out of the box solutionBring accurate PDF viewing, annotating, editing to any web, mobile, desktop or framework.
+
+ApryseSponsoredPDFjs Alternative | Out of the box solutionBring accurate PDF viewing, annotating, editing to any web, mobile, desktop or framework.
+
+ApryseSponsored
+
+ApryseSponsored
+
+ApryseSponsored
+
+ApryseSponsored
+
+Apryse
+
+Sponsored
+
+PDFjs Alternative | Out of the box solutionBring accurate PDF viewing, annotating, editing to any web, mobile, desktop or framework.
+
+PDFjs Alternative | Out of the box solutionBring accurate PDF viewing, annotating, editing to any web, mobile, desktop or framework.
+
+PDFjs Alternative | Out of the box solutionBring accurate PDF viewing, annotating, editing to any web, mobile, desktop or framework.
+
+PDFjs Alternative | Out of the box solution
+
+Bring accurate PDF viewing, annotating, editing to any web, mobile, desktop or framework.
+
+You said:let's proceed
+
+#### You said:
+
+let's proceed
+
+let's proceed
+
+let's proceed
+
+let's proceed
+
+let's proceed
+
+let's proceed
+
+let's proceed

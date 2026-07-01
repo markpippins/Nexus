@@ -1,0 +1,298 @@
+Yes — that’s a cleaner cut.That means LOSM stops being part of theidentity layerof Nexus/Assistance and becomes part of thecapability layer.The distinction I’d makeCore systemWhat Assistanceiseven in its leanest valid form:the semantic contracts you want preserved across the bridgeCIRCERCGELWRPthe base runtime / orchestration / governance modelthe PGV successor to PEBwhatever minimal execution + memory + coordination substrate makes “Assistance” still be AssistanceOptional process modules / upgradesWhat Assistance canuseif present, but does not require to exist as itself:LOSMVisionprobably other heavier cognition / perception / semantic-processing subsystems laterSo instead of saying “Assistance includes LOSM,” the better statement is:Assistance defines a contract for semantic execution augmentation, and LOSM is one implementation of that contract.That’s a much better place for it.Why this is a useful moveBecause it prevents LOSM from becoming a mandatory dependency of the whole system.If LOSM stays “inside” Assistance, then every Assistance deployment implicitly inherits:its complexityits process modelits runtime assumptionsits maintenance burdenits startup / resource costIf LOSM becomes an optional upgrade, then Assistance can exist in tiers:Assistance Coreorchestrationrole/governance/runtimeshared IR/contractsdurable memory/governance substrateenough to do real workAssistance + LOSMricher semantic execution / graph morphism / lifecycle intelligence / whatever subset of LOSM survives extractionAssistance + Visionmultimodal / visual / perception-specific capabilitiesAssistance + LOSM + Visionthe full loaded buildThat’s a much healthier product/system topology than “everything is fused into the definition of the platform.”I’d name the split explicitlyIdentity-defining componentsWithout these, it’s not Assistance:shared semantic contractsbase runtime/orchestration/governance substratePGV / durable project-governance memory layerwhatever minimal execution spine is requiredCapability modulesThese enhance Assistance but do not define it:LOSMVisionmaybe future planner/analysis accelerators, specialized graph engines, etc.That also clarifies Nexus’s relationship to LOSMIf Nexus canuseLOSM withoutbeingLOSM, then LOSM is really closer to:a semantic execution enginea cognition/graph-processing subsystema service/module that can be mounted into multiple hostsSo Nexus and Assistance becomehosts / consumersof LOSM, not containers for it.That’s a much stronger architectural position because it means LOSM can have its own lifecycle and contract.The bridge taxonomy gets sharper if you add one more categoryEarlier we had:PreserveRefineExtractI’d now split “Extract” into two subtypes:Extract as foundational serviceA thing pulled out because multiple systems should depend on it.LOSMExtract as optional capability moduleA thing pulled out because it’s valuable but not identity-defining.LOSMVisionLOSM may actually be both:extracted from Nexus internalspositioned as an optional capability module for AssistanceSo the Assistance picture starts to look like thisAssistance CoreCIR / CER / CGEL / WRP compatibility substrateruntime / governance / orchestrationPGVchange log / continuity / execution spineminimal multirole agent systemCapability ModulesLOSMVisionanything else that augments semantic perception/executionAdapters / contractsthe interfaces that let Core call into those modules without hard-wiring itself to themThe sentence I’d use in your docsSomething like:LOSM and Vision are not constitutive parts of Assistance. They are optional capability modules that Assistance can mount through stable process contracts.And for Nexus:Nexus may host or consume LOSM, but LOSM is no longer treated as part of Nexus’s defining architecture.That gives you a clean way to keep LOSM valuable without letting it dominate the shape of either platform.If you want, I canturn this into aCore vs Capability Module boundary docfor Assistance, witha table that classifies CIR/CER/CGEL/WRP/PGV/LOSM/Vision into:Core identityshared compatibility substrateoptional capability moduleexternal process/service
+
+Yes — that’s a cleaner cut.That means LOSM stops being part of theidentity layerof Nexus/Assistance and becomes part of thecapability layer.The distinction I’d makeCore systemWhat Assistanceiseven in its leanest valid form:the semantic contracts you want preserved across the bridgeCIRCERCGELWRPthe base runtime / orchestration / governance modelthe PGV successor to PEBwhatever minimal execution + memory + coordination substrate makes “Assistance” still be AssistanceOptional process modules / upgradesWhat Assistance canuseif present, but does not require to exist as itself:LOSMVisionprobably other heavier cognition / perception / semantic-processing subsystems laterSo instead of saying “Assistance includes LOSM,” the better statement is:Assistance defines a contract for semantic execution augmentation, and LOSM is one implementation of that contract.That’s a much better place for it.Why this is a useful moveBecause it prevents LOSM from becoming a mandatory dependency of the whole system.If LOSM stays “inside” Assistance, then every Assistance deployment implicitly inherits:its complexityits process modelits runtime assumptionsits maintenance burdenits startup / resource costIf LOSM becomes an optional upgrade, then Assistance can exist in tiers:Assistance Coreorchestrationrole/governance/runtimeshared IR/contractsdurable memory/governance substrateenough to do real workAssistance + LOSMricher semantic execution / graph morphism / lifecycle intelligence / whatever subset of LOSM survives extractionAssistance + Visionmultimodal / visual / perception-specific capabilitiesAssistance + LOSM + Visionthe full loaded buildThat’s a much healthier product/system topology than “everything is fused into the definition of the platform.”I’d name the split explicitlyIdentity-defining componentsWithout these, it’s not Assistance:shared semantic contractsbase runtime/orchestration/governance substratePGV / durable project-governance memory layerwhatever minimal execution spine is requiredCapability modulesThese enhance Assistance but do not define it:LOSMVisionmaybe future planner/analysis accelerators, specialized graph engines, etc.That also clarifies Nexus’s relationship to LOSMIf Nexus canuseLOSM withoutbeingLOSM, then LOSM is really closer to:a semantic execution enginea cognition/graph-processing subsystema service/module that can be mounted into multiple hostsSo Nexus and Assistance becomehosts / consumersof LOSM, not containers for it.That’s a much stronger architectural position because it means LOSM can have its own lifecycle and contract.The bridge taxonomy gets sharper if you add one more categoryEarlier we had:PreserveRefineExtractI’d now split “Extract” into two subtypes:Extract as foundational serviceA thing pulled out because multiple systems should depend on it.LOSMExtract as optional capability moduleA thing pulled out because it’s valuable but not identity-defining.LOSMVisionLOSM may actually be both:extracted from Nexus internalspositioned as an optional capability module for AssistanceSo the Assistance picture starts to look like thisAssistance CoreCIR / CER / CGEL / WRP compatibility substrateruntime / governance / orchestrationPGVchange log / continuity / execution spineminimal multirole agent systemCapability ModulesLOSMVisionanything else that augments semantic perception/executionAdapters / contractsthe interfaces that let Core call into those modules without hard-wiring itself to themThe sentence I’d use in your docsSomething like:LOSM and Vision are not constitutive parts of Assistance. They are optional capability modules that Assistance can mount through stable process contracts.And for Nexus:Nexus may host or consume LOSM, but LOSM is no longer treated as part of Nexus’s defining architecture.That gives you a clean way to keep LOSM valuable without letting it dominate the shape of either platform.If you want, I canturn this into aCore vs Capability Module boundary docfor Assistance, witha table that classifies CIR/CER/CGEL/WRP/PGV/LOSM/Vision into:Core identityshared compatibility substrateoptional capability moduleexternal process/service
+
+Yes — that’s a cleaner cut.That means LOSM stops being part of theidentity layerof Nexus/Assistance and becomes part of thecapability layer.The distinction I’d makeCore systemWhat Assistanceiseven in its leanest valid form:the semantic contracts you want preserved across the bridgeCIRCERCGELWRPthe base runtime / orchestration / governance modelthe PGV successor to PEBwhatever minimal execution + memory + coordination substrate makes “Assistance” still be AssistanceOptional process modules / upgradesWhat Assistance canuseif present, but does not require to exist as itself:LOSMVisionprobably other heavier cognition / perception / semantic-processing subsystems laterSo instead of saying “Assistance includes LOSM,” the better statement is:Assistance defines a contract for semantic execution augmentation, and LOSM is one implementation of that contract.That’s a much better place for it.Why this is a useful moveBecause it prevents LOSM from becoming a mandatory dependency of the whole system.If LOSM stays “inside” Assistance, then every Assistance deployment implicitly inherits:its complexityits process modelits runtime assumptionsits maintenance burdenits startup / resource costIf LOSM becomes an optional upgrade, then Assistance can exist in tiers:Assistance Coreorchestrationrole/governance/runtimeshared IR/contractsdurable memory/governance substrateenough to do real workAssistance + LOSMricher semantic execution / graph morphism / lifecycle intelligence / whatever subset of LOSM survives extractionAssistance + Visionmultimodal / visual / perception-specific capabilitiesAssistance + LOSM + Visionthe full loaded buildThat’s a much healthier product/system topology than “everything is fused into the definition of the platform.”I’d name the split explicitlyIdentity-defining componentsWithout these, it’s not Assistance:shared semantic contractsbase runtime/orchestration/governance substratePGV / durable project-governance memory layerwhatever minimal execution spine is requiredCapability modulesThese enhance Assistance but do not define it:LOSMVisionmaybe future planner/analysis accelerators, specialized graph engines, etc.That also clarifies Nexus’s relationship to LOSMIf Nexus canuseLOSM withoutbeingLOSM, then LOSM is really closer to:a semantic execution enginea cognition/graph-processing subsystema service/module that can be mounted into multiple hostsSo Nexus and Assistance becomehosts / consumersof LOSM, not containers for it.That’s a much stronger architectural position because it means LOSM can have its own lifecycle and contract.The bridge taxonomy gets sharper if you add one more categoryEarlier we had:PreserveRefineExtractI’d now split “Extract” into two subtypes:Extract as foundational serviceA thing pulled out because multiple systems should depend on it.LOSMExtract as optional capability moduleA thing pulled out because it’s valuable but not identity-defining.LOSMVisionLOSM may actually be both:extracted from Nexus internalspositioned as an optional capability module for AssistanceSo the Assistance picture starts to look like thisAssistance CoreCIR / CER / CGEL / WRP compatibility substrateruntime / governance / orchestrationPGVchange log / continuity / execution spineminimal multirole agent systemCapability ModulesLOSMVisionanything else that augments semantic perception/executionAdapters / contractsthe interfaces that let Core call into those modules without hard-wiring itself to themThe sentence I’d use in your docsSomething like:LOSM and Vision are not constitutive parts of Assistance. They are optional capability modules that Assistance can mount through stable process contracts.And for Nexus:Nexus may host or consume LOSM, but LOSM is no longer treated as part of Nexus’s defining architecture.That gives you a clean way to keep LOSM valuable without letting it dominate the shape of either platform.If you want, I canturn this into aCore vs Capability Module boundary docfor Assistance, witha table that classifies CIR/CER/CGEL/WRP/PGV/LOSM/Vision into:Core identityshared compatibility substrateoptional capability moduleexternal process/service
+
+Yes — that’s a cleaner cut.
+
+That means LOSM stops being part of theidentity layerof Nexus/Assistance and becomes part of thecapability layer.
+
+## The distinction I’d make
+
+### Core system
+
+What Assistanceiseven in its leanest valid form:
+
+- the semantic contracts you want preserved across the bridgeCIRCERCGELWRP
+the semantic contracts you want preserved across the bridge
+
+- CIR
+CIR
+
+- CER
+CER
+
+- CGEL
+CGEL
+
+- WRP
+WRP
+
+- the base runtime / orchestration / governance model
+the base runtime / orchestration / governance model
+
+- the PGV successor to PEB
+the PGV successor to PEB
+
+- whatever minimal execution + memory + coordination substrate makes “Assistance” still be Assistance
+whatever minimal execution + memory + coordination substrate makes “Assistance” still be Assistance
+
+### Optional process modules / upgrades
+
+What Assistance canuseif present, but does not require to exist as itself:
+
+- LOSM
+LOSM
+
+- Vision
+Vision
+
+- probably other heavier cognition / perception / semantic-processing subsystems later
+probably other heavier cognition / perception / semantic-processing subsystems later
+
+So instead of saying “Assistance includes LOSM,” the better statement is:
+
+> Assistance defines a contract for semantic execution augmentation, and LOSM is one implementation of that contract.
+
+Assistance defines a contract for semantic execution augmentation, and LOSM is one implementation of that contract.
+
+That’s a much better place for it.
+
+---
+
+# Why this is a useful move
+
+Because it prevents LOSM from becoming a mandatory dependency of the whole system.
+
+If LOSM stays “inside” Assistance, then every Assistance deployment implicitly inherits:
+
+- its complexity
+its complexity
+
+- its process model
+its process model
+
+- its runtime assumptions
+its runtime assumptions
+
+- its maintenance burden
+its maintenance burden
+
+- its startup / resource cost
+its startup / resource cost
+
+If LOSM becomes an optional upgrade, then Assistance can exist in tiers:
+
+## Assistance Core
+
+- orchestration
+orchestration
+
+- role/governance/runtime
+role/governance/runtime
+
+- shared IR/contracts
+shared IR/contracts
+
+- durable memory/governance substrate
+durable memory/governance substrate
+
+- enough to do real work
+enough to do real work
+
+## Assistance + LOSM
+
+- richer semantic execution / graph morphism / lifecycle intelligence / whatever subset of LOSM survives extraction
+richer semantic execution / graph morphism / lifecycle intelligence / whatever subset of LOSM survives extraction
+
+## Assistance + Vision
+
+- multimodal / visual / perception-specific capabilities
+multimodal / visual / perception-specific capabilities
+
+## Assistance + LOSM + Vision
+
+- the full loaded build
+the full loaded build
+
+That’s a much healthier product/system topology than “everything is fused into the definition of the platform.”
+
+---
+
+# I’d name the split explicitly
+
+## Identity-defining components
+
+Without these, it’s not Assistance:
+
+- shared semantic contracts
+shared semantic contracts
+
+- base runtime/orchestration/governance substrate
+base runtime/orchestration/governance substrate
+
+- PGV / durable project-governance memory layer
+PGV / durable project-governance memory layer
+
+- whatever minimal execution spine is required
+whatever minimal execution spine is required
+
+## Capability modules
+
+These enhance Assistance but do not define it:
+
+- LOSM
+LOSM
+
+- Vision
+Vision
+
+- maybe future planner/analysis accelerators, specialized graph engines, etc.
+maybe future planner/analysis accelerators, specialized graph engines, etc.
+
+---
+
+# That also clarifies Nexus’s relationship to LOSM
+
+If Nexus canuseLOSM withoutbeingLOSM, then LOSM is really closer to:
+
+- a semantic execution engine
+a semantic execution engine
+
+- a cognition/graph-processing subsystem
+a cognition/graph-processing subsystem
+
+- a service/module that can be mounted into multiple hosts
+a service/module that can be mounted into multiple hosts
+
+So Nexus and Assistance becomehosts / consumersof LOSM, not containers for it.
+
+That’s a much stronger architectural position because it means LOSM can have its own lifecycle and contract.
+
+---
+
+# The bridge taxonomy gets sharper if you add one more category
+
+Earlier we had:
+
+- Preserve
+Preserve
+
+- Refine
+Refine
+
+- Extract
+Extract
+
+I’d now split “Extract” into two subtypes:
+
+## Extract as foundational service
+
+A thing pulled out because multiple systems should depend on it.
+
+- LOSM
+LOSM
+
+## Extract as optional capability module
+
+A thing pulled out because it’s valuable but not identity-defining.
+
+- LOSM
+LOSM
+
+- Vision
+Vision
+
+LOSM may actually be both:
+
+- extracted from Nexus internals
+extracted from Nexus internals
+
+- positioned as an optional capability module for Assistance
+positioned as an optional capability module for Assistance
+
+---
+
+# So the Assistance picture starts to look like this
+
+## Assistance Core
+
+- CIR / CER / CGEL / WRP compatibility substrate
+CIR / CER / CGEL / WRP compatibility substrate
+
+- runtime / governance / orchestration
+runtime / governance / orchestration
+
+- PGV
+PGV
+
+- change log / continuity / execution spine
+change log / continuity / execution spine
+
+- minimal multirole agent system
+minimal multirole agent system
+
+## Capability Modules
+
+- LOSM
+LOSM
+
+- Vision
+Vision
+
+- anything else that augments semantic perception/execution
+anything else that augments semantic perception/execution
+
+## Adapters / contracts
+
+- the interfaces that let Core call into those modules without hard-wiring itself to them
+the interfaces that let Core call into those modules without hard-wiring itself to them
+
+---
+
+# The sentence I’d use in your docs
+
+Something like:
+
+> LOSM and Vision are not constitutive parts of Assistance. They are optional capability modules that Assistance can mount through stable process contracts.
+
+LOSM and Vision are not constitutive parts of Assistance. They are optional capability modules that Assistance can mount through stable process contracts.
+
+And for Nexus:
+
+> Nexus may host or consume LOSM, but LOSM is no longer treated as part of Nexus’s defining architecture.
+
+Nexus may host or consume LOSM, but LOSM is no longer treated as part of Nexus’s defining architecture.
+
+That gives you a clean way to keep LOSM valuable without letting it dominate the shape of either platform.
+
+If you want, I canturn this into aCore vs Capability Module boundary docfor Assistance, witha table that classifies CIR/CER/CGEL/WRP/PGV/LOSM/Vision into:
+
+- Core identity
+Core identity
+
+- shared compatibility substrate
+shared compatibility substrate
+
+- optional capability module
+optional capability module
+
+- external process/service
+external process/service
+
+Sources
+
+Sources
+
+Sources
+
+You said:We'll do that once we get closer. Where we want to get to is a point where Nexus itself can tell us what it contains, what it uses which thing for and what it thinks about its own topology.
+
+#### You said:
+
+We'll do that once we get closer. Where we want to get to is a point where Nexus itself can tell us what it contains, what it uses which thing for and what it thinks about its own topology.
+
+We'll do that once we get closer. Where we want to get to is a point where Nexus itself can tell us what it contains, what it uses which thing for and what it thinks about its own topology.
+
+We'll do that once we get closer. Where we want to get to is a point where Nexus itself can tell us what it contains, what it uses which thing for and what it thinks about its own topology.

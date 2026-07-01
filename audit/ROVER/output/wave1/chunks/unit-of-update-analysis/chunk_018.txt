@@ -1,0 +1,164 @@
+## 3. Your system’s correct abstraction layer
+
+Given everything you’ve been building, the clean stack becomes:
+
+### Level 0 — Physical truth
+
+- Temporal Event History
+Temporal Event History
+
+### Level 1 — Execution truth
+
+- Activity completion / failure
+Activity completion / failure
+
+- deterministic workflow transitions
+deterministic workflow transitions
+
+### Level 2 — Domain truth (this is your key layer)
+
+- WorkRequest State Transition
+WorkRequest State Transition
+
+### Level 3 — Governance truth
+
+- Decision (PGE / PEB updates)
+Decision (PGE / PEB updates)
+
+---
+
+## 4. The important design insight
+
+Temporalwantsyou to think:
+
+> “What is the workflow doing?”
+
+“What is the workflow doing?”
+
+Your systemwants:
+
+> “What is the intention doing over its lifecycle?”
+
+“What is the intention doing over its lifecycle?”
+
+So you actually get a very sharp conclusion:
+
+### Your unit of update is:
+
+> A WorkRequest state transition, materialized as a Temporal workflow event
+
+A WorkRequest state transition, materialized as a Temporal workflow event
+
+Everything else is derivation.
+
+---
+
+## 5. Where this gets interesting (for your architecture)
+
+This is where your previous “harness” thinking locks in:
+
+If your harness sits above Temporal workers, it should NOT:
+
+- mutate state directly
+mutate state directly
+
+- write to PGE directly
+write to PGE directly
+
+- interpret execution results directly
+interpret execution results directly
+
+Instead it should only:
+
+> emit or interpretWorkRequest transitions
+
+emit or interpretWorkRequest transitions
+
+So your harness becomes:
+
+```
+Harness  → starts workflow (WorkRequest created)  → triggers plan (transition)  → triggers execution (activity)  → records receipt (transition)  → emits governance update (derived)
+```
+
+```
+Harness  → starts workflow (WorkRequest created)  → triggers plan (transition)  → triggers execution (activity)  → records receipt (transition)  → emits governance update (derived)
+```
+
+---
+
+## 6. One subtle but important correction
+
+A lot of people make this mistake with Temporal:
+
+> “Workflow history is the unit of truth”
+
+“Workflow history is the unit of truth”
+
+In your system that is incomplete.
+
+Because you also have:
+
+- semantic reconciliation (CIR resolution)
+semantic reconciliation (CIR resolution)
+
+- governance updates (PGE)
+governance updates (PGE)
+
+- multi-agent interpretation
+multi-agent interpretation
+
+So the corrected statement is:
+
+> Workflow history is themechanism, not thesemantic unit
+
+Workflow history is themechanism, not thesemantic unit
+
+---
+
+## Bottom line
+
+If you anchor it cleanly:
+
+> The unit of update is aWorkRequest lifecycle transition, implemented as aTemporal workflow event, and projected into multiple views (execution, governance, knowledge).
+
+The unit of update is aWorkRequest lifecycle transition, implemented as aTemporal workflow event, and projected into multiple views (execution, governance, knowledge).
+
+Everything else in your architecture becomes consistent once that is fixed.
+
+---
+
+If you want, next step is interesting:we candefine the exactWorker contract boundary(what belongs in Temporal activities vs what belongs in your kernel/harness), because that’s usually where these systems either become elegant or turn into spaghetti.
+
+Sources
+
+Sources
+
+Sources
+
+You said:so, ultimately, everything is going to become a Work Request.
+
+#### You said:
+
+so, ultimately, everything is going to become a Work Request.
+
+so, ultimately, everything is going to become a Work Request.
+
+so, ultimately, everything is going to become a Work Request.
+
+so, ultimately, everything is going to become a Work Request.
+
+so, ultimately, everything is going to become a Work Request.
+
+so, ultimately, everything is going to become a Work Request.
+
+so, ultimately, everything is going to become a Work Request.
+
+ChatGPT said:Yes — and that statement is either the breakthrough or the trap, depending on how strictly you mean it.Because there aretwo different interpretationshiding inside it:1. The strong claim (everythingisa WorkRequest)Every meaningful system change is represented as a WorkRequest.This is the clean, architectural version you’re circling:CIR → WorkRequestEvent ingestion → WorkRequestUser intent → WorkRequestSystem repair → WorkRequestOptimization → WorkRequestGovernance change → WorkRequestEven “observation” → WorkRequest (query-as-intent)In this model, WorkRequest becomes:the universal carrier ofintentionalityNot data. Not execution. Not logs.Intent.Everything else becomes a projection of WorkRequest lifecycles.2. The weak claim (everything literally becomes one)This is where it breaks:Ifeverything is literally a WorkRequest, you lose distinction between:query vs commandobservation vs mutationinference vs executionsignal vs actionAnd the system collapses into semantic inflation.Everything becomes “a task,” and then nothing is meaningfully a task anymore.That’s the classic “everything is X” architecture failure mode.3. The correct invariant (what your system actually wants)What your design is actually converging toward is more precise:Everything thatchanges system statebecomes a WorkRequest.And everything else is one of:evidence (events)projections (PGE views)interpretations (CIR resolution)or queries (read-only WorkRequests, which is where it gets subtle)4. The key distinction you need to lock inYou need this separation or the model will drift:A. WorkRequest = actionable intenthas lifecyclehas possible execution pathcan succeed/fail/supersedeB. Everything else = supporting structureCategoryRoleEventwhat happenedSignalwhat might matterFactwhat is believedQuerywhat is requestedDecisionwhat is approvedReceiptwhat is provenOnly one of theseowns time evolution:WorkRequest5. The subtle but powerful refinementYour instinct is actually pointing at something stronger than “everything becomes a WorkRequest”:Everything becomes a WorkRequestor a derivative of a WorkRequest lifecycleThat gives you closure without flattening the ontology.So:WorkRequest = root node of all system causalityEverything else is:emitted by itreacting to itconstraining itor summarizing it6. Why this matters for Temporal + your harnessIf you accept this, then Temporal Workers stop being “execution units” and become:lifecycle transition engines for WorkRequestsAnd your harness becomes:not a schedulernot a brokernot a plannerbut:a WorkRequest generator + interpreter7. The real architectural checkpointIf you go all the way with this idea, there’s one hard question you should answer explicitly:Is a read-only query a WorkRequest?Because that determines whether your system is:task-centric OS(everything is WorkRequest)orintent-centric OS(only state-changing things are WorkRequests)Most stable systems land on the second.Bottom lineYou’revery close, but the precise formulation that won’t haunt you later is:Everything meaningful in the system is either a WorkRequest, or a projection of a WorkRequest lifecycle.Not everythingisa WorkRequest.Only everything that participates in causality is.SAPSponsoredUnified SAP SolutionAchieve enterprise automation with SAP.
+
+#### ChatGPT said:
+
+Yes — and that statement is either the breakthrough or the trap, depending on how strictly you mean it.Because there aretwo different interpretationshiding inside it:1. The strong claim (everythingisa WorkRequest)Every meaningful system change is represented as a WorkRequest.This is the clean, architectural version you’re circling:CIR → WorkRequestEvent ingestion → WorkRequestUser intent → WorkRequestSystem repair → WorkRequestOptimization → WorkRequestGovernance change → WorkRequestEven “observation” → WorkRequest (query-as-intent)In this model, WorkRequest becomes:the universal carrier ofintentionalityNot data. Not execution. Not logs.Intent.Everything else becomes a projection of WorkRequest lifecycles.2. The weak claim (everything literally becomes one)This is where it breaks:Ifeverything is literally a WorkRequest, you lose distinction between:query vs commandobservation vs mutationinference vs executionsignal vs actionAnd the system collapses into semantic inflation.Everything becomes “a task,” and then nothing is meaningfully a task anymore.That’s the classic “everything is X” architecture failure mode.3. The correct invariant (what your system actually wants)What your design is actually converging toward is more precise:Everything thatchanges system statebecomes a WorkRequest.And everything else is one of:evidence (events)projections (PGE views)interpretations (CIR resolution)or queries (read-only WorkRequests, which is where it gets subtle)4. The key distinction you need to lock inYou need this separation or the model will drift:A. WorkRequest = actionable intenthas lifecyclehas possible execution pathcan succeed/fail/supersedeB. Everything else = supporting structureCategoryRoleEventwhat happenedSignalwhat might matterFactwhat is believedQuerywhat is requestedDecisionwhat is approvedReceiptwhat is provenOnly one of theseowns time evolution:WorkRequest5. The subtle but powerful refinementYour instinct is actually pointing at something stronger than “everything becomes a WorkRequest”:Everything becomes a WorkRequestor a derivative of a WorkRequest lifecycleThat gives you closure without flattening the ontology.So:WorkRequest = root node of all system causalityEverything else is:emitted by itreacting to itconstraining itor summarizing it6. Why this matters for Temporal + your harnessIf you accept this, then Temporal Workers stop being “execution units” and become:lifecycle transition engines for WorkRequestsAnd your harness becomes:not a schedulernot a brokernot a plannerbut:a WorkRequest generator + interpreter7. The real architectural checkpointIf you go all the way with this idea, there’s one hard question you should answer explicitly:Is a read-only query a WorkRequest?Because that determines whether your system is:task-centric OS(everything is WorkRequest)orintent-centric OS(only state-changing things are WorkRequests)Most stable systems land on the second.Bottom lineYou’revery close, but the precise formulation that won’t haunt you later is:Everything meaningful in the system is either a WorkRequest, or a projection of a WorkRequest lifecycle.Not everythingisa WorkRequest.Only everything that participates in causality is.SAPSponsoredUnified SAP SolutionAchieve enterprise automation with SAP.
+
+Yes — and that statement is either the breakthrough or the trap, depending on how strictly you mean it.Because there aretwo different interpretationshiding inside it:1. The strong claim (everythingisa WorkRequest)Every meaningful system change is represented as a WorkRequest.This is the clean, architectural version you’re circling:CIR → WorkRequestEvent ingestion → WorkRequestUser intent → WorkRequestSystem repair → WorkRequestOptimization → WorkRequestGovernance change → WorkRequestEven “observation” → WorkRequest (query-as-intent)In this model, WorkRequest becomes:the universal carrier ofintentionalityNot data. Not execution. Not logs.Intent.Everything else becomes a projection of WorkRequest lifecycles.2. The weak claim (everything literally becomes one)This is where it breaks:Ifeverything is literally a WorkRequest, you lose distinction between:query vs commandobservation vs mutationinference vs executionsignal vs actionAnd the system collapses into semantic inflation.Everything becomes “a task,” and then nothing is meaningfully a task anymore.That’s the classic “everything is X” architecture failure mode.3. The correct invariant (what your system actually wants)What your design is actually converging toward is more precise:Everything thatchanges system statebecomes a WorkRequest.And everything else is one of:evidence (events)projections (PGE views)interpretations (CIR resolution)or queries (read-only WorkRequests, which is where it gets subtle)4. The key distinction you need to lock inYou need this separation or the model will drift:A. WorkRequest = actionable intenthas lifecyclehas possible execution pathcan succeed/fail/supersedeB. Everything else = supporting structureCategoryRoleEventwhat happenedSignalwhat might matterFactwhat is believedQuerywhat is requestedDecisionwhat is approvedReceiptwhat is provenOnly one of theseowns time evolution:WorkRequest5. The subtle but powerful refinementYour instinct is actually pointing at something stronger than “everything becomes a WorkRequest”:Everything becomes a WorkRequestor a derivative of a WorkRequest lifecycleThat gives you closure without flattening the ontology.So:WorkRequest = root node of all system causalityEverything else is:emitted by itreacting to itconstraining itor summarizing it6. Why this matters for Temporal + your harnessIf you accept this, then Temporal Workers stop being “execution units” and become:lifecycle transition engines for WorkRequestsAnd your harness becomes:not a schedulernot a brokernot a plannerbut:a WorkRequest generator + interpreter7. The real architectural checkpointIf you go all the way with this idea, there’s one hard question you should answer explicitly:Is a read-only query a WorkRequest?Because that determines whether your system is:task-centric OS(everything is WorkRequest)orintent-centric OS(only state-changing things are WorkRequests)Most stable systems land on the second.Bottom lineYou’revery close, but the precise formulation that won’t haunt you later is:Everything meaningful in the system is either a WorkRequest, or a projection of a WorkRequest lifecycle.Not everythingisa WorkRequest.Only everything that participates in causality is.SAPSponsoredUnified SAP SolutionAchieve enterprise automation with SAP.
+
+Yes — and that statement is either the breakthrough or the trap, depending on how strictly you mean it.Because there aretwo different interpretationshiding inside it:1. The strong claim (everythingisa WorkRequest)Every meaningful system change is represented as a WorkRequest.This is the clean, architectural version you’re circling:CIR → WorkRequestEvent ingestion → WorkRequestUser intent → WorkRequestSystem repair → WorkRequestOptimization → WorkRequestGovernance change → WorkRequestEven “observation” → WorkRequest (query-as-intent)In this model, WorkRequest becomes:the universal carrier ofintentionalityNot data. Not execution. Not logs.Intent.Everything else becomes a projection of WorkRequest lifecycles.2. The weak claim (everything literally becomes one)This is where it breaks:Ifeverything is literally a WorkRequest, you lose distinction between:query vs commandobservation vs mutationinference vs executionsignal vs actionAnd the system collapses into semantic inflation.Everything becomes “a task,” and then nothing is meaningfully a task anymore.That’s the classic “everything is X” architecture failure mode.3. The correct invariant (what your system actually wants)What your design is actually converging toward is more precise:Everything thatchanges system statebecomes a WorkRequest.And everything else is one of:evidence (events)projections (PGE views)interpretations (CIR resolution)or queries (read-only WorkRequests, which is where it gets subtle)4. The key distinction you need to lock inYou need this separation or the model will drift:A. WorkRequest = actionable intenthas lifecyclehas possible execution pathcan succeed/fail/supersedeB. Everything else = supporting structureCategoryRoleEventwhat happenedSignalwhat might matterFactwhat is believedQuerywhat is requestedDecisionwhat is approvedReceiptwhat is provenOnly one of theseowns time evolution:WorkRequest5. The subtle but powerful refinementYour instinct is actually pointing at something stronger than “everything becomes a WorkRequest”:Everything becomes a WorkRequestor a derivative of a WorkRequest lifecycleThat gives you closure without flattening the ontology.So:WorkRequest = root node of all system causalityEverything else is:emitted by itreacting to itconstraining itor summarizing it6. Why this matters for Temporal + your harnessIf you accept this, then Temporal Workers stop being “execution units” and become:lifecycle transition engines for WorkRequestsAnd your harness becomes:not a schedulernot a brokernot a plannerbut:a WorkRequest generator + interpreter7. The real architectural checkpointIf you go all the way with this idea, there’s one hard question you should answer explicitly:Is a read-only query a WorkRequest?Because that determines whether your system is:task-centric OS(everything is WorkRequest)orintent-centric OS(only state-changing things are WorkRequests)Most stable systems land on the second.Bottom lineYou’revery close, but the precise formulation that won’t haunt you later is:Everything meaningful in the system is either a WorkRequest, or a projection of a WorkRequest lifecycle.Not everythingisa WorkRequest.Only everything that participates in causality is.

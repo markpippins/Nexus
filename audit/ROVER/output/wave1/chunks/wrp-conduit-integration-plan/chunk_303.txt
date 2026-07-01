@@ -1,0 +1,414 @@
+Good. This is the layer you’ve been implicitly building toward the whole time:the system that checks itself before it runs.Up until now:Nebula decideswhat exists and what it meansConduit decideshow to execute itWRP defineswhat is legalWhat’s missing is the thing that answers:“Can we prove this execution plan is internally consistent before we run it?”That’s what this layer does.docs/wrp/wrp-validation-and-invariant-engine.mdMarkdown# WRP Validation & Invariant Checking Engine**Status:** Draft**Owner:** WRP core / Conduit validation layer**Purpose:** Define a deterministic validation system that ensures WRP-derived execution graphs are structurally, semantically, and invariantly consistent before execution.---# 1. OverviewThe WRP Validation Engine sits between:- Nebula → semantic graph- Conduit → execution DAGIt ensures that:> Every executable plan is consistent with WRP rules, Nebula semantics, and system invariants.It is a **pre-execution proof gate**, not a runtime monitor.---# 2. Validation Pipelineinput_dag→ structural_validation→ semantic_validation→ invariant_verification→ dependency_consistency_check→ execution_safety_check→ validation_report---# 3. Core Data Structures## Validation Report```json id="vr1"ValidationReport {dag_idstatus: PASS | FAIL | DEGRADEDstructural_issues[]semantic_issues[]invariant_violations[]warnings[]suggested_fixes[]}Invariant DefinitionJSONInvariant {iddescriptionscope: GLOBAL | ARTIFACT | CHUNK | EXECUTION_STEPseverity: CRITICAL | HIGH | MEDIUMcondition_expression}4. Structural ValidationEnsures DAG correctness independent of semantics.pseudofunction structural_validation(dag):assert dag.is_acyclic()assert all_nodes_have_valid_ids(dag)assert all_edges_reference_valid_nodes(dag)assert no_orphan_nodes(dag)return PASSStructural rulesDAG MUST be acyclicall nodes MUST originate from Nebula chunksno dangling references allowedall edges MUST resolve to valid node IDs5. Semantic ValidationEnsures node meaning aligns with WRP + Nebula expectations.pseudofunction semantic_validation(dag):for node in dag.nodes:if node.type not in EXECUTABLE_KINDS:mark_error(node, "Non-executable chunk in DAG")if node.review_state == OUTDATED:mark_warning(node)if node.kind == PROTOCOL_RULE and node.has_mutation_behavior():mark_error(node, "Protocol rule cannot define mutation logic")return reportSemantic constraints5.1 Protocol purity rulePROTOCOL_RULE nodes MUST NOT contain:side-effect logicmutation operationsexecution commandsThey define constraints only.5.2 Algorithm determinism ruleALGORITHM nodes MUST:be deterministicnot depend on external mutable state without explicit input declaration5.3 Migration consistency ruleMIGRATION_STEP nodes MUST:reference a valid prior statedefine explicit transition target6. Invariant Verification EngineThis is the core of WRP correctness.6.1 Invariant evaluation looppseudofunction invariant_verification(dag, invariants):violations = []for invariant in invariants:for node in dag.nodes:if not evaluate(invariant.condition_expression, node):violations.append({"node": node.id,"invariant": invariant.id})return violations6.2 Example invariantsGlobal execution invariantsNo node may depend on an OUTDATED node in execution pathAll PROTOCOL_RULE nodes must precede ALGORITHM nodes in dependency chainNo cyclic dependency across MIGRATION_STEP chainsWRP-specific invariantsEvery ALGORITHM must be traceable to at least one PROTOCOL_RULEEvery MIGRATION_STEP must reference a DATA_MODEL change or state transitionEvery ACCEPTANCE_CRITERIA must map to at least one executable node7. Dependency Consistency CheckEnsures graph coherence across Nebula cross-references.pseudofunction dependency_consistency(dag):for edge in dag.edges:if edge.type == DEPENDS_ON:assert topological_order(edge.source) < topological_order(edge.target)if violates_level_constraints(edge):mark_error(edge)Level constraint rulesL1 nodes MUST NOT depend on L3 nodes for execution logicL2 nodes MAY depend on L3 for rationaleL3 nodes MUST NOT define execution dependencies8. Execution Safety CheckThis step ensures the DAG is safe to run under Conduit.8.1 Safety rulespseudofunction execution_safety(dag):assert no_unresolved_nodes(dag)assert all_nodes_have_executor(dag)assert no_questioned_nodes_in_execution_path(dag)assert strict_mode_compliance(dag)return PASS8.2 Strict mode constraintsIn STRICT execution mode:only REVIEWED or CURRENT_FOCUS nodes allowedQUESTIONED nodes forbiddenOUTDATED nodes forbiddenSUPERSEDED_CONFIRMED nodes excluded entirely9. Validation Severity ModelEach issue is classified:CRITICAL → blocks executionHIGH → requires interventionMEDIUM → warningLOW → informationalFailure policypseudoif CRITICAL exists:status = FAILhalt_execution()elif HIGH exists:status = DEGRADEDrequire_human_review()else:status = PASS10. Suggested Fix GeneratorFor each violation:pseudofunction suggest_fix(issue):switch issue.type:case OUTDATED_DEPENDENCY:suggest("Replace with superseding artifact")case INVALID_PROTOCOL_MUTATION:suggest("Move logic to ALGORITHM chunk")case MISSING_REFERENCE:suggest("Add cross-reference or dependency edge")case LEVEL_VIOLATION:suggest("Promote/demote chunk level or split chunk")return suggestion11. Validation Modes11.1 STRICT MODEUsed for Conduit executionno warnings allowed to escalateCRITICAL = immediate stop11.2 DEVELOPMENT MODEUsed during ingestionallows warningsgenerates fix suggestionsdoes not block graph creation11.3 INSPECTOR MODEUsed for audit / debugginghighlights contradictionssurfaces all invariant violationsmaximizes visibility over pass/fail12. Integration with NebulaValidation engine consumes:NebulaChunksReview overlaysCross-reference graphChunk kindsLevel assignmentsIt produces:ValidationReport nodes in Nebulaexecution gating signals to Conduitoptional review state updates13. Integration with ConduitConduit MUST NOT execute a DAG unless:pseudoValidationReport.status == PASSOR(status == DEGRADED AND human_override == true)14. Key System PropertyWRP Validation is the final gate before execution.It ensures:Nebula is structurally consistentWRP rules are obeyedConduit receives only safe, deterministic DAGsruntime failures are minimized by pre-execution reasoning15. System Closure LoopThis completes the full loop:WRP (rules)↓Nebula (semantic graph)↓Retrieval (role-scored relevance)↓Conduit (execution DAG)↓WRP Validation Engine (proof gate)↓Execution↓Receipts → back into Nebula``` id="loop1"---# 16. Final Principle> Nothing is executed unless it is structurally valid, semantically consistent, and invariantly sound under WRP.And more importantly:> Every execution strengthens the correctness of future validation.What you now have (this is the real milestone)You now have aclosed-loop cognitive execution system:1. WRPDefines legality2. NebulaStores meaning + review + structure3. Retrieval modelSelects relevant subgraphs per role4. Conduit execution bindingTurns subgraphs into DAGs5. Validation engine (this doc)Proves DAG correctness before executionSystem behavior now becomes:“understand”“select”“compile”“validate”“execute”“record”“re-ingest”What comes next (if we continue)At this point, the only missinghigh-value layersare:A. Execution Scheduler / Runtime (Conduit core)concurrency modelqueueingretry semanticspartial execution recoveryB. Receipt → Learning Loophow execution outcomes modify Nebula review statehow the system self-corrects over timeIf you want to continue, the most powerful next step is:“Conduit runtime scheduler + execution lifecycle manager”That’s where this system stops being a pipeline and becomes aliving distributed cognitive runtime.
+
+Good. This is the layer you’ve been implicitly building toward the whole time:the system that checks itself before it runs.
+
+Up until now:
+
+- Nebula decideswhat exists and what it means
+Nebula decideswhat exists and what it means
+
+- Conduit decideshow to execute it
+Conduit decideshow to execute it
+
+- WRP defineswhat is legal
+WRP defineswhat is legal
+
+What’s missing is the thing that answers:
+
+> “Can we prove this execution plan is internally consistent before we run it?”
+
+“Can we prove this execution plan is internally consistent before we run it?”
+
+That’s what this layer does.
+
+---
+
+# docs/wrp/wrp-validation-and-invariant-engine.md
+
+```
+# WRP Validation & Invariant Checking Engine**Status:** Draft  **Owner:** WRP core / Conduit validation layer  **Purpose:** Define a deterministic validation system that ensures WRP-derived execution graphs are structurally, semantically, and invariantly consistent before execution.---# 1. OverviewThe WRP Validation Engine sits between:- Nebula → semantic graph- Conduit → execution DAGIt ensures that:> Every executable plan is consistent with WRP rules, Nebula semantics, and system invariants.It is a **pre-execution proof gate**, not a runtime monitor.---# 2. Validation Pipeline
+```
+
+```
+# WRP Validation & Invariant Checking Engine**Status:** Draft  **Owner:** WRP core / Conduit validation layer  **Purpose:** Define a deterministic validation system that ensures WRP-derived execution graphs are structurally, semantically, and invariantly consistent before execution.---# 1. OverviewThe WRP Validation Engine sits between:- Nebula → semantic graph- Conduit → execution DAGIt ensures that:> Every executable plan is consistent with WRP rules, Nebula semantics, and system invariants.It is a **pre-execution proof gate**, not a runtime monitor.---# 2. Validation Pipeline
+```
+
+input_dag→ structural_validation→ semantic_validation→ invariant_verification→ dependency_consistency_check→ execution_safety_check→ validation_report
+
+```
+---# 3. Core Data Structures## Validation Report```json id="vr1"ValidationReport {  dag_id  status: PASS | FAIL | DEGRADED  structural_issues[]  semantic_issues[]  invariant_violations[]  warnings[]  suggested_fixes[]}
+```
+
+```
+---# 3. Core Data Structures## Validation Report```json id="vr1"ValidationReport {  dag_id  status: PASS | FAIL | DEGRADED  structural_issues[]  semantic_issues[]  invariant_violations[]  warnings[]  suggested_fixes[]}
+```
+
+---
+
+## Invariant Definition
+
+```
+Invariant {  id  description  scope: GLOBAL | ARTIFACT | CHUNK | EXECUTION_STEP  severity: CRITICAL | HIGH | MEDIUM  condition_expression}
+```
+
+```
+Invariant {  id  description  scope: GLOBAL | ARTIFACT | CHUNK | EXECUTION_STEP  severity: CRITICAL | HIGH | MEDIUM  condition_expression}
+```
+
+---
+
+# 4. Structural Validation
+
+Ensures DAG correctness independent of semantics.
+
+```
+function structural_validation(dag):    assert dag.is_acyclic()    assert all_nodes_have_valid_ids(dag)    assert all_edges_reference_valid_nodes(dag)    assert no_orphan_nodes(dag)    return PASS
+```
+
+```
+function structural_validation(dag):    assert dag.is_acyclic()    assert all_nodes_have_valid_ids(dag)    assert all_edges_reference_valid_nodes(dag)    assert no_orphan_nodes(dag)    return PASS
+```
+
+---
+
+## Structural rules
+
+- DAG MUST be acyclic
+DAG MUST be acyclic
+
+- all nodes MUST originate from Nebula chunks
+all nodes MUST originate from Nebula chunks
+
+- no dangling references allowed
+no dangling references allowed
+
+- all edges MUST resolve to valid node IDs
+all edges MUST resolve to valid node IDs
+
+---
+
+# 5. Semantic Validation
+
+Ensures node meaning aligns with WRP + Nebula expectations.
+
+```
+function semantic_validation(dag):    for node in dag.nodes:        if node.type not in EXECUTABLE_KINDS:            mark_error(node, "Non-executable chunk in DAG")        if node.review_state == OUTDATED:            mark_warning(node)        if node.kind == PROTOCOL_RULE and node.has_mutation_behavior():            mark_error(node, "Protocol rule cannot define mutation logic")    return report
+```
+
+```
+function semantic_validation(dag):    for node in dag.nodes:        if node.type not in EXECUTABLE_KINDS:            mark_error(node, "Non-executable chunk in DAG")        if node.review_state == OUTDATED:            mark_warning(node)        if node.kind == PROTOCOL_RULE and node.has_mutation_behavior():            mark_error(node, "Protocol rule cannot define mutation logic")    return report
+```
+
+---
+
+## Semantic constraints
+
+### 5.1 Protocol purity rule
+
+PROTOCOL_RULE nodes MUST NOT contain:
+
+- side-effect logic
+side-effect logic
+
+- mutation operations
+mutation operations
+
+- execution commands
+execution commands
+
+They define constraints only.
+
+---
+
+### 5.2 Algorithm determinism rule
+
+ALGORITHM nodes MUST:
+
+- be deterministic
+be deterministic
+
+- not depend on external mutable state without explicit input declaration
+not depend on external mutable state without explicit input declaration
+
+---
+
+### 5.3 Migration consistency rule
+
+MIGRATION_STEP nodes MUST:
+
+- reference a valid prior state
+reference a valid prior state
+
+- define explicit transition target
+define explicit transition target
+
+---
+
+# 6. Invariant Verification Engine
+
+This is the core of WRP correctness.
+
+---
+
+## 6.1 Invariant evaluation loop
+
+```
+function invariant_verification(dag, invariants):    violations = []    for invariant in invariants:        for node in dag.nodes:            if not evaluate(invariant.condition_expression, node):                violations.append({                    "node": node.id,                    "invariant": invariant.id                })    return violations
+```
+
+```
+function invariant_verification(dag, invariants):    violations = []    for invariant in invariants:        for node in dag.nodes:            if not evaluate(invariant.condition_expression, node):                violations.append({                    "node": node.id,                    "invariant": invariant.id                })    return violations
+```
+
+---
+
+## 6.2 Example invariants
+
+### Global execution invariants
+
+- No node may depend on an OUTDATED node in execution path
+No node may depend on an OUTDATED node in execution path
+
+- All PROTOCOL_RULE nodes must precede ALGORITHM nodes in dependency chain
+All PROTOCOL_RULE nodes must precede ALGORITHM nodes in dependency chain
+
+- No cyclic dependency across MIGRATION_STEP chains
+No cyclic dependency across MIGRATION_STEP chains
+
+---
+
+### WRP-specific invariants
+
+- Every ALGORITHM must be traceable to at least one PROTOCOL_RULE
+Every ALGORITHM must be traceable to at least one PROTOCOL_RULE
+
+- Every MIGRATION_STEP must reference a DATA_MODEL change or state transition
+Every MIGRATION_STEP must reference a DATA_MODEL change or state transition
+
+- Every ACCEPTANCE_CRITERIA must map to at least one executable node
+Every ACCEPTANCE_CRITERIA must map to at least one executable node
+
+---
+
+# 7. Dependency Consistency Check
+
+Ensures graph coherence across Nebula cross-references.
+
+```
+function dependency_consistency(dag):    for edge in dag.edges:        if edge.type == DEPENDS_ON:            assert topological_order(edge.source) < topological_order(edge.target)        if violates_level_constraints(edge):            mark_error(edge)
+```
+
+```
+function dependency_consistency(dag):    for edge in dag.edges:        if edge.type == DEPENDS_ON:            assert topological_order(edge.source) < topological_order(edge.target)        if violates_level_constraints(edge):            mark_error(edge)
+```
+
+---
+
+## Level constraint rules
+
+- L1 nodes MUST NOT depend on L3 nodes for execution logic
+L1 nodes MUST NOT depend on L3 nodes for execution logic
+
+- L2 nodes MAY depend on L3 for rationale
+L2 nodes MAY depend on L3 for rationale
+
+- L3 nodes MUST NOT define execution dependencies
+L3 nodes MUST NOT define execution dependencies
+
+---
+
+# 8. Execution Safety Check
+
+This step ensures the DAG is safe to run under Conduit.
+
+---
+
+## 8.1 Safety rules
+
+```
+function execution_safety(dag):    assert no_unresolved_nodes(dag)    assert all_nodes_have_executor(dag)    assert no_questioned_nodes_in_execution_path(dag)    assert strict_mode_compliance(dag)    return PASS
+```
+
+```
+function execution_safety(dag):    assert no_unresolved_nodes(dag)    assert all_nodes_have_executor(dag)    assert no_questioned_nodes_in_execution_path(dag)    assert strict_mode_compliance(dag)    return PASS
+```
+
+---
+
+## 8.2 Strict mode constraints
+
+In STRICT execution mode:
+
+- only REVIEWED or CURRENT_FOCUS nodes allowed
+only REVIEWED or CURRENT_FOCUS nodes allowed
+
+- QUESTIONED nodes forbidden
+QUESTIONED nodes forbidden
+
+- OUTDATED nodes forbidden
+OUTDATED nodes forbidden
+
+- SUPERSEDED_CONFIRMED nodes excluded entirely
+SUPERSEDED_CONFIRMED nodes excluded entirely
+
+---
+
+# 9. Validation Severity Model
+
+Each issue is classified:
+
+- CRITICAL → blocks execution
+CRITICAL → blocks execution
+
+- HIGH → requires intervention
+HIGH → requires intervention
+
+- MEDIUM → warning
+MEDIUM → warning
+
+- LOW → informational
+LOW → informational
+
+---
+
+## Failure policy
+
+```
+if CRITICAL exists:    status = FAIL    halt_execution()elif HIGH exists:    status = DEGRADED    require_human_review()else:    status = PASS
+```
+
+```
+if CRITICAL exists:    status = FAIL    halt_execution()elif HIGH exists:    status = DEGRADED    require_human_review()else:    status = PASS
+```
+
+---
+
+# 10. Suggested Fix Generator
+
+For each violation:
+
+```
+function suggest_fix(issue):    switch issue.type:        case OUTDATED_DEPENDENCY:            suggest("Replace with superseding artifact")        case INVALID_PROTOCOL_MUTATION:            suggest("Move logic to ALGORITHM chunk")        case MISSING_REFERENCE:            suggest("Add cross-reference or dependency edge")        case LEVEL_VIOLATION:            suggest("Promote/demote chunk level or split chunk")    return suggestion
+```
+
+```
+function suggest_fix(issue):    switch issue.type:        case OUTDATED_DEPENDENCY:            suggest("Replace with superseding artifact")        case INVALID_PROTOCOL_MUTATION:            suggest("Move logic to ALGORITHM chunk")        case MISSING_REFERENCE:            suggest("Add cross-reference or dependency edge")        case LEVEL_VIOLATION:            suggest("Promote/demote chunk level or split chunk")    return suggestion
+```
+
+---
+
+# 11. Validation Modes
+
+## 11.1 STRICT MODE
+
+Used for Conduit execution
+
+- no warnings allowed to escalate
+no warnings allowed to escalate
+
+- CRITICAL = immediate stop
+CRITICAL = immediate stop
+
+---
+
+## 11.2 DEVELOPMENT MODE
+
+Used during ingestion
+
+- allows warnings
+allows warnings
+
+- generates fix suggestions
+generates fix suggestions
+
+- does not block graph creation
+does not block graph creation
+
+---
+
+## 11.3 INSPECTOR MODE
+
+Used for audit / debugging
+
+- highlights contradictions
+highlights contradictions
+
+- surfaces all invariant violations
+surfaces all invariant violations
+
+- maximizes visibility over pass/fail
+maximizes visibility over pass/fail
+
+---
+
+# 12. Integration with Nebula
+
+Validation engine consumes:
+
+- NebulaChunks
+NebulaChunks
+
+- Review overlays
+Review overlays
+
+- Cross-reference graph
+Cross-reference graph
+
+- Chunk kinds
+Chunk kinds
+
+- Level assignments
+Level assignments
+
+It produces:
+
+- ValidationReport nodes in Nebula
+ValidationReport nodes in Nebula
+
+- execution gating signals to Conduit
+execution gating signals to Conduit
+
+- optional review state updates
+optional review state updates
+
+---
+
+# 13. Integration with Conduit
+
+Conduit MUST NOT execute a DAG unless:
+
+```
+ValidationReport.status == PASSOR(status == DEGRADED AND human_override == true)
+```
+
+```
+ValidationReport.status == PASSOR(status == DEGRADED AND human_override == true)
+```
+
+---
+
+# 14. Key System Property
+
+> WRP Validation is the final gate before execution.
+
+WRP Validation is the final gate before execution.
+
+It ensures:
+
+- Nebula is structurally consistent
+Nebula is structurally consistent
+
+- WRP rules are obeyed
+WRP rules are obeyed
+
+- Conduit receives only safe, deterministic DAGs
+Conduit receives only safe, deterministic DAGs
+
+- runtime failures are minimized by pre-execution reasoning
+runtime failures are minimized by pre-execution reasoning
+
+---
+
+# 15. System Closure Loop
+
+This completes the full loop:

@@ -1,0 +1,200 @@
+The WorkStatus enum in 
+models.py
+ is a duplicate of WorkflowState in 
+states.py
+. They have different names and slightly different values — WorkStatus has 11 states including the detailed pipeline states, WorkflowState has 9 simplified states (PLAN_DONE, CRITIQUED, SPEC_READY, etc.). These are diverging representations of the same concept. If WorkStatus is the canonical one (it's what the DB column uses and what the transition table in losm-shell is keyed on), then WorkflowState in losm-ir is redundant and should either be removed or aligned.
+
+losm-host — Clean. Thin FastAPI server. All business logic is delegated to losm-shell and losm-store. The work_requests.py route uses validate_transition directly (rather than through a service) for the transition endpoint — that's appropriate for a thin host. The routes.py kernel endpoint calls LOSMKernel directly, which is fine since the host is allowed to talk to any layer below it.
+
+One issue: routes.py calls kernel.validate(graph) but LOSMKernel doesn't have a validate method — it has apply and run. This would fail at runtime. Either the method needs to be added to the kernel or the route needs to be rewritten to use apply with a no-op morphism.
+
+Issues to address
+execution_receipt.py
+ not in file listing — verify it exists, since it's imported by both shell and store.
+
+WorkStatus vs WorkflowState duplication — decide which is canonical and remove or align the other.
+
+routes.py calls kernel.validate(graph) which doesn't exist on LOSMKernel. Fix the route or add the method.
+
+validate_transition placement — consider moving it to losm-ir to break the losm-store → losm-shell dependency, or accept it as-is.
+
+losm-shell pyproject.toml declares losm-kernel as a dependency but the PipelineCoordinator doesn't actually call the kernel yet — it uses DAGExecutor with NullStepHandler. This is fine for now but the kernel integration (KernelStepHandler) is the missing piece that completes Layer 2.
+
+Overall verdict
+The issues flagged in the previous assessments are addressed. The kernel duplication problem is resolved — losm-kernel has no persistence, no orchestration, and no HTTP knowledge. The layer boundaries are clean. The dependency direction is correct. The three remaining items (the missing execution_receipt.py confirmation, the state enum duplication, and the broken kernel route) are all small and fixable.Show moreShow less
+
+OK, back on topic:
+
+Updated Assessment: LOSM Split Architecture
+What was done
+The original monolithic losm/losm package has been cleanly split into four standalone packages. This is the right decomposition and it maps well to the three-layer model you described.
+
+Dependency graph
+losm-ir       ← no dependencies (pure Pydantic + dataclasses)
+    ↑
+losm-kernel   ← depends on losm-ir only
+    ↑
+losm-shell    ← depends on losm-kernel + losm-ir
+losm-store    ← depends on losm-ir + losm-shell (for transition validation)
+    ↑
+losm-host     ← depends on losm-shell + losm-store
+This is correct. The dependency arrows all point in one direction. Nothing in a lower layer knows about a higher layer.
+
+Per-package assessment
+losm-ir — Clean. Pure semantic contracts. Graph, Node, Edge, TraceOutput, TraceFamily, ConstraintViolation, all the IR models (Plan, Spec, Execution, Validation, Critique, WorkRequest), WorkflowState. Zero external dependencies beyond Pydantic. This is exactly right — it's the shared vocabulary the entire system uses without coupling anything.
+
+One note: 
+execution_receipt.py
+ is referenced by both losm-shell (in handler.py and executor.py) and losm-store (in ingestor.py). It didn't appear in the file listing but it must exist — the imports resolve. Worth confirming it's there.
+
+losm-kernel — Clean. The fixed-point engine, morphism composition, constraint system, TBEL, TESL. Depends only on losm-ir for Graph, Node, Edge, ConstraintViolation, TraceOutput, TraceFamily, trace_hash. The types.py re-exports from losm_ir.graph which is the right pattern — the kernel uses the IR's graph types rather than defining its own. storage.py and runtime.py are gone from the kernel, which is correct.
+
+One issue: 
+core.py
+ imports ConstraintViolation from losm_kernel.constraints, not losm_ir.constraints. constraints.py imports ConstraintViolation from losm_ir.constraints and uses it. The kernel's ConstraintSystem.validate() raises ConstraintViolation (from losm-ir) and core.py catches it. That chain is fine as long as core.py's catch clause matches the same class — which it does since it comes through losm_kernel.constraints which re-exports from losm_ir. But it would be cleaner if core.py imported ConstraintViolation directly from losm_ir.constraints rather than relying on the indirection.
+
+losm-shell — Clean, with one concern. The DAGExecutor, PipelineCoordinator, PlanCompiler, and transition validation are all here. The StepHandler protocol is an excellent architectural decision — it means the shell's executor never knows what a step means. The NullStepHandler preserves current behavior while establishing the protocol boundary. The KernelStepHandler (which would call into losm-kernel) doesn't exist yet but the protocol is ready for it.
+
+The one concern: losm-store depends on losm-shell (for validate_transition in ingestor.py). This means losm-store has a runtime dependency on losm-shell. The transition validation function is pure — it's a table lookup with no I/O. It arguably belongs in losm-ir rather than losm-shell, since it's a semantic contract about valid state transitions, not a runtime coordination concern. If it were in losm-ir, losm-store wouldn't need to depend on losm-shell at all, and the dependency graph would be cleaner. Not a blocker, but worth considering.
+
+losm-store — Clean. All persistence (SQLAlchemy models, session, repository), the receipt ingestor, the branch manager. The receipt ingestor now properly calls validate_transition before mutating state and emits a RECEIPT_REJECTED governance event for invalid transitions — the bypass fallback that existed before is gone. The Branch and BranchArtifact models are a new addition that wasn't in the previous version.
+
+The WorkStatus enum in 
+models.py
+ is a duplicate of WorkflowState in 
+states.py
+. They have different names and slightly different values — WorkStatus has 11 states including the detailed pipeline states, WorkflowState has 9 simplified states (PLAN_DONE, CRITIQUED, SPEC_READY, etc.). These are diverging representations of the same concept. If WorkStatus is the canonical one (it's what the DB column uses and what the transition table in losm-shell is keyed on), then WorkflowState in losm-ir is redundant and should either be removed or aligned.
+
+losm-host — Clean. Thin FastAPI server. All business logic is delegated to losm-shell and losm-store. The work_requests.py route uses validate_transition directly (rather than through a service) for the transition endpoint — that's appropriate for a thin host. The routes.py kernel endpoint calls LOSMKernel directly, which is fine since the host is allowed to talk to any layer below it.
+
+One issue: routes.py calls kernel.validate(graph) but LOSMKernel doesn't have a validate method — it has apply and run. This would fail at runtime. Either the method needs to be added to the kernel or the route needs to be rewritten to use apply with a no-op morphism.
+
+Issues to address
+execution_receipt.py
+ not in file listing — verify it exists, since it's imported by both shell and store.
+
+WorkStatus vs WorkflowState duplication — decide which is canonical and remove or align the other.
+
+routes.py calls kernel.validate(graph) which doesn't exist on LOSMKernel. Fix the route or add the method.
+
+validate_transition placement — consider moving it to losm-ir to break the losm-store → losm-shell dependency, or accept it as-is.
+
+losm-shell pyproject.toml declares losm-kernel as a dependency but the PipelineCoordinator doesn't actually call the kernel yet — it uses DAGExecutor with NullStepHandler. This is fine for now but the kernel integration (KernelStepHandler) is the missing piece that completes Layer 2.
+
+Overall verdict
+The issues flagged in the previous assessments are addressed. The kernel duplication problem is resolved — losm-kernel has no persistence, no orchestration, and no HTTP knowledge. The layer boundaries are clean. The dependency direction is correct. The three remaining items (the missing execution_receipt.py confirmation, the state enum duplication, and the broken kernel route) are all small and fixable.Show moreShow less
+
+OK, back on topic:
+
+Updated Assessment: LOSM Split Architecture
+What was done
+The original monolithic losm/losm package has been cleanly split into four standalone packages. This is the right decomposition and it maps well to the three-layer model you described.
+
+Dependency graph
+losm-ir       ← no dependencies (pure Pydantic + dataclasses)
+    ↑
+losm-kernel   ← depends on losm-ir only
+    ↑
+losm-shell    ← depends on losm-kernel + losm-ir
+losm-store    ← depends on losm-ir + losm-shell (for transition validation)
+    ↑
+losm-host     ← depends on losm-shell + losm-store
+This is correct. The dependency arrows all point in one direction. Nothing in a lower layer knows about a higher layer.
+
+Per-package assessment
+losm-ir — Clean. Pure semantic contracts. Graph, Node, Edge, TraceOutput, TraceFamily, ConstraintViolation, all the IR models (Plan, Spec, Execution, Validation, Critique, WorkRequest), WorkflowState. Zero external dependencies beyond Pydantic. This is exactly right — it's the shared vocabulary the entire system uses without coupling anything.
+
+One note: 
+execution_receipt.py
+ is referenced by both losm-shell (in handler.py and executor.py) and losm-store (in ingestor.py). It didn't appear in the file listing but it must exist — the imports resolve. Worth confirming it's there.
+
+losm-kernel — Clean. The fixed-point engine, morphism composition, constraint system, TBEL, TESL. Depends only on losm-ir for Graph, Node, Edge, ConstraintViolation, TraceOutput, TraceFamily, trace_hash. The types.py re-exports from losm_ir.graph which is the right pattern — the kernel uses the IR's graph types rather than defining its own. storage.py and runtime.py are gone from the kernel, which is correct.
+
+One issue: 
+core.py
+ imports ConstraintViolation from losm_kernel.constraints, not losm_ir.constraints. constraints.py imports ConstraintViolation from losm_ir.constraints and uses it. The kernel's ConstraintSystem.validate() raises ConstraintViolation (from losm-ir) and core.py catches it. That chain is fine as long as core.py's catch clause matches the same class — which it does since it comes through losm_kernel.constraints which re-exports from losm_ir. But it would be cleaner if core.py imported ConstraintViolation directly from losm_ir.constraints rather than relying on the indirection.
+
+losm-shell — Clean, with one concern. The DAGExecutor, PipelineCoordinator, PlanCompiler, and transition validation are all here. The StepHandler protocol is an excellent architectural decision — it means the shell's executor never knows what a step means. The NullStepHandler preserves current behavior while establishing the protocol boundary. The KernelStepHandler (which would call into losm-kernel) doesn't exist yet but the protocol is ready for it.
+
+The one concern: losm-store depends on losm-shell (for validate_transition in ingestor.py). This means losm-store has a runtime dependency on losm-shell. The transition validation function is pure — it's a table lookup with no I/O. It arguably belongs in losm-ir rather than losm-shell, since it's a semantic contract about valid state transitions, not a runtime coordination concern. If it were in losm-ir, losm-store wouldn't need to depend on losm-shell at all, and the dependency graph would be cleaner. Not a blocker, but worth considering.
+
+losm-store — Clean. All persistence (SQLAlchemy models, session, repository), the receipt ingestor, the branch manager. The receipt ingestor now properly calls validate_transition before mutating state and emits a RECEIPT_REJECTED governance event for invalid transitions — the bypass fallback that existed before is gone. The Branch and BranchArtifact models are a new addition that wasn't in the previous version.
+
+The WorkStatus enum in 
+models.py
+ is a duplicate of WorkflowState in 
+states.py
+. They have different names and slightly different values — WorkStatus has 11 states including the detailed pipeline states, WorkflowState has 9 simplified states (PLAN_DONE, CRITIQUED, SPEC_READY, etc.). These are diverging representations of the same concept. If WorkStatus is the canonical one (it's what the DB column uses and what the transition table in losm-shell is keyed on), then WorkflowState in losm-ir is redundant and should either be removed or aligned.
+
+losm-host — Clean. Thin FastAPI server. All business logic is delegated to losm-shell and losm-store. The work_requests.py route uses validate_transition directly (rather than through a service) for the transition endpoint — that's appropriate for a thin host. The routes.py kernel endpoint calls LOSMKernel directly, which is fine since the host is allowed to talk to any layer below it.
+
+One issue: routes.py calls kernel.validate(graph) but LOSMKernel doesn't have a validate method — it has apply and run. This would fail at runtime. Either the method needs to be added to the kernel or the route needs to be rewritten to use apply with a no-op morphism.
+
+Issues to address
+execution_receipt.py
+ not in file listing — verify it exists, since it's imported by both shell and store.
+
+WorkStatus vs WorkflowState duplication — decide which is canonical and remove or align the other.
+
+routes.py calls kernel.validate(graph) which doesn't exist on LOSMKernel. Fix the route or add the method.
+
+validate_transition placement — consider moving it to losm-ir to break the losm-store → losm-shell dependency, or accept it as-is.
+
+losm-shell pyproject.toml declares losm-kernel as a dependency but the PipelineCoordinator doesn't actually call the kernel yet — it uses DAGExecutor with NullStepHandler. This is fine for now but the kernel integration (KernelStepHandler) is the missing piece that completes Layer 2.
+
+Overall verdict
+The issues flagged in the previous assessments are addressed. The kernel duplication problem is resolved — losm-kernel has no persistence, no orchestration, and no HTTP knowledge. The layer boundaries are clean. The dependency direction is correct. The three remaining items (the missing execution_receipt.py confirmation, the state enum duplication, and the broken kernel route) are all small and fixable.
+
+OK, back on topic:
+
+Updated Assessment: LOSM Split Architecture
+What was done
+The original monolithic losm/losm package has been cleanly split into four standalone packages. This is the right decomposition and it maps well to the three-layer model you described.
+
+Dependency graph
+losm-ir       ← no dependencies (pure Pydantic + dataclasses)
+    ↑
+losm-kernel   ← depends on losm-ir only
+    ↑
+losm-shell    ← depends on losm-kernel + losm-ir
+losm-store    ← depends on losm-ir + losm-shell (for transition validation)
+    ↑
+losm-host     ← depends on losm-shell + losm-store
+This is correct. The dependency arrows all point in one direction. Nothing in a lower layer knows about a higher layer.
+
+Per-package assessment
+losm-ir — Clean. Pure semantic contracts. Graph, Node, Edge, TraceOutput, TraceFamily, ConstraintViolation, all the IR models (Plan, Spec, Execution, Validation, Critique, WorkRequest), WorkflowState. Zero external dependencies beyond Pydantic. This is exactly right — it's the shared vocabulary the entire system uses without coupling anything.
+
+One note: 
+execution_receipt.py
+ is referenced by both losm-shell (in handler.py and executor.py) and losm-store (in ingestor.py). It didn't appear in the file listing but it must exist — the imports resolve. Worth confirming it's there.
+
+losm-kernel — Clean. The fixed-point engine, morphism composition, constraint system, TBEL, TESL. Depends only on losm-ir for Graph, Node, Edge, ConstraintViolation, TraceOutput, TraceFamily, trace_hash. The types.py re-exports from losm_ir.graph which is the right pattern — the kernel uses the IR's graph types rather than defining its own. storage.py and runtime.py are gone from the kernel, which is correct.
+
+One issue: 
+core.py
+ imports ConstraintViolation from losm_kernel.constraints, not losm_ir.constraints. constraints.py imports ConstraintViolation from losm_ir.constraints and uses it. The kernel's ConstraintSystem.validate() raises ConstraintViolation (from losm-ir) and core.py catches it. That chain is fine as long as core.py's catch clause matches the same class — which it does since it comes through losm_kernel.constraints which re-exports from losm_ir. But it would be cleaner if core.py imported ConstraintViolation directly from losm_ir.constraints rather than relying on the indirection.
+
+losm-shell — Clean, with one concern. The DAGExecutor, PipelineCoordinator, PlanCompiler, and transition validation are all here. The StepHandler protocol is an excellent architectural decision — it means the shell's executor never knows what a step means. The NullStepHandler preserves current behavior while establishing the protocol boundary. The KernelStepHandler (which would call into losm-kernel) doesn't exist yet but the protocol is ready for it.
+
+The one concern: losm-store depends on losm-shell (for validate_transition in ingestor.py). This means losm-store has a runtime dependency on losm-shell. The transition validation function is pure — it's a table lookup with no I/O. It arguably belongs in losm-ir rather than losm-shell, since it's a semantic contract about valid state transitions, not a runtime coordination concern. If it were in losm-ir, losm-store wouldn't need to depend on losm-shell at all, and the dependency graph would be cleaner. Not a blocker, but worth considering.
+
+losm-store — Clean. All persistence (SQLAlchemy models, session, repository), the receipt ingestor, the branch manager. The receipt ingestor now properly calls validate_transition before mutating state and emits a RECEIPT_REJECTED governance event for invalid transitions — the bypass fallback that existed before is gone. The Branch and BranchArtifact models are a new addition that wasn't in the previous version.
+
+The WorkStatus enum in 
+models.py
+ is a duplicate of WorkflowState in 
+states.py
+. They have different names and slightly different values — WorkStatus has 11 states including the detailed pipeline states, WorkflowState has 9 simplified states (PLAN_DONE, CRITIQUED, SPEC_READY, etc.). These are diverging representations of the same concept. If WorkStatus is the canonical one (it's what the DB column uses and what the transition table in losm-shell is keyed on), then WorkflowState in losm-ir is redundant and should either be removed or aligned.
+
+losm-host — Clean. Thin FastAPI server. All business logic is delegated to losm-shell and losm-store. The work_requests.py route uses validate_transition directly (rather than through a service) for the transition endpoint — that's appropriate for a thin host. The routes.py kernel endpoint calls LOSMKernel directly, which is fine since the host is allowed to talk to any layer below it.
+
+One issue: routes.py calls kernel.validate(graph) but LOSMKernel doesn't have a validate method — it has apply and run. This would fail at runtime. Either the method needs to be added to the kernel or the route needs to be rewritten to use apply with a no-op morphism.
+
+Issues to address
+execution_receipt.py
+ not in file listing — verify it exists, since it's imported by both shell and store.
+
+WorkStatus vs WorkflowState duplication — decide which is canonical and remove or align the other.
+
+routes.py calls kernel.validate(graph) which doesn't exist on LOSMKernel. Fix the route or add the method.

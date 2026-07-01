@@ -1,0 +1,200 @@
+Yes—and that “unless things go wrong” clause is exactly where systems like this either stay clean or slowly rot.What you’ve defined is actually a very strong invariant:Conduit is the commitment boundary. Nebula is everything before commitment.That’s the normal path.But the moment you allow “exception routing” back across that boundary, you’re introducing a second, implicit system:Conduit as recovery surfaceAnd that’s fine—but it needs to be treated as adifferent mode, not a relaxation of the boundary.The key distinction you’re circlingThere are really two Conduit states that must never get confused:1. Normal Conduit (Commitment Execution Plane)accepts onlycommitted artifactsno reasoning historyno draft semanticsstrict state machine:committed → executing → completed / failedThis is your factory floor.2. Recovery Conduit (Incident Plane)Activated only when something breaks:execution failedinconsistency detectedplan invalidated post-commitexternal interruptionThis is not “proposed plans returning.”It is:post-commit exception handlingAnd it should behave more like:incident ticketsrollback tracesrepair actionsquarantine statesNOT:re-opened proposalsreactivated draftsblurred execution stateThe subtle failure mode you’re currently avoidingWhat you’re wisely pushing against is this degeneracy:“If something goes wrong, we downgrade execution back into proposal space”That creates a dangerous loop:plan is committedexecution failsplan is demoted to “proposed”it re-enters reasoning spaceit becomes mutable againexecution is re-derivedThat collapses the entire semantic separation between:what we decidedwhat went wrongThe cleaner modelInstead of “demotion,” you want:Commit is irreversible in meaning, even if execution is notSo when things go wrong:Conduit does NOT say:“this is a proposed plan again”Conduit says:“this committed plan produced a failure trace”And then emits:PlanExecutionFailedPlanQuarantinedRepairPlanCreated(in Nebula, if needed)Key idea:You never undo commitment. You only add evidence that commitment failed.Why your instinct is right about NebulaYour instinct that “proposed plans should never be visible in Conduit” is actually protecting this invariant:Nebula =revision spaceConduit =irreversible event spaceIf proposed artifacts leak into Conduit, you implicitly make execution reversible in interpretation, even if not in mechanics.That’s where systems start to feel “soft” or inconsistent under load.The real architecture you’re converging onYou’re essentially building a two-plane cognitive system:Nebulareversiblereflectivemulti-hypothesisstratifiedgraph-mutatingConduitirreversibleevent-sourcedfailure-tolerant but not revision-tolerantstrictly state-drivenAnd the boundary is:commitment is a one-way projection from Nebula → ConduitEverything else is apost-mortem or repair flow, not a rollback into ambiguity.If you want to formalize the next step, the most useful artifact now is probably:afailure taxonomy for Conduitexecution failurevalidation failureenvironmental failuresemantic mismatch (Nebula → Conduit drift)Because that determines whether your “unless things go wrong” clause becomes a controlled recovery system—or a hidden backdoor between cognition and execution.
+
+Yes—and that “unless things go wrong” clause is exactly where systems like this either stay clean or slowly rot.What you’ve defined is actually a very strong invariant:Conduit is the commitment boundary. Nebula is everything before commitment.That’s the normal path.But the moment you allow “exception routing” back across that boundary, you’re introducing a second, implicit system:Conduit as recovery surfaceAnd that’s fine—but it needs to be treated as adifferent mode, not a relaxation of the boundary.The key distinction you’re circlingThere are really two Conduit states that must never get confused:1. Normal Conduit (Commitment Execution Plane)accepts onlycommitted artifactsno reasoning historyno draft semanticsstrict state machine:committed → executing → completed / failedThis is your factory floor.2. Recovery Conduit (Incident Plane)Activated only when something breaks:execution failedinconsistency detectedplan invalidated post-commitexternal interruptionThis is not “proposed plans returning.”It is:post-commit exception handlingAnd it should behave more like:incident ticketsrollback tracesrepair actionsquarantine statesNOT:re-opened proposalsreactivated draftsblurred execution stateThe subtle failure mode you’re currently avoidingWhat you’re wisely pushing against is this degeneracy:“If something goes wrong, we downgrade execution back into proposal space”That creates a dangerous loop:plan is committedexecution failsplan is demoted to “proposed”it re-enters reasoning spaceit becomes mutable againexecution is re-derivedThat collapses the entire semantic separation between:what we decidedwhat went wrongThe cleaner modelInstead of “demotion,” you want:Commit is irreversible in meaning, even if execution is notSo when things go wrong:Conduit does NOT say:“this is a proposed plan again”Conduit says:“this committed plan produced a failure trace”And then emits:PlanExecutionFailedPlanQuarantinedRepairPlanCreated(in Nebula, if needed)Key idea:You never undo commitment. You only add evidence that commitment failed.Why your instinct is right about NebulaYour instinct that “proposed plans should never be visible in Conduit” is actually protecting this invariant:Nebula =revision spaceConduit =irreversible event spaceIf proposed artifacts leak into Conduit, you implicitly make execution reversible in interpretation, even if not in mechanics.That’s where systems start to feel “soft” or inconsistent under load.The real architecture you’re converging onYou’re essentially building a two-plane cognitive system:Nebulareversiblereflectivemulti-hypothesisstratifiedgraph-mutatingConduitirreversibleevent-sourcedfailure-tolerant but not revision-tolerantstrictly state-drivenAnd the boundary is:commitment is a one-way projection from Nebula → ConduitEverything else is apost-mortem or repair flow, not a rollback into ambiguity.If you want to formalize the next step, the most useful artifact now is probably:afailure taxonomy for Conduitexecution failurevalidation failureenvironmental failuresemantic mismatch (Nebula → Conduit drift)Because that determines whether your “unless things go wrong” clause becomes a controlled recovery system—or a hidden backdoor between cognition and execution.
+
+Yes—and that “unless things go wrong” clause is exactly where systems like this either stay clean or slowly rot.What you’ve defined is actually a very strong invariant:Conduit is the commitment boundary. Nebula is everything before commitment.That’s the normal path.But the moment you allow “exception routing” back across that boundary, you’re introducing a second, implicit system:Conduit as recovery surfaceAnd that’s fine—but it needs to be treated as adifferent mode, not a relaxation of the boundary.The key distinction you’re circlingThere are really two Conduit states that must never get confused:1. Normal Conduit (Commitment Execution Plane)accepts onlycommitted artifactsno reasoning historyno draft semanticsstrict state machine:committed → executing → completed / failedThis is your factory floor.2. Recovery Conduit (Incident Plane)Activated only when something breaks:execution failedinconsistency detectedplan invalidated post-commitexternal interruptionThis is not “proposed plans returning.”It is:post-commit exception handlingAnd it should behave more like:incident ticketsrollback tracesrepair actionsquarantine statesNOT:re-opened proposalsreactivated draftsblurred execution stateThe subtle failure mode you’re currently avoidingWhat you’re wisely pushing against is this degeneracy:“If something goes wrong, we downgrade execution back into proposal space”That creates a dangerous loop:plan is committedexecution failsplan is demoted to “proposed”it re-enters reasoning spaceit becomes mutable againexecution is re-derivedThat collapses the entire semantic separation between:what we decidedwhat went wrongThe cleaner modelInstead of “demotion,” you want:Commit is irreversible in meaning, even if execution is notSo when things go wrong:Conduit does NOT say:“this is a proposed plan again”Conduit says:“this committed plan produced a failure trace”And then emits:PlanExecutionFailedPlanQuarantinedRepairPlanCreated(in Nebula, if needed)Key idea:You never undo commitment. You only add evidence that commitment failed.Why your instinct is right about NebulaYour instinct that “proposed plans should never be visible in Conduit” is actually protecting this invariant:Nebula =revision spaceConduit =irreversible event spaceIf proposed artifacts leak into Conduit, you implicitly make execution reversible in interpretation, even if not in mechanics.That’s where systems start to feel “soft” or inconsistent under load.The real architecture you’re converging onYou’re essentially building a two-plane cognitive system:Nebulareversiblereflectivemulti-hypothesisstratifiedgraph-mutatingConduitirreversibleevent-sourcedfailure-tolerant but not revision-tolerantstrictly state-drivenAnd the boundary is:commitment is a one-way projection from Nebula → ConduitEverything else is apost-mortem or repair flow, not a rollback into ambiguity.If you want to formalize the next step, the most useful artifact now is probably:afailure taxonomy for Conduitexecution failurevalidation failureenvironmental failuresemantic mismatch (Nebula → Conduit drift)Because that determines whether your “unless things go wrong” clause becomes a controlled recovery system—or a hidden backdoor between cognition and execution.
+
+Yes—and that “unless things go wrong” clause is exactly where systems like this either stay clean or slowly rot.What you’ve defined is actually a very strong invariant:Conduit is the commitment boundary. Nebula is everything before commitment.That’s the normal path.But the moment you allow “exception routing” back across that boundary, you’re introducing a second, implicit system:Conduit as recovery surfaceAnd that’s fine—but it needs to be treated as adifferent mode, not a relaxation of the boundary.The key distinction you’re circlingThere are really two Conduit states that must never get confused:1. Normal Conduit (Commitment Execution Plane)accepts onlycommitted artifactsno reasoning historyno draft semanticsstrict state machine:committed → executing → completed / failedThis is your factory floor.2. Recovery Conduit (Incident Plane)Activated only when something breaks:execution failedinconsistency detectedplan invalidated post-commitexternal interruptionThis is not “proposed plans returning.”It is:post-commit exception handlingAnd it should behave more like:incident ticketsrollback tracesrepair actionsquarantine statesNOT:re-opened proposalsreactivated draftsblurred execution stateThe subtle failure mode you’re currently avoidingWhat you’re wisely pushing against is this degeneracy:“If something goes wrong, we downgrade execution back into proposal space”That creates a dangerous loop:plan is committedexecution failsplan is demoted to “proposed”it re-enters reasoning spaceit becomes mutable againexecution is re-derivedThat collapses the entire semantic separation between:what we decidedwhat went wrongThe cleaner modelInstead of “demotion,” you want:Commit is irreversible in meaning, even if execution is notSo when things go wrong:Conduit does NOT say:“this is a proposed plan again”Conduit says:“this committed plan produced a failure trace”And then emits:PlanExecutionFailedPlanQuarantinedRepairPlanCreated(in Nebula, if needed)Key idea:You never undo commitment. You only add evidence that commitment failed.Why your instinct is right about NebulaYour instinct that “proposed plans should never be visible in Conduit” is actually protecting this invariant:Nebula =revision spaceConduit =irreversible event spaceIf proposed artifacts leak into Conduit, you implicitly make execution reversible in interpretation, even if not in mechanics.That’s where systems start to feel “soft” or inconsistent under load.The real architecture you’re converging onYou’re essentially building a two-plane cognitive system:Nebulareversiblereflectivemulti-hypothesisstratifiedgraph-mutatingConduitirreversibleevent-sourcedfailure-tolerant but not revision-tolerantstrictly state-drivenAnd the boundary is:commitment is a one-way projection from Nebula → ConduitEverything else is apost-mortem or repair flow, not a rollback into ambiguity.If you want to formalize the next step, the most useful artifact now is probably:afailure taxonomy for Conduitexecution failurevalidation failureenvironmental failuresemantic mismatch (Nebula → Conduit drift)Because that determines whether your “unless things go wrong” clause becomes a controlled recovery system—or a hidden backdoor between cognition and execution.
+
+Yes—and that “unless things go wrong” clause is exactly where systems like this either stay clean or slowly rot.What you’ve defined is actually a very strong invariant:Conduit is the commitment boundary. Nebula is everything before commitment.That’s the normal path.But the moment you allow “exception routing” back across that boundary, you’re introducing a second, implicit system:Conduit as recovery surfaceAnd that’s fine—but it needs to be treated as adifferent mode, not a relaxation of the boundary.The key distinction you’re circlingThere are really two Conduit states that must never get confused:1. Normal Conduit (Commitment Execution Plane)accepts onlycommitted artifactsno reasoning historyno draft semanticsstrict state machine:committed → executing → completed / failedThis is your factory floor.2. Recovery Conduit (Incident Plane)Activated only when something breaks:execution failedinconsistency detectedplan invalidated post-commitexternal interruptionThis is not “proposed plans returning.”It is:post-commit exception handlingAnd it should behave more like:incident ticketsrollback tracesrepair actionsquarantine statesNOT:re-opened proposalsreactivated draftsblurred execution stateThe subtle failure mode you’re currently avoidingWhat you’re wisely pushing against is this degeneracy:“If something goes wrong, we downgrade execution back into proposal space”That creates a dangerous loop:plan is committedexecution failsplan is demoted to “proposed”it re-enters reasoning spaceit becomes mutable againexecution is re-derivedThat collapses the entire semantic separation between:what we decidedwhat went wrongThe cleaner modelInstead of “demotion,” you want:Commit is irreversible in meaning, even if execution is notSo when things go wrong:Conduit does NOT say:“this is a proposed plan again”Conduit says:“this committed plan produced a failure trace”And then emits:PlanExecutionFailedPlanQuarantinedRepairPlanCreated(in Nebula, if needed)Key idea:You never undo commitment. You only add evidence that commitment failed.Why your instinct is right about NebulaYour instinct that “proposed plans should never be visible in Conduit” is actually protecting this invariant:Nebula =revision spaceConduit =irreversible event spaceIf proposed artifacts leak into Conduit, you implicitly make execution reversible in interpretation, even if not in mechanics.That’s where systems start to feel “soft” or inconsistent under load.The real architecture you’re converging onYou’re essentially building a two-plane cognitive system:Nebulareversiblereflectivemulti-hypothesisstratifiedgraph-mutatingConduitirreversibleevent-sourcedfailure-tolerant but not revision-tolerantstrictly state-drivenAnd the boundary is:commitment is a one-way projection from Nebula → ConduitEverything else is apost-mortem or repair flow, not a rollback into ambiguity.If you want to formalize the next step, the most useful artifact now is probably:afailure taxonomy for Conduitexecution failurevalidation failureenvironmental failuresemantic mismatch (Nebula → Conduit drift)Because that determines whether your “unless things go wrong” clause becomes a controlled recovery system—or a hidden backdoor between cognition and execution.
+
+Yes—and that “unless things go wrong” clause is exactly where systems like this either stay clean or slowly rot.
+
+What you’ve defined is actually a very strong invariant:
+
+> Conduit is the commitment boundary. Nebula is everything before commitment.
+
+Conduit is the commitment boundary. Nebula is everything before commitment.
+
+That’s the normal path.
+
+But the moment you allow “exception routing” back across that boundary, you’re introducing a second, implicit system:
+
+> Conduit as recovery surface
+
+Conduit as recovery surface
+
+And that’s fine—but it needs to be treated as adifferent mode, not a relaxation of the boundary.
+
+---
+
+## The key distinction you’re circling
+
+There are really two Conduit states that must never get confused:
+
+### 1. Normal Conduit (Commitment Execution Plane)
+
+- accepts onlycommitted artifacts
+accepts onlycommitted artifacts
+
+- no reasoning history
+no reasoning history
+
+- no draft semantics
+no draft semantics
+
+- strict state machine:committed → executing → completed / failed
+strict state machine:
+
+- committed → executing → completed / failed
+committed → executing → completed / failed
+
+This is your factory floor.
+
+---
+
+### 2. Recovery Conduit (Incident Plane)
+
+Activated only when something breaks:
+
+- execution failed
+execution failed
+
+- inconsistency detected
+inconsistency detected
+
+- plan invalidated post-commit
+plan invalidated post-commit
+
+- external interruption
+external interruption
+
+This is not “proposed plans returning.”
+
+It is:
+
+> post-commit exception handling
+
+post-commit exception handling
+
+And it should behave more like:
+
+- incident tickets
+incident tickets
+
+- rollback traces
+rollback traces
+
+- repair actions
+repair actions
+
+- quarantine states
+quarantine states
+
+NOT:
+
+- re-opened proposals
+re-opened proposals
+
+- reactivated drafts
+reactivated drafts
+
+- blurred execution state
+blurred execution state
+
+---
+
+## The subtle failure mode you’re currently avoiding
+
+What you’re wisely pushing against is this degeneracy:
+
+> “If something goes wrong, we downgrade execution back into proposal space”
+
+“If something goes wrong, we downgrade execution back into proposal space”
+
+That creates a dangerous loop:
+
+- plan is committed
+plan is committed
+
+- execution fails
+execution fails
+
+- plan is demoted to “proposed”
+plan is demoted to “proposed”
+
+- it re-enters reasoning space
+it re-enters reasoning space
+
+- it becomes mutable again
+it becomes mutable again
+
+- execution is re-derived
+execution is re-derived
+
+That collapses the entire semantic separation between:
+
+- what we decided
+what we decided
+
+- what went wrong
+what went wrong
+
+---
+
+## The cleaner model
+
+Instead of “demotion,” you want:
+
+### Commit is irreversible in meaning, even if execution is not
+
+So when things go wrong:
+
+Conduit does NOT say:
+
+- “this is a proposed plan again”
+“this is a proposed plan again”
+
+Conduit says:
+
+- “this committed plan produced a failure trace”
+“this committed plan produced a failure trace”
+
+And then emits:
+
+- PlanExecutionFailed
+PlanExecutionFailed
+
+- PlanQuarantined
+PlanQuarantined
+
+- RepairPlanCreated(in Nebula, if needed)
+RepairPlanCreated(in Nebula, if needed)
+
+Key idea:
+
+> You never undo commitment. You only add evidence that commitment failed.
+
+You never undo commitment. You only add evidence that commitment failed.
+
+---
+
+## Why your instinct is right about Nebula
+
+Your instinct that “proposed plans should never be visible in Conduit” is actually protecting this invariant:
+
+- Nebula =revision space
+Nebula =revision space
+
+- Conduit =irreversible event space
+Conduit =irreversible event space
+
+If proposed artifacts leak into Conduit, you implicitly make execution reversible in interpretation, even if not in mechanics.
+
+That’s where systems start to feel “soft” or inconsistent under load.
+
+---
+
+## The real architecture you’re converging on
+
+You’re essentially building a two-plane cognitive system:

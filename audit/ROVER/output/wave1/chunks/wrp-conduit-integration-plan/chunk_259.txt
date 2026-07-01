@@ -1,0 +1,287 @@
+## 16.2 Section integrity
+
+- duplicatesectionKeywithin an artifact
+duplicatesectionKeywithin an artifact
+
+- invalid parent-child heading hierarchy
+invalid parent-child heading hierarchy
+
+## 16.3 Chunk integrity
+
+- empty chunk body after trimming
+empty chunk body after trimming
+
+- missing level
+missing level
+
+- missing chunkKind
+missing chunkKind
+
+- missing normativeStrength
+missing normativeStrength
+
+- duplicate chunk id in one import batch
+duplicate chunk id in one import batch
+
+## 16.4 Cross-reference integrity
+
+- source or target id missing
+source or target id missing
+
+- relation type missing
+relation type missing
+
+- self-loop edges unless explicitly allowed
+self-loop edges unless explicitly allowed
+
+- duplicate identical edges unless deduplication policy permits weighted merge
+duplicate identical edges unless deduplication policy permits weighted merge
+
+---
+
+# 17. Initial WRP-Specific Heuristic Defaults
+
+Until a richer classifier exists, the projector SHOULD apply these WRP-specific priors:
+
+## wrp-v1-protocol
+
+Bias toward:
+
+- L2
+L2
+
+- PROTOCOL_RULE
+PROTOCOL_RULE
+
+- DEFINITION
+DEFINITION
+
+- INVARIANT
+INVARIANT
+
+## wrp-v1_1-dag
+
+Bias toward:
+
+- L2
+L2
+
+- DATA_MODEL
+DATA_MODEL
+
+- ALGORITHM
+ALGORITHM
+
+- INVARIANT
+INVARIANT
+
+## wrp-v1_2-traversal
+
+Bias toward:
+
+- L1orL2depending on whether content is implementation-facing or semantic
+L1orL2depending on whether content is implementation-facing or semantic
+
+- ALGORITHM
+ALGORITHM
+
+- IMPLEMENTATION_NOTE
+IMPLEMENTATION_NOTE
+
+- INVARIANT
+INVARIANT
+
+## wrp-migration-plan
+
+Bias toward:
+
+- L1for concrete rollout steps
+L1for concrete rollout steps
+
+- L3for migration rationale / sequencing
+L3for migration rationale / sequencing
+
+- MIGRATION_STEP
+MIGRATION_STEP
+
+- RATIONALE
+RATIONALE
+
+- ACCEPTANCE_CRITERIA
+ACCEPTANCE_CRITERIA
+
+---
+
+# 18. Recommended Import Output Shape
+
+For each source document, the importer SHOULD emit:
+
+- oneNebulaArtifactbinding (or verification of existing binding)
+oneNebulaArtifactbinding (or verification of existing binding)
+
+- NebulaSectionrows for heading structure
+NebulaSectionrows for heading structure
+
+- NebulaChunkrows for chunked semantic units
+NebulaChunkrows for chunked semantic units
+
+- NebulaCrossReferencerows inferred from references
+NebulaCrossReferencerows inferred from references
+
+- optional execution-link rows if Conduit metadata is present
+optional execution-link rows if Conduit metadata is present
+
+- import receipt / projector report containing:artifact idsource pathprojector versionsection countchunk countxref countwarningsvalidation failures
+import receipt / projector report containing:
+
+- artifact id
+artifact id
+
+- source path
+source path
+
+- projector version
+projector version
+
+- section count
+section count
+
+- chunk count
+chunk count
+
+- xref count
+xref count
+
+- warnings
+warnings
+
+- validation failures
+validation failures
+
+---
+
+# 19. Future Extensions
+
+The following are intentionally out of scope for the first WRP projection pass but expected later:
+
+- concept node projection (ExecutionReceipt,TraversalCursor, etc.)
+concept node projection (ExecutionReceipt,TraversalCursor, etc.)
+
+- embedding generation and vector indexing
+embedding generation and vector indexing
+
+- role-specific retrieval scoring weights in the importer itself
+role-specific retrieval scoring weights in the importer itself
+
+- supersession lineage across chunk revisions
+supersession lineage across chunk revisions
+
+- bidirectional Conduit synchronization
+bidirectional Conduit synchronization
+
+- LLM-assisted chunk classification as a fallback after deterministic heuristics
+LLM-assisted chunk classification as a fallback after deterministic heuristics
+
+- confidence scoring for level / chunk kind assignments
+confidence scoring for level / chunk kind assignments
+
+---
+
+# 20. Summary
+
+The WRP document projection pipeline exists to transform a small set of high-value markdown artifacts into a stable Nebula graph with:
+
+- artifact identity
+artifact identity
+
+- section structure
+section structure
+
+- semantically coherent chunking
+semantically coherent chunking
+
+- chunk-level level stratification
+chunk-level level stratification
+
+- chunk kind and normative classification
+chunk kind and normative classification
+
+- cross-artifact references
+cross-artifact references
+
+- optional execution links back to Conduit
+optional execution links back to Conduit
+
+The first-pass rule is simple:
+
+> project by heading, split by semantic purpose, classify at chunk level, preserve stable ids, and emit explicit graph structure rather than storing markdown as opaque blobs.
+
+project by heading, split by semantic purpose, classify at chunk level, preserve stable ids, and emit explicit graph structure rather than storing markdown as opaque blobs.
+
+```
+---# What I’d do next, before your questionThis doc is enough to start building the importer, but there are **two companion artifacts** that would make implementation much safer:## 1. `schemas/core/nebula-chunk-kinds.jsonld`A proper ontology file for:- `PROTOCOL_RULE`- `DATA_MODEL`- `ALGORITHM`- `INVARIANT`- `RATIONALE`- `MIGRATION_STEP`- `OPEN_QUESTION`- etc.and probably:- which retrieval profiles prefer them- whether they are normative by default- whether they’re expected at L1/L2/L3/L4## 2. `docs/nebula/wrp-projection-pseudocode.md`A literal importer algorithm doc:- parse markdown AST- build section tree- segment blocks into chunk candidates- classify chunk- infer cross refs- upsert SQL rows / graph rowsThat second one would be especially good for your current “Conduit + local Qwen coder” setup because it’s exactly the kind of thing you can hand to the model as an implementation scaffold.---Go ahead with the question.
+```
+
+```
+---# What I’d do next, before your questionThis doc is enough to start building the importer, but there are **two companion artifacts** that would make implementation much safer:## 1. `schemas/core/nebula-chunk-kinds.jsonld`A proper ontology file for:- `PROTOCOL_RULE`- `DATA_MODEL`- `ALGORITHM`- `INVARIANT`- `RATIONALE`- `MIGRATION_STEP`- `OPEN_QUESTION`- etc.and probably:- which retrieval profiles prefer them- whether they are normative by default- whether they’re expected at L1/L2/L3/L4## 2. `docs/nebula/wrp-projection-pseudocode.md`A literal importer algorithm doc:- parse markdown AST- build section tree- segment blocks into chunk candidates- classify chunk- infer cross refs- upsert SQL rows / graph rowsThat second one would be especially good for your current “Conduit + local Qwen coder” setup because it’s exactly the kind of thing you can hand to the model as an implementation scaffold.---Go ahead with the question.
+```
+
+Sources
+
+Sources
+
+Sources
+
+FivetranSponsoredOpen Data ArchitecturePower your AI with the adaptability of ODI.
+
+FivetranSponsoredOpen Data ArchitecturePower your AI with the adaptability of ODI.
+
+FivetranSponsoredOpen Data ArchitecturePower your AI with the adaptability of ODI.
+
+FivetranSponsoredOpen Data ArchitecturePower your AI with the adaptability of ODI.
+
+FivetranSponsored
+
+FivetranSponsored
+
+FivetranSponsored
+
+FivetranSponsored
+
+Fivetran
+
+Sponsored
+
+Open Data ArchitecturePower your AI with the adaptability of ODI.
+
+Open Data ArchitecturePower your AI with the adaptability of ODI.
+
+Open Data ArchitecturePower your AI with the adaptability of ODI.
+
+Open Data Architecture
+
+Power your AI with the adaptability of ODI.
+
+You said:OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.Show moreShow less
+
+#### You said:
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.Show moreShow less
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.Show moreShow less
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.Show moreShow less
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.Show moreShow less
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.Show moreShow less
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.Show moreShow less
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.Show moreShow less
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.Show moreShow less
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.
+
+OK, don't forget about those two documents, we do want them, but since we're touching on Nebula, I want to make sure that it's possible for me to do the simplest thing: as I review the corpus of specs and documentation, I want to be able to categorize them as needing review, being outdated, having been superseded, et cetera, in order to focus everyone's attention on priorities.

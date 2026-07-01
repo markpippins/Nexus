@@ -1,0 +1,167 @@
+This is actually already at the point where the design decision matters more than the implementation detail, because you’re not missing “code,” you’re choosing whether the kernel is ageneralization of what you haveor anew semantic layer that replaces it.I’ll go straight through your questions, but there’s a higher-order split that shows up underneath all of them:You already have aPlan Reducer system (WRPProjectionBuilder).The spec is asking for aSystem Reducer (KernelState fold over all plans).Those are not the same abstraction. Everything else is consequence.🧠 First: what you actually already built (important reframing)Your current system is not “partial.” It is:✔ Asingle-plan event-sourced projection engineIt already has:receipt ingestionstate foldingtransition validationcross-reference inference (within a plan)stratified view construction (L1–L4)So functionally:PlanState = reduce(plan_receipts)That’s aclosed system per plan.🧭 The Spec 2 kernel is a different animalSpec 2 is:KernelState = reduce(all_receipts, global_state)So instead of:many independent foldsit becomes:one global fold with shared structureThat single shift introduces:cross-plan identityglobal graph consistencyversioned system stateThis is why everything downstream feels “uncertain”—you’re missing the decision aboutscope of the fold, not data structures.Now your questions (clean answers, but opinionated)Q1: Kernel vs ProjectionRecommendation:DO NOT replace projection — layer kernel above itYou already built something valuable and correct.So:Kernel shouldcompose existing projection builder, not replace it.Architecture:KernelReduce├── builds/updates PlanState via WRPProjectionBuilder├── merges PlanStates into KernelState└── builds GraphIndex across plansWhy this wins:no rewrite of working systempreserves single-plan correctnessisolates “global reasoning” to kernel layerIf you try to merge them, you’ll lose clarity and reintroduce bugs in a place you already solved.Q2: What is LOSMIR?This is themost important abstraction decision in the whole system.Recommendation:Define LOSMIR as:a typed, append-only stream of Receipts + WorkRequestDCO derivativesNOT a DAG yet.Why:Because:you already have receipts workingDAG isderived, not primarykernel should be deterministic fold over linear inputSo:LOSMIR = ReceiptStream | IRDeltaStream (future)But for Spec 2:start with receipts onlyEverything else becomes amaterialization step, not input complexity.Q3: 4 phases vs single foldRecommendation: YES — split into 4 phasesBut not for performance reasons.Forreasoning isolation.The real reason:Right now your system mixes:validationstate mutationgraph inferenceprojection formattingThat makes kernel correctness untestable at scale.So:1. MaterializeReceipts2. BuildPlanStates3. ApplyTransitions4. BuildGraphIndexEach becomes:pure functionindependently replayablediffableThis is critical for “kernel correctness proofs” later.Q4: All-or-nothing vs convergenceRecommendation: HYBRIDPure all-or-nothing is too brittle for real systems.But silent convergence is dangerous.Best model:KernelReduce:- produces candidate KernelState- produces validation report- commits only if validSo:phase pipeline is strictcommit boundary is explicitThink:“transactional kernel fold”NOT “best-effort merge”Q5: What is GraphIndex?You’re close already.Recommendation: GraphIndex = typed adjacency + query layerNot just edges.GraphIndex {edges: Set<(source, relation, target)>reverseIndex: Map<target, sources[]>typeIndex: Map<relation, edge[]>}And critically:it must support traversal queries as a first-class APISo it’s not a collection—it’s aread model.Your existing taxonomy already defines the ontology; GraphIndex operationalizes it globally.Q6: Where does KernelState live?Recommendation: dual-layerin-memory KernelState = authoritative working stateSQLite/Postgres = event log + snapshot storeSo:Startup:replay receipts → KernelStateRuntime:KernelState in memoryPersistence:append-only receipts + periodic snapshotsThis matches:event sourcingreplay determinismkernel purityDo NOT store KernelState as primary truth.It becomes derived.Q7: Entry point locationRecommendation: NEW MODULEDo NOT extend the archived reducer.Create:nexus/python/conduit/kernel/reduce.pyphases/graph_index.pystate.pyWhy:existing reducer = product-specific (WRP)kernel = system-level abstractionmixing them will entangle concerns permanently🧩 The key architectural realizationYou are not building:“a better reducer”You are building:atwo-layer fold systemLayer 1: Plan Fold (existing, good)Receipt → PlanStateLayer 2: Kernel Fold (new)All PlanStates + cross-plan receipts → KernelState🧠 The cleanest mental modelThink of it like:WRPProjectionBuilder =function reducerKernelReduce =system reduceror more formally:f(plan) = plan_stateF(system) = system_state over f(plan_i)🚨 Final design recommendation (opinionated summary)If you want this to stay coherent long-term:Do this:Keep WRPProjectionBuilder unchangedBuild KernelReduce as orchestration layerDefine LOSMIR = receipt stream only (for now)Make GraphIndex a derived global read modelUse 4-phase pipeline with strict validationUse transactional commit semanticsStore KernelState only as snapshot, not source of truthIf you want, next step is where this gets interesting:We can define theexact type boundaries between LOSMIR → PlanIR → KernelState, and that’s where the system stops being “a reducer architecture” and becomes acompiler-like runtime.
+
+This is actually already at the point where the design decision matters more than the implementation detail, because you’re not missing “code,” you’re choosing whether the kernel is ageneralization of what you haveor anew semantic layer that replaces it.I’ll go straight through your questions, but there’s a higher-order split that shows up underneath all of them:You already have aPlan Reducer system (WRPProjectionBuilder).The spec is asking for aSystem Reducer (KernelState fold over all plans).Those are not the same abstraction. Everything else is consequence.🧠 First: what you actually already built (important reframing)Your current system is not “partial.” It is:✔ Asingle-plan event-sourced projection engineIt already has:receipt ingestionstate foldingtransition validationcross-reference inference (within a plan)stratified view construction (L1–L4)So functionally:PlanState = reduce(plan_receipts)That’s aclosed system per plan.🧭 The Spec 2 kernel is a different animalSpec 2 is:KernelState = reduce(all_receipts, global_state)So instead of:many independent foldsit becomes:one global fold with shared structureThat single shift introduces:cross-plan identityglobal graph consistencyversioned system stateThis is why everything downstream feels “uncertain”—you’re missing the decision aboutscope of the fold, not data structures.Now your questions (clean answers, but opinionated)Q1: Kernel vs ProjectionRecommendation:DO NOT replace projection — layer kernel above itYou already built something valuable and correct.So:Kernel shouldcompose existing projection builder, not replace it.Architecture:KernelReduce├── builds/updates PlanState via WRPProjectionBuilder├── merges PlanStates into KernelState└── builds GraphIndex across plansWhy this wins:no rewrite of working systempreserves single-plan correctnessisolates “global reasoning” to kernel layerIf you try to merge them, you’ll lose clarity and reintroduce bugs in a place you already solved.Q2: What is LOSMIR?This is themost important abstraction decision in the whole system.Recommendation:Define LOSMIR as:a typed, append-only stream of Receipts + WorkRequestDCO derivativesNOT a DAG yet.Why:Because:you already have receipts workingDAG isderived, not primarykernel should be deterministic fold over linear inputSo:LOSMIR = ReceiptStream | IRDeltaStream (future)But for Spec 2:start with receipts onlyEverything else becomes amaterialization step, not input complexity.Q3: 4 phases vs single foldRecommendation: YES — split into 4 phasesBut not for performance reasons.Forreasoning isolation.The real reason:Right now your system mixes:validationstate mutationgraph inferenceprojection formattingThat makes kernel correctness untestable at scale.So:1. MaterializeReceipts2. BuildPlanStates3. ApplyTransitions4. BuildGraphIndexEach becomes:pure functionindependently replayablediffableThis is critical for “kernel correctness proofs” later.Q4: All-or-nothing vs convergenceRecommendation: HYBRIDPure all-or-nothing is too brittle for real systems.But silent convergence is dangerous.Best model:KernelReduce:- produces candidate KernelState- produces validation report- commits only if validSo:phase pipeline is strictcommit boundary is explicitThink:“transactional kernel fold”NOT “best-effort merge”Q5: What is GraphIndex?You’re close already.Recommendation: GraphIndex = typed adjacency + query layerNot just edges.GraphIndex {edges: Set<(source, relation, target)>reverseIndex: Map<target, sources[]>typeIndex: Map<relation, edge[]>}And critically:it must support traversal queries as a first-class APISo it’s not a collection—it’s aread model.Your existing taxonomy already defines the ontology; GraphIndex operationalizes it globally.Q6: Where does KernelState live?Recommendation: dual-layerin-memory KernelState = authoritative working stateSQLite/Postgres = event log + snapshot storeSo:Startup:replay receipts → KernelStateRuntime:KernelState in memoryPersistence:append-only receipts + periodic snapshotsThis matches:event sourcingreplay determinismkernel purityDo NOT store KernelState as primary truth.It becomes derived.Q7: Entry point locationRecommendation: NEW MODULEDo NOT extend the archived reducer.Create:nexus/python/conduit/kernel/reduce.pyphases/graph_index.pystate.pyWhy:existing reducer = product-specific (WRP)kernel = system-level abstractionmixing them will entangle concerns permanently🧩 The key architectural realizationYou are not building:“a better reducer”You are building:atwo-layer fold systemLayer 1: Plan Fold (existing, good)Receipt → PlanStateLayer 2: Kernel Fold (new)All PlanStates + cross-plan receipts → KernelState🧠 The cleanest mental modelThink of it like:WRPProjectionBuilder =function reducerKernelReduce =system reduceror more formally:f(plan) = plan_stateF(system) = system_state over f(plan_i)🚨 Final design recommendation (opinionated summary)If you want this to stay coherent long-term:Do this:Keep WRPProjectionBuilder unchangedBuild KernelReduce as orchestration layerDefine LOSMIR = receipt stream only (for now)Make GraphIndex a derived global read modelUse 4-phase pipeline with strict validationUse transactional commit semanticsStore KernelState only as snapshot, not source of truthIf you want, next step is where this gets interesting:We can define theexact type boundaries between LOSMIR → PlanIR → KernelState, and that’s where the system stops being “a reducer architecture” and becomes acompiler-like runtime.
+
+This is actually already at the point where the design decision matters more than the implementation detail, because you’re not missing “code,” you’re choosing whether the kernel is ageneralization of what you haveor anew semantic layer that replaces it.I’ll go straight through your questions, but there’s a higher-order split that shows up underneath all of them:You already have aPlan Reducer system (WRPProjectionBuilder).The spec is asking for aSystem Reducer (KernelState fold over all plans).Those are not the same abstraction. Everything else is consequence.🧠 First: what you actually already built (important reframing)Your current system is not “partial.” It is:✔ Asingle-plan event-sourced projection engineIt already has:receipt ingestionstate foldingtransition validationcross-reference inference (within a plan)stratified view construction (L1–L4)So functionally:PlanState = reduce(plan_receipts)That’s aclosed system per plan.🧭 The Spec 2 kernel is a different animalSpec 2 is:KernelState = reduce(all_receipts, global_state)So instead of:many independent foldsit becomes:one global fold with shared structureThat single shift introduces:cross-plan identityglobal graph consistencyversioned system stateThis is why everything downstream feels “uncertain”—you’re missing the decision aboutscope of the fold, not data structures.Now your questions (clean answers, but opinionated)Q1: Kernel vs ProjectionRecommendation:DO NOT replace projection — layer kernel above itYou already built something valuable and correct.So:Kernel shouldcompose existing projection builder, not replace it.Architecture:KernelReduce├── builds/updates PlanState via WRPProjectionBuilder├── merges PlanStates into KernelState└── builds GraphIndex across plansWhy this wins:no rewrite of working systempreserves single-plan correctnessisolates “global reasoning” to kernel layerIf you try to merge them, you’ll lose clarity and reintroduce bugs in a place you already solved.Q2: What is LOSMIR?This is themost important abstraction decision in the whole system.Recommendation:Define LOSMIR as:a typed, append-only stream of Receipts + WorkRequestDCO derivativesNOT a DAG yet.Why:Because:you already have receipts workingDAG isderived, not primarykernel should be deterministic fold over linear inputSo:LOSMIR = ReceiptStream | IRDeltaStream (future)But for Spec 2:start with receipts onlyEverything else becomes amaterialization step, not input complexity.Q3: 4 phases vs single foldRecommendation: YES — split into 4 phasesBut not for performance reasons.Forreasoning isolation.The real reason:Right now your system mixes:validationstate mutationgraph inferenceprojection formattingThat makes kernel correctness untestable at scale.So:1. MaterializeReceipts2. BuildPlanStates3. ApplyTransitions4. BuildGraphIndexEach becomes:pure functionindependently replayablediffableThis is critical for “kernel correctness proofs” later.Q4: All-or-nothing vs convergenceRecommendation: HYBRIDPure all-or-nothing is too brittle for real systems.But silent convergence is dangerous.Best model:KernelReduce:- produces candidate KernelState- produces validation report- commits only if validSo:phase pipeline is strictcommit boundary is explicitThink:“transactional kernel fold”NOT “best-effort merge”Q5: What is GraphIndex?You’re close already.Recommendation: GraphIndex = typed adjacency + query layerNot just edges.GraphIndex {edges: Set<(source, relation, target)>reverseIndex: Map<target, sources[]>typeIndex: Map<relation, edge[]>}And critically:it must support traversal queries as a first-class APISo it’s not a collection—it’s aread model.Your existing taxonomy already defines the ontology; GraphIndex operationalizes it globally.Q6: Where does KernelState live?Recommendation: dual-layerin-memory KernelState = authoritative working stateSQLite/Postgres = event log + snapshot storeSo:Startup:replay receipts → KernelStateRuntime:KernelState in memoryPersistence:append-only receipts + periodic snapshotsThis matches:event sourcingreplay determinismkernel purityDo NOT store KernelState as primary truth.It becomes derived.Q7: Entry point locationRecommendation: NEW MODULEDo NOT extend the archived reducer.Create:nexus/python/conduit/kernel/reduce.pyphases/graph_index.pystate.pyWhy:existing reducer = product-specific (WRP)kernel = system-level abstractionmixing them will entangle concerns permanently🧩 The key architectural realizationYou are not building:“a better reducer”You are building:atwo-layer fold systemLayer 1: Plan Fold (existing, good)Receipt → PlanStateLayer 2: Kernel Fold (new)All PlanStates + cross-plan receipts → KernelState🧠 The cleanest mental modelThink of it like:WRPProjectionBuilder =function reducerKernelReduce =system reduceror more formally:f(plan) = plan_stateF(system) = system_state over f(plan_i)🚨 Final design recommendation (opinionated summary)If you want this to stay coherent long-term:Do this:Keep WRPProjectionBuilder unchangedBuild KernelReduce as orchestration layerDefine LOSMIR = receipt stream only (for now)Make GraphIndex a derived global read modelUse 4-phase pipeline with strict validationUse transactional commit semanticsStore KernelState only as snapshot, not source of truthIf you want, next step is where this gets interesting:We can define theexact type boundaries between LOSMIR → PlanIR → KernelState, and that’s where the system stops being “a reducer architecture” and becomes acompiler-like runtime.
+
+This is actually already at the point where the design decision matters more than the implementation detail, because you’re not missing “code,” you’re choosing whether the kernel is ageneralization of what you haveor anew semantic layer that replaces it.
+
+I’ll go straight through your questions, but there’s a higher-order split that shows up underneath all of them:
+
+> You already have aPlan Reducer system (WRPProjectionBuilder).The spec is asking for aSystem Reducer (KernelState fold over all plans).
+
+You already have aPlan Reducer system (WRPProjectionBuilder).The spec is asking for aSystem Reducer (KernelState fold over all plans).
+
+Those are not the same abstraction. Everything else is consequence.
+
+---
+
+# 🧠 First: what you actually already built (important reframing)
+
+Your current system is not “partial.” It is:
+
+### ✔ Asingle-plan event-sourced projection engine
+
+It already has:
+
+- receipt ingestion
+receipt ingestion
+
+- state folding
+state folding
+
+- transition validation
+transition validation
+
+- cross-reference inference (within a plan)
+cross-reference inference (within a plan)
+
+- stratified view construction (L1–L4)
+stratified view construction (L1–L4)
+
+So functionally:
+
+```
+PlanState = reduce(plan_receipts)
+```
+
+```
+PlanState = reduce(plan_receipts)
+```
+
+That’s aclosed system per plan.
+
+---
+
+# 🧭 The Spec 2 kernel is a different animal
+
+Spec 2 is:
+
+```
+KernelState = reduce(all_receipts, global_state)
+```
+
+```
+KernelState = reduce(all_receipts, global_state)
+```
+
+So instead of:
+
+> many independent folds
+
+many independent folds
+
+it becomes:
+
+> one global fold with shared structure
+
+one global fold with shared structure
+
+That single shift introduces:
+
+- cross-plan identity
+cross-plan identity
+
+- global graph consistency
+global graph consistency
+
+- versioned system state
+versioned system state
+
+This is why everything downstream feels “uncertain”—you’re missing the decision aboutscope of the fold, not data structures.
+
+---
+
+# Now your questions (clean answers, but opinionated)
+
+---
+
+## Q1: Kernel vs Projection
+
+### Recommendation:DO NOT replace projection — layer kernel above it
+
+You already built something valuable and correct.
+
+So:
+
+> Kernel shouldcompose existing projection builder, not replace it.
+
+Kernel shouldcompose existing projection builder, not replace it.
+
+### Architecture:
+
+```
+KernelReduce  ├── builds/updates PlanState via WRPProjectionBuilder  ├── merges PlanStates into KernelState  └── builds GraphIndex across plans
+```
+
+```
+KernelReduce  ├── builds/updates PlanState via WRPProjectionBuilder  ├── merges PlanStates into KernelState  └── builds GraphIndex across plans
+```
+
+### Why this wins:
+
+- no rewrite of working system
+no rewrite of working system
+
+- preserves single-plan correctness
+preserves single-plan correctness
+
+- isolates “global reasoning” to kernel layer
+isolates “global reasoning” to kernel layer
+
+If you try to merge them, you’ll lose clarity and reintroduce bugs in a place you already solved.
+
+---
+
+## Q2: What is LOSMIR?
+
+This is themost important abstraction decision in the whole system.
+
+### Recommendation:
+
+Define LOSMIR as:
+
+> a typed, append-only stream of Receipts + WorkRequestDCO derivatives
+
+a typed, append-only stream of Receipts + WorkRequestDCO derivatives
+
+NOT a DAG yet.
+
+### Why:
+
+Because:
+
+- you already have receipts working
+you already have receipts working
+
+- DAG isderived, not primary
+DAG isderived, not primary
+
+- kernel should be deterministic fold over linear input
+kernel should be deterministic fold over linear input
+
+### So:
+
+```
+LOSMIR = ReceiptStream | IRDeltaStream (future)
+```

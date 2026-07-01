@@ -1,0 +1,16 @@
+{
+  "request_id": "wr-1052-1782886381-476e6803",
+  "ccnf_hash": "60e0f4f21b0baa7ac74069dce54c106ec2f75976f7ba333bc9e7dbeb5ecb9ca2",
+  "cer_root_hash": "2c059621fd9c8ecfafacd8e2bff09e8d4f5fe4982f1d7ae7410c7d0ffac81481",
+  "trace_root_hash": "2c059621fd9c8ecfafacd8e2bff09e8d4f5fe4982f1d7ae7410c7d0ffac81481",
+  "trace_event_count": 1,
+  "replay_binding_hash": "f7b11940d9d50a76398cd09342510e5cdbef64913dbcec76608f862a9c0a561d",
+  "status": "SUCCESS",
+  "failure": null,
+  "timing": {
+    "started_at": 1782871982,
+    "completed_at": 1782871986,
+    "duration_ms": 4000
+  },
+  "ccnf_version": 1
+}

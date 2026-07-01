@@ -1,0 +1,90 @@
+---
+
+# 17. Summary
+
+Nebula review workflow exists to turn the corpus into a manageable attention system rather than a passive archive.
+
+The governing rule is:
+
+> Lifecycle status tells us what an artifact is; review state tells us whether we should trust it, revisit it, focus on it, or route around it right now.
+
+Lifecycle status tells us what an artifact is; review state tells us whether we should trust it, revisit it, focus on it, or route around it right now.
+
+The initial operational model is intentionally simple:
+
+- review at artifact scope first
+review at artifact scope first
+
+- mark items as current focus / needs review / reviewed / outdated / questioned / superseded
+mark items as current focus / needs review / reviewed / outdated / questioned / superseded
+
+- record priority and attention reason
+record priority and attention reason
+
+- let retrieval and dashboards honor that state
+let retrieval and dashboards honor that state
+
+- only descend to section/chunk review when precision is worth the effort
+only descend to section/chunk review when precision is worth the effort
+
+```
+---# Where we are nowWe’ve now inserted the review-governance pair:1. **`schemas/core/nebula-review-state.jsonld`**  2. **`docs/nebula/review-workflow.md`**So we can go back to the two deferred docs you originally wanted:3. **`schemas/core/nebula-chunk-kinds.jsonld`**  4. **`docs/nebula/wrp-projection-pseudocode.md`**I’d do **`schemas/core/nebula-chunk-kinds.jsonld`** next, because it tightens the classification layer that the projection rules and retrieval profiles already depend on.
+```
+
+```
+---# Where we are nowWe’ve now inserted the review-governance pair:1. **`schemas/core/nebula-review-state.jsonld`**  2. **`docs/nebula/review-workflow.md`**So we can go back to the two deferred docs you originally wanted:3. **`schemas/core/nebula-chunk-kinds.jsonld`**  4. **`docs/nebula/wrp-projection-pseudocode.md`**I’d do **`schemas/core/nebula-chunk-kinds.jsonld`** next, because it tightens the classification layer that the projection rules and retrieval profiles already depend on.
+```
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.SponsoredCompany Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.Sponsored
+
+Helpjuice, Inc.
+
+Sponsored
+
+Company Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Company Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Company Knowledge, Now Searchable by AIHelpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+Company Knowledge, Now Searchable by AI
+
+Helpjuice gives teams an AI-powered knowledge base built from their real documentation.
+
+You said:let's go
+
+#### You said:
+
+let's go
+
+let's go
+
+let's go
+
+let's go
+
+let's go
+
+let's go
+
+let's go
+
+ChatGPT said:Good — this is the point where Nebula stops being “documents with structure” and becomes an actualsemantic compiler target.We’ll lock the chunk ontology first, because everything else (projection, retrieval, review rollups) depends on it.schemas/core/nebula-chunk-kinds.jsonldJSON{"@context": {"@version":1.1,"id":"@id","type":"@type","xsd":"http://www.w3.org/2001/XMLSchema#","rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#","rdfs":"http://www.w3.org/2000/01/rdf-schema#","schema":"https://schema.org/","nebula":"https://nexus.example/schema/nebula/","chunk":"https://nexus.example/schema/chunk/","label":"rdfs:label","comment":"rdfs:comment","ChunkKind":"chunk:ChunkKind","chunkKind": {"@id":"nebula:chunkKind","@type":"@id"},"preferredLevel": {"@id":"nebula:preferredLevel","@type":"@id"},"normativeDefault": {"@id":"nebula:normativeDefault","@type":"@id"},"retrievalBias": {"@id":"nebula:retrievalBias","@type":"xsd:decimal"},"isNormative": {"@id":"nebula:isNormative","@type":"xsd:boolean"}},"@graph": [{"id":"chunk:ChunkKind","type":"rdfs:Class","label":"Chunk Kind","comment":"A classification of semantic intent for a Nebula chunk used for retrieval, ranking, and projection behavior."},// ----------------------------// Core structural kinds// ----------------------------{"id":"chunk:OVERVIEW","type":"ChunkKind","label":"Overview","comment":"High-level summary or introduction of an artifact, section, or subsystem.","preferredLevel":"nebula:L3","isNormative":false,"retrievalBias":0.6},{"id":"chunk:DEFINITION","type":"ChunkKind","label":"Definition","comment":"Defines a term, concept, or structural element in the ontology or system model.","preferredLevel":"nebula:L2","isNormative":false,"retrievalBias":0.9},// ----------------------------// Protocol + system behavior// ----------------------------{"id":"chunk:PROTOCOL_RULE","type":"ChunkKind","label":"Protocol Rule","comment":"A rule governing system behavior, request/response semantics, or lifecycle constraints.","preferredLevel":"nebula:L2","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":1.0},{"id":"chunk:INVARIANT","type":"ChunkKind","label":"Invariant","comment":"A condition that must always hold true for valid system state or execution.","preferredLevel":"nebula:L2","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":1.0},{"id":"chunk:ALGORITHM","type":"ChunkKind","label":"Algorithm","comment":"Deterministic procedure describing traversal, compilation, validation, or execution logic.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":1.0},// ----------------------------// Data + model structure// ----------------------------{"id":"chunk:DATA_MODEL","type":"ChunkKind","label":"Data Model","comment":"Schema-level description of structures such as nodes, edges, DAGs, or execution receipts.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"RECOMMENDED","retrievalBias":0.95},// ----------------------------// Implementation layer// ----------------------------{"id":"chunk:IMPLEMENTATION_NOTE","type":"ChunkKind","label":"Implementation Note","comment":"Concrete guidance for implementation, code structure, or system wiring.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"RECOMMENDED","retrievalBias":0.85},{"id":"chunk:MIGRATION_STEP","type":"ChunkKind","label":"Migration Step","comment":"A concrete step in a system migration, rollout, or compatibility transition plan.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":0.95},// ----------------------------// Explanation + rationale// ----------------------------{"id":"chunk:RATIONALE","type":"ChunkKind","label":"Rationale","comment":"Explanation of why a design decision, structure, or boundary exists.","preferredLevel":"nebula:L3","isNormative":false,"retrievalBias":0.7},{"id":"chunk:OPEN_QUESTION","type":"ChunkKind","label":"Open Question","comment":"An unresolved question or ambiguity in system design or interpretation.","preferredLevel":"nebula:L3","isNormative":false,"retrievalBias":0.8},// ----------------------------// Examples + validation// ----------------------------{"id":"chunk:EXAMPLE","type":"ChunkKind","label":"Example","comment":"Illustrative example showing how a system, model, or protocol behaves.","preferredLevel":"nebula:L2","isNormative":false,"retrievalBias":0.75},{"id":"chunk:ACCEPTANCE_CRITERIA","type":"ChunkKind","label":"Acceptance Criteria","comment":"Conditions that must be satisfied for a feature, migration, or system behavior to be considered correct.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":0.95}]}What this actually does (important)This is not just classification metadata — it gives Nebula threecontrol surfaces:1. Retrieval shaping (the big win)Each chunk kind has:retrievalBiaspreferredLevelisNormativeSo now you can do things like:Builder → boostALGORITHM,DATA_MODEL,IMPLEMENTATION_NOTEArchitect → boostINVARIANT,PROTOCOL_RULE,RATIONALEInspector → boostOPEN_QUESTION,INVARIANT, low-confidenceDEFINITIONWithout hardcoding roles into every query.2. Level coherence enforcementBecause each chunk kind declares:expectedpreferredLevelYou can now detect:L3 chunk leaking implementation detail → smells wrongL1 chunk containing pure rationale → likely misclassifiedinvariant appearing in L3 → probably needs tighteningThis becomes yourautomatic ontology consistency checkerlater.3. Normative surface separationYou now have a clean distinction between:isNormative: truenormativeDefault: REQUIRED / RECOMMENDEDThis matters because it lets you do:“show me all REQUIRED rules in WRP”“ignore non-normative chunks in execution reasoning”“highlight normative drift between versions”This is what eventually makes Nebula behave like aspec compiler rather than a wiki.Important design choice you just locked in (quietly)This schema implicitly enforces:Chunk kind is not cosmetic — it is a semantic contract.That matters because it means:chunking decisions are part of the system correctness modelnot just UI or indexing heuristicsThat’s exactly what you want for WRP + Conduit + execution graph systems.Next step (last deferred artifact)Now the final missing piece in the sequence is:docs/nebula/wrp-projection-pseudocode.mdThat will connect everything:markdown → sectionssections → chunkschunks → kinds (this schema)chunks → levelschunks → review state overlaychunks → cross-reference graphchunks → Conduit linkageIt’s thecompiler function for everything we just defined.If you say “go”, I’llproduce it as a single coherent projection algorithmthat you can literally hand to:Ollama / Qwen2.5-CoderConduit ingestion pipelineor a Spring/Python hybrid workerand it will behave like a deterministic WRP → Nebula compiler.SourcesQodoSponsoredQodo: code review that knows your codebaseFull codebase context across services and repos. Works for monorepos, multi-repo, and microservices.
+
+#### ChatGPT said:
+
+Good — this is the point where Nebula stops being “documents with structure” and becomes an actualsemantic compiler target.We’ll lock the chunk ontology first, because everything else (projection, retrieval, review rollups) depends on it.schemas/core/nebula-chunk-kinds.jsonldJSON{"@context": {"@version":1.1,"id":"@id","type":"@type","xsd":"http://www.w3.org/2001/XMLSchema#","rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#","rdfs":"http://www.w3.org/2000/01/rdf-schema#","schema":"https://schema.org/","nebula":"https://nexus.example/schema/nebula/","chunk":"https://nexus.example/schema/chunk/","label":"rdfs:label","comment":"rdfs:comment","ChunkKind":"chunk:ChunkKind","chunkKind": {"@id":"nebula:chunkKind","@type":"@id"},"preferredLevel": {"@id":"nebula:preferredLevel","@type":"@id"},"normativeDefault": {"@id":"nebula:normativeDefault","@type":"@id"},"retrievalBias": {"@id":"nebula:retrievalBias","@type":"xsd:decimal"},"isNormative": {"@id":"nebula:isNormative","@type":"xsd:boolean"}},"@graph": [{"id":"chunk:ChunkKind","type":"rdfs:Class","label":"Chunk Kind","comment":"A classification of semantic intent for a Nebula chunk used for retrieval, ranking, and projection behavior."},// ----------------------------// Core structural kinds// ----------------------------{"id":"chunk:OVERVIEW","type":"ChunkKind","label":"Overview","comment":"High-level summary or introduction of an artifact, section, or subsystem.","preferredLevel":"nebula:L3","isNormative":false,"retrievalBias":0.6},{"id":"chunk:DEFINITION","type":"ChunkKind","label":"Definition","comment":"Defines a term, concept, or structural element in the ontology or system model.","preferredLevel":"nebula:L2","isNormative":false,"retrievalBias":0.9},// ----------------------------// Protocol + system behavior// ----------------------------{"id":"chunk:PROTOCOL_RULE","type":"ChunkKind","label":"Protocol Rule","comment":"A rule governing system behavior, request/response semantics, or lifecycle constraints.","preferredLevel":"nebula:L2","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":1.0},{"id":"chunk:INVARIANT","type":"ChunkKind","label":"Invariant","comment":"A condition that must always hold true for valid system state or execution.","preferredLevel":"nebula:L2","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":1.0},{"id":"chunk:ALGORITHM","type":"ChunkKind","label":"Algorithm","comment":"Deterministic procedure describing traversal, compilation, validation, or execution logic.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":1.0},// ----------------------------// Data + model structure// ----------------------------{"id":"chunk:DATA_MODEL","type":"ChunkKind","label":"Data Model","comment":"Schema-level description of structures such as nodes, edges, DAGs, or execution receipts.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"RECOMMENDED","retrievalBias":0.95},// ----------------------------// Implementation layer// ----------------------------{"id":"chunk:IMPLEMENTATION_NOTE","type":"ChunkKind","label":"Implementation Note","comment":"Concrete guidance for implementation, code structure, or system wiring.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"RECOMMENDED","retrievalBias":0.85},{"id":"chunk:MIGRATION_STEP","type":"ChunkKind","label":"Migration Step","comment":"A concrete step in a system migration, rollout, or compatibility transition plan.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":0.95},// ----------------------------// Explanation + rationale// ----------------------------{"id":"chunk:RATIONALE","type":"ChunkKind","label":"Rationale","comment":"Explanation of why a design decision, structure, or boundary exists.","preferredLevel":"nebula:L3","isNormative":false,"retrievalBias":0.7},{"id":"chunk:OPEN_QUESTION","type":"ChunkKind","label":"Open Question","comment":"An unresolved question or ambiguity in system design or interpretation.","preferredLevel":"nebula:L3","isNormative":false,"retrievalBias":0.8},// ----------------------------// Examples + validation// ----------------------------{"id":"chunk:EXAMPLE","type":"ChunkKind","label":"Example","comment":"Illustrative example showing how a system, model, or protocol behaves.","preferredLevel":"nebula:L2","isNormative":false,"retrievalBias":0.75},{"id":"chunk:ACCEPTANCE_CRITERIA","type":"ChunkKind","label":"Acceptance Criteria","comment":"Conditions that must be satisfied for a feature, migration, or system behavior to be considered correct.","preferredLevel":"nebula:L1","isNormative":true,"normativeDefault":"REQUIRED","retrievalBias":0.95}]}What this actually does (important)This is not just classification metadata — it gives Nebula threecontrol surfaces:1. Retrieval shaping (the big win)Each chunk kind has:retrievalBiaspreferredLevelisNormativeSo now you can do things like:Builder → boostALGORITHM,DATA_MODEL,IMPLEMENTATION_NOTEArchitect → boostINVARIANT,PROTOCOL_RULE,RATIONALEInspector → boostOPEN_QUESTION,INVARIANT, low-confidenceDEFINITIONWithout hardcoding roles into every query.2. Level coherence enforcementBecause each chunk kind declares:expectedpreferredLevelYou can now detect:L3 chunk leaking implementation detail → smells wrongL1 chunk containing pure rationale → likely misclassifiedinvariant appearing in L3 → probably needs tighteningThis becomes yourautomatic ontology consistency checkerlater.3. Normative surface separationYou now have a clean distinction between:isNormative: truenormativeDefault: REQUIRED / RECOMMENDEDThis matters because it lets you do:“show me all REQUIRED rules in WRP”“ignore non-normative chunks in execution reasoning”“highlight normative drift between versions”This is what eventually makes Nebula behave like aspec compiler rather than a wiki.Important design choice you just locked in (quietly)This schema implicitly enforces:Chunk kind is not cosmetic — it is a semantic contract.That matters because it means:chunking decisions are part of the system correctness modelnot just UI or indexing heuristicsThat’s exactly what you want for WRP + Conduit + execution graph systems.Next step (last deferred artifact)Now the final missing piece in the sequence is:docs/nebula/wrp-projection-pseudocode.mdThat will connect everything:markdown → sectionssections → chunkschunks → kinds (this schema)chunks → levelschunks → review state overlaychunks → cross-reference graphchunks → Conduit linkageIt’s thecompiler function for everything we just defined.If you say “go”, I’llproduce it as a single coherent projection algorithmthat you can literally hand to:Ollama / Qwen2.5-CoderConduit ingestion pipelineor a Spring/Python hybrid workerand it will behave like a deterministic WRP → Nebula compiler.SourcesQodoSponsoredQodo: code review that knows your codebaseFull codebase context across services and repos. Works for monorepos, multi-repo, and microservices.

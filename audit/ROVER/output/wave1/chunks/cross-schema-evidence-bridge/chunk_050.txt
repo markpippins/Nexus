@@ -1,0 +1,262 @@
+Yes — and I’d do them in a very specific order, because you’ve already told me two constraints that matter:Nebula is not brain— it’s the cabinet / evidence / harvest substrate, not the authoritative semantic layer.You don’t want to throw the current KG away or let auto-graph mutation run wild yet— so anything we do should preserve provenance and keep graph writes gated.Given that, I wouldnotstart with “unified semantic search” as the first move, even though it’s the flashiest. I’d start by building the bridge that makes the later searchcorrectinstead of just convenient.What I’d build firstPhase 1 — Cross-schema evidence bridgeBuild this first.WhyRight now the core missing thing is not “search,” it’ssemantic adjacency with provenance:harvest candidate says somethingcurated knowledge graph contains a concept / decision / entitythere is no durable, queryable statement that“this harvested claim supports / refines / contradicts / instantiates that knowledge entity.”Without that bridge:embeddings are just floating similarityunified search returns “related stuff” but notwhy it is relatedyou can’t safely rebuild or evolve the KG from harvest evidence laterSteward has no principled substrate to adjudicate fromThis fits your architecture better because it keepsNebula as evidenceandKnowledge/Steward as semantic interpretation, instead of collapsing them.The order I recommend1) Add cross-schema cross-referencesGoalCreate a durable relation from Nebula artifacts to Knowledge entities.New tableI would add a bridge table inknowledge, not nebula, because this is asemantic interpretationof evidence, not a property of the harvest itself.Something like:SQLknowledge.evidence_links-id uuid pk-knowledge_entity_id uuidnotnull-nebula_harvest_id uuidnull-nebula_candidate_id uuidnull-link_type textnotnull-- supports | refines | instantiates | contradicts | supersedes | mentions-confidencenumeric(5,4)null-rationale textnull-created_by textnotnull-- 'steward_ingestor_v1', 'manual', 'reconciler'-source_span jsonbnull-- optional offsets, excerpt ids, transcript turn refs-metadata jsonbnotnulldefault'{}'-created_at timestamptznotnulldefaultnow()InvariantsNebula remains immutable evidence-ish history; this table does not rewrite harvest records.A link is aninterpretation layer artifact, not a source artifact.Multiple candidates can link to one knowledge entity.One candidate can link to multiple knowledge entities with different link types.Links are additive and versionable; don’t silently overwrite them.Minimal first passSupport only these link types initially:supportsrefinesinstantiatescontradictsThat’s enough to make the system useful without ontology bloat.2) Add provenance/source bridgeGoalLet you walk both directions:harvest candidate → transcript / harvest / entityknowledge entity → source transcript(s) / harvest candidate(s) that informed itThis is where the JSON KG’ssources[]and Nebula’ssource_filename/ harvest IDs get normalized into one navigable layer.Why this is secondBecause once evidence links exist, provenance becomes straightforward and extremely valuable.You’ll want to answer questions like:“show me every transcript fragment that contributed totypespec-dsl-layer”“which harvested candidates fed this architectural observation?”“which KG entities are currently backed only by legacy JSON and not by transcript harvests?”What I’d addA normalized provenance model rather than trying to infer everything from filenames.Possible table:SQLknowledge.source_artifacts-id uuid pk-source_kind textnotnull-- transcript_html | transcript_turn | harvest | harvest_candidate | kg_json_section-external_key textnotnull-source_filename textnull-metadata jsonbnotnulldefault'{}'and then either:useknowledge.evidence_linksdirectly to point at source artifacts, oraddknowledge.entity_sources(entity_id, source_artifact_id, relation_type, ...)If I were optimizing for speed, I’dskip a full generalized source model on day oneand just enrichevidence_linkswith enough source identifiers to get the job done. Then normalize later.3) Add embeddings for harvest candidatesGoalMake Nebula content semantically retrievablewithoutpretending it is canonical knowledge.Why this is third, not firstBecause embeddings without linkage create a fancy sidecar search index.Embeddingsafterlinkage become genuinely useful:retrieve candidateshow which KG entities it supports/refinescluster evidence around an entitysurface candidate-to-entity match suggestions for Steward reviewMy recommendation on where to store themDonotbury this in Nebula if your long-term plan is Steward-mediated semantic operations.I’d create ashared semantic projection layerrather than adding ad hoc vectors directly tonebula.*tables.Two viable approaches:Option A — Preferred: a sharedknowledge.semantic_documents/knowledge.semantic_chunksThis is the cleanest fit with your architecture.ExampleSQLknowledge.semantic_documents-id uuid pk-origin_system textnotnull-- 'knowledge' | 'nebula'-origin_table textnotnull-origin_id uuidnotnull-document_kind textnotnull-- knowledge_entity | harvest_candidate | harvest_source_chunk-title textnull-body textnotnull-metadata jsonbnotnulldefault'{}'-embedding vector(1536)null-created_at timestamptznotnulldefaultnow()-updated_at timestamptznotnulldefaultnow()Optionally split outsemantic_chunksif you want chunk-level indexing.Why I like thisIt gives you one semantic index across multiple systemswithout pretending the systems are the same thing.So the semantic layer becomes a projection over:knowledge.graph_entitiesnebula.harvests_historynebula.agent_records_historymaybe later PEB docs, requirements, incidents, etc.That lines up very well with the way you’ve been describing Steward as a federator / interpreter rather than Nebula as source of truth.Option B — Simpler but less clean: add vector columns to Nebula candidate tablesThis is faster if you just want semantic search tomorrow, but I think it’s architecturally weaker.I’d only do this if you explicitly want aNebula-local search capabilitybefore the shared projection exists.4) Build unified semantic searchThis should comeafterthe above, because then it’s not “search two piles of text,” it’s “search a semantic fabric with evidence trails.”The query surface I’d wantA single search endpoint from Steward / Knowledge MCP that can search across both layers and tell you what you got back.Example response categories:knowledge_entityharvest_candidateharvest_source_chunkagent_recordlater:open_question,incident,requirement, etc.Query behaviorA search for:“TypeSpec contract-first architecture”should be able to return:the KG entity fortypespec-dsl-layerrelated harvest candidatestranscript chunks that mention itevidence links showing which candidates support or refine the entitymaybe unresolved contradictions or competing formulationsThat’s aSteward-gradequery, not just vector search.My concrete recommendation: the next slice to implementIf you want me to pick the next engineering artifact, I’d have you buildthis exact slice first:Bridge Slice v0Deliverables1) New bridge tableknowledge.evidence_links2) Matching jobA job/service that proposes candidate ↔ entity links:InputNebula harvest candidatesKnowledge graph entitiesSignalsexact / fuzzy title overlapentity aliases / keywordsdomain matchtranscript source overlapembedding similarityif available latercross-reference hints already present in nebulaOutputproposedsupports/refines/instantiates/contradictslinksconfidence + rationale3) Review/apply pathstore proposals separately or as low-confidence evidence linksSteward / manual review can promote themno silent mutation of KG entities4) Query surfaceAdd two queries:knowledge_get_entity_evidence(entity_id)→ all linked harvest candidates + provenancenebula_get_candidate_knowledge_links(candidate_id)→ all linked knowledge entities + link typesThat alone gives you the first real bridge between “cabinet” and “memory.”What I wouldnotdo firstI would not start with “embed everything and search it”Because you’ll end up with a very seductive but semantically mushy layer:useful retrievalweak explainabilityunclear ownershipno clean path from “this looks related” to “this updates the graph under governance”That’s exactly the kind of thing that becomes expensive later when you want Steward to reason over it.If you want the shortest path to visible valueThen I’d do thistwo-step implementation plan:Step A — Evidence bridge firstcreateknowledge.evidence_linkswritebridge_harvest_candidates.pygenerate candidate→entity proposalsexpose MCP read methodsStep B — Semantic projection secondcreateknowledge.semantic_documentsbackfill:knowledge.graph_entitiesnebula.harvest_candidatesimplement a singlesemantic_search_union(query, filters)over that projectioninclude evidence-link joins in resultsThat gets you:preserved separation of concernsprovenanceexplainable searchno premature auto-graph mutationa foundation for later “harvest → steward DB direct ingest”My answer to your “want me to start building any of these?” questionYes: start with Linkage #1, but implement it as a Steward-side evidence bridge, not a Nebula-local convenience feature.Then do#3 embeddingsin ashared semantic projection layer, and only then expose#4 unified semantic search.If you want, I can do the next step right now as an actual engineering artifact:I can write“Knowledge–Nebula Evidence Bridge Spec v0”with:schema DDLtable contracts and invariantslink type ontologycandidate→entity matching algorithmconfidence scoring rulesMCP endpointsbackfill / migration planphased rollout planIf you say go, I’ll write it in the same style as the WRP package spec: classes, contracts, invariants, SQL, and pseudocode.
+
+Yes — and I’d do them in a very specific order, because you’ve already told me two constraints that matter:
+
+- Nebula is not brain— it’s the cabinet / evidence / harvest substrate, not the authoritative semantic layer.
+Nebula is not brain— it’s the cabinet / evidence / harvest substrate, not the authoritative semantic layer.
+
+- You don’t want to throw the current KG away or let auto-graph mutation run wild yet— so anything we do should preserve provenance and keep graph writes gated.
+You don’t want to throw the current KG away or let auto-graph mutation run wild yet— so anything we do should preserve provenance and keep graph writes gated.
+
+Given that, I wouldnotstart with “unified semantic search” as the first move, even though it’s the flashiest. I’d start by building the bridge that makes the later searchcorrectinstead of just convenient.
+
+---
+
+# What I’d build first
+
+## Phase 1 — Cross-schema evidence bridge
+
+Build this first.
+
+### Why
+
+Right now the core missing thing is not “search,” it’ssemantic adjacency with provenance:
+
+- harvest candidate says something
+harvest candidate says something
+
+- curated knowledge graph contains a concept / decision / entity
+curated knowledge graph contains a concept / decision / entity
+
+- there is no durable, queryable statement that“this harvested claim supports / refines / contradicts / instantiates that knowledge entity.”
+there is no durable, queryable statement that“this harvested claim supports / refines / contradicts / instantiates that knowledge entity.”
+
+Without that bridge:
+
+- embeddings are just floating similarity
+embeddings are just floating similarity
+
+- unified search returns “related stuff” but notwhy it is related
+unified search returns “related stuff” but notwhy it is related
+
+- you can’t safely rebuild or evolve the KG from harvest evidence later
+you can’t safely rebuild or evolve the KG from harvest evidence later
+
+- Steward has no principled substrate to adjudicate from
+Steward has no principled substrate to adjudicate from
+
+This fits your architecture better because it keepsNebula as evidenceandKnowledge/Steward as semantic interpretation, instead of collapsing them.
+
+---
+
+# The order I recommend
+
+## 1) Add cross-schema cross-references
+
+### Goal
+
+Create a durable relation from Nebula artifacts to Knowledge entities.
+
+### New table
+
+I would add a bridge table inknowledge, not nebula, because this is asemantic interpretationof evidence, not a property of the harvest itself.
+
+Something like:
+
+```
+knowledge.evidence_links- id uuid pk- knowledge_entity_id uuid not null- nebula_harvest_id uuid null- nebula_candidate_id uuid null- link_type text not null    -- supports | refines | instantiates | contradicts | supersedes | mentions- confidence numeric(5,4) null- rationale text null- created_by text not null    -- 'steward_ingestor_v1', 'manual', 'reconciler'- source_span jsonb null    -- optional offsets, excerpt ids, transcript turn refs- metadata jsonb not null default '{}'- created_at timestamptz not null default now()
+```
+
+```
+knowledge.evidence_links- id uuid pk- knowledge_entity_id uuid not null- nebula_harvest_id uuid null- nebula_candidate_id uuid null- link_type text not null    -- supports | refines | instantiates | contradicts | supersedes | mentions- confidence numeric(5,4) null- rationale text null- created_by text not null    -- 'steward_ingestor_v1', 'manual', 'reconciler'- source_span jsonb null    -- optional offsets, excerpt ids, transcript turn refs- metadata jsonb not null default '{}'- created_at timestamptz not null default now()
+```
+
+### Invariants
+
+- Nebula remains immutable evidence-ish history; this table does not rewrite harvest records.
+Nebula remains immutable evidence-ish history; this table does not rewrite harvest records.
+
+- A link is aninterpretation layer artifact, not a source artifact.
+A link is aninterpretation layer artifact, not a source artifact.
+
+- Multiple candidates can link to one knowledge entity.
+Multiple candidates can link to one knowledge entity.
+
+- One candidate can link to multiple knowledge entities with different link types.
+One candidate can link to multiple knowledge entities with different link types.
+
+- Links are additive and versionable; don’t silently overwrite them.
+Links are additive and versionable; don’t silently overwrite them.
+
+### Minimal first pass
+
+Support only these link types initially:
+
+- supports
+supports
+
+- refines
+refines
+
+- instantiates
+instantiates
+
+- contradicts
+contradicts
+
+That’s enough to make the system useful without ontology bloat.
+
+---
+
+## 2) Add provenance/source bridge
+
+### Goal
+
+Let you walk both directions:
+
+- harvest candidate → transcript / harvest / entity
+harvest candidate → transcript / harvest / entity
+
+- knowledge entity → source transcript(s) / harvest candidate(s) that informed it
+knowledge entity → source transcript(s) / harvest candidate(s) that informed it
+
+This is where the JSON KG’ssources[]and Nebula’ssource_filename/ harvest IDs get normalized into one navigable layer.
+
+### Why this is second
+
+Because once evidence links exist, provenance becomes straightforward and extremely valuable.You’ll want to answer questions like:
+
+- “show me every transcript fragment that contributed totypespec-dsl-layer”
+“show me every transcript fragment that contributed totypespec-dsl-layer”
+
+- “which harvested candidates fed this architectural observation?”
+“which harvested candidates fed this architectural observation?”
+
+- “which KG entities are currently backed only by legacy JSON and not by transcript harvests?”
+“which KG entities are currently backed only by legacy JSON and not by transcript harvests?”
+
+### What I’d add
+
+A normalized provenance model rather than trying to infer everything from filenames.
+
+Possible table:
+
+```
+knowledge.source_artifacts- id uuid pk- source_kind text not null    -- transcript_html | transcript_turn | harvest | harvest_candidate | kg_json_section- external_key text not null- source_filename text null- metadata jsonb not null default '{}'
+```
+
+```
+knowledge.source_artifacts- id uuid pk- source_kind text not null    -- transcript_html | transcript_turn | harvest | harvest_candidate | kg_json_section- external_key text not null- source_filename text null- metadata jsonb not null default '{}'
+```
+
+and then either:
+
+- useknowledge.evidence_linksdirectly to point at source artifacts, or
+useknowledge.evidence_linksdirectly to point at source artifacts, or
+
+- addknowledge.entity_sources(entity_id, source_artifact_id, relation_type, ...)
+addknowledge.entity_sources(entity_id, source_artifact_id, relation_type, ...)
+
+If I were optimizing for speed, I’dskip a full generalized source model on day oneand just enrichevidence_linkswith enough source identifiers to get the job done. Then normalize later.
+
+---
+
+## 3) Add embeddings for harvest candidates
+
+### Goal
+
+Make Nebula content semantically retrievablewithoutpretending it is canonical knowledge.
+
+### Why this is third, not first
+
+Because embeddings without linkage create a fancy sidecar search index.Embeddingsafterlinkage become genuinely useful:
+
+- retrieve candidate
+retrieve candidate
+
+- show which KG entities it supports/refines
+show which KG entities it supports/refines
+
+- cluster evidence around an entity
+cluster evidence around an entity
+
+- surface candidate-to-entity match suggestions for Steward review
+surface candidate-to-entity match suggestions for Steward review
+
+### My recommendation on where to store them
+
+Donotbury this in Nebula if your long-term plan is Steward-mediated semantic operations.
+
+I’d create ashared semantic projection layerrather than adding ad hoc vectors directly tonebula.*tables.
+
+Two viable approaches:
+
+---
+
+## Option A — Preferred: a sharedknowledge.semantic_documents/knowledge.semantic_chunks
+
+This is the cleanest fit with your architecture.
+
+### Example
+
+```
+knowledge.semantic_documents- id uuid pk- origin_system text not null    -- 'knowledge' | 'nebula'- origin_table text not null- origin_id uuid not null- document_kind text not null    -- knowledge_entity | harvest_candidate | harvest_source_chunk- title text null- body text not null- metadata jsonb not null default '{}'- embedding vector(1536) null- created_at timestamptz not null default now()- updated_at timestamptz not null default now()
+```
+
+```
+knowledge.semantic_documents- id uuid pk- origin_system text not null    -- 'knowledge' | 'nebula'- origin_table text not null- origin_id uuid not null- document_kind text not null    -- knowledge_entity | harvest_candidate | harvest_source_chunk- title text null- body text not null- metadata jsonb not null default '{}'- embedding vector(1536) null- created_at timestamptz not null default now()- updated_at timestamptz not null default now()
+```
+
+Optionally split outsemantic_chunksif you want chunk-level indexing.
+
+### Why I like this
+
+It gives you one semantic index across multiple systemswithout pretending the systems are the same thing.
+
+So the semantic layer becomes a projection over:
+
+- knowledge.graph_entities
+knowledge.graph_entities
+
+- nebula.harvests_history
+nebula.harvests_history
+
+- nebula.agent_records_history
+nebula.agent_records_history
+
+- maybe later PEB docs, requirements, incidents, etc.
+maybe later PEB docs, requirements, incidents, etc.
+
+That lines up very well with the way you’ve been describing Steward as a federator / interpreter rather than Nebula as source of truth.
+
+---
+
+## Option B — Simpler but less clean: add vector columns to Nebula candidate tables
+
+This is faster if you just want semantic search tomorrow, but I think it’s architecturally weaker.
+
+I’d only do this if you explicitly want aNebula-local search capabilitybefore the shared projection exists.
+
+---
+
+## 4) Build unified semantic search
+
+This should comeafterthe above, because then it’s not “search two piles of text,” it’s “search a semantic fabric with evidence trails.”
+
+### The query surface I’d want
+
+A single search endpoint from Steward / Knowledge MCP that can search across both layers and tell you what you got back.
+
+Example response categories:
+
+- knowledge_entity
+knowledge_entity
+
+- harvest_candidate
+harvest_candidate
+
+- harvest_source_chunk
+harvest_source_chunk
+
+- agent_record
+agent_record
