@@ -28,7 +28,7 @@ public class ServiceRegistryRegistrationService {
 
     @Inject
     @ConfigProperty(name = "service.registry.url", defaultValue = "http://localhost:8085")
-    String hostServerUrl;
+    String registryServerUrl;
 
     @Inject
     @ConfigProperty(name = "server.port", defaultValue = "9093")
@@ -70,7 +70,7 @@ public class ServiceRegistryRegistrationService {
             return;
         }
 
-        logger.info("Starting registration with host server: " + hostServerUrl);
+        logger.info("Starting registration with service registry: " + registryServerUrl);
         logger.info("Service details - Name: " + serviceName + ", Host: " + serviceHost + ", Port: " + port);
 
         // Create registration payload
@@ -107,7 +107,7 @@ public class ServiceRegistryRegistrationService {
             logger.fine("Registration payload: " + jsonPayload);
 
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(hostServerUrl + "/api/v1/registry/register"))
+                    .uri(URI.create(registryServerUrl + "/api/v1/registry/register"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .timeout(Duration.ofSeconds(10))
@@ -116,17 +116,17 @@ public class ServiceRegistryRegistrationService {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() == 200) {
-                logger.info("Successfully registered with host server: " + serviceName);
+                logger.info("Successfully registered with service registry: " + serviceName);
                 logger.info("Service endpoint: " + String.format("http://%s:%d", serviceHost, port));
             } else {
-                logger.warning("Failed to register with host server. Status: " + response.statusCode() +
+                logger.warning("Failed to register with service registry. Status: " + response.statusCode() +
                         ", Response: " + response.body());
             }
         } catch (IOException | InterruptedException e) {
-            logger.severe("Error registering with host server: " + e.getMessage());
+            logger.severe("Error registering with service registry: " + e.getMessage());
             Thread.currentThread().interrupt();
         } catch (Exception e) {
-            logger.severe("Error registering with host server: " + e.getMessage());
+            logger.severe("Error registering with service registry: " + e.getMessage());
         }
     }
 
@@ -136,7 +136,7 @@ public class ServiceRegistryRegistrationService {
     private void sendHeartbeat() {
         try {
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(hostServerUrl + "/api/v1/registry/heartbeat/" + serviceName))
+                    .uri(URI.create(registryServerUrl + "/api/v1/registry/heartbeat/" + serviceName))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("{}"))
                     .timeout(Duration.ofSeconds(10))

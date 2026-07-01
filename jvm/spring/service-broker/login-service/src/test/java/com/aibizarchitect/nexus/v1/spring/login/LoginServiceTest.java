@@ -22,7 +22,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
-import com.aibizarchitect.nexus.v1.spring.login.client.UserAccessClient;
+import com.aibizarchitect.nexus.v1.spring.broker.Broker;
 import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,14 +36,14 @@ class LoginServiceTest {
     private ValueOperations<String, Object> valueOperations;
 
     @Mock
-    private UserAccessClient userAccessClient;
+    private Broker broker;
 
     private LoginService loginService;
 
     @BeforeEach
     void setUp() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        loginService = new LoginService(redisTemplate, userAccessClient);
+        loginService = new LoginService(redisTemplate, broker);
     }
 
     @Test
@@ -54,7 +54,11 @@ class LoginServiceTest {
         mockUser.setAlias("testuser");
         mockUser.setAdmin(false);
 
-        when(userAccessClient.validateUser(any())).thenReturn(mockUser);
+        @SuppressWarnings("rawtypes")
+        ServiceResponse rawResp = new ServiceResponse();
+        rawResp.setOk(true);
+        rawResp.setData(mockUser);
+        when(broker.submit(any())).thenReturn(rawResp);
 
         // When
         ServiceResponse<LoginResponse> result = loginService.login("testuser", "password123");
@@ -74,7 +78,11 @@ class LoginServiceTest {
     @Test
     void login_WithInvalidCredentials_ShouldReturnFailure() {
         // Given
-        when(userAccessClient.validateUser(any())).thenReturn(null);
+        @SuppressWarnings("rawtypes")
+        ServiceResponse rawResp = new ServiceResponse();
+        rawResp.setOk(true);
+        rawResp.setData(null);
+        when(broker.submit(any())).thenReturn(rawResp);
 
         // When
         ServiceResponse<LoginResponse> result = loginService.login("invalid", "invalid");
@@ -89,7 +97,7 @@ class LoginServiceTest {
     @Test
     void login_WithException_ShouldReturnFailure() {
         // Given
-        when(userAccessClient.validateUser(any())).thenThrow(new RuntimeException("Service down"));
+        when(broker.submit(any())).thenThrow(new RuntimeException("Service down"));
 
         // When
         ServiceResponse<LoginResponse> result = loginService.login("testuser", "password123");

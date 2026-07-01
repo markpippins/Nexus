@@ -10,8 +10,8 @@ export function convertToFileSystemNode(node: GenericTreeNode): FileSystemNode {
   let fileType: FileType = 'folder';
   if (node.type === 'file' || node.type === NodeType.FILE) {
     fileType = 'file';
-  } else if (node.type === 'host-server' || node.type === NodeType.HOST_SERVER) {
-    fileType = 'host-server';
+  } else if (node.type === 'registry-server' || node.type === NodeType.REGISTRY_SERVER) {
+    fileType = 'registry-server';
   }
 
   const fileSystemNode: FileSystemNode = {

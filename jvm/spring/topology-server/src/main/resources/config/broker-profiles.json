@@ -1,0 +1,10 @@
+[
+  {
+    "profileId": "strontium",
+    "name": "Strontium Gateway",
+    "brokerUrl": "strontium:8081",
+    "imageUrl": "http://strontium:9081",
+    "autoConnect": false,
+    "healthCheckDelayMinutes": 3
+  }
+]

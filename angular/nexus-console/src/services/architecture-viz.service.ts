@@ -65,7 +65,7 @@ export class ArchitectureVizService {
     private interactionMode: 'camera' | 'edit' = 'camera';
 
     // View Mode (3-way: camera | auto | edit)
-    public readonly viewMode = signal<ViewMode>('camera');
+    public readonly viewMode = signal<ViewMode>('auto');
     private savedCameraState: { pos: THREE.Vector3; target: THREE.Vector3; controlsEnabled: boolean } | null = null;
 
     // Dragging State

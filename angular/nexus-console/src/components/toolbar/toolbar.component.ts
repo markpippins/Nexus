@@ -75,7 +75,7 @@ export class ToolbarComponent {
   showAllControls = input(true);
 
   // Service Mesh / Graph inputs
-  graphInteractionMode = input<'camera' | 'edit'>('camera');
+  graphInteractionMode = input<'camera' | 'auto' | 'edit'>('auto');
   isSimulationActive = input(false);
   backgroundColor = input('#000510');
   graphSubView = input<'canvas' | 'creator'>('canvas');
@@ -113,7 +113,7 @@ export class ToolbarComponent {
   toggleStream = output<void>();
 
   // Graph/Mesh outputs
-  graphModeChange = output<'camera' | 'edit'>();
+  graphModeChange = output<'camera' | 'auto' | 'edit'>();
   toggleSimulation = output<void>();
   saveGraph = output<void>();
   loadGraph = output<void>();

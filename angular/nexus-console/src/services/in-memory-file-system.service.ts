@@ -149,7 +149,7 @@ export class SessionService implements FileSystemProvider {
           // Cleanup: Remove legacy or virtual folders if they were persisted
           if (parsedTree.children) {
             parsedTree.children = parsedTree.children.filter(c =>
-              !['Search & Discovery', 'Home', 'Service Registries', 'Host Servers', 'Gateways', 'Platform Management'].includes(c.name)
+              !['Search & Discovery', 'Home', 'Service Registries', 'Service Registries', 'Gateways', 'Platform Management'].includes(c.name)
             );
           }
 

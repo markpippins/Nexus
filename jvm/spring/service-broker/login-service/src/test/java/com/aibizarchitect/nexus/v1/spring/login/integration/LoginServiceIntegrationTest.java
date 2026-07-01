@@ -18,9 +18,10 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
+import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
+import com.aibizarchitect.nexus.v1.spring.broker.Broker;
 import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 import com.aibizarchitect.nexus.v1.spring.login.LoginService;
-import com.aibizarchitect.nexus.v1.spring.login.client.UserAccessClient;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -33,14 +34,14 @@ class LoginServiceIntegrationTest {
     private ValueOperations<String, Object> valueOperations;
 
     @Mock
-    private UserAccessClient userAccessClient;
+    private Broker broker;
 
     private LoginService loginService;
 
     @BeforeEach
     void setUp() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        loginService = new LoginService(redisTemplate, userAccessClient);
+        loginService = new LoginService(redisTemplate, broker);
     }
 
     @Test
@@ -49,7 +50,11 @@ class LoginServiceIntegrationTest {
         UserRegistrationDTO mockUser = new UserRegistrationDTO();
         mockUser.setId("1");
         mockUser.setAdmin(false);
-        when(userAccessClient.validateUser(any())).thenReturn(mockUser);
+        @SuppressWarnings("rawtypes")
+        ServiceResponse rawResp = new ServiceResponse();
+        rawResp.setOk(true);
+        rawResp.setData(mockUser);
+        when(broker.submit(any())).thenReturn(rawResp);
 
         // When
         var result = loginService.login("testuser", "password123");
@@ -66,13 +71,14 @@ class LoginServiceIntegrationTest {
     @Test
     void login_WithInvalidCredentials_ShouldReturnFailure() {
         // Given
-        feign.Request request = feign.Request.create(feign.Request.HttpMethod.GET, "url",
-                java.util.Collections.emptyMap(), null, null, null);
-        when(userAccessClient.validateUser(any()))
-                .thenThrow(new feign.FeignException.Unauthorized("Unauthorized", request, null, null));
+        @SuppressWarnings("rawtypes")
+        ServiceResponse rawResp = new ServiceResponse();
+        rawResp.setOk(true);
+        rawResp.setData(null);
+        when(broker.submit(any())).thenReturn(rawResp);
 
         // When
-        var result = loginService.login("", ""); // Empty credentials
+        var result = loginService.login("invalid", "invalid");
 
         // Then
         assertFalse(result.isOk());

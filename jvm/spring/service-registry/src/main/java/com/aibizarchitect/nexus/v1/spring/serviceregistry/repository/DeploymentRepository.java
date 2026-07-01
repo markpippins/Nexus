@@ -14,8 +14,8 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
 public interface DeploymentRepository extends JpaRepository<Deployment, Long> {
     List<Deployment> findByService(Service service);
     List<Deployment> findByService_Id(Long serviceId);
-    List<Deployment> findByServer(Host server);
-    List<Deployment> findByServer_Id(Long serverId);
+    List<Deployment> findByHost(Host host);
+    List<Deployment> findByHost_Id(Long hostId);
     List<Deployment> findByStatus(String status);
     List<Deployment> findByEnvironment(EnvironmentType environment);
     List<Deployment> findByEnvironment_Id(Long environmentId);
@@ -23,8 +23,8 @@ public interface DeploymentRepository extends JpaRepository<Deployment, Long> {
 
     org.springframework.data.domain.Page<Deployment> findByService(Service service, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Deployment> findByService_Id(Long serviceId, org.springframework.data.domain.Pageable pageable);
-    org.springframework.data.domain.Page<Deployment> findByServer(Host server, org.springframework.data.domain.Pageable pageable);
-    org.springframework.data.domain.Page<Deployment> findByServer_Id(Long serverId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByHost(Host host, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByHost_Id(Long hostId, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Deployment> findByStatus(String status, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Deployment> findByEnvironment(EnvironmentType environment, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Deployment> findByEnvironment_Id(Long environmentId, org.springframework.data.domain.Pageable pageable);
@@ -35,8 +35,8 @@ public interface DeploymentRepository extends JpaRepository<Deployment, Long> {
         return findByService_Id(serviceId);
     }
 
-    default List<Deployment> findByServerId(Long serverId) {
-        return findByServer_Id(serverId);
+    default List<Deployment> findByHostId(Long hostId) {
+        return findByHost_Id(hostId);
     }
 
     default List<Deployment> findByEnvironmentId(Long environmentId) {

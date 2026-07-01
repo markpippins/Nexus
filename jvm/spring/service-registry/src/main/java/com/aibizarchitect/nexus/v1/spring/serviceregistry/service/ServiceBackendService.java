@@ -68,7 +68,7 @@ public class ServiceBackendService {
         // We need to fetch the actual service and server names for display
         // For now, use the IDs as placeholders
         dto.setServiceName("Service-" + deployment.getServiceId());
-        dto.setServerHostname("Server-" + deployment.getServerId());
+        dto.setServerHostname("Host-" + deployment.getHostId());
         dto.setPort(deployment.getPort());
         dto.setVersion(deployment.getVersion());
         dto.setStatus(deployment.getStatus());

@@ -25,9 +25,11 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
+import com.aibizarchitect.nexus.v1.broker.api.ServiceRequest;
+import com.aibizarchitect.nexus.v1.broker.api.ServiceResponse;
+import com.aibizarchitect.nexus.v1.spring.broker.Broker;
 import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 import com.aibizarchitect.nexus.v1.spring.login.LoginService;
-import com.aibizarchitect.nexus.v1.spring.login.client.UserAccessClient;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -44,7 +46,7 @@ class LoginServiceE2ETest {
     private Map<String, Object> redisStore; // In-memory store
 
     @Mock
-    private UserAccessClient userAccessClient;
+    private Broker broker;
 
     @BeforeEach
     void setUp() {
@@ -67,28 +69,30 @@ class LoginServiceE2ETest {
         when(redisTemplate.delete(anyString()))
                 .thenAnswer(invocation -> redisStore.remove(invocation.getArgument(0)) != null);
 
-        // Mock UserAccessClient
-        when(userAccessClient.validateUser(any())).thenAnswer(invocation -> {
-            org.springframework.util.MultiValueMap<String, String> params = invocation.getArgument(0);
-            String alias = params.getFirst("alias");
-            String password = params.getFirst("identifier");
+        // Mock Broker — validateUser via ServiceRequest
+        when(broker.submit(any())).thenAnswer(invocation -> {
+            ServiceRequest req = invocation.getArgument(0);
+            String alias = (String) req.getParams().get("alias");
+            String password = (String) req.getParams().get("identifier");
 
+            @SuppressWarnings("rawtypes")
+            ServiceResponse rawResp = new ServiceResponse();
+            rawResp.setOk(true);
             if (alias != null && !alias.isEmpty() && password != null && !password.isEmpty()) {
                 UserRegistrationDTO user = new UserRegistrationDTO();
-                user.setId("1"); // Default ID
-                if ("user2".equals(alias))
-                    user.setId("2");
-                if ("user3".equals(alias))
-                    user.setId("3");
+                user.setId("1");
+                if ("user2".equals(alias)) user.setId("2");
+                if ("user3".equals(alias)) user.setId("3");
                 user.setAlias(alias);
                 user.setAdmin(false);
-                return user;
+                rawResp.setData(user);
             } else {
-                throw new feign.FeignException.Unauthorized("Unauthorized", null, null, null);
+                rawResp.setData(null);
             }
+            return rawResp;
         });
 
-        loginService = new LoginService(redisTemplate, userAccessClient);
+        loginService = new LoginService(redisTemplate, broker);
     }
 
     @Test

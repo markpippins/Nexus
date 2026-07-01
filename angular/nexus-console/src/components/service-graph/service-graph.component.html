@@ -3,16 +3,16 @@
   <div class="header-bar">
     <div class="mode-switcher">
       <button
-        (click)="setMode('camera')"
-        [class.active]="viewMode() === 'camera' && !isSimulationActive()"
-      >
-        🎥 Camera
-      </button>
-      <button
         (click)="setMode('auto')"
         [class.active]="viewMode() === 'auto'"
       >
         🔄 Auto
+      </button>
+      <button
+        (click)="setMode('camera')"
+        [class.active]="viewMode() === 'camera' && !isSimulationActive()"
+      >
+        🎥 Camera
       </button>
       <button (click)="setMode('edit')" [class.active]="viewMode() === 'edit'">✋ Edit</button>
     </div>

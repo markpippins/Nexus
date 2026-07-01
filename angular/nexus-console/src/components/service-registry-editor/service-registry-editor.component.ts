@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HostProfile } from '../../models/host-profile.model.js';
-import { HostProfileService } from '../../services/host-profile.service.js';
+import { RegistryServerProfile } from '../../models/registry-server-profile.model.js';
+import { RegistryServerProfileService } from '../../services/registry-server-profile.service.js';
 
 interface FormState {
     id: string;
     name: string;
-    hostServerUrl: string;
+    registryServerUrl: string;
     imageUrl: string;
     hostname: string;
     ipAddress: string;
@@ -25,7 +25,7 @@ interface FormState {
 const INITIAL_FORM_STATE: FormState = {
     id: '',
     name: '',
-    hostServerUrl: '',
+    registryServerUrl: '',
     imageUrl: '',
     hostname: '',
     ipAddress: '',
@@ -47,7 +47,7 @@ const INITIAL_FORM_STATE: FormState = {
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ServiceRegistryEditorComponent {
-    profileService = inject(HostProfileService);
+    profileService = inject(RegistryServerProfileService);
 
     // Input: the profile ID to edit
     profileId = input.required<string>();
@@ -106,11 +106,11 @@ export class ServiceRegistryEditorComponent {
         });
     }
 
-    private loadProfileIntoForm(profile: HostProfile) {
+    private loadProfileIntoForm(profile: RegistryServerProfile) {
         this.formState.set({
             id: profile.id,
             name: profile.name,
-            hostServerUrl: profile.hostServerUrl,
+            registryServerUrl: profile.registryServerUrl,
             imageUrl: profile.imageUrl,
             hostname: profile.hostname || '',
             ipAddress: profile.ipAddress || '',
@@ -136,16 +136,16 @@ export class ServiceRegistryEditorComponent {
 
     async saveProfile() {
         const form = this.formState();
-        if (!form.name || !form.hostServerUrl) {
+        if (!form.name || !form.registryServerUrl) {
             return; // Basic validation
         }
 
         this.isSaving.set(true);
 
-        const profile: HostProfile = {
+        const profile: RegistryServerProfile = {
             id: form.id,
             name: form.name,
-            hostServerUrl: form.hostServerUrl,
+            registryServerUrl: form.registryServerUrl,
             imageUrl: form.imageUrl,
             hostname: form.hostname,
             ipAddress: form.ipAddress,

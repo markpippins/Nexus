@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { ServiceMeshService } from '../../services/service-mesh.service.js';
-import { HostProfileService } from '../../services/host-profile.service.js';
+import { RegistryServerProfileService } from '../../services/registry-server-profile.service.js';
 import { LocalConfigService } from '../../services/local-config.service.js';
 import {
   ServiceInstance,
@@ -38,7 +38,7 @@ interface GroupedService {
 })
 export class ServiceTreeComponent {
   private serviceMeshService = inject(ServiceMeshService);
-  private hostProfileService = inject(HostProfileService);
+  private registryServerProfileService = inject(RegistryServerProfileService);
   private localConfigService = inject(LocalConfigService);
 
   services = input<ServiceInstance[]>([]);
@@ -184,7 +184,7 @@ export class ServiceTreeComponent {
   }
 
   async restart(service: ServiceInstance): Promise<void> {
-    const profiles = this.hostProfileService.profiles();
+    const profiles = this.registryServerProfileService.profiles();
     if (profiles.length > 0) {
       const profile = profiles[0];
       const result = await this.serviceMeshService.executeServiceOperation(service.id, 'restart', profile);
@@ -197,7 +197,7 @@ export class ServiceTreeComponent {
   }
 
   async viewServiceLogs(service: ServiceInstance): Promise<void> {
-    const profiles = this.hostProfileService.profiles();
+    const profiles = this.registryServerProfileService.profiles();
     if (profiles.length > 0) {
       const profile = profiles[0];
       const result = await this.serviceMeshService.executeServiceOperation(service.id, 'view-logs', profile);

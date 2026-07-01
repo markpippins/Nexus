@@ -5,10 +5,32 @@
     @if (viewMode() === 'service-mesh' && meshViewMode() === 'graph') {
       <!-- Service Mesh Graph Controls -->
       <div class="flex items-center space-x-2">
-        <!-- Mode Toggle: Camera / Edit -->
+        <!-- Mode Toggle: Auto / Camera / Edit -->
         <div
           class="flex items-center bg-[rgb(var(--color-background))] rounded-md p-0.5 border border-[rgb(var(--color-border-muted))]"
         >
+          <button
+            (click)="graphModeChange.emit('auto')"
+            title="Auto Mode - Click nodes for 2D view, click canvas for 3D view"
+            class="flex items-center gap-1 px-2 py-1 rounded text-xs transition-all"
+            [class.bg-[rgb(var(--color-accent-solid-bg))]]="graphInteractionMode() === 'auto'"
+            [class.text-white]="graphInteractionMode() === 'auto'"
+            [class.text-[rgb(var(--color-text-muted))]]="graphInteractionMode() !== 'auto'"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            Auto
+          </button>
           <button
             (click)="graphModeChange.emit('camera')"
             title="Camera Mode - Orbit around the scene"

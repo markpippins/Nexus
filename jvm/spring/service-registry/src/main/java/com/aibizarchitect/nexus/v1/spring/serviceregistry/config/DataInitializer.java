@@ -24,7 +24,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Host;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Library;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.LibraryCategory;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.OperatingSystem;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServerType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.HostType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
@@ -37,7 +37,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostReposit
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.LibraryCategoryRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.LibraryRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.OperatingSystemRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerTypeRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceConfigurationRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceDependencyRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
@@ -59,7 +59,7 @@ public class DataInitializer implements CommandLineRunner {
     private final FrameworkCategoryRepository categoryRepository;
     private final FrameworkLanguageRepository languageRepository;
     private final ServiceTypeRepository serviceTypeRepository;
-    private final ServerTypeRepository serverTypeRepository;
+    private final HostTypeRepository hostTypeRepository;
     private final EnvironmentTypeRepository environmentTypeRepository;
     private final HostRepository hostRepository;
     private final DeploymentRepository deploymentRepository;
@@ -74,7 +74,7 @@ public class DataInitializer implements CommandLineRunner {
     public DataInitializer(ObjectMapper objectMapper, ResourceLoader resourceLoader, ServiceRepository serviceRepository,
             FrameworkRepository frameworkRepository, FrameworkCategoryRepository categoryRepository,
             FrameworkLanguageRepository languageRepository, ServiceTypeRepository serviceTypeRepository,
-            ServerTypeRepository serverTypeRepository, EnvironmentTypeRepository environmentTypeRepository,
+            HostTypeRepository hostTypeRepository, EnvironmentTypeRepository environmentTypeRepository,
             HostRepository hostRepository, DeploymentRepository deploymentRepository,
             ServiceConfigurationRepository configurationRepository, ServiceDependencyRepository serviceDependencyRepository,
             LibraryCategoryRepository libraryCategoryRepository, LibraryRepository libraryRepository,
@@ -87,7 +87,7 @@ public class DataInitializer implements CommandLineRunner {
         this.categoryRepository = categoryRepository;
         this.languageRepository = languageRepository;
         this.serviceTypeRepository = serviceTypeRepository;
-        this.serverTypeRepository = serverTypeRepository;
+        this.hostTypeRepository = hostTypeRepository;
         this.environmentTypeRepository = environmentTypeRepository;
         this.hostRepository = hostRepository;
         this.deploymentRepository = deploymentRepository;
@@ -104,7 +104,7 @@ public class DataInitializer implements CommandLineRunner {
     private final Map<String, FrameworkCategory> categoryCache = new HashMap<>();
     private final Map<String, FrameworkLanguage> languageCache = new HashMap<>();
     private final Map<String, ServiceType> serviceTypeCache = new HashMap<>();
-    private final Map<String, ServerType> serverTypeCache = new HashMap<>();
+    private final Map<String, HostType> hostTypeCache = new HashMap<>();
     private final Map<String, EnvironmentType> environmentTypeCache = new HashMap<>();
     private final Map<String, OperatingSystem> osCache = new HashMap<>();
     private final Map<String, FrameworkVendor> vendorCache = new HashMap<>();
@@ -165,15 +165,15 @@ public class DataInitializer implements CommandLineRunner {
         });
 
         // Server Types
-        loadJsonConfig("classpath:config/server-types.json", new TypeReference<List<Map<String, Object>>>() {
+        loadJsonConfig("classpath:config/host-types.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String name = (String) data.get("name");
-            ServerType entity = serverTypeCache.computeIfAbsent(name, k -> serverTypeRepository.findByName(name)
+            HostType entity = hostTypeCache.computeIfAbsent(name, k -> hostTypeRepository.findByName(name)
                     .orElseGet(() -> {
-                        ServerType st = new ServerType();
+                        HostType st = new HostType();
                         st.setName(name);
                         st.setDescription((String) data.get("description"));
-                        return serverTypeRepository.save(st);
+                        return hostTypeRepository.save(st);
                     }));
         });
 
@@ -257,14 +257,14 @@ public class DataInitializer implements CommandLineRunner {
 
     private void initializeHosts() throws IOException {
         log.info("Initializing hosts...");
-        loadJsonConfig("classpath:config/servers.json", new TypeReference<List<Map<String, Object>>>() {
+        loadJsonConfig("classpath:config/hosts.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String hostname = (String) data.get("hostname");
             Host host = hostCache.computeIfAbsent(hostname, k -> hostRepository.findByHostname(hostname).orElseGet(() -> {
                 Host h = new Host();
                 h.setHostname(hostname);
                 h.setIpAddress((String) data.get("ipAddress"));
-                h.setType(serverTypeCache.get(data.get("type")));
+                h.setType(hostTypeCache.get(data.get("type")));
                 h.setEnvironmentType(environmentTypeCache.get(data.get("environment")));
                 h.setOperatingSystem(osCache.get(data.get("operatingSystem")));
                 h.setCpuCores((Integer) data.get("cpuCores"));
@@ -350,7 +350,7 @@ public class DataInitializer implements CommandLineRunner {
                 if (deploymentRepository.findByServiceAndEnvironment(service, host.getEnvironmentType()).isEmpty()) {
                     Deployment d = new Deployment();
                     d.setService(service);
-                    d.setServer(host);
+                    d.setHost(host);
                     d.setEnvironment(host.getEnvironmentType());
                     d.setVersion((String) data.get("version"));
                     d.setStatus((String) data.get("status"));

@@ -33,7 +33,7 @@ public class RegistryClientService {
 
     @Inject
     @ConfigProperty(name = "service.registry.url", defaultValue = "http://localhost:8085")
-    String hostServerUrl;
+    String registryServerUrl;
 
     @Inject
     @ConfigProperty(name = "service.name", defaultValue = "user-access-service")
@@ -90,7 +90,7 @@ public class RegistryClientService {
                 TimeUnit.SECONDS);
 
         LOGGER.info("Registry client initialized. Service: " + serviceName +
-                ", Heartbeats every " + heartbeatInterval + " seconds to " + hostServerUrl);
+                ", Heartbeats every " + heartbeatInterval + " seconds to " + registryServerUrl);
     }
 
     @PreDestroy
@@ -126,7 +126,7 @@ public class RegistryClientService {
                 serviceName, endpoint, healthCheckUrl, servicePort);
 
         try {
-            Response response = httpClient.target(hostServerUrl + "/api/v1/registry/register")
+            Response response = httpClient.target(registryServerUrl + "/api/v1/registry/register")
                     .request(MediaType.APPLICATION_JSON)
                     .post(Entity.json(registrationJson));
 
@@ -146,7 +146,7 @@ public class RegistryClientService {
      */
     private void sendHeartbeat() {
         try {
-            Response response = httpClient.target(hostServerUrl + "/api/v1/registry/heartbeat/" + serviceName)
+            Response response = httpClient.target(registryServerUrl + "/api/v1/registry/heartbeat/" + serviceName)
                     .request(MediaType.APPLICATION_JSON)
                     .post(Entity.json("{}"));
 

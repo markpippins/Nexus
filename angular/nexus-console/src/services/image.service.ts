@@ -16,7 +16,7 @@ export class ImageService {
   ) { }
 
   getIconUrl(item: FileSystemNode, customImageName?: string | null): string | null {
-    if (item.type !== 'folder' && item.type !== 'host-server') {
+    if (item.type !== 'folder' && item.type !== 'registry-server') {
       return null;
     }
 
@@ -49,8 +49,8 @@ export class ImageService {
 
     let folderName: string;
 
-    if (item.type === 'host-server') {
-      folderName = 'host-server';
+    if (item.type === 'registry-server') {
+      folderName = 'registry-server';
     } else if (customImageName) {
       folderName = customImageName;
     } else {

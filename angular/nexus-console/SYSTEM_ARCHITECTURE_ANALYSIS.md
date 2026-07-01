@@ -8,7 +8,7 @@ This document provides a comprehensive analysis of the Atomic Platform's current
 
 ### Core Components
 
-#### 1. **Spring Boot Host Server** (`spring/host-server`)
+#### 1. **Spring Boot Service Registry** (`jvm/spring/service-registry`)
 - **Role**: Central service registry and management system
 - **Port**: 8085
 - **Database**: H2 (in-memory for development)
@@ -32,7 +32,7 @@ This document provides a comprehensive analysis of the Atomic Platform's current
 - **Role**: Alternative gateway implementation demonstrating polyglot service mesh
 - **Port**: 8090
 - **Key Features**:
-  - **Auto-registration with Host Server** ✅
+  - **Auto-registration with Service Registry** ✅
   - Periodic heartbeats (30-second intervals)
   - Same API contracts as Spring Boot version
   - Native compilation support
@@ -41,7 +41,7 @@ This document provides a comprehensive analysis of the Atomic Platform's current
 - **Role**: Service mesh visualization and management interface
 - **Key Features**:
   - Tree-based service navigation
-  - Host Server integration via `HostServerProvider`
+   - Service Registry integration via `RegistryServerProvider`
   - Multi-pane file explorer interface
   - Real-time service status monitoring
 
@@ -49,7 +49,7 @@ This document provides a comprehensive analysis of the Atomic Platform's current
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Host Server   │◄───┤ Quarkus Gateway  │    │ Spring Gateway  │
+│ Service Registry│◄───┤ Quarkus Gateway  │    │ Spring Gateway  │
 │   (Registry)    │    │  Auto-registers  │    │   (Manual?)     │
 │   Port: 8085    │    │   Port: 8090     │    │   Port: 8080    │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
@@ -68,7 +68,7 @@ This document provides a comprehensive analysis of the Atomic Platform's current
 ### ✅ **Strengths**
 
 1. **Polyglot Service Mesh Foundation**
-   - Quarkus service successfully auto-registers with Spring Boot host-server
+   - Quarkus service successfully auto-registers with Spring Boot service-registry
    - Framework-agnostic data model supports Java, Node.js, Python, .NET, Go, Rust
    - Clear separation of concerns between registry and gateway
 
@@ -87,7 +87,7 @@ This document provides a comprehensive analysis of the Atomic Platform's current
 ### ❌ **Critical Gaps**
 
 #### 1. **Incomplete Service Registration**
-- **Spring Boot Broker Gateway**: No evidence of auto-registration with Host Server
+- **Spring Boot Broker Gateway**: No evidence of auto-registration with Service Registry
 - **Missing Services**: No registration visible for:
   - `helidon/satellite` projects
   - `go/projman` projects  
@@ -98,16 +98,16 @@ This document provides a comprehensive analysis of the Atomic Platform's current
 
 **Current Implementation Problems:**
 ```typescript
-// In app.component.ts - Host Server integration is mixed with file system navigation
+// In app.component.ts - Service Registry integration is mixed with file system navigation
 private treeAdapters = new Map<string, TreeProviderAdapter>();
 
 constructor() {
     // Hard-coded root categories - not dynamic
-    this.treeAdapters.set('Services', new TreeProviderAdapter(this.hostServerProvider, 'services'));
-    this.treeAdapters.set('Users', new TreeProviderAdapter(this.hostServerProvider, 'users'));
-    this.treeAdapters.set('Search & Discovery', new TreeProviderAdapter(this.hostServerProvider, 'search'));
-    this.treeAdapters.set('File Systems', new TreeProviderAdapter(this.hostServerProvider, 'filesystems'));
-    this.treeAdapters.set('Platform Management', new TreeProviderAdapter(this.hostServerProvider, 'platform'));
+    this.treeAdapters.set('Services', new TreeProviderAdapter(this.registryServerProvider, 'services'));
+    this.treeAdapters.set('Users', new TreeProviderAdapter(this.registryServerProvider, 'users'));
+    this.treeAdapters.set('Search & Discovery', new TreeProviderAdapter(this.registryServerProvider, 'search'));
+    this.treeAdapters.set('File Systems', new TreeProviderAdapter(this.registryServerProvider, 'filesystems'));
+    this.treeAdapters.set('Platform Management', new TreeProviderAdapter(this.registryServerProvider, 'platform'));
 }
 ```
 
@@ -118,10 +118,10 @@ constructor() {
 - No service operation controls (start/stop/restart)
 - Hard-coded categories instead of dynamic service discovery
 
-#### 3. **Host Server Provider Limitations**
+#### 3. **Registry Server Provider Limitations**
 
 ```typescript
-// In host-server-provider.service.ts
+// In registry-server-provider.service.ts
 async getChildren(nodeId: string): Promise<TreeNode[]> {
     if (nodeId === 'services') {
         // Only lists host profiles, not actual services
@@ -138,7 +138,7 @@ async getChildren(nodeId: string): Promise<TreeNode[]> {
 
 **Problems:**
 - Confuses host profiles with actual service instances
-- No direct connection to Host Server's `/api/registry/services` endpoint
+- No direct connection to Service Registry's `/api/registry/services` endpoint
 - Missing service metadata (framework, version, health status)
 - No service operation capabilities
 
@@ -162,8 +162,8 @@ Create a common registration library:
 @Component
 public class ServiceRegistrar {
     @EventListener(ApplicationReadyEvent.class)
-    public void registerWithHostServer() {
-        // Auto-register with host-server on startup
+    public void registerWithServiceRegistry() {
+        // Auto-register with service-registry on startup
         // Send periodic heartbeats
         // Handle graceful shutdown
     }
@@ -182,7 +182,7 @@ class ServiceRegistrar {
             port: process.env.PORT,
             healthCheckPath: '/health'
         };
-        // POST to host-server/api/registry/services
+        // POST to service-registry/api/registry/services
     }
 }
 ```
@@ -192,14 +192,10 @@ class ServiceRegistrar {
 // python/common/service_registrar.py
 class ServiceRegistrar:
     async def register(self):
-        registration = {
-            "name": os.getenv("SERVICE_NAME"),
-            "framework": "Python",
-            "version": os.getenv("SERVICE_VERSION"),
-            "port": int(os.getenv("PORT")),
-            "health_check_path": "/health"
+        const registration = {
+            ...
         }
-        // POST to host-server/api/registry/services
+        // POST to service-registry/api/registry/services
 ```
 
 ### 2. **Enhanced Angular Service Mesh Visualization**
@@ -244,11 +240,11 @@ export class ServiceMeshComponent {
 // web/angular/nexus/src/services/service-mesh.service.ts
 @Injectable({ providedIn: 'root' })
 export class ServiceMeshService {
-  private hostServerUrl = 'http://localhost:8085';
+  private serviceRegistryUrl = 'http://localhost:8085';
   
   watchServices(): Observable<ServiceInstance[]> {
     return interval(5000).pipe(
-      switchMap(() => this.http.get<ServiceInstance[]>(`${this.hostServerUrl}/api/registry/services`)),
+      switchMap(() => this.http.get<ServiceInstance[]>(`${this.serviceRegistryUrl}/api/registry/services`)),
       map(services => services.map(s => ({
         ...s,
         healthStatus: this.mapHealthStatus(s.status),
@@ -258,11 +254,11 @@ export class ServiceMeshService {
   }
   
   getServiceDependencies(serviceId: string): Observable<ServiceDependency[]> {
-    return this.http.get<ServiceDependency[]>(`${this.hostServerUrl}/api/services/${serviceId}/dependencies`);
+    return this.http.get<ServiceDependency[]>(`${this.serviceRegistryUrl}/api/services/${serviceId}/dependencies`);
   }
   
   executeServiceOperation(serviceId: string, operation: string): Observable<any> {
-    return this.http.post(`${this.hostServerUrl}/api/services/${serviceId}/operations/${operation}`, {});
+    return this.http.post(`${this.serviceRegistryUrl}/api/services/${serviceId}/operations/${operation}`, {});
   }
 }
 ```
@@ -431,7 +427,7 @@ export class ServiceMonitorService {
    - Add registration for Python services
    - Test Quarkus registration (already implemented)
 
-2. **Host Server API Enhancement**
+2. **Service Registry API Enhancement**
    - Add WebSocket support for real-time updates
    - Implement service operation endpoints (start/stop/restart)
    - Add service metrics collection

@@ -77,7 +77,7 @@ The Nexus platform is a distributed system supporting multiple programming langu
 
 - Public-facing entry point for all client requests
 - Rate limiting and request logging
-- Auto-registration with host-server
+- Auto-registration with service-registry
 - Heartbeat mechanism (30-second intervals)
 - Graceful shutdown with deregistration
 - Request context headers for tracing
@@ -120,7 +120,7 @@ The Atomic Platform has evolved from a file-explorer-based tool to a **comprehen
 
 #### **Service Discovery System**
 
-- **Service Discovery Client**: Host-server integration for service lookup
+- **Service Discovery Client**: Service Registry integration for service lookup
 - **External Service Invoker**: Dynamic external service invocation  
 - **Broker Auto Registration**: Annotation-based service exposure
 - **Fallback Mechanism**: Local → External service resolution
@@ -238,7 +238,7 @@ Many services now communicate internally through the broker service rather than 
                      │
                      ▼
             ┌────────────────┐
-            │  Host Server   │ ← Control Plane (Port 8085)
+            │  Service Registry   │ ← Control Plane (Port 8085)
             │   (H2 DB)      │   - Service registry
             └────────┬───────┘   - Service catalog
                      │           - Configuration mgmt
@@ -262,19 +262,19 @@ Many services now communicate internally through the broker service rather than 
 
 The platform supports **dynamic service registration** for polyglot microservices:
 
-1. **Host Server**: Primary service registry with persistent storage (H2)
+1. **Service Registry**: Primary service registry with persistent storage (H2)
 2. **Registration**: External services register via REST API at `POST /api/registry/register`
-3. **Discovery**: Broker-gateway queries host-server to route requests
+3. **Discovery**: Broker-gateway queries service-registry to route requests
 4. **Admin UI**: Real-time visibility into registered services
 
 **Registration Flow**:
 
 ```
-Moleculer Service → Host Server (register) → Persistent DB
-Broker Gateway → Host Server (query) → Route to service
+Moleculer Service → Service Registry (register) → Persistent DB
+Broker Gateway → Service Registry (query) → Route to service
 ```
 
-This architecture separates concerns: host-server manages the service catalog (control plane), while broker-gateway handles request routing (data plane).
+This architecture separates concerns: service-registry manages the service catalog (control plane), while broker-gateway handles request routing (data plane).
 
 ## Running the Platform
 
@@ -298,7 +298,7 @@ This will start all services with proper networking and dependencies.
 
 #### Spring Boot Services
 
-- **host-server**: `http://localhost:8085` - Service registry and management (H2)
+- **service-registry**: `http://localhost:8085` - Service registry and management (H2)
 - **broker-gateway**: `http://localhost:8080` - Main API gateway and request router
 - **user-access-service**: `http://localhost:8081` - Legacy-compatible user management (MySQL)
 - **login-service**: `http://localhost:8082` - Authentication service
@@ -320,14 +320,14 @@ This will start all services with proper networking and dependencies.
 - **cool-people-admin**: `http://localhost:4201` - Cool people admin console
 - **nexus**: `http://localhost:3001` - Nexus application
 - **throttler**: `http://localhost:9007` - Throttler application
-- **web-poc host-server-admin**: `http://localhost:3002` - Host server admin console
+- **web-poc service-registry-admin**: `http://localhost:3002` - Service registry admin console
 - **web-poc projman-ui**: `http://localhost:3029` - Project management UI
 - **web-poc throttler-alt**: `http://localhost:3003` - Alternative throttler application
 - **web-poc throttler-og**: `http://localhost:9008` - Original throttler application
 
 #### React Applications
 
-- **web host-server-admin**: `http://localhost:5173` - Host server admin (Vite)
+- **web service-registry-admin**: `http://localhost:5173` - Service registry admin (Vite)
 - **web-poc cripto-api-tester**: `http://localhost:5174` - Crypto API tester (Vite)
 - **web-poc google-cloud-search-assistant**: `http://localhost:5175` - Google Cloud search assistant (Vite)
 - **web-poc google-custom-search-app**: `http://localhost:5176` - Google custom search app (Vite)
