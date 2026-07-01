@@ -2181,6 +2181,8 @@ function parseJsonSafe(text: string, fallback: any): any {
 export interface ResolvedRoleConfig {
   role: string;
   model_identifier: string;
+  provider_id: string;
+  provider_name: string;
   provider_type: string;
   api_key: string | null;
   endpoint_url: string | null;
@@ -2208,6 +2210,8 @@ export async function getResolvedRoleConfig(role: string): Promise<ResolvedRoleC
   const row = await qOne(
     `SELECT cb.role,
             m.model_identifier,
+            p.id            AS provider_id,
+            p.name          AS provider_name,
             COALESCE(p.type, '') AS provider_type,
             p.api_key,
             COALESCE(cb.endpoint_url, p.endpoint_url) AS endpoint_url,
@@ -2228,6 +2232,8 @@ export async function getResolvedRoleConfig(role: string): Promise<ResolvedRoleC
   return {
     role: row.role,
     model_identifier: row.model_identifier,
+    provider_id: row.provider_id ?? "",
+    provider_name: row.provider_name ?? "",
     provider_type: row.provider_type,
     api_key: row.api_key ?? null,
     endpoint_url: row.endpoint_url ?? null,

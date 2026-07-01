@@ -486,6 +486,33 @@ export const NebulaClient = {
   getOpRegistryLineage: (id: string) =>
     httpGet(`/api/op-registry/${encodeURIComponent(id)}/lineage`),
 
+  // ── Review State (Plan 1041) ─────────────────────────────
+  /** GET /api/review-state/:artifactId */
+  getReviewState: (artifactId: string) =>
+    httpGet(`/api/review-state/${encodeURIComponent(artifactId)}`),
+  /** POST /api/review-state/:artifactId */
+  setReviewState: (artifactId: string, body: {
+    reviewStatus: string; reviewPriority: string; needsAttention: boolean;
+    lastReviewedAt: string | null; reviewSummary: string | null;
+    attentionReasons: string[]; annotatorRole: string;
+    annotationNote?: string | null; previousStatus?: string | null;
+  }) => httpRequest("POST", `/api/review-state/${encodeURIComponent(artifactId)}`, body),
+  /** GET /api/review-state/:artifactId/annotations */
+  listReviewAnnotations: (artifactId: string, query?: { limit?: number; offset?: number }) => {
+    const params = new URLSearchParams();
+    if (query?.limit) params.set("limit", String(query.limit));
+    if (query?.offset) params.set("offset", String(query.offset));
+    const qs = params.toString();
+    return httpGet(`/api/review-state/${encodeURIComponent(artifactId)}/annotations${qs ? `?${qs}` : ""}`);
+  },
+  /** POST /api/review-state/bulk */
+  bulkSetReviewState: (body: {
+    artifactIds: string[]; reviewStatus: string; reviewPriority: string;
+    needsAttention: boolean; lastReviewedAt: string | null;
+    reviewSummary: string | null; attentionReasons: string[];
+    annotatorRole: string;
+  }) => httpRequest("POST", "/api/review-state/bulk", body),
+
   // ── Import / Seed ──────────────────────────────────────────
   /** POST /api/import */
   importData: (body: {

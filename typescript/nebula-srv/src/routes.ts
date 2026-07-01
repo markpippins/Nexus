@@ -2532,7 +2532,7 @@ export function createRoutes(pool: Pool): Router {
       if (role) { clauses.push(`role = $${i++}`); vals.push(role); }
       if (systemId) { clauses.push(`system_id = $${i++}`); vals.push(systemId); }
       if (planRef) { clauses.push(`plan_ref = $${i++}`); vals.push(planRef); }
-      if (tag) { clauses.push(`$$${i} = ANY(tags)`); vals.push(tag); i++; }
+      if (tag) { clauses.push(`$${i} = ANY(tags)`); vals.push(tag); i++; }
       if (level) { clauses.push(`level = $${i++}`); vals.push(parseInt(level as string)); }
       if (visibilityScope) { clauses.push(`visibility_scope = $${i++}`); vals.push(visibilityScope); }
 
