@@ -8,6 +8,7 @@ import { HostProfileService } from './host-profile.service.js';
 import { HostProfile } from '../models/host-profile.model.js';
 import { ServiceInstance, Deployment, Framework } from '../models/service-mesh.model.js';
 import { ServiceMeshService } from './service-mesh.service.js';
+import { LocalConfigService } from './local-config.service.js';
 
 @Injectable({
     providedIn: 'root'
@@ -18,6 +19,7 @@ export class RegistryServerProvider implements TreeProvider {
     private http = inject(HttpClient);
     private profileService = inject(HostProfileService);
     private serviceMeshService = inject(ServiceMeshService);
+    private localConfigService = inject(LocalConfigService);
     private updateSubject = new Subject<TreeChange[]>();
 
     constructor() {
@@ -138,86 +140,88 @@ export class RegistryServerProvider implements TreeProvider {
 
         if (nodeId === 'platform') {
             const profiles = this.profileService.profiles();
-            if (profiles.length === 0) {
-                return [{
-                    id: 'platform-no-registry',
-                    name: 'No Registry Connected',
-                    type: NodeType.FOLDER, // Generic placeholder
-                    icon: 'link_off',
-                    hasChildren: false,
-                    operations: [],
-                    metadata: {},
-                    lastUpdated: new Date()
-                }];
-            }
-            // Use the first profile as the default context
-            const profile = profiles[0];
+            const terrainUrl = this.localConfigService.terrainServerUrl();
 
-            // Combine relevant management nodes
-            const baseUrl = this.getBaseUrl(profile);
-
-            return [
+            // Always include System Health (connects directly to terrain server, no profile needed)
+            // and Data Dictionary (uses terrain for lookup tables).
+            const nodes: TreeNode[] = [
                 {
-                    id: 'users',
-                    name: 'Users',
-                    type: NodeType.FOLDER,
-                    icon: 'group',
-                    hasChildren: true,
-                    operations: [],
-                    metadata: {},
-                    lastUpdated: new Date()
-                },
-                {
-                    id: `platform-deployments-${profile.id}`,
-                    name: 'Deployments',
-                    type: NodeType.FOLDER,
-                    icon: 'cloud_upload',
-                    hasChildren: false,
-                    operations: ['manage-deployments'],
-                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/deployments`, managementType: 'deployments' },
-                    lastUpdated: new Date()
-                },
-                {
-                    id: `platform-servers-${profile.id}`,
-                    name: 'Servers',
-                    type: NodeType.FOLDER,
-                    icon: 'storage',
-                    hasChildren: false,
-                    operations: ['manage-servers'],
-                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/servers`, managementType: 'servers' },
-                    lastUpdated: new Date()
-                },
-                {
-                    id: `platform-services-${profile.id}`,
-                    name: 'Services',
-                    type: NodeType.FOLDER,
-                    icon: 'dns',
-                    hasChildren: false,
-                    operations: ['manage-services'],
-                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/services`, managementType: 'services' },
-                    lastUpdated: new Date()
-                },
-                {
-                    id: `platform-health-${profile.id}`,
+                    id: `platform-health-terrain`,
                     name: 'System Health',
                     type: NodeType.HEALTH_CHECK,
                     icon: 'monitor_heart',
                     hasChildren: false,
                     operations: ['check-health'],
-                    metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/platform/health` },
+                    metadata: {
+                        url: `${terrainUrl}/api/v1/platform/health`,
+                        managementType: 'system-health',
+                        baseUrl: terrainUrl
+                    },
                     lastUpdated: new Date()
                 },
                 {
-                    id: `platform-dictionary-${profile.id}`,
+                    id: `platform-dictionary-terrain`,
                     name: 'Data Dictionary',
                     type: NodeType.FOLDER,
                     icon: 'library_books',
                     hasChildren: true,
                     operations: [],
-                    metadata: { hostProfileId: profile.id },
+                    metadata: {},
                     lastUpdated: new Date()
                 }
             ];
+
+            // If profiles exist, also show profile-dependent management nodes
+            if (profiles.length > 0) {
+                // Use the first profile as the default context
+                const profile = profiles[0];
+                const baseUrl = this.getBaseUrl(profile);
+
+                nodes.unshift(
+                    {
+                        id: 'users',
+                        name: 'Users',
+                        type: NodeType.FOLDER,
+                        icon: 'group',
+                        hasChildren: true,
+                        operations: [],
+                        metadata: {},
+                        lastUpdated: new Date()
+                    },
+                    {
+                        id: `platform-deployments-${profile.id}`,
+                        name: 'Deployments',
+                        type: NodeType.FOLDER,
+                        icon: 'cloud_upload',
+                        hasChildren: false,
+                        operations: ['manage-deployments'],
+                        metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/deployments`, managementType: 'deployments' },
+                        lastUpdated: new Date()
+                    },
+                    {
+                        id: `platform-servers-${profile.id}`,
+                        name: 'Servers',
+                        type: NodeType.FOLDER,
+                        icon: 'storage',
+                        hasChildren: false,
+                        operations: ['manage-servers'],
+                        metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/servers`, managementType: 'servers' },
+                        lastUpdated: new Date()
+                    },
+                    {
+                        id: `platform-services-${profile.id}`,
+                        name: 'Services',
+                        type: NodeType.FOLDER,
+                        icon: 'dns',
+                        hasChildren: false,
+                        operations: ['manage-services'],
+                        metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/services`, managementType: 'services' },
+                        lastUpdated: new Date()
+                    }
+                );
+            }
+
+            return nodes;
         }
 
         if (nodeId.startsWith('host-platform-')) {
@@ -344,7 +348,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'monitor_heart',
                 hasChildren: false,
                 operations: ['check-health'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/platform/health` },
+                metadata: { hostProfileId: profile.id, url: `${this.localConfigService.terrainServerUrl()}/api/v1/platform/health`, managementType: 'system-health', baseUrl: this.localConfigService.terrainServerUrl() },
                 lastUpdated: new Date()
             },
             {

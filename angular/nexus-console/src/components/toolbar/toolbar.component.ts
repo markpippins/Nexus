@@ -26,7 +26,6 @@ export class ToolbarComponent {
   isSortDropdownOpen = signal(false);
   isCopyToOpen = signal(false);
   isMoveToOpen = signal(false);
-  isHamburgerMenuOpen = signal(false);
   isColorPickerOpen = signal(false);
 
   // View mode inputs
@@ -165,26 +164,6 @@ export class ToolbarComponent {
     this.isMoveToOpen.update(v => !v);
   }
 
-  toggleHamburgerMenu(event: MouseEvent): void {
-    event.stopPropagation();
-    this.isHamburgerMenuOpen.update(v => !v);
-  }
-
-  onThemeMenuItemClick(buttonElement: HTMLElement): void {
-    this.themeMenuClick.emit(buttonElement);
-    this.isHamburgerMenuOpen.set(false);
-  }
-
-  onRssFeedsMenuItemClick(): void {
-    this.rssFeedsMenuClick.emit();
-    this.isHamburgerMenuOpen.set(false);
-  }
-
-  onPreferencesMenuItemClick(): void {
-    this.preferencesMenuClick.emit();
-    this.isHamburgerMenuOpen.set(false);
-  }
-
   onNewFolderItemClick(): void {
     this.newFolderClick.emit();
     this.isNewDropdownOpen.set(false);
@@ -201,7 +180,6 @@ export class ToolbarComponent {
       if (this.isSortDropdownOpen()) this.isSortDropdownOpen.set(false);
       if (this.isCopyToOpen()) this.isCopyToOpen.set(false);
       if (this.isMoveToOpen()) this.isMoveToOpen.set(false);
-      if (this.isHamburgerMenuOpen()) this.isHamburgerMenuOpen.set(false);
     }
   }
 
