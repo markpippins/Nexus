@@ -64,7 +64,7 @@ DCO_DIR = os.environ.get("PIPELINE_DCO_DIR", "/home/codex/dev/nexus/.conduit-dat
 PROJECT_ROOT = os.environ.get("PIPELINE_ROOT", "/home/codex/dev/nexus")
 
 EXECUTOR_TIMEOUT_SECONDS = int(os.environ.get("PIPELINE_EXECUTOR_TIMEOUT", "1800"))
-WATCHDOG_STALE_SECONDS = int(os.environ.get("PIPELINE_WATCHDOG_STALE", "600"))
+WATCHDOG_STALE_SECONDS = int(os.environ.get("PIPELINE_WATCHDOG_STALE", "1500"))
 LOCK_STALE_SECONDS = int(os.environ.get("PIPELINE_LOCK_STALE", "3600"))
 
 # ── Rate-limit retry (v090) ───────────────────────────────────────
@@ -531,7 +531,7 @@ def _dispatch_one(
         return
     print(f"  Ticket {ticket_id} claimed for {role} on plan {plan_id}.")
 
-    # ── Empty-chain guard (Temporal-era hardening) ──
+    # ── Resolve model chain (primary + fallbacks) ─────────────────
     chain = _resolve_model_chain(db, role)
     if not chain:
         _insert_empty_chain_block(db, plan_id, role, session_id, ticket_id)
@@ -539,260 +539,275 @@ def _dispatch_one(
         db.close_session(session_id, 1)
         return
 
-    # ── Normalize into WorkRequest DCO ──
-    dco = WorkRequestFactory.create_from_plan(plan, role=role, model_cfg=model_cfg, working_path=PROJECT_ROOT, session_id=session_id)
-    wr_id = dco.id
+    print(f"  Model chain: {[e['model'] for e in chain]}")
 
-    os.makedirs(DCO_DIR, exist_ok=True)
-    dco_path = os.path.join(DCO_DIR, f"{wr_id}.json")
-    with open(dco_path, "w") as f:
-        json.dump(dco.model_dump(by_alias=True), f, indent=2)
+    # ── Outer loop: try each model in the chain ───────────────────
+    last_exit_code = -1
+    last_output_text = ""
+    last_tokens_used = 0
+    last_wr_id = ""
+    overall_success = False
 
-    db.add_work_request(wr_id, plan_id, json.dumps(dco.model_dump(by_alias=True)))
+    for chain_idx, entry in enumerate(chain):
+        harness = entry.get("harness", "opencode")
+        model = entry.get("model", "")
+        is_primary = (chain_idx == 0)
+        model_label = f"primary={model}" if is_primary else f"fallback#{chain_idx}={model}"
+        print(f"  [{model_label}] trying harness={harness}")
 
-    # ── Budget check (plan 1018) — reject before dispatch if over ceiling ──
-    if not _check_budget(db, plan, role, session_id, ticket_id, model_cfg.model):
-        db.advance_cursor(role, plan_id, wr_id)
-        print(f"  Budget check failed for {role} on plan {plan_id}. Skipping.")
-        return
-
-    # ── Resolve executor ──
-    executor = resolve_executor(registry, model_cfg.harness)
-    executor_cmd = executor.invocation_contract.command
-    if not executor_cmd:
-        db.release_ticket(plan_id, role, session_id)
-        db.close_session(session_id, 1)
-        raise ValueError(
-            f"Executor '{executor.executor_id}' has no command in its invocation_contract"
-        )
-
-    # ── Execute with rate-limit retry loop (v090) ────────────────
-    print(f"  Executor '{executor.executor_id}' ({model_cfg.harness}) → {wr_id}")
-    tokens_used = 0
-    exit_code = -1  # sentinel
-    try:
-        for attempt in range(1, _retry_max_attempts + 1):
-            print(f"  Execution attempt {attempt}/{_retry_max_attempts}")
-            work_start = time.time()
-            proc = subprocess.Popen(
-                [sys.executable, executor_cmd, dco_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                start_new_session=True,
+        # ── Create a fresh DCO for this model ─────────────────
+        current_model_cfg = ModelConfig(harness=harness, model=model)
+        try:
+            dco = WorkRequestFactory.create_from_plan(
+                plan, role=role, model_cfg=current_model_cfg,
+                working_path=PROJECT_ROOT, session_id=session_id,
             )
-            db.update_session_activity(session_id, pid=proc.pid)
-            try:
-                stdout, _ = proc.communicate(timeout=EXECUTOR_TIMEOUT_SECONDS)
-                exit_code = proc.returncode
-            except subprocess.TimeoutExpired:
-                print(f"  TIMEOUT: executor exceeded {EXECUTOR_TIMEOUT_SECONDS}s. Killing process tree (PID {proc.pid}).")
-                _kill_process_tree(proc.pid)
+        except Exception as e:
+            print(f"  [{model_label}] DCO creation failed: {e}. Skipping to next fallback.")
+            log.warning("_dispatch_one: DCO creation failed role=%s plan=%s model=%s: %s",
+                        role, plan_id, model, e)
+            last_exit_code = -1
+            continue
+
+        wr_id = dco.id
+        last_wr_id = wr_id
+
+        os.makedirs(DCO_DIR, exist_ok=True)
+        dco_path = os.path.join(DCO_DIR, f"{wr_id}.json")
+        with open(dco_path, "w") as f:
+            json.dump(dco.model_dump(by_alias=True), f, indent=2)
+
+        db.add_work_request(wr_id, plan_id, json.dumps(dco.model_dump(by_alias=True)))
+
+        # ── Budget check ───────────────────────────────────────
+        if not _check_budget(db, plan, role, session_id, ticket_id, model):
+            db.advance_cursor(role, plan_id, wr_id)
+            print(f"  [{model_label}] Budget check failed. Trying next model.")
+            continue
+
+        # ── Resolve executor ───────────────────────────────────
+        try:
+            executor = resolve_executor(registry, harness)
+            executor_cmd = executor.invocation_contract.command
+            if not executor_cmd:
+                log.warning("_dispatch_one: executor has no command role=%s harness=%s model=%s",
+                            role, harness, model)
+                print(f"  [{model_label}] No executor command for harness '{harness}'. Trying next.")
+                continue
+        except Exception as e:
+            log.warning("_dispatch_one: executor resolve failed role=%s harness=%s: %s",
+                        role, harness, e)
+            print(f"  [{model_label}] Executor resolution failed: {e}. Trying next.")
+            last_exit_code = -1
+            continue
+
+        print(f"  [{model_label}] Executor '{executor.executor_id}' → {wr_id}")
+
+        # ── Inner retry loop for this model (v090) ─────────────
+        model_failed = False
+        tokens_used = 0
+        exit_code = -1
+        try:
+            for attempt in range(1, _retry_max_attempts + 1):
+                print(f"  [{model_label}] attempt {attempt}/{_retry_max_attempts}")
+                work_start = time.time()
+                proc = subprocess.Popen(
+                    [sys.executable, executor_cmd, dco_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    start_new_session=True,
+                )
+                db.update_session_activity(session_id, pid=proc.pid)
                 try:
-                    stdout, _ = proc.communicate(timeout=5)
+                    stdout, _ = proc.communicate(timeout=EXECUTOR_TIMEOUT_SECONDS)
+                    exit_code = proc.returncode
                 except subprocess.TimeoutExpired:
-                    proc.kill()
-                    stdout, _ = proc.communicate(timeout=5)
-                exit_code = 124
+                    print(f"  [{model_label}] TIMEOUT: exceeded {EXECUTOR_TIMEOUT_SECONDS}s. Killing PID {proc.pid}.")
+                    _kill_process_tree(proc.pid)
+                    try:
+                        stdout, _ = proc.communicate(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        stdout, _ = proc.communicate(timeout=5)
+                    exit_code = 124
 
-            work_elapsed = time.time() - work_start
-            db.add_session_work_time(session_id, work_elapsed)
+                work_elapsed = time.time() - work_start
+                db.add_session_work_time(session_id, work_elapsed)
 
-            output_text = stdout or ""
-            tokens_used = _extract_tokens_from_output(output_text)
+                output_text = stdout or ""
+                tokens_used = _extract_tokens_from_output(output_text)
 
-            _sync_plan_files_to_db(db, PROJECT_ROOT)
+                _sync_plan_files_to_db(db, PROJECT_ROOT)
 
-            # ── Success ──────────────────────────────────────────
-            if exit_code == 0:
-                db.update_work_request_status(wr_id, "completed")
-                db.close_ticket(plan_id, role, session_id, "completed")
+                # ── Success → close everything, return ──────────
+                if exit_code == 0:
+                    overall_success = True
+                    db.update_work_request_status(wr_id, "completed")
+                    db.close_ticket(plan_id, role, session_id, "completed")
+                    db.insert_receipt(
+                        plan_id=plan_id,
+                        receipt_type=_SUCCESS_RECEIPTS.get(role, "IMPLEMENTATION"),
+                        agent_role=role,
+                        session_id=session_id,
+                        ticket_id=ticket_id,
+                        summary=f"{role} completed via {wr_id} (model={model})",
+                        metadata={
+                            "work_request_id": wr_id,
+                            "role": role,
+                            "harness": harness,
+                            "model": model,
+                            "exit_code": 0,
+                            "chain_index": chain_idx,
+                        },
+                        tokens_used=tokens_used,
+                    )
+                    if tokens_used > 0:
+                        db.increment_ticket_tokens(ticket_id, tokens_used)
+                    _record_cost(db, output_text, ticket_id, session_id, role, model)
 
-                db.insert_receipt(
-                    plan_id=plan_id,
-                    receipt_type=_SUCCESS_RECEIPTS.get(role, "IMPLEMENTATION"),
-                    agent_role=role,
-                    session_id=session_id,
-                    ticket_id=ticket_id,
-                    summary=f"{role} completed successfully via {wr_id}",
-                    metadata={
-                        "work_request_id": wr_id,
-                        "role": role,
-                        "harness": model_cfg.harness,
-                        "model": model_cfg.model,
-                        "exit_code": 0,
-                    },
-                    tokens_used=tokens_used,
-                )
-                if tokens_used > 0:
-                    db.increment_ticket_tokens(ticket_id, tokens_used)
-                _record_cost(db, output_text, ticket_id, session_id, role, model_cfg.model)
-
-                created = db.create_next_tickets(
-                    plan_id, role, "completed",
-                    parent_ticket_id=ticket_id,
-                    objective=plan.get("title") or plan.get("goal", ""),
-                    completion_criteria=plan.get("acceptance_criteria", ""),
-                    owner=role,
-                )
-                if created:
-                    print(f"  Created {created} next Ticket(s) after {role} completed.")
-                break
-
-            # ── Rate limit → sleep & retry ───────────────────────
-            if _detect_api_limit_error(exit_code, output_text):
-                print(f"  Rate limit hit (attempt {attempt}/{_retry_max_attempts}).")
-                error_summary = "API usage limit reached"
-                for line in output_text.splitlines():
-                    line_lower = line.lower()
-                    if any(p in line_lower for p in ["limit", "quota", "usage", "credit", "429"]):
-                        error_summary = line.strip()[:200]
-                        break
-
-                db.update_work_request_status(wr_id, "rate_limited")
-                db.insert_receipt(
-                    plan_id=plan_id,
-                    receipt_type="API_LIMIT",
-                    agent_role=role,
-                    session_id=session_id,
-                    ticket_id=ticket_id,
-                    summary=f"Rate limit retry {attempt}/{_retry_max_attempts}: {error_summary}",
-                    metadata={
-                        "work_request_id": wr_id,
-                        "role": role,
-                        "harness": model_cfg.harness,
-                        "model": model_cfg.model,
-                        "exit_code": exit_code,
-                        "attempt": attempt,
-                    },
-                    tokens_used=tokens_used,
-                )
-                if tokens_used > 0:
-                    db.increment_ticket_tokens(ticket_id, tokens_used)
-                _record_cost(db, output_text, ticket_id, session_id, role, model_cfg.model)
-
-                if attempt < _retry_max_attempts:
-                    print(f"  Waiting {_retry_delay_seconds}s before retry...")
-                    time.sleep(_retry_delay_seconds)
-                    continue
-                else:
-                    print(f"  Retries exhausted for {role} on plan {plan_id}. Closing as failed.")
-                    db.update_work_request_status(wr_id, "failed")
-                    db.close_ticket(plan_id, role, session_id, "failed")
                     created = db.create_next_tickets(
-                        plan_id, role, "failed",
+                        plan_id, role, "completed",
                         parent_ticket_id=ticket_id,
                         objective=plan.get("title") or plan.get("goal", ""),
+                        completion_criteria=plan.get("acceptance_criteria", ""),
                         owner=role,
                     )
                     if created:
-                        print(f"  Created {created} retry Ticket(s) after retries exhausted.")
-                    break
+                        print(f"  Created {created} next Ticket(s) after {role} completed.")
+                    break  # inner retry loop
 
-            # ── Non-rate-limit failure ───────────────────────────
-            print(f"  {role} failed with exit code {exit_code} (not a rate limit).")
-            db.update_work_request_status(wr_id, "failed")
-            db.close_ticket(plan_id, role, session_id, "failed")
+                # ── Rate limit → sleep & retry (or try next model) ──
+                if _detect_api_limit_error(exit_code, output_text):
+                    print(f"  [{model_label}] Rate limit hit (attempt {attempt}/{_retry_max_attempts}).")
+                    error_summary = "API usage limit reached"
+                    for line in output_text.splitlines():
+                        line_lower = line.lower()
+                        if any(p in line_lower for p in ["limit", "quota", "usage", "credit", "429"]):
+                            error_summary = line.strip()[:200]
+                            break
 
-            db.insert_receipt(
-                plan_id=plan_id,
-                receipt_type=_FAIL_RECEIPTS.get(role, "BLOCK"),
-                agent_role=role,
-                session_id=session_id,
-                ticket_id=ticket_id,
-                summary=f"{role} failed with exit code {exit_code}",
-                metadata={
-                    "work_request_id": wr_id,
-                    "role": role,
-                    "harness": model_cfg.harness,
-                    "model": model_cfg.model,
-                    "exit_code": exit_code,
-                },
-                tokens_used=tokens_used,
-            )
-            if tokens_used > 0:
-                db.increment_ticket_tokens(ticket_id, tokens_used)
-            _record_cost(db, output_text, ticket_id, session_id, role, model_cfg.model)
-            created = db.create_next_tickets(
-                    plan_id, role, "failed",
-                    parent_ticket_id=ticket_id,
-                    objective=plan.get("title") or plan.get("goal", ""),
-                    owner=role,
+                    db.update_work_request_status(wr_id, "rate_limited")
+                    db.insert_receipt(
+                        plan_id=plan_id,
+                        receipt_type="API_LIMIT",
+                        agent_role=role,
+                        session_id=session_id,
+                        ticket_id=ticket_id,
+                        summary=f"Rate limit retry {attempt}/{_retry_max_attempts}: {error_summary}",
+                        metadata={
+                            "work_request_id": wr_id,
+                            "role": role,
+                            "harness": harness,
+                            "model": model,
+                            "exit_code": exit_code,
+                            "attempt": attempt,
+                            "chain_index": chain_idx,
+                        },
+                        tokens_used=tokens_used,
+                    )
+                    if tokens_used > 0:
+                        db.increment_ticket_tokens(ticket_id, tokens_used)
+                    _record_cost(db, output_text, ticket_id, session_id, role, model)
+
+                    if attempt < _retry_max_attempts:
+                        print(f"  [{model_label}] Waiting {_retry_delay_seconds}s before retry...")
+                        time.sleep(_retry_delay_seconds)
+                        continue  # retry same model
+                    else:
+                        # Retries exhausted for this model → mark WR and try next fallback
+                        print(f"  [{model_label}] Retries exhausted. Falling back to next model.")
+                        db.update_work_request_status(wr_id, "failed")
+                        last_exit_code = exit_code
+                        last_output_text = output_text
+                        last_tokens_used = tokens_used
+                        model_failed = True
+                        break  # inner retry loop → outer chain loop
+
+                # ── Non-rate-limit failure → try next fallback ──
+                print(f"  [{model_label}] Failed with exit code {exit_code} (not a rate limit). Trying next fallback.")
+                db.update_work_request_status(wr_id, "failed")
+                db.insert_receipt(
+                    plan_id=plan_id,
+                    receipt_type=_FAIL_RECEIPTS.get(role, "BLOCK"),
+                    agent_role=role,
+                    session_id=session_id,
+                    ticket_id=ticket_id,
+                    summary=f"{role} failed exit={exit_code} model={model}",
+                    metadata={
+                        "work_request_id": wr_id,
+                        "role": role,
+                        "harness": harness,
+                        "model": model,
+                        "exit_code": exit_code,
+                        "chain_index": chain_idx,
+                    },
+                    tokens_used=tokens_used,
                 )
-            if created:
-                print(f"  Created {created} next Ticket(s) after {role} failed.")
-            break
+                if tokens_used > 0:
+                    db.increment_ticket_tokens(ticket_id, tokens_used)
+                _record_cost(db, output_text, ticket_id, session_id, role, model)
+                last_exit_code = exit_code
+                last_output_text = output_text
+                last_tokens_used = tokens_used
+                model_failed = True
+                break  # inner retry loop → outer chain loop
 
-        # ── Post-loop: advance cursor & close session ────────────
-        db.advance_cursor(role, plan_id, wr_id)
-        cursor_after = db.get_cursor(role)
-        print(f"  cursor after: {cursor_after}")
-        db.close_session(session_id, exit_code)
-
-    except Exception as e:
-        print(f"  Error during {role} execution: {e}")
-        log.error("_dispatch_one: %s role=%s plan=%s: %s", type(e).__name__, role, plan_id, e)
-        error_text = str(e)
-        if _detect_api_limit_error(3, error_text):
-            print(f"  Rate limit detected in exception. Waiting {_retry_delay_seconds}s then closing.")
-            db.insert_receipt(
-                plan_id=plan_id,
-                receipt_type="API_LIMIT",
-                agent_role=role,
-                session_id=session_id,
-                ticket_id=ticket_id,
-                summary=f"API limit via exception: {error_text[:200]}",
-                metadata={
-                    "work_request_id": wr_id,
-                    "role": role,
-                    "harness": model_cfg.harness,
-                    "model": model_cfg.model,
-                    "exception": error_text[:500],
-                },
-                tokens_used=tokens_used,
-            )
-            if tokens_used > 0:
-                db.increment_ticket_tokens(ticket_id, tokens_used)
-            time.sleep(_retry_delay_seconds)
+        except Exception as e:
+            # Exception during this model's attempt → log and try next fallback
+            print(f"  [{model_label}] Exception during execution: {e}. Trying next fallback.")
+            log.warning("_dispatch_one: exception role=%s plan=%s model=%s: %s",
+                        role, plan_id, model, e)
             db.update_work_request_status(wr_id, "failed")
-            db.close_ticket(plan_id, role, session_id, "failed")
-            db.create_next_tickets(
-                plan_id, role, "failed",
-                parent_ticket_id=ticket_id,
-                objective=plan.get("title") or plan.get("goal", ""),
-                owner=role,
-            )
-        else:
-            db.close_ticket(plan_id, role, session_id, "failed")
-            db.insert_receipt(
-                plan_id=plan_id,
-                receipt_type=_FAIL_RECEIPTS.get(role, "BLOCK"),
-                agent_role=role,
-                session_id=session_id,
-                ticket_id=ticket_id,
-                summary=f"{role} crashed: {error_text[:200]}",
-                metadata={
-                    "work_request_id": wr_id,
-                    "role": role,
-                    "harness": model_cfg.harness,
-                    "model": model_cfg.model,
-                    "exit_code": -1,
-                    "exception": error_text[:500],
-                },
-                tokens_used=tokens_used,
-            )
-            if tokens_used > 0:
-                db.increment_ticket_tokens(ticket_id, tokens_used)
-            db.create_next_tickets(
-                    plan_id, role, "failed",
-                    parent_ticket_id=ticket_id,
-                    objective=plan.get("title") or plan.get("goal", ""),
-                    owner=role,
-                )
-        db.advance_cursor(role, plan_id, wr_id)
+            last_exit_code = -1
+            model_failed = True
+            # Continue to next model in chain
+
+        # ── If the success path already closed the ticket, return ──
+        if overall_success:
+            db.advance_cursor(role, plan_id, wr_id)
+            cursor_after = db.get_cursor(role)
+            print(f"  cursor after: {cursor_after}")
+            db.close_session(session_id, 0)
+            return
+
+        # model_failed → continue to next entry in chain
+
+    # ── All models in chain exhausted ──────────────────────────
+    if not overall_success:
+        print(f"  All {len(chain)} model(s) failed for {role} on plan {plan_id}. Closing ticket.")
+        db.close_ticket(plan_id, role, session_id, "failed")
+
+        db.insert_receipt(
+            plan_id=plan_id,
+            receipt_type=_FAIL_RECEIPTS.get(role, "BLOCK"),
+            agent_role=role,
+            session_id=session_id,
+            ticket_id=ticket_id,
+            summary=f"All fallbacks exhausted for {role} on plan {plan_id}",
+            metadata={
+                "role": role,
+                "plan_id": plan_id,
+                "chain_attempted": [e.get("model", "?") for e in chain],
+                "last_exit_code": last_exit_code,
+            },
+            tokens_used=last_tokens_used,
+        )
+        if last_tokens_used > 0:
+            db.increment_ticket_tokens(ticket_id, last_tokens_used)
+        created = db.create_next_tickets(
+            plan_id, role, "failed",
+            parent_ticket_id=ticket_id,
+            objective=plan.get("title") or plan.get("goal", ""),
+            owner=role,
+        )
+        if created:
+            print(f"  Created {created} retry Ticket(s) after all models failed.")
+
+        db.advance_cursor(role, plan_id, last_wr_id)
         cursor_after = db.get_cursor(role)
-        print(f"  cursor after (error): {cursor_after}")
-        db.close_session(session_id, 1)
+        print(f"  cursor after (all failed): {cursor_after}")
+        db.close_session(session_id, last_exit_code)
 
 
 def dispatch_single_plan(

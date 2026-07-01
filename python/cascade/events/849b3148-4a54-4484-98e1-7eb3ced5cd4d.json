@@ -1,0 +1,14 @@
+{
+  "id": "849b3148-4a54-4484-98e1-7eb3ced5cd4d",
+  "type": "InferenceCompleted",
+  "timestamp": "2026-06-28T04:01:21.734864+00:00",
+  "source": "inference-subscriber",
+  "payload": {
+    "source_event_id": "6cd59300-096d-4e15-9333-58d991b6986b",
+    "source_event_type": "IdeaCaptured",
+    "role": "architect",
+    "status": "error",
+    "output": null,
+    "error": "No Tackle config for role=architect"
+  }
+}

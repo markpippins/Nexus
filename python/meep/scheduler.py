@@ -1,5 +1,13 @@
 """Deterministic Scheduler — Station 5 of the MEEP pipeline.
 
+.. deprecated:: 2026-06-28
+    MEEP's simple topological executor is superseded by the LS-IR
+    scheduler at ``ir.scheduler.Scheduler``, which adds lease
+    dispatch, arbitration scoring, preemption, and a deferred frontier.
+    This module is kept for backward compatibility with the existing
+    MEEP test suite (186 tests) but new execution pipelines should use
+    ``ir.scheduler``.
+
 Walks a frozen ExecutionGraph in topological order, invokes handlers,
 and emits CER events into an append-only log.
 

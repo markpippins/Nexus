@@ -5,9 +5,14 @@ ExecutionState every time.  It supports full replay (all events) and
 partial replay (up to a given event index).
 
 Station 6 of the Phase 1 vertical slice.
+
+Use ``replay_to_dag()`` to replay into SM-IR's ``StateDAG`` instead of
+the flat ``ExecutionState``.  This is an optional bridge — MEEP does not
+hard-depend on the IR module.
 """
 
 from collections.abc import Sequence
+from typing import Any
 
 from meep.models import CEREvent, CERLog, ExecutionState, NodeState
 
@@ -103,3 +108,38 @@ def replay_until(
     """
     events = _events_from_input(log)
     return _replay_events(events[:n])
+
+
+def replay_to_dag(
+    log: CERLog | Sequence[CEREvent],
+) -> Any:
+    """Replay the CER event log into an SM-IR ``StateDAG``.
+
+    Uses ``ir.state_replay.StateReplayEngine`` to promote each CEREvent
+    into a ``StateVersion`` with version expansion, causal edges, and
+    promotion receipts.  Returns a ``StateDAG`` instead of the flat
+    ``ExecutionState``.
+
+    Parameters
+    ----------
+    log: CERLog | Sequence[CEREvent]
+        The event log to replay.
+
+    Returns
+    -------
+    StateDAG
+        Versioned, causally-addressable state DAG (from ``nexus.python.ir``).
+
+    Raises
+    ------
+    ImportError
+        If the IR module is not importable.
+
+    Pure function: no side effects, no IO, no mutation of inputs.
+    """
+    from ir.state_replay import StateReplayEngine
+
+    events = _events_from_input(log)
+    events_list = list(events)
+    engine = StateReplayEngine()
+    return engine.replay(events_list)
