@@ -59,6 +59,9 @@ class ReceiptResponse(BaseModel):
 class GraphResponse(BaseModel):
     nodes: list[dict]
     edges: list[dict]
+    total_edges: int = 0
+    cursor: str = ""
+    limit: int = 200
 
 
 class PlanReceiptItem(BaseModel):
@@ -172,15 +175,45 @@ def get_receipts_by_plan_route(plan_num: str):
 
 
 @router.get("/graph", response_model=GraphResponse)
-def get_graph_route():
-    """Return the full cross-plan graph with all nodes and typed edges.
+def get_graph_route(
+    cursor: str = Query("", description="Cursor token for pagination"),
+    limit: int = Query(200, description="Max edges to return", ge=1, le=5000),
+):
+    """Return the cross-plan graph with cursor-based pagination.
 
     Nodes are all known kernel identities; edges are typed relationships
     (``wrp:depends_on``, ``wrp:impacts_system``, etc.) with resolved
     human-readable labels for each endpoint.
+
+    Args:
+        cursor: Opaque cursor from previous response (node ID).
+                Pass empty string for the first page.
+        limit: Max edges to return (1–5000, default 200).
+
+    Returns:
+        Paginated graph with a ``cursor`` for the next page
+        (empty string when there are no more results).
     """
-    _log.debug("GET /state/graph")
-    return get_graph()
+    _log.debug("GET /state/graph: cursor=%s limit=%d", cursor, limit)
+    full = get_graph()
+
+    nodes = full.get("nodes", [])
+    edges = full.get("edges", [])
+
+    # Cursor-based pagination on edges
+    if cursor:
+        edges = [e for e in edges if e.get("source", "") > cursor or e.get("target", "") > cursor]
+    page_edges = edges[:limit]
+    next_cursor = edges[limit - 1].get("source", "") if len(edges) > limit else ""
+
+    # Return all nodes (they're cheap) + paginated edges with cursor
+    return {
+        "nodes": nodes,
+        "edges": page_edges,
+        "total_edges": len(edges),
+        "cursor": next_cursor,
+        "limit": limit,
+    }
 
 
 @router.get("/plan/{plan_num}", response_model=PlanDetailResponse)

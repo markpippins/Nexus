@@ -65,29 +65,79 @@ def replay(target_version: Optional[int] = None) -> KernelState:
 def compare(target_version: int) -> dict:
     """Compare live engine state vs reconstructed state at a version.
 
-    Useful for integrity checking: the live engine and a fresh replay
-    should produce identical state.
+    Deep structural comparison: checks per-identity, per-receipt, and
+    per-edge alignment — not just count-level checks.
 
     Args:
         target_version: Version to compare at.
 
     Returns:
-        dict with 'match': bool, 'live_version', 'replay_version'.
+        dict with 'match': bool, detailed diff fields for identities,
+        receipts, and graph edges.
     """
     from app.services.reducer_service import get_engine
 
     live = get_engine().kernel_state
     reconstructed = replay(target_version)
 
-    live_dict = live.to_dict()
-    replay_dict = reconstructed.to_dict()
+    # ── Identity comparison ──
+    live_ids = set(live.identity._identities.keys()) if hasattr(live.identity, '_identities') else set()
+    replay_ids = set(reconstructed.identity._identities.keys()) if hasattr(reconstructed.identity, '_identities') else set()
+    missing_ids = replay_ids - live_ids
+    extra_ids = live_ids - replay_ids
 
-    # Compare key fields
+    # ── Receipt comparison ──
+    live_receipt_ids = set(live.receipts.keys()) if hasattr(live, 'receipts') else set()
+    replay_receipt_ids = set(reconstructed.receipts.keys()) if hasattr(reconstructed, 'receipts') else set()
+    missing_receipts = replay_receipt_ids - live_receipt_ids
+    extra_receipts = live_receipt_ids - replay_receipt_ids
+
+    # ── Graph edge comparison ──
+    live_edges = set()
+    if hasattr(live, 'graph'):
+        for e in live.graph.all_edges():
+            live_edges.add((e.source, e.target, e.relation or ""))
+
+    replay_edges = set()
+    if hasattr(reconstructed, 'graph'):
+        for e in reconstructed.graph.all_edges():
+            replay_edges.add((e.source, e.target, e.relation or ""))
+
+    missing_edges = replay_edges - live_edges
+    extra_edges = live_edges - replay_edges
+
+    # ── Version / plan alignment ──
+    version_match = live.version == reconstructed.version
+    plans_match = set(live.plans) == set(reconstructed.plans)
+
     match = (
-        live.version == reconstructed.version
-        and set(live.plans) == set(reconstructed.plans)
-        and len(live.receipts) == len(reconstructed.receipts)
+        version_match
+        and plans_match
+        and not missing_ids
+        and not extra_ids
+        and not missing_receipts
+        and not extra_receipts
+        and not missing_edges
+        and not extra_edges
     )
+
+    diffs = []
+    if not version_match:
+        diffs.append(f"Version: live={live.version} replay={reconstructed.version}")
+    if not plans_match:
+        diffs.append("Plan set mismatch")
+    if missing_ids:
+        diffs.append(f"Missing identities (in replay but not live): {sorted(missing_ids)[:10]}")
+    if extra_ids:
+        diffs.append(f"Extra identities (in live but not replay): {sorted(extra_ids)[:10]}")
+    if missing_receipts:
+        diffs.append(f"Missing receipts (in replay but not live): {sorted(missing_receipts)[:10]}")
+    if extra_receipts:
+        diffs.append(f"Extra receipts (in live but not replay): {sorted(extra_receipts)[:10]}")
+    if missing_edges:
+        diffs.append(f"Missing edges (in replay but not live): {sorted(missing_edges)[:10]}")
+    if extra_edges:
+        diffs.append(f"Extra edges (in live but not replay): {sorted(extra_edges)[:10]}")
 
     return {
         "match": match,
@@ -95,6 +145,11 @@ def compare(target_version: int) -> dict:
         "replay_version": reconstructed.version,
         "live_plan_count": len(live.plans),
         "replay_plan_count": len(reconstructed.plans),
-        "live_receipt_count": len(live.receipts),
-        "replay_receipt_count": len(reconstructed.receipts),
+        "live_receipt_count": len(live.receipts) if hasattr(live, 'receipts') else 0,
+        "replay_receipt_count": len(reconstructed.receipts) if hasattr(reconstructed, 'receipts') else 0,
+        "live_identity_count": len(live_ids),
+        "replay_identity_count": len(replay_ids),
+        "live_edge_count": len(live_edges),
+        "replay_edge_count": len(replay_edges),
+        "diffs": diffs,
     }

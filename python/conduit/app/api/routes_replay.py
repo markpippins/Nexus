@@ -39,6 +39,11 @@ class CompareResponse(BaseModel):
     replay_plan_count: int
     live_receipt_count: int
     replay_receipt_count: int
+    live_identity_count: int = 0
+    replay_identity_count: int = 0
+    live_edge_count: int = 0
+    replay_edge_count: int = 0
+    diffs: list[str] = []
 
 
 # ── Routes ────────────────────────────────────────────────────────────

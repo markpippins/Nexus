@@ -821,11 +821,12 @@ def _run_from_path(dco_path: str) -> int:
             except Exception as e:
                 _log.warning("_run_from_path: cost capture failed session=%s error=%s", session_id, e)
 
-    # ── Write CCNF execution receipt (if bridge ran successfully) ──
+    # ── Publish CCNF execution receipt (if bridge ran successfully) ──
+    # Primary path: POST CCNF_EXECUTION receipt to kernel API.
+    # Fallback: write to filesystem if kernel is unreachable.
     if _ccnf_cer_json is not None and _ccnf_started_at is not None and _ccnf_artifacts_dir is not None:
         from ccnf_bridge import CERBinder
         try:
-            os.makedirs(_ccnf_artifacts_dir, exist_ok=True)
             _completed_at = int(time.time())
             _receipt = CERBinder.attach_execution(
                 cer_json=_ccnf_cer_json,
@@ -836,12 +837,50 @@ def _run_from_path(dco_path: str) -> int:
                 started_at=_ccnf_started_at,
                 completed_at=_completed_at,
             )
-            _receipt_path = os.path.join(_ccnf_artifacts_dir, "execution_receipt.json")
-            with open(_receipt_path, "w", encoding="utf-8") as _rf:
-                json.dump(_receipt, _rf, indent=2)
-            _log.info("[ccnf] receipt written: %s", _receipt_path)
+
+            # Build KernelDelta with CCNF_EXECUTION receipt
+            _delta_payload = {
+                "delta_id": f"ccnf-{wr_id}-{int(time.time())}",
+                "batch_id": f"ccnf-bridge-{int(time.time())}",
+                "receipts": [{
+                    "id": f"rec-ccnf-{wr_id}-{int(time.time())}",
+                    "type": "CCNF_EXECUTION",
+                    "agent_role": "builder",
+                    "plan_id": plan_id if plan_id else wr_id,
+                    "summary": f"CCNF conformance: {_receipt.get('status', 'UNKNOWN')}",
+                    "ccnf_hash": _receipt.get("ccnf_hash", ""),
+                    "created_at": datetime.utcnow().isoformat() + "Z",
+                    "metadata": _receipt,
+                }],
+                "affected_plans": [plan_id] if plan_id else [],
+                "invalidated_plans": [],
+            }
+
+            _kernel_url = os.environ.get("KERNEL_API_URL", "http://localhost:3103")
+            _post_url = f"{_kernel_url}/delta/"
+            _post_data = json.dumps(_delta_payload).encode("utf-8")
+            _post_req = Request(_post_url, data=_post_data, method="POST")
+            _post_req.add_header("Content-Type", "application/json")
+
+            try:
+                with urlopen(_post_req, timeout=15) as _resp:
+                    _body = json.loads(_resp.read().decode("utf-8"))
+                    if _body.get("success"):
+                        _log.info("[ccnf] receipt posted to kernel: delta=%s version=%d",
+                                  _delta_payload["delta_id"], _body.get("version", 0))
+                    else:
+                        _log.warning("[ccnf] kernel rejected receipt: %s", _body.get("error", "unknown"))
+            except URLError as _e:
+                _log.warning("[ccnf] kernel unreachable (%s), falling back to filesystem artifact", _e)
+                # Fallback: write to filesystem
+                os.makedirs(_ccnf_artifacts_dir, exist_ok=True)
+                _receipt_path = os.path.join(_ccnf_artifacts_dir, "execution_receipt.json")
+                with open(_receipt_path, "w", encoding="utf-8") as _rf:
+                    json.dump(_receipt, _rf, indent=2)
+                _log.info("[ccnf] receipt written: %s", _receipt_path)
+
         except Exception as _e:
-            _log.warning("[ccnf] receipt write failed: %s", _e)
+            _log.warning("[ccnf] bridge post failed: %s", _e)
 
     return exit_code
 

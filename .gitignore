@@ -61,6 +61,11 @@ scripts/sql/nebula_backup_*.sql
 graph/HISTORY/
 docs/HISTORY/
 
+# Runtime output artifacts
+.artifacts/
+.receipts/
+.runtime/
+
 # Temp / test files
 test.txt
 diff.txt

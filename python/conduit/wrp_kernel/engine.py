@@ -12,6 +12,12 @@ The engine is a pure function: same input → same output, no IO, no side effect
 
 Design reference: kernel-projection-answers.md §8 (engine.py)
 Plan: #1023 WRP Kernel Reduce Function (Two-Layer Architecture)
+
+# GENERATED FROM CANONICAL — typescript/conduit-mcp/src/receipts.ts (receipt transitions)
+#                             typescript/nebula-mcp/src/conduit-wrp-contract.ts (WRP states)
+#
+# Do not edit this mapping table independently — reconcile against the TypeScript
+# canonical source. See: AUDIT>PLAN_1053_RECONCILIATION.md for drift tracking.
 """
 
 from dataclasses import dataclass, field
@@ -188,7 +194,7 @@ WRP_ADJACENCY_MATRIX: Dict[str, Set[str]] = {
     "APPROVED":      {"SPECIFICATION", "QUEUED", "FAILED"},
     "QUEUED":        {"EXECUTING", "FAILED"},
     "EXECUTING":     {"COMPLETED", "FAILED"},
-    "COMPLETED":     {"ARCHIVED", "FAILED"},
+    "COMPLETED":     {"ARCHIVED"},  # NB: FAILED not valid from COMPLETED — terminal success
     "ARCHIVED":      set(),
     "FAILED":        set(),
 }
@@ -210,12 +216,14 @@ RECEIPT_TO_WRP_STATE: Dict[str, str] = {
     "CRITIQUE_PASS": "SPECIFICATION",
     "CRITIQUE_REJECT": "PLANNING",
     "IMPLEMENTATION": "EXECUTING",
+    "CCNF_EXECUTION": "EXECUTING",
     "REVIEW": "APPROVED",
     "REVIEW_PASS": "COMPLETED",
     "REVIEW_REJECT": "EXECUTING",
     "BLOCK": "FAILED",
     "PLAN_BLOCK": "FAILED",
     "API_LIMIT": "FAILED",
+    "HOLD": "QUEUED",
     "REQUEUED": "QUEUED",
     "CANCELLED": "ARCHIVED",
     "ABANDONED": "FAILED",
