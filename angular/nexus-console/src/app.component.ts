@@ -63,7 +63,7 @@ import { ServiceRegistryEditorComponent } from './components/service-registry-ed
 import { GatewayEditorComponent } from './components/gateway-editor/gateway-editor.component.js';
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
 import { GatewayManagementComponent } from './components/gateway-management/gateway-management.component.js';
-import { HostServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
+import { RegistryServerManagementComponent } from './components/registry-server-management/registry-server-management.component.js';
 import { IframeViewComponent } from './components/iframe-view/iframe-view.component.js';
 import { NavToolbarComponent } from './nav-toolbar/nav-toolbar.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
@@ -118,7 +118,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -176,7 +176,7 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -186,13 +186,15 @@ export class AppComponent implements OnInit, OnDestroy {
     'duality': 'http://localhost:3002',
     'plurality': 'http://localhost:3001',
     'nebula-rms': 'http://localhost:3000',
+    'tackle-ui': 'http://localhost:4202',
   };
 
   isIframeMode = computed(() =>
     this.currentViewMode() === 'conduit-ui' ||
     this.currentViewMode() === 'duality' ||
     this.currentViewMode() === 'plurality' ||
-    this.currentViewMode() === 'nebula-rms'
+    this.currentViewMode() === 'nebula-rms' ||
+    this.currentViewMode() === 'tackle-ui'
   );
 
   // --- Pane Visibility State (from service) ---
@@ -375,7 +377,7 @@ export class AppComponent implements OnInit, OnDestroy {
       if (validTypes.includes(type)) {
         const profile = activeProfile;
         if (profile) {
-          const baseUrl = profile.hostServerUrl.startsWith('http') ? profile.hostServerUrl.replace(/\/$/, '') : `http://${profile.hostServerUrl.replace(/\/$/, '')}`;
+          const baseUrl = profile.registryServerUrl.startsWith('http') ? profile.registryServerUrl.replace(/\/$/, '') : `http://${profile.registryServerUrl.replace(/\/$/, '')}`;
           console.log('[AppComponent] Matched single-element path', { type, baseUrl });
           return { type: normalizeType(type), baseUrl };
         }
@@ -438,7 +440,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
         const finalProfile = profile || activeProfile;
         if (finalProfile) {
-          const baseUrl = finalProfile.hostServerUrl.startsWith('http') ? finalProfile.hostServerUrl.replace(/\/$/, '') : `http://${finalProfile.hostServerUrl.replace(/\/$/, '')}`;
+          const baseUrl = finalProfile.registryServerUrl.startsWith('http') ? finalProfile.registryServerUrl.replace(/\/$/, '') : `http://${finalProfile.registryServerUrl.replace(/\/$/, '')}`;
           console.log('[AppComponent] Matched Platform Management path', { type, baseUrl, targetProfileName });
           return { type: normalizedType, baseUrl };
         }
@@ -462,7 +464,7 @@ export class AppComponent implements OnInit, OnDestroy {
         }
 
         if (profile) {
-          const baseUrl = profile.hostServerUrl.startsWith('http') ? profile.hostServerUrl.replace(/\/$/, '') : `http://${profile.hostServerUrl.replace(/\/$/, '')}`;
+          const baseUrl = profile.registryServerUrl.startsWith('http') ? profile.registryServerUrl.replace(/\/$/, '') : `http://${profile.registryServerUrl.replace(/\/$/, '')}`;
           console.log('[AppComponent] Matched direct management path', { type: lastElement, baseUrl, profileName: path[0] });
           return { type: normalizeType(lastElement), baseUrl };
         }
@@ -564,7 +566,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.hostProfileService.saveProfile({
       id: Date.now().toString(),
       name,
-      hostServerUrl: 'http://localhost:8000',
+      registryServerUrl: 'http://localhost:8000',
       imageUrl: '',
       status: 'ACTIVE'
     }).then(() => {
@@ -844,7 +846,7 @@ export class AppComponent implements OnInit, OnDestroy {
                 // IMPORTANT: 'type' in Host interface is 'serverTypeId' (number). 
                 // The interface I imported for Host has: serverTypeId: number
 
-                await this.platformManagementService.createServer(baseUrl, payload);
+                await this.platformManagementService.createHost(baseUrl, payload);
               }
               successes++;
             } catch (err) {
@@ -948,16 +950,16 @@ export class AppComponent implements OnInit, OnDestroy {
         console.log('[homeProvider.getContents] hostChildren:', hostChildren.map(c => c.name));
         const hostNodes: FileSystemNode[] = hostChildren.map(node => {
           // Convert NodeType to FileType
-          let fileType: 'folder' | 'file' | 'host-server' = 'folder';
+          let fileType: 'folder' | 'file' | 'registry-server' = 'folder';
           if (node.type === NodeType.FILE) {
             fileType = 'file';
-          } else if (node.type === NodeType.HOST_SERVER) {
-            fileType = 'host-server';
+          } else if (node.type === NodeType.REGISTRY_SERVER) {
+            fileType = 'registry-server';
           }
 
           return {
             name: node.name,
-            type: node.type === NodeType.HOST_SERVER ? 'host-server' :
+            type: node.type === NodeType.REGISTRY_SERVER ? 'registry-server' :
               node.type === NodeType.FILE ? 'file' : 'folder',
             id: node.id,
             metadata: node.metadata,
@@ -1071,11 +1073,11 @@ export class AppComponent implements OnInit, OnDestroy {
             const nodes = await this.registryServerProvider.getChildren(currentNodeId);
             return nodes.map(node => {
               // Determine the type based on NodeType enum, converting to FileType
-              let fileType: 'file' | 'folder' | 'host-server' = 'folder';
+              let fileType: 'file' | 'folder' | 'registry-server' = 'folder';
               if (node.type === NodeType.FILE) {
                 fileType = 'file';
-              } else if (node.type === NodeType.HOST_SERVER) {
-                fileType = 'host-server';
+              } else if (node.type === NodeType.REGISTRY_SERVER) {
+                fileType = 'registry-server';
               } else {
                 fileType = 'folder';
               }
@@ -2114,7 +2116,7 @@ export class AppComponent implements OnInit, OnDestroy {
       const activeId = this.activePaneId();
       this.panePaths.update(paths => {
         const otherPanes = paths.filter(p => p.id !== activeId);
-        return [...otherPanes, { id: activeId, path: ['Host Servers', hostProfile.name] }];
+        return [...otherPanes, { id: activeId, path: ['Service Registries', hostProfile.name] }];
       });
     }
   }

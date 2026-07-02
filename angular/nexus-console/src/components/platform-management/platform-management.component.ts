@@ -1,6 +1,8 @@
 import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PlatformManagementService, Host } from '../../services/platform-management.service.js';
+import { ServiceMeshService } from '../../services/service-mesh.service.js';
+import { ComponentRegistryService } from '../../services/component-registry.service.js';
 import { ServiceInstance, Framework, Deployment, Library } from '../../models/service-mesh.model.js';
 import { UpsertServiceDialogComponent } from './upsert-service-dialog/upsert-service-dialog.component.js';
 import { UpsertFrameworkDialogComponent } from './upsert-framework-dialog/upsert-framework-dialog.component.js';
@@ -553,6 +555,8 @@ export class PlatformManagementComponent {
     private lastProcessedActionId = 0;
 
     platformService = inject(PlatformManagementService);
+    private serviceMeshService = inject(ServiceMeshService);
+    private componentRegistry = inject(ComponentRegistryService);
 
     // Data Signals
     // Data Signals (Raw)
@@ -982,6 +986,10 @@ export class PlatformManagementComponent {
                     break;
             }
             this.loadData(); // Refresh
+            this.serviceMeshService.fetchAllData();
+            if (actualType === 'service-types') {
+                this.componentRegistry.refresh();
+            }
         } catch (e) {
             console.error('Delete failed', e);
             alert('Failed to delete item');
@@ -996,6 +1004,7 @@ export class PlatformManagementComponent {
 
     onServiceSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
 
     // Framework Dialog Handlers
@@ -1006,6 +1015,7 @@ export class PlatformManagementComponent {
 
     onFrameworkSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
 
     // Deployment Dialog Handlers
@@ -1016,6 +1026,7 @@ export class PlatformManagementComponent {
 
     onDeploymentSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
 
     // Server Dialog Handlers
@@ -1026,6 +1037,7 @@ export class PlatformManagementComponent {
 
     onHostSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
 
     getStatusClass(status: string | undefined): string {
@@ -1058,6 +1070,11 @@ export class PlatformManagementComponent {
 
     onLookupSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
+        // Visual components (Default Visual Style) may have changed for service-types
+        if (this.managementType() === 'service-types') {
+            this.componentRegistry.refresh();
+        }
     }
 
     // Library Dialog Handlers

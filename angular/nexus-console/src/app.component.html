@@ -336,12 +336,12 @@
                         (connectGateway)="onConnectToServer($event)"
                       ></app-gateway-editor>
                     } @else if (isServiceRegistriesNodeSelected() && activePaneId() === 1) {
-                      <app-host-server-management
+                      <app-registry-server-management
                         [toolbarAction]="activePaneId() === 1 ? toolbarAction() : null"
                         (addServiceRegistry)="onAddServiceRegistry()"
                         (editServiceRegistry)="onEditServiceRegistryByName($event)"
                         (deleteServiceRegistry)="onDeleteServiceRegistryById($event)"
-                      ></app-host-server-management>
+                      ></app-registry-server-management>
                     } @else if (isGatewaysNodeSelected() && activePaneId() === 1) {
                       <app-gateway-management
                         [mountedProfileIds]="mountedProfileIds()"
@@ -439,12 +439,12 @@
                         (connectGateway)="onConnectToServer($event)"
                       ></app-gateway-editor>
                     } @else if (isServiceRegistriesNodeSelected() && activePaneId() === 2) {
-                      <app-host-server-management
+                      <app-registry-server-management
                         [toolbarAction]="activePaneId() === 2 ? toolbarAction() : null"
                         (addServiceRegistry)="onAddServiceRegistry()"
                         (editServiceRegistry)="onEditServiceRegistryByName($event)"
                         (deleteServiceRegistry)="onDeleteServiceRegistryById($event)"
-                      ></app-host-server-management>
+                      ></app-registry-server-management>
                     } @else if (isGatewaysNodeSelected() && activePaneId() === 2) {
                       <app-gateway-management
                         [mountedProfileIds]="mountedProfileIds()"

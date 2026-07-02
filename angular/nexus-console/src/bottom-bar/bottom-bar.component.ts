@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { EXTERNAL_SITES } from '../components/external-site-selector/external-site-selector.component.js';
 import { MessageBoxService } from '../services/message-box.service.js';
 
-export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms';
+export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui';
 
 export interface NavItem {
   key: ViewMode;
@@ -18,6 +18,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'service-mesh',  label: 'Service Mesh', title: 'Service Mesh' },
   { key: 'duality',       label: 'Duality',  title: 'Duality Dual-Pane Interface' },
   { key: 'plurality',     label: 'Plurality', title: 'Plurality Multi-Agent View' },
+  { key: 'tackle-ui',     label: 'Tackle',   title: 'Tackle AI Configuration' },
 ];
 
 @Component({
