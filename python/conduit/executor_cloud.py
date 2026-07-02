@@ -261,7 +261,7 @@ def _build_default_opencode_launcher(role: str, model: str) -> 'HarnessLauncher'
     Callers should call ``launcher.set_working_directory(path)``
     and ``launcher.set_prompt(prompt)`` after construction.
     """
-    from tackle.harness_launcher import HarnessLauncher
+    from nexus_core.harness.launcher import HarnessLauncher
     launcher = HarnessLauncher.from_harness_row({
         "name": "opencode",
         "invocation_semantics": _OPencode_SEMANTICS,
@@ -683,8 +683,8 @@ def run_codex(req, working_path, artifacts_dir=None, session_log_path=None):
     Builds a HarnessLauncher with the codex semantic schema, writes the
     role prompt to a temp file, and invokes ``codex exec --cd PATH FILE``.
     """
-    from tackle.harness_launcher import DEFAULT_BINARIES, HarnessLauncher
-    from tackle.harness_enums import ExecutionMode, RoleMappingStrategy
+    from nexus_core.harness.launcher import DEFAULT_BINARIES, HarnessLauncher
+    from nexus_core.harness.enums import ExecutionMode, RoleMappingStrategy
 
     role = _resolve_role(req)
     prompt = _build_opencode_prompt(req, working_path, artifacts_dir)
