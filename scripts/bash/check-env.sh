@@ -2,7 +2,7 @@
 
 # Script to check and validate environment variables for the Atomic project
 
-echo "Checking environment variables for Atomic project..."
+echo "Checking environment variables for Nexus project..."
 
 # Function to check if an environment variable is set and not empty
 check_env_var() {
