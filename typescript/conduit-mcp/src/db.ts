@@ -1402,8 +1402,339 @@ const migrations: Migration[] = [
           'EXECUTION.STARTED','EXECUTION.COMPLETED','EXECUTION.FAILED',
           'SYSTEM.CRON_TRIGGERED',
           'WR_SUBMITTED','WR_VALIDATED','WR_QUEUED','WR_CLAIMED','WR_ACKED','WR_SETTLED',
-          'WR_REJECTED','WR_FAILED','WR_NOOP','WR_DEFERRED'
+          'WR_REJECTED',          'WR_FAILED','WR_NOOP','WR_DEFERRED'
         ));
+      `);
+    },
+  },
+  {
+    version: 21,
+    description: "Add vision.is_terminal_receipt_type() helper — canonical source-of-truth for terminal receipt types, consulted by vision.check_receipt_integrity() (Plan 0175 follow-up)",
+    up: async (exec) => {
+      // Helper used by vision.check_receipt_integrity() (migrations v20+) and
+      // any future receipt-flow invariant. Single source of truth so the
+      // verifier stays in lockstep with db.ts:_isPlanTerminal, which already
+      // treats REVIEW_PASS, BLOCK, PLAN_BLOCK, CANCELLED, ABANDONED as
+      // close-out receipts.
+      //
+      // Independent of v20 because:
+      // 1. Fresh-DB bootstrap ordering — v20 kinds #1/#3 invoke this helper,
+      //    so it must exist before any code path that selects from the
+      //    check function runs against it.
+      // 2. Drift prevention — adding new terminal types means one place
+      //    (this function) instead of editing kinds #1+3 in v20 separately.
+      await exec(`
+        CREATE OR REPLACE FUNCTION vision.is_terminal_receipt_type(p_type text)
+        RETURNS boolean AS $FUNC$
+        BEGIN
+          RETURN p_type IN ('REVIEW_PASS','BLOCK','PLAN_BLOCK','CANCELLED','ABANDONED');
+        END;
+        $FUNC$ LANGUAGE plpgsql IMMUTABLE
+      `);
+    },
+  },
+  {
+    version: 20,
+    description: "Add vision.check_receipt_integrity() — orphan-detection invariant for tickets-vs-receipts-vs-plans consistency (Plan 0175 follow-up)",
+    up: async (exec) => {
+      // The function detects three INDEPENDENT classes of orphan state that
+      // can accumulate silently during partial failures (e.g. the 2026-07-03
+      // power outage that left 14 ghost plans visible in /state). The kinds
+      // are partitioned so each row fires at most ONE anomaly, keeping verifier
+      // output signal-rich (no double-counting across kinds).
+      //
+      //   1. STUCK_OPEN_TICKET_NO_TERMINAL_RECEIPT — a non-terminal ticket on
+      //      a soft-deleted plan with NO terminal CANCELLED/ABANDONED/BLOCK/
+      //      PLAN_BLOCK receipt on record. Builder keeps polling for a plan
+      //      that should already be closed.
+      //
+      //   2. ORPHAN_RECEIPT_NO_PLAN — a receipt whose plan_id has no live
+      //      nebula.plans row (deleted=0) AND no conduit_plan_id linkage
+      //      on a nebula.requirements row. Unmoored audit history.
+      //
+      //   3. DELETED_PLAN_HAS_OPEN_TICKETS_AFTER_TERMINAL_RECEIPT — a soft-
+      //      deleted plan still has non-terminal tickets *despite* a terminal
+      //      receipt being on record. Indicates delete_plan MCP cascade did
+      //      not cancel the ticket (clean-up signal).
+      //
+      // Gating note for kind #1 + #3: scoped strictly to `p.deleted = 1` so
+      // active plans with legitimately-running open tickets are NOT flagged
+      // as anomalies (their close-out receipt is correctly absent during
+      // normal lifecycle).
+      //
+      // Read-only invariant — never mutates state. Safe to call repeatedly.
+      await exec(`
+        CREATE OR REPLACE FUNCTION vision.check_receipt_integrity()
+        RETURNS TABLE(
+          kind text,
+          plan_id text,
+          ticket_id text,
+          receipt_id text,
+          detail text
+        ) AS $FUNC$
+        BEGIN
+          /* ── 1. Stuck ticket on deleted plan with NO terminal receipt ── */
+          RETURN QUERY
+          SELECT
+            'STUCK_OPEN_TICKET_NO_TERMINAL_RECEIPT'::text AS kind,
+            t.plan_id::text AS plan_id,
+            t.id::text AS ticket_id,
+            NULL::text AS receipt_id,
+            format(
+              'ticket %s (status=%s) on deleted plan %s has no terminal receipt',
+              t.id, t.status, t.plan_id
+            ) AS detail
+          FROM ${VISION_SCHEMA}.tickets t
+          JOIN nebula.plans p ON p.id = t.plan_id
+          WHERE t.status IN ('open','claimed','stale','failed')
+            AND p.deleted = 1
+            AND NOT EXISTS (
+              SELECT 1 FROM ${VISION_SCHEMA}.receipts r
+              WHERE r.plan_id = t.plan_id
+                AND vision.is_terminal_receipt_type(r.type)
+            );
+
+          /* ── 2. Receipt whose plan row is gone AND no requirements link ── */
+          RETURN QUERY
+          SELECT
+            'ORPHAN_RECEIPT_NO_PLAN'::text AS kind,
+            r.plan_id::text AS plan_id,
+            NULL::text AS ticket_id,
+            r.id::text AS receipt_id,
+            format(
+              'receipt %s type=%s plan=%s has no live nebula.plans row and no conduit_plan_id linkage',
+              r.id, r.type, r.plan_id
+            ) AS detail
+          FROM ${VISION_SCHEMA}.receipts r
+          WHERE NOT EXISTS (
+            SELECT 1 FROM nebula.plans p
+            WHERE p.id = r.plan_id AND p.deleted = 0
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM nebula.requirements req
+            WHERE req.conduit_plan_id = r.plan_id
+          );
+
+          /* ── 3. Deleted plan still has open tickets DESPITE terminal receipt ── */
+          RETURN QUERY
+          SELECT
+            'DELETED_PLAN_HAS_OPEN_TICKETS_AFTER_TERMINAL_RECEIPT'::text AS kind,
+            t.plan_id::text AS plan_id,
+            t.id::text AS ticket_id,
+            NULL::text AS receipt_id,
+            format(
+              'ticket %s (status=%s) left open on deleted plan %s despite terminal receipt',
+              t.id, t.status, t.plan_id
+            ) AS detail
+          FROM ${VISION_SCHEMA}.tickets t
+          JOIN nebula.plans p ON p.id = t.plan_id
+          WHERE t.status IN ('open','claimed','stale','failed')
+            AND p.deleted = 1
+            AND EXISTS (
+              SELECT 1 FROM ${VISION_SCHEMA}.receipts r
+              WHERE r.plan_id = t.plan_id
+                AND vision.is_terminal_receipt_type(r.type)
+            );
+
+          /* ── 4. Ticket references a plan that has NO nebula.plans row at all ── */
+          /* Closes the symmetric orphan-ticket gap (Kind #2 covers orphan RECEIPTS; */
+          /* this covers orphan TICKETS). Triggered by partial hard_delete_plan cascade */
+          /* where the plan row is gone but a ticket somehow survived. */
+          RETURN QUERY
+          SELECT
+            'ORPHAN_TICKET_NO_PLAN'::text AS kind,
+            t.plan_id::text AS plan_id,
+            t.id::text AS ticket_id,
+            NULL::text AS receipt_id,
+            format(
+              'ticket %s (status=%s) references plan %s which has no row in nebula.plans',
+              t.id, t.status, t.plan_id
+            ) AS detail
+          FROM ${VISION_SCHEMA}.tickets t
+          LEFT JOIN nebula.plans p ON p.id = t.plan_id
+          WHERE p.id IS NULL
+            AND t.status IN ('open','claimed','stale','failed');
+        END;
+        $FUNC$ LANGUAGE plpgsql STABLE
+      `);
+
+      // Quick smoke-query — confirm the function is callable and returns
+      // the expected shape (zero rows on a clean DB).
+      await exec(`
+        SELECT count(*) AS anomaly_rows
+        FROM vision.check_receipt_integrity()
+      `);
+    },
+  },
+  {
+    version: 22,
+    description: "Add 5th kind STUCK_PENDING_PLAN_AGE to vision.check_receipt_integrity() and parameterize the function with p_threshold_seconds (default 1800s) — surfaces plans stuck in pending with only a PLAN_CREATE receipt + open builder ticket past threshold (Plan 0175 follow-up)",
+    up: async (exec) => {
+      // v22 supersedes v20's function body with a 5th kind AND changes the
+      // function signature from no-arg to (p_threshold_seconds int DEFAULT 1800).
+      // The migration system treats each version as immutable history, so we
+      // replace the function rather than edit v20 in place. The end state of
+      // the function after v20+v22 is: kinds 1-4 from v20 + kind 5 from v22,
+      // with a parameterized threshold.
+      //
+      //   5. STUCK_PENDING_PLAN_AGE — a plan that has ONLY PLAN_CREATE
+      //      receipts (no progress receipts of any kind), with an open
+      //      builder ticket, and the PLAN_CREATE receipt is older than
+      //      p_threshold_seconds (default 1800s = 30 min). Gates on
+      //      `deleted = 0` so already-cleaned plans do not re-fire after
+      //      the cleanup script soft-deletes them.
+      //
+      // Signature change handling: CREATE OR REPLACE with a different
+      // signature does NOT drop the old no-arg function. We must DROP both
+      // possible old signatures (no-arg + int) before CREATE OR REPLACE,
+      // otherwise a fresh-DB bootstrap (or any DB that previously ran v20)
+      // will end up with two functions of different signatures and any
+      // no-arg caller will fail with "function is not unique".
+      //
+      // Function signature now takes a threshold parameter so callers
+      // (e.g. the cleanup script) can pass STUCK_PENDING_THRESHOLD_SECONDS
+      // without SQL and Node drifting out of sync. The default keeps
+      // existing no-arg callers (the verifier) compatible.
+      //
+      // Read-only invariant — never mutates state. Safe to call repeatedly.
+      // The cleanup script `migrations/cleanup-stuck-pending-plans.js`
+      // consumes this kind to take the actual cleanup action.
+
+      // Pre-step: drop any old no-arg + int signatures so CREATE OR REPLACE
+      // below is unambiguous. Both IF EXISTS so this migration is safe to
+      // re-apply on a DB that already has the parameterized version.
+      await exec(`DROP FUNCTION IF EXISTS vision.check_receipt_integrity()`);
+      await exec(`DROP FUNCTION IF EXISTS vision.check_receipt_integrity(int)`);
+
+      await exec(`
+        CREATE OR REPLACE FUNCTION vision.check_receipt_integrity(
+          p_threshold_seconds int DEFAULT 1800
+        )
+        RETURNS TABLE(
+          kind text,
+          plan_id text,
+          ticket_id text,
+          receipt_id text,
+          detail text
+        ) AS $FUNC$
+        BEGIN
+          /* ── 1. Stuck ticket on deleted plan with NO terminal receipt ── */
+          RETURN QUERY
+          SELECT
+            'STUCK_OPEN_TICKET_NO_TERMINAL_RECEIPT'::text AS kind,
+            t.plan_id::text AS plan_id,
+            t.id::text AS ticket_id,
+            NULL::text AS receipt_id,
+            format(
+              'ticket %s (status=%s) on deleted plan %s has no terminal receipt',
+              t.id, t.status, t.plan_id
+            ) AS detail
+          FROM ${VISION_SCHEMA}.tickets t
+          JOIN nebula.plans p ON p.id = t.plan_id
+          WHERE t.status IN ('open','claimed','stale','failed')
+            AND p.deleted = 1
+            AND NOT EXISTS (
+              SELECT 1 FROM ${VISION_SCHEMA}.receipts r
+              WHERE r.plan_id = t.plan_id
+                AND vision.is_terminal_receipt_type(r.type)
+            );
+
+          /* ── 2. Receipt whose plan row is gone AND no requirements link ── */
+          RETURN QUERY
+          SELECT
+            'ORPHAN_RECEIPT_NO_PLAN'::text AS kind,
+            r.plan_id::text AS plan_id,
+            NULL::text AS ticket_id,
+            r.id::text AS receipt_id,
+            format(
+              'receipt %s type=%s plan=%s has no live nebula.plans row and no conduit_plan_id linkage',
+              r.id, r.type, r.plan_id
+            ) AS detail
+          FROM ${VISION_SCHEMA}.receipts r
+          WHERE NOT EXISTS (
+            SELECT 1 FROM nebula.plans p
+            WHERE p.id = r.plan_id AND p.deleted = 0
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM nebula.requirements req
+            WHERE req.conduit_plan_id = r.plan_id
+          );
+
+          /* ── 3. Deleted plan still has open tickets DESPITE terminal receipt ── */
+          RETURN QUERY
+          SELECT
+            'DELETED_PLAN_HAS_OPEN_TICKETS_AFTER_TERMINAL_RECEIPT'::text AS kind,
+            t.plan_id::text AS plan_id,
+            t.id::text AS ticket_id,
+            NULL::text AS receipt_id,
+            format(
+              'ticket %s (status=%s) left open on deleted plan %s despite terminal receipt',
+              t.id, t.status, t.plan_id
+            ) AS detail
+          FROM ${VISION_SCHEMA}.tickets t
+          JOIN nebula.plans p ON p.id = t.plan_id
+          WHERE t.status IN ('open','claimed','stale','failed')
+            AND p.deleted = 1
+            AND EXISTS (
+              SELECT 1 FROM ${VISION_SCHEMA}.receipts r
+              WHERE r.plan_id = t.plan_id
+                AND vision.is_terminal_receipt_type(r.type)
+            );
+
+          /* ── 4. Ticket references a plan that has NO nebula.plans row at all ── */
+          RETURN QUERY
+          SELECT
+            'ORPHAN_TICKET_NO_PLAN'::text AS kind,
+            t.plan_id::text AS plan_id,
+            t.id::text AS ticket_id,
+            NULL::text AS receipt_id,
+            format(
+              'ticket %s (status=%s) references plan %s which has no row in nebula.plans',
+              t.id, t.status, t.plan_id
+            ) AS detail
+          FROM ${VISION_SCHEMA}.tickets t
+          LEFT JOIN nebula.plans p ON p.id = t.plan_id
+          WHERE p.id IS NULL
+            AND t.status IN ('open','claimed','stale','failed');
+
+          /* ── 5. Stuck-pending plan: ONLY PLAN_CREATE receipt(s), open builder ticket, age > threshold ── */
+          /* Threshold comes from p_threshold_seconds parameter (default 1800s = 30 min). */
+          /* Gated on deleted=0 so already-cleaned plans do not re-fire after the cleanup script. */
+          RETURN QUERY
+          SELECT
+            'STUCK_PENDING_PLAN_AGE'::text AS kind,
+            p.id::text AS plan_id,
+            t.id::text AS ticket_id,
+            NULL::text AS receipt_id,
+            format(
+              'plan %s stuck pending: only PLAN_CREATE receipt(s) for %ss (threshold=%ss), open builder ticket %s',
+              p.id,
+              EXTRACT(EPOCH FROM NOW() - MIN(r.created_at::timestamptz))::int,
+              p_threshold_seconds,
+              t.id
+            ) AS detail
+          FROM nebula.plans p
+          JOIN ${VISION_SCHEMA}.tickets t ON t.plan_id = p.id
+          JOIN ${VISION_SCHEMA}.receipts r ON r.plan_id = p.id
+          WHERE p.deleted = 0
+            AND t.role = 'builder'
+            AND t.status IN ('open','claimed','stale','failed')
+            AND r.type = 'PLAN_CREATE'
+            AND NOT EXISTS (
+              SELECT 1 FROM ${VISION_SCHEMA}.receipts r2
+              WHERE r2.plan_id = p.id
+                AND r2.type != 'PLAN_CREATE'
+            )
+          GROUP BY p.id, t.id
+          HAVING EXTRACT(EPOCH FROM NOW() - MIN(r.created_at::timestamptz))::int > p_threshold_seconds;
+        END;
+        $FUNC$ LANGUAGE plpgsql STABLE
+      `);
+
+      // Smoke-query: confirm Kind #5 is reachable with default threshold
+      await exec(`
+        SELECT count(*) FILTER (WHERE kind = 'STUCK_PENDING_PLAN_AGE') AS kind5_rows
+        FROM vision.check_receipt_integrity()
       `);
     },
   },
@@ -1444,6 +1775,9 @@ async function runMigrations(
 }
 
 // ── Plan CRUD ──────────────────────────────────────────────────────
+// All write operations go directly to nebula.implementation_plans.
+// Read operations go through the compat view nebula.plans (which maps
+// implementation_plans to the old PlanRow shape for backward compat).
 
 export interface PlanRow {
   id: string;
@@ -1468,30 +1802,90 @@ export type UpsertPlanInput = Omit<PlanRow, "derived_status" | "deleted"> & {
   deleted?: number;
 };
 
+// ── Helpers ────────────────────────────────────────────────────────
+
+/** Parse a value that may be a JSON array string or comma-separated. */
+function parseTextArray(val: string | undefined | null): string[] {
+  if (!val) return [];
+  try {
+    const parsed = JSON.parse(val);
+    if (Array.isArray(parsed)) return parsed.map(String);
+  } catch {
+    // not JSON — treat as comma-separated
+  }
+  return val.split(",").map(s => s.trim()).filter(s => s.length > 0);
+}
+
+// ── Write ──────────────────────────────────────────────────────────
+
 export async function upsertPlan(plan: UpsertPlanInput): Promise<void> {
+  const planNumber = plan.id; // old id was the plan number
+  const uuid = crypto.randomUUID();
+
+  // Parse array fields — callers may pass JSON or comma-separated
+  const filesAffected = parseTextArray(plan.files_affected);
+  const deps = parseTextArray(plan.dependencies);
+
+  // Build metadata from fields that don't have dedicated columns
+  const metaParts: string[] = [];
+  if (plan.prompt_ref) metaParts.push(`"prompt_ref":${JSON.stringify(plan.prompt_ref)}`);
+  if (plan.notes) metaParts.push(`"notes":${JSON.stringify(plan.notes)}`);
+  if (plan.priority) metaParts.push(`"priority":${plan.priority}`);
+  if (plan.project) metaParts.push(`"project":${JSON.stringify(plan.project)}`);
+  const metadata = `{${metaParts.join(",")}}`;
+
+  // Map deleted flag → status
+  const status = plan.deleted === 1 ? "archived" : "pending";
+
+  // Generate a deterministic-looking plan_number if caller didn't provide one
+  // (the old upsert used `id` which was already the plan number)
+  const effectivePlanNumber = planNumber || plan.title?.slice(0, 8).toUpperCase() || uuid.slice(0, 8);
+
   await qRun(
-    `INSERT INTO nebula.plans (id, file_name, title, project, goal, content,
-      files_affected, acceptance_criteria, dependencies, prompt_ref,
-      notes, priority, deleted, created_at, updated_at)
-    VALUES (@id, @file_name, @title, @project, @goal, @content,
-      @files_affected, @acceptance_criteria, @dependencies, @prompt_ref,
-      @notes, @priority, @deleted, @created_at, @updated_at)
-    ON CONFLICT(id) DO UPDATE SET
-      title = EXCLUDED.title,
-      goal = EXCLUDED.goal,
-      files_affected = EXCLUDED.files_affected,
-      acceptance_criteria = EXCLUDED.acceptance_criteria,
-      dependencies = EXCLUDED.dependencies,
-      prompt_ref = EXCLUDED.prompt_ref,
-      priority = EXCLUDED.priority,
-      updated_at = EXCLUDED.updated_at`,
-    { ...plan, deleted: plan.deleted ?? 0, notes: plan.notes ?? '', priority: plan.priority ?? 0 }
+    `INSERT INTO nebula.implementation_plans
+       (id, plan_number, title, goal, content,
+        files_affected, acceptance_criteria, dependencies,
+        status, metadata, created_at, updated_at)
+     VALUES
+       (@uuid::uuid, @planNumber, @title, @goal, @content,
+        @filesAffected::text[], @acceptanceCriteria::jsonb, @dependencies::text[],
+        @status, @metadata::jsonb, @createdAt::timestamptz, @updatedAt::timestamptz)
+     ON CONFLICT (plan_number) WHERE plan_number IS NOT NULL DO UPDATE SET
+       title        = EXCLUDED.title,
+       goal         = EXCLUDED.goal,
+       content      = EXCLUDED.content,
+       files_affected  = EXCLUDED.files_affected,
+       acceptance_criteria = EXCLUDED.acceptance_criteria,
+       dependencies  = EXCLUDED.dependencies,
+       metadata     = implementation_plans.metadata || EXCLUDED.metadata,
+       status       = CASE WHEN EXCLUDED.status = 'archived' THEN 'archived'
+                           ELSE implementation_plans.status END,
+       updated_at   = EXCLUDED.updated_at`,
+    {
+      uuid,
+      planNumber: effectivePlanNumber,
+      title: plan.title ?? "",
+      goal: plan.goal ?? "",
+      content: plan.content ?? "",
+      filesAffected,
+      acceptanceCriteria: plan.acceptance_criteria || "[]",
+      dependencies: deps,
+      status,
+      metadata,
+      createdAt: plan.created_at || new Date().toISOString(),
+      updatedAt: plan.updated_at || new Date().toISOString(),
+    },
   );
 }
 
 export function checkpointWal(): void {
   // No-op: PG doesn't use WAL checkpointing from application layer
 }
+
+// ── Read ───────────────────────────────────────────────────────────
+// All reads go through the compat view nebula.plans or conduit.plan_status.
+// The compat view maps implementation_plans columns to the old PlanRow shape,
+// so callers receive familiar field names (id=plan_number, deleted=1 for archived).
 
 export async function getPlan(id: string): Promise<PlanRow | undefined> {
   return qOne(
@@ -1515,21 +1909,30 @@ export async function getPlanById(id: string): Promise<PlanRow | undefined> {
   return qOne("SELECT * FROM nebula.plans WHERE id = @id", { id });
 }
 
+// ── Soft delete / undelete ─────────────────────────────────────────
+// Maps to status field on implementation_plans.
+
 export async function softDeletePlan(planId: string): Promise<boolean> {
   const changes = await qRun(
-    "UPDATE nebula.plans SET deleted = 1, updated_at = @now WHERE id = @planId AND deleted = 0",
-    { planId, now: new Date().toISOString() }
+    `UPDATE nebula.implementation_plans
+        SET status = 'archived', updated_at = @now::timestamptz
+      WHERE plan_number = @planId AND status != 'archived'`,
+    { planId, now: new Date().toISOString() },
   );
   return changes > 0;
 }
 
 export async function undeletePlan(planId: string): Promise<boolean> {
   const changes = await qRun(
-    "UPDATE nebula.plans SET deleted = 0, updated_at = @now WHERE id = @planId AND deleted = 1",
-    { planId, now: new Date().toISOString() }
+    `UPDATE nebula.implementation_plans
+        SET status = 'pending', updated_at = @now::timestamptz
+      WHERE plan_number = @planId AND status = 'archived'`,
+    { planId, now: new Date().toISOString() },
   );
   return changes > 0;
 }
+
+// ── Hard delete ────────────────────────────────────────────────────
 
 export async function hardDeletePlan(planId: string): Promise<{
   deleted: boolean;
@@ -1544,7 +1947,9 @@ export async function hardDeletePlan(planId: string): Promise<{
       client, `DELETE FROM ${VISION_SCHEMA}.tickets WHERE plan_id = @planId`, { planId }
     );
     const changes = await tRun(
-      client, "DELETE FROM nebula.plans WHERE id = @planId", { planId }
+      client,
+      "DELETE FROM nebula.implementation_plans WHERE plan_number = @planId",
+      { planId },
     );
     return {
       deleted: changes > 0,

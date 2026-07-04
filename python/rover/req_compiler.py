@@ -527,29 +527,50 @@ def write_journal_entry(normalized: dict, compiled_result: dict) -> str | None:
         return None
 
 
-# ── Plan Creation ─────────────────────────────────────────────────────────
+# ── WorkRequest Submission ────────────────────────────────────────────────
 
-def call_conduit_create_plan(normalized: dict, compiled: dict) -> str | None:
-    """Call conduit-mcp create_plan with the compiled WorkRequest IR.
+def call_conduit_submit_work_request(normalized: dict, compiled: dict) -> str | None:
+    """Submit a WorkRequest via conduit-mcp runtime_submit_work_request.
 
-    Returns the plan number on success, None on failure.
+    Replaces the old flow that created conduit plans directly. WorkRequests
+    are the execution contract — the builder follows the opcode recipe.
+
+    Returns the wrId on success, None on failure.
     """
+    req_id = normalized["requirement_id"]
     title = normalized["title"]
-    goal = normalized["intent_summary"]
+    objective = normalized["intent_summary"]
+    wr_id = f"WR-REQ-{req_id[:8].upper()}"
 
-    # Derive project from system name
-    sys_name = normalized["hierarchy_context"]["system"]["name"] or "nexus"
-    project = sys_name.lower().replace(" ", "-")
+    # Build opTrace from compiled op_sequence
+    resolved_ops = [step["op"] for step in compiled["op_sequence"]]
+    ip_nodes = compiled["files_affected"][:10] if compiled["files_affected"] else [f"req-{req_id[:8]}"]
+    registry_version = compiled.get("registry_version", "v1")
 
     payload = {
-        "name": "create_plan",
+        "name": "runtime_submit_work_request",
         "arguments": {
-            "title": title,
-            "project": project,
-            "goal": goal,
-            "acceptanceCriteria": compiled["acceptance_criteria"],
-            "filesAffected": compiled["files_affected"],
-            "dependencies": compiled["dependencies"],
+            "wrId": wr_id,
+            "intent": {
+                "type": "implementation",
+                "inputs": {
+                    "requirement_id": req_id,
+                    "acceptance_criteria": compiled["acceptance_criteria"],
+                    "dependencies": compiled["dependencies"],
+                },
+                "objective": objective,
+            },
+            "constraints": {
+                "deterministic": True,
+                "maxRetries": 2,
+                "timeoutPolicy": "medium",
+                "resourceHints": ["local", "python"],
+            },
+            "opTrace": {
+                "ipNodes": ip_nodes,
+                "resolvedOps": resolved_ops,
+                "registryVersion": registry_version,
+            },
         },
     }
 
@@ -565,10 +586,10 @@ def call_conduit_create_plan(normalized: dict, compiled: dict) -> str | None:
             result = json.loads(resp.read())
 
         inner = result.get("result", result)
-        if inner.get("created") and inner.get("planNumber"):
-            plan_num = inner["planNumber"]
-            log.info("  → Conduit plan created: %s", plan_num)
-            return plan_num
+        if inner.get("ok") and inner.get("result", {}).get("state", {}).get("wrId"):
+            wr_id_resp = inner["result"]["state"]["wrId"]
+            log.info("  → WorkRequest submitted: %s", wr_id_resp)
+            return wr_id_resp
 
         log.warning("  Conduit response: %s", str(result)[:200])
         return None
@@ -582,25 +603,70 @@ def call_conduit_create_plan(normalized: dict, compiled: dict) -> str | None:
         return None
 
 
-def create_cross_reference(req_id: str, plan_number: str) -> bool:
-    """Create a cross-reference linking the requirement to the new plan."""
+def create_implementation_plan(normalized: dict, compiled: dict) -> str | None:
+    """Create a record in nebula.implementation_plans for the compiled output.
+
+    Implementation plans are the detailed context-heavy bridge between
+    requirements/specs and WorkRequests. This is the canonical record.
+    """
+    import uuid as uuidlib
+    plan_id = str(uuidlib.uuid4())
+    req_id = normalized["requirement_id"]
+    now = datetime.utcnow().isoformat() + "Z"
+
+    title = normalized["title"].replace("'", "''")
+    goal = normalized["intent_summary"].replace("'", "''")
+    files = compiled["files_affected"]
+    criteria = compiled["acceptance_criteria"]
+    deps = compiled["dependencies"]
+
+    files_json = json.dumps(files).replace("'", "''")
+    criteria_json = json.dumps(criteria).replace("'", "''")
+    deps_json = json.dumps(deps).replace("'", "''")
+
+    sql = f"""
+        INSERT INTO nebula.implementation_plans
+            (id, plan_number, requirement_id, title, goal,
+             files_affected, acceptance_criteria, dependencies,
+             status, metadata, created_at, updated_at)
+        VALUES
+            ('{plan_id}'::uuid, '{req_id[:8]}', '{req_id}'::uuid,
+             '{title}', '{goal}',
+             '{files_json}'::text[], '{criteria_json}'::jsonb, '{deps_json}'::text[],
+             'work_requested',
+             '{{"compiled": true, "idempotency_key": "{compiled.get("idempotency_key", "")}"}}'::jsonb,
+             '{now}', '{now}')
+        RETURNING id;
+    """
+    rc, out = psql(sql)
+    if rc == 0 and out:
+        impl_id = out.strip()
+        log.info("  → Implementation plan created: %s", impl_id[:8])
+        return impl_id
+
+    log.error("  Failed to create implementation plan: %s", out[:200])
+    return None
+
+
+def create_cross_reference(req_id: str, target_id: str, rel_type: str = "compiles_to") -> bool:
+    """Create a cross-reference linking the requirement to the target artifact."""
     now = datetime.utcnow().isoformat() + "Z"
     xref_id = str(uuidlib.uuid4())
     sql = f"""
         INSERT INTO nebula.cross_references
             (id, source_type, source_id, target_type, target_id, rel_type, metadata, created_at)
-        SELECT '{xref_id}'::uuid, 'requirement', '{req_id}', 'plan', '{plan_number}',
-               'compiles_to', '{{}}'::jsonb, '{now}'
+        SELECT '{xref_id}'::uuid, 'requirement', '{req_id}', 'implementation_plan', '{target_id}',
+               '{rel_type}', '{{}}'::jsonb, '{now}'
         WHERE NOT EXISTS (
             SELECT 1 FROM nebula.cross_references
             WHERE source_type = 'requirement' AND source_id = '{req_id}'
-              AND target_type = 'plan' AND target_id = '{plan_number}'
-              AND rel_type = 'compiles_to'
+              AND target_type = 'implementation_plan' AND target_id = '{target_id}'
+              AND rel_type = '{rel_type}'
         );
     """
     rc, _ = psql(sql)
     if rc == 0:
-        log.info("  Cross-reference created: requirement → plan %s", plan_number)
+        log.info("  Cross-reference created: requirement → implementation_plan %s", target_id[:8])
         return True
     return False
 
@@ -611,14 +677,15 @@ def compile_requirement(
     req_id: str,
     dry_run: bool = False,
     stage1_only: bool = False,
-    create_plan: bool = False,
+    submit_wr: bool = False,
 ) -> dict:
     """Full compilation pipeline for a single requirement."""
     result = {
         "requirement_id": req_id,
         "stage1": None,
         "stage2": None,
-        "plan_number": None,
+        "implementation_plan_id": None,
+        "wr_id": None,
         "journal_entry_id": None,
         "success": False,
         "error": None,
@@ -659,8 +726,8 @@ def compile_requirement(
         }
 
     if dry_run:
-        log.info("  [DRY RUN] Would write journal entry and %screate plan",
-                 "" if create_plan else "skip ")
+        log.info("  [DRY RUN] Would write journal entry and %ssubmit WorkRequest",
+                 "" if submit_wr else "skip ")
         result["success"] = True
         result["compiled_ir"] = compiled_result
         return result
@@ -669,22 +736,33 @@ def compile_requirement(
     journal_id = write_journal_entry(normalized, compiled_result)
     result["journal_entry_id"] = journal_id
 
-    # Plan creation
-    if create_plan and compiled:
-        plan_num = call_conduit_create_plan(normalized, compiled)
-        if plan_num:
-            result["plan_number"] = plan_num
-            create_cross_reference(req_id, plan_num)
-        else:
-            result["error"] = "Plan creation failed"
+    # WorkRequest submission (replaces old plan creation flow)
+    if submit_wr and compiled:
+        # 1. Create implementation_plan record first
+        impl_plan_id = create_implementation_plan(normalized, compiled)
+        if not impl_plan_id:
+            result["error"] = "Implementation plan creation failed"
             result["success"] = True  # Compilation succeeded, plan creation failed
             return result
+        result["implementation_plan_id"] = impl_plan_id
+
+        # 2. Cross-reference requirement → implementation_plan
+        create_cross_reference(req_id, impl_plan_id, rel_type="compiles_to")
+
+        # 3. Submit WorkRequest to conduit
+        wr_id = call_conduit_submit_work_request(normalized, compiled)
+        if wr_id:
+            result["wr_id"] = wr_id
+        else:
+            log.warning("  WorkRequest submission failed (implementation plan created but not submitted)")
 
     result["success"] = True
     log.info("═" * 60)
     log.info("Compilation %s", "complete" if result["success"] else "failed")
-    if result["plan_number"]:
-        log.info("  Plan: %s", result["plan_number"])
+    if result.get("implementation_plan_id"):
+        log.info("  Implementation plan: %s", result["implementation_plan_id"][:8])
+    if result.get("wr_id"):
+        log.info("  WorkRequest: %s", result["wr_id"])
     log.info("═" * 60)
     return result
 
@@ -693,10 +771,10 @@ def main():
     parser = argparse.ArgumentParser(description="Requirement → WorkRequest Compiler")
     parser.add_argument("--requirement", type=str, required=True,
                         help="Requirement UUID to compile")
-    parser.add_argument("--create-plan", action="store_true",
-                        help="Create a conduit plan from the compiled output")
+    parser.add_argument("--submit-wr", action="store_true",
+                        help="Submit a WorkRequest from the compiled output (creates implementation_plan + WR)")
     parser.add_argument("--dry-run", action="store_true",
-                        help="Show compiled IR without writing or creating a plan")
+                        help="Show compiled IR without writing or submitting a WorkRequest")
     parser.add_argument("--stage-1-only", action="store_true",
                         help="Run Stage 1 (normalization) only, skip Stage 2")
     parser.add_argument("--json", action="store_true",
@@ -713,7 +791,7 @@ def main():
         args.requirement,
         dry_run=args.dry_run,
         stage1_only=args.stage_1_only,
-        create_plan=args.create_plan,
+        submit_wr=args.submit_wr,
     )
 
     if args.json:

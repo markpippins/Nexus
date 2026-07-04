@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """
-candidate_promote.py — Candidate Promotion Gate
+candidate_promote.py — Candidate → IntentRecord Promotion Gate
 
 Takes ready harvest candidates (CPF >= threshold) and promotes them into
-the plan pipeline by:
+the pipeline by:
 
-  1. Creating a requirement record (candidate_id back-link)
-  2. Creating a conduit plan via the MCP API
-  3. Marking the candidate status = 'promoted'
+  1. Creating an intent_record (lightweight pre-canonical intent capture)
+     linked back to the harvest candidate
+  2. Marking the candidate status = 'promoted'
 
-Traceability: harvest → candidate → requirement → plan → WorkRequest
+This replaces the old flow that incorrectly created conduit implementation
+plans from raw intents. IntentRecords live in the cognitive/pre-canonical
+layer — they can later be decomposed into requirements, specs, and
+implementation plans.
+
+Traceability: harvest → candidate → intent_record → requirements → ...
 
 Usage:
     cd /home/codex/dev/nexus/python/rover
@@ -33,14 +38,12 @@ import json
 import logging
 import subprocess
 import sys
-import urllib.error
-import urllib.request
+import uuid as uuidlib
 from datetime import datetime
 
 log = logging.getLogger("candidate_promote")
 
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
-CONDUIT_MCP_URL = "http://localhost:3100/tools/call"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -141,127 +144,57 @@ def fetch_candidate(candidate_id: str) -> dict | None:
         return None
 
 
-def create_requirement(candidate: dict) -> str | None:
-    """Insert a requirement record linked to the candidate. Returns requirement ID or None."""
+def create_intent_record(candidate: dict) -> str | None:
+    """Create an intent_record linked to this candidate.
+
+    IntentRecords sit at the cognitive/pre-canonical layer. They are
+    lightweight, mutable, and capture raw intent. They can later be
+    decomposed into requirements.
+
+    Returns the intent_record UUID or None on failure.
+    """
+    record_id = str(uuidlib.uuid4())
     title = candidate["title"].replace("'", "''")
     description = (candidate.get("intent_description") or "").replace("'", "''")
-    system_id = candidate.get("system_id") or "NULL"
-    subsystem_id = candidate.get("subsystem_id") or "NULL"
-    feature_id = candidate.get("feature_id") or "NULL"
     cid = candidate["id"]
 
-    # Build acceptance criteria from implementation_notes
-    notes = candidate.get("implementation_notes") or []
-    ac_items = json.dumps([n.get("title", str(n))[:200] for n in notes if isinstance(n, dict)] or [])
+    # Build tags from candidate tags + source marker
+    tags = candidate.get("tags") or []
+    tags_json = json.dumps(list(tags) + ["promoted-from-candidate"]).replace("'", "''")
 
-    # Derive project from system name
-    project = (candidate.get("system_name") or "nexus").lower().replace(" ", "-")
-
-    # Derive priority from CPF
-    readiness = candidate.get("compilation_readiness") or 0.0
-    if readiness >= 0.9:
-        priority = "High"
-    elif readiness >= 0.8:
-        priority = "High"
-    elif readiness >= 0.7:
-        priority = "Medium"
-    else:
-        priority = "Low"
+    now = datetime.utcnow().isoformat() + "Z"
 
     sql = f"""
-        INSERT INTO nebula.requirements
-            (title, description, system_id, subsystem_id, feature_id,
-             candidate_id, status, priority, acceptance_criteria)
+        INSERT INTO nebula.intent_records
+            (id, candidate_id, title, description,
+             source_type, source_ref, tags, status, metadata,
+             created_at, updated_at)
         VALUES
-            ('{title}', '{description}',
-             {f"'{system_id}'" if system_id != "NULL" else "NULL"}::uuid,
-             {f"'{subsystem_id}'" if subsystem_id != "NULL" else "NULL"}::uuid,
-             {f"'{feature_id}'" if feature_id != "NULL" else "NULL"}::uuid,
-             '{cid}'::uuid,
-             'Backlog', '{priority}',
-             '{ac_items.replace("'", "''")}'::jsonb)
+            ('{record_id}'::uuid, '{cid}'::uuid,
+             '{title}', '{description}',
+             'candidate', '{cid}',
+             '{tags_json}'::text[],
+             'draft',
+             '{{"cpf": {candidate.get("compilation_readiness", 0.0)}}}'::jsonb,
+             '{now}', '{now}')
         RETURNING id;
     """
     rc, out = psql(sql)
     if rc != 0 or not out:
-        log.error("  Failed to create requirement: %s", out[:200])
-        return None
-    req_id = out.strip()
-    log.info("  → Requirement created: %s (priority=%s)", req_id[:8], priority)
-    return req_id
-
-
-def call_conduit_create_plan(candidate: dict) -> str | None:
-    """Call conduit-mcp create_plan tool via HTTP. Returns plan number or None."""
-    title = candidate["title"]
-    goal = candidate.get("intent_description") or title
-    system_name = candidate.get("system_name", "nexus")
-    project = system_name.lower().replace(" ", "-")
-
-    # Build acceptance criteria
-    notes = candidate.get("implementation_notes") or []
-    acceptance_criteria = []
-    for n in notes:
-        if isinstance(n, dict) and "title" in n:
-            acceptance_criteria.append(n["title"][:200])
-        elif isinstance(n, str):
-            acceptance_criteria.append(n[:200])
-    if not acceptance_criteria and candidate.get("open_questions"):
-        qs = candidate["open_questions"]
-        if isinstance(qs, list):
-            acceptance_criteria = [f"Resolve: {q[:200]}" for q in qs[:3]]
-
-    payload = {
-        "name": "create_plan",
-        "arguments": {
-            "title": title,
-            "project": project,
-            "goal": goal,
-            "acceptanceCriteria": acceptance_criteria[:5] or ["Validate candidate promotion"],
-            "filesAffected": [],
-        },
-    }
-
-    data = json.dumps(payload).encode("utf-8")
-    try:
-        req = urllib.request.Request(
-            CONDUIT_MCP_URL,
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read())
-
-        # Conduit-mcp wraps success in result.result
-        inner = result.get("result", result)
-        if inner.get("created") and inner.get("planNumber"):
-            plan_num = inner["planNumber"]
-            log.info("  → Conduit plan created: %s", plan_num)
-            return plan_num
-
-        log.warning("  Conduit response: %s", str(result)[:200])
+        log.error("  Failed to create intent_record: %s", out[:200])
         return None
 
-    except urllib.error.HTTPError as e:
-        body = e.read().decode()[:300] if e.fp else ""
-        log.error("  Conduit HTTP %d: %s", e.code, body)
-        return None
-    except urllib.error.URLError as e:
-        log.error("  Conduit unreachable: %s", e.reason)
-        return None
-    except Exception as e:
-        log.error("  Conduit error: %s", e)
-        return None
+    ir_id = out.strip()
+    log.info("  → IntentRecord created: %s (from candidate %s)", ir_id[:8], cid[:8])
+    return ir_id
 
 
 def promote_candidate(candidate: dict, dry_run: bool = False) -> dict:
-    """Promote a single candidate: requirement → plan → mark promoted."""
+    """Promote a single candidate: create intent_record → mark promoted."""
     result = {
         "candidate_id": candidate["id"],
         "title": candidate["title"],
-        "requirement_id": None,
-        "plan_number": None,
+        "intent_record_id": None,
         "success": False,
         "error": None,
     }
@@ -285,26 +218,18 @@ def promote_candidate(candidate: dict, dry_run: bool = False) -> dict:
              ", ".join((candidate.get("tags") or [])[:3]))
 
     if dry_run:
-        log.info("  [DRY RUN] Would create requirement + plan")
+        log.info("  [DRY RUN] Would create intent_record")
         result["success"] = True
         return result
 
-    # Step 1: Create requirement
-    req_id = create_requirement(candidate)
-    if not req_id:
-        result["error"] = "Requirement creation failed"
+    # Step 1: Create intent_record (replaces old requirement + conduit plan creation)
+    ir_id = create_intent_record(candidate)
+    if not ir_id:
+        result["error"] = "IntentRecord creation failed"
         return result
-    result["requirement_id"] = req_id
+    result["intent_record_id"] = ir_id
 
-    # Step 2: Create conduit plan
-    plan_num = call_conduit_create_plan(candidate)
-    if not plan_num:
-        result["error"] = "Plan creation failed (requirement created but no plan)"
-        result["success"] = True  # Partial success: requirement exists
-        return result
-    result["plan_number"] = plan_num
-
-    # Step 3: Mark candidate as promoted
+    # Step 2: Mark candidate as promoted
     sql = f"""
         UPDATE nebula.harvest_candidates
         SET status = 'promoted',
@@ -319,12 +244,12 @@ def promote_candidate(candidate: dict, dry_run: bool = False) -> dict:
         log.warning("  Could not update candidate status: %s", out[:100])
 
     result["success"] = True
-    log.info("  ✓ Promoted: req=%s plan=%s", req_id[:8], plan_num)
+    log.info("  ✓ Promoted: intent_record=%s", ir_id[:8])
     return result
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Promote candidates to plans")
+    parser = argparse.ArgumentParser(description="Promote candidates to IntentRecords")
     parser.add_argument("--candidate", type=str, default=None,
                         help="Single candidate UUID to promote")
     parser.add_argument("--candidates", type=str, nargs="+", default=None,
@@ -340,7 +265,7 @@ def main():
     args = parser.parse_args()
 
     log.info("=" * 60)
-    log.info("Candidate Promotion Gate")
+    log.info("Candidate → IntentRecord Promotion Gate")
     log.info("Time: %s", datetime.now().isoformat())
     log.info("Mode: %s", "DRY RUN" if args.dry_run else "LIVE")
     log.info("=" * 60)
@@ -398,9 +323,8 @@ def main():
     if successes:
         log.info("─" * 60)
         for s in successes:
-            req = s.get("requirement_id", "?")[:8] if s.get("requirement_id") else "-"
-            plan = s.get("plan_number") or "-"
-            log.info("  ✓ %s  req=%s  plan=%s", s["title"][:50], req, plan)
+            ir = s.get("intent_record_id", "?")[:8] if s.get("intent_record_id") else "-"
+            log.info("  ✓ %s  intent_record=%s", s["title"][:50], ir)
 
     log.info("=" * 60)
     return 0 if not failures else 1

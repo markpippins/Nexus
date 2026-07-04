@@ -5,14 +5,19 @@
 # PURPOSE:
 #   Promote ready harvest candidates into the pipeline.
 #   Runs CPF computation first, then promotes candidates that meet the
-#   readiness threshold by creating requirements and conduit plans.
+#   readiness threshold by creating intent_records.
 #
 #   This closes the loop:
-#     Harvest → Candidate → CPF readiness → Requirement → Plan → WorkRequest
+#     Harvest → Candidate → CPF readiness → IntentRecord → Requirements → Specs → ImplementationPlan → WorkRequest
+#
+#   NOTE (2026-07-03): This script no longer creates conduit plans directly.
+#   candidate_promote.py now creates intent_records (lightweight pre-canonical
+#   intents). The old flow (candidate → conduit plan) caused 10 stuck-pending
+#   plans every 30 minutes — fixed structurally.
 #
 # PREREQUISITES:
 #   - Docker container `pgvector_db` running with the nexus database
-#   - Conduit-mcp running at localhost:3100
+#   - Conduit-mcp NOT required (no longer creates conduit plans)
 #   - Python venv at nexus/python/rover/.venv
 #   - cpf_compute.py and candidate_promote.py in ROVER_DIR
 #
@@ -109,11 +114,10 @@ check_prereqs() {
     fi
     log_info "  ✓ pgvector_db container is running"
 
-    if ! curl -sf http://localhost:3100/tools/call >/dev/null 2>&1; then
-        log_warn "  Conduit-mcp at localhost:3100 is not reachable."
-        log_warn "  Plan creation will fail."
+    if curl -sf http://localhost:3100/tools/call >/dev/null 2>&1; then
+        log_info "  ✓ Conduit-mcp is reachable (not required for intent_record flow)"
     else
-        log_info "  ✓ Conduit-mcp is reachable"
+        log_info "  Conduit-mcp not reachable (ok — no longer needed for promotion step)"
     fi
 
     if [[ ! -f "$VENV_ACTIVATE" ]]; then
