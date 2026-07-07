@@ -1947,6 +1947,7 @@ export function registerToolHandlers(
         dco_json: JSON.stringify(args),
         context: { intent: args.intent, constraints: args.constraints, opTrace: args.opTrace },
         status: "draft",
+        title: args.intent?.objective || "",
       });
       await appendEvent(event.wrId, event.type, event.payload as Record<string, unknown>);
       const rawEvents = await getEvents(event.wrId);

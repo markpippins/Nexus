@@ -1297,6 +1297,7 @@ app.post("/vision/work-requests", async (req, res) => {
       dco_json: dco_json || "{}",
       context: context || {},
       status: status || "pending",
+      title: req.body.title || "",
     });
     res.json({ ...result });
   } catch (err: any) {
@@ -1397,6 +1398,7 @@ app.post("/wr/submit", async (req, res) => {
       dco_json: JSON.stringify(output),
       context: { intent: output.intent, constraints: output.constraints, opTrace: output.opTrace },
       status: "draft",
+      title: output.intent?.objective || "",
     });
     // Append the WR_SUBMITTED event
     await appendEvent(event.wrId, event.type, event.payload as Record<string, unknown>);

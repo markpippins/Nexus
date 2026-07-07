@@ -617,9 +617,23 @@ async function createSchema(
     WHERE p.deleted = 0;
 
     CREATE VIEW ${PG_SCHEMA}.plans_by_status AS
-    SELECT 
-      ps.derived_status AS status,
-      ps.*
+    SELECT
+      ps.id,
+      ps.file_name,
+      ps.title,
+      ps.project,
+      ps.goal,
+      ps.content,
+      ps.files_affected,
+      ps.acceptance_criteria,
+      ps.dependencies,
+      ps.prompt_ref,
+      ps.notes,
+      ps.priority,
+      ps.deleted,
+      ps.created_at,
+      ps.updated_at,
+      ps.derived_status AS status
     FROM ${PG_SCHEMA}.plan_status ps;
   `);
 
@@ -1564,6 +1578,146 @@ const migrations: Migration[] = [
         SELECT count(*) AS anomaly_rows
         FROM vision.check_receipt_integrity()
       `);
+    },
+  },
+  {
+    version: 23,
+    description: "Add title TEXT column to conduit.work_requests and vision.work_requests for denormalized WR titles, avoiding costly joins to nebula.plans (Architect gap #2)",
+    up: async (exec) => {
+      // Add title to conduit.work_requests (Python-managed pipeline table)
+      await exec(`
+        DO $$ BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'conduit' AND table_name = 'work_requests') THEN
+            ALTER TABLE conduit.work_requests ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '';
+          END IF;
+        END $$;
+      `);
+
+      // Add title to vision.work_requests (TypeScript-managed runtime kernel table)
+      await exec(`
+        ALTER TABLE ${VISION_SCHEMA}.work_requests ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT ''
+      `);
+
+      // Backfill titles for existing rows where title is empty
+      // First pass: join on wr_id = plan_id (direct mapping)
+      // Second pass: join on context->>'plan_id' = plan_id (UUID-based vision WRs)
+      await exec(`
+        UPDATE ${VISION_SCHEMA}.work_requests wr
+        SET title = COALESCE(p.title, '')
+        FROM nebula.plans p
+        WHERE wr.wr_id = p.id
+          AND (wr.title IS NULL OR wr.title = '')
+          AND p.title IS NOT NULL AND p.title != ''
+      `);
+
+      // Second pass: join on context->>'plan_id' for UUID-based vision work requests
+      await exec(`
+        UPDATE ${VISION_SCHEMA}.work_requests wr
+        SET title = COALESCE(p.title, '')
+        FROM nebula.plans p
+        WHERE wr.context->>'plan_id' = p.id
+          AND (wr.title IS NULL OR wr.title = '')
+          AND p.title IS NOT NULL AND p.title != ''
+      `);
+
+      // Backfill conduit.work_requests titles the same way
+      await exec(`
+        DO $$ BEGIN
+          IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'conduit' AND table_name = 'work_requests') THEN
+            UPDATE conduit.work_requests wr
+            SET title = COALESCE(p.title, '')
+            FROM nebula.plans p
+            WHERE wr.plan_id = p.id
+              AND (wr.title IS NULL OR wr.title = '')
+              AND p.title IS NOT NULL AND p.title != '';
+          END IF;
+        END $$;
+      `);
+
+      console.log("[migrations] v23: Added title column to work_requests (conduit + vision)");
+    },
+  },
+  {
+    version: 24,
+    description: "Expose status column in nebula.plans view (Architect gap #1) — add implementation_plan status (draft/pending/approved/work_requested/completed/archived) so consumers can query plan lifecycle stage without joining to nebula.implementation_plans",
+    up: async (exec) => {
+      // Add status column to nebula.plans view
+      // IMPORTANT: Must append at END because CREATE OR REPLACE VIEW cannot
+      // change existing column names — inserting 'status' mid-list would
+      // be interpreted as renaming 'deleted' to 'status'.
+      await exec(`
+        CREATE OR REPLACE VIEW nebula.plans AS
+        SELECT
+          plan_number AS id,
+          ''::text AS file_name,
+          title,
+          'wrp'::text AS project,
+          COALESCE(goal, ''::text) AS goal,
+          COALESCE(content, ''::text) AS content,
+          COALESCE(array_to_string(files_affected, ','::text), ''::text) AS files_affected,
+          COALESCE(acceptance_criteria::text, '[]'::text) AS acceptance_criteria,
+          COALESCE(array_to_string(dependencies, ','::text), ''::text) AS dependencies,
+          ''::text AS prompt_ref,
+          ''::text AS notes,
+          0 AS priority,
+          CASE
+            WHEN status = 'archived' THEN 1
+            ELSE 0
+          END AS deleted,
+          created_at::text AS created_at,
+          updated_at::text AS updated_at,
+          status
+        FROM nebula.implementation_plans
+      `);
+
+      // Recreate conduit.plans_by_status to avoid duplicate column name.
+      // Adding 'status' to nebula.plans means ps.* now includes a 'status'
+      // column, which conflicts with 'ps.derived_status AS status'.
+      // We rebuild with explicit column selection to resolve the ambiguity.
+      await exec(`
+        DROP VIEW IF EXISTS nebula.plans_by_status CASCADE;
+        DROP VIEW IF EXISTS conduit.plans_by_status CASCADE;
+        CREATE VIEW conduit.plans_by_status AS
+        SELECT
+          ps.id,
+          ps.file_name,
+          ps.title,
+          ps.project,
+          ps.goal,
+          ps.content,
+          ps.files_affected,
+          ps.acceptance_criteria,
+          ps.dependencies,
+          ps.prompt_ref,
+          ps.notes,
+          ps.priority,
+          ps.deleted,
+          ps.created_at,
+          ps.updated_at,
+          ps.derived_status AS status
+        FROM conduit.plan_status ps
+      `);
+
+      // Recreate nebula mirror views
+      await exec(`
+        CREATE OR REPLACE VIEW nebula.plans_by_status AS SELECT * FROM conduit.plans_by_status
+      `);
+
+      // Temporal schema is optional — skip if it doesn't exist
+      try {
+        await exec(`
+          DO $$ BEGIN
+            CREATE OR REPLACE VIEW temporal.plans AS SELECT * FROM nebula.plans;
+            CREATE OR REPLACE VIEW temporal.plan_status AS SELECT * FROM conduit.plan_status;
+          EXCEPTION WHEN undefined_schema THEN
+            RAISE NOTICE 'temporal schema does not exist, skipping temporal views';
+          END $$;
+        `);
+      } catch {
+        console.log("[migrations] v24: temporal schema not found, skipping temporal views");
+      }
+
+      console.log("[migrations] v24: Exposed status column in nebula.plans view");
     },
   },
   {
@@ -2727,6 +2881,7 @@ export interface WorkRequestRow {
   dco_json: string;
   context: any;
   status: string;
+  title: string;         // denormalized title to avoid costly joins
   step_outputs: string;
   recorded_on_dt: string;
   recorded_until_dt: string | null;
@@ -2738,6 +2893,7 @@ export async function createWorkRequest(wr: {
   dco_json: string;
   context?: any;
   status?: string;
+  title?: string;
 }): Promise<{ ok: boolean; id: string; work_request_uuid: string }> {
   const now = new Date().toISOString();
   const ctx = wr.context ?? {};
@@ -2746,18 +2902,20 @@ export async function createWorkRequest(wr: {
   const uuid = wr.work_request_uuid || crypto.randomUUID();
   if (!ctx.work_request_uuid) ctx.work_request_uuid = uuid;
   await qRun(
-    `INSERT INTO ${VISION_SCHEMA}.work_requests (wr_id, work_request_uuid, dco_json, context, status, recorded_on_dt)
-     VALUES (@wr_id, @work_request_uuid, @dco_json, @context::jsonb, @status, @now)
+    `INSERT INTO ${VISION_SCHEMA}.work_requests (wr_id, work_request_uuid, dco_json, context, status, title, recorded_on_dt)
+     VALUES (@wr_id, @work_request_uuid, @dco_json, @context::jsonb, @status, @title, @now)
      ON CONFLICT (wr_id) DO UPDATE SET
        dco_json = EXCLUDED.dco_json,
        context = EXCLUDED.context,
-       status = EXCLUDED.status`,
+       status = EXCLUDED.status,
+       title = COALESCE(EXCLUDED.title, ${VISION_SCHEMA}.work_requests.title)`,
     {
       wr_id: wr.id,
       work_request_uuid: uuid,
       dco_json: wr.dco_json,
       context: JSON.stringify(ctx),
       status: wr.status ?? "pending",
+      title: wr.title ?? "",
       now,
     }
   );

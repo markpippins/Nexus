@@ -246,7 +246,7 @@ export function registerTools(server: McpServer) {
     "Create a new requirement in the backlog.",
     {
       systemId: z.string().describe("System UUID"),
-      subsystemId: z.string().describe("Subsystem UUID"),
+      subsystemId: z.string().nullable().optional().describe("Optional subsystem UUID — requirement can live at system level"),
       featureId: z.string().nullable().optional().describe("Optional feature UUID"),
       title: z.string().describe("Requirement title"),
       description: z.string().optional().describe("Requirement description"),
@@ -254,6 +254,10 @@ export function registerTools(server: McpServer) {
       priority: z.string().optional().describe("Priority: Low, Medium, High"),
       startDate: z.string().nullable().optional().describe("Start date string"),
       completionDate: z.string().nullable().optional().describe("Completion date string"),
+      parentId: z.string().nullable().optional().describe("Parent requirement UUID (for hierarchy)"),
+      reqType: z.string().nullable().optional().describe("Requirement type: Epic, Story, Task, Bug"),
+      acceptanceCriteria: z.array(z.string()).nullable().optional().describe("Acceptance criteria list"),
+      candidateId: z.string().nullable().optional().describe("Originating harvest candidate UUID"),
     },
     async (args) => {
       const result = await NebulaClient.createRequirement({
@@ -266,6 +270,10 @@ export function registerTools(server: McpServer) {
         priority: args.priority,
         startDate: args.startDate,
         completionDate: args.completionDate,
+        parentId: args.parentId,
+        reqType: args.reqType,
+        acceptanceCriteria: args.acceptanceCriteria,
+        candidateId: args.candidateId,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -285,11 +293,15 @@ export function registerTools(server: McpServer) {
       systemId: z.string().optional().describe("Reassign to system"),
       subsystemId: z.string().optional().describe("Reassign to subsystem"),
       featureId: z.string().nullable().optional().describe("Reassign to feature"),
+      parentId: z.string().nullable().optional().describe("Parent requirement UUID"),
+      reqType: z.string().nullable().optional().describe("Requirement type: Epic, Story, Task, Bug"),
+      acceptanceCriteria: z.array(z.string()).nullable().optional().describe("Acceptance criteria list"),
+      candidateId: z.string().nullable().optional().describe("Originating harvest candidate UUID"),
     },
     async (args) => {
-      const { id, title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId } = args;
+      const { id, title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId, parentId, reqType, acceptanceCriteria, candidateId } = args;
       const result = await NebulaClient.updateRequirement(id, {
-        title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId,
+        title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId, parentId, reqType, acceptanceCriteria, candidateId,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -770,7 +782,7 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_update_harvest_candidate",
-    "Update a harvest candidate — primarily used to link it to a system, subsystem, or feature in the Nebula project hierarchy. Also supports updating title, status, intent description, and tags.",
+    "Update a harvest candidate — primarily used to link it to a system, subsystem, or feature in the Nebula project hierarchy. Also supports updating title, status, intent description, tags, work request linkage, and completion status.",
     {
       id: z.string().describe("Harvest candidate UUID"),
       title: z.string().optional().describe("New title"),
@@ -781,6 +793,8 @@ export function registerTools(server: McpServer) {
       featureId: z.string().nullable().optional().describe("Link to feature UUID (or null to unlink)"),
       tags: z.array(z.string()).optional().describe("New tags array"),
       planRef: z.string().optional().describe("Conduit plan reference (e.g. '0136') — creates a cross-reference linking this candidate to the plan with rel_type='spawns_plan'"),
+      workRequestId: z.string().uuid().nullable().optional().describe("Link to WRP runtime WorkRequest UUID — set when a WorkRequest is created for this candidate"),
+      completed: z.boolean().optional().describe("Mark candidate as completed (independent of work_request_id — useful for backfilling conduit-era work)"),
     },
     async (args) => {
       const { id, ...body } = args;
@@ -897,13 +911,16 @@ export function registerTools(server: McpServer) {
     {
       id: z.string().describe("Harvest candidate UUID"),
       systemId: z.string().describe("System UUID to link the candidate to (also used for the requirement and info tab)"),
-      subsystemId: z.string().describe("Subsystem UUID — required because the requirement must belong to a subsystem"),
+      subsystemId: z.string().nullable().optional().describe("Optional subsystem UUID — requirement can live at system level"),
       featureId: z.string().nullable().optional().describe("Optional feature UUID to link candidate and requirement to"),
       planRef: z.string().optional().describe("Optional conduit plan reference (e.g. '0136') — creates a cross-reference with rel_type='spawns_plan'"),
       priority: z.string().optional().describe("Requirement priority: Low, Medium, High (default Medium)"),
       status: z.string().optional().describe("Requirement status: Backlog, ToDo, InProgress, Active, Blocked, Done, Cancelled, Accepted (default Backlog)"),
       title: z.string().optional().describe("Requirement title (defaults to candidate title)"),
       description: z.string().optional().describe("Requirement description (defaults to candidate intent_description)"),
+      parentId: z.string().nullable().optional().describe("Parent requirement UUID (for hierarchy)"),
+      reqType: z.string().nullable().optional().describe("Requirement type: Epic, Story, Task, Bug"),
+      acceptanceCriteria: z.array(z.string()).nullable().optional().describe("Acceptance criteria list"),
     },
     async (args) => {
       const { id, ...body } = args;
@@ -918,13 +935,18 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_list_agent_records",
-    "List agent audit records, optionally filtered by type (report|analysis|assessment|inspection|prompt|response|engineering_log|architecture_note|decision), role, system, or plan.",
+    "List agent audit records, optionally filtered by type, role, system/subsystem/feature, plan, multi-tag (AND conjunction), text search, date range, level, or visibility scope.",
     {
       type: z.string().optional().describe("Filter by record type (report, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision)"),
       role: z.string().optional().describe("Filter by agent role (architect, planner, builder, reviewer, critic, analyst, inspector, engineer)"),
       systemId: z.string().optional().describe("Filter by associated system UUID"),
+      subsystemId: z.string().optional().describe("Filter by associated subsystem UUID"),
+      featureId: z.string().optional().describe("Filter by associated feature UUID"),
       planRef: z.string().optional().describe("Filter by conduit plan reference (e.g. '0136')"),
-      tag: z.string().optional().describe("Filter by tag"),
+      tag: z.union([z.string(), z.array(z.string())]).optional().describe("Filter by tag(s). Single string or array for AND conjunction (e.g. ['to:engineer', 'type:response'])"),
+      search: z.string().optional().describe("Free-text search across title and content (case-insensitive ILIKE)"),
+      createdAfter: z.string().optional().describe("Filter records created at or after this ISO 8601 timestamp"),
+      createdBefore: z.string().optional().describe("Filter records created at or before this ISO 8601 timestamp"),
       level: z.number().optional().describe("Filter by abstraction level (1-4)"),
       visibilityScope: z.string().optional().describe("Filter by visibility scope (builder, architect, planner, reviewer, all)"),
       limit: z.number().optional().describe("Max results (default 100, max 500)"),

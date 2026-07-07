@@ -125,6 +125,14 @@ async function createSchema(
       updated_at   TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.roles (
+      id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name        TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.harnesses (
       id                   TEXT PRIMARY KEY,
       name                 TEXT NOT NULL,
@@ -207,6 +215,9 @@ async function createSchema(
     );
   `);
 
+  // Seed default roles (idempotent)
+  await exec(seedDefaultRoles());
+
   // Seed default circuit breaker row
   await exec(`
     INSERT INTO ${TACKLE_SCHEMA}.circuit_breaker (id, tripped, updated_at)
@@ -280,10 +291,74 @@ async function createSchema(
       ON ${TACKLE_SCHEMA}.role_memory (role, expiration_dt DESC NULLS FIRST)
   `);
 
+  // ── Add FK constraints to roles(name) (idempotent for existing tables) ──
+  await exec(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_config_bundle_role'
+      ) THEN
+        ALTER TABLE ${TACKLE_SCHEMA}.config_bundle
+          ADD CONSTRAINT fk_config_bundle_role
+          FOREIGN KEY (role) REFERENCES ${TACKLE_SCHEMA}.roles(name);
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_agent_scheduler_role'
+      ) THEN
+        ALTER TABLE ${TACKLE_SCHEMA}.agent_scheduler
+          ADD CONSTRAINT fk_agent_scheduler_role
+          FOREIGN KEY (role) REFERENCES ${TACKLE_SCHEMA}.roles(name);
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_role_memory_role'
+      ) THEN
+        ALTER TABLE ${TACKLE_SCHEMA}.role_memory
+          ADD CONSTRAINT fk_role_memory_role
+          FOREIGN KEY (role) REFERENCES ${TACKLE_SCHEMA}.roles(name);
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_sessions_agent_role'
+      ) THEN
+        ALTER TABLE ${TACKLE_SCHEMA}.sessions
+          ADD CONSTRAINT fk_sessions_agent_role
+          FOREIGN KEY (agent_role) REFERENCES ${TACKLE_SCHEMA}.roles(name);
+      END IF;
+    END $$;
+  `);
+
   // Seed memory procedures (idempotent)
   await exec(seedMemoryProcedures());
 
   console.log(`Tackle schema initialized in PG schema ${TACKLE_SCHEMA}.`);
+}
+
+// ── Default roles seed ─────────────────────────────────────────────
+
+const DEFAULT_ROLES: { name: string; description: string }[] = [
+  { name: "engineer", description: "Primary implementation agent — writes code, runs commands, integrates systems" },
+  { name: "architect", description: "System design authority — owns architecture decisions, cross-system contracts, and design lineage" },
+  { name: "planner", description: "Work decomposition authority — creates and manages implementation plans, promotes proposals" },
+  { name: "builder", description: "Implementation executor — picks up pending plans and implements them against acceptance criteria" },
+  { name: "reviewer", description: "Quality gate — reviews changes, issues approval/rejection receipts" },
+  { name: "critic", description: "Adversarial evaluator — surfaces risks, contradictions, and blind spots" },
+  { name: "analyst", description: "Gap and triage analyst — identifies missing coverage, classifies incidents" },
+  { name: "inspector", description: "Compliance auditor — verifies invariants, issues violation reports" },
+  { name: "test", description: "Internal test harness role — used for test invoke sessions and ad-hoc agent runs" },
+];
+
+function seedDefaultRoles(): string {
+  const now = new Date().toISOString();
+  let sql = "";
+  for (const r of DEFAULT_ROLES) {
+    sql += `
+    INSERT INTO ${TACKLE_SCHEMA}.roles (name, description, created_at, updated_at)
+    VALUES ('${r.name}', '${r.description.replace(/'/g, "''")}', '${now}', '${now}')
+    ON CONFLICT (name) DO NOTHING;\n`;
+  }
+  return sql;
 }
 
 // ── Memory procedure seed function ─────────────────────────────────
@@ -1874,6 +1949,67 @@ export async function saveFailureRecoveryConfig(config: {
 }
 
 // ── Agent Scheduler ──────────────────────────────────────────────────
+
+// ── Roles Registry CRUD ─────────────────────────────────────────────
+
+export interface RoleRow {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getRoles(): Promise<RoleRow[]> {
+  return qAll("SELECT * FROM roles ORDER BY name");
+}
+
+export async function getRole(idOrName: string): Promise<RoleRow | undefined> {
+  // Check if input looks like a UUID before trying UUID query
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidPattern.test(idOrName)) {
+    const byId = await qOne("SELECT * FROM roles WHERE id = @id", { id: idOrName });
+    if (byId) return byId;
+  }
+  return qOne("SELECT * FROM roles WHERE name = @name", { name: idOrName });
+}
+
+export async function upsertRole(
+  r: Partial<RoleRow> & { name: string; description?: string },
+): Promise<RoleRow> {
+  const now = new Date().toISOString();
+  // Use the DEFAULT gen_random_uuid() when no id is provided
+  const hasId = !!r.id;
+  return qOne(
+    hasId
+      ? `INSERT INTO roles (id, name, description, created_at, updated_at)
+         VALUES (@id, @name, @description, @now, @now)
+         ON CONFLICT (name) DO UPDATE SET
+           description = EXCLUDED.description,
+           updated_at = EXCLUDED.updated_at
+         RETURNING *`
+      : `INSERT INTO roles (name, description, created_at, updated_at)
+         VALUES (@name, @description, @now, @now)
+         ON CONFLICT (name) DO UPDATE SET
+           description = EXCLUDED.description,
+           updated_at = EXCLUDED.updated_at
+         RETURNING *`,
+    { id: r.id ?? undefined, name: r.name, description: r.description ?? "", now }
+  );
+}
+
+export async function deleteRole(idOrName: string): Promise<boolean> {
+  // Check if input looks like a UUID before trying UUID query
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let changes = 0;
+  if (uuidPattern.test(idOrName)) {
+    changes = await qRun("DELETE FROM roles WHERE id = @id", { id: idOrName });
+  }
+  if (changes === 0) {
+    changes = await qRun("DELETE FROM roles WHERE name = @name", { name: idOrName });
+  }
+  return changes > 0;
+}
 
 export interface AgentSchedulerRow {
   id: number;

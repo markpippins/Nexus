@@ -116,15 +116,19 @@ export const NebulaClient = {
   },
   /** POST /api/requirements */
   createRequirement: (body: {
-    systemId: string; subsystemId: string; featureId?: string | null;
+    systemId: string; subsystemId?: string | null; featureId?: string | null;
     title: string; description?: string; status?: string; priority?: string;
     startDate?: string | null; completionDate?: string | null;
+    parentId?: string | null; reqType?: string | null;
+    acceptanceCriteria?: string[] | null; candidateId?: string | null;
   }) => httpRequest("POST", "/api/requirements", body),
   /** PATCH /api/requirements/:id */
   updateRequirement: (id: string, body: {
     title?: string; description?: string; status?: string; priority?: string;
     startDate?: string | null; completionDate?: string | null;
     systemId?: string; subsystemId?: string; featureId?: string | null;
+    parentId?: string | null; reqType?: string | null;
+    acceptanceCriteria?: string[] | null; candidateId?: string | null;
   }) => httpRequest("PATCH", `/api/requirements/${id}`, body),
   /** DELETE /api/requirements/:id */
   deleteRequirement: (id: string) => httpRequest("DELETE", `/api/requirements/${id}`),
@@ -258,6 +262,7 @@ export const NebulaClient = {
     title?: string; intentDescription?: string; status?: string;
     systemId?: string | null; subsystemId?: string | null; featureId?: string | null;
     tags?: string[]; planRef?: string;
+    workRequestId?: string | null; completed?: boolean;
   }) => httpRequest("PATCH", `/api/harvest-candidates/${encodeURIComponent(id)}`, body),
   /** POST /api/harvest-candidates */
   createHarvestCandidate: (body: {
@@ -273,18 +278,31 @@ export const NebulaClient = {
   }) => httpRequest("POST", "/api/harvest-candidates/discover", body),
 
   // ── Agent Records ──────────────────────────────────────────
-  /** GET /api/agent-records?type=&role=&systemId=&planRef=&tag=&limit=&offset= */
+  /** GET /api/agent-records?type=&role=&systemId=&subsystemId=&featureId=&planRef=&tag=&tags=&search=&createdAfter=&createdBefore=&level=&visibilityScope=&limit=&offset= */
   listAgentRecords: (query?: {
-    type?: string; role?: string; systemId?: string; planRef?: string;
-    tag?: string; level?: number; visibilityScope?: string;
+    type?: string; role?: string; systemId?: string; subsystemId?: string; featureId?: string; planRef?: string;
+    tag?: string | string[]; search?: string;
+    createdAfter?: string; createdBefore?: string;
+    level?: number; visibilityScope?: string;
     limit?: number; offset?: number;
   }) => {
     const params = new URLSearchParams();
     if (query?.type) params.set("type", query.type);
     if (query?.role) params.set("role", query.role);
     if (query?.systemId) params.set("systemId", query.systemId);
+    if (query?.subsystemId) params.set("subsystemId", query.subsystemId);
+    if (query?.featureId) params.set("featureId", query.featureId);
     if (query?.planRef) params.set("planRef", query.planRef);
-    if (query?.tag) params.set("tag", query.tag);
+    // Support both single string and array of tags
+    if (query?.tag) {
+      const tags = Array.isArray(query.tag) ? query.tag : [query.tag];
+      for (const t of tags) {
+        params.append("tag", t);
+      }
+    }
+    if (query?.search) params.set("search", query.search);
+    if (query?.createdAfter) params.set("createdAfter", query.createdAfter);
+    if (query?.createdBefore) params.set("createdBefore", query.createdBefore);
     if (query?.level !== undefined) params.set("level", String(query.level));
     if (query?.visibilityScope) params.set("visibilityScope", query.visibilityScope);
     if (query?.limit) params.set("limit", String(query.limit));
@@ -406,9 +424,11 @@ export const NebulaClient = {
   // ── Candidate → Plan spawn (full flow) ─────────────────────
   /** POST /api/harvest-candidates/:id/spawn-plan — link + requirement + cross-reference */
   spawnPlanFromCandidate: (id: string, body: {
-    systemId: string; subsystemId: string; featureId?: string | null;
+    systemId: string; subsystemId?: string | null; featureId?: string | null;
     planRef?: string; priority?: string; status?: string;
     title?: string; description?: string;
+    parentId?: string | null; reqType?: string | null;
+    acceptanceCriteria?: string[] | null;
   }) => httpRequest("POST", `/api/harvest-candidates/${encodeURIComponent(id)}/spawn-plan`, body),
 
   // ── Conduit History (Plan 0169 recovery queries) ──────────
