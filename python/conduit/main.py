@@ -61,7 +61,7 @@ def _get_log() -> logging.Logger:
 DEFAULT_DB_PATH = os.environ.get("CONDUIT_DATA_DIR", "/home/codex/dev/nexus/.conduit-data")
 LOCK_PATH = os.environ.get("PIPELINE_LOCK_PATH", "/tmp/pipeline-manager.lock")
 DCO_DIR = os.environ.get("PIPELINE_DCO_DIR", "/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS")
-PROJECT_ROOT = os.environ.get("PIPELINE_ROOT", "/home/codex/dev/nexus")
+PROJECT_ROOT = os.environ.get("PIPELINE_ROOT", "/home/codex/dev")
 
 EXECUTOR_TIMEOUT_SECONDS = int(os.environ.get("PIPELINE_EXECUTOR_TIMEOUT", "1800"))
 WATCHDOG_STALE_SECONDS = int(os.environ.get("PIPELINE_WATCHDOG_STALE", "1500"))
@@ -442,6 +442,19 @@ def _resolve_model_chain(db: DBAdapter, role: str) -> list:
             "model": fb.get("model_identifier", ""),
             "priority": fb.get("priority", 0),
         })
+
+    # Fallback: if chain is still empty, try PIPELINE_MODEL env var
+    # (allows local execution without tackle-mcp / DB role config)
+    if not chain:
+        env_model = os.environ.get("PIPELINE_MODEL", "")
+        if env_model:
+            log.info("_resolve_model_chain: PIPELINE_MODEL fallback role=%s model=%s", role, env_model)
+            chain.append({
+                "harness": "opencode",
+                "model": env_model,
+                "priority": -1,
+            })
+
     return chain
 
 
@@ -577,7 +590,8 @@ def _dispatch_one(
         with open(dco_path, "w") as f:
             json.dump(dco.model_dump(by_alias=True), f, indent=2)
 
-        db.add_work_request(wr_id, plan_id, json.dumps(dco.model_dump(by_alias=True)))
+        db.add_work_request(wr_id, plan_id, json.dumps(dco.model_dump(by_alias=True)),
+                             title=plan.get('title', '') or plan.get('goal', '')[:100])
 
         # ── Budget check ───────────────────────────────────────
         if not _check_budget(db, plan, role, session_id, ticket_id, model):

@@ -523,7 +523,42 @@ def main():
                     total_candidates += 1
             results[h["id"]] = (created, elapsed)
             
-            # Publish to Assembly forum if candidates were created
+            # ── Emit observation.captured kernel event ──
+            # This proves the nervous system: the organization notices
+            # that something happened. Cascade subscribers will assess
+            # and potentially surface via Assembly.
+            if created > 0:
+                try:
+                    import uuid as _uuid
+                    obs_id = str(_uuid.uuid4())
+                    filename_escaped = h["filename"].replace("'", "''")
+                    payload_json = json.dumps({
+                        "trigger_type": "candidate_extracted",
+                        "source_artifact_type": "harvest",
+                        "source_artifact_id": h["id"],
+                        "details": {
+                            "candidate_count": created,
+                            "filename": h["filename"],
+                        }
+                    }).replace("'", "''")
+                    rc_transition, _ = psql(
+                        f"SELECT kernel.sys_transition("
+                        f"  'observation.captured'::kernel.event_type,"
+                        f"  'observation',"
+                        f"  '{obs_id}',"
+                        f"  'rover',"
+                        f"  '{payload_json}'::jsonb,"
+                        f"  p_authority := 'rover'"
+                        f");"
+                    )
+                    if rc_transition == 0:
+                        log.info("  ✓ Emitted observation.captured (%s)", obs_id[:8])
+                    else:
+                        log.warning("  ⚠ Failed to emit observation.captured")
+                except Exception as e:
+                    log.warning("  ⚠ observation.captured emission failed: %s", e)
+
+            # Publish to Assembly forum if candidates were created (direct path)
             if created > 0 and args.publish:
                 log.info("  Publishing harvest %s to Assembly forum...", h["id"][:8])
                 if publish_harvest_to_forum(h["id"]):

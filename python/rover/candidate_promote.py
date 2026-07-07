@@ -39,11 +39,13 @@ import logging
 import subprocess
 import sys
 import uuid as uuidlib
-from datetime import datetime
+from datetime import datetime, timezone
+
+import agenda_matcher
 
 log = logging.getLogger("candidate_promote")
 
-DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
+DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus", "-q"]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,15 +54,15 @@ logging.basicConfig(
 )
 
 
-def psql(sql: str, timeout: int = 30) -> tuple[int, str]:
+def psql(sql: str, timeout: int = 30) -> tuple[int, str, str]:
     try:
         result = subprocess.run(
             DOCKER_PSQL + ["-t", "-A"],
             input=sql, capture_output=True, text=True, timeout=timeout,
         )
-        return result.returncode, result.stdout.strip()
+        return result.returncode, result.stdout.strip(), result.stderr.strip()
     except subprocess.TimeoutExpired:
-        return 1, "(timeout)"
+        return 1, "(timeout)", ""
 
 
 def fetch_ready_candidates(threshold: float = 0.7) -> list[dict]:
@@ -92,7 +94,7 @@ def fetch_ready_candidates(threshold: float = 0.7) -> list[dict]:
             ORDER BY hc.compilation_readiness DESC, hc.created_at DESC
         ) r;
     """
-    rc, out = psql(sql)
+    rc, out, err = psql(sql)
     if rc != 0 or not out:
         return []
 
@@ -135,7 +137,7 @@ def fetch_candidate(candidate_id: str) -> dict | None:
             WHERE hc.id = '{candidate_id}'
         ) r;
     """
-    rc, out = psql(sql)
+    rc, out, err = psql(sql)
     if rc != 0 or not out:
         return None
     try:
@@ -159,10 +161,12 @@ def create_intent_record(candidate: dict) -> str | None:
     cid = candidate["id"]
 
     # Build tags from candidate tags + source marker
+    # PostgreSQL text[] requires array literal syntax {a,b}, not JSON [a,b]
     tags = candidate.get("tags") or []
-    tags_json = json.dumps(list(tags) + ["promoted-from-candidate"]).replace("'", "''")
+    all_tags = list(tags) + ["promoted-from-candidate"]
+    tags_pg = "{" + ",".join(all_tags) + "}"
 
-    now = datetime.utcnow().isoformat() + "Z"
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
     sql = f"""
         INSERT INTO nebula.intent_records
@@ -173,15 +177,16 @@ def create_intent_record(candidate: dict) -> str | None:
             ('{record_id}'::uuid, '{cid}'::uuid,
              '{title}', '{description}',
              'candidate', '{cid}',
-             '{tags_json}'::text[],
+             '{tags_pg}'::text[],
              'draft',
              '{{"cpf": {candidate.get("compilation_readiness", 0.0)}}}'::jsonb,
              '{now}', '{now}')
         RETURNING id;
     """
-    rc, out = psql(sql)
+    rc, out, err = psql(sql)
     if rc != 0 or not out:
-        log.error("  Failed to create intent_record: %s", out[:200])
+        details = err[:200] if err else out[:200]
+        log.error("  Failed to create intent_record: %s", details)
         return None
 
     ir_id = out.strip()
@@ -189,7 +194,7 @@ def create_intent_record(candidate: dict) -> str | None:
     return ir_id
 
 
-def promote_candidate(candidate: dict, dry_run: bool = False) -> dict:
+def promote_candidate(candidate: dict, dry_run: bool = False, skip_agenda: bool = False) -> dict:
     """Promote a single candidate: create intent_record → mark promoted."""
     result = {
         "candidate_id": candidate["id"],
@@ -229,6 +234,24 @@ def promote_candidate(candidate: dict, dry_run: bool = False) -> dict:
         return result
     result["intent_record_id"] = ir_id
 
+    # Step 2.5: Match to agenda (if not skipped)
+    if not skip_agenda:
+        match = agenda_matcher.match_intent_to_agenda(ir_id, threshold=0.5)
+        if match.is_new:
+            log.info("  Creating new agenda...")
+            aid, iid = agenda_matcher.create_agenda(ir_id)
+            result["agenda_id"] = aid
+            result["agenda_item_id"] = iid
+        else:
+            log.info("  Adding to existing agenda %s...", match.agenda_id[:8])
+            iid = agenda_matcher.add_item_to_agenda(match.agenda_id, ir_id)
+            result["agenda_id"] = match.agenda_id
+            result["agenda_item_id"] = iid
+    else:
+        log.info("  Agenda matching skipped (--skip-agenda)")
+        result["agenda_id"] = None
+        result["agenda_item_id"] = None
+
     # Step 2: Mark candidate as promoted
     sql = f"""
         UPDATE nebula.harvest_candidates
@@ -237,11 +260,12 @@ def promote_candidate(candidate: dict, dry_run: bool = False) -> dict:
         WHERE id = '{candidate['id']}'
         AND (status IS NULL OR status NOT IN ('promoted'));
     """
-    rc, out = psql(sql)
+    rc, out, err = psql(sql)
     if rc == 0:
         log.info("  → Candidate status → promoted")
     else:
-        log.warning("  Could not update candidate status: %s", out[:100])
+        details = err[:100] if err else out[:100]
+        log.warning("  Could not update candidate status: %s", details)
 
     result["success"] = True
     log.info("  ✓ Promoted: intent_record=%s", ir_id[:8])
@@ -260,6 +284,8 @@ def main():
                         help="CPF threshold for --ready (default: 0.7)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be promoted without making changes")
+    parser.add_argument("--skip-agenda", action="store_true",
+                        help="Skip agenda matching step")
     parser.add_argument("--limit", type=int, default=10,
                         help="Max candidates to promote (default: 10)")
     args = parser.parse_args()
@@ -306,7 +332,7 @@ def main():
     log.info("Candidates to promote: %d", len(candidates))
     results = []
     for c in candidates:
-        r = promote_candidate(c, dry_run=args.dry_run)
+        r = promote_candidate(c, dry_run=args.dry_run, skip_agenda=args.skip_agenda)
         results.append(r)
 
     # Summary
@@ -324,7 +350,8 @@ def main():
         log.info("─" * 60)
         for s in successes:
             ir = s.get("intent_record_id", "?")[:8] if s.get("intent_record_id") else "-"
-            log.info("  ✓ %s  intent_record=%s", s["title"][:50], ir)
+            ag = s.get("agenda_id", "?")[:8] if s.get("agenda_id") else "-"
+            log.info("  ✓ %s  intent_record=%s  agenda=%s", s["title"][:50], ir, ag)
 
     log.info("=" * 60)
     return 0 if not failures else 1

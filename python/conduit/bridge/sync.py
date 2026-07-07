@@ -26,6 +26,14 @@ Cursor column:
     recorded_on_dt (TIMESTAMPTZ) — primary ordering key
     id (TEXT PK)                 — tiebreaker (unique within timestamp)
 
+In-process contract:
+    The wrp-kernel is an in-process Python library imported at the top of
+    this module. The bridge owns a single ``KernelEngine`` instance whose
+    ``KernelState`` persists across poll cycles (no HTTP boundary, no
+    ``KERNEL_API_URL``). Engine state is in-memory only; a daemon restart
+    rebuilds ``KernelState`` empty — full KSRA replay-from-snapshot is a
+    separate concern handled by ``wrp_kernel.engine.reconstruct_kernel_state``.
+
 Usage:
     # One-shot sync (for cron):
     python -c "from bridge.sync import syncer; syncer.sync_once()"
@@ -38,20 +46,17 @@ import json
 import logging
 import os
 import time
-from urllib.request import Request, urlopen
-from urllib.error import URLError
 
 import psycopg2
 import psycopg2.extras
 
 from bridge.checkpoint import Checkpoint
+from wrp_kernel import KernelDelta, KernelEngine
 
 _log = logging.getLogger("bridge.sync")
 
 # ── Defaults ──────────────────────────────────────────────────────────
 
-KERNEL_API_URL = os.environ.get("KERNEL_API_URL", "http://localhost:3103")
-KERNEL_API_KEY = os.environ.get("KERNEL_API_KEY", "")
 POLL_INTERVAL_SECONDS = 30
 MAX_RECEIPTS_PER_BATCH = 500
 
@@ -146,6 +151,58 @@ def _enrich_with_plan_data(conn, plan_ids: set[str]) -> dict[str, dict]:
     }
 
 
+# ── Kernel API (in-process) ──────────────────────────────────────────
+
+
+def _apply_delta(
+    engine: KernelEngine,
+    batch_id: str,
+    kernel_receipts: list[dict],
+) -> tuple[bool, str]:
+    """Apply a KernelDelta to the in-process ``KernelEngine``.
+
+    Replaces the previous HTTP POST to ``KERNEL_API_URL/delta/``. The engine
+    is owned by the bridge and its state persists across poll cycles, so
+    successive ``sync_once()`` calls advance ``KernelState.version`` without
+    any HTTP boundary.
+
+    Args:
+        engine: The singleton ``KernelEngine`` carried on ``Syncer``.
+        batch_id: Stable identifier for this poll cycle's batch.
+        kernel_receipts: Mapped kernel-compatible receipt dicts.
+
+    Returns:
+        ``(True, log_message)`` if the engine accepted the delta,
+        ``(False, error_message)`` on a ``KernelError``.
+    """
+    affected_plans = {r["plan_id"] for r in kernel_receipts}
+    delta = KernelDelta(
+        delta_id=f"bridge-{batch_id}",
+        batch_id=batch_id,
+        receipts=kernel_receipts,
+        affected_plans=affected_plans,
+    )
+
+    result = engine.reduce(delta)
+    if result.is_error:
+        msg = (result.error.message if result.error is not None
+               else "unknown kernel error")
+        _log.warning(
+            "sync_once: kernel rejected delta %s — checkpoint NOT saved: %s",
+            delta.delta_id, msg,
+        )
+        return False, msg
+
+    new_state = result.value
+    log_msg = (
+        f"reduce: OK id={delta.delta_id} "
+        f"version={new_state.version} plans={len(new_state.plans)} "
+        f"rcpts={len(new_state.receipts)}"
+    )
+    _log.info(log_msg)
+    return True, log_msg
+
+
 # ── Semantic mapping (the critical layer per BP) ──────────────────────
 
 def _conduit_receipt_to_kernel_receipt(
@@ -217,67 +274,7 @@ def _conduit_receipt_to_kernel_receipt(
     }
 
 
-def _build_kernel_delta(
-    batch_id: str,
-    kernel_receipts: list[dict],
-) -> dict:
-    """Build a KernelDelta-compatible JSON payload for the kernel API.
 
-    Args:
-        batch_id: Stable identifier for this batch.
-        kernel_receipts: Mapped kernel-compatible receipt dicts.
-
-    Returns:
-        Dict ready for POST to /delta/.
-    """
-    affected_plans = list({r["plan_id"] for r in kernel_receipts})
-    delta_id = f"bridge-{batch_id}"
-
-    return {
-        "delta_id": delta_id,
-        "batch_id": batch_id,
-        "receipts": kernel_receipts,
-        "affected_plans": affected_plans,
-        "invalidated_plans": [],
-    }
-
-
-def _post_delta(payload: dict) -> bool:
-    """POST a KernelDelta payload to the kernel API.
-
-    Args:
-        payload: The KernelDelta JSON payload.
-
-    Returns:
-        True if the kernel accepted (success=true), False otherwise.
-    """
-    url = f"{KERNEL_API_URL}/delta/"
-    data = json.dumps(payload).encode("utf-8")
-    req = Request(url, data=data, method="POST")
-    req.add_header("Content-Type", "application/json")
-    if KERNEL_API_KEY:
-        req.add_header("X-API-Key", KERNEL_API_KEY)
-
-    try:
-        with urlopen(req, timeout=30) as resp:
-            body = json.loads(resp.read().decode("utf-8"))
-            if body.get("success"):
-                _log.info("POST /delta/: OK id=%s version=%d plans=%d rcpts=%d",
-                          payload["delta_id"],
-                          body.get("version", 0),
-                          body.get("plan_count", 0),
-                          body.get("receipt_count", 0))
-                return True
-            else:
-                _log.warning("POST /delta/: FAILED id=%s error=%s",
-                             payload["delta_id"], body.get("error", "unknown"))
-                return False
-    except URLError as exc:
-        _log.error("POST /delta/: connection failed: %s", exc)
-        return False
-
-
-# ── Syncer ────────────────────────────────────────────────────────────
 
 class Syncer:
     """Conduit → Kernel bridge syncer.
@@ -300,6 +297,7 @@ class Syncer:
     def __init__(self) -> None:
         self.checkpoint = Checkpoint()
         self._pg_conn = None
+        self.engine = KernelEngine()
 
     # ── PG connection ──────────────────────────────────────────────
 
@@ -364,18 +362,15 @@ class Syncer:
             for r in receipts
         ]
 
-        # Step 5: Build KernelDelta payload
+        # Step 5+6: Build KernelDelta and apply in-process via wrp_kernel
         batch_id = (
             f"sync-{receipts[0]['id'][:12]}"
             f"-{receipts[-1]['id'][:12]}"
             f"-{int(time.time())}"
         )
-        payload = _build_kernel_delta(batch_id, kernel_receipts)
-
-        # Step 6: POST to kernel API
-        success = _post_delta(payload)
+        success, _msg = _apply_delta(self.engine, batch_id, kernel_receipts)
         if not success:
-            _log.warning("sync_once: kernel APi rejected delta — checkpoint NOT saved")
+            # _apply_delta already logged the kernel error.
             return -1
 
         # Step 7: Save checkpoint with last receipt
@@ -387,8 +382,8 @@ class Syncer:
             recorded_on_dt=dt_str,
         )
 
-        _log.info("sync_once: synced %d receipt(s) → kernel version=%s",
-                  len(receipts), payload.get("delta_id", "?"))
+        _log.info("sync_once: synced %d receipt(s); checkpoint advanced to id=%s",
+                  len(receipts), last["id"])
         return len(receipts)
 
     # ── Daemon mode ────────────────────────────────────────────────

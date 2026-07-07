@@ -126,8 +126,16 @@ def _send_heartbeat(session_id: str, role: str, pid: int | None) -> None:
 
 
 def _resolve_harness(req: Dict[str, Any]) -> str:
-    """Extract the harness from DCO metadata (defaults to 'opencode')."""
+    """Extract the harness from DCO metadata (defaults to 'opencode').
+
+    Supports both logical harness names (``opencode``, ``ollama``, ``codex``)
+    and binary paths (e.g. ``/home/codex/.opencode/bin/opencode``), extracting
+    the base name in the latter case.
+    """
     harness = (req.get("metadata") or {}).get("harness", "opencode")
+    # If harness is a binary path, extract basename (e.g. "/path/to/opencode" → "opencode")
+    if "/" in harness:
+        harness = os.path.basename(harness)
     resolved = harness if harness in ("opencode", "ollama", "codex") else "opencode"
     _log.debug("_resolve_harness: raw=%s resolved=%s", harness, resolved)
     return resolved
@@ -745,7 +753,9 @@ def _run_from_path(dco_path: str) -> int:
     req = raw  # keep raw dict for backward-compat in helpers that use .get()
     wr_id = dco.id or os.path.splitext(os.path.basename(dco_path))[0]
     role = dco.metadata.role or _resolve_role(req)
-    harness = dco.metadata.harness or _resolve_harness(req)
+    # Always normalize harness through _resolve_harness to handle both
+    # logical names ("opencode") and binary paths ("/path/to/opencode")
+    harness = _resolve_harness(req) or dco.metadata.harness or "opencode"
     working_path = os.path.abspath(dco.path)
     session_id = dco.metadata.session_id
 

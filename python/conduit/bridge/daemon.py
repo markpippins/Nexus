@@ -11,9 +11,11 @@ Logs to stdout (12-factor style) at INFO level by default.
 
 Environment variables:
     CONDUIT_PG_DSN    PostgreSQL connection string (required)
-    KERNEL_API_URL    Kernel API base URL (default: http://localhost:3103)
     POLL_INTERVAL     Seconds between poll cycles (default: 30)
     LOG_LEVEL         Logging level (default: INFO)
+
+The wrp-kernel is an in-process Python library imported by the syncer;
+there is no KERNEL_API_URL or HTTP endpoint on port 3103.
 """
 
 import logging
@@ -53,11 +55,7 @@ def run_daemon(interval: int = 30) -> None:
     Args:
         interval: Seconds between poll cycles.
     """
-    _log.info(
-        "daemon: starting (interval=%ds, kernel=%s)",
-        interval,
-        os.environ.get("KERNEL_API_URL", "http://localhost:3103"),
-    )
+    _log.info("daemon: starting (interval=%ds, kernel=in-process)", interval)
 
     _setup_signal_handlers()
 
@@ -97,10 +95,7 @@ def main() -> None:
         "--interval", type=int, default=int(os.environ.get("POLL_INTERVAL", "30")),
         help="Poll interval in seconds (default: 30, env: POLL_INTERVAL)",
     )
-    parser.add_argument(
-        "--kernel-url", default=os.environ.get("KERNEL_API_URL", "http://localhost:3103"),
-        help="Kernel API base URL (default: http://localhost:3103, env: KERNEL_API_URL)",
-    )
+
     parser.add_argument(
         "--log-level", default=os.environ.get("LOG_LEVEL", "INFO"),
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -119,10 +114,6 @@ def main() -> None:
         datefmt="%Y-%m-%dT%H:%M:%S",
         stream=sys.stdout,
     )
-
-    # Set env vars from CLI args for sub-modules
-    if args.kernel_url:
-        os.environ.setdefault("KERNEL_API_URL", args.kernel_url)
 
     if args.oneshot:
         n = syncer.sync_once()

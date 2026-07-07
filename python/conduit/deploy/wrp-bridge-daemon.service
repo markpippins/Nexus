@@ -12,9 +12,12 @@ WorkingDirectory=/home/codex/dev/nexus/python/conduit
 
 # ── Environment ────────────────────────────────────────────────────────
 Environment=CONDUIT_PG_DSN=host=localhost port=5432 user=pguser password=pgpass dbname=nexus
-Environment=KERNEL_API_URL=http://localhost:3103
 Environment=POLL_INTERVAL=30
 Environment=LOG_LEVEL=INFO
+
+# Note: wrp-kernel is now an in-process Python library imported by the
+# bridge daemon (see python/conduit/wrp_kernel/engine.py). There is no
+# KERNEL_API_URL or HTTP endpoint on port 3103.
 Environment=PYTHONUNBUFFERED=1
 
 # ── Executable ─────────────────────────────────────────────────────────

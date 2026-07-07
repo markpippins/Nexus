@@ -168,6 +168,7 @@ class DBAdapter:
                 CREATE TABLE IF NOT EXISTS work_requests (
                     id TEXT PRIMARY KEY,
                     plan_id TEXT REFERENCES nebula.plans(id),
+                    title TEXT NOT NULL DEFAULT '',
                     status TEXT NOT NULL,
                     dco_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
@@ -660,15 +661,15 @@ class DBAdapter:
             conn.commit()
         _log.debug("insert_receipt: created %s", receipt_id)
 
-    def add_work_request(self, wr_id: str, plan_id: str, dco_json: str):
-        _log.info("add_work_request: wr=%s plan=%s", wr_id, plan_id)
+    def add_work_request(self, wr_id: str, plan_id: str, dco_json: str, title: str = ''):
+        _log.info("add_work_request: wr=%s plan=%s title=%s", wr_id, plan_id, title or '(empty)')
         now = datetime.utcnow().isoformat() + "Z"
         with self._get_connection() as conn:
             conn.execute(
-                "INSERT INTO work_requests (id, plan_id, status, dco_json, created_at, updated_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s) "
+                "INSERT INTO work_requests (id, plan_id, title, status, dco_json, created_at, updated_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s) "
                 "ON CONFLICT (id) DO NOTHING",
-                (wr_id, plan_id, 'pending', dco_json, now, now),
+                (wr_id, plan_id, title, 'pending', dco_json, now, now),
             )
             conn.commit()
 
