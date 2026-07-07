@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
 import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 import com.aibizarchitect.nexus.v1.spring.user.model.UserRegistration;
 
@@ -18,14 +19,14 @@ class UserRegistrationModelTest {
         UserRegistration user = new UserRegistration();
 
         // When
-        user.setId(123L);
+        user.setId(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
         user.setAlias("testuser");
         user.setEmail("test@example.com");
         user.setIdentifier("mypassword");
         user.setAdmin(true);
 
         // Then
-        assertEquals(Long.valueOf(123L), user.getId());
+        assertEquals(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"), user.getId());
         assertEquals("testuser", user.getAlias());
         assertEquals("test@example.com", user.getEmail());
         assertEquals("mypassword", user.getIdentifier());
@@ -58,7 +59,7 @@ class UserRegistrationModelTest {
     void userRegistration_ToDto_ShouldConvertCorrectly() {
         // Given
         UserRegistration user = new UserRegistration();
-        user.setId(456L);
+        user.setId(UUID.fromString("123e4567-e89b-12d3-a456-426614174001"));
         user.setAlias("dtoUser");
         user.setEmail("dto@example.com");
         user.setAdmin(true);
@@ -68,7 +69,7 @@ class UserRegistrationModelTest {
 
         // Then
         assertNotNull(dto);
-        assertEquals("456", dto.getId()); // ID should be converted to String
+        assertEquals("123e4567-e89b-12d3-a456-426614174001", dto.getId()); // UUID converted to String
         assertEquals("dtoUser", dto.getAlias());
         assertEquals("dto@example.com", dto.getEmail());
         assertTrue(dto.isAdmin());

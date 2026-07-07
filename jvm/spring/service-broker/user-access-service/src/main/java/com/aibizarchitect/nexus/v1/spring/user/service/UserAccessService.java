@@ -30,11 +30,11 @@ public class UserAccessService {
 
         UserRegistration userReg = userRepository.findByAlias(alias).orElse(null);
 
-        if (userReg == null || !password.equals(userReg.getIdentifier())) {
+        if (userReg == null || !password.equals(userReg.getPassword())) {
             return null;
         }
 
-        if (!password.equals(userReg.getIdentifier())) {
+        if (!password.equals(userReg.getPassword())) {
             log.info("Password mismatch for user {}", alias);
             return null;
         }

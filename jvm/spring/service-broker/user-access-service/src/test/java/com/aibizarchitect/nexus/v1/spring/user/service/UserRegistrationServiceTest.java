@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.UUID;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -29,10 +30,11 @@ class UserRegistrationServiceTest {
         userAccessService = new UserAccessService(userRepository);
 
         validUser = new UserRegistration();
-        validUser.setId(123L);
+        validUser.setId(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
         validUser.setAlias("testUser");
         validUser.setEmail("test@example.com");
         validUser.setIdentifier("testpass");
+        validUser.setPassword("testpass");
     }
 
     @Test
@@ -42,7 +44,7 @@ class UserRegistrationServiceTest {
         UserRegistrationDTO result = userAccessService.validateUser("testUser", "testpass");
 
         assertNotNull(result);
-        assertEquals("123", result.getId());
+        assertEquals("123e4567-e89b-12d3-a456-426614174000", result.getId());
         assertEquals("testUser", result.getAlias());
     }
 

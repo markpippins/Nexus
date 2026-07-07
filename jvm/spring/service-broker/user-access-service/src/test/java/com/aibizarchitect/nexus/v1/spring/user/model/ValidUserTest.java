@@ -2,6 +2,8 @@ package com.aibizarchitect.nexus.v1.spring.user.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +13,7 @@ import com.aibizarchitect.nexus.v1.spring.user.model.UserRegistration;
 class ValidUserTest {
 
     private UserRegistration validUser;
+    private static final UUID TEST_UUID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
     @BeforeEach
     void setUp() {
@@ -37,10 +40,8 @@ class ValidUserTest {
 
     @Test
     void testId() {
-        Long expectedId = 123L;
-        validUser.setId(expectedId);
-
-        assertEquals(expectedId, validUser.getId());
+        validUser.setId(TEST_UUID);
+        assertEquals(TEST_UUID, validUser.getId());
     }
 
     @Test
@@ -70,7 +71,7 @@ class ValidUserTest {
     @Test
     void testToDTO() {
         // Setup user with data
-        validUser.setId(123L);
+        validUser.setId(TEST_UUID);
         validUser.setAlias("testUser");
         validUser.setEmail("test@example.com");
 
@@ -78,7 +79,7 @@ class ValidUserTest {
         UserRegistrationDTO dto = validUser.toDTO();
 
         // Verify DTO values
-        assertEquals("123", dto.getId()); // Long id converted to String
+        assertEquals(TEST_UUID.toString(), dto.getId()); // UUID converted to String
         assertEquals("testUser", dto.getAlias());
         assertEquals("test@example.com", dto.getEmail());
     }

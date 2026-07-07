@@ -119,12 +119,22 @@
             </dependency>
             <dependency>
                 <groupId>com.aibizarchitect.nexus</groupId>
+                <artifactId>social-media-api</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.aibizarchitect.nexus</groupId>
                 <artifactId>broker-gateway</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>com.aibizarchitect.nexus</groupId>
                 <artifactId>broker-gateway-sec-bot</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>com.aibizarchitect.nexus</groupId>
+                <artifactId>shrapnel-data</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
 
@@ -215,6 +225,8 @@
         <module>broker-gateway-sec-bot</module>
         <module>broker-service</module>
         <module>broker-service-spi</module>
+        <module>social-media-api</module>
+        <module>social-media</module>
         <module>file-service-api</module>
         <module>file-service</module>
         <module>login-service</module>
@@ -224,5 +236,6 @@
         <module>user-access-service</module>
         <module>user-creation-service</module>
         <module>user-service</module>
+        <module>shrapnel-data</module>
     </modules>
 </project>

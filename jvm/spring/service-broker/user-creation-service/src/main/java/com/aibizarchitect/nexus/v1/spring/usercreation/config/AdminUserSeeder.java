@@ -30,21 +30,27 @@ public class AdminUserSeeder implements CommandLineRunner {
         Optional<UserRegistration> existing = repository.findByAlias("admin");
 
         if (existing.isEmpty()) {
-            // No admin exists — create one
+            // No admin exists — create one.
+            // Mirror identifier to password: the entity declares both as NOT NULL
+            // String columns; this seeder historically used identifier as the
+            // credential, so keep them in sync until the entity is refactored.
             UserRegistration admin = new UserRegistration();
             admin.setAlias("admin");
             admin.setEmail("admin@localhost");
             admin.setAdmin(true);
             admin.setIdentifier(adminPassword);
+            admin.setPassword(adminPassword);
             repository.save(admin);
             log.info("Created admin user with configured password");
         } else {
-            // Admin exists — verify/update password
+            // Admin exists — verify/update identifier+password against config.
             UserRegistration admin = existing.get();
-            if (!adminPassword.equals(admin.getIdentifier())) {
+            if (!adminPassword.equals(admin.getIdentifier())
+                    || !adminPassword.equals(admin.getPassword())) {
                 admin.setIdentifier(adminPassword);
+                admin.setPassword(adminPassword);
                 repository.save(admin);
-                log.info("Updated admin user password to match application.properties");
+                log.info("Updated admin user identifier+password to match admin.password config");
             }
         }
     }
