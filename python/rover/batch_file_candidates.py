@@ -4,12 +4,13 @@ Batch File Candidates — Stage 2 Inference
 
 Reads docklang from nebula.harvests, uses Gemini to identify candidate-worthy
 architectural concepts, maps them to the Nebula hierarchy (systems/subsystems/
-features), and creates harvest candidates via the nebula-srv REST API.
+features), creates harvest candidates via the nebula-srv REST API, and
+optionally publishes to the Assembly forum.
 
 Usage:
     cd /home/codex/dev/nexus/python/rover
     source .venv/bin/activate
-    python3 batch_file_candidates.py [--dry-run] [--limit N] [--batch N]
+    python3 batch_file_candidates.py [--dry-run] [--limit N] [--batch N] [--publish]
 """
 
 import argparse
@@ -168,29 +169,35 @@ def summarize_docklang(docklang: dict) -> str:
 
 
 def get_unfiled_harvests(limit: int = None) -> list[dict]:
-    try:
-        candidates_data = nebula_get("/harvest-candidates?limit=500")
-        candidates = candidates_data.get("candidates", [])
-        filed_harvest_ids = set(c.get("harvest_id") for c in candidates if c.get("harvest_id"))
-        log.info("Existing: %d candidates across %d harvests", len(candidates), len(filed_harvest_ids))
-    except Exception as e:
-        log.warning("Could not fetch existing candidates: %s", e)
-        filed_harvest_ids = set()
-    
-    rc, out = psql("SELECT id, source_filename FROM nebula.harvests WHERE docklang IS NOT NULL ORDER BY created_at DESC;")
+    """Query harvests with docklang that have no existing candidates.
+    Uses direct SQL exclusion (NOT IN subquery) — immune to API limits."""
+    sql = """
+    SELECT h.id, h.source_filename
+    FROM nebula.harvests h
+    WHERE h.docklang IS NOT NULL
+      AND h.id NOT IN (
+        SELECT DISTINCT harvest_id
+        FROM nebula.harvest_candidates
+        WHERE harvest_id IS NOT NULL
+      )
+    ORDER BY h.created_at DESC
+    """
+    rc, out = psql(sql)
     if rc != 0 or not out:
         log.error("Failed to query harvests")
         return []
-    
+
     harvests = []
     for line in out.splitlines():
         parts = line.split("|", 1)
         if len(parts) == 2:
-            hid, fname = parts
-            if hid not in filed_harvest_ids:
-                harvests.append({"id": hid, "filename": fname})
-    
-    log.info("Unfiled: %d / %d harvests", len(harvests), len(out.splitlines()))
+            harvests.append({"id": parts[0], "filename": parts[1]})
+
+    # Also query total for logging
+    rc2, out2 = psql("SELECT COUNT(*) FROM nebula.harvests WHERE docklang IS NOT NULL;")
+    total = int(out2) if rc2 == 0 and out2 else 0
+
+    log.info("Unfiled: %d / %d harvests (direct SQL exclusion)", len(harvests), total)
     if limit:
         harvests = harvests[:limit]
     return harvests
@@ -290,12 +297,61 @@ def create_candidate(harvest_id: str, candidate: dict) -> bool:
     return True
 
 
+ASSEMBLY_MCP_URL = "http://localhost:3104"
+
+
+def assembly_mcp_call(method: str, params: dict) -> dict:
+    """Call an MCP tool on the assembly-mcp server via JSON-RPC over HTTP."""
+    import urllib.request, urllib.error
+    payload = json.dumps({
+        "jsonrpc": "2.0",
+        "id": "1",
+        "method": method,
+        "params": params,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        ASSEMBLY_MCP_URL,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode() if e.fp else "(no body)"
+        log.error("  Assembly MCP %s: %s", method, body_text[:500])
+        return {"error": True, "status": e.code, "body": body_text[:500]}
+    except Exception as e:
+        log.error("  Assembly MCP call failed: %s", e)
+        return {"error": True}
+
+
+def publish_harvest_to_forum(harvest_id: str) -> bool:
+    """Call assembly_publish_harvest MCP tool to create a forum post."""
+    result = assembly_mcp_call("tools/call", {
+        "name": "assembly_publish_harvest",
+        "arguments": {"harvest_id": harvest_id},
+    })
+    if isinstance(result, dict) and result.get("error"):
+        return False
+    # Successful response looks like: {"jsonrpc":"2.0","id":"1","result":{"content":[{"text":"..."}]}}
+    content = result.get("result", {}).get("content", [])
+    if content:
+        log.info("  Forum post result: %s", content[0].get("text", "")[:200])
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="Batch file candidates")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--batch", type=int, default=3)
-    parser.add_argument("--resume", type=str, default=None)
+    parser.add_argument("--resume", type=str, default=None,
+                        help="Resume from a specific harvest ID")
+    parser.add_argument("--resume-file", type=str, default=None,
+                        help="Resume from a specific source_filename (immune to UUID changes)")
+    parser.add_argument("--publish", action="store_true", default=False,
+                        help="Publish harvests to Assembly forum after creating candidates")
     args = parser.parse_args()
     
     log.info("=" * 60)
@@ -312,12 +368,20 @@ def main():
         log.info("No unfiled harvests.")
         return 0
     
-    if args.resume:
+    if args.resume_file:
         try:
-            idx = next(i for i, h in enumerate(harvests) if h["id"] == args.resume)
+            idx = next(i for i, h in enumerate(harvests) if h["filename"] == args.resume_file)
+            log.info("Resuming from file: %s (position %d/%d)", args.resume_file, idx + 1, len(harvests))
             harvests = harvests[idx:]
         except StopIteration:
-            pass
+            log.warning("Resume file not found: %s", args.resume_file)
+    elif args.resume:
+        try:
+            idx = next(i for i, h in enumerate(harvests) if h["id"] == args.resume)
+            log.info("Resuming from ID: %s (position %d/%d)", args.resume[:8], idx + 1, len(harvests))
+            harvests = harvests[idx:]
+        except StopIteration:
+            log.warning("Resume ID not found: %s", args.resume[:8])
     
     if args.dry_run:
         for h in harvests:
@@ -415,6 +479,14 @@ def main():
                     created += 1
                     total_candidates += 1
             results[h["id"]] = (created, elapsed)
+            
+            # Publish to Assembly forum if candidates were created
+            if created > 0 and args.publish:
+                log.info("  Publishing harvest %s to Assembly forum...", h["id"][:8])
+                if publish_harvest_to_forum(h["id"]):
+                    log.info("  ✓ Published to Assembly forum")
+                else:
+                    log.warning("  ⚠ Failed to publish harvest %s to forum", h["id"][:8])
     
     log.info("=" * 60)
     log.info("COMPLETE: %d candidates created across %d harvests",
