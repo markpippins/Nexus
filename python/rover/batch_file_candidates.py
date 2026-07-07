@@ -168,11 +168,16 @@ def summarize_docklang(docklang: dict) -> str:
     return "\n".join(parts)
 
 
-def get_unfiled_harvests(limit: int = None) -> list[dict]:
+def get_unfiled_harvests(limit: int = None, skip_unchanged: bool = False) -> tuple[list[dict], list[str]]:
     """Query harvests with docklang that have no existing candidates.
-    Uses direct SQL exclusion (NOT IN subquery) — immune to API limits."""
+    Uses direct SQL exclusion (NOT IN subquery) — immune to API limits.
+    
+    If skip_unchanged=True, also excludes harvests whose same-filename
+    predecessor at the same file_size already has candidates (re-ingestion
+    of unchanged content). Returns (harvests, skipped_filenames).
+    """
     sql = """
-    SELECT h.id, h.source_filename
+    SELECT h.id, h.source_filename, h.file_size
     FROM nebula.harvests h
     WHERE h.docklang IS NOT NULL
       AND h.id NOT IN (
@@ -183,24 +188,60 @@ def get_unfiled_harvests(limit: int = None) -> list[dict]:
     ORDER BY h.created_at DESC
     """
     rc, out = psql(sql)
-    if rc != 0 or not out:
+    if rc != 0:
         log.error("Failed to query harvests")
-        return []
+        return [], []
 
     harvests = []
-    for line in out.splitlines():
-        parts = line.split("|", 1)
-        if len(parts) == 2:
-            harvests.append({"id": parts[0], "filename": parts[1]})
+    if out:  # 0 results is valid, not an error
+        for line in out.splitlines():
+            parts = line.split("|")
+            if len(parts) >= 2:
+                h = {"id": parts[0], "filename": parts[1]}
+                if len(parts) >= 3 and parts[2]:
+                    try:
+                        h["file_size"] = int(parts[2])
+                    except ValueError:
+                        pass
+                harvests.append(h)
 
     # Also query total for logging
     rc2, out2 = psql("SELECT COUNT(*) FROM nebula.harvests WHERE docklang IS NOT NULL;")
     total = int(out2) if rc2 == 0 and out2 else 0
 
+    # File-size-based skip: for each unfiled harvest, check if a previous
+    # version of the same source_filename at the same file_size already has
+    # candidates (re-ingestion of unchanged content).
+    skipped = []
+    if skip_unchanged:
+        remaining = []
+        for h in harvests:
+            fs = h.get("file_size")
+            if fs is None:
+                remaining.append(h)
+                continue
+            rc3, out3 = psql(f"""
+                SELECT 1 FROM nebula.harvests
+                WHERE source_filename = '{h["filename"].replace(chr(39), chr(39)+chr(39))}'
+                  AND file_size = {fs}
+                  AND id != '{h["id"]}'
+                  AND id IN (SELECT DISTINCT harvest_id FROM nebula.harvest_candidates)
+                LIMIT 1;
+            """)
+            if rc3 == 0 and out3:
+                log.info("  Skip (unchanged): %s (%d bytes) — predecessor has candidates",
+                         h["filename"], fs)
+                skipped.append(h["filename"])
+            else:
+                remaining.append(h)
+        harvests = remaining
+
     log.info("Unfiled: %d / %d harvests (direct SQL exclusion)", len(harvests), total)
+    if skipped:
+        log.info("Skipped (unchanged file_size): %d", len(skipped))
     if limit:
         harvests = harvests[:limit]
-    return harvests
+    return harvests, skipped
 
 
 def get_docklang(harvest_id: str) -> dict | None:
@@ -352,6 +393,8 @@ def main():
                         help="Resume from a specific source_filename (immune to UUID changes)")
     parser.add_argument("--publish", action="store_true", default=False,
                         help="Publish harvests to Assembly forum after creating candidates")
+    parser.add_argument("--skip-unchanged", action="store_true", default=False,
+                        help="Skip harvests whose same-filename predecessor at same file_size already has candidates")
     args = parser.parse_args()
     
     log.info("=" * 60)
@@ -363,7 +406,7 @@ def main():
         return 1
     hierarchy_text = build_hierarchy_text(systems)
     
-    harvests = get_unfiled_harvests(args.limit)
+    harvests, skipped = get_unfiled_harvests(args.limit, args.skip_unchanged)
     if not harvests:
         log.info("No unfiled harvests.")
         return 0
