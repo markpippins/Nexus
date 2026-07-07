@@ -331,6 +331,10 @@ def validate_integrity() -> dict:
             SELECT COUNT(*) FROM nebula.harvest_candidates
             WHERE title IS NULL OR title = ''
         """,
+        "null_file_size": """
+            SELECT COUNT(*) - COUNT(file_size)
+            FROM nebula.harvests
+        """,
     }
 
     results = {}
@@ -340,6 +344,19 @@ def validate_integrity() -> dict:
     log.info("Data Integrity Validation")
 
     for check_name, sql in checks.items():
+        if check_name == "null_file_size":
+            rc, out = psql(sql)
+            missing = int(out) if rc == 0 and out else -1
+            results[check_name] = missing
+            rc2, total_out = psql("SELECT COUNT(*) FROM nebula.harvests;")
+            total = int(total_out) if rc2 == 0 and total_out else 0
+            if missing >= 0 and total > 0:
+                log.info("  ℹ file_size coverage: %d/%d (%d missing)",
+                         total - missing, total, missing)
+            else:
+                log.warning("  ✗ file_size coverage: query failed")
+                all_clean = False
+            continue
         rc, out = psql(sql)
         if rc != 0:
             log.warning("  ✗ %s: query failed", check_name)
