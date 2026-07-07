@@ -582,10 +582,12 @@ See **[JVM_PIPELINE_FLOW.md](./JVM_PIPELINE_FLOW.md)** for complete Mermaid diag
 - Loads checkpoint (last_id, last_recorded_on_dt) from disk
 - Queries new receipts ordered by (recorded_on_dt ASC, id ASC), enriched with plan data from `conduit.plans`
 - Performs **semantic mapping** — converts each conduit receipt to kernel format (dependencies, files_affected from plan enrichment)
-- Builds `KernelDelta` payload and POSTs to wrp-kernel at `KERNEL_API_URL/delta/`
+- Builds `KernelDelta` payload and calls `KernelEngine.reduce(delta)` directly in-process
 - Saves checkpoint on success; skips checkpoint on kernel rejection (retries next poll)
 
-**WRP Kernel Runtime** (`wrp_kernel/`, port 3103):
+**WRP Kernel Runtime** (`wrp_kernel/`, in-process Python library):
+
+> **Reconciliation Note:** `wrp-kernel` is an **in-process Python library** at `python/conduit/wrp_kernel/` (`engine.py`, `identity.py`, `graph.py`, `lineage.py`, `delta.py`, `snapshot.py`). It is **not** an HTTP service, MCP server, or daemon on port 3103 — the bridge daemon imports it and calls `KernelEngine.reduce(delta)` directly. Canonical note: `mcp_server_standalone_discrepancies` in `nexus/graph/nexus-knowledge-graph.json`.
 - Available as an MCP server via stdio, exposing a 5-step deterministic reduce pipeline:
   1. **Receipt Materialization** — insert receipts into `KernelState.receipts`, dedup check (rejects duplicate receipt_id)
   2. **Identity Resolution** — `IdentityEngine.resolve(node_id, plan_id) → identity_id`, ensuring cross-plan continuity
@@ -795,7 +797,7 @@ The terrain topology server (port 8084, PostgreSQL `terrain` schema) is the cano
 | 11 | AI / Local LLM |
 | 12 | Python Service |
 
-**Total registered:** 10 MCP servers, 26 runnable services.
+**Total registered:** 9 MCP servers, 26 runnable services.
 
 ### Dependency Graph (from terrain.service_dependencies)
 
@@ -804,7 +806,7 @@ The terrain topology server (port 8084, PostgreSQL `terrain` schema) is the cano
 | vision-mcp-py (MCP) | vision-srv-py (Python :8003) | **critical** | MCP stdio proxy → FastAPI REST API |
 | vision-mcp (MCP) | vision-srv (Express :3103) | **critical** | MCP stdio proxy → Express REST API |
 | wrp-bridge-daemon | PostgreSQL (:5432) | **high** | PostgreSQL for checkpoint storage |
-| wrp-bridge-daemon | wrp-kernel (MCP :3103) | **high** | POSTs KernelDeltas for state machine |
+| wrp-bridge-daemon | wrp-kernel (in-process lib) | **high** | Calls `KernelEngine.reduce(delta)` in-process for state machine |
 | terrain-mcp (MCP) | nebula-srv (Express :3101) | medium | terrain-mcp → nebula-srv |
 | nebula-mcp (MCP) | nebula-srv (Express :3101) | medium | nebula-mcp → nebula-srv |
 | conduit-mcp (MCP) | nebula-srv (Express :3101) | medium | conduit-mcp → nebula-srv |
@@ -923,7 +925,7 @@ Each role sees a filtered view of the same graph tuned to its level and scope.
 
 ### WorkRequest Pipeline (operational)
 
-The WorkRequest Pipeline coordinates 10+ services across the Python, TypeScript, and JVM layers to move work from user intent to committed state. The pipeline is organized into three stages: **plan orchestration** (conduit-mcp), **receipt projection** (wrp-bridge-daemon → wrp-kernel), and **JVM governance & discovery** (peb-kernel, service-registry, broker-gateway, terrain).
+The WorkRequest Pipeline coordinates 10+ services across the Python, TypeScript, and JVM layers to move work from user intent to committed state. The pipeline is organized into three stages: **plan orchestration** (conduit-mcp), **receipt projection** (wrp-bridge-daemon → wrp-kernel in-process library), and **JVM governance & discovery** (peb-kernel, service-registry, broker-gateway, terrain).
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
@@ -948,10 +950,10 @@ The WorkRequest Pipeline coordinates 10+ services across the Python, TypeScript,
 │       ├── Load checkpoint (last_id, last_recorded_on_dt)                 │
 │       ├── Query new receipts with enrichment from conduit.plans          │
 │       ├── Semantic mapping: conduit receipt → kernel format              │
-│       ├── Build KernelDelta → POST to :3103                              │
+│       ├── Build KernelDelta → call KernelEngine.reduce(delta) in-process │
 │       └── Save checkpoint on success / skip on rejection                 │
 │                                                                          │
-│  wrp-kernel (:3103) — 5-Step Reduce Pipeline                            │
+│  wrp-kernel (in-process) — 5-Step Reduce Pipeline                       │
 │       ├── 1. Receipt Materialization (dedup, insert)                     │
 │       ├── 2. Identity Resolution (node_id → identity_id)                │
 │       ├── 3. Graph Update (edges: depends_on, impacts_system)           │
@@ -991,7 +993,7 @@ The WorkRequest Pipeline coordinates 10+ services across the Python, TypeScript,
 │       │  Provides canonical service inventory for all pipeline actors.  │
 │       │  Agents use terrain-mcp to find which MCP servers, microservices,│
 │       │  or CLI tools are available for execution.                      │
-│       └── Registered: 10 MCP servers, 28 runnable services             │
+│       └── Registered: 9 MCP servers, 28 runnable services              │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1121,7 +1123,7 @@ See **[JVM_PIPELINE_FLOW.md](./JVM_PIPELINE_FLOW.md)** for peb-kernel governance
 
 | Port | Service A | Service B | Status |
 |------|-----------|-----------|--------|
-| 3103 | vision-srv (Express) | wrp-kernel / conduit uvicorn (conduit Python) | wrp-kernel running on 3103; vision-srv moved to 3104. The WRP kernel owns this port as the deterministic state machine endpoint. |
+| 3103 | vision-srv (Express) | — | **Resolved.** vision-srv owns port 3103 (Express API). `wrp-kernel` is an in-process library at `python/conduit/wrp_kernel/` and does **not** bind a port. The 3103/3104 collision with wrp-kernel was a documentation artifact; see `mcp_server_standalone_discrepancies` in `nexus/graph/nexus-knowledge-graph.json`. |
 | 8084 | terrain | topology-server | Same process (duplicate registration in terrain) |
 | 4040 | file-system-server (Node.js) | filesystem-server (Bun) | Registered as separate services on same port |
 
@@ -1129,8 +1131,10 @@ See **[JVM_PIPELINE_FLOW.md](./JVM_PIPELINE_FLOW.md)** for peb-kernel governance
 
 ## Appendix: Terrain-Registered Services (Complete List)
 
-### MCP Servers (10 total)
-conduit-mcp (:3100), knowledge-mcp (stdio), nebula-mcp (→:3101), nebula-mcp-sse (:3102), peb-mcp (stdio), tackle-mcp (:3400), terrain-mcp (stdio), vision-mcp (stdio), vision-mcp-py (stdio — Python), wrp-kernel (:3103)
+### MCP Servers (9 total)
+conduit-mcp (:3100), knowledge-mcp (stdio), nebula-mcp (→:3101), nebula-mcp-sse (:3102), peb-mcp (stdio), tackle-mcp (:3400), terrain-mcp (stdio), vision-mcp (stdio), vision-mcp-py (stdio — Python)
+
+> **Note:** `wrp-kernel` is not listed here — it is an **in-process Python library** at `python/conduit/wrp_kernel/`, not an MCP server or any standalone service.
 
 ### REST API Servers (newly added)
 role-memory-srv (:3500), tools-aggregator (:3200)

@@ -222,6 +222,21 @@ Schemas are the validation and transport contracts.
 
 ## 7. Cross-System Integration
 
+### wrp-kernel: in-process library, not an HTTP service
+
+The `wrp-kernel` state-machine engine is an **in-process Python library** at
+`python/conduit/wrp_kernel/` (`engine.py`, `identity.py`, `graph.py`,
+`lineage.py`, `delta.py`, `snapshot.py`). It is NOT a standalone HTTP service,
+MCP server, or daemon, and it does not bind a port. The bridge daemon (and any
+other Conduit-side caller) imports `wrp_kernel` and calls
+`KernelEngine.reduce(delta)` directly.
+
+Consequence for §5 (API Reference): the WRP endpoints listed there describe
+the **WRP contract** exposed by the upstream Conduit / API-Gateway boundary.
+The kernel itself is reached by in-process function call from there, not by
+HTTP. Canonical reconciliation: `mcp_server_standalone_discrepancies` in
+`nexus/graph/nexus-knowledge-graph.json`.
+
 ### Conduit Bridge
 
 WRP WorkRequests map to Conduit plans via the cross-reference relation
@@ -243,6 +258,8 @@ projection. See plan #0181 (Temporal Graph Versioning) for branching and
 snapshot semantics.
 
 ---
+
+> **Note:** `wrp-kernel` referenced in §7 is an in-process Python library (see note above). Earlier revisions of `WRP_PIPELINE_FLOW.md`, `ARCHITECTURE.md`, `SERVICE_TOPOLOGY.md`, and `INDEX.md` listed `wrp-kernel` as a standalone MCP server on port 3103. That description has been reconciled; the canonical note is `mcp_server_standalone_discrepancies` in `nexus/graph/nexus-knowledge-graph.json`.
 
 ## 8. Protocol Evolution
 

@@ -73,10 +73,10 @@ graph TB
         HUS["helidon-user-access<br/><small>Helidon MP :9093 • User auth</small>"]
     end
 
-    %% ===== WRP PIPELINE LAYER (standalone process group, not nested in Python) =====
+    %% ===== WRP PIPELINE LAYER (Python layer: bridge daemon + in-process kernel library) =====
     subgraph WRPI["WRP Pipeline — Bridge Daemon + Kernel Runtime"]
-        WBD["🐉 wrp-bridge-daemon<br/><small>Polls vision.receipts (PG)<br/>Creates KernelDeltas → wrp-kernel</small>"]
-        WK_INT["⚙️ wrp-kernel (internal)<br/><small>:3103</small>"]
+        WBD["🐉 wrp-bridge-daemon<br/><small>Polls vision.receipts (PG)<br/>Calls KernelEngine.reduce(delta) in-process</small>"]
+        WK_INT["⚙️ wrp-kernel (in-process lib)<br/><small>python/conduit/wrp_kernel/</small>"]
         subgraph WK_STEPS["Kernel Reduce Pipeline (5-step)"]
             S1["1️⃣ Receipt Materialization<br/><small>Insert receipts, dedup check</small>"]
             S2["2️⃣ Identity Resolution<br/><small>node_id → identity_id mapping</small>"]
@@ -226,7 +226,7 @@ graph LR
     %% HIGH dependencies
     subgraph High["High Dependencies"]
         WBD1("wrp-bridge-daemon") --> PG1("PostgreSQL :5432")
-        WBD1 --> WK1("wrp-kernel :3103")
+        WBD1 --> WK1("wrp-kernel (in-process lib)")
         WK1 --> WK_STEPS("5-Step Reduce Pipeline<br/>Materialize→Identity→Graph→Lineage→Commit")
     end
 
@@ -450,18 +450,18 @@ NATS JetStream   ← cascade — event publication
                  │     kernel receipt format                 │
                  │  5. Build KernelDelta payload (delta_id,   │
                  │     receipts, affected_plans)             │
-                 │  6. POST KernelDelta to :3103/delta/      │
+                 │  6. Call KernelEngine.reduce(delta) (in-process)│
                  │  7. On success: save checkpoint            │
                  │     On rejection: skip checkpoint (retry)  │
                  │  ─────────────────────────────────────    │
                  │  Env: CONDUIT_PG_DSN                      │
-                 │       KERNEL_API_URL (http://:3103)       │
+                 │       (no HTTP — direct in-process call)  │
                  │       POLL_INTERVAL (default 30s)         │
                  └──────────┬───────────────────────────────┘
                             │ KernelDelta (receipts + affected_plans)
                  ┌──────────▼───────────────────────────────┐
-                 │  wrp-kernel :3103                          │
-                 │  wrp_kernel/engine.py                      │
+                 │  wrp-kernel (in-process lib)               │
+                 │  python/conduit/wrp_kernel/engine.py       │
                  │                                            │
                  │  ┌────────────────────────────────────┐    │
                  │  │  5-Step Reduce Pipeline (pure fn)   │    │
@@ -495,8 +495,12 @@ NATS JetStream   ← cascade — event publication
                  │  GRAPH_CYCLE, VERSION_MISMATCH,            │
                  │  INVALID_TRANSITION, VALIDATION_ERROR      │
                  │                                            │
-                 │  Available as MCP server via stdio          │
+                 │  In-process Python library — imported by    │
+                 │  the bridge daemon; no HTTP/MCP endpoint  │
                  └────────────────────────────────────────────┘
+```
+
+> **Reconciliation Note:** `wrp-kernel` is an **in-process Python library** at `python/conduit/wrp_kernel/` (`engine.py`, `identity.py`, `graph.py`, `lineage.py`, `delta.py`, `snapshot.py`). It is **not** an MCP server, daemon, or HTTP service on port 3103 — the bridge daemon imports it and calls `KernelEngine.reduce(delta)` directly. This ASCII diagram previously framed the kernel as a standalone process on `:3103`; that framing was a documentation artifact. Canonical note: `mcp_server_standalone_discrepancies` in `nexus/graph/nexus-knowledge-graph.json`.
 ```
 
 ---
