@@ -4,6 +4,7 @@ import com.aibizarchitect.nexus.v1.spring.topology.entity.*;
 import com.aibizarchitect.nexus.v1.spring.topology.repository.*;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -31,7 +32,7 @@ public class TopologyDataInitializer implements CommandLineRunner {
     private static final String SERVICE_DEPENDENCIES_PATH = "config/service-dependencies.json";
     private static final String CLI_TOOLS_PATH = "config/cli-tools.json";
 
-    private static boolean reInitialize = false;
+    private final boolean reInitialize;
 
     public TopologyDataInitializer(BrokerProfileRepository brokerProfileRepository,
                                     RegistryServerProfileRepository registryServerProfileRepository,
@@ -41,7 +42,8 @@ public class TopologyDataInitializer implements CommandLineRunner {
                                     RunnableServiceRepository runnableServiceRepository,
                                     ServiceDependencyRepository serviceDependencyRepository,
                                     CliToolRepository cliToolRepository,
-                                    ObjectMapper objectMapper) {
+                                    ObjectMapper objectMapper,
+                                    @Value("${terrain.re-initialize:false}") boolean reInitialize) {
         this.brokerProfileRepository = brokerProfileRepository;
         this.registryServerProfileRepository = registryServerProfileRepository;
         this.serviceTypeRepository = serviceTypeRepository;
@@ -51,6 +53,7 @@ public class TopologyDataInitializer implements CommandLineRunner {
         this.serviceDependencyRepository = serviceDependencyRepository;
         this.cliToolRepository = cliToolRepository;
         this.objectMapper = objectMapper;
+        this.reInitialize = reInitialize;
     }
 
     @Override

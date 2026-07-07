@@ -76,3 +76,5 @@ python/voyager/fs-crawler-v2_files/
 legacy/python/conduit/
 WORK_TO_DATE.md
 **/__pycache__/
+python/rover/.embedding_cache/
+typescript/image-server/images/

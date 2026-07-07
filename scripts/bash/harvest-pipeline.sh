@@ -31,8 +31,8 @@
 # SAFETY:
 #   Dry-run by default. Pass --apply to actually write to the database.
 #
-# CRON EXAMPLE (process up to 3 every 30 minutes, dry-run only):
-#   */30 * * * * /home/codex/dev/nexus/scripts/bash/harvest-pipeline.sh --limit 3 --apply
+# CRON EXAMPLE (process up to 6 once per hour):
+#   0 * * * * /home/codex/dev/nexus/scripts/bash/harvest-pipeline.sh --apply --limit 6
 #
 # AUTHOR:  generated via Codebuff
 # DATE:    2026-07-03
@@ -132,6 +132,14 @@ check_prereqs() {
         log_info "  ✓ Nebula API is reachable"
     fi
 
+    if [[ "$APPLY_MODE" == "true" ]] && ! curl -sf http://localhost:3104/ >/dev/null 2>&1; then
+        log_warn "  Assembly MCP at localhost:3104 is not reachable."
+        log_warn "  Forum publishing (--publish) will fail."
+        log_warn "  Ensure assembly-mcp is running with: ASSEMBLY_MCP_PORT=3104 node dist/server.js"
+    elif curl -sf http://localhost:3104/ >/dev/null 2>&1; then
+        log_info "  ✓ Assembly MCP is reachable"
+    fi
+
     if [[ ! -f "$VENV_ACTIVATE" ]]; then
         log_error "Python venv not found at ${VENV_ACTIVATE}"
         exit 1
@@ -215,6 +223,10 @@ main() {
     fi
     STAGE2_ARGS+=("--limit" "${STAGE2_LIMIT}")
     STAGE2_ARGS+=("--batch" "${STAGE2_BATCH}")
+    if [[ "$APPLY_MODE" == "true" ]]; then
+        STAGE2_ARGS+=("--publish")
+        log_info "  Publishing harvests to Assembly forum (--publish)"
+    fi
 
     python3 "$STAGE2" "${STAGE2_ARGS[@]}" 2>&1
 

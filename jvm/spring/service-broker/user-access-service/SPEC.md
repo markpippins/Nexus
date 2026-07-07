@@ -2,36 +2,44 @@
 
 ## Functional Requirements
 
-- Register new user accounts with input validation
-- Authenticate users with credentials (login/password)
-- Manage user profiles (view, update, search)
-- Support password management (secure updates, recovery)
-- Provide session management and authentication tokens
-- Implement multi-factor authentication support
-- Maintain dual ID system (Long IDs for client compatibility, String mongoIds for MongoDB)
+- **Account Management:** Handle registration with validation, profile management (view, update, search), and password management.
+- **Authentication:** Provide login/password authentication and token-based session management.
+- **Identification:** Single UUID primary key pattern (generated via PostgreSQL `gen_random_uuid()`).
 
 ## Non-Functional Requirements
 
-- MongoDB for flexible document-based persistence
-- bcrypt password hashing (cost factor 12)
-- Rate limiting for brute force attack protection
-- XSS prevention through proper output encoding
-- Audit logging for all account changes
+- **Storage:** PostgreSQL via JPA, `assembly` schema.
+- **Security:** bcrypt (cost factor 12) for password hashing, rate limiting for brute force protection, XSS prevention, and audit logging for all account changes.
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| (Broker) | login | Authenticate user with credentials |
-| (Broker) | createUser | Create a new user account |
-| (Broker) | findById | Retrieve user by ID |
-| (Broker) | findByEmail | Retrieve user by email |
-| (Broker) | findAll | Retrieve all users |
-| (Broker) | update | Update user profile |
-| (Broker) | delete | Delete user by ID |
+All operations are performed via the broker: `login`, `createUser`, `findById`, `findByEmail`, `findAll`, `update`, and `delete`.
 
 ## Data Model
 
-- User: id (Long), mongoId (String), username (String), email (String), passwordHash (String), displayName (String), roles (String[]), mfaEnabled (Boolean), createdAt (Instant), updatedAt (Instant)
-- UserProfile: userId (Long), avatarUrl (String), bio (String), preferences (JSON)
-- Session: id (UUID), userId (Long), token (String), ipAddress (String), expiresAt (Instant), createdAt (Instant)
+### Assembly Schema — `assembly.users`
+
+| Column | Type | Constraints |
+|--------|------|-------------|
+| `id` | `UUID` | PK, default `gen_random_uuid()` |
+| `alias` | `VARCHAR(255)` | NOT NULL, UNIQUE |
+| `email` | `VARCHAR(255)` | NOT NULL, UNIQUE |
+| `password` | `TEXT` | NOT NULL (bcrypt hash) |
+| `identifier` | `VARCHAR(255)` | Optional external identifier |
+| `admin` | `BOOLEAN` | DEFAULT FALSE |
+| `avatar_url` | `VARCHAR(255)` | Optional profile avatar URL |
+| `created_at` | `TIMESTAMPTZ` | DEFAULT NOW() |
+| `updated_at` | `TIMESTAMPTZ` | DEFAULT NOW() |
+
+### Social Graph Tables (in `assembly` schema)
+
+- `user_followers` — Junction table (user_id, follower_id)
+- `user_following` — Junction table (user_id, following_id)
+- `user_friends` — Junction table (user_id, friend_id)
+
+## Tech Stack
+
+- **Framework:** Spring Boot 4.x, Java 21
+- **Persistence:** Spring Data JPA + PostgreSQL (assembly schema)
+- **Auth:** JWT tokens, bcrypt password hashing
+- **Build:** Maven
