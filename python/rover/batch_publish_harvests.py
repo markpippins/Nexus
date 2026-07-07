@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-Batch Publish Harvests — Query-driven forum publishing.
+Batch Publish Harvests — Query-driven forum publishing + duplicate harvest cleanup.
 
 Queries nebula.harvests for harvests that have candidates but no Assembly
 forum post, then publishes each one via assembly-mcp. No hard-coded IDs.
 
+Also supports --deduplicate to clean up duplicate harvests (same source_filename,
+different UUIDs from re-ingestion), keeping only the most recent per filename.
+
 Usage:
     cd /home/codex/dev/nexus/python/rover
     source .venv/bin/activate
-    python3 batch_publish_harvests.py [--dry-run] [--limit N]
+    python3 batch_publish_harvests.py [--dry-run] [--limit N] [--deduplicate]
 """
 
 import argparse
@@ -111,14 +114,197 @@ def get_unpublished_harvests(limit: int | None = None) -> list[dict]:
     return harvests
 
 
+def get_duplicate_groups() -> list[dict]:
+    """Find duplicate harvests (same source_filename, multiple IDs)."""
+    sql = """
+    WITH dupes AS (
+        SELECT source_filename, COUNT(*) as cnt
+        FROM nebula.harvests
+        GROUP BY source_filename
+        HAVING COUNT(*) > 1
+    ),
+    keep AS (
+        SELECT DISTINCT ON (h.source_filename)
+            h.id as keep_id, h.source_filename, h.created_at
+        FROM nebula.harvests h
+        JOIN dupes d ON d.source_filename = h.source_filename
+        ORDER BY h.source_filename, h.created_at DESC
+    )
+    SELECT
+        k.source_filename,
+        k.keep_id,
+        h.id as remove_id,
+        (SELECT COUNT(*) FROM nebula.harvest_candidates WHERE harvest_id = h.id) as remove_cands,
+        (SELECT COUNT(*) FROM nebula.harvest_candidates WHERE harvest_id = k.keep_id) as keep_cands,
+        (SELECT COUNT(*) FROM assembly.post_artifact_refs
+         WHERE artifact_type = 'harvest' AND artifact_id = h.id) as remove_posts
+    FROM keep k
+    JOIN nebula.harvests h ON h.source_filename = k.source_filename AND h.id != k.keep_id
+    ORDER BY k.source_filename;
+    """
+    rc, out = psql(sql)
+    if rc != 0:
+        log.error("Failed to query duplicate groups")
+        return []
+
+    if not out:
+        return []  # No duplicates — expected, not an error
+
+    groups = []
+    for line in out.splitlines():
+        parts = line.split("|", 5)
+        if len(parts) == 6:
+            groups.append({
+                "filename": parts[0],
+                "keep_id": parts[1],
+                "remove_id": parts[2],
+                "remove_cands": int(parts[3]),
+                "keep_cands": int(parts[4]),
+                "remove_posts": int(parts[5]),
+            })
+    return groups
+
+
+def deduplicate_harvests(dry_run: bool = False) -> dict:
+    """Deduplicate harvests: reassign candidates, clean refs, delete duplicates.
+    For each duplicate filename group, keeps the most recent harvest (by created_at).
+    Returns summary dict with counts."""
+    groups = get_duplicate_groups()
+    if not groups:
+        log.info("No duplicate harvests found.")
+        return {"groups": 0, "removed": 0, "candidates_moved": 0, "posts_cleaned": 0}
+
+    unique_filenames = len(set(g["filename"] for g in groups))
+    total_remove = len(groups)
+    total_remove_cands = sum(g["remove_cands"] for g in groups)
+    total_remove_posts = sum(g["remove_posts"] for g in groups)
+
+    log.info("=" * 60)
+    log.info("Duplicate Harvest Analysis")
+    log.info("  Duplicate groups: %d filenames, %d harvests to remove",
+             unique_filenames, total_remove)
+    log.info("  Candidates to reassign: %d", total_remove_cands)
+    log.info("  Forum post refs to clean: %d", total_remove_posts)
+
+    for g in groups:
+        log.info("  [%s] %s → keep=%s (keep_cands=%d, remove_cands=%d)",
+                 g["remove_id"][:12], g["filename"][:60],
+                 g["keep_id"][:12], g["keep_cands"], g["remove_cands"])
+
+    if dry_run:
+        log.info("DRY RUN — no changes made.")
+        log.info("=" * 60)
+        return {
+            "groups": unique_filenames,
+            "removed": total_remove,
+            "candidates_moved": total_remove_cands,
+            "posts_cleaned": total_remove_posts,
+        }
+
+    # Step 1: Reassign candidates from remove → keep harvest
+    sql_reassign = """
+    WITH keep AS (
+        SELECT DISTINCT ON (source_filename) id, source_filename
+        FROM nebula.harvests
+        ORDER BY source_filename, created_at DESC
+    ),
+    remove AS (
+        SELECT h.id, h.source_filename, k.id as keep_id
+        FROM nebula.harvests h
+        JOIN keep k ON k.source_filename = h.source_filename AND k.id != h.id
+        WHERE h.source_filename IN (
+            SELECT source_filename FROM nebula.harvests
+            GROUP BY source_filename HAVING COUNT(*) > 1
+        )
+    )
+    UPDATE nebula.harvest_candidates hc
+    SET harvest_id = r.keep_id
+    FROM remove r
+    WHERE hc.harvest_id = r.id;
+    """
+    rc, _ = psql(sql_reassign)
+    if rc == 0:
+        log.info("  ✓ Reassigned %d candidates", total_remove_cands)
+    else:
+        log.error("  ✗ Failed to reassign candidates")
+        return {"error": True}
+
+    # Step 2: Delete forum post artifact refs on remove harvests
+    sql_clean_refs = """
+    WITH keep AS (
+        SELECT DISTINCT ON (source_filename) id, source_filename
+        FROM nebula.harvests
+        ORDER BY source_filename, created_at DESC
+    )
+    DELETE FROM assembly.post_artifact_refs
+    WHERE artifact_type = 'harvest'
+    AND artifact_id IN (
+        SELECT h.id FROM nebula.harvests h
+        WHERE h.id NOT IN (SELECT id FROM keep)
+        AND h.source_filename IN (
+            SELECT source_filename FROM nebula.harvests
+            GROUP BY source_filename HAVING COUNT(*) > 1
+        )
+    );
+    """
+    rc, _ = psql(sql_clean_refs)
+    if rc == 0:
+        log.info("  ✓ Cleaned %d forum post artifact refs", total_remove_posts)
+    else:
+        log.warning("  ⚠ Failed to clean some forum post refs")
+
+    # Step 3: Delete the duplicate harvests
+    sql_delete = """
+    WITH keep AS (
+        SELECT DISTINCT ON (source_filename) id, source_filename
+        FROM nebula.harvests
+        ORDER BY source_filename, created_at DESC
+    )
+    DELETE FROM nebula.harvests
+    WHERE id NOT IN (SELECT id FROM keep)
+    AND source_filename IN (
+        SELECT source_filename FROM nebula.harvests
+        GROUP BY source_filename HAVING COUNT(*) > 1
+    );
+    """
+    rc, _ = psql(sql_delete)
+    if rc == 0:
+        log.info("  ✓ Deleted %d duplicate harvests", total_remove)
+    else:
+        log.error("  ✗ Failed to delete duplicate harvests")
+        return {"error": True}
+
+    log.info("=" * 60)
+    return {
+        "groups": unique_filenames,
+        "removed": total_remove,
+        "candidates_moved": total_remove_cands,
+        "posts_cleaned": total_remove_posts,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Batch publish harvests to Assembly forum")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--delay", type=float, default=0.5,
                         help="Delay in seconds between publishes (default: 0.5)")
+    parser.add_argument("--deduplicate", action="store_true",
+                        help="Deduplicate harvests: keep most recent per filename, "
+                             "reassign candidates, clean forum refs, delete old harvests")
     args = parser.parse_args()
 
+    # Deduplication mode
+    if args.deduplicate:
+        result = deduplicate_harvests(dry_run=args.dry_run)
+        if result.get("error"):
+            return 1
+        log.info("Dedup summary: %d groups, %d harvests removed, %d candidates moved, %d posts cleaned",
+                 result["groups"], result["removed"],
+                 result["candidates_moved"], result["posts_cleaned"])
+        return 0
+
+    # Publishing mode
     harvests = get_unpublished_harvests(args.limit)
     if not harvests:
         log.info("No unpublished harvests found.")
