@@ -7,11 +7,12 @@ forum post, then publishes each one via assembly-mcp. No hard-coded IDs.
 
 Also supports --deduplicate to clean up duplicate harvests (same source_filename,
 different UUIDs from re-ingestion), keeping only the most recent per filename.
+Supports --validate to run data integrity checks before publishing.
 
 Usage:
     cd /home/codex/dev/nexus/python/rover
     source .venv/bin/activate
-    python3 batch_publish_harvests.py [--dry-run] [--limit N] [--deduplicate]
+    python3 batch_publish_harvests.py [--dry-run] [--limit N] [--validate] [--deduplicate]
 """
 
 import argparse
@@ -283,16 +284,104 @@ def deduplicate_harvests(dry_run: bool = False) -> dict:
     }
 
 
+def validate_integrity() -> dict:
+    """Run data integrity checks and return results dict.
+    Non-zero values indicate potential issues that should be reviewed."""
+    checks = {
+        "orphaned_candidates": """
+            SELECT COUNT(*) FROM nebula.harvest_candidates
+            WHERE harvest_id NOT IN (SELECT id FROM nebula.harvests)
+        """,
+        "null_harvest_id": """
+            SELECT COUNT(*) FROM nebula.harvest_candidates
+            WHERE harvest_id IS NULL
+        """,
+        "no_docklang_with_candidates": """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT h.id FROM nebula.harvests h
+                JOIN nebula.harvest_candidates hc ON hc.harvest_id = h.id
+                WHERE h.docklang IS NULL
+            ) x
+        """,
+        "orphaned_forum_refs": """
+            SELECT COUNT(*) FROM assembly.post_artifact_refs
+            WHERE artifact_type = 'harvest'
+            AND artifact_id NOT IN (SELECT id FROM nebula.harvests)
+        """,
+        "docklang_no_candidates": """
+            SELECT COUNT(*) FROM nebula.harvests h
+            WHERE h.docklang IS NOT NULL
+            AND (h.docklang->'stats'->>'total_units')::int > 0
+            AND h.id NOT IN (
+                SELECT DISTINCT harvest_id FROM nebula.harvest_candidates
+                WHERE harvest_id IS NOT NULL
+            )
+        """,
+        "duplicate_filenames": """
+            SELECT COUNT(*) FROM (
+                SELECT source_filename FROM nebula.harvests
+                GROUP BY source_filename HAVING COUNT(*) > 1
+            ) x
+        """,
+        "null_system_id": """
+            SELECT COUNT(*) FROM nebula.harvest_candidates
+            WHERE system_id IS NULL
+        """,
+        "null_empty_title": """
+            SELECT COUNT(*) FROM nebula.harvest_candidates
+            WHERE title IS NULL OR title = ''
+        """,
+    }
+
+    results = {}
+    all_clean = True
+
+    log.info("=" * 60)
+    log.info("Data Integrity Validation")
+
+    for check_name, sql in checks.items():
+        rc, out = psql(sql)
+        if rc != 0:
+            log.warning("  ✗ %s: query failed", check_name)
+            results[check_name] = -1
+            all_clean = False
+            continue
+        count = int(out) if out else 0
+        results[check_name] = count
+        if count > 0:
+            log.warning("  ⚠ %s: %d", check_name, count)
+            all_clean = False
+        else:
+            log.info("  ✓ %s: 0", check_name)
+
+    if all_clean:
+        log.info("  ✓ All integrity checks passed.")
+    else:
+        log.warning("  ⚠ Some integrity checks failed — review before publishing.")
+
+    log.info("=" * 60)
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description="Batch publish harvests to Assembly forum")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--delay", type=float, default=0.5,
                         help="Delay in seconds between publishes (default: 0.5)")
+    parser.add_argument("--validate", action="store_true",
+                        help="Run data integrity checks before publishing")
     parser.add_argument("--deduplicate", action="store_true",
                         help="Deduplicate harvests: keep most recent per filename, "
                              "reassign candidates, clean forum refs, delete old harvests")
     args = parser.parse_args()
+
+    # Validate mode: check integrity, report issues, optionally continue to publishing
+    if args.validate:
+        results = validate_integrity()
+        issues = sum(1 for v in results.values() if v > 0)
+        if issues and args.dry_run and not args.deduplicate:
+            return 1
 
     # Deduplication mode
     if args.deduplicate:
