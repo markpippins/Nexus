@@ -2072,7 +2072,7 @@ export function createRoutes(pool: Pool): Router {
         SELECT h.id, h.source_path, h.source_filename, h.model,
                h.total_candidates, h.tags, h.metadata, h.created_at,
                h.level, h.visibility_scope,
-               h.source_hash, h.version, h.run_metadata,
+               h.source_hash, h.file_size, h.version, h.run_metadata,
                COALESCE((h.docklang #>> '{stats,by_type,code}')::int, 0) AS code_blocks,
                COALESCE(jsonb_array_length(h.docklang -> 'discourse_units'), 0) AS turns,
                CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0
