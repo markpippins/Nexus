@@ -12,7 +12,7 @@
       class="flex-shrink-0 flex items-center h-12 px-4 border-b border-[rgb(var(--color-border-base))]"
     >
       <h3 class="font-semibold text-lg text-[rgb(var(--color-text-base))] truncate">
-        {{ viewMode() === 'file-explorer' ? 'Explorer' : 'Service Mesh' }}
+        {{ viewMode() === 'kanban' ? 'Operations' : viewMode() === 'file-explorer' ? 'Throttler' : 'Service Mesh' }}
       </h3>
     </div>
 
@@ -340,6 +340,7 @@
           </div>
         </div>
       }
+
       @if (!isIframeMode() && isTreeVisible() && isNotesVisible() && !isNotesPaneCollapsed()) {
         <div
           (mousedown)="startNotesResize($event)"

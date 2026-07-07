@@ -68,8 +68,10 @@ import { IframeViewComponent } from './components/iframe-view/iframe-view.compon
 import { NavToolbarComponent } from './nav-toolbar/nav-toolbar.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 import { MessageBoxContainerComponent } from './components/message-box-container/message-box-container.component.js';
+import { UiEventBusService } from './services/ui-event-bus.service.js';
 
 import { SystemHealthComponent } from './components/system-health/system-health.component.js';
+import { NebulaPanelComponent } from './components/nebula-panel/nebula-panel.component.js';
 
 interface PanePath {
   id: number;
@@ -118,7 +120,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent, NebulaPanelComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -154,7 +156,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private registryServerProvider = inject(RegistryServerProvider);
   private serviceMeshService = inject(ServiceMeshService);
   public vizService = inject(ArchitectureVizService);
-
+  private eventBus = inject(UiEventBusService);
   private initialAutoConnectAttempted = false;
 
   // --- State Management ---
@@ -176,7 +178,7 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui' | 'kanban'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -184,7 +186,7 @@ export class AppComponent implements OnInit, OnDestroy {
   viewModeUrls: Record<string, string> = {
     'conduit-ui': 'http://localhost:4201',
     'duality': 'http://localhost:3002',
-    'plurality': 'http://localhost:3001',
+    'plurality': 'http://localhost:9003',
     'nebula-rms': 'http://localhost:3000',
     'tackle-ui': 'http://localhost:4202',
   };
@@ -195,6 +197,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.currentViewMode() === 'plurality' ||
     this.currentViewMode() === 'nebula-rms' ||
     this.currentViewMode() === 'tackle-ui'
+  );
+
+  isKanbanMode = computed(() => this.currentViewMode() === 'kanban');
+
+  isFullScreenMode = computed(() =>
+    this.isIframeMode() || this.currentViewMode() === 'kanban'
   );
 
   // --- Pane Visibility State (from service) ---
@@ -322,28 +330,28 @@ export class AppComponent implements OnInit, OnDestroy {
   pane2GatewayProfileId = computed(() => this.getGatewayProfileIdForPath(this.pane2Path()));
 
   private getHostServerProfileIdForPath(path: string[]): string | null {
-    // Path must be exactly ['Service Registries', 'Profile Name'] to show editor
-    if (path.length !== 2 || path[0] !== 'Service Registries') {
+    // Path must be ['Platform Management', 'Service Registries', 'Profile Name', ...] to show editor (any depth under the profile).
+    if (path.length < 3 || path[0] !== 'Platform Management' || path[1] !== 'Service Registries') {
       return null;
     }
-    const profileName = path[1];
+    const profileName = path[2];
     const profile = this.hostProfileService.profiles().find(p => p.name === profileName);
     return profile?.id ?? null;
   }
 
   private getGatewayProfileIdForPath(path: string[]): string | null {
-    // Path must be exactly ['Gateways', 'Profile Name'] to show editor
-    if (path.length !== 2 || path[0] !== 'Gateways') {
+    // Path must be ['Platform Management', 'Gateways', 'Profile Name', ...] to show editor (any depth under the profile).
+    if (path.length < 3 || path[0] !== 'Platform Management' || path[1] !== 'Gateways') {
       return null;
     }
-    const profileName = path[1];
+    const profileName = path[2];
     const profile = this.profileService.profiles().find(p => p.name === profileName);
     return profile?.id ?? null;
   }
 
   private getPlatformNodeForPath(path: string[]) {
-    // Valid management types
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'hosts', 'service hosts', 'lookup tables', 'service types', 'server types', 'framework languages', 'framework categories', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'system health'];
+    // Valid management types (System Health is now a top-level sibling, not a Platform Management child).
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'hosts', 'service hosts', 'lookup tables', 'service types', 'server types', 'framework languages', 'framework categories', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments'];
     const profiles = this.hostProfileService.profiles();
     const activeProfile = this.hostProfileService.activeProfile();
 
@@ -356,7 +364,6 @@ export class AppComponent implements OnInit, OnDestroy {
       if (n === 'service-hosts' || n === 'hosts') return 'servers';
       if (n === 'languages') return 'framework-languages';
       if (n === 'categories') return 'framework-categories';
-      if (n === 'system-health') return 'system-health';
       return n;
     };
 
@@ -367,7 +374,12 @@ export class AppComponent implements OnInit, OnDestroy {
     // Explicitly exclude "Search & Discovery" paths to prevent masking user folders
     if (path[0] === 'Search & Discovery') {
       return null;
-    }
+    }        // System Health is a top-level sibling of Platform Management (always connects to terrain server).
+        // Handle it here at root before the Platform Management branch — also covers any deeper path.
+        if (path[0] === 'System Health') {
+          const terrainUrl = this.localConfigService.terrainServerUrl();
+          return { type: 'system-health', baseUrl: terrainUrl };
+        }
 
     console.log('[AppComponent] getPlatformNodeForPath', { path, profilesCount: profiles.length, activeProfile: activeProfile?.name });
 
@@ -434,9 +446,11 @@ export class AppComponent implements OnInit, OnDestroy {
           return { type: normalizedType, baseUrl: terrainUrl };
         }
 
+        // 'Service Registries' was previously a root sibling and had a special branch here;
+        // it now lives inside 'Platform Management', so the special case is unreachable.
         const profile = targetProfileName
           ? profiles.find(p => p.name === targetProfileName)
-          : (path[0] === 'Service Registries' && path.length > 1 ? profiles.find(p => p.name === path[1]) : (path[0].toLowerCase() !== 'platform management' ? profiles.find(p => p.name === path[0]) : activeProfile));
+          : (path[0].toLowerCase() !== 'platform management' ? profiles.find(p => p.name === path[0]) : activeProfile);
 
         const finalProfile = profile || activeProfile;
         if (finalProfile) {
@@ -476,13 +490,19 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   // --- Gateway Context Signals ---
-  isGatewayContext = computed(() => this.activePanePath()[0] === 'Gateways');
-  isGatewaysNodeSelected = computed(() => this.activePanePath().length === 1 && this.activePanePath()[0] === 'Gateways');
-  isGatewaySelected = computed(() => this.activePanePath().length === 2 && this.activePanePath()[0] === 'Gateways');
+  // Gateways now lives at ['Platform Management', 'Gateways', ...] — context = at-or-below the container.
+  isGatewayContext = computed(() => this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Gateways');
+  isGatewaysNodeSelected = computed(() => this.activePanePath().length === 2 && this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Gateways');
+  isGatewaySelected = computed(() => this.activePanePath().length === 3 && this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Gateways');
 
-  isServiceRegistryContext = computed(() => this.activePanePath()[0] === 'Service Registries');
-  isServiceRegistriesNodeSelected = computed(() => this.activePanePath().length === 1 && this.activePanePath()[0] === 'Service Registries');
-  isServiceRegistrySelected = computed(() => this.activePanePath().length === 2 && this.activePanePath()[0] === 'Service Registries');
+  // Service Registries analogously.
+  isServiceRegistryContext = computed(() => this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Service Registries');
+  isServiceRegistriesNodeSelected = computed(() => this.activePanePath().length === 2 && this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Service Registries');
+  isServiceRegistrySelected = computed(() => this.activePanePath().length === 3 && this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Service Registries');
+
+  // Combined disjunction — use when callers only care about being anywhere under
+  // Gateways or Service Registries and don't need to distinguish between them.
+  isInGatewaysOrRegistries = computed(() => this.isGatewayContext() || this.isServiceRegistryContext());
 
   isPlatformManagementContext = computed(() => {
     // Check if current view is a platform management view
@@ -512,13 +532,12 @@ export class AppComponent implements OnInit, OnDestroy {
       this.isDeleteGatewayConfirmOpen.set(false);
       this.gatewayToDelete.set(null);
       await this.loadFolderTree();
-      // Navigate back to Gateways root if we were editing
+      // Navigate back to Gateways container under Platform Management if we were editing
       const activeId = this.activePaneId();
-      this.panePaths.update(paths => {
-        const pathObj = paths.find(p => p.id === activeId);
-        if (pathObj && pathObj.path.length > 1 && pathObj.path[0] === 'Gateways') {
+      this.panePaths.update(paths => {          const pathObj = paths.find(p => p.id === activeId);
+        if (pathObj && pathObj.path.length >= 2 && pathObj.path[0] === 'Platform Management' && pathObj.path[1] === 'Gateways') {
           const otherPanes = paths.filter(p => p.id !== activeId);
-          return [...otherPanes, { id: activeId, path: ['Gateways'] }];
+          return [...otherPanes, { id: activeId, path: ['Platform Management', 'Gateways'] }];
         }
         return paths;
       });
@@ -540,13 +559,12 @@ export class AppComponent implements OnInit, OnDestroy {
       this.isDeleteServiceRegistryConfirmOpen.set(false);
       this.serviceRegistryToDelete.set(null);
       await this.loadFolderTree();
-      // Navigate back to Service Registries root
+      // Navigate back to Service Registries container under Platform Management
       const activeId = this.activePaneId();
-      this.panePaths.update(paths => {
-        const pathObj = paths.find(p => p.id === activeId);
-        if (pathObj && pathObj.path.length > 1 && pathObj.path[0] === 'Service Registries') {
+      this.panePaths.update(paths => {          const pathObj = paths.find(p => p.id === activeId);
+        if (pathObj && pathObj.path.length >= 2 && pathObj.path[0] === 'Platform Management' && pathObj.path[1] === 'Service Registries') {
           const otherPanes = paths.filter(p => p.id !== activeId);
-          return [...otherPanes, { id: activeId, path: ['Service Registries'] }];
+          return [...otherPanes, { id: activeId, path: ['Platform Management', 'Service Registries'] }];
         }
         return paths;
       });
@@ -569,11 +587,11 @@ export class AppComponent implements OnInit, OnDestroy {
       registryServerUrl: 'http://localhost:8000',
       imageUrl: '',
       status: 'ACTIVE'
-    }).then(() => {
+    }    ).then(() => {
       this.loadFolderTree();
       this.panePaths.update(paths => {
         const otherPanes = paths.filter(p => p.id !== activeId);
-        return [...otherPanes, { id: activeId, path: ['Service Registries', name] }];
+        return [...otherPanes, { id: activeId, path: ['Platform Management', 'Service Registries', name] }];
       });
     });
   }
@@ -599,7 +617,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const activeId = this.activePaneId();
     this.panePaths.update(paths => {
       const otherPanes = paths.filter(p => p.id !== activeId);
-      return [...otherPanes, { id: activeId, path: ['Gateways', newName] }];
+      return [...otherPanes, { id: activeId, path: ['Platform Management', 'Gateways', newName] }];
     });
   };
 
@@ -607,7 +625,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const activeId = this.activePaneId();
     this.panePaths.update(paths => {
       const otherPanes = paths.filter(p => p.id !== activeId);
-      return [...otherPanes, { id: activeId, path: ['Service Registries', name] }];
+      return [...otherPanes, { id: activeId, path: ['Platform Management', 'Service Registries', name] }];
     });
   }
 
@@ -615,7 +633,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const activeId = this.activePaneId();
     this.panePaths.update(paths => {
       const otherPanes = paths.filter(p => p.id !== activeId);
-      return [...otherPanes, { id: activeId, path: ['Gateways', name] }];
+      return [...otherPanes, { id: activeId, path: ['Platform Management', 'Gateways', name] }];
     });
   }
 
@@ -1042,13 +1060,12 @@ export class AppComponent implements OnInit, OnDestroy {
             }));
           }
 
-          // Gateways folder - contains broker gateway nodes
-          if (rootName === 'Gateways') {
+          // Gateways / Service Registries virtual containers (now nested under Platform Management).
+          // Handles ['Platform Management', 'Gateways'] and ['Platform Management', 'Service Registries'].
+          if (rootName === 'Platform Management' && path.length === 2 && path[1] === 'Gateways') {
             return brokerProfileNodes;
           }
-
-          // Service Registries folder
-          if (rootName === 'Service Registries') {
+          if (rootName === 'Platform Management' && path.length === 2 && path[1] === 'Service Registries') {
             return hostProfileNodes;
           }
 
@@ -1104,26 +1121,10 @@ export class AppComponent implements OnInit, OnDestroy {
           throw new Error(`Home provider does not support path: ${path.join('/')}`);
         }
 
-        // Root path [] - return all children
-        // Create "Gateways" virtual folder containing broker profiles
-        const gatewaysNode: FileSystemNode = {
-          name: 'Gateways',
-          type: 'folder' as FileType,
-          children: brokerProfileNodes,
-          childrenLoaded: true,
-          isVirtualFolder: true,
-        };
-
-        // Create "Service Registries" virtual folder containing host server profiles
-        const serviceRegistriesNode: FileSystemNode = {
-          name: 'Service Registries',
-          type: 'folder' as FileType,
-          children: hostProfileNodes,
-          childrenLoaded: true,
-          isVirtualFolder: true,
-        };
-
-
+        // Root path [] - return all children.
+        // Gateways and Service Registries are no longer synthesized as root siblings —
+        // they live inside Platform Management (added by registry-server-provider.service.ts).
+        // brokerProfileNodes / hostProfileNodes still feed those nested children when accessed.
 
         // Find the "File Systems" node and add Local Session as its child
         const fileSystemsNode = hostNodes.find(n => n.name === 'File Systems');
@@ -1137,12 +1138,14 @@ export class AppComponent implements OnInit, OnDestroy {
         // Find the "Users" node
         const usersNode = hostNodes.find(n => n.name === 'Users');
 
-        // Filter out nodes we want to order manually
+        // Filter out nodes we want to order manually.
+        // Service Registries / service-registries clauses were removed: registryServerProvider
+        // no longer emits them at root (they live under Platform Management), so the defensive
+        // clauses were dead code here. in-memory-file-system.service.ts retains its clause
+        // because it parses persisted tree snapshots that may still contain stale entries.
         const otherHostNodes = hostNodes.filter((n: FileSystemNode) =>
           n.name !== 'Users' &&
           n.name !== 'Search & Discovery' &&
-          n.name !== 'Service Registries' &&
-          n.id !== 'service-registries' &&
           n.name !== 'File Systems' &&
           n.name !== 'Platform Management'
         );
@@ -1152,9 +1155,7 @@ export class AppComponent implements OnInit, OnDestroy {
         const rootChildren = [
           ...otherHostNodes,
           ...(fileSystemsNode ? [fileSystemsNode] : []),
-          gatewaysNode,
           ...(platformNode ? [platformNode] : []),
-          serviceRegistriesNode,
           sessionNode,
           ...(usersNode ? [usersNode] : []),
           ...(searchDiscoveryNode ? [searchDiscoveryNode] : [])
@@ -1220,8 +1221,19 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    // Initialization is now handled reactively by effects in the constructor.
-    // This method is kept to satisfy the OnInit interface, but can be left empty.
+    // Connect to the UI event bus as nexus-console
+    this.eventBus.connect('nexus-console');
+
+    // Log incoming events for debugging (nexus-console won't receive its own events)
+    this.eventBus.onAny((event) => {
+      console.log(`[EventBus] received: ${event.sender} → ${event.eventName}`, event.eventValue);
+    });
+
+    // Subscribe to location changes from child apps
+    this.eventBus.onLocationChange((location) => {
+      console.log(`[EventBus] location change from child app:`, location);
+      // TODO: update address bar display when child apps report their location
+    });
   }
 
   ngOnDestroy(): void {
@@ -1233,27 +1245,6 @@ export class AppComponent implements OnInit, OnDestroy {
   getProvider = (path: string[]): FileSystemProvider => {
     if (path.length === 0) return this.homeProvider;
     const rootName = path[0];
-
-    // Handle "Gateways" virtual folder - broker gateways are nested under it
-    if (rootName === 'Gateways') {
-      if (path.length === 1) {
-        // At the Gateways folder level itself - return home provider 
-        // (children are already loaded in the tree)
-        return this.homeProvider;
-      }
-      // Path is like ['Gateways', 'ServerName', ...]
-      const serverName = path[1];
-      const remoteProvider = this.remoteProviders().get(serverName);
-      if (remoteProvider) {
-        return remoteProvider;
-      }
-      // Server is known but not mounted
-      const isServerProfile = this.profileService.profiles().some(p => p.name === serverName);
-      if (isServerProfile) {
-        return disconnectedProvider;
-      }
-      return this.homeProvider;
-    }
 
     // Handle Local Session at root level
     const sessionName = this.localConfigService.sessionName();
@@ -1283,22 +1274,41 @@ export class AppComponent implements OnInit, OnDestroy {
       return this.homeProvider;
     }
 
-    // Handle "Service Registries" virtual folder - host server profiles are nested under it
-    if (rootName === 'Service Registries') {
-      if (path.length === 1) {
-        // At the Service Registries folder level itself - return home provider
-        // (children are already loaded in the tree)
+    // Handle "Gateways" virtual container nested under "Platform Management" — broker profiles at depth 3.
+    if (rootName === 'Platform Management' && path.length > 1 && path[1] === 'Gateways') {
+      if (path.length === 2) {
+        // At the Gateways container level itself - return home provider
+        // (children come from homeProvider.getContents(['Platform Management', 'Gateways']))
         return this.homeProvider;
       }
-      // Path is like ['Service Registries', 'ProfileName', ...]
-      // For now, host server profiles don't have navigable children in file explorer
-      // They are informational only
+      // Path is like ['Platform Management', 'Gateways', 'ServerName', ...]
+      const serverName = path[2];
+      const remoteProvider = this.remoteProviders().get(serverName);
+      if (remoteProvider) {
+        return remoteProvider;
+      }
+      const isServerProfile = this.profileService.profiles().some(p => p.name === serverName);
+      if (isServerProfile) {
+        return disconnectedProvider;
+      }
       return this.homeProvider;
     }
 
-    // Handle virtual organization folders (Platform Management, Users, Services)
+    // Handle "Service Registries" virtual container nested under "Platform Management" — host profiles at depth 3.
+    if (rootName === 'Platform Management' && path.length > 1 && path[1] === 'Service Registries') {
+      if (path.length === 2) {
+        // At the Service Registries container level itself - return home provider
+        // (children come from homeProvider.getContents(['Platform Management', 'Service Registries']))
+        return this.homeProvider;
+      }
+      // Path is like ['Platform Management', 'Service Registries', 'ProfileName', ...]
+      // For now, host server profiles don't have navigable children in the file explorer.
+      return this.homeProvider;
+    }
+
+    // Handle virtual organization folders (Platform Management, Users, Services, System Health)
     // These are top-level categories that don't have navigable children in the file explorer main area
-    const virtualOrgFolders = ['Platform Management', 'Users', 'Services'];
+    const virtualOrgFolders = ['Platform Management', 'Users', 'Services', 'System Health'];
     if (virtualOrgFolders.includes(rootName)) {
       // Return homeProvider which handles these paths with special logic
       return this.homeProvider;
@@ -1331,9 +1341,9 @@ export class AppComponent implements OnInit, OnDestroy {
   getImageService = (path: string[]): ImageService => {
     let effectiveRootName = path.length > 0 ? path[0] : this.localConfigService.sessionName();
 
-    // Handle "Gateways" virtual folder - server name is at path[1]
-    if (effectiveRootName === 'Gateways' && path.length > 1) {
-      effectiveRootName = path[1];
+    // Handle nested Gateways/Service Registries under Platform Management - profile name is at path[2].
+    if (effectiveRootName === 'Platform Management' && path.length > 2 && (path[1] === 'Gateways' || path[1] === 'Service Registries')) {
+      effectiveRootName = path[2];
     }
 
     // Handle "File Systems" folder - Local Session is at path[1]
@@ -1458,14 +1468,9 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     }
 
-    // Create "Gateways" parent node for broker gateways
-    const gatewaysNode: FileSystemNode = {
-      name: 'Gateways',
-      type: 'folder' as FileType,
-      children: remoteRoots,
-      childrenLoaded: true,
-      isVirtualFolder: true, // Mark as a virtual organizational folder
-    };
+    // Gateways and Service Registries no longer synthesized as root siblings — they live
+    // inside Platform Management (added by registry-server-provider.service.ts).
+    // brokerProfileNodes / hostProfileNodes still feed those nested children when accessed.
 
     // Find the "File Systems" node
     const fileSystemsNode = hostNodes.find(n => n.name === 'File Systems');
@@ -1501,16 +1506,11 @@ export class AppComponent implements OnInit, OnDestroy {
       childrenLoaded: false,
     }));
 
-    // Create "Service Registries" parent node
-    const serviceRegistriesNode: FileSystemNode = {
-      name: 'Service Registries',
-      type: 'folder' as FileType,
-      children: hostProfileNodes,
-      childrenLoaded: true,
-      isVirtualFolder: true,
-    };
-
-    // Filter out specific nodes for manual ordering
+    // Filter out specific nodes for manual ordering.
+    // Service Registries / service-registries clauses were removed: registryServerProvider
+    // no longer emits them at root (they live under Platform Management), so the defensive
+    // clauses were dead. in-memory-file-system.service.ts retains its equivalent clause
+    // because it parses persisted tree snapshots that may still contain stale entries.
     const otherHostNodes = hostNodes.filter((n: FileSystemNode) =>
       n.name !== 'File Systems' &&
       n.name !== 'Search & Discovery' &&
@@ -1519,13 +1519,13 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const platformNode = hostNodes.find(n => n.name === 'Platform Management');
 
-    // Build the final tree structure alphabetically
+    // Build the final tree structure alphabetically.
+    // Gateways / Service Registries are no longer root siblings — they live inside
+    // Platform Management (registry-server-provider.service.ts appends them there).
     const rootChildren = [
       ...otherHostNodes,
       ...(fileSystemsNode ? [fileSystemsNode] : []),
-      gatewaysNode,
       ...(platformNode ? [platformNode] : []),
-      ...(allHostProfiles.length > 0 ? [serviceRegistriesNode] : []),
       sessionTree,
     ];
 
@@ -1573,9 +1573,11 @@ export class AppComponent implements OnInit, OnDestroy {
       // Calculate the provider-relative path by removing the routing prefix
       let providerPath: string[];
 
-      if (rootName === 'Gateways' && path.length > 1) {
-        // Path is ['Gateways', 'ServerName', ...], provider expects path without 'Gateways' and 'ServerName'
-        providerPath = path.slice(2);
+      if (rootName === 'Platform Management' && path.length > 2 && (path[1] === 'Gateways' || path[1] === 'Service Registries')) {
+        // Path is ['Platform Management', 'Gateways', 'ServerName', ...] or
+        // ['Platform Management', 'Service Registries', 'ProfileName', ...]; strip both container
+        // levels so the per-profile remoteProvider sees an inner path.
+        providerPath = path.slice(3);
       } else if (rootName === 'File Systems' && path.length > 1) {
         // Path is ['File Systems', 'Local Session', ...], provider expects path without both prefixes
         providerPath = path.slice(2);
@@ -1852,9 +1854,8 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     if (name === 'rename') {
-      if ((this.isGatewayContext() && this.isGatewaysNodeSelected()) ||
-        (this.isServiceRegistryContext() && this.isServiceRegistriesNodeSelected())) {
-        // Handled by management component
+      if (this.isGatewaysNodeSelected() || this.isServiceRegistriesNodeSelected()) {
+        // Handled by management component — leaf signals already imply context.
         return;
       }
     }
@@ -2105,7 +2106,7 @@ export class AppComponent implements OnInit, OnDestroy {
       const activeId = this.activePaneId();
       this.panePaths.update(paths => {
         const otherPanes = paths.filter(p => p.id !== activeId);
-        return [...otherPanes, { id: activeId, path: ['Gateways', brokerProfile.name] }];
+        return [...otherPanes, { id: activeId, path: ['Platform Management', 'Gateways', brokerProfile.name] }];
       });
       return;
     }
@@ -2116,7 +2117,7 @@ export class AppComponent implements OnInit, OnDestroy {
       const activeId = this.activePaneId();
       this.panePaths.update(paths => {
         const otherPanes = paths.filter(p => p.id !== activeId);
-        return [...otherPanes, { id: activeId, path: ['Service Registries', hostProfile.name] }];
+        return [...otherPanes, { id: activeId, path: ['Platform Management', 'Service Registries', hostProfile.name] }];
       });
     }
   }
@@ -2464,6 +2465,8 @@ export class AppComponent implements OnInit, OnDestroy {
   setTheme(theme: Theme): void {
     this.uiPreferencesService.setTheme(theme);
     this.isThemeDropdownOpen.set(false);
+    // Publish theme change to the event bus for other apps
+    this.eventBus.publishThemeChange(theme);
   }
 
   // --- Preferences Dialog ---

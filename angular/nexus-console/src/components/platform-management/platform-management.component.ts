@@ -354,9 +354,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             </table>
                         </div>
                     }
-                    @case ('hosts') {
+                    @case ('servers') {
                         <div class="flex flex-col h-full">
-                            <!-- Hosts List -->
+                            <!-- Hosts / Servers List -->
                             <div class="overflow-x-auto flex-1">
                                 <table class="w-full text-left border-collapse">
                                     <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
@@ -760,7 +760,7 @@ export class PlatformManagementComponent {
                     count = this.deployments().length;
                     displayType = 'Deployments';
                     break;
-                case 'hosts':
+                case 'servers':
                     count = this.hosts().length;
                     displayType = 'Servers';
                     break;
@@ -843,7 +843,7 @@ export class PlatformManagementComponent {
                     const d = await this.platformService.getDeployments(url);
                     this.rawDeployments.set(d);
                     break;
-                case 'hosts':
+                case 'servers':
                     const h = await this.platformService.getHosts(url);
                     this.rawHosts.set(h);
                     break;
@@ -889,7 +889,7 @@ export class PlatformManagementComponent {
                 this.selectedDeploymentForEdit.set(null);
                 this.isDeploymentDialogOpen.set(true);
                 break;
-            case 'hosts':
+            case 'servers':
                 this.selectedHostForEdit.set(null);
                 this.isHostDialogOpen.set(true);
                 break;
@@ -929,7 +929,7 @@ export class PlatformManagementComponent {
                 this.selectedDeploymentForEdit.set(item);
                 this.isDeploymentDialogOpen.set(true);
                 break;
-            case 'hosts':
+            case 'servers':
                 this.selectedHostForEdit.set(item);
                 this.isHostDialogOpen.set(true);
                 break;
@@ -969,7 +969,7 @@ export class PlatformManagementComponent {
                 case 'deployments':
                     await this.platformService.deleteDeployment(url, Number(item.id));
                     break;
-                case 'hosts':
+                case 'servers':
                     await this.platformService.deleteHost(url, Number(item.id));
                     break;
                 case 'service-types':

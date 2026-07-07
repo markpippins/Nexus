@@ -43,11 +43,14 @@ export class RegistryServerProvider implements TreeProvider {
             nodeId.startsWith('search') ||
             nodeId.startsWith('filesystems') ||
             nodeId.startsWith('platform') ||
-            nodeId.startsWith('platform-dictionary-');
+            nodeId.startsWith('platform-dictionary-') ||
+            // System Health is now a top-level sibling (no longer nested under Platform Management).
+            nodeId === 'system-health-terrain';
     }
 
     async getChildren(nodeId: string): Promise<TreeNode[]> {
         if (nodeId === 'root') {
+            const terrainUrl = this.localConfigService.terrainServerUrl();
             return [
                 {
                     id: 'filesystems',
@@ -57,6 +60,22 @@ export class RegistryServerProvider implements TreeProvider {
                     hasChildren: true,
                     operations: [],
                     metadata: {},
+                    lastUpdated: new Date()
+                },
+                // System Health lives at root (promoted up from Platform Management) because
+                // it connects directly to the terrain server, never to a profile.
+                {
+                    id: 'system-health-terrain',
+                    name: 'System Health',
+                    type: NodeType.HEALTH_CHECK,
+                    icon: 'monitor_heart',
+                    hasChildren: false,
+                    operations: ['check-health'],
+                    metadata: {
+                        url: `${terrainUrl}/api/v1/platform/health`,
+                        managementType: 'system-health',
+                        baseUrl: terrainUrl
+                    },
                     lastUpdated: new Date()
                 },
                 {
@@ -140,25 +159,10 @@ export class RegistryServerProvider implements TreeProvider {
 
         if (nodeId === 'platform') {
             const profiles = this.profileService.profiles();
-            const terrainUrl = this.localConfigService.terrainServerUrl();
 
-            // Always include System Health (connects directly to terrain server, no profile needed)
-            const nodes: TreeNode[] = [
-                {
-                    id: `platform-health-terrain`,
-                    name: 'System Health',
-                    type: NodeType.HEALTH_CHECK,
-                    icon: 'monitor_heart',
-                    hasChildren: false,
-                    operations: ['check-health'],
-                    metadata: {
-                        url: `${terrainUrl}/api/v1/platform/health`,
-                        managementType: 'system-health',
-                        baseUrl: terrainUrl
-                    },
-                    lastUpdated: new Date()
-                }
-            ];
+            // System Health used to live here; it has been promoted to root (see getChildren('root')).
+            // We keep the platform node set strictly to profile-dependent management nodes below.
+            const nodes: TreeNode[] = [];
 
             // If profiles exist, also show profile-dependent management nodes
             if (profiles.length > 0) {
@@ -219,6 +223,35 @@ export class RegistryServerProvider implements TreeProvider {
                     }
                 );
             }
+
+            // Nested virtual folders under Platform Management.
+            // Order: System Health leads, profile-dependent nodes unshifted to front,
+            // then Gateways + Service Registries appended at the end. Together with the
+            // downstream homeProvider path handlers in app.component.ts, the user
+            // navigates: Platform Management → Gateways → <broker profile> OR
+            //                          Platform Management → Service Registries → <host profile>.
+            nodes.push(
+                {
+                    id: `platform-gateways`,
+                    name: 'Gateways',
+                    type: NodeType.FOLDER,
+                    icon: 'cloud',
+                    hasChildren: true,
+                    operations: [],
+                    metadata: { virtualContainer: 'gateways' },
+                    lastUpdated: new Date()
+                },
+                {
+                    id: `platform-service-registries`,
+                    name: 'Service Registries',
+                    type: NodeType.FOLDER,
+                    icon: 'storage',
+                    hasChildren: true,
+                    operations: [],
+                    metadata: { virtualContainer: 'service-registries' },
+                    lastUpdated: new Date()
+                }
+            );
 
             return nodes;
         }

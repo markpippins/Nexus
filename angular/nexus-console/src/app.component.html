@@ -12,7 +12,7 @@
 
   <!-- Main Content -->
   <main class="flex-1 flex flex-row overflow-hidden">
-    @if (isSidebarVisible() && !isIframeMode()) {
+    @if (isSidebarVisible() && !isFullScreenMode()) {
       <app-sidebar
         [folderTree]="folderTree()"
         [currentPath]="activePanePath()"
@@ -208,7 +208,7 @@
         </div>
 
         <!-- Top toolbar removed — navigation is now in app-bottom-bar -->
-        @if (!isIframeMode()) {
+        @if (!isFullScreenMode()) {
         <app-toolbar
           [viewMode]="currentViewMode()"
           [meshViewMode]="meshViewMode()"
@@ -222,6 +222,7 @@
           [isServiceRegistriesNodeSelected]="isServiceRegistriesNodeSelected()"
           [isServiceRegistrySelected]="isServiceRegistrySelected()"
           [isPlatformManagementContext]="isPlatformManagementContext()"
+          [isInGatewaysOrRegistries]="isInGatewaysOrRegistries()"
           [graphInteractionMode]="vizService.modeSignal()"
           [isSimulationActive]="vizService.isSimulationActive()"
           [backgroundColor]="graphBackgroundColor()"
@@ -407,6 +408,8 @@
                     ></app-service-mesh>
                   } @else if (isIframeMode()) {
                     <app-iframe-view [src]="viewModeUrls[currentViewMode()]"></app-iframe-view>
+                  }                  @else if (currentViewMode() === 'kanban') {
+                    <app-nebula-panel></app-nebula-panel>
                   }
                 </div>
 
@@ -467,6 +470,8 @@
                           (statusInfo)="contentStatusInfo.set($event)"
                         ></app-platform-management>
                       }
+                    } @else if (currentViewMode() === 'kanban') {
+                      <app-nebula-panel></app-nebula-panel>
                     } @else {
                       <app-file-explorer
                         [id]="2"
@@ -506,7 +511,7 @@
               </div>
             </div>
 
-        @if (!isIframeMode()) {
+        @if (!isFullScreenMode()) {
             <!-- Content Status Bar (CRUD screens only) -->
             @if (activePanePlatformNode() && contentStatusInfo()) {
               <div
@@ -582,7 +587,7 @@
         </div>
       </div>
       <!-- Close the main content wrapper div -->
-      @if (isDetailPaneOpen() && !isIframeMode()) {
+      @if (isDetailPaneOpen() && !isFullScreenMode()) {
         <app-detail-pane
           [path]="activePanePath()"
           [isSavedItemsVisible]="isSavedItemsVisible()"

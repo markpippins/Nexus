@@ -18,6 +18,7 @@ import { ServiceInstance } from '../../models/service-mesh.model.js';
 import { ArchitectureVizService } from '../../services/architecture-viz.service.js';
 import { NodeType } from '../../models/component-config.js';
 
+
 @Component({
   selector: 'app-sidebar',
   templateUrl: './sidebar.component.html',
@@ -31,14 +32,13 @@ export class SidebarComponent implements OnDestroy {
   private uiPreferencesService = inject(UiPreferencesService);
   private serviceMeshService = inject(ServiceMeshService);
   private vizService = inject(ArchitectureVizService);
-
   folderTree = input<FileSystemNode | null>(null);
   currentPath = input.required<string[]>();
   getImageService = input.required<(path: string[]) => ImageService>();
   getProvider = input.required<(path: string[]) => FileSystemProvider>();
   isTreeVisible = input(true);
   isNotesVisible = input(true);
-  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui'>('file-explorer');
+  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui' | 'kanban'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console'); // Sub-mode when in service-mesh
   graphSubView = input<'canvas' | 'creator'>('canvas'); // Sub-view when in graph mode
 
@@ -71,6 +71,7 @@ export class SidebarComponent implements OnDestroy {
   deployments = computed(() => this.serviceMeshService.deployments());
   selectedService = this.serviceMeshService.selectedService;
   isIframeMode = computed(() => this.viewMode() === 'conduit-ui' || this.viewMode() === 'duality' || this.viewMode() === 'plurality' || this.viewMode() === 'nebula-rms' || this.viewMode() === 'tackle-ui');
+
 
   width = signal(this.uiPreferencesService.sidebarWidth() ?? 288);
   isResizing = signal(false);

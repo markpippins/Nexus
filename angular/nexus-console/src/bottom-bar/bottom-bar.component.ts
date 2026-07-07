@@ -3,23 +3,7 @@ import { CommonModule } from '@angular/common';
 import { EXTERNAL_SITES } from '../components/external-site-selector/external-site-selector.component.js';
 import { MessageBoxService } from '../services/message-box.service.js';
 
-export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui';
-
-export interface NavItem {
-  key: ViewMode;
-  label: string;
-  title: string;
-}
-
-export const NAV_ITEMS: NavItem[] = [
-  { key: 'file-explorer', label: 'Explorer', title: 'Nexus Explorer' },
-  { key: 'nebula-rms',    label: 'Nebula',   title: 'Nebula Requirements Management System' },
-  { key: 'conduit-ui',    label: 'Conduit',  title: 'Conduit Pipeline Dashboard' },
-  { key: 'service-mesh',  label: 'Service Mesh', title: 'Service Mesh' },
-  { key: 'duality',       label: 'Duality',  title: 'Duality Dual-Pane Interface' },
-  { key: 'plurality',     label: 'Plurality', title: 'Plurality Multi-Agent View' },
-  { key: 'tackle-ui',     label: 'Tackle',   title: 'Tackle AI Configuration' },
-];
+export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui' | 'kanban';
 
 @Component({
   selector: 'app-bottom-bar',
@@ -42,7 +26,6 @@ export class BottomBarComponent {
   /** Emitted when the AI config button is clicked */
   aiconfigClick = output<void>();
 
-  readonly navItems = NAV_ITEMS;
   readonly externalSites = EXTERNAL_SITES;
 
   openExternal(url: string): void {

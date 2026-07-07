@@ -68,6 +68,7 @@ export class ToolbarComponent {
   isServiceRegistriesNodeSelected = input(false);
   isServiceRegistrySelected = input(false);
   isPlatformManagementContext = input(false);
+  isInGatewaysOrRegistries = input(false);
   canSave = input(false);
 
   // Visibility flags

@@ -414,7 +414,7 @@
           </button>
         }
 
-        @if (!isGatewayContext() && !isServiceRegistryContext() && !isPlatformManagementContext()) {
+        @if (!isInGatewaysOrRegistries() && !isPlatformManagementContext()) {
           <!-- Divider -->
           <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
 
@@ -512,7 +512,7 @@
           </svg>
         </button>
 
-        @if (!isGatewayContext() && !isServiceRegistryContext() && !isPlatformManagementContext()) {
+        @if (!isInGatewaysOrRegistries() && !isPlatformManagementContext()) {
           <button
             (click)="shareClick.emit()"
             [disabled]="!canShare()"
@@ -592,7 +592,7 @@
           </svg>
         </button>
 
-        @if (!isGatewayContext() && !isServiceRegistryContext() && !isPlatformManagementContext()) {
+        @if (!isInGatewaysOrRegistries() && !isPlatformManagementContext()) {
           <button
             (click)="magnetizeClick.emit()"
             [disabled]="!canMagnetize()"
@@ -611,7 +611,7 @@
         }
         <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
 
-        @if (!isGatewayContext() && !isServiceRegistryContext() && !isPlatformManagementContext()) {
+        @if (!isInGatewaysOrRegistries() && !isPlatformManagementContext()) {
           <!-- Copy to / Move to -->
           <div class="relative inline-block text-left">
             <button
