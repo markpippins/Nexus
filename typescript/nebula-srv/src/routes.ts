@@ -4,8 +4,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { randomUUID } from 'crypto';
 import * as bs from './block-segmentation.service';
 import * as bsRedis from './services/block-segmentation-redis.service';
+import { CrossReferenceType } from './crossref-taxonomy';
 
 const execFileAsync = promisify(execFile);
 
@@ -143,6 +145,17 @@ function normalizeStatus(input: string | null | undefined): string | null {
   const key = String(input).trim().toLowerCase();
   if (!key) return null;
   return STATUS_NORMALIZATION[key] ?? null;
+}
+
+// ── Requirement Type Constants ────────────────────────────────
+const REQ_TYPES = ['Epic', 'Story', 'Task', 'Bug'] as const;
+type ReqType = typeof REQ_TYPES[number];
+function normalizeReqType(input: string | null | undefined): string | null {
+  if (input === undefined || input === null) return null;
+  const key = String(input).trim();
+  if (!key) return null;
+  // Case-sensitive match (DB CHECK constraint is case-sensitive)
+  return (REQ_TYPES as readonly string[]).includes(key) ? key : null;
 }
 
 // ── Plans Display (Plan 0134) ─────────────────────────────────
@@ -446,7 +459,135 @@ export function createRoutes(pool: Pool): Router {
         featureId: r.feature_id,
         startDate: r.start_date,
         completionDate: r.completion_date,
+        parentId: r.parent_id,
+        reqType: r.req_type,
+        acceptanceCriteria: r.acceptance_criteria,
+        candidateId: r.candidate_id,
+        conduitPlanId: r.conduit_plan_id,
       })));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/requirements/:id/children — fetch direct child requirements
+  router.get('/requirements/:id/children', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT * FROM requirements WHERE parent_id = $1 ORDER BY created_at ASC`,
+        [id]
+      );
+      res.json(rows.map((r: any) => ({
+        ...toEpochMs(r, 'created_at'),
+        systemId: r.system_id,
+        subsystemId: r.subsystem_id,
+        featureId: r.feature_id,
+        startDate: r.start_date,
+        completionDate: r.completion_date,
+        parentId: r.parent_id,
+        reqType: r.req_type,
+        acceptanceCriteria: r.acceptance_criteria,
+        candidateId: r.candidate_id,
+        conduitPlanId: r.conduit_plan_id,
+      })));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/requirements/:id/dependencies — list blockers and blocked-by
+  router.get('/requirements/:id/dependencies', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT cr.id, cr.source_type, cr.source_id, cr.target_type, cr.target_id,
+                cr.rel_type, cr.metadata, cr.created_at,
+                CASE WHEN cr.source_id = $1 THEN cr.target_id ELSE cr.source_id END AS other_id,
+                CASE WHEN cr.source_id = $1 THEN 'outgoing' ELSE 'incoming' END AS direction
+         FROM nebula.cross_references cr
+         WHERE ((cr.source_type = 'requirement' AND cr.source_id = $1)
+            OR (cr.target_type = 'requirement' AND cr.target_id = $1))
+           AND cr.rel_type IN ('req:blocks', 'req:depends_on')
+         ORDER BY cr.created_at ASC`,
+        [id]
+      );
+      res.json(rows.map((r: any) => ({
+        id: r.id,
+        relType: r.rel_type,
+        sourceType: r.source_type,
+        sourceId: r.source_id,
+        targetType: r.target_type,
+        targetId: r.target_id,
+        direction: r.direction,
+        otherId: r.other_id,
+        metadata: r.metadata,
+        createdAt: r.created_at ? new Date(r.created_at).getTime() : null,
+      })));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/requirements/:id/dependencies — create a dependency link
+  router.post('/requirements/:id/dependencies', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { targetId, relType = 'req:blocks' } = req.body;
+      if (!targetId) return res.status(400).json({ error: 'targetId is required' });
+      if (id === targetId) return res.status(400).json({ error: 'A requirement cannot depend on itself' });
+
+      const validRelTypes = [CrossReferenceType.REQ_BLOCKS, CrossReferenceType.REQ_DEPENDS_ON];
+      if (!validRelTypes.includes(relType)) {
+        return res.status(400).json({ error: `relType must be one of: ${validRelTypes.join(', ')}` });
+      }
+
+      // Verify both requirements exist
+      const { rows } = await pool.query(
+        'SELECT id FROM requirements WHERE id = ANY($1::uuid[])',
+        [[id, targetId]]
+      );
+      if (rows.length !== 2) {
+        return res.status(404).json({ error: 'One or both requirements not found' });
+      }
+
+      // Idempotent insert (WHERE NOT EXISTS)
+      const { rows: [xref] } = await pool.query(
+        `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+         SELECT 'requirement', $1, 'requirement', $2, $3, '{}'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM nebula.cross_references
+           WHERE source_type = 'requirement'
+             AND source_id = $1
+             AND target_type = 'requirement'
+             AND target_id = $2
+             AND rel_type = $3
+         )
+         RETURNING *`,
+        [id, targetId, relType]
+      );
+
+      res.status(201).json(xref || { ok: true, message: 'Dependency already exists' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/requirements/:id/dependencies/:depId — remove a dependency link
+  router.delete('/requirements/:id/dependencies/:depId', async (req: Request, res: Response) => {
+    try {
+      const { id, depId } = req.params;
+      const { rowCount } = await pool.query(
+        `DELETE FROM nebula.cross_references
+         WHERE id = $1
+           AND source_type = 'requirement'
+           AND target_type = 'requirement'
+           AND rel_type IN ('req:blocks', 'req:depends_on')
+           AND (source_id = $2 OR target_id = $2)`,
+        [depId, id]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'Dependency not found' });
+      res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -455,14 +596,18 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/requirements
   router.post('/requirements', async (req: Request, res: Response) => {
     try {
-      const { systemId, subsystemId, featureId = null, title, description = '', status = 'Backlog', priority = 'Medium', startDate = null, completionDate = null } = req.body;
-      if (!systemId || !subsystemId || !title) return res.status(400).json({ error: 'systemId, subsystemId, and title are required' });
+      const { systemId, subsystemId = null, featureId = null, title, description = '', status = 'Backlog', priority = 'Medium', startDate = null, completionDate = null, parentId = null, reqType = null, acceptanceCriteria = null, candidateId = null } = req.body;
+      if (!systemId || !title) return res.status(400).json({ error: 'systemId and title are required' });
       const normalizedStatus = normalizeStatus(status);
       if (!normalizedStatus) return res.status(400).json({ error: `status, if provided, must be one of: ${Array.from(STATUS_CANONICAL).join(', ')}` });
+      // Validate reqType if provided
+      if (reqType && !(REQ_TYPES as readonly string[]).includes(reqType)) {
+        return res.status(400).json({ error: `reqType, if provided, must be one of: ${REQ_TYPES.join(', ')}` });
+      }
       const { rows: [reqt] } = await pool.query(
-        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-        [systemId, subsystemId, featureId, title, description, normalizedStatus, priority, startDate, completionDate]
+        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date, parent_id, req_type, acceptance_criteria, candidate_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        [systemId, subsystemId, featureId, title, description, normalizedStatus, priority, startDate, completionDate, parentId, reqType, acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null, candidateId]
       );
       res.status(201).json({
         ...toEpochMs(reqt, 'created_at'),
@@ -471,6 +616,11 @@ export function createRoutes(pool: Pool): Router {
         featureId: reqt.feature_id,
         startDate: reqt.start_date,
         completionDate: reqt.completion_date,
+        parentId: reqt.parent_id,
+        reqType: reqt.req_type,
+        acceptanceCriteria: reqt.acceptance_criteria,
+        candidateId: reqt.candidate_id,
+        conduitPlanId: reqt.conduit_plan_id,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -498,7 +648,7 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/requirements/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId } = req.body;
+      const { title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId, parentId, reqType, acceptanceCriteria, candidateId, conduitPlanId } = req.body;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -515,6 +665,14 @@ export function createRoutes(pool: Pool): Router {
       if (systemId !== undefined) { sets.push(`system_id = $${i++}`); vals.push(systemId); }
       if (subsystemId !== undefined) { sets.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
       if (featureId !== undefined) { sets.push(`feature_id = $${i++}`); vals.push(featureId); }
+      if (parentId !== undefined) { sets.push(`parent_id = $${i++}`); vals.push(parentId); }
+      if (reqType !== undefined) {
+        if (reqType && !(REQ_TYPES as readonly string[]).includes(reqType)) return res.status(400).json({ error: `reqType must be one of: ${REQ_TYPES.join(', ')}` });
+        sets.push(`req_type = $${i++}`); vals.push(reqType);
+      }
+      if (acceptanceCriteria !== undefined) { sets.push(`acceptance_criteria = $${i++}`); vals.push(acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null); }
+      if (candidateId !== undefined) { sets.push(`candidate_id = $${i++}`); vals.push(candidateId); }
+      if (conduitPlanId !== undefined) { sets.push(`conduit_plan_id = $${i++}`); vals.push(conduitPlanId); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [reqt] } = await pool.query(
@@ -522,10 +680,23 @@ export function createRoutes(pool: Pool): Router {
         vals
       );
       if (!reqt) return res.status(404).json({ error: 'Requirement not found' });
+      // ── Backlog→ToDo auto-compile trigger (Plan 1062) ────────────
+      // When a requirement transitions to ToDo, fire-and-forget the
+      // two-stage compiler to generate WorkRequest IR + conduit plan.
+      if (status !== undefined && reqt.status === 'ToDo') {
+        fetch(`http://localhost:3101/api/requirements/${id}/compile`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ createPlan: true }),
+        }).catch(() => { /* compilation is best-effort */ });
+      }
       res.json({
         ...toEpochMs(reqt, 'created_at'),
         systemId: reqt.system_id, subsystemId: reqt.subsystem_id, featureId: reqt.feature_id,
         startDate: reqt.start_date, completionDate: reqt.completion_date,
+        parentId: reqt.parent_id, reqType: reqt.req_type,
+        acceptanceCriteria: reqt.acceptance_criteria, candidateId: reqt.candidate_id,
+        conduitPlanId: reqt.conduit_plan_id,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -591,12 +762,273 @@ export function createRoutes(pool: Pool): Router {
         ...toEpochMs(reqt, 'created_at'),
         systemId: reqt.system_id, subsystemId: reqt.subsystem_id, featureId: reqt.feature_id,
         startDate: reqt.start_date, completionDate: reqt.completion_date,
+        parentId: reqt.parent_id, reqType: reqt.req_type,
+        acceptanceCriteria: reqt.acceptance_criteria, candidateId: reqt.candidate_id,
+        conduitPlanId: reqt.conduit_plan_id,
       });
     } catch (err: any) {
       await client.query('ROLLBACK');
       res.status(500).json({ error: err.message });
     } finally {
       client.release();
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  REQUIREMENT → WORKREQUEST COMPILATION (Plan 1062)
+  // ════════════════════════════════════════════════════════════════
+
+  // POST /api/requirements/:id/compile — compile a requirement into a WorkRequest IR
+  // Runs the two-stage compiler (Stage 1 normalization + Stage 2 op_registry compilation).
+  // Optionally creates a conduit plan if createPlan=true.
+  router.post('/requirements/:id/compile', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { stage1Only = false, createPlan = false, dryRun = false } = req.body;
+
+      // Fetch requirement with hierarchy context
+      const { rows: [reqt] } = await pool.query(
+        `SELECT req.id, req.title, req.description, req.status, req.priority, req.req_type,
+                req.acceptance_criteria, req.candidate_id,
+                req.system_id, req.subsystem_id, req.feature_id, req.parent_id,
+                COALESCE(sys.name, '') AS system_name,
+                COALESCE(sys.description, '') AS system_description,
+                COALESCE(sub.name, '') AS subsystem_name,
+                COALESCE(sub.description, '') AS subsystem_description,
+                COALESCE(feat.name, '') AS feature_name,
+                COALESCE(feat.description, '') AS feature_description
+         FROM nebula.requirements req
+         LEFT JOIN nebula.systems sys ON sys.id = req.system_id
+         LEFT JOIN nebula.subsystems sub ON sub.id = req.subsystem_id
+         LEFT JOIN nebula.features feat ON feat.id = req.feature_id
+         WHERE req.id = $1`,
+        [id]
+      );
+      if (!reqt) return res.status(404).json({ error: 'Requirement not found' });
+
+      // ── Stage 1: Semantic Normalization ──────────────────────────
+      const hierarchyContext = {
+        system: { id: reqt.system_id, name: reqt.system_name, description: reqt.system_description },
+        subsystem: { id: reqt.subsystem_id, name: reqt.subsystem_name, description: reqt.subsystem_description },
+        feature: { id: reqt.feature_id, name: reqt.feature_name, description: reqt.feature_description },
+      };
+
+      // Normalize acceptance criteria
+      let normalizedCriteria: string[] = [];
+      const rawAC = reqt.acceptance_criteria;
+      if (rawAC) {
+        const parsed = typeof rawAC === 'string' ? JSON.parse(rawAC) : rawAC;
+        if (Array.isArray(parsed)) {
+          normalizedCriteria = parsed.map((item: any) =>
+            typeof item === 'string' ? item.trim() :
+            (item?.condition || item?.title || item?.criterion || '').trim()
+          ).filter(Boolean);
+        } else if (typeof parsed === 'object' && parsed?.condition) {
+          normalizedCriteria = [parsed.condition];
+        }
+      }
+
+      // Resolve cross-references
+      const { rows: crossRefs } = await pool.query(
+        `SELECT cr.rel_type, cr.target_type, cr.target_id,
+                CASE WHEN cr.target_type = 'requirement' THEN
+                  (SELECT title FROM nebula.requirements WHERE id = cr.target_id::uuid)
+                ELSE cr.target_id::text END AS target_label
+         FROM nebula.cross_references cr
+         WHERE cr.source_type = 'requirement' AND cr.source_id = $1
+         ORDER BY cr.created_at`,
+        [id]
+      );
+
+      // Synthesize intent summary
+      const intentParts = [reqt.title];
+      if (reqt.description) intentParts.push(reqt.description);
+      if (reqt.subsystem_name) intentParts.push(`Subsystem: ${reqt.subsystem_name}`);
+      if (reqt.feature_name) intentParts.push(`Feature: ${reqt.feature_name}`);
+      const intentSummary = intentParts.filter(Boolean).join(' — ');
+
+      const stage1 = {
+        requirement_id: id,
+        title: reqt.title,
+        hierarchy_context: hierarchyContext,
+        normalized_criteria: normalizedCriteria,
+        cross_references: crossRefs,
+        intent_summary: intentSummary,
+      };
+
+      if (stage1Only) {
+        return res.json({ ok: true, stage: 1, result: stage1 });
+      }
+
+      // ── Stage 2: Engineering Compilation ─────────────────────────
+      // Match against op_registry
+      const { rows: registry } = await pool.query(
+        `SELECT id, intent_id, version, label, match_patterns, opcode_template,
+                required_params, idempotency_key
+         FROM nebula.op_registry
+         WHERE status = 'active' AND deleted_at IS NULL`
+      );
+
+      let matchedEntry: any = null;
+      let bestScore = 0;
+      const intentText = `${reqt.title} ${intentSummary}`.toLowerCase();
+      for (const entry of registry) {
+        const patterns = entry.match_patterns || [];
+        for (const pattern of patterns) {
+          try {
+            const match = new RegExp(pattern, 'i').exec(intentText);
+            if (match && match[0].length > bestScore) {
+              bestScore = match[0].length;
+              matchedEntry = entry;
+            }
+          } catch { /* skip invalid regex */ }
+        }
+      }
+
+      // Generate opcode sequence
+      let opSequence: any[] = [];
+      if (matchedEntry?.opcode_template) {
+        const template = typeof matchedEntry.opcode_template === 'string'
+          ? JSON.parse(matchedEntry.opcode_template) : matchedEntry.opcode_template;
+        if (Array.isArray(template)) {
+          opSequence = template.map((step: any, i: number) => ({
+            step: i + 1,
+            op: step.op || 'WRITE_FILE',
+            target: step.target || '',
+            args: step.params || {},
+            idempotency_key: `${matchedEntry.idempotency_key || ''}-${id.slice(0, 8)}`,
+          }));
+        }
+      }
+      if (opSequence.length === 0) {
+        // Default: generate from acceptance criteria
+        const reqShort = id.slice(0, 8);
+        normalizedCriteria.slice(0, 5).forEach((criterion: string, i: number) => {
+          opSequence.push({
+            step: i + 1, op: 'WRITE_SOURCE_FILE',
+            target: `src/${reqShort}/step_${i+1}`,
+            args: { content_template: 'acceptance-criterion', criterion },
+            idempotency_key: `req-${reqShort}-step-${i+1}`,
+          });
+        });
+        opSequence.push({
+          step: opSequence.length + 1, op: 'VALIDATE_SYNTAX',
+          target: `src/${reqShort}/`, args: { language: 'auto' },
+          idempotency_key: `req-${reqShort}-validate`,
+        });
+      }
+
+      // Resolve files affected
+      const filesAffected: string[] = [];
+      const fileSet = new Set<string>();
+      for (const step of opSequence) {
+        if (step.target && !step.target.startsWith('spec/') && !step.target.startsWith('files/')) {
+          let t = step.target;
+          if (!t.match(/\.(py|ts|js|go|java|sql|md)$/)) t = t.replace(/\/$/, '') + '/__init__.py';
+          fileSet.add(t);
+        }
+      }
+      if (reqt.system_name) {
+        let base = reqt.system_name.toLowerCase().replace(/\s/g, '-');
+        if (reqt.subsystem_name) base += '/' + reqt.subsystem_name.toLowerCase().replace(/\s/g, '-');
+        fileSet.add(`${base}/__init__.py`);
+      }
+      filesAffected.push(...Array.from(fileSet).sort());
+
+      // Resolve dependencies from cross-refs
+      const dependencies = crossRefs
+        .filter((r: any) => r.rel_type === 'req:depends_on' || r.rel_type === 'req:blocks')
+        .map((r: any) => r.target_label)
+        .filter(Boolean);
+
+      const idempotencyKey = matchedEntry?.idempotency_key || `req-${id.slice(0, 8)}`;
+      const acceptanceForPlan = normalizedCriteria.slice(0, 5).length > 0
+        ? normalizedCriteria.slice(0, 5)
+        : [`Implement: ${reqt.title}`];
+
+      const stage2 = {
+        requirement_id: id,
+        intent_id: matchedEntry?.intent_id || `REQ-${id.slice(0, 8)}`,
+        registry_version: matchedEntry?.version || 'default',
+        op_sequence: opSequence,
+        files_affected: filesAffected,
+        dependencies,
+        acceptance_criteria: acceptanceForPlan,
+        idempotency_key: idempotencyKey,
+        matched_op_registry_id: matchedEntry?.id || null,
+      };
+
+      if (dryRun) {
+        return res.json({ ok: true, stage: 2, stage1, stage2, dryRun: true });
+      }
+
+      // ── Audit: journal entry via agent_records ───────────────────
+      const journalId = randomUUID();
+      const now = new Date().toISOString();
+      const journalContent = JSON.stringify({
+        requirement_id: id,
+        stage1: { normalized_criteria_count: normalizedCriteria.length, cross_references_count: crossRefs.length },
+        stage2: { matched: !!matchedEntry, op_count: opSequence.length, files_count: filesAffected.length, idempotency_key: idempotencyKey },
+      });
+      try {
+        await pool.query(
+          `INSERT INTO nebula.agent_records (id, record_type, role, title, content, tags, created_at, updated_at)
+           VALUES ($1::uuid, 'engineering_log', 'architect', $2, $3, $4, $5, $5)`,
+          [journalId, `Requirement Compilation: ${reqt.title.slice(0, 80)}`, journalContent,
+           JSON.stringify(['req-compilation', `requirement:${id.slice(0, 8)}`, 'audit']), now]
+        );
+      } catch (journalErr) {
+        console.warn('[compile] Journal entry write failed:', journalErr);
+      }
+
+      // ── Optional: create conduit plan ────────────────────────────
+      let planNumber: string | null = null;
+      if (createPlan) {
+        const project = (reqt.system_name || 'nexus').toLowerCase().replace(/\s/g, '-');
+        try {
+          const planResponse = await fetch('http://localhost:3100/tools/call', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: 'create_plan',
+              arguments: {
+                title: reqt.title, project, goal: intentSummary,
+                acceptanceCriteria: acceptanceForPlan,
+                filesAffected, dependencies,
+              },
+            }),
+          });
+          const planResult = await planResponse.json() as any;
+          const inner = planResult.result || planResult;
+          if (inner.created && inner.planNumber) {
+            planNumber = inner.planNumber;
+            // Create cross-reference: requirement → plan (matches existing pattern — let DB defaults handle id/created_at)
+            await pool.query(
+              `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+               SELECT 'requirement', $1, 'plan', $2, 'compiles_to', '{}'::jsonb
+               WHERE NOT EXISTS (
+                 SELECT 1 FROM nebula.cross_references
+                 WHERE source_type = 'requirement' AND source_id = $1
+                   AND target_type = 'plan' AND target_id = $2 AND rel_type = 'compiles_to'
+               )`,
+              [id, planNumber]
+            );
+          }
+        } catch (planErr) {
+          console.warn('[compile] Conduit plan creation failed:', planErr);
+        }
+      }
+
+      res.json({
+        ok: true,
+        stage: 2,
+        stage1,
+        stage2,
+        journal_entry_id: journalId,
+        plan_number: planNumber,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -1777,7 +2209,7 @@ export function createRoutes(pool: Pool): Router {
 
       // Get candidates
       const { rows: candidates } = await pool.query(
-        'SELECT id, title, status, system_id, intent_description FROM nebula.harvest_candidates WHERE harvest_id = $1 ORDER BY created_at', [id]
+        'SELECT id, title, status, completed, system_id, intent_description FROM nebula.harvest_candidates WHERE harvest_id = $1 ORDER BY created_at', [id]
       );
 
       res.json({
@@ -1833,14 +2265,14 @@ export function createRoutes(pool: Pool): Router {
   router.post('/harvests', async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
-      const { sourcePath, sourceFilename, model, totalCandidates, candidates, sourceText, tags, metadata, level, visibilityScope, sourceHash, runMetadata, docklang } = req.body;
+      const { sourcePath, sourceFilename, model, totalCandidates, candidates, sourceText, tags, metadata, level, visibilityScope, sourceHash, fileSize, runMetadata, docklang } = req.body;
       if (!sourcePath) return res.status(400).json({ error: 'sourcePath is required' });
       await client.query('BEGIN');
 
       // 1. Insert the harvest (trigger auto-computes version and source_hash)
       const { rows: [row] } = await client.query(
-        `INSERT INTO nebula.harvests (source_path, source_filename, model, total_candidates, candidates, source_text, tags, metadata, level, visibility_scope, source_hash, run_metadata, docklang)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        `INSERT INTO nebula.harvests (source_path, source_filename, model, total_candidates, candidates, source_text, tags, metadata, level, visibility_scope, source_hash, file_size, run_metadata, docklang)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
         [
           sourcePath,
           sourceFilename || '',
@@ -1853,6 +2285,7 @@ export function createRoutes(pool: Pool): Router {
           level ?? 1,
           visibilityScope || 'all',
           sourceHash || null,
+          fileSize || null,
           runMetadata || {},
           docklang || null,
         ]
@@ -1921,7 +2354,7 @@ export function createRoutes(pool: Pool): Router {
       const { planRef } = req.params;
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source,
                 cr.created_at AS linked_at
@@ -1948,7 +2381,7 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source
          FROM nebula.harvest_candidates hc
@@ -1970,7 +2403,7 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source
          FROM nebula.harvest_candidates hc
@@ -1992,7 +2425,7 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source
          FROM nebula.harvest_candidates hc
@@ -2028,6 +2461,7 @@ export function createRoutes(pool: Pool): Router {
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description, hc.status, hc.tags,
                 hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.work_request_id, hc.completed,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source
          FROM nebula.harvest_candidates hc
@@ -2062,7 +2496,7 @@ export function createRoutes(pool: Pool): Router {
     const client = await pool.connect();
     try {
       const { id } = req.params;
-      const { title, intentDescription, status, systemId, subsystemId, featureId, tags, planRef } = req.body;
+      const { title, intentDescription, status, systemId, subsystemId, featureId, tags, planRef, workRequestId, completed } = req.body;
 
       await client.query('BEGIN');
 
@@ -2076,6 +2510,8 @@ export function createRoutes(pool: Pool): Router {
       if (subsystemId !== undefined) { sets.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
       if (featureId !== undefined) { sets.push(`feature_id = $${i++}`); vals.push(featureId); }
       if (tags !== undefined) { sets.push(`tags = $${i++}`); vals.push(tags); }
+      if (workRequestId !== undefined) { sets.push(`work_request_id = $${i++}`); vals.push(workRequestId); }
+      if (completed !== undefined) { sets.push(`completed = $${i++}`); vals.push(completed); }
 
       // planRef creates a cross-reference but doesn't update the candidate row;
       // still count it as a "change" to avoid the early no-op return.
@@ -2144,17 +2580,22 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const {
         systemId,
-        subsystemId,
+        subsystemId = null,
         featureId = null,
         planRef,
         priority = 'Medium',
         status = 'Backlog',
         title,
         description,
+        parentId = null,
+        reqType = null,
+        acceptanceCriteria = null,
       } = req.body;
 
       if (!systemId) return res.status(400).json({ error: 'systemId is required' });
-      if (!subsystemId) return res.status(400).json({ error: 'subsystemId is required (requirement must belong to a subsystem)' });
+      if (reqType && !(REQ_TYPES as readonly string[]).includes(reqType)) {
+        return res.status(400).json({ error: `reqType must be one of: ${REQ_TYPES.join(', ')}` });
+      }
       await client.query('BEGIN');
 
       // 1. Fetch the harvest candidate (must exist)
@@ -2179,7 +2620,7 @@ export function createRoutes(pool: Pool): Router {
         await upsertHarvestContextTab(client, systemId, candidate);
       }
 
-      // 4. Create a requirement derived from the candidate
+      // 4. Create a requirement derived from the candidate, linked via candidate_id
       const reqTitle = title || candidate.title;
       const reqDescription = description || candidate.intent_description || '';
       const normalizedStatus = normalizeStatus(status);
@@ -2188,9 +2629,9 @@ export function createRoutes(pool: Pool): Router {
         return res.status(400).json({ error: `status, if provided, must be one of: ${Array.from(STATUS_CANONICAL).join(', ')}` });
       }
       const { rows: [requirement] } = await client.query(
-        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-        [systemId, subsystemId, featureId, reqTitle, reqDescription, normalizedStatus, priority, null, null]
+        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date, parent_id, req_type, acceptance_criteria, candidate_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        [systemId, subsystemId, featureId, reqTitle, reqDescription, normalizedStatus, priority, null, null, parentId, reqType, acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null, candidate.id]
       );
 
       // 5. Create cross-reference: candidate → plan (if planRef provided)
@@ -2201,6 +2642,31 @@ export function createRoutes(pool: Pool): Router {
         requirementId: requirement.id,
         linkedAt: new Date().toISOString(),
       });
+
+      // 5b. Create cross-reference: requirement → plan (if planRef provided)
+      let reqCrossRef: any = null;
+      if (hasPlanRef(planRef)) {
+        const planRefStr = String(planRef).trim();
+        const { rows: [rcr] } = await client.query(
+          `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+           SELECT 'requirement', $1, 'plan', $2, 'req:spawns_plan', $3
+           WHERE NOT EXISTS (
+             SELECT 1 FROM nebula.cross_references
+             WHERE source_type = 'requirement'
+               AND source_id = $1
+               AND target_type = 'plan'
+               AND target_id = $2
+               AND rel_type = 'req:spawns_plan'
+           )
+           RETURNING *`,
+          [requirement.id, planRefStr, JSON.stringify({
+            candidateId: candidate.id,
+            systemId,
+            linkedAt: new Date().toISOString(),
+          })]
+        );
+        reqCrossRef = rcr || null;
+      }
 
       await client.query('COMMIT');
 
@@ -2213,9 +2679,16 @@ export function createRoutes(pool: Pool): Router {
           featureId: requirement.feature_id,
           startDate: requirement.start_date,
           completionDate: requirement.completion_date,
+          parentId: requirement.parent_id,
+          reqType: requirement.req_type,
+          acceptanceCriteria: requirement.acceptance_criteria,
+          candidateId: requirement.candidate_id,
         },
         crossReference: crossRef
           ? { ...toEpochMs(crossRef, 'created_at'), sourceType: crossRef.source_type, sourceId: crossRef.source_id, targetType: crossRef.target_type, targetId: crossRef.target_id, relType: crossRef.rel_type }
+          : null,
+        reqCrossReference: reqCrossRef
+          ? { ...toEpochMs(reqCrossRef, 'created_at'), sourceType: reqCrossRef.source_type, sourceId: reqCrossRef.source_id, targetType: reqCrossRef.target_type, targetId: reqCrossRef.target_id, relType: reqCrossRef.rel_type }
           : null,
       });
     } catch (err: any) {
@@ -2520,7 +2993,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/agent-records — list records with optional filters
   router.get('/agent-records', async (req: Request, res: Response) => {
     try {
-      const { type, role, systemId, planRef, tag, level, visibilityScope, limit: qLimit, offset: qOffset } = req.query;
+      const { type, role, systemId, subsystemId, featureId, planRef, tag, search, createdAfter, createdBefore, level, visibilityScope, limit: qLimit, offset: qOffset } = req.query;
       const limit = Math.min(parseInt(qLimit as string) || 100, 500);
       const offset = parseInt(qOffset as string) || 0;
 
@@ -2531,14 +3004,41 @@ export function createRoutes(pool: Pool): Router {
       if (type) { clauses.push(`record_type = $${i++}`); vals.push(type); }
       if (role) { clauses.push(`role = $${i++}`); vals.push(role); }
       if (systemId) { clauses.push(`system_id = $${i++}`); vals.push(systemId); }
+      if (subsystemId) { clauses.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
+      if (featureId) { clauses.push(`feature_id = $${i++}`); vals.push(featureId); }
       if (planRef) { clauses.push(`plan_ref = $${i++}`); vals.push(planRef); }
-      if (tag) { clauses.push(`$${i} = ANY(tags)`); vals.push(tag); i++; }
+      // Multi-tag support: single ?tag=val or multiple ?tag=a&tag=b (AND conjunction)
+      if (tag) {
+        const tagArr = Array.isArray(tag) ? tag as string[] : [tag as string];
+        if (tagArr.length === 1) {
+          clauses.push(`$${i} = ANY(tags)`);
+          vals.push(tagArr[0]);
+          i++;
+        } else {
+          clauses.push(`tags @> $${i}::text[]`);
+          vals.push(tagArr);
+          i++;
+        }
+      }
+      if (search) {
+        clauses.push(`(title ILIKE $${i} OR content ILIKE $${i})`);
+        vals.push(`%${search}%`);
+        i++;
+      }
+      if (createdAfter) {
+        clauses.push(`created_at >= $${i++}`);
+        vals.push(createdAfter);
+      }
+      if (createdBefore) {
+        clauses.push(`created_at <= $${i++}`);
+        vals.push(createdBefore);
+      }
       if (level) { clauses.push(`level = $${i++}`); vals.push(parseInt(level as string)); }
       if (visibilityScope) { clauses.push(`visibility_scope = $${i++}`); vals.push(visibilityScope); }
 
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
       const { rows } = await pool.query(
-        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
+        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
          FROM nebula.agent_records ${where}
          ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
         [...vals, limit, offset]

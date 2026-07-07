@@ -59,24 +59,32 @@ def get_harvest_id_from_source(html_path: Path) -> str | None:
         return None
 
 
-def check_docklang(harvest_id: str) -> bool:
-    """Check if a harvest record already has docklang data."""
-    sql = f"SELECT docklang IS NOT NULL FROM nebula.harvests WHERE id = '{harvest_id}';"
+def check_docklang(harvest_id: str) -> dict:
+    """Check if a harvest record already has docklang data and its file_size.
+    Returns {'has_docklang': bool, 'file_size': int|None}."""
+    sql = f"SELECT docklang IS NOT NULL, file_size FROM nebula.harvests WHERE id = '{harvest_id}';"
     try:
         result = subprocess.run(
             DOCKER_PSQL + ["-t", "-A"],
             input=sql, capture_output=True, text=True, timeout=10,
         )
-        return result.stdout.strip() == "t"
+        out = result.stdout.strip()
+        if not out:
+            return {"has_docklang": False, "file_size": None}
+        parts = out.split("|")
+        has_dl = parts[0] == "t" if parts else False
+        fs = int(parts[1]) if len(parts) > 1 and parts[1] and parts[1] != "\\N" else None
+        return {"has_docklang": has_dl, "file_size": fs}
     except Exception:
-        return False
+        return {"has_docklang": False, "file_size": None}
 
 
-def upsert_docklang(harvest_id: str, docklang_json: str) -> bool:
-    """Upsert docklang JSON into a harvest record."""
+def upsert_docklang(harvest_id: str, docklang_json: str, file_size: int | None = None) -> bool:
+    """Upsert docklang JSON and optionally file_size into a harvest record."""
     sql = f"""
     UPDATE nebula.harvests
     SET docklang = $${docklang_json}$$::jsonb
+        {', file_size = ' + str(file_size) if file_size is not None else ''}
     WHERE id = '{harvest_id}'
     RETURNING id;
     """
@@ -134,11 +142,22 @@ def process_html(html_path: Path, force: bool = False, dry_run: bool = False) ->
         return result
 
     if not force:
-        has_dock = check_docklang(harvest_id)
-        if has_dock:
-            result["status"] = "exists"
-            log.info("  %s → docklang already exists (use --force to regenerate)", filename)
-            return result
+        dl_info = check_docklang(harvest_id)
+        if dl_info["has_docklang"]:
+            # Check if file size matches — if so, skip (unchanged)
+            current_size = html_path.stat().st_size if html_path.exists() else None
+            if current_size is not None and dl_info["file_size"] is not None and current_size == dl_info["file_size"]:
+                result["status"] = "unchanged"
+                log.info("  %s → docklang exists, file_size unchanged (%d bytes) — skipping", filename, current_size)
+                return result
+            elif dl_info["has_docklang"]:
+                if current_size is not None and dl_info["file_size"] is not None and current_size != dl_info["file_size"]:
+                    log.info("  %s → docklang exists but file_size changed (%d → %d) — use --force to regenerate",
+                             filename, dl_info["file_size"], current_size)
+                else:
+                    log.info("  %s → docklang already exists (use --force to regenerate)", filename)
+                result["status"] = "exists"
+                return result
 
     # Generate DockLang
     docklang = generate_docklang(html_path, force)
@@ -157,7 +176,8 @@ def process_html(html_path: Path, force: bool = False, dry_run: bool = False) ->
 
     # Upsert to DB
     docklang_json = json.dumps(docklang, ensure_ascii=False)
-    ok = upsert_docklang(harvest_id, docklang_json)
+    file_size = html_path.stat().st_size if html_path.exists() else None
+    ok = upsert_docklang(harvest_id, docklang_json, file_size)
     result["status"] = "updated" if ok else "update_failed"
     return result
 
@@ -185,7 +205,7 @@ def main():
 
     log.info("Found %d HTML files to process", len(html_files))
 
-    stats = {"processed": 0, "updated": 0, "exists": 0, "no_harvest": 0,
+    stats = {"processed": 0, "updated": 0, "exists": 0, "unchanged": 0, "no_harvest": 0,
              "failed": 0, "dry_run": 0, "total_units": 0, "total_blocks": 0}
 
     for i, html_path in enumerate(html_files):
@@ -201,6 +221,7 @@ def main():
     log.info("  Total HTML files:    %d", stats["processed"])
     log.info("  Updated:             %d", stats.get("updated", 0))
     log.info("  Already existed:     %d", stats.get("exists", 0))
+    log.info("  Unchanged (size):    %d", stats.get("unchanged", 0))
     log.info("  No harvest record:   %d", stats.get("no_harvest", 0))
     log.info("  Failed:              %d", stats.get("failed", 0))
     log.info("  Dry-run:             %d", stats.get("dry_run", 0))
