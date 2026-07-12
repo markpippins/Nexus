@@ -1,0 +1,68 @@
+-- Migration Registry: 027-031 TIMESTAMPTZ Conversion Series
+-- ====================================================================
+-- These five migrations convert all legacy TEXT timestamp columns to
+-- native PostgreSQL TIMESTAMPTZ across the conduit, vision, peb, and
+-- tackle schemas.
+--
+-- They are idempotent: each DO $$ block checks data_type='text' before
+-- altering, so re-running against an already-migrated database is a no-op.
+--
+-- The conversion handles three TEXT formats:
+--   1. Empty string ''        → NULL
+--   2. ISO 8601 with Z suffix → REPLACE(col, 'Z', '')::timestamptz
+--   3. Valid ISO 8601 string  → col::timestamptz
+--
+-- Companion change in conduit-mcp/src/db.ts (lines 5-8):
+--   types.setTypeParser(types.builtins.TIMESTAMPTZ, (val: string) => val);
+--   types.setTypeParser(types.builtins.TIMESTAMP, (val: string) => val);
+-- This ensures the application layer still receives ISO 8601 strings
+-- from TIMESTAMPTZ columns — no application code changes needed.
+-- ====================================================================
+
+-- ┌──────┬────────────────────┬────────────────────────────────────┐
+-- │ Vers │ Applied (UTC)      │ Scope                              │
+-- ├──────┼────────────────────┼────────────────────────────────────┤
+-- │ v27  │ 2026-07-12 01:54   │ conduit core + tackle shared       │
+-- │ v28  │ 2026-07-12 01:54   │ conduit utility tables             │
+-- │ v29  │ 2026-07-12 01:59   │ conduit kernel/log tables          │
+-- │ v30  │ 2026-07-12 02:18   │ vision + peb tables                │
+-- │ v31  │ 2026-07-12 02:22   │ vision.tickets.deadline (catch-up) │
+-- └──────┴────────────────────┴────────────────────────────────────┘
+
+-- Column Coverage by Migration:
+--
+-- v27 — conduit core + tackle shared (9 tables, 25 columns)
+--   conduit.plans:             created_at, updated_at
+--   conduit.schema_version:    applied_at
+--   conduit.sessions:          created_at, start_iso, end_iso,
+--                              last_heartbeat_at, last_activity,
+--                              workflow_start_time, workflow_close_time
+--   conduit.circuit_breaker:   tripped_at, updated_at, wake_requested_at
+--   conduit.work_requests:     created_at, updated_at
+--   tackle.providers:          created_at, updated_at
+--   tackle.harnesses:          created_at, updated_at
+--   tackle.models:             created_at, updated_at
+--   tackle.config_bundle:      created_at, updated_at, valid_from, valid_to
+--
+-- v28 — conduit utility tables (5 tables, 8 columns)
+--   conduit.cost_logs:              recorded_at
+--   conduit.model_pricing:          updated_at
+--   conduit.agent_budgets:          reset_at, updated_at
+--   conduit.pipeline_cursor:        updated_at
+--   conduit.role_circuit_breaker:   created_at, tripped_at, updated_at
+--
+-- v29 — conduit kernel/log tables (4 tables, 4 columns)
+--   conduit.kernel_delta_log:   created_at
+--   conduit.kernel_snapshot:    created_at
+--   conduit.lineage_log:        created_at
+--   conduit.bridge_checkpoint:  last_recorded_on_dt
+--
+-- v30 — vision + peb tables (3 tables, 7 columns)
+--   vision.receipts:             created_at
+--   vision.tickets:              created_at, claimed_at, closed_at, expires_at
+--   peb.role_circuit_breaker:    tripped_at, updated_at
+--
+-- v31 — catch-up (1 table, 1 column)
+--   vision.tickets:              deadline
+--
+-- Total: 22 tables, 45 columns migrated from TEXT to TIMESTAMPTZ
