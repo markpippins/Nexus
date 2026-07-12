@@ -1,0 +1,122 @@
+[
+  {
+    "hostname": "vanadium",
+    "ipAddress": "172.16.30.44",
+    "type": "PHYSICAL",
+    "environment": "PRODUCTION",
+    "operatingSystem": "LINUX",
+    "cpuCores": 4,
+    "memoryMb": 4096,
+    "diskGb": 32,
+    "status": "ACTIVE",
+    "description": "PI4 Node"
+  },
+  {
+    "hostname": "iridium",
+    "ipAddress": "172.16.30.13",
+    "type": "PHYSICAL",
+    "environment": "PRODUCTION",
+    "operatingSystem": "LINUX",
+    "cpuCores": 4,
+    "memoryMb": 4096,
+    "diskGb": 32,
+    "status": "ACTIVE",
+    "description": "PI4 Node"
+  },
+  {
+    "hostname": "thallium",
+    "ipAddress": "172.16.30.55",
+    "type": "PHYSICAL",
+    "environment": "PRODUCTION",
+    "operatingSystem": "LINUX",
+    "cpuCores": 4,
+    "memoryMb": 4096,
+    "diskGb": 32,
+    "status": "ACTIVE",
+    "description": "PI4 Node"
+  },
+  {
+    "hostname": "barium",
+    "ipAddress": "172.16.30.20",
+    "type": "PHYSICAL",
+    "environment": "PRODUCTION",
+    "operatingSystem": "LINUX",
+    "cpuCores": 4,
+    "memoryMb": 4096,
+    "diskGb": 32,
+    "status": "ACTIVE",
+    "description": "PI4 Node"
+  },
+  {
+    "hostname": "thorium",
+    "ipAddress": "172.16.30.46",
+    "type": "PHYSICAL",
+    "environment": "PRODUCTION",
+    "operatingSystem": "LINUX",
+    "cpuCores": 2,
+    "memoryMb": 2048,
+    "diskGb": 16,
+    "status": "ACTIVE",
+    "description": "C4 Node"
+  },
+  {
+    "hostname": "bohrium",
+    "ipAddress": "172.16.30.32",
+    "type": "PHYSICAL",
+    "environment": "PRODUCTION",
+    "operatingSystem": "LINUX",
+    "cpuCores": 2,
+    "memoryMb": 2048,
+    "diskGb": 16,
+    "status": "ACTIVE",
+    "description": "C4 Node"
+  },
+  {
+    "hostname": "osmium",
+    "ipAddress": "127.0.0.1",
+    "type": "PHYSICAL",
+    "environment": "DEVELOPMENT",
+    "operatingSystem": "LINUX",
+    "cpuCores": 4,
+    "memoryMb": 4096,
+    "diskGb": 16,
+    "status": "ACTIVE",
+    "description": "OrangePi Node (Local)"
+  },
+  {
+    "hostname": "titanium",
+    "ipAddress": "172.16.30.56",
+    "type": "PHYSICAL",
+    "environment": "PRODUCTION",
+    "operatingSystem": "LINUX",
+    "cpuCores": 8,
+    "memoryMb": 16384,
+    "diskGb": 512,
+    "status": "ACTIVE",
+    "description": "x86 Node"
+  },
+  {
+    "hostname": "beryllium",
+    "ipAddress": "172.16.30.23",
+    "type": "PHYSICAL",
+    "environment": "PRODUCTION",
+    "operatingSystem": "LINUX",
+    "cpuCores": 8,
+    "memoryMb": 16384,
+    "diskGb": 512,
+    "status": "ACTIVE",
+    "description": "x86 Node"
+  },
+  {
+    "hostname": "strontium",
+    "ipAddress": "172.16.30.2",
+    "type": "VIRTUAL",
+    "environment": "PRODUCTION",
+    "operatingSystem": "LINUX",
+    "cpuCores": 4,
+    "memoryMb": 8192,
+    "diskGb": 100,
+    "status": "ACTIVE",
+    "description": "VM Node"
+  }
+]

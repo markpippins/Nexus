@@ -99,11 +99,11 @@ public class ServiceStatusController {
             Long serviceId = deployment.getService() != null ? deployment.getService().getId() : null;
 
             // If no explicit healthCheckUrl, construct one from server and port
-            if ((healthUrl == null || healthUrl.isEmpty()) && deployment.getHost() != null
+            if ((healthUrl == null || healthUrl.isEmpty()) && deployment.getServer() != null
                     && deployment.getPort() != null) {
-                String hostname = deployment.getHost().getHostname();
+                String hostname = deployment.getServer().getHostname();
                 if (hostname == null || hostname.isEmpty()) {
-                    hostname = deployment.getHost().getIpAddress();
+                    hostname = deployment.getServer().getIpAddress();
                 }
                 if (hostname != null && !hostname.isEmpty()) {
                     // Try standard health endpoints: /health, /actuator/health, /q/health

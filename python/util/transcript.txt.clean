@@ -1,179 +1,1550 @@
-I've been a huge fan and advocate of markdown for as long as I can remember,
-even to the point where it hurt my career. I literally didn't apply to jobs at companies where I couldn't submit my markdown resume as my official resume
-for the company. I had my entire resume on my GitHub and if I had to or I was really interested, I would just submit a PDF with a single link to the markdown
-file on my GitHub. That's how dedicated I was. I just didn't think all of these fancy ways of presenting information mattered when we had a good, simple,
-reliable language for it specifically. I will always be incredibly thankful to John Gruber and Aaron Schwarz for creating something as magical as
-Markdown. Having such a simple, reliable way to just write content and have it come out and render so well, it still
-has a bit of a magical feel to it. As someone who tried really hard to make latte work in college, markdown once it clicked for me just kind of became how I
-write everything to this day. Which is why this article immediately grabbed my attention. Why the heck are we still using Markdown? As great as Markdown is,
-I am more than happy to agree we have went too far with it. Once we got to the point where we were making new file extensions to embed other types of
-content into our markdown, we were probably over the line. And now that we're in a world where we're using LLMs and agents and all of these things and
-Markdown is the method we communicate between them, it's getting even more questionable. I have a lot of different things I want to talk about with Markdown in the near future. Things like
-how Markdown is not the right primitive for memory or how Markdown is actually pretty good as a programming scripting language in specific scenarios, which
-we'll definitely talk a lot about in the future. But today, I want to question the fundamentals. Why are we still using Markdown? What makes it so great? and
-what would a better solution for the stuff we do today look like? I've barely even started and I can already imagine all of the Obsidian comments in my head.
-And if I know y'all love anything more than Obsidian, it's probably today's sponsor. I have a question for you.
-What's the most times you've committed code that didn't work just trying to fix CI? I've probably stacked up to 15 commits before just watching CI break
-again and again, and all I wanted was the ability to run it locally without having to make more commits. Ideally, in a way that doesn't even force me to leave my editor or my agent. Today's
-sponsor is RWX. I can tell you about how fast they are or how great they are to work with agents or how they run things in parallel so you don't have to wait for a bunch of stuff that's blocking
-when it doesn't have to be. There's a lot of reasons to use RWX, but I don't want to talk about any of that because I'm in love with the CLI. Once you write the YAML file for your CI, all you have
-to do is run their CLI to trigger a run without having to commit the code. So instead of committing, pushing, and waiting for the whole thing to run, you can just run a CLI command locally. It
-will then spin up a cloud instance that can still take advantage of all of the caching infra, and all the other things they do, right? and immediately get your feedback as to whether or not it worked.
-This should be enough to sell you. But when you combine it with their agent skill, suddenly it's like, "Oh yeah,
-seriously though, run loops are such a great solution to so many different problems. If you're working on a hard feature that you can test, go write the test, commit it, and then tell the
-agent, make sure CI passes by running the RWX run command, and then when it passes, commit and push." This is such a good workflow, and I'm amazed nothing
-else has it. And this is just the tip of the iceberg. The more you dig in, the more you'll appreciate RWX's unique way of fixing CI so that you will move faster instead of slower. Check out the CI that makes your agents faster at soy.
-Rwx. So, why the heck are we still using Markdown? There are few things in life that bring me much joy and hate at the same time, like a chocolate that hurts when eaten or markdown. Seriously, why?
-Half of the time we aren't even using the full language. Speaking of which,
-this is a bold opening. HTML is the best programming language. I know you've heard people say that the only programming language they know is HTML.
-And I know we both rolled our eyes in discontent trying to get our programming language papers out of assembled decks on of papers on how HTML is only a
-markup language and not a programming language. I mean, yes, we're on the right, but that guy probably has something that we don't have a life.
-Okay, already owned and the articles barely started. I I will have you know that my girlfriend loves when I talk
-about HTML and Markdown, but to each their own. Note, when the author is talking about markdown, he is specifically talking about common mark unless stated otherwise because it is
-the unambiguous syntax specification. I love the project. I really appreciate their efforts on making this language a bit more grounded. It's not the specification that's broken. It's the
-language itself. Oh boy, the good markdown is a minimal language used for type setting trivial documents. It needed to do one simple job. Get a markdown file and output an HTML file.
-It index is as legible as it gets and it's easy to write even with no assists.
-Like the C language, you can see the output that will be created. Bold is always open, closed, B tags at the end,
-and the italics are the same. Learning curve is simply non-existent if you're just a casual user. Just one look at the cheat sheet and you're ready. But now
-the bad. We don't know what we want. Do we want UI? Do we want a programming language? We don't know. The only reason feature creep exists is because of
-unclear specifications. You want a minimal, easily legible markup language. You have markdown. Simple as that,
-right? Well, here are two different syntaxes to generate the exact same output. You have the single hash for
-title, hello, stars for doing an italics here for I am, and then unambiguous,
-which you want bold, and then grammar in a block quote. This is roughly how I would write this. I would have used double stars for unambiguous, but I am
-what I am. Actually, actually, I would have used double stars for unambiguous and underscores for that. So, I guess I'm closer to here, but I would never have done the header syntax like this.
-God. Yeah, there is almost no syntax overlap between these other than the block quote at the end. Oh boy, I to
-have fun. I hope you have the two eyeballs enough to see that markdown is not what you asked for. These produce two identical outputs and this is just the tip of the iceberg. It has so many
-poor decisions baked in that if you try to use it, it will actively fight against you the moment you think you know what you're doing. Let's start with bold itallic and bold itallic. In
-markdown, you can write a bold in different ways. You have the double star syntax, double underscores, or the B tag. And these are just some of the ways a valid bold can be written. And these
-are for common mark. If you're using something which isn't marketing itself as common mark compliant, you can very well encounter valid stuff that produces
-the same input like this or this or Yeah. God. Yeah, we've had to deal with so much [ __ ] like this for T3 chat. You
-guys have no idea. It is so absurdly difficult to handle all the different weird cases for markdown rendering. But
-I will also personally say the edge cases for latte are even worse. So yeah,
-[snorts] and don't even get him started on layered ones like this. Oh god, I don't even want to try to parse this.
-Okay, we got the two star here. Then this one is an italic. So this whole section is bold here. This one is italicized. This is italicized.
-A is bolded here. Not italicized. This is reitalicized. Of is italicized. This
-is italics. And this is doubled the italics for the lead here. I think that hurt.
-or this. Oh no, no, please no. I'm not even going to try on that one. This thing is actually
-so peak that we have a class of parser vulnerabilities called redos, regular expression denial of service that are affecting this. Like this 6.9 severity
-level CVE for markdown. It this is a legit DOS vulnerability.
-You just put a bunch of stars in a link and it can't process it. Beautiful. Beautiful.
-Yeah, this string here takes 65,553 steps. That will [ __ ] over anything.
-Great. Super cool. We love that.
-So, how much worse can it possibly get here? Exhibit B. Am was a good idea. But this in old languages where compilers
-were producing optimal code like a river in a desert, inline assembly helped them write performance critical code with ease in the cost of the compiler
-engineers blood, sweat, tears in the birth of their firstborn son. Yeah,
-writing your inline assembly to get perfect code is hellish. It's one of the reasons that a project like ffmpeg is so tough but also so important. Inline as
-allowed stuff like simd operations before the compiler support in for them.
-You want an overview of early SIMD generation failures, you can take a look at those here. Oh god, that's the last thing I want to look at. Now, let's take this wonderful idea and bolt it directly
-into the most bloated singlethreaded sandboxed environment, expecting a simple and easy way to write documents.
-And that's how inline HTML inside Markdown was born. Oh boy. Inline HTML allows you to do stuff like this. I've
-had so many problems with inline HTML in Markdown personally that I am even more on this author side now. Yeah, I am an
-insert simple programmer doing span class fancy text elegant close span programming div class animation. And
-here's my portfolio clos. Isn't this just simple? Isn't this just neat? The main reason why correct markdown parsing is exceptionally hard isn't because
-markdown syntax is so hard to comprehend. It's only onetenth of the issue. The real issue is that to ship a markdown parser, you also need to ship a
-friendly HTML parser. You're using HTML inside of Markdown. Why not use HTML from the start? Fair. I actually remember now friend of the channel who
-might even be here right now, Jacob Evans tried really hard a while back and it looks like he has given it up since,
-but he tried super hard to have a single markdown file for his GitHub profile and for his homepage by serving the markdown
-as HTML because there's enough overlap that hypothetically you could write a valid HTML homepage and have it render
-as your profile as well without code between the two. literally the same exact bites for both. And the results were hellish. He tried really hard to
-make it work. But man, it was very fun watching him try. Markdown in and of itself isn't powerful enough to satisfy the simple monkey brain developers like
-the author who's only satisfied when the site looks good enough. Good enough in this case means it needs to have at least basic latex support with tix support with the ability to install
-packages, plant UML, mermaid, custom styling, custom short codes, tagging and taxonomy, proper footnotes, bib tech
-support. I don't want a simple job from the simple tool too. To nail a painting to the wall, I need a hammer. In this case, the hammer is Markdown. But what
-if I wanted to paint too? I'll break the canvas the moment I try to paint it with a hammer. Breaking the canvas also means a whole lot of CVEes primarily around cross-ite scripting vulnerabilities.
-This has me thinking. It has me thinking. I want to take a look at my blog and see how [ __ ] my markdown is. I haven't thought about this in a while.
-So, we already have a helmet here. That's great.
-I have an iframe embedded because it's a YouTube video. So, in the first 13 lines in the second paragraph here, I'm
-already doing weird HTML [ __ ] Then the rest is fine. Oh, here's a great one. I needed to have an image tag that was
-also a link. So, I put an image HTML tag inside of brackets to attach the link.
-Isn't this wonderful? I had to check two posts to find some cursed [ __ ] More cursed HTML and lined. Man, I used to be
-so good at writing. It's a shame that the syntax is awful. Yeah, get the idea.
-It as soon as you want to use markdown for more interesting stuff, you end up writing some cursed stuff. Every time we
-allow inline HTML, plug-in hooks, or embedded execution engines, we expand the attack surface. The result is predictable recurring cross-sight scripting vulnerabilities across major
-Markdown implementations and much much more. And this will continue to rise with the vibe shaded parsers that are hitting the market. Yep, I've seen a lot
-of attempts to rethink how we parse markdown because all of the agents spit out Markdown. We want to make things that are better, faster, and more reliable, and all of them are just full of exploits, edge cases,
-vulnerabilities, and more. Apparently, Obsidian Markdown is even more cursed.
-I'm sure I will love that. Speaking of things I love, we're now in exhibit C. The old and obscure syntax. Markdown,
-like all the good tech we have around the worldwide web, was made in the good old 2000s. Markdown was inspired by pre-existing conventions for marking up plain text in email and Usenet posts.
-Mind you, before 2000, most serious mail looked like this. You see this quote syntax, putting the colon at the start of every line.
-Oh god, this ending in the signature. Do you see the beauty of it? The quote syntax, the vertical separation with pipes. This is what markdown was needed
-for which it would fail horribly at because in Markdown you can't divide the screen into n parts without inline HTML blackmagic. But because of this legacy you have two different ways of writing
-headings. The normal way and the ATX way. You have two different ways and more than two CVE of writing bold and itallic. You have two different ways of writing horizontal rules which collide
-with one of them colliding with the set text header syntax. You have two different ways of writing unordered lists. You have an ordered list which doesn't care about how you ordered them.
-And you have a footnote syntax which moves the entire grammar to context dependent grammar. And I remember the first time I saw that like the right way
-to do lists in markdown. The correct thing is to put zeros because then your markdown parser can number them correctly. And if you change the order of things, you don't have to go redo all the numbers.
-So much [ __ ] Oh. Oh, I didn't see this line. This language is literally the C++ of markup languages. Oh man, now that I've seen this, I can't unsee this.
-That is entirely correct. This might be my favorite programming video ever other than maybe the OOP is garbage video.
-It's two hours long and I had to stop and pause and go back to it later because unlike most 2-hour long videos,
-I couldn't watch that one in the background cuz it was too good. So, I actually sat and like walked in and just stared at my phone for 2 hours. My roommate at the time asked if I was okay. I was like, I'm more than okay.
-You're going to have to watch this after. This video is so good. highly recommend it. And knowing that, having that still in my head, C++ and markdown,
-yeah, there's a lot of overlap. Nearly everything can be done in two different ways, which some of them might allow for cross-ite scripting and somehow leak memory in HTML. It's used everywhere,
-but it also fails everywhere equally.
-And now we're at exhibit D. You can't simply just parse it. You also have to use it. Parsing is the easy thing. If you remember, I told you that the
-footnote syntax moves this grammar up to a contextsensitive one. Let me elucidate you. Okay. So if we have this syntax
-with the carrot for a citation, this becomes test bracket one there. But if we actually handle a citation at the
-bottom, now the markdown changes because this is now a link instead. Previously,
-it just put this in. Now this thing further on changes how this part here is parsed. Oh boy. Actually though,
-footnotes aren't supported in common mark. They have links. The only notable difference is that link syntax means you can put only one word after the
-definition as opposed to a shameful explanation of why bananas on pizza is a good idea. Reference style links and footnotes require global definition
-resolution. A token's meaning depends on declarations elsewhere in the document that breaks purely contextfree parsing assumptions. Erggo the updates to a CSG
-from a CFG. I had some intuition that markdown as as we use it was a context-sensitive grammar, but god damn,
-this is a really really damning example of that.
-All this is a lot of words for saying if you want a simple language, it should say simple. Rendering is the hard thing.
-I think this is the most controversial part about the author's rant because nobody wants to admit that what we use and need are two very different things.
-Vanilla markdown needs a transliterator which is literally a onetoone mapping function. You see bold and then HTML bold comes out. But modern markdown has
-to support stuff like footnotes which takes this simple transliterator into a full-blown compiler. And after you made this step, here's the ladder that you'll
-climb. I need a personal knowledge management system. Oh boy, the Obsidian people are going to love this requirement. I'll need footnotes. Cool.
-We're now in a CSG grammar. Now we've built a compiler. Oh, you want custom callouts, hooks that bind HTML with markdown? Now you have a dependency
-graph. I'll need math. Well, you need type setting library integrations, too.
-So, your dependency graph just got way more complex with execution engines as well. And if you want custom styling,
-custom CSS, you have to deal with CSS injections with file-based scoping rules. This one is really fun. Having CSS in one markdown file and making sure
-it doesn't break things in others. Good luck. Have fun. This is a great section y'all will love. I swear what I have to do in Obsidian work to make my needs
-using markdown make it seem like notion made a sane decision copying Word and Excel internally instead. Yeah, the
-author thinks that notion seems sane because of how bad Markdown is. Do you understand how absurd that is? Honestly,
-okay, here I'm going to drop my hot take here. I like notion's use of markdown as hotkeys effectively where you can export
-markdown from notion, but the formatting of it's broken and garbage. It's so bad.
-So, like don't do that. But when I'm typing in notion, the fact that I can just use markdown syntax to change the element without having to learn a whole bunch of new hotkeys, that's really
-nice. Like if I'm looking at the notion doc for this video, I say sup and I decide this should actually be a title hash space. Now it's a title. Oh, I want
-a smaller one. Two hash three hash space. That's really nice. But that's a different use case. That's not the
-syntax we're using. That is a syntax or grammar that we're familiar with being used effectively as a hotkey layer. Bun.
-Uh, Wabo just linked me async syntax in markdown. This is JS though. But still,
-this syntax for doing execution with awaits in blockers is so cursed. This is like view levels
-of curse but in a markup language. Async markdown, not even once.
-This This horrifies me. I feel sick. Oh god, there's more. Oh, this is data view.js JS as text in oh no I want
-nothing to do with any of this save me get me away no let's let's see how we solve this according to the author you ask the guy with a majestic beard with
-30 plus years of experience in 886 assembly the answer is plain text you ask the guy with MacBook and openclaw running three different Mac minis making
-a startup a day the answer is MDX no I okay I'm not an openclaw guy with three Mac minis I do have three Mac minis in
-this apartment but only one is on I even know MDX is not the right answer here you ask the guy who codes can see for a living. The answer is restructured text.
-If you ask the author, the answer's none. All of these solutions are broken in their own ways. Plain text is beautiful, but I can't show it to somebody that doesn't know what a null
-pointer dreference is. Restructured text is wonderful if you only read it and never write it. And MDX is so busy trying to be HTML, it forgets it needs
-to be legible. And the biggest problem in all of them is that they don't have a build system. We cut corners in the name of speed. If they had a build system, a
-sane, unambiguous, legible syntax purpose built for what it's needed to be. I think all of the problems will be fixed. Don't allow inline HTML. Allow
-for well-defined short codes and functions to manipulate the text. Allow for custom hooks to be executed before, during, and after the compilation. Oh,
-so you are in favor of async markdown. And most importantly, define everything.
-What we need is a customuilt tool, not a Frankenstein's monster that we dare to call a language. Not saying markdown or markup should be a programming language.
-I'm saying we are trying to use it like one. And because it lacks a formal foundation, it's failing at both. I genuinely think that a proper build system around a ser markup language with
-compile time hook support can fix a lot of the problems around this with the right constraints. At this point, we should just let go of markdown for good and look for our answers elsewhere,
-probably with a trivially parsible grammar. He has a whole formal language theory section here. Markup languages are a standard text encoding system
-consisting of a set of symbols inserted in a text document to control its structure, formatting, or the relationship between its parts. And programming languages are computer
-programming languages. Any of various languages for expressing a set of detailed instructions for a digital computer. So you can clearly see these official definitions are not the way to
-go. So he's going to use another separate one. A language is a programming language if it's tingcomplete. Oh god. So markdown is definitely a programming language. I
-write JavaScript for a living. So we're not going to get into eBnf and contextfree languages. Articles in the description if you're the type that
-cares about these depths to turn completeness things. God, none of these words are in the Bible. The thing separating a set of mathematical axioms
-from provability to non-provability is the want of recursion self-reference,
-which manifests itself as the common multiplication operation. A trivial observation can have non-trivial reactions. Yeah. Oh god, I missed this.
-Man, I forgot about this. This was in 2012. Jeff Atwood wrote an article begging Gruber to give up markdown or at
-least bless these attempts to make a better standard. Oh man, this is actually really good. I wish that this happened. RIP. John Gruber's original
-Markdown.Ppl is one of the worst small programs I've ever read. Completely riddled with outright bugs and missed features that continually bite its users in the ass. It's awful even by the
-already low standards of handwritten many past reax based spaghetti parsers.
-Nobody should be using this original script. And unfortunately, many of the other implementations out there are direct transliterations that replicate all of its absurd errors. Like where if
-you mention the MD5 hash of another token in the document, the hash will be replaced with the token because it uses that as inline escaping mechanisms. But I got hit with a cross-sight scripting
-virus that got through the filters because of this. Jesus Christ. And another markdown is a disaster from last year.
-Wild. I did not know there was this quiet cult of people fighting the chaos that is Markdown, but it's really cool to see and I have a lot of respect for
-the author for taking the time to write this. Thank you to Barack for writing this. This was a fantastic read. I did
-not realize how much I hated Markdown and I use it every day. This article very much pushed me over the edge to more deeply appreciate how bad it is.
-Sadly, this author does not have a Twitter or anything linked, so I can't throw you at anything other than his blog, but I would recommend checking it out if you're nerdy about these things.
-And the original article has even more fun details if you want to check it out yourself. I got nothing else, though. I can't help but notice the irony of me
-wearing this HTML shirt, and I'm going to resist the urge to go rewrite all of my stuff in HTML or maybe a new markup language I make up myself. Please don't
-make me do this, guys. T3 down is not the solution, but I am admitting [sighs]
-a little bit of temptation. Until next time, peace nerds.
+Why 1.6 million agents did nothing
+
+I'm interested in agents that work, not
+
+agents that don't. But one of the
+
+fundamental problems with finding agents
+
+that work is that we don't know what
+
+work looks like whe when it's
+
+agent-shaped. We don't know how to
+
+recognize agent problems when we see
+
+them. Is it a single agent problem? Is
+
+it a multi- aent problem? Is it not an
+
+agent problem at all? It's really hard
+
+for people to understand practically in
+
+front of their own desks where work fits
+
+in these categories. This video solves
+
+that. I'm going to walk you through how
+
+we know. I'm going to give you the
+
+academic grounding, the practical
+
+grounding from Frontier Labs, and I'm
+
+going to give you a easy one minute
+
+test. And on top of that, I'm going to
+
+give you an automated AI skill that you
+
+can jump into and grab and use to get
+
+into the work itself. Because we don't
+
+want to just do this for the sake of
+
+doing it. You're not sitting there
+
+estimating work for the sake of
+
+estimating. That's shaving the yak,
+
+right? What you're trying to do is
+
+you're trying to get into the work more
+
+quickly and pick more accurately. And so
+
+we're going to use our one minute test
+
+that I'm going to teach you and we're
+
+going to jump straight in. And I I
+
+actually built a tool for this. You're
+
+going to be able to jump straight into a
+
+multi- aent solution or a single agent
+
+solution or maybe a chat or even no no
+
+AI at all. Yes, we're going to talk
+
+about when you don't use AI at all. The
+
+answer to all this, the reason all this
+
+matters is because we are in a
+
+postopenclaw moment. 1.6 million agents
+
+registered for an agent-driven social
+
+network at the peak of openclaw. Most of
+
+them did not do a single task. They
+
+didn't do a task because people set up
+
+OpenClaw, didn't know what to do with it
+
+next. We live in a world where we have
+
+intelligence and we don't know how to
+
+use it and we don't have an idea of how
+
+to match our tasks to the agents with
+
+confidence. This video solves that. So,
+Three tasks on every desk
+
+let's jump in. So, let me make it
+
+concrete. Three tasks. Not my tasks,
+
+right? Your tasks. You have all three of
+
+these on your desk. Now, I bet you have
+
+a scheduling task, right? You have to
+
+find a slot for a meeting. You have to
+
+book a class. You have to fit an
+
+appointment around a calendar that's
+
+really busy. Task two, you have a pile
+
+of something that you're not going to
+
+read. You have to, right? Maybe it's
+
+your inbox. Maybe it's a contracts
+
+folder. Maybe it's a share drive, right?
+
+It's a big pile of something. Maybe it's
+
+a bunch of meeting notes that you always
+
+meant to organize. Pick a pile.
+
+Everybody has one. And then number
+
+three, you have a judgment call to make.
+
+Which candidate do you hire maybe? Or
+
+what do you name something? Or what
+
+direction do you take a product? Here's
+
+what I want you to know about these
+
+three tasks. One of them is a 30-cond AI
+
+job. One of them needs a whole team of
+
+agents to do the job properly. And and
+
+the token bill, by the way, is smaller
+
+than you think for that. And I'll show
+
+you how. And one of them, no matter how
+
+much AI you use, is going to need your
+
+involvement. The reason I know this is
+
+that I actually spent the money finding
+
+out, like I actually ran all three of
+
+these tests, and you're going to see me
+
+run them on screen as we go through this
+
+video together. So, everybody bought
+
+thinking, but no one knows what to point
+
+that thinking at. This is one of the
+
+core issues with the AI economy. If we
+
+can't figure out how to use this
+
+intelligence, we're wasting it. You'll
+
+be able to figure out, is it a chat
+
+task? Is it a one agent task? Is it a
+
+multi- aent task? Or whether you
+
+shouldn't bother at all. Right? And the
+
+trick is there's only four things you
+
+need to estimate to answer that
+
+question. And you can do those really
+
+quickly. That's the whole skill. And I'm
+
+going to run my version of all three of
+
+those tasks I just gave you on camera so
+
+you can watch that test work. And one of
+
+the tasks the agent is going to tell me
+
+no, which I love. And we'll get into why
+
+that is. For all of our history before
+
+AI came along, if you wanted to apply
+
+thinking to a problem, you had two
+
+options. You could either hire a brain,
+
+hire someone to do that thinking for
+
+you, or you could wait until you had
+
+time to think yourself. Thinking came
+
+connected to people. People were
+
+expensive, they were slow to find, they
+
+fall asleep, they need food, they need
+
+rest, etc. and they also need clear
+
+clear direction and clear access to
+
+resources and all kinds of things that
+
+make hiring relatively expensive.
+
+That era is over. And by the way, that
+
+doesn't mean jobs are over. I've said
+
+that and I'll cover that in another
+
+video. But the era of tying thinking to
+
+people is done. Especially post November
+
+2025. Thinking is now metered. It's
+
+priced per token. You can buy a little
+
+of it. You can buy a lot of it. You can
+
+buy it tonight for a problem you only
+
+discovered this afternoon. And nobody,
+
+including me, grew up with instincts for
+
+for any of that, for how we handle that.
+
+This is net new to us, right? It's a new
+
+kind of managerial instinct. Nobody has
+
+ever had to ask which task in my week is
+
+actually worth 50 bucks of purchase
+
+thought. That question just didn't exist
+
+a year ago. So when people stand in
+
+front of their shiny new agent and say,
+
+"What do I even do with this?" That's
+
+not a tooling problem, right? It's not a
+
+lack of imagination on our part. It's
+
+it's a budgeting question that we don't
+
+have the tools to answer because we've
+
+never had to before. Maybe you watch a
+
+demo of someone's 23 agents form and and
+
+you feel left behind somehow. I I want
+
+to give you a word of comfort here. You
+
+may not need those 23 agents for the
+
+task. They may be overkill and I'm the
+
+last person to suggest a multi- aent
+
+solution where you don't need one. The
+
+trick is you might need one. And so what
+
+I realized the most important skill is
+
+that we're not learning that we're not
+
+teaching that I couldn't find anywhere
+
+is how do you know when you need an
+
+agent? How do you know when you need
+
+multiple agents? How do you know when
+
+you need none? Before I jump into the
+What 250 attempts proved
+
+one minute test for how to get this
+
+done, I want to give you the two facts
+
+that I built this test on so you can
+
+understand how to extend this further.
+
+So Stanford 2024 researchers took a
+
+cheap coding model and gave it one
+
+attempt at each bug in a standard
+
+benchmark. It fixed 15.9% of them. Not
+
+impressive even back then, right in
+
+2024. Then they gave the same cheap
+
+model 250 attempts per bug. They jumped
+
+to 56% without changing the model,
+
+without changing the harness, without
+
+changing anything. For context, the best
+
+single attempt from the best model money
+
+could buy at the time in 2024 was 43%.
+
+So they beat state-of-the-art just by
+
+trying a little bit more. What's the
+
+takeaway here for us? Why are we quoting
+
+a 2024 study for AI in 2026? I'll tell
+
+you why. Stanford discovered a law, a
+
+pattern in AI token usage that we still
+
+see upheld today by agents and that
+
+informed how I think about teaching all
+
+of you where tasks are agent applicable
+
+and where they're not. Because you see,
+
+when Stanford graphed the curve of
+
+improvement, how the AI models got
+
+better at fixing bugs as they added more
+
+turns, they found that the improvement
+
+followed a law, a smooth, predictable
+
+curve across four orders of magnitude of
+
+attempts. More attempts, more problems
+
+solved. It was like clockwork. That's
+
+academia, right? But in production, this
+
+holds up as well. Anthropic built a
+
+research system out of multiple agents
+
+and then studied what actually predicted
+
+whether a run was good or bad. Was it
+
+prompt wording? It didn't matter as much
+
+as you would think. Not at all really.
+
+The single biggest factor explaining 80%
+
+of the difference between a good run
+
+that resulted in a solved problem and a
+
+bad run was token spend. Basically, how
+
+much the system was allowed to think.
+
+and Anthropic team of agents beat the
+
+frontier model at the time working alone
+
+by 90.2%.
+
+Their explanation, Anthropic's
+
+explanation in plain terms is that a
+
+team of agents is how you spend more
+
+tokens than one agent can usefully hold
+
+and that has traction against hard
+
+problems. A multi- aent run can cost 10,
+
+15, 20, 30 times more than a single
+
+agent run or even more than that. And so
+
+for a long time we were held back
+
+because token spend got expensive and it
+
+just wasn't practical for individuals to
+
+spend on multi- aent teams. That's
+
+changed. This is why Ringer matters.
+
+Ringer matters because it brings the
+
+power of multi- aent problem solving
+
+within reach of individuals because
+
+token costs are no longer prohibitive.
+
+Because for a long time, budgeting
+
+agents meant capping work, not just
+
+buying a bigger pile of thinking. And
+
+that's what's changed as we've had
+
+better open- source models in the last
+
+month or so. Which is exactly why the
+
+whole game is knowing which tasks are
+
+worth it. Because here's the thing, if
+
+more tokens reliably meant better
+
+answers, this would be a very short
+
+video. It would just be like spend more.
+
+But there's a catch. And the catch is
+
+the half of the Stanford study that
+
+nobody quotes. Same study, by the way,
+
+same cheap model. Remember, still back
+
+in 2024, they kept pushing. They pushed
+
+to a 100 attempts. They pushed to a,000
+
+attempts at this bug solving. They
+
+pushed to 10,000 attempts. And they
+
+tracked a simple question. For what
+
+share of problems does a correct answer
+
+exist somewhere in the pile of attempts?
+
+At 10,000 attempts, over 95%
+
+of the 10,000 attempt runs contained a
+
+correct answer. The right answer was
+
+almost always in there. And now the real
+
+question comes up. How do you find it?
+
+How do you find it? Where where do you
+
+get the validation that lets you see
+
+that the right answer is there? If
+
+you're giving your agent multiple tries,
+
+is there an automatic checker somewhere,
+
+a test suite? Stanford tested that too.
+
+And what they found was where there was
+
+an automatic checker, a test suite,
+
+something mechanical that could grade
+
+each attempt. Yeah, they could find the
+
+answers. Coverage turned straight into
+
+results. But where there was no checker
+
+and the model had to pick the best
+
+answer out of the pile, they tried
+
+majority voting. They tried rewarding
+
+models. All of that, everything stalled
+
+out at 100 attempts. In other words, you
+
+need evals. You need external validation
+
+in order to scale multi- aent systems
+
+because look at that gap, right? The
+
+right answer exists, but nobody can tell
+
+which one it is. Every dollar spent past
+
+that line buys attempts that are
+
+generated. The answer is probably in
+
+there, but they're never found. This is
+
+a failure of multi- aent systems. And
+
+that shaded area, that's money. That's
+
+money you're spending you're not getting
+
+back if you don't design your systems
+
+correctly. And there's a second caveat
+
+on the other side. A single agent cannot
+
+absorb unlimited spending either because
+
+everything it reads and does piles into
+
+a context window. As the context window
+
+fills up, quality tends to drop even
+
+with new techniques like autocompaction.
+
+And ultimately, the model will have to
+
+either delegate to other agents or
+
+abandon the task. And that's actually
+
+how a lot of these newer agentic models
+
+are handling long tasks. In other words,
+
+with tools like chat GPT 5.6 Six, you
+
+might be inadvertently running multi-
+
+aent solutions if you give it a big
+
+enough task. Part of my goal is to help
+
+you be intentional about that. One is a
+
+memory constraint, one is an eval
+
+constraint. You have to be able to
+
+evaluate
+
+systems and you have to know when your
+
+task is big enough that one agent can't
+
+hold it. It's a memory constraint that
+
+would drive you into a multi-agent
+
+system. So with that in mind, that
+The two limits that create teams
+
+equips us to think more deliberately
+
+about where we apply multi- aent
+
+problems. Every team of agents design
+
+that actually works is an answer to one
+
+of these two problems. Everything else
+
+is just more agents. The need to split
+
+capacity is changing over time as agents
+
+get more capable. And that's one of the
+
+things that has made this problem space
+
+really hard. It's hard to know what to
+
+assign to an agent when agents keep
+
+getting smarter. But there's a second
+
+reason to split out work that has
+
+nothing to do with capacity and that
+
+really helps us when we're trying to
+
+assign multiple agents work. Some work
+
+has parts that inherently has to be done
+
+by different minds or different agents.
+
+Not because one agent or one mind lacks
+
+the skill, but because the parts poison
+
+each other. The auditor who also kept
+
+the books isn't a worse auditor. He's
+
+just not an auditor at all. Right? You
+
+need to have two different roles in that
+
+problem. Peer review only works because
+
+the reviewer didn't write the paper.
+
+Your bank will not let the person who
+
+enters a payment be the person who
+
+approves it. Not because they're
+
+dishonest, but because for centuries,
+
+the way to get reliable work done was to
+
+make sure that you had checks and
+
+balances made of multiple minds. And
+
+agents add one thing to this trick that
+
+has never existed before. You cannot
+
+unknow something. You've read your own
+
+product page a thousand times. You'll
+
+never see it the way a stranger does,
+
+right? But you can now start a mind that
+
+has never seen it. You can start an
+
+agent that has never seen it. So you can
+
+have fresh eyes on demand for the first
+
+time in history. Now, where I see this
+
+being most useful is when there are
+
+genuine conflicts of interest you want
+
+to balance in an agent system. Things
+
+where you need to review something twice
+
+to ensure it's done correctly. A
+
+contract comes to mind, a draft comes to
+
+mind, a plan comes to mind. So, put all
+
+of this together and you get the agent
+
+test. Four things you can estimate about
+
+any task on your desk in about a minute.
+
+First, size. Is the task bigger than
+
+what one agent can hold at full quality?
+
+Your calendar is not bigger than what
+
+one agent can hold, for example, right?
+
+It fits in a corner of a context window.
+
+It's not a problem. your last quarter of
+
+email. Well, it depends on how much
+
+email you get, but for a lot of us, that
+
+fits in a context window, too. Question
+
+two, but a pile of aundred documents,
+
+that might scale out of the context
+
+window. A thousand documents definitely
+
+would. Independence, can the parts be
+
+done without knowing what the other
+
+parts did? Reading a pile of documents
+
+actually splits really well because one
+
+reader agent can read any given document
+
+and they never need to talk. Coding
+
+sometimes splits and sometimes doesn't.
+
+It depends on how you tell the agent to
+
+organize files. If agents are able to
+
+organize code into independent parts,
+
+then multiple agents can work on coding
+
+problems and it can be extremely
+
+effective. Three, separation of
+
+concerns. Do any parts of this task need
+
+to be done by different minds? A real
+
+critic who didn't write the draft, as an
+
+example, an overview written by someone
+
+who didn't do the reading. output that's
+
+kept apart from the inputs that you
+
+drive and analyze because you need a
+
+separate frame for that. If you're
+
+thinking about that, you're thinking
+
+about a team of agents. Question four,
+
+and this is a critical one,
+
+checkability. Remember I talked about
+
+that verification evals. Is checking an
+
+answer a whole lot cheaper than
+
+producing one? A test suite, an exit
+
+code, a source document that you can
+
+point at, something where you can glance
+
+at it and say this is right or this is
+
+wrong. If checking is almost free,
+
+however you do it, then every extra
+
+attempt, including if checkability is
+
+expensive, on the other hand, if it
+
+takes a while to check, you're going to
+
+top out on the value of your multi- aent
+
+systems relatively quickly. And the
+
+Stanford research suggests that about a
+
+100 tries, you're just not going to get
+
+a lot more value out of it. If you put
+
+all these four together, you get an
+
+overall verdict. The problem might be
+
+small, in which case it's just a chat
+
+back and forth. It might fit in a
+
+context window, in which case it's an
+
+agent with a goal. It's genuinely
+
+useful. It works alone. It checks its
+
+own work and it gets the job done. Or it
+
+may be bigger than one perspective or
+
+have parts of the task that need
+
+separate minds or perspectives to work
+
+well. That's a team of agents. There's
+
+also a fourth option, which is that
+
+there's also a fourth option, which is
+
+the one that saves you the most money.
+
+Ironically, maybe you don't need the AI
+
+at all. Maybe it's a judgment call that
+
+you need to sit with and make on your
+
+own and that still needs to happen in
+
+the age of AI. Okay, card one, the
+
+scheduling thing. I think you can guess
+
+the answer here. My version was find me
+
+a gym slot this week that fits around my
+
+meetings. That is absolutely a single
+
+agent task. It is not a multi- aent
+
+task. It's a relatively quick 5-minute
+
+task. You can feed it to Claude. You can
+
+feed it to Codeex. It's not going to be
+
+a problem for today's models. This tier
+
+is solved. If this impressed you, you
+Auditing 40 tools with agents
+
+should start to raise the bar for what
+
+you think AI can do because this has
+
+been an easy one for a bit now. My
+
+version is a complicated document
+
+review. I have about 40 different tools
+
+I use to run my media business. They all
+
+have different renewal dates. They all
+
+have different contracts. They all have
+
+different emails that they're sending me
+
+all the time. And what I need is one
+
+single dashboard that shows me my
+
+renewal dates across all of them. And
+
+that also gives me a sense of where I'm
+
+actually using these tools versus where
+
+I'm not. And that in turn gives me an
+
+intelligent way to assess, do I want to
+
+build an in-home solution to some of
+
+these or do I want to depend on ones
+
+that I'm using all the time and say no,
+
+these are worth the money. It's hard to
+
+make that decision intentionally unless
+
+I know when are the renewal dates coming
+
+up, how am I actually using it, that the
+
+tool, etc., etc. So there's there's
+
+easily thousands of pages of documents
+
+in this pile. Whether you count the
+
+emails, whether you count the contracts
+
+that I'm agreeing to, whether you count
+
+the logs of usage that I'm piling up as
+
+I use these tools. So when you look at
+
+all of that together, what you need is a
+
+team of agents to solve that problem for
+
+you to actually go through the different
+
+tools that you use to pop up. Okay, this
+
+is the renewal date. this is your actual
+
+usage that we're seeing from these
+
+tools. These are the tokens you're using
+
+or if it's not an AI tool, it's
+
+something else, right? This is the
+
+number of times you've logged in, etc.,
+
+etc. And then to give me a sense of
+
+which are the tools that are open for
+
+rebuilding, right? If you look at it by
+
+complexity, you look at it by usage, you
+
+look at it by cost, you start to get a
+
+matrix that gives you business decisions
+
+you can make about your tooling. That's
+
+a complicated task. That's much more
+
+than an agent can hold. It is something
+
+I can evaluate fairly easily because
+
+when I look at it, I can say, "Oh, yeah,
+
+I do use that tool that much." You know,
+
+I I I do not use this tool that much. I
+
+can look at it and say, "Oh, yeah, I do
+
+use superhuman a ton." Right? That's not
+
+a surprise. Or maybe another SAS tool
+
+comes up and I'm like, I haven't used
+
+that in in ages. What is this? Like, I I
+
+don't use it at all. Or maybe there's
+
+one that I look at, it's a candidate for
+
+disruption, at least for me, where I
+
+want to build it internally. And I think
+
+that that's very much a per business
+
+kind of decision. If I can use agents to
+
+do that work, one, I never would have
+
+had time to do that myself. Two, it
+
+helps me make better decisions that
+
+focus my leverage as a business. And
+
+three, I can actually make sure that I'm
+
+maximizing where my dollars are going,
+
+whether those are dollars for SAS
+
+contracts or whether those are dollars
+
+for agents, because the agent run isn't
+
+free. And I can feel good that I'm
+
+actually putting the agents against a
+
+problem that has real ROI. Now, let's
+
+spend 60 seconds on the machinery of how
+
+this works because this is where the two
+
+limits that I talked about earlier show
+
+up as actual design in the multi-agent
+
+harness I put together. And I went deep
+
+on this in Wednesday's video. So, I'm
+
+just giving you this shape here. Every
+
+task gets a spec. It's written once by
+
+the strongest model, which then never
+
+touches the work again. Every finished
+
+task does get a check, and the check is
+
+mechanical, right? The source has to be
+
+attached and match the task or the entry
+
+is rejected. The agent's opinion of its
+
+own work is not evidence. A failed task
+
+gets a retry with the failure included
+
+and every result feeds a running
+
+scorecard that I can keep an eye on so
+
+it's easy for me to understand how this
+
+particular agent run is working. That's
+
+how Ringer works. The idea is that you
+
+take this whole complicated process of
+
+getting validation that allows you to
+
+use these multi- aent systems
+
+effectively and you turn it into
+
+something that is as easy as watching a
+
+dashboard stream while your agents solve
+
+a hard problem. And this setup saves a
+
+ton on tokens and token costs. One of
+
+the things that I called out in my video
+
+on Wednesday is that I was able to
+
+reduce Fable 5 costs by about 10x and
+
+keep the brain power of Fable 5 because
+
+I allowed Fable to be the brains behind
+
+the system and organize and make
+
+judgment calls on a multi- aent system.
+
+But all of the tokens for doing the work
+
+got farmed out to much much cheaper
+
+worker agents. So here you can see the
+
+result of the run. You can see tools
+
+ranked by cost against usage. You can
+
+see renewals with their notice
+
+deadlines. You can see any risky terms
+
+in the contracts. And you can see a
+
+recommendation per tool, whether that's
+
+keep it or negotiate it or cancel it or
+
+even build your own with sources
+
+attached. Now, here we come to the part
+
+that most AI demos skip. It's not done
+
+when I say it's done and show you. It's
+
+done when I show you the bill. How much
+
+did this cost me to do all of this work?
+
+And Wednesday's video is how this works.
+
+You use an expensive model to plan and
+
+judge like Fable and a lot of cheap
+
+models to do all the coding and burn all
+
+the tokens and do the research and
+
+actually execute the multi- aent
+
+workflows. This is what makes it
+
+possible for individuals to go through
+
+the process I described for work on
+
+their desk for all of us, right? And to
+
+say this is a multi- aent problem. I'm
+
+going to apply multiple agents to this
+
+task and feel good that I'm not burning
+
+a lot of money. By the way, this did not
+
+take long to set up like under an hour.
+
+Like this is not a hard setup task. And
+
+if you have something with thousands of
+
+documents and then another task after
+
+that and another task after that,
+
+spending under an hour to set it up,
+
+that's great. Like that's not a problem.
+Which piles are worth automating
+
+Now, you may have other kinds of piles.
+
+I'm assuming you do. Maybe it's a
+
+project handoff. Maybe someone's leaving
+
+and and everything lives in meeting
+
+notes and and chat threads and a
+
+half-finished stack of documents in a
+
+folder. And the new person has to come
+
+in and they're going to spend a week
+
+digging through and getting oriented.
+
+and you want to speed that up. Hey, same
+
+shape. Sounds like you need to apply a
+
+multiple agent solution and you can
+
+actually get a briefing for your new
+
+person that gets them set up and saves
+
+them dozens of hours. Maybe it's the
+
+research archive at the end of a
+
+project. Maybe it's an inbox quarter and
+
+you have thousands and tens of thousands
+
+of emails and you need to sort through
+
+them all. Maybe it's actually building a
+
+cold lead follow-up system and you're
+
+trying to get your cold pipeline going
+
+for sales. You have piles regardless.
+
+Recognize where you have piles of work
+
+and look at them as multi- aent
+
+susceptible. Other examples in our
+
+personal lives would include cases where
+
+we have lots of medical records, cases
+
+where we have lots of bank statements
+
+and we do want to do analysis of our of
+
+our spending patterns of our financial
+
+health. Now, these want careful setup,
+
+right? You want to have exports landing
+
+in a folder you can control agents that
+
+only ever read that folder. You ideally
+
+want to run it on a machine you own. so
+
+your financial data and your health data
+
+don't leak out. So you can see the shape
+
+of the task, but if it's certain
+
+sensitive information, you may want to
+
+look at running it locally on a Mac
+
+Mini. And I have got videos on how to
+
+set that up and have your own stack as
+
+well and you can dig into that also.
+The judgment calls to keep
+
+Okay, last card. Which candidate do you
+
+hire? Judgment call type problems. What
+
+do you name a product? What direction
+
+does the business take? These are tasks
+
+that I hear people saying they hand to
+
+AI. Let's not do that. And in fact, I've
+
+heard people say, "I don't do that, but
+
+I let AI help me make judgment calls on
+
+candidates." I've let AI help me make
+
+judgment calls on which product
+
+direction to go in. I understand that we
+
+want AI to support us. I'm all for
+
+research to support us. I'm all for
+
+opinions from AI to support us. But if
+
+you don't have a strong instinct around
+
+what is correct and you're not willing
+
+to apply your human judgment, this is a
+
+situation where you're going to make a
+
+mistake because no frontier model is
+
+going to be able to beat an expert at
+
+the thing they are most expert in. And
+
+I've actually talked with people who are
+
+experts in their field at product at
+
+engineering at at investing at at
+
+running businesses and they are using
+
+Fable 5 or 5.6 from OpenAI and they say
+
+I am better at my job and the decisions
+
+I make because I sort of run chats with
+
+Fable 5. I run chats with chat GPT 5.6
+
+and I get a a wall I can bounce ideas
+
+off of. But the instincts of these
+
+models are not worldclass.
+
+They are not strong enough that you can
+
+find the jean sequa. You can find that
+
+that thing that is unspeakable or
+
+unthinkable that says this is the
+
+candidate that I am going with and
+
+between two candidates that are equally
+
+qualified. I know that this person has a
+
+quality of character that I've seen come
+
+through in interviews that I want on my
+
+team. AI isn't good at that kind of
+
+thing. that needs human judgment. And
+
+this is where I said the cheapest thing
+
+sometimes is to sit down, put the AI to
+
+the side, and type out your own answer
+
+to use your human judgment. So, here's
+The one-minute agent test tool
+
+where I'm going to leave you. First, I'm
+
+going to give you a skill, a tool that
+
+you can use to determine whether
+
+something is single agent, multi-agent,
+
+or whether it's something you should do
+
+yourself. And you can develop that
+
+instinct on your own. I gave you the
+
+exact questions, but if you want a skill
+
+to do that, I got that. Second, I want
+
+you to remember that the tools I'm
+
+showing you in this video, they're going
+
+to be replaced, right? The spreadsheet
+
+prompt will evolve. The single goal
+
+agent will evolve. Eventually, today's
+
+team setups are going to evolve, too.
+
+But what won't change is the power of
+
+these estimates and these questions I've
+
+given you. We will still be asking about
+
+the size of the task, the independence
+
+of the task, whether we have separation
+
+of concerns in the task, whether we have
+
+verifiability because these describe the
+
+work, not the evolving tools. And that's
+
+why I chose them. In a market where
+
+everything is disposable, this test is
+
+like a buy it for life purchase, right?
+
+So you can name your pile. You can name
+
+the handoff. You can name the folder
+
+that nobody opens. You can run your
+
+estimates against it and you can figure
+
+out is this an agent task? Is it a
+
+multi- aent task? And then you can get
+
+going right away. And that's what I
+
+built for you. I built a tool for you
+
+that lets you estimate all of this in a
+
+minute or less and then get started with
+
+multi-agent if that's what you need to
+
+do or recommends a single agent setup
+
+and you can go right into codeex or claw
+
+from there or your tool of choice. And
+
+why did I build this? Because nobody out
+
+there will tell you whether your task is
+
+agent-shaped. I built the thing that
+
+will. It's live right now. You just
+
+describe your task. You set the sliders.
+
+Uh so you have four estimates plus the
+
+two money dials, right? how often does
+
+it come back as a cost and what is a
+
+good answer worth to you and it's going
+
+to give you a verdict, right? Uh you can
+
+you can chat, you can use an agent, a
+
+team or you don't even have to bother.
+
+And every verdict is going to come with
+
+a next step attached because a verdict
+
+without a way forward is just more
+
+homework for you to do, right? You need
+
+something that helps you to actually use
+
+that pattern and pick until your
+
+instincts really develop because a
+
+verdict without a door to go forward is
+
+just more work for you, right? You want
+
+something that gets you into the work.
+
+You want something that says, "Okay, I'm
+
+going to get into Ringer and do this
+
+task, and it's just a click away. I want
+
+to get into chat GPT and do this task.
+
+It's a click away. Oh, it's human
+
+judgment." Uh, yeah, that's a good
+
+reminder. Which, by the way, that may be
+
+the most valuable thing about this tool
+
+is I find a lot of people when they're
+
+so excited about AI overindex on what
+
+they delegate to AI. And this tool, I
+
+find, is a helpful reminder of when to
+
+apply human judgment. Do the minute of
+
+thinking yourself first. Check the tool.
+
+If you agree, then you're in alignment
+
+and move with confidence. If you
+
+disagree, that's an interesting case.
+
+And I want you to think about that
+
+disagreement between the tool and your
+
+own instinct because there's probably
+
+something here for you to learn from.
+
+There's probably something the tool is
+
+seeing that you may not be recognizing
+
+from a size and complexity perspective.
+
+You can get the tool, you can get the
+
+one-click startup for Ringer, and you
+
+can get all of it at the link below.
+
+Have fun.

@@ -1,6 +1,5 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
-import java.util.List;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -8,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -17,45 +15,45 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.client.ServicesConsoleClient;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Deployment;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
-import com.aibizarchitect.nexus.v1.dto.PagedResponse;
 
 @RestController
 @RequestMapping("/api/v1/deployments")
 public class DeploymentController {
 
     private static final Logger log = LoggerFactory.getLogger(DeploymentController.class);
-    private final ServicesConsoleClient client;
+
     private final DeploymentRepository deploymentRepository;
     private final ServiceRepository serviceRepository;
+    private final ServerRepository serverRepository;
 
-    public DeploymentController(ServicesConsoleClient client, DeploymentRepository deploymentRepository,
-            ServiceRepository serviceRepository) {
-        this.client = client;
+    public DeploymentController(DeploymentRepository deploymentRepository,
+            ServiceRepository serviceRepository,
+            ServerRepository serverRepository) {
         this.deploymentRepository = deploymentRepository;
         this.serviceRepository = serviceRepository;
+        this.serverRepository = serverRepository;
     }
 
     @GetMapping
-    public ResponseEntity<PagedResponse<Deployment>> getDeployments(
+    public ResponseEntity<?> getDeployments(
             @RequestParam(required = false) Long serviceId,
             org.springframework.data.domain.Pageable pageable) {
         if (serviceId != null) {
-            log.info("Fetching deployments for service: {}", serviceId);
-            return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(deploymentRepository.findByService_Id(serviceId, pageable)));
-        } else {
-            log.info("Fetching all deployments from database");
-            return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(deploymentRepository.findAll(pageable)));
+            log.info("Fetching deployments for service ID: {}", serviceId);
+            return ResponseEntity.ok(deploymentRepository.findByServiceId(serviceId));
         }
+        log.info("Fetching all deployments from database");
+        return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(
+                deploymentRepository.findAll(pageable)));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Deployment> getDeploymentById(@PathVariable Long id) {
-        log.info("Fetching deployment by id: {}", id);
+        log.info("Fetching deployment by ID: {}", id);
         return deploymentRepository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -65,95 +63,51 @@ public class DeploymentController {
     public ResponseEntity<Deployment> createDeployment(@RequestBody Deployment deployment) {
         log.info("Creating new deployment");
 
-        // Set active flag
-        deployment.setActiveFlag(true);
-
-        Deployment savedDeployment = deploymentRepository.save(deployment);
-        log.info("Successfully created deployment with ID: {}", savedDeployment.getId());
-
-        // Check if this service has sub-modules and deploy them automatically
-        if (deployment.getService() != null) {
-            List<Service> subModules = serviceRepository.findByParentService_Id(deployment.getService().getId());
-            if (!subModules.isEmpty()) {
-                log.info("Service {} has {} sub-modules, creating deployments for them", deployment.getService().getId(),
-                        subModules.size());
-                for (Service subModule : subModules) {
-                    Deployment subDeployment = new Deployment();
-                    subDeployment.setService(subModule);
-                    subDeployment.setHost(deployment.getHost());
-                    subDeployment.setEnvironment(deployment.getEnvironment());
-                    subDeployment.setVersion(deployment.getVersion());
-                    subDeployment.setStatus(deployment.getStatus());
-                    subDeployment.setPort(deployment.getPort()); // Sub-modules share the same port (bundled)
-                    subDeployment.setContextPath(deployment.getContextPath());
-                    subDeployment.setHealthCheckUrl(deployment.getHealthCheckUrl());
-                    subDeployment.setHealthStatus(deployment.getHealthStatus());
-                    subDeployment.setActiveFlag(true);
-
-                    Deployment savedSubDeployment = deploymentRepository.save(subDeployment);
-                    log.info("Created sub-module deployment for service {} with ID: {}", subModule.getName(),
-                            savedSubDeployment.getId());
-                }
+        // Validate service exists
+        if (deployment.getService() != null && deployment.getService().getId() != null) {
+            var serviceOpt = serviceRepository.findById(deployment.getService().getId());
+            if (serviceOpt.isEmpty()) {
+                log.warn("Service with ID {} not found", deployment.getService().getId());
+                return ResponseEntity.badRequest().build();
             }
+            deployment.setService(serviceOpt.get());
         }
 
+        // Validate server exists
+        if (deployment.getServer() != null && deployment.getServer().getId() != null) {
+            var serverOpt = serverRepository.findById(deployment.getServer().getId());
+            if (serverOpt.isEmpty()) {
+                log.warn("Server with ID {} not found", deployment.getServer().getId());
+                return ResponseEntity.badRequest().build();
+            }
+            deployment.setServer(serverOpt.get());
+        }
+
+        deployment.setActiveFlag(true);
+        Deployment saved = deploymentRepository.save(deployment);
+        log.info("Successfully created deployment with ID: {}", saved.getId());
         java.net.URI location = org.springframework.web.servlet.support.ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
-                .buildAndExpand(savedDeployment.getId())
+                .buildAndExpand(saved.getId())
                 .toUri();
-        return ResponseEntity.created(location).body(savedDeployment);
+        return ResponseEntity.created(location).body(saved);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Deployment> updateDeployment(@PathVariable Long id, @RequestBody Deployment deployment) {
         log.info("Updating deployment with ID: {}", id);
 
-        Optional<Deployment> existingDeploymentOpt = deploymentRepository.findById(id);
-        if (existingDeploymentOpt.isEmpty()) {
+        Optional<Deployment> existingOpt = deploymentRepository.findById(id);
+        if (existingOpt.isEmpty()) {
             log.warn("Deployment with ID {} not found", id);
             return ResponseEntity.notFound().build();
         }
 
-        // Update the deployment
         deployment.setId(id);
-        Deployment updatedDeployment = deploymentRepository.save(deployment);
+        Deployment updated = deploymentRepository.save(deployment);
         log.info("Successfully updated deployment with ID: {}", id);
-        return ResponseEntity.ok(updatedDeployment);
-    }
-
-    @PatchMapping("/{id}/status")
-    public ResponseEntity<Deployment> updateDeploymentStatus(@PathVariable Long id, @RequestParam String status) {
-        log.info("Updating deployment {} status to: {}", id, status);
-
-        Optional<Deployment> deploymentOpt = deploymentRepository.findById(id);
-        if (deploymentOpt.isEmpty()) {
-            log.warn("Deployment with ID {} not found", id);
-            return ResponseEntity.notFound().build();
-        }
-
-        Deployment deployment = deploymentOpt.get();
-        deployment.setStatus(status);
-        Deployment updatedDeployment = deploymentRepository.save(deployment);
-        log.info("Successfully updated deployment status");
-        return ResponseEntity.ok(updatedDeployment);
-    }
-
-    @PatchMapping("/{id}/health")
-    public ResponseEntity<Deployment> updateDeploymentHealth(@PathVariable Long id, @RequestParam String healthStatus) {
-        log.info("Updating deployment {} health to: {}", id, healthStatus);
-
-        Optional<Deployment> deploymentOpt = deploymentRepository.findById(id);
-        if (deploymentOpt.isEmpty()) {
-            log.warn("Deployment with ID {} not found", id);
-            return ResponseEntity.notFound().build();
-        }
-
-        Deployment deployment = deploymentOpt.get();
-        deployment.setHealthStatus(healthStatus);
-        Deployment updatedDeployment = deploymentRepository.save(deployment);
-        log.info("Successfully updated deployment health status");
-        return ResponseEntity.ok(updatedDeployment);
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
@@ -164,28 +118,6 @@ public class DeploymentController {
         if (deploymentOpt.isEmpty()) {
             log.warn("Deployment with ID {} not found", id);
             return ResponseEntity.notFound().build();
-        }
-
-        Deployment deployment = deploymentOpt.get();
-
-        // Check if this service has sub-modules and delete their deployments
-        if (deployment.getService() != null) {
-            List<Service> subModules = serviceRepository.findByParentService_Id(deployment.getService().getId());
-            if (!subModules.isEmpty()) {
-                log.info("Service {} has {} sub-modules, deleting their deployments", deployment.getService().getId(),
-                        subModules.size());
-                for (Service subModule : subModules) {
-                    List<Deployment> subDeployments = deploymentRepository.findByService_Id(subModule.getId());
-                    for (Deployment subDeployment : subDeployments) {
-                        // Only delete sub-deployments on the same server
-                        if (subDeployment.getHost() != null && subDeployment.getHost().equals(deployment.getHost())) {
-                            deploymentRepository.deleteById(subDeployment.getId());
-                            log.info("Deleted sub-module deployment for service {} with ID: {}", subModule.getName(),
-                                    subDeployment.getId());
-                        }
-                    }
-                }
-            }
         }
 
         deploymentRepository.deleteById(id);

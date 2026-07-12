@@ -17,7 +17,7 @@ import {
   OperationResult,
   HealthStatus,
   DeploymentStatus,
-  HostEnvironment,
+  EnvironmentType,
   ServiceOperation,
   ServiceWithHosted,
   HostedService
@@ -157,7 +157,7 @@ export class ServiceMeshService {
       count: services.filter(s => s.framework?.id === f.id).length
     })).filter(fb => fb.count > 0);
 
-    const environments: HostEnvironment[] = ['DEVELOPMENT', 'STAGING', 'PRODUCTION', 'TEST'];
+    const environments: EnvironmentType[] = ['Development', 'Staging', 'Production', 'Test'];
     const environmentBreakdown = environments.map(env => ({
       environment: env,
       count: deployments.filter(d => d.environment === env).length
@@ -452,7 +452,7 @@ export class ServiceMeshService {
 
   private async fetchHosts(baseUrl: string): Promise<any[]> {
     try {
-      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/hosts`));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/servers`));
       return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];

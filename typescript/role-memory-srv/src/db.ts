@@ -1,4 +1,12 @@
-import { Pool } from "pg";
+import { Pool, types } from "pg";
+
+// ── Keep timestamps as ISO strings ─────────────────────────────────
+// pg parses TIMESTAMPTZ into Date objects by default. Override to keep
+// strings so TypeScript interfaces (which type timestamps as string)
+// match runtime behavior. tackle.memory and tackle.role_memory already
+// use TIMESTAMPTZ — without this, created_at/as_of_dt come back as Date.
+types.setTypeParser(types.builtins.TIMESTAMPTZ, (val: string) => val);
+types.setTypeParser(types.builtins.TIMESTAMP, (val: string) => val);
 
 export interface MemoryRow {
   id: string;

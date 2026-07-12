@@ -5,6 +5,8 @@ import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
+import java.util.Set;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.CascadeType;
@@ -19,7 +21,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "environment_types")
+@Table(name = "environment_type")
 @JsonIgnoreProperties({ "servers", "deployments", "serviceConfigs" })
 public class EnvironmentType {
 
@@ -43,13 +45,13 @@ public class EnvironmentType {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "environmentType", cascade = CascadeType.ALL)
-    private Set<Host> servers = new HashSet<>();
+    private Set<Server> servers = new HashSet<>();
 
     public EnvironmentType() {
     }
 
     public EnvironmentType(Long id, String name, String description, Boolean activeFlag, LocalDateTime createdAt,
-            LocalDateTime updatedAt, Set<Host> servers) {
+            LocalDateTime updatedAt, Set<Server> servers) {
         this.id = id;
         this.name = name;
         this.description = description;
@@ -107,11 +109,11 @@ public class EnvironmentType {
         this.updatedAt = updatedAt;
     }
 
-    public Set<Host> getServers() {
+    public Set<Server> getServers() {
         return servers;
     }
 
-    public void setServers(Set<Host> servers) {
+    public void setServers(Set<Server> servers) {
         this.servers = servers;
     }
 

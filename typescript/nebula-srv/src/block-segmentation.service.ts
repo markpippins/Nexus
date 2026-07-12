@@ -289,6 +289,29 @@ export async function createSnapshot(
 
 // ── 4. Commit a segment ──────────────────────────────────────────────
 
+/**
+ * Resolve block UUID from index for a given snapshot.
+ * Returns null if no block is found at that index.
+ */
+async function resolveBlockId(
+  pool: Pool,
+  snapshotId: string,
+  blockIndex: number,
+): Promise<string | null> {
+  const { rows } = await pool.query(
+    `SELECT id FROM nebula.conversation_blocks
+     WHERE snapshot_id = $1 AND block_index = $2
+     LIMIT 1`,
+    [snapshotId, blockIndex],
+  );
+  return rows.length > 0 ? rows[0].id : null;
+}
+
+/** Validate whether a string is a UUID‑format value. */
+function looksLikeUuid(s: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
+
 export async function createSegment(
   pool: Pool,
   params: {
@@ -305,6 +328,26 @@ export async function createSegment(
     createdBy?: string;
   },
 ): Promise<SegmentEntry> {
+  // Resolve start/end block UUIDs from indices when the provided IDs
+  // are not valid UUIDs (legacy client sends "block-<index>").
+  let startBlockId = params.startBlockId;
+  let endBlockId = params.endBlockId;
+
+  if (!looksLikeUuid(startBlockId)) {
+    const resolved = await resolveBlockId(pool, params.snapshotId, params.startBlockIndex);
+    if (!resolved) {
+      throw new Error(`No block found at index ${params.startBlockIndex} in snapshot ${params.snapshotId}`);
+    }
+    startBlockId = resolved;
+  }
+  if (!looksLikeUuid(endBlockId)) {
+    const resolved = await resolveBlockId(pool, params.snapshotId, params.endBlockIndex);
+    if (!resolved) {
+      throw new Error(`No block found at index ${params.endBlockIndex} in snapshot ${params.snapshotId}`);
+    }
+    endBlockId = resolved;
+  }
+
   const { rows: [segment] } = await pool.query(
     `INSERT INTO nebula.segments
      (conversation_id, snapshot_id, start_block_id, end_block_id,
@@ -318,8 +361,8 @@ export async function createSegment(
     [
       params.conversationId,
       params.snapshotId,
-      params.startBlockId,
-      params.endBlockId,
+      startBlockId,
+      endBlockId,
       params.startBlockIndex,
       params.endBlockIndex,
       params.segmentType || null,

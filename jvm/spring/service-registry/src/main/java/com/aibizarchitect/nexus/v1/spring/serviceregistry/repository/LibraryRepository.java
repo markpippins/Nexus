@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkLanguage;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Library;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.LibraryCategory;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.LibraryType;
 
 @Repository
 public interface LibraryRepository extends JpaRepository<Library, Long> {
@@ -16,7 +16,7 @@ public interface LibraryRepository extends JpaRepository<Library, Long> {
 
     Optional<Library> findByPackageName(String packageName);
 
-    List<Library> findByCategory(LibraryCategory category);
+    List<Library> findByCategory(LibraryType category);
 
     List<Library> findByCategory_Id(Long categoryId);
 
@@ -26,7 +26,7 @@ public interface LibraryRepository extends JpaRepository<Library, Long> {
 
     List<Library> findByPackageManager(String packageManager);
 
-    org.springframework.data.domain.Page<Library> findByCategory(LibraryCategory category, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Library> findByCategory(LibraryType category, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Library> findByCategory_Id(Long categoryId, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Library> findByLanguage(FrameworkLanguage language, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Library> findByLanguage_Id(Long languageId, org.springframework.data.domain.Pageable pageable);

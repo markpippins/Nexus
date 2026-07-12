@@ -420,26 +420,6 @@ export class RegistryServerProvider implements TreeProvider {
                 lastUpdated: new Date()
             },
             {
-                id: `platform-dict-servicetypes-${profile.id}`,
-                name: 'Service Types',
-                type: NodeType.FOLDER,
-                icon: 'dns',
-                hasChildren: false,
-                operations: ['manage-servicetypes'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/service-types`, managementType: 'service-types' },
-                lastUpdated: new Date()
-            },
-            {
-                id: `platform-dict-servertypes-${profile.id}`,
-                name: 'Host Types',
-                type: NodeType.FOLDER,
-                icon: 'storage',
-                hasChildren: false,
-                operations: ['manage-servertypes'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/server-types`, managementType: 'server-types' },
-                lastUpdated: new Date()
-            },
-            {
                 id: `platform-dict-languages-${profile.id}`,
                 name: 'Languages',
                 type: NodeType.FOLDER,
@@ -456,17 +436,7 @@ export class RegistryServerProvider implements TreeProvider {
                 icon: 'class',
                 hasChildren: false,
                 operations: ['manage-categories'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/framework-categories`, managementType: 'framework-categories' },
-                lastUpdated: new Date()
-            },
-            {
-                id: `platform-dict-libcategories-${profile.id}`,
-                name: 'Library Categories',
-                type: NodeType.FOLDER,
-                icon: 'style',
-                hasChildren: false,
-                operations: ['manage-libcategories'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/library-categories`, managementType: 'library-categories' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/categories`, managementType: 'categories' },
                 lastUpdated: new Date()
             },
             {
@@ -571,7 +541,7 @@ export class RegistryServerProvider implements TreeProvider {
 
             return deploymentsResponse.map(deployment => ({
                 id: `deployment-${profile.id}-${deployment.id}`,
-                name: `${deployment.host.hostname}:${deployment.port}`,
+                name: `${deployment.server.hostname}:${deployment.port}`,
                 type: NodeType.REGISTRY_SERVER, // Using HOST_SERVER as a deployment node type
                 icon: 'settings',
                 hasChildren: false,

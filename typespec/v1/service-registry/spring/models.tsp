@@ -70,12 +70,14 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
     activeFlag?: boolean = true;
   }
 
-  model FrameworkCategory {
+  model FrameworkType {
     id: int64;
     name: string;
     @maxLength(1000)
     description?: string;
     activeFlag?: boolean = true;
+    createdAt?: utcDateTime;
+    updatedAt?: utcDateTime;
   }
 
   model Framework {
@@ -84,7 +86,7 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
     @maxLength(1000)
     description?: string;
     vendor: FrameworkVendor;
-    category: FrameworkCategory;
+    category: FrameworkType;
     language: FrameworkLanguage;
     currentVersion?: string;
     ltsVersion?: string;
@@ -109,7 +111,11 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
   model ServerType {
     id: int64;
     name: string;
+    @maxLength(1000)
+    description?: string;
     activeFlag?: boolean = true;
+    createdAt?: utcDateTime;
+    updatedAt?: utcDateTime;
   }
 
   model OperatingSystem {
@@ -120,22 +126,44 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
     activeFlag?: boolean = true;
   }
 
-  model LibraryCategory {
+  model LibraryType {
     id: int64;
     name: string;
+    @maxLength(500)
+    description?: string;
     activeFlag?: boolean = true;
+    createdAt?: utcDateTime;
+    updatedAt?: utcDateTime;
   }
 
   model Library {
     id: int64;
     name: string;
-    version?: string;
+    @maxLength(1000)
+    description?: string;
+    category?: LibraryType;
+    language?: FrameworkLanguage;
+    currentVersion?: string;
+    packageName?: string;
+    packageManager?: string;
+    @format("url")
+    url?: string;
+    repositoryUrl?: string;
+    license?: string;
     activeFlag?: boolean = true;
+    createdAt?: utcDateTime;
+    updatedAt?: utcDateTime;
   }
 
   model ServiceType {
     id: int64;
     name: string;
+    @maxLength(1000)
+    description?: string;
+    activeFlag?: boolean = true;
+    defaultComponent?: VisualComponent;
+    createdAt?: utcDateTime;
+    updatedAt?: utcDateTime;
   }
 
   model ServiceBackend {
@@ -150,12 +178,12 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
   }
 
   // ========================================================================
-  // Host — maps to JPA Host entity (table: servers)
+  // Server — maps to JPA Server entity (table: servers)
   // ========================================================================
 
-  model Host {
+  model Server {
     id: int64;
-    /** Server hostname (maps to JPA hostname field, serialized as "hostname") */
+    /** Server hostname */
     hostname: string;
     ipAddress: string;
     type: ServerType;
@@ -200,7 +228,6 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
 
   // ========================================================================
   // Deployment — maps to JPA Deployment entity (table: deployments)
-  // Uses object references for FK relationships matching JPA JSON serialization.
   // ========================================================================
 
   model Deployment {
@@ -209,8 +236,8 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
     service: Service;
     /** FK: deployment environment */
     environment: EnvironmentType;
-    /** FK: target server/host */
-    server: Host;
+    /** FK: target server */
+    server: Server;
     version?: string;
     deployedAt?: utcDateTime;
     status?: string;
@@ -245,12 +272,6 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
     name: string;
   }
 
-  model ServiceLibrary {
-    id: int64;
-    name: string;
-    version?: string;
-  }
-
   // ========================================================================
   // Create / Update DTOs
   // ========================================================================
@@ -274,14 +295,16 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
     activeFlag?: boolean;
   }
 
-  model FrameworkCategoryCreate {
+  model FrameworkTypeCreate {
     name: string;
+    description?: string;
     activeFlag?: boolean = true;
   }
 
-  model FrameworkCategoryUpdate {
+  model FrameworkTypeUpdate {
     id: int64;
     name?: string;
+    description?: string;
     activeFlag?: boolean;
   }
 

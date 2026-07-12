@@ -1,0 +1,126 @@
+<div class="h-full flex flex-col bg-[rgb(var(--color-background))]">
+  <!-- Error State -->
+  @if (error()) {
+    <div class="flex items-center justify-center h-full text-[rgb(var(--color-text-muted))] text-sm p-4">
+      <div class="text-center space-y-2">
+        <div class="text-[rgb(var(--color-danger-text))] font-medium">Connection Error</div>
+        <div>{{ error() }}</div>
+        <button
+          (click)="refresh()"
+          class="px-3 py-1 rounded bg-[rgb(var(--color-accent-solid-bg))] text-white text-xs hover:opacity-90 transition-opacity"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  }
+  <!-- Loading State -->
+  @else if (loading()) {
+    <div class="flex items-center justify-center h-full text-[rgb(var(--color-text-muted))] text-sm">
+      <div class="text-center space-y-3">
+        <div class="animate-spin w-6 h-6 border-2 border-[rgb(var(--color-accent-border))] border-t-transparent rounded-full mx-auto"></div>
+        <div>Loading requirements from Nebula...</div>
+      </div>
+    </div>
+  }
+  <!-- Connected: Kanban Board -->
+  @else if (connected()) {
+    <!-- Header -->
+    <div class="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold text-[rgb(var(--color-text-base))]">Nebula Requirements</span>
+        <span class="text-xs text-[rgb(var(--color-text-muted))]">({{ totalCount() }})</span>
+      </div>
+      <button
+        (click)="refresh()"
+        title="Refresh"
+        class="p-1.5 rounded hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[rgb(var(--color-text-muted))]" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10.899 12.101A7.002 7.002 0 012.399 8.567a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101z" clip-rule="evenodd" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Kanban Columns (scrollable horizontally) -->
+    <div class="flex-1 overflow-x-auto overflow-y-auto">
+      <div class="grid grid-cols-8 gap-0 h-full min-w-[1600px]">
+        @for (col of columns; track col) {
+          <div
+            class="flex flex-col border-r border-[rgb(var(--color-border-base))] last:border-r-0 h-full"
+            (dragover)="onDragOver($event)"
+            (drop)="onDrop(col, $event)"
+          >
+            <!-- Column Header -->
+            <div class="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+              <span class="text-xs font-semibold uppercase tracking-wider" [style.color]="columnColor(col)">
+                {{ columnLabel(col) }}
+              </span>
+              <span class="text-xs text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-background))] px-1.5 py-0.5 rounded-full">
+                {{ getRequirementsForColumn(col).length }}
+              </span>
+            </div>
+
+            <!-- Column Cards (scrollable vertically) -->
+            <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+              @for (req of getRequirementsForColumn(col); track req.id) {
+                <div
+                  draggable="true"
+                  (dragstart)="onDragStart(req.id, $event)"
+                  (dragend)="onDragEnd()"
+                  class="group rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-card))] hover:border-[rgb(var(--color-accent-border))] hover:shadow-sm transition-all cursor-grab active:cursor-grabbing p-2.5"
+                  [class.opacity-40]="draggingReqId() === req.id"
+                >
+                  <!-- Title -->
+                  <div class="text-xs font-medium text-[rgb(var(--color-text-base))] leading-snug mb-1.5 line-clamp-2">
+                    {{ req.title }}
+                  </div>
+
+                  <!-- Badges -->
+                  <div class="flex items-center gap-1 flex-wrap mb-1.5">
+                    @if (req.reqType) {
+                      <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" [class]="typeBadge(req.reqType)">
+                        {{ req.reqType }}
+                      </span>
+                    }
+                    @if (req.priority && req.priority !== 'Medium') {
+                      <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" [class]="priorityBadge(req.priority)">
+                        {{ req.priority }}
+                      </span>
+                    }
+                  </div>
+
+                  <!-- Context path -->
+                  <div class="text-[10px] text-[rgb(var(--color-text-subtle))] truncate" [title]="nebula.getRequirementContext(req)">
+                    {{ nebula.getRequirementContext(req) }}
+                  </div>
+                </div>
+              }
+
+              <!-- Empty column placeholder -->
+              @if (getRequirementsForColumn(col).length === 0) {
+                <div class="flex items-center justify-center h-20 text-[10px] text-[rgb(var(--color-text-subtle))] italic">
+                  No items
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+  <!-- Not connected (initial state) -->
+  @else {
+    <div class="flex items-center justify-center h-full text-[rgb(var(--color-text-muted))] text-sm">
+      <div class="text-center space-y-2">
+        <div>Nebula API not connected.</div>
+        <button
+          (click)="refresh()"
+          class="px-3 py-1 rounded bg-[rgb(var(--color-accent-solid-bg))] text-white text-xs hover:opacity-90 transition-opacity"
+        >
+          Connect
+        </button>
+      </div>
+    </div>
+  }
+</div>

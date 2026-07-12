@@ -35,6 +35,62 @@ def clean_html_text(text):
     return text.strip()
 
 
+def _extract_list_items(list_tag, depth=0):
+    """Recursively extract items from a <ul> or <ol> element.
+
+    Returns (flat_items, markdown_lines) where:
+      - flat_items is a flat list of all item texts (for backward compat)
+      - markdown_lines is a list of markdown-formatted lines with indentation
+    """
+    prefix = '  ' * depth
+    is_ordered = list_tag.name == 'ol'
+    flat_items = []
+    md_lines = []
+
+    for i, li in enumerate(list_tag.find_all('li', recursive=False)):
+        # Check for a nested list inside this li
+        nested_list = li.find(['ul', 'ol'], recursive=False)
+
+        # Extract the li's own text content (excluding the nested list)
+        if nested_list:
+            # Build text from everything except the nested list
+            li_text_parts = []
+            for content in li.children:
+                if isinstance(content, Tag) and content.name in ('ul', 'ol'):
+                    continue
+                if isinstance(content, Tag):
+                    li_text_parts.append(content.get_text(' ', strip=True))
+                elif isinstance(content, str):
+                    txt = content.strip()
+                    if txt:
+                        li_text_parts.append(txt)
+            li_text = ' '.join(li_text_parts)
+            li_text = clean_html_text(li_text)
+        else:
+            li_text = clean_html_text(li.get_text('\n', strip=True))
+
+        if not li_text and not nested_list:
+            continue
+
+        if li_text:
+            flat_items.append(li_text)
+
+            # Format with appropriate prefix
+            if is_ordered:
+                item_prefix = f"{prefix}{i + 1}. "
+            else:
+                item_prefix = f"{prefix}- "
+            md_lines.append(item_prefix + li_text)
+
+        # Recurse into nested list
+        if nested_list:
+            sub_flat, sub_md = _extract_list_items(nested_list, depth + 1)
+            flat_items.extend(sub_flat)
+            md_lines.extend(sub_md)
+
+    return flat_items, md_lines
+
+
 def extract_code_text(code_tag):
     lines = []
     for span in code_tag.find_all('span', recursive=True):
@@ -117,11 +173,9 @@ def extract_block_from_child(child, seen_code):
             return {'type': 'paragraph', 'content': text}
         return None
     if child.name in ('ul', 'ol'):
-        items = [clean_html_text(li.get_text('\n', strip=True))
-                 for li in child.find_all('li', recursive=False)]
-        items = [i for i in items if i]
+        items, md_lines = _extract_list_items(child)
         if items:
-            return {'type': 'list', 'items': items}
+            return {'type': 'list', 'items': items, 'content': '\n'.join(md_lines)}
         return None
     if child.name == 'div':
         inner = extract_div_blocks(child, seen_code)

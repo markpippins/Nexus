@@ -235,14 +235,18 @@ def promote_candidate(candidate: dict, dry_run: bool = False, skip_agenda: bool 
     result["intent_record_id"] = ir_id
 
     # Step 2.5: Match to agenda (if not skipped)
+    # Uses embedding-based semantic matching. Does NOT auto-create agendas
+    # from scans — items with no matching agenda are simply skipped.
     if not skip_agenda:
-        match = agenda_matcher.match_intent_to_agenda(ir_id, threshold=0.5)
-        if match.is_new:
-            log.info("  Creating new agenda...")
-            aid, iid = agenda_matcher.create_agenda(ir_id)
-            result["agenda_id"] = aid
-            result["agenda_item_id"] = iid
-        else:
+        match = agenda_matcher.match_intent_to_agenda(
+            ir_id, threshold=0.60, allow_new=False,
+        )
+        if match.skip:
+            log.info("  No matching agenda (best=%.3f) — skipping agenda assignment",
+                     match.score)
+            result["agenda_id"] = None
+            result["agenda_item_id"] = None
+        elif match.agenda_id:
             log.info("  Adding to existing agenda %s...", match.agenda_id[:8])
             iid = agenda_matcher.add_item_to_agenda(match.agenda_id, ir_id)
             result["agenda_id"] = match.agenda_id

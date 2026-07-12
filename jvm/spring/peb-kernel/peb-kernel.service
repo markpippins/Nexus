@@ -1,0 +1,35 @@
+[Unit]
+Description=PEB Kernel — Persistent Engineering Brain (Spring Boot, port 8080)
+Documentation=https://github.com/nexus/jvm/spring/peb-kernel
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/jvm/spring/peb-kernel
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=SERVER_PORT=8080
+Environment=JAVA_HOME=/usr
+Environment=MAVEN_OPTS=-Xmx512m
+Environment=PATH=/usr/bin:/bin:/usr/local/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/usr/bin/mvn -pl peb-bootstrap spring-boot:run
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=10
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/jvm/spring/peb-kernel /home/codex/.m2
+
+[Install]
+WantedBy=default.target

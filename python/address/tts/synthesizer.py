@@ -1,0 +1,210 @@
+"""synthesizer.py — Piper TTS engine wrapper.
+
+Handles voice model loading, text-to-speech synthesis, and audio file
+output. Uses Piper's Python API with a subprocess fallback.
+
+Voice models are downloaded on first use to ~/.local/share/piper-tts/.
+Audio output is written to the project's audio cache directory.
+
+Architecture:
+    text → PiperVoice.synthesize() → .wav file → audio cache dir
+"""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import subprocess
+import sys
+import wave
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+# ── Configuration ───────────────────────────────────────────────────
+
+# Default voice model (en_US, female, medium quality, 60MB)
+# Piper provides many voices: https://github.com/rhasspy/piper#voices
+DEFAULT_VOICE = "en_US-lessac-medium"
+DEFAULT_MODEL_DIR = Path.home() / ".local" / "share" / "piper-tts"
+
+# Where synthesized audio files are stored
+# Relative to the project root (nexus/)
+AUDIO_CACHE_DIR = Path(__file__).resolve().parents[3] / ".tts-audio"
+
+# Sampling rate for Piper output
+SAMPLE_RATE = 22050
+
+
+@dataclass
+class SynthesisResult:
+    """Result of a TTS synthesis operation."""
+
+    audio_path: str
+    text: str
+    engine: str = "piper"
+    voice: str = DEFAULT_VOICE
+    duration_ms: int = 0
+    synthesized_at: str = ""
+
+
+def _ensure_voice_model(voice: str = DEFAULT_VOICE) -> tuple[str, str]:
+    """Ensure the voice model is downloaded. Returns (model_path, config_path).
+
+    Piper voices are .onnx files + .json configs. On first use, we
+    download them from the Piper voice repository.
+    """
+    model_dir = DEFAULT_MODEL_DIR / voice
+    model_path = model_dir / f"{voice}.onnx"
+    config_path = model_dir / f"{voice}.onnx.json"
+
+    if model_path.exists() and config_path.exists():
+        return str(model_path), str(config_path)
+
+    # Download the voice model
+    model_dir.mkdir(parents=True, exist_ok=True)
+    _log(f"Downloading voice model: {voice}...")
+
+    base_url = f"https://huggingface.co/rhasspy/piper-voices/resolve/main"
+    model_url = f"{base_url}/en/en_US/{voice}/high/{voice}.onnx"
+    config_url = f"{base_url}/en/en_US/{voice}/high/{voice}.onnx.json"
+
+    try:
+        import urllib.request
+        urllib.request.urlretrieve(model_url, str(model_path))
+        urllib.request.urlretrieve(config_url, str(config_path))
+        _log(f"Voice model downloaded: {voice}")
+    except Exception as e:
+        # If download fails, try to use any available model
+        _log(f"Download failed ({e}), looking for any available model...")
+        for candidate in DEFAULT_MODEL_DIR.glob("**/*.onnx"):
+            voice_dir = candidate.parent
+            cfg = voice_dir / f"{candidate.stem}.onnx.json"
+            if cfg.exists():
+                _log(f"Using available model: {candidate.stem}")
+                return str(candidate), str(cfg)
+        raise RuntimeError(
+            f"Could not download or find any Piper voice model. "
+            f"Download manually from https://huggingface.co/rhasspy/piper-voices"
+        ) from e
+
+    return str(model_path), str(config_path)
+
+
+def _log(msg: str, *args: Any) -> None:
+    ts = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+    print(f"[{ts}] [tts.synth] {msg % args}", file=sys.stderr, flush=True)
+
+
+def synthesize(text: str, *, voice: str = DEFAULT_VOICE) -> SynthesisResult:
+    """Synthesize text to speech and return the audio file path.
+
+    Uses Piper's Python API (piper.PiperVoice) for synthesis.
+    Falls back to the piper CLI if the Python API is unavailable.
+
+    Args:
+        text: The text to synthesize.
+        voice: Voice model name (default: en_US-lessac-medium).
+
+    Returns:
+        SynthesisResult with audio file path and metadata.
+    """
+    AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Sanitize text for filename
+    text_hash = hashlib.sha256(text.encode()).hexdigest()[:12]
+    output_path = AUDIO_CACHE_DIR / f"tts_{text_hash}.wav"
+
+    # Skip synthesis if file already exists AND has actual audio data
+    if output_path.exists() and output_path.stat().st_size > 100:
+        _log("Cache hit: %s (%d bytes)", output_path.name, output_path.stat().st_size)
+        return SynthesisResult(
+            audio_path=str(output_path),
+            text=text,
+            engine="piper",
+            voice=voice,
+            duration_ms=0,
+            synthesized_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        )
+
+    # Remove any stale zero-byte file from a failed synthesis
+    if output_path.exists():
+        output_path.unlink()
+
+    start_time = time.time()
+
+    # ── Use Piper subprocess (primary — proven reliable) ──
+    try:
+        _synthesize_subprocess(text, str(output_path), voice)
+    except Exception as e:
+        _log(f"Subprocess failed ({e}), trying Python API...")
+        _synthesize_python(text, str(output_path), voice)
+
+    duration_ms = int((time.time() - start_time) * 1000)
+
+    return SynthesisResult(
+        audio_path=str(output_path),
+        text=text,
+        engine="piper",
+        voice=voice,
+        duration_ms=duration_ms,
+        synthesized_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    )
+
+
+def _synthesize_python(text: str, output_path: str, voice: str) -> None:
+    """Use Piper's Python API for synthesis.
+
+    PiperVoice.synthesize() expects a wave.Wave_write object, not a raw
+    file handle. We must set up the WAV header (mono, 16-bit PCM,
+    correct sample rate) before passing it to Piper.
+    """
+    model_path, config_path = _ensure_voice_model(voice)
+
+    from piper import PiperVoice
+
+    voice_obj = PiperVoice.load(model_path, config_path=config_path)
+    sample_rate = voice_obj.config.sample_rate
+    _log(f"Voice loaded: {voice} @ {sample_rate}Hz")
+
+    with wave.open(output_path, "wb") as wav_file:
+        wav_file.setnchannels(1)          # mono
+        wav_file.setsampwidth(2)          # 16-bit PCM
+        wav_file.setframerate(sample_rate)
+        voice_obj.synthesize(text, wav_file)
+
+    _log(f"Synthesized {len(text)} chars → {output_path}")
+
+
+def _synthesize_subprocess(text: str, output_path: str, voice: str) -> None:
+    """Use Piper's CLI via subprocess (python -m piper).
+
+    The piper-tts pip package doesn't always install a 'piper' binary
+    on PATH. We invoke it via sys.executable -m piper which works
+    in virtualenvs and any pip install.
+    """
+    model_path, config_path = _ensure_voice_model(voice)
+
+    cmd = [
+        sys.executable, "-m", "piper",
+        "--model", model_path,
+        "--config", config_path,
+        "--output_file", output_path,
+    ]
+
+    result = subprocess.run(
+        cmd,
+        input=text,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Piper CLI failed (exit {result.returncode}): {result.stderr}"
+        )
+
+    _log(f"Synthesized {len(text)} chars → {output_path}")

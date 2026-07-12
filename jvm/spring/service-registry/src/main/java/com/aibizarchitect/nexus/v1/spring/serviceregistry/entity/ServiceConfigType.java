@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Entity
-@Table(name = "service_config_types")
+@Table(name = "service_config_type")
 public class ServiceConfigType {
 
     @Id

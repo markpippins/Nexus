@@ -12,7 +12,7 @@ import { HostProfileService } from './services/host-profile.service.js';
 import { DetailPaneComponent } from './components/detail-pane/detail-pane.component.js';
 import { SessionService } from './services/in-memory-file-system.service.js';
 import { BrokerProfile } from './models/broker-profile.model.js';
-import { PlatformManagementService, ServicePayload, FrameworkPayload, Host } from './services/platform-management.service.js';
+import { PlatformManagementService, ServicePayload, FrameworkPayload, Server } from './services/platform-management.service.js';
 import { RemoteFileSystemService } from './services/remote-file-system.service.js';
 import { FsService } from './services/fs.service.js';
 import { ImageService } from './services/image.service.js';
@@ -351,7 +351,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private getPlatformNodeForPath(path: string[]) {
     // Valid management types (System Health is now a top-level sibling, not a Platform Management child).
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'hosts', 'service hosts', 'lookup tables', 'service types', 'server types', 'framework languages', 'framework categories', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments'];
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments'];
     const profiles = this.hostProfileService.profiles();
     const activeProfile = this.hostProfileService.activeProfile();
 
@@ -363,7 +363,9 @@ export class AppComponent implements OnInit, OnDestroy {
       if (n === 'service-definitions') return 'services';
       if (n === 'service-hosts' || n === 'hosts') return 'servers';
       if (n === 'languages') return 'framework-languages';
-      if (n === 'categories') return 'framework-categories';
+      if (n === 'categories') return 'categories';
+      if (n === 'framework-types') return 'framework-categories';
+      if (n === 'library-types') return 'library-categories';
       return n;
     };
 
@@ -850,21 +852,14 @@ export class AppComponent implements OnInit, OnDestroy {
                 const { type: _t, environment: _e, operatingSystem: _o, ...cleanedItem } = item;
 
                 // If mappings fail, fallback to existing IDs if present, or let it fail gracefully (or send what we have)
-                const payload: Partial<Host> = {
+                const payload: Partial<Server> = {
                   ...cleanedItem,
                   serverTypeId: st ? st.id : item.serverTypeId,
                   environmentTypeId: et ? et.id : item.environmentTypeId,
                   operatingSystemId: os ? os.id : item.operatingSystemId
                 };
 
-                // Cleanup string fields that shouldn't be sent if we have IDs? 
-                // The Host interface has 'status' as string, which is fine.
-                // But fields like 'type', 'environment', 'operatingSystem' (if they exist in item) are not part of Host interface for creation (Host entity has relationships).
-                // However, the Service/Controller might ignore unknown fields.
-                // IMPORTANT: 'type' in Host interface is 'serverTypeId' (number). 
-                // The interface I imported for Host has: serverTypeId: number
-
-                await this.platformManagementService.createHost(baseUrl, payload);
+                await this.platformManagementService.createServer(baseUrl, payload);
               }
               successes++;
             } catch (err) {

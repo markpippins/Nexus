@@ -40,7 +40,7 @@ public class Framework {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "category_id")
-    private FrameworkCategory category;
+    private FrameworkType category;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "language_id")
@@ -105,11 +105,11 @@ public class Framework {
         this.vendor = vendor;
     }
 
-    public FrameworkCategory getCategory() {
+    public FrameworkType getCategory() {
         return category;
     }
 
-    public void setCategory(FrameworkCategory category) {
+    public void setCategory(FrameworkType category) {
         this.category = category;
     }
 

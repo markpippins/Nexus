@@ -1,369 +1,1550 @@
-Welcome to Hypervelocity Engineering
+Why 1.6 million agents did nothing
 0:00
-The fire hose of vibe-coded  AI slop will not stop. But
+I'm interested in agents that work, not
+0:02
+agents that don't. But one of the
 0:04
-our friends at Microsoft have the  answer: Hypervelocity Engineering.
+fundamental problems with finding agents
+0:06
+that work is that we don't know what
+0:10
+work looks like whe when it's
 0:12
-So I've been going through Microsoft's  open-source stuff on this topic,
+agent-shaped. We don't know how to
+0:14
+recognize agent problems when we see
 0:16
-Hypervelocity Engineering, their  documentation, and some internal
-0:20
-stuff that I can't share. And even if you're  not a Microsoft shop, this is probably going
+them. Is it a single agent problem? Is
+0:18
+it a multi- aent problem? Is it not an
+0:19
+agent problem at all? It's really hard
+0:22
+for people to understand practically in
 0:24
-to impact you because this is basically the  Silicon Valley bros leaking into enterprise.
+front of their own desks where work fits
+0:27
+in these categories. This video solves
 0:29
-All right. So as a quick intro, Microsoft uses  this Hypervelocity Engineering methodology
+that. I'm going to walk you through how
+0:31
+we know. I'm going to give you the
+0:33
+academic grounding, the practical
 0:35
-internally, and they've been doing it across  their Industry Solutions Engineering team,
-0:42
-which is basically Microsoft Consulting. Okay.  So this is what they are trying to do on all of
-0:46
-their projects: use AI to hypervelocity-accelerate  the software engineering life cycle. Everybody in
-0:54
-the Microsoft ecosystem is going to be impacted by  this, from mom and pop .NET shops to big corporate
-0:59
-guys. This is going to leak everywhere. Okay? So,  we should pay some attention to this. Seriously.
-1:04
-So, what are people doing today with their AI  tools? Yeah. If you're at a quite low maturity
-1:08
-level, you will just be opening Copilot Chat.  You'll type a prompt, paste the result back in,
-Prompt Engineering vs Context Engineering
-1:15
-accept it, move on with our lives. But this  isn't engineering. This is vibe coding. All
-1:20
-right? And it's going to get everybody in a  lot of trouble. Okay? There's no structure.
+grounding from Frontier Labs, and I'm
+0:37
+going to give you a easy one minute
+0:38
+test. And on top of that, I'm going to
+0:40
+give you an automated AI skill that you
+0:44
+can jump into and grab and use to get
+0:47
+into the work itself. Because we don't
+0:50
+want to just do this for the sake of
+0:51
+doing it. You're not sitting there
+0:52
+estimating work for the sake of
+0:53
+estimating. That's shaving the yak,
+0:55
+right? What you're trying to do is
+0:58
+you're trying to get into the work more
+1:00
+quickly and pick more accurately. And so
+1:02
+we're going to use our one minute test
+1:05
+that I'm going to teach you and we're
+1:07
+going to jump straight in. And I I
+1:09
+actually built a tool for this. You're
+1:10
+going to be able to jump straight into a
+1:12
+multi- aent solution or a single agent
+1:14
+solution or maybe a chat or even no no
+1:17
+AI at all. Yes, we're going to talk
+1:18
+about when you don't use AI at all. The
+1:21
+answer to all this, the reason all this
+1:23
+matters is because we are in a
 1:25
-There's no verification. There's no  persistence between sessions. I mean,
-1:29
-normally the system would have forgotten  what you did the day before. It can
+postopenclaw moment. 1.6 million agents
+1:28
+registered for an agent-driven social
+1:30
+network at the peak of openclaw. Most of
+1:32
+them did not do a single task. They
 1:34
-be really useful. You can do some great  one-shot cracking demos. And when it works,
-1:39
-it's great. When it doesn't work, it sucks,  but you will normally end up with a giant
-1:44
-pull request that nobody understands or  a load of slop with security holes in it.
-1:49
-In Microsoft Docs, they put this pretty  bluntly, okay? They say AI code is still
-1:55
-your code, and if you can't explain it,  understand it, maintain it, or support it,
-1:59
-don't ship it. Which sounds fair enough to me.  But sadly for this boomer, this .NET boomer,
+didn't do a task because people set up
+1:36
+OpenClaw, didn't know what to do with it
+1:38
+next. We live in a world where we have
+1:40
+intelligence and we don't know how to
+1:42
+use it and we don't have an idea of how
+1:45
+to match our tasks to the agents with
+1:48
+confidence. This video solves that. So,
+Three tasks on every desk
+1:51
+let's jump in. So, let me make it
+1:53
+concrete. Three tasks. Not my tasks,
+1:56
+right? Your tasks. You have all three of
+1:58
+these on your desk. Now, I bet you have
+2:00
+a scheduling task, right? You have to
+2:01
+find a slot for a meeting. You have to
+2:03
+book a class. You have to fit an
+2:04
+appointment around a calendar that's
 2:05
-okay, who used to hand-crank his C# code—he  loved it, right—the question isn't "should we
-2:11
-use AI to write code anymore?" All right,  that ship has well and truly sailed away.
-2:17
-It's left the platform. Okay, we have to catch  up because the industry will demand it of us,
-2:22
-or we won't be competitive. We won't be  able to build anything ever. It'll just
+really busy. Task two, you have a pile
+2:07
+of something that you're not going to
+2:09
+read. You have to, right? Maybe it's
+2:10
+your inbox. Maybe it's a contracts
+2:12
+folder. Maybe it's a share drive, right?
+2:15
+It's a big pile of something. Maybe it's
+2:16
+a bunch of meeting notes that you always
+2:18
+meant to organize. Pick a pile.
+2:20
+Everybody has one. And then number
+2:21
+three, you have a judgment call to make.
+2:24
+Which candidate do you hire maybe? Or
 2:26
-be us doing some weird artisan thing that  nobody will pay for, and we will all starve.
+what do you name something? Or what
+2:28
+direction do you take a product? Here's
+2:30
+what I want you to know about these
 2:31
-All right, so the question is how can we  actually use this AI stuff without burying
+three tasks. One of them is a 30-cond AI
 2:35
-ourselves in technical debt? And that  is the industry's number one challenge
-What exactly is Hypervelocity Engineering
+job. One of them needs a whole team of
+2:37
+agents to do the job properly. And and
 2:40
-at the moment. Hypervelocity Engineering is  Microsoft's proposed answer to this problem,
-2:46
-right? And they describe it as expert  multidisciplinary teams using AI tools,
-2:51
-proven starting points, and design thinking  across the entire life cycle. Design thinking is
+the token bill, by the way, is smaller
+2:41
+than you think for that. And I'll show
+2:42
+you how. And one of them, no matter how
+2:45
+much AI you use, is going to need your
+2:47
+involvement. The reason I know this is
+2:48
+that I actually spent the money finding
+2:50
+out, like I actually ran all three of
+2:52
+these tests, and you're going to see me
+2:53
+run them on screen as we go through this
+2:55
+video together. So, everybody bought
 2:57
-basically consulting, genuine actual consulting,  the stuff that users on various parts of the
+thinking, but no one knows what to point
+3:00
+that thinking at. This is one of the
+3:02
+core issues with the AI economy. If we
 3:05
-spectrum don't particularly want to do, but  we won't have a choice anymore. They claim,
-3:10
-and this sounds like, you know, your X/Twitter  tech bro yap, two to three times faster delivery,
+can't figure out how to use this
+3:06
+intelligence, we're wasting it. You'll
+3:08
+be able to figure out, is it a chat
+3:09
+task? Is it a one agent task? Is it a
+3:11
+multi- aent task? Or whether you
+3:13
+shouldn't bother at all. Right? And the
+3:15
+trick is there's only four things you
 3:18
-half the team sizes from what they used  to use. They have three or four people
-3:22
-on a team instead of 10. I don't know what you  were doing with 10 people on the team anyway,
-3:26
-but I guess that was your average Agile Scrum dev  team, right? And 30% of the code in Microsoft is
+need to estimate to answer that
+3:20
+question. And you can do those really
+3:21
+quickly. That's the whole skill. And I'm
+3:23
+going to run my version of all three of
+3:24
+those tasks I just gave you on camera so
+3:27
+you can watch that test work. And one of
+3:29
+the tasks the agent is going to tell me
 3:31
-now written by AI, they claim. So they use this  internally and externally with their customers.
-3:36
-Hypervelocity Engineering, according to the  documentation, has four key parts. All right,
-3:43
-multidisciplinary teams. These are those  full-stack engineers I keep banging on
+no, which I love. And we'll get into why
+3:33
+that is. For all of our history before
+3:35
+AI came along, if you wanted to apply
+3:37
+thinking to a problem, you had two
+3:40
+options. You could either hire a brain,
+3:42
+hire someone to do that thinking for
+3:44
+you, or you could wait until you had
+3:46
+time to think yourself. Thinking came
 3:48
-about. We don't just have a little bit of  front end, a little bit of back end, a DBA,
+connected to people. People were
+3:50
+expensive, they were slow to find, they
 3:52
-an architect, a QA. Everybody ends up doing  everything. You are a software engineer. Okay,
-3:59
-design thinking, which is basically consulting all  over again. Proven starting points. So you have
-4:05
-to use accelerators. You don't rewrite or recreate  Hypervelocity Engineering on every single project,
-4:12
-and you use agents across the entire life cycle.  AI does everything from requirements checking to
-4:17
-validation at the end. That's what they want you  to do, and that is the future of this industry,
+fall asleep, they need food, they need
+3:54
+rest, etc. and they also need clear
+3:58
+clear direction and clear access to
+4:00
+resources and all kinds of things that
+4:02
+make hiring relatively expensive.
+4:06
+That era is over. And by the way, that
+4:08
+doesn't mean jobs are over. I've said
+4:09
+that and I'll cover that in another
+4:11
+video. But the era of tying thinking to
+4:13
+people is done. Especially post November
+4:16
+2025. Thinking is now metered. It's
+4:19
+priced per token. You can buy a little
+4:21
+of it. You can buy a lot of it. You can
 4:23
-despite what us poor, whingeing  boomers have to say about it.
+buy it tonight for a problem you only
+4:25
+discovered this afternoon. And nobody,
+4:27
+including me, grew up with instincts for
 4:30
-If you are a software engineer like me, okay,  you've been doing Agile Scrum for ages. So,
-4:35
-you're saying Agile is already fast. Well, yes,  it is. Agile is agile. Agile Scrum. We've been
-4:41
-doing this for decades now. Do you remember Scrum  Masters? Yeah. At least we're not going to have
+for any of that, for how we handle that.
+4:32
+This is net new to us, right? It's a new
+4:34
+kind of managerial instinct. Nobody has
+4:36
+ever had to ask which task in my week is
+4:39
+actually worth 50 bucks of purchase
+4:42
+thought. That question just didn't exist
+4:44
+a year ago. So when people stand in
 4:46
-Scrum Masters in all of this. All right. I see  that the principles of agile in Hypervelocity
-4:53
-Engineering are still there. All right. We ship  working software, we iterate, we keep talking
-4:57
-to the customer. Sometimes we've forgotten  how to do that in normal agile. But anyway,
+front of their shiny new agent and say,
+4:48
+"What do I even do with this?" That's
+4:50
+not a tooling problem, right? It's not a
+4:52
+lack of imagination on our part. It's
+4:54
+it's a budgeting question that we don't
+4:56
+have the tools to answer because we've
+4:58
+never had to before. Maybe you watch a
 5:00
-we respond to change. Okay, that's what we  do. Most of the ceremony of agile, right,
+demo of someone's 23 agents form and and
+5:03
+you feel left behind somehow. I I want
+5:05
+to give you a word of comfort here. You
 5:07
-accumulated to compensate for slow humans. All  right, you know those annoying standups and
+may not need those 23 agents for the
+5:09
+task. They may be overkill and I'm the
 5:12
-those annoying retrospectives and all this slop  you have to deal with every week. Your week is
+last person to suggest a multi- aent
+5:14
+solution where you don't need one. The
+5:16
+trick is you might need one. And so what
 5:18
-full of calendar meetings. It's because humans  have been really crap at this process. Right?
-Old Agile vs Super Agile
-5:24
-If you think of Hypervelocity Engineering as  super agile or agile squared, you're getting
+I realized the most important skill is
+5:20
+that we're not learning that we're not
+5:21
+teaching that I couldn't find anywhere
+5:23
+is how do you know when you need an
+5:25
+agent? How do you know when you need
+5:26
+multiple agents? How do you know when
+5:28
+you need none? Before I jump into the
+What 250 attempts proved
+5:30
+one minute test for how to get this
 5:32
-the hang of it. Things that used to take two  weeks now need to be compressed again down
-5:37
-to two or three days with the same quality  rigor. That is the dream. Do you remember
+done, I want to give you the two facts
+5:34
+that I built this test on so you can
+5:36
+understand how to extend this further.
+5:38
+So Stanford 2024 researchers took a
+5:41
+cheap coding model and gave it one
 5:42
-those Agile Scrum loops on graphic PowerPoints  that all the consultants used to whip out? Do
+attempt at each bug in a standard
+5:44
+benchmark. It fixed 15.9% of them. Not
 5:47
-you remember the SAFe Agile Release Train?  Choo choo. Let's all get on the train. Well,
-5:53
-Hypervelocity Engineering is being described as  multiple parallel development cycles in some sort
-6:00
-of messed up whirlwind vortex of productivity.  You should see some of the graphics that are
-6:05
-coming out on this. Story points and planning  poker, thank God, consigned to the dustbin of
+impressive even back then, right in
+5:50
+2024. Then they gave the same cheap
+5:52
+model 250 attempts per bug. They jumped
+5:55
+to 56% without changing the model,
+5:57
+without changing the harness, without
+5:59
+changing anything. For context, the best
+6:01
+single attempt from the best model money
+6:04
+could buy at the time in 2024 was 43%.
+6:07
+So they beat state-of-the-art just by
+6:09
+trying a little bit more. What's the
 6:11
-history as it should have been, because the plan  itself is the contract with the AI agent. You
-6:17
-create the plan first. All right. No more backlog  refinement. Okay. The research agent reads your
-6:23
-codebase and writes the backlog for you. Or,  as one of the examples that Microsoft uses,
-6:28
-they just take a meeting transcript to use  the Azure DevOps MCP server to automatically
+takeaway here for us? Why are we quoting
+6:12
+a 2024 study for AI in 2026? I'll tell
+6:16
+you why. Stanford discovered a law, a
+6:19
+pattern in AI token usage that we still
+6:22
+see upheld today by agents and that
+6:24
+informed how I think about teaching all
+6:26
+of you where tasks are agent applicable
+6:30
+and where they're not. Because you see,
+6:31
+when Stanford graphed the curve of
 6:33
-create the work items that the customer wants  based on those transcripts. Okay, it's wild.
-6:39
-So, it's still iterative and incremental. But I  think if you try to squint a bit, okay, you can
+improvement, how the AI models got
+6:35
+better at fixing bugs as they added more
+6:38
+turns, they found that the improvement
+6:40
+followed a law, a smooth, predictable
+6:43
+curve across four orders of magnitude of
+6:46
+attempts. More attempts, more problems
 6:48
-see that this is moving software engineering  again from what was a creative team sport,
+solved. It was like clockwork. That's
+6:50
+academia, right? But in production, this
+6:52
+holds up as well. Anthropic built a
 6:54
-almost like making a movie, into more of an  engineering discipline, like actual engineering
-7:03
-jobs. Okay. I mean, I think calling it agile  squared is a nice analogy, because in old agile,
+research system out of multiple agents
+6:57
+and then studied what actually predicted
+7:00
+whether a run was good or bad. Was it
+7:02
+prompt wording? It didn't matter as much
+7:04
+as you would think. Not at all really.
+7:06
+The single biggest factor explaining 80%
 7:10
-one dev was one dev, right? But in Hypervelocity  Engineering, one dev is orchestrating a little
-7:16
-mini team of agents. And you might have seen  one of my old videos on the squad thing that
+of the difference between a good run
+7:12
+that resulted in a solved problem and a
+7:14
+bad run was token spend. Basically, how
+7:18
+much the system was allowed to think.
 7:20
-they were coming up with. But that is sadly  the direction that Microsoft and Enterprise
-7:27
-Software want you to go over the next few years.  And we're not going to have a choice. Okay.
+and Anthropic team of agents beat the
+7:23
+frontier model at the time working alone
+7:25
+by 90.2%.
+7:28
+Their explanation, Anthropic's
+7:30
+explanation in plain terms is that a
+7:31
+team of agents is how you spend more
 7:34
-So, how do you level up? How do you level up  to Hypervelocity Engineering? Well, step one,
-7:39
-okay, is moving from prompt engineering, which is  just spamming what you want built into Copilot or
-7:45
-Claude or whatever, and moving into context  engineering. And context engineering is a bit
-7:51
-like this, okay? The entire information pipeline  of your product and your work items and how to
+tokens than one agent can usefully hold
+7:38
+and that has traction against hard
+7:41
+problems. A multi- aent run can cost 10,
+7:44
+15, 20, 30 times more than a single
+7:47
+agent run or even more than that. And so
+7:50
+for a long time we were held back
+7:53
+because token spend got expensive and it
+7:55
+just wasn't practical for individuals to
 7:58
-verify the work is all available to the agent,  to the AI LLM that you're using. You tell it
-8:05
-what documentation it has access to, what coding  conventions you want to use, and it also has all
-8:10
-the context from all the work you did yesterday,  which if you just started a brand new chat session
-8:14
-in Copilot, you wouldn't have, right? Context  is so important because it actually lets you use
+spend on multi- aent teams. That's
+8:01
+changed. This is why Ringer matters.
+8:04
+Ringer matters because it brings the
+8:06
+power of multi- aent problem solving
+8:08
+within reach of individuals because
+8:11
+token costs are no longer prohibitive.
+8:13
+Because for a long time, budgeting
+8:15
+agents meant capping work, not just
+8:18
+buying a bigger pile of thinking. And
 8:20
-cheaper models, right? You don't have to bankrupt  yourself or your employer if there's actual work
-8:25
-on the context before using it in the model.  A small model with good context can outperform
+that's what's changed as we've had
+8:22
+better open- source models in the last
+8:23
+month or so. Which is exactly why the
+8:26
+whole game is knowing which tasks are
+8:29
+worth it. Because here's the thing, if
 8:31
-something twice its size is what Microsoft claims,  and they have the data. So I kind of believe them.
+more tokens reliably meant better
+8:34
+answers, this would be a very short
 8:36
-Practically what this means you need to do  is, if you've never written or got the agent
-8:40
-to write a Copilot instructions file and stick  it in your repository, you haven't told your AI
-8:45
-what patterns and libraries it should be using  when writing code on this particular project,
-8:50
-and 80% of the value is left on the table.  Okay? It doesn't matter what model you use,
+video. It would just be like spend more.
+8:39
+But there's a catch. And the catch is
+8:42
+the half of the Stanford study that
+8:44
+nobody quotes. Same study, by the way,
+8:46
+same cheap model. Remember, still back
+8:49
+in 2024, they kept pushing. They pushed
+8:52
+to a 100 attempts. They pushed to a,000
+8:54
+attempts at this bug solving. They
 8:56
-you need to level up from just spamming prompts  in and designing the context for your AI to use.
-9:05
-All right, I know this is painful for a boomer  like me, but this is just the way it's going.
-9:12
-So, how does Microsoft do it? This is it. The  money shot, boys. Okay, the actual workflow that
-RPI: Research, Plan, Implement, Review
-9:17
-Microsoft uses for their customer work and their  internal work, they call it RPI: Research, Plan,
-9:24
-Implement, and then Review. All right. Discover  is a fifth phase, but we'll ignore that. RPI is
-9:31
-a name that they stick with. Each is handled  by a different agent. They've created agents
+pushed to 10,000 attempts. And they
+8:58
+tracked a simple question. For what
+9:00
+share of problems does a correct answer
+9:03
+exist somewhere in the pile of attempts?
+9:06
+At 10,000 attempts, over 95%
+9:10
+of the 10,000 attempt runs contained a
+9:14
+correct answer. The right answer was
+9:16
+almost always in there. And now the real
+9:20
+question comes up. How do you find it?
+9:22
+How do you find it? Where where do you
+9:25
+get the validation that lets you see
+9:28
+that the right answer is there? If
+9:30
+you're giving your agent multiple tries,
+9:32
+is there an automatic checker somewhere,
+9:34
+a test suite? Stanford tested that too.
+9:36
+And what they found was where there was
 9:38
-for their AI LLM to use. And then by using  this process, the agents can hand off work.
-9:44
-First, there's a research agent. It goes off and  reads your codebase, your APIs, your conventions,
+an automatic checker, a test suite,
+9:40
+something mechanical that could grade
+9:42
+each attempt. Yeah, they could find the
+9:45
+answers. Coverage turned straight into
+9:47
+results. But where there was no checker
 9:49
-documentation, but it's not allowed to write  code. Okay? It can't write code. It just has
+and the model had to pick the best
+9:51
+answer out of the pile, they tried
 9:53
-to plan and research, which is fine. Okay? I  mean, that's actually, if we were engineers,
+majority voting. They tried rewarding
+9:55
+models. All of that, everything stalled
 9:58
-the first thing we do shouldn't be to write code,  okay? It actually researches the task and creates
+out at 100 attempts. In other words, you
+10:00
+need evals. You need external validation
+10:01
+in order to scale multi- aent systems
 10:04
-some evidence, right? It gets file references  and then comes up with a recommended approach,
+because look at that gap, right? The
+10:05
+right answer exists, but nobody can tell
 10:09
-because then it plans. It sends it over to  the planning agent for phase two. All right?
-10:14
-This takes the research and produces an explicit  plan with even some line numbers in some cases,
+which one it is. Every dollar spent past
+10:12
+that line buys attempts that are
+10:16
+generated. The answer is probably in
+10:18
+there, but they're never found. This is
 10:20
-I'm told. Right, something then validates the  plan to make sure that it's okay against the
+a failure of multi- aent systems. And
+10:23
+that shaded area, that's money. That's
 10:26
-research and the context that you've given  your AI LLM, and it tries to catch design
-10:30
-issues before the code is written. So phase three  is implement. Now we can write some code. Okay,
-10:36
-you might still have some bit of fun with  this, maybe you can actually do some coding
-10:39
-for a change, but in reality, there's probably  a coding agent and you will need to handhold
+money you're spending you're not getting
+10:27
+back if you don't design your systems
+10:29
+correctly. And there's a second caveat
+10:31
+on the other side. A single agent cannot
+10:33
+absorb unlimited spending either because
+10:35
+everything it reads and does piles into
+10:38
+a context window. As the context window
+10:40
+fills up, quality tends to drop even
+10:42
+with new techniques like autocompaction.
 10:44
-and review the work because  phase four is review. All right?
+And ultimately, the model will have to
+10:46
+either delegate to other agents or
 10:48
-And you're supposed to create automatic  checks and hooks and make sure that the
-10:52
-linting passes. And who uses StyleCop?  This is the equivalent, okay, of when
-10:58
-you had these weird people that insisted  on using StyleCop on every single project,
+abandon the task. And that's actually
+10:50
+how a lot of these newer agentic models
+10:54
+are handling long tasks. In other words,
+10:56
+with tools like chat GPT 5.6 Six, you
+11:00
+might be inadvertently running multi-
 11:02
-but basically, you have to check  the work. So you've got agents,
-11:05
-AI checking AI to keep it all on track. And  this is kind of checks and balances for the real
-11:12
-engineering work. It can be tough to swallow for  us creatives, but that's what they want us to do.
+aent solutions if you give it a big
+11:04
+enough task. Part of my goal is to help
+11:06
+you be intentional about that. One is a
+11:08
+memory constraint, one is an eval
+11:11
+constraint. You have to be able to
+11:13
+evaluate
+11:15
+systems and you have to know when your
+11:17
+task is big enough that one agent can't
 11:20
-Here's a quote from the big boys, Microsoft  themselves. Okay. "When AI knows it cannot
+hold it. It's a memory constraint that
+11:21
+would drive you into a multi-agent
+11:23
+system. So with that in mind, that
+The two limits that create teams
 11:25
-implement during research, it stops optimizing  for plausible code and starts optimizing for
+equips us to think more deliberately
+11:27
+about where we apply multi- aent
+11:28
+problems. Every team of agents design
 11:31
-verified truth." Okay. The constraint changes the  optimization target. All right? Constraints make
+that actually works is an answer to one
+11:33
+of these two problems. Everything else
+11:35
+is just more agents. The need to split
 11:38
-AI better, not worse. So the more context you  have, the better the result you're going to get
-11:43
-when you finally get round to asking it to build  your app for you. They even have this thing called
-Tools Microsoft offer for Hypervelocity Engineering
+capacity is changing over time as agents
+11:41
+get more capable. And that's one of the
+11:42
+things that has made this problem space
+11:45
+really hard. It's hard to know what to
+11:46
+assign to an agent when agents keep
+11:48
+getting smarter. But there's a second
 11:50
-phase bleed. Would you believe it? That sounds  pretty bleak to me. They leak phases together,
+reason to split out work that has
+11:53
+nothing to do with capacity and that
 11:55
-and this really does a bad job on their  AI-assisted efforts, is what Microsoft says.
+really helps us when we're trying to
+11:56
+assign multiple agents work. Some work
+11:58
+has parts that inherently has to be done
 12:01
-The good news is this isn't  just an idea. All right,
+by different minds or different agents.
 12:03
-Microsoft has published the same tools that they  use with their consulting customers. All right,
+Not because one agent or one mind lacks
+12:06
+the skill, but because the parts poison
 12:09
-you don't have to build all this yourself.  They've open-sourced the whole toolkit.
-12:12
-It's called hve-core, right? It's  a VS Code extension. It's a GitHub
-12:17
-Copilot CLI plugin. And the source code is at  github.com/microsoft/hve-core. This is how you
+each other. The auditor who also kept
+12:11
+the books isn't a worse auditor. He's
+12:14
+just not an auditor at all. Right? You
+12:16
+need to have two different roles in that
+12:18
+problem. Peer review only works because
+12:20
+the reviewer didn't write the paper.
+12:22
+Your bank will not let the person who
+12:24
+enters a payment be the person who
 12:26
-install it in VS Code: install the extension  ise-hve-essentials.hve-core is what you want.
-12:34
-This gives you an entire dump of Microsoft's  entire AI development stack. All right,
-12:40
-you got agents for research, planning,  implementation, review, PR review,
+approves it. Not because they're
+12:28
+dishonest, but because for centuries,
+12:30
+the way to get reliable work done was to
+12:33
+make sure that you had checks and
+12:35
+balances made of multiple minds. And
+12:37
+agents add one thing to this trick that
+12:39
+has never existed before. You cannot
+12:42
+unknow something. You've read your own
 12:44
-doc ops, whatever the hell that is, conventional  commit messages, prompt evaluation, a coaching
+product page a thousand times. You'll
+12:46
+never see it the way a stranger does,
+12:48
+right? But you can now start a mind that
 12:50
-agent that actually teaches you how to do design  thinking and be a proper user-centric consultant,
+has never seen it. You can start an
+12:52
+agent that has never seen it. So you can
+12:54
+have fresh eyes on demand for the first
 12:57
-as well as memory agents. The whole works. All  right. They've even got some coding standards
+time in history. Now, where I see this
+12:59
+being most useful is when there are
+13:01
+genuine conflicts of interest you want
+13:03
+to balance in an agent system. Things
 13:05
-for your favorite programming languages, such as  C#, my favorite obviously, and obviously Python,
-13:11
-Bash, TypeScript. It's all there. Okay. They've  really, really published the kitchen sink.
+where you need to review something twice
+13:08
+to ensure it's done correctly. A
+13:10
+contract comes to mind, a draft comes to
+13:12
+mind, a plan comes to mind. So, put all
+13:15
+of this together and you get the agent
+13:17
+test. Four things you can estimate about
 13:20
-So, time for some advice. So, I'll close this rant  off with some advice for those boomers out there
-How to get started with HVE
-13:26
-like me that want to get started because they  want to pay the bills, and if they don't do this,
-13:31
-they will probably eventually at some point  get out-competed in the market. All right? So,
+any task on your desk in about a minute.
+13:23
+First, size. Is the task bigger than
+13:27
+what one agent can hold at full quality?
+13:30
+Your calendar is not bigger than what
+13:32
+one agent can hold, for example, right?
+13:34
+It fits in a corner of a context window.
+13:36
+It's not a problem. your last quarter of
 13:38
-you need to stop one-shotting stuff. Okay? You  need to create a plan. Next time you have a task
-13:43
-that you want to use AI with, force yourself  to create two prompts. Okay? "Research this.
-13:49
-Do not write code." And then "propose a  plan." All right, you don't have to use
+email. Well, it depends on how much
+13:40
+email you get, but for a lot of us, that
+13:42
+fits in a context window, too. Question
+13:44
+two, but a pile of aundred documents,
+13:47
+that might scale out of the context
+13:48
+window. A thousand documents definitely
+13:50
+would. Independence, can the parts be
 13:53
-the actual hve-core stuff for this. You can  just practice when you're doing your yapping,
+done without knowing what the other
+13:56
+parts did? Reading a pile of documents
 13:58
-but plan first. All right, the next step is  to try the hve-core stuff. Okay, you can just
-14:06
-copy and paste some of the useful agent code,  the agents, into your skillset library in your
+actually splits really well because one
+14:00
+reader agent can read any given document
+14:02
+and they never need to talk. Coding
+14:05
+sometimes splits and sometimes doesn't.
+14:07
+It depends on how you tell the agent to
+14:09
+organize files. If agents are able to
 14:12
-repository and share it amongst your team. So  this is like Copilot instructions, for example.
+organize code into independent parts,
+14:14
+then multiple agents can work on coding
+14:16
+problems and it can be extremely
 14:17
-Step three is to write that file. All right, pick  something you care about like testing or secrets
-14:23
-management or UX design or whatever, or your  favorite libraries. Like my instructions file
-14:30
-would say "don't use AutoFixture," for example,  or AutoMapper. Okay, right, particularly don't use
+effective. Three, separation of
+14:19
+concerns. Do any parts of this task need
+14:22
+to be done by different minds? A real
+14:25
+critic who didn't write the draft, as an
+14:27
+example, an overview written by someone
+14:29
+who didn't do the reading. output that's
+14:32
+kept apart from the inputs that you
+14:34
+drive and analyze because you need a
 14:36
-AutoMapper, and put it in copilot-instructions.md.  Okay. And the AI LLM will never use it. And if it
+separate frame for that. If you're
+14:38
+thinking about that, you're thinking
+14:39
+about a team of agents. Question four,
+14:41
+and this is a critical one,
+14:42
+checkability. Remember I talked about
 14:44
-does accidentally use it randomly, another agent  will check it against the instructions and make
+that verification evals. Is checking an
+14:47
+answer a whole lot cheaper than
 14:49
-sure that you didn't accidentally put AutoMapper  in your source code, for example. All right.
+producing one? A test suite, an exit
+14:51
+code, a source document that you can
+14:53
+point at, something where you can glance
+14:55
+at it and say this is right or this is
 14:56
-So, in closing, is this going  to change your life? Well,
-14:59
-I don't think it's going to change our lives,  our side projects. All right. Because actually,
+wrong. If checking is almost free,
+14:58
+however you do it, then every extra
+15:01
+attempt, including if checkability is
 15:04
-prompt engineering is fun. It's like pulling a  slot machine. Will I get it right this time? Okay.
+expensive, on the other hand, if it
+15:06
+takes a while to check, you're going to
+15:08
+top out on the value of your multi- aent
 15:10
-But when you're working with a team and  are using these very expensive tools,
-15:13
-all right, you kind of owe it to the poor gits  paying your token bills to do this properly,
-15:20
-right, and make sure that you're not wasting  everybody's time and money and GPU usage. Okay,
-15:27
-so Microsoft has done this for you. I mean, they  get the luxury obviously of unlimited GitHub
-15:33
-Copilot tokens, I'm assuming. So some of their  advice and shilling on X is a bit difficult for
-15:40
-us plebs to also replicate. But anyway, we still  should try and do some actual engineering here.
+systems relatively quickly. And the
+15:12
+Stanford research suggests that about a
+15:14
+100 tries, you're just not going to get
+15:16
+a lot more value out of it. If you put
+15:18
+all these four together, you get an
+15:19
+overall verdict. The problem might be
+15:21
+small, in which case it's just a chat
+15:23
+back and forth. It might fit in a
+15:25
+context window, in which case it's an
+15:26
+agent with a goal. It's genuinely
+15:28
+useful. It works alone. It checks its
+15:30
+own work and it gets the job done. Or it
+15:32
+may be bigger than one perspective or
+15:35
+have parts of the task that need
+15:37
+separate minds or perspectives to work
+15:39
+well. That's a team of agents. There's
+15:42
+also a fourth option, which is that
+15:44
+there's also a fourth option, which is
+15:45
+the one that saves you the most money.
+15:47
+Ironically, maybe you don't need the AI
 15:48
-If you think of it as super agile or super  mega ultra agile, which I think we should
-15:54
-coin in this video, or agile squared  is a bit of a lazy way of doing it,
-16:00
-we need to be up to date on this because at some  point you'll be asked to do a project this way.
+at all. Maybe it's a judgment call that
+15:50
+you need to sit with and make on your
+15:51
+own and that still needs to happen in
+15:53
+the age of AI. Okay, card one, the
+15:55
+scheduling thing. I think you can guess
+15:56
+the answer here. My version was find me
+15:59
+a gym slot this week that fits around my
+16:01
+meetings. That is absolutely a single
+16:03
+agent task. It is not a multi- aent
 16:05
-And if you haven't practiced with it, you'll be  stuck. You won't even be able to wipe your own
-16:11
-butt. Okay? And you'll look very stupid, right?  So this is at least... I actually think this is
-16:17
-better than Agile Scrum. Okay? It's better  than story points, planning poker, therapy,
-16:23
-retrospective sessions. All of that is meatware  for humans, and this is way smarter and more
-16:30
-concise. And if we can get used to it, okay, and  actually focus our human skills on the consulting
+task. It's a relatively quick 5-minute
+16:07
+task. You can feed it to Claude. You can
+16:08
+feed it to Codeex. It's not going to be
+16:10
+a problem for today's models. This tier
+16:12
+is solved. If this impressed you, you
+Auditing 40 tools with agents
+16:15
+should start to raise the bar for what
+16:18
+you think AI can do because this has
+16:19
+been an easy one for a bit now. My
+16:21
+version is a complicated document
+16:22
+review. I have about 40 different tools
+16:24
+I use to run my media business. They all
+16:26
+have different renewal dates. They all
+16:28
+have different contracts. They all have
+16:31
+different emails that they're sending me
+16:33
+all the time. And what I need is one
+16:36
+single dashboard that shows me my
 16:38
-aspect of our projects, well, maybe we'll be  happier. Maybe software engineers will be happier.
+renewal dates across all of them. And
+16:40
+that also gives me a sense of where I'm
+16:42
+actually using these tools versus where
 16:44
-Let me know what you think. Is Hypervelocity  Engineering going to be a total slop disaster
-16:49
-for the industry? Or will it be a saving grace  and turn us into proper real professionals?
+I'm not. And that in turn gives me an
+16:46
+intelligent way to assess, do I want to
+16:48
+build an in-home solution to some of
+16:50
+these or do I want to depend on ones
+16:52
+that I'm using all the time and say no,
 16:54
-Let me know in the comments. I reply  to every single one. Why not subscribe,
-16:59
-because I'm going to do a video where I  update one of my apps using this methodology,
-17:03
-and it's probably going to  be next. Thanks for watching.
+these are worth the money. It's hard to
+16:56
+make that decision intentionally unless
+16:58
+I know when are the renewal dates coming
+17:00
+up, how am I actually using it, that the
+17:02
+tool, etc., etc. So there's there's
+17:04
+easily thousands of pages of documents
+17:07
+in this pile. Whether you count the
+17:09
+emails, whether you count the contracts
+17:10
+that I'm agreeing to, whether you count
+17:13
+the logs of usage that I'm piling up as
+17:16
+I use these tools. So when you look at
+17:19
+all of that together, what you need is a
+17:21
+team of agents to solve that problem for
+17:23
+you to actually go through the different
+17:25
+tools that you use to pop up. Okay, this
+17:28
+is the renewal date. this is your actual
+17:31
+usage that we're seeing from these
+17:32
+tools. These are the tokens you're using
+17:34
+or if it's not an AI tool, it's
+17:36
+something else, right? This is the
+17:37
+number of times you've logged in, etc.,
+17:38
+etc. And then to give me a sense of
+17:41
+which are the tools that are open for
+17:43
+rebuilding, right? If you look at it by
+17:45
+complexity, you look at it by usage, you
+17:47
+look at it by cost, you start to get a
+17:48
+matrix that gives you business decisions
+17:50
+you can make about your tooling. That's
+17:52
+a complicated task. That's much more
+17:54
+than an agent can hold. It is something
+17:57
+I can evaluate fairly easily because
+17:59
+when I look at it, I can say, "Oh, yeah,
+18:00
+I do use that tool that much." You know,
+18:02
+I I I do not use this tool that much. I
+18:05
+can look at it and say, "Oh, yeah, I do
+18:07
+use superhuman a ton." Right? That's not
+18:08
+a surprise. Or maybe another SAS tool
+18:10
+comes up and I'm like, I haven't used
+18:11
+that in in ages. What is this? Like, I I
+18:13
+don't use it at all. Or maybe there's
+18:15
+one that I look at, it's a candidate for
+18:17
+disruption, at least for me, where I
+18:19
+want to build it internally. And I think
+18:20
+that that's very much a per business
+18:21
+kind of decision. If I can use agents to
+18:24
+do that work, one, I never would have
+18:26
+had time to do that myself. Two, it
+18:28
+helps me make better decisions that
+18:29
+focus my leverage as a business. And
+18:32
+three, I can actually make sure that I'm
+18:35
+maximizing where my dollars are going,
+18:38
+whether those are dollars for SAS
+18:39
+contracts or whether those are dollars
+18:41
+for agents, because the agent run isn't
+18:42
+free. And I can feel good that I'm
+18:44
+actually putting the agents against a
+18:45
+problem that has real ROI. Now, let's
+18:48
+spend 60 seconds on the machinery of how
+18:50
+this works because this is where the two
+18:52
+limits that I talked about earlier show
+18:54
+up as actual design in the multi-agent
+18:56
+harness I put together. And I went deep
+18:58
+on this in Wednesday's video. So, I'm
+19:00
+just giving you this shape here. Every
+19:02
+task gets a spec. It's written once by
+19:06
+the strongest model, which then never
+19:08
+touches the work again. Every finished
+19:11
+task does get a check, and the check is
+19:14
+mechanical, right? The source has to be
+19:16
+attached and match the task or the entry
+19:18
+is rejected. The agent's opinion of its
+19:20
+own work is not evidence. A failed task
+19:23
+gets a retry with the failure included
+19:26
+and every result feeds a running
+19:28
+scorecard that I can keep an eye on so
+19:31
+it's easy for me to understand how this
+19:32
+particular agent run is working. That's
+19:35
+how Ringer works. The idea is that you
+19:37
+take this whole complicated process of
+19:39
+getting validation that allows you to
+19:41
+use these multi- aent systems
+19:43
+effectively and you turn it into
+19:45
+something that is as easy as watching a
+19:47
+dashboard stream while your agents solve
+19:50
+a hard problem. And this setup saves a
+19:54
+ton on tokens and token costs. One of
+19:57
+the things that I called out in my video
+19:58
+on Wednesday is that I was able to
+20:00
+reduce Fable 5 costs by about 10x and
+20:03
+keep the brain power of Fable 5 because
+20:05
+I allowed Fable to be the brains behind
+20:08
+the system and organize and make
+20:10
+judgment calls on a multi- aent system.
+20:12
+But all of the tokens for doing the work
+20:15
+got farmed out to much much cheaper
+20:17
+worker agents. So here you can see the
+20:20
+result of the run. You can see tools
+20:22
+ranked by cost against usage. You can
+20:24
+see renewals with their notice
+20:26
+deadlines. You can see any risky terms
+20:28
+in the contracts. And you can see a
+20:30
+recommendation per tool, whether that's
+20:32
+keep it or negotiate it or cancel it or
+20:34
+even build your own with sources
+20:36
+attached. Now, here we come to the part
+20:38
+that most AI demos skip. It's not done
+20:40
+when I say it's done and show you. It's
+20:43
+done when I show you the bill. How much
+20:45
+did this cost me to do all of this work?
+20:48
+And Wednesday's video is how this works.
+20:51
+You use an expensive model to plan and
+20:53
+judge like Fable and a lot of cheap
+20:55
+models to do all the coding and burn all
+20:57
+the tokens and do the research and
+20:59
+actually execute the multi- aent
+21:01
+workflows. This is what makes it
+21:03
+possible for individuals to go through
+21:05
+the process I described for work on
+21:07
+their desk for all of us, right? And to
+21:09
+say this is a multi- aent problem. I'm
+21:11
+going to apply multiple agents to this
+21:13
+task and feel good that I'm not burning
+21:15
+a lot of money. By the way, this did not
+21:17
+take long to set up like under an hour.
+21:19
+Like this is not a hard setup task. And
+21:21
+if you have something with thousands of
+21:23
+documents and then another task after
+21:25
+that and another task after that,
+21:27
+spending under an hour to set it up,
+21:28
+that's great. Like that's not a problem.
+Which piles are worth automating
+21:30
+Now, you may have other kinds of piles.
+21:32
+I'm assuming you do. Maybe it's a
+21:34
+project handoff. Maybe someone's leaving
+21:36
+and and everything lives in meeting
+21:38
+notes and and chat threads and a
+21:40
+half-finished stack of documents in a
+21:43
+folder. And the new person has to come
+21:45
+in and they're going to spend a week
+21:46
+digging through and getting oriented.
+21:48
+and you want to speed that up. Hey, same
+21:51
+shape. Sounds like you need to apply a
+21:53
+multiple agent solution and you can
+21:54
+actually get a briefing for your new
+21:56
+person that gets them set up and saves
+21:58
+them dozens of hours. Maybe it's the
+22:01
+research archive at the end of a
+22:02
+project. Maybe it's an inbox quarter and
+22:05
+you have thousands and tens of thousands
+22:07
+of emails and you need to sort through
+22:08
+them all. Maybe it's actually building a
+22:11
+cold lead follow-up system and you're
+22:14
+trying to get your cold pipeline going
+22:15
+for sales. You have piles regardless.
+22:18
+Recognize where you have piles of work
+22:21
+and look at them as multi- aent
+22:23
+susceptible. Other examples in our
+22:25
+personal lives would include cases where
+22:27
+we have lots of medical records, cases
+22:29
+where we have lots of bank statements
+22:31
+and we do want to do analysis of our of
+22:33
+our spending patterns of our financial
+22:35
+health. Now, these want careful setup,
+22:37
+right? You want to have exports landing
+22:39
+in a folder you can control agents that
+22:41
+only ever read that folder. You ideally
+22:43
+want to run it on a machine you own. so
+22:45
+your financial data and your health data
+22:46
+don't leak out. So you can see the shape
+22:49
+of the task, but if it's certain
+22:51
+sensitive information, you may want to
+22:54
+look at running it locally on a Mac
+22:57
+Mini. And I have got videos on how to
+22:59
+set that up and have your own stack as
+23:01
+well and you can dig into that also.
+The judgment calls to keep
+23:03
+Okay, last card. Which candidate do you
+23:05
+hire? Judgment call type problems. What
+23:07
+do you name a product? What direction
+23:09
+does the business take? These are tasks
+23:12
+that I hear people saying they hand to
+23:14
+AI. Let's not do that. And in fact, I've
+23:17
+heard people say, "I don't do that, but
+23:19
+I let AI help me make judgment calls on
+23:22
+candidates." I've let AI help me make
+23:24
+judgment calls on which product
+23:25
+direction to go in. I understand that we
+23:29
+want AI to support us. I'm all for
+23:31
+research to support us. I'm all for
+23:33
+opinions from AI to support us. But if
+23:35
+you don't have a strong instinct around
+23:38
+what is correct and you're not willing
+23:40
+to apply your human judgment, this is a
+23:43
+situation where you're going to make a
+23:45
+mistake because no frontier model is
+23:48
+going to be able to beat an expert at
+23:52
+the thing they are most expert in. And
+23:55
+I've actually talked with people who are
+23:56
+experts in their field at product at
+23:58
+engineering at at investing at at
+24:02
+running businesses and they are using
+24:06
+Fable 5 or 5.6 from OpenAI and they say
+24:10
+I am better at my job and the decisions
+24:12
+I make because I sort of run chats with
+24:16
+Fable 5. I run chats with chat GPT 5.6
+24:19
+and I get a a wall I can bounce ideas
+24:23
+off of. But the instincts of these
+24:27
+models are not worldclass.
+24:30
+They are not strong enough that you can
+24:32
+find the jean sequa. You can find that
+24:34
+that thing that is unspeakable or
+24:36
+unthinkable that says this is the
+24:38
+candidate that I am going with and
+24:41
+between two candidates that are equally
+24:43
+qualified. I know that this person has a
+24:46
+quality of character that I've seen come
+24:48
+through in interviews that I want on my
+24:50
+team. AI isn't good at that kind of
+24:53
+thing. that needs human judgment. And
+24:55
+this is where I said the cheapest thing
+24:57
+sometimes is to sit down, put the AI to
+24:59
+the side, and type out your own answer
+25:01
+to use your human judgment. So, here's
+The one-minute agent test tool
+25:03
+where I'm going to leave you. First, I'm
+25:05
+going to give you a skill, a tool that
+25:08
+you can use to determine whether
+25:10
+something is single agent, multi-agent,
+25:12
+or whether it's something you should do
+25:14
+yourself. And you can develop that
+25:16
+instinct on your own. I gave you the
+25:17
+exact questions, but if you want a skill
+25:19
+to do that, I got that. Second, I want
+25:22
+you to remember that the tools I'm
+25:24
+showing you in this video, they're going
+25:26
+to be replaced, right? The spreadsheet
+25:27
+prompt will evolve. The single goal
+25:29
+agent will evolve. Eventually, today's
+25:31
+team setups are going to evolve, too.
+25:33
+But what won't change is the power of
+25:36
+these estimates and these questions I've
+25:38
+given you. We will still be asking about
+25:39
+the size of the task, the independence
+25:41
+of the task, whether we have separation
+25:43
+of concerns in the task, whether we have
+25:45
+verifiability because these describe the
+25:48
+work, not the evolving tools. And that's
+25:51
+why I chose them. In a market where
+25:53
+everything is disposable, this test is
+25:56
+like a buy it for life purchase, right?
+25:58
+So you can name your pile. You can name
+26:00
+the handoff. You can name the folder
+26:01
+that nobody opens. You can run your
+26:04
+estimates against it and you can figure
+26:06
+out is this an agent task? Is it a
+26:09
+multi- aent task? And then you can get
+26:11
+going right away. And that's what I
+26:13
+built for you. I built a tool for you
+26:16
+that lets you estimate all of this in a
+26:19
+minute or less and then get started with
+26:21
+multi-agent if that's what you need to
+26:23
+do or recommends a single agent setup
+26:25
+and you can go right into codeex or claw
+26:27
+from there or your tool of choice. And
+26:29
+why did I build this? Because nobody out
+26:31
+there will tell you whether your task is
+26:33
+agent-shaped. I built the thing that
+26:35
+will. It's live right now. You just
+26:37
+describe your task. You set the sliders.
+26:39
+Uh so you have four estimates plus the
+26:41
+two money dials, right? how often does
+26:43
+it come back as a cost and what is a
+26:45
+good answer worth to you and it's going
+26:47
+to give you a verdict, right? Uh you can
+26:49
+you can chat, you can use an agent, a
+26:51
+team or you don't even have to bother.
+26:53
+And every verdict is going to come with
+26:56
+a next step attached because a verdict
+26:58
+without a way forward is just more
+27:00
+homework for you to do, right? You need
+27:02
+something that helps you to actually use
+27:04
+that pattern and pick until your
+27:06
+instincts really develop because a
+27:07
+verdict without a door to go forward is
+27:09
+just more work for you, right? You want
+27:11
+something that gets you into the work.
+27:12
+You want something that says, "Okay, I'm
+27:14
+going to get into Ringer and do this
+27:15
+task, and it's just a click away. I want
+27:17
+to get into chat GPT and do this task.
+27:19
+It's a click away. Oh, it's human
+27:20
+judgment." Uh, yeah, that's a good
+27:22
+reminder. Which, by the way, that may be
+27:24
+the most valuable thing about this tool
+27:26
+is I find a lot of people when they're
+27:28
+so excited about AI overindex on what
+27:30
+they delegate to AI. And this tool, I
+27:33
+find, is a helpful reminder of when to
+27:35
+apply human judgment. Do the minute of
+27:37
+thinking yourself first. Check the tool.
+27:39
+If you agree, then you're in alignment
+27:41
+and move with confidence. If you
+27:43
+disagree, that's an interesting case.
+27:44
+And I want you to think about that
+27:46
+disagreement between the tool and your
+27:48
+own instinct because there's probably
+27:50
+something here for you to learn from.
+27:51
+There's probably something the tool is
+27:53
+seeing that you may not be recognizing
+27:55
+from a size and complexity perspective.
+27:57
+You can get the tool, you can get the
+27:59
+one-click startup for Ringer, and you
+28:01
+can get all of it at the link below.
+28:03
+Have fun.

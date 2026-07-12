@@ -1,15 +1,15 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { ServiceInstance, Framework, Deployment, Library, ServiceLibrary } from '../models/service-mesh.model.js';
+import { ServiceInstance, Framework, Deployment, Library } from '../models/service-mesh.model.js';
 import { ComponentConfig } from '../models/component-config.js';
 import { PagedResponse } from '../models/paged-response.model.js';
 
-export interface Host {
+export interface Server {
     id: number;
     hostname: string;
     ipAddress: string;
-    hostTypeId: number;
+    serverTypeId: number;
     environmentTypeId: number;
     operatingSystemId: number;
     cpuCores?: number;
@@ -50,7 +50,7 @@ export interface FrameworkPayload {
 export interface DeploymentPayload {
     serviceId: number;
     environmentId: number;
-    hostId: number;
+    serverId: number;
     version?: string;
     status?: string;
     port?: number;
@@ -69,17 +69,6 @@ export interface LibraryPayload {
     url?: string;
     repositoryUrl?: string;
     license?: string;
-}
-
-export interface ServiceLibraryPayload {
-    serviceId: number;
-    libraryId: number;
-    version: string;
-    versionConstraint?: string;
-    scope?: string;
-    isDirect?: boolean;
-    isDevDependency?: boolean;
-    notes?: string;
 }
 
 @Injectable({
@@ -266,58 +255,58 @@ export class PlatformManagementService {
         }
     }
 
-    // Servers/Hosts CRUD
-    async getHosts(baseUrl: string): Promise<Host[]> {
+    // Servers CRUD
+    async getServers(baseUrl: string): Promise<Server[]> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/hosts`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<Host>>(url));
+            const url = `${baseUrl}/api/v1/servers`;
+            const response = await firstValueFrom(this.http.get<PagedResponse<Server>>(url));
             return response.data;
         } catch (e) {
-            this.error.set('Failed to fetch hosts');
+            this.error.set('Failed to fetch servers');
             throw e;
         } finally {
             this.loading.set(false);
         }
     }
 
-    async createHost(baseUrl: string, host: Partial<Host>): Promise<Host> {
+    async createServer(baseUrl: string, server: Partial<Server>): Promise<Server> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/hosts`;
-            return await firstValueFrom(this.http.post<Host>(url, host));
+            const url = `${baseUrl}/api/v1/servers`;
+            return await firstValueFrom(this.http.post<Server>(url, server));
         } catch (e) {
-            this.error.set('Failed to create host');
+            this.error.set('Failed to create server');
             throw e;
         } finally {
             this.loading.set(false);
         }
     }
 
-    async updateHost(baseUrl: string, id: number, host: Partial<Host>): Promise<Host> {
+    async updateServer(baseUrl: string, id: number, server: Partial<Server>): Promise<Server> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/hosts/${id}`;
-            return await firstValueFrom(this.http.put<Host>(url, host));
+            const url = `${baseUrl}/api/v1/servers/${id}`;
+            return await firstValueFrom(this.http.put<Server>(url, server));
         } catch (e) {
-            this.error.set('Failed to update host');
+            this.error.set('Failed to update server');
             throw e;
         } finally {
             this.loading.set(false);
         }
     }
 
-    async deleteHost(baseUrl: string, id: number): Promise<void> {
+    async deleteServer(baseUrl: string, id: number): Promise<void> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/hosts/${id}`;
+            const url = `${baseUrl}/api/v1/servers/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
-            this.error.set('Failed to delete host');
+            this.error.set('Failed to delete server');
             throw e;
         } finally {
             this.loading.set(false);
@@ -386,10 +375,12 @@ export class PlatformManagementService {
     private getLookupEndpoint(type: string): string {
         switch (type) {
             case 'service-types': return 'service-types';
-            case 'server-types': return 'host-types';
+            case 'server-types': return 'server-types';
             case 'framework-categories': return 'framework-categories';
+            case 'framework-types': return 'framework-categories';
             case 'framework-languages': return 'framework-languages';
             case 'library-categories': return 'library-categories';
+            case 'library-types': return 'library-categories';
             case 'operating-systems': return 'operating-systems';
             case 'environments': return 'environments';
             default: return type;
@@ -464,59 +455,6 @@ export class PlatformManagementService {
         }
     }
 
-    // Service Libraries (Dependencies) CRUD
-    async getServiceLibraries(baseUrl: string, serviceId: number): Promise<ServiceLibrary[]> {
-        try {
-            const url = `${baseUrl}/api/v1/service-libraries/service/${serviceId}`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<ServiceLibrary>>(url));
-            return response.data;
-        } catch (e) {
-            this.error.set('Failed to fetch service libraries');
-            throw e;
-        }
-    }
-
-    async addServiceLibrary(baseUrl: string, payload: ServiceLibraryPayload): Promise<ServiceLibrary> {
-        this.loading.set(true);
-        this.error.set(null);
-        try {
-            const url = `${baseUrl}/api/v1/service-libraries`;
-            return await firstValueFrom(this.http.post<ServiceLibrary>(url, payload));
-        } catch (e) {
-            this.error.set('Failed to add library to service');
-            throw e;
-        } finally {
-            this.loading.set(false);
-        }
-    }
-
-    async updateServiceLibrary(baseUrl: string, id: number, payload: ServiceLibraryPayload): Promise<ServiceLibrary> {
-        this.loading.set(true);
-        this.error.set(null);
-        try {
-            const url = `${baseUrl}/api/v1/service-libraries/${id}`;
-            return await firstValueFrom(this.http.put<ServiceLibrary>(url, payload));
-        } catch (e) {
-            this.error.set('Failed to update service library');
-            throw e;
-        } finally {
-            this.loading.set(false);
-        }
-    }
-
-    async removeServiceLibrary(baseUrl: string, id: number): Promise<void> {
-        this.loading.set(true);
-        this.error.set(null);
-        try {
-            const url = `${baseUrl}/api/v1/service-libraries/${id}`;
-            await firstValueFrom(this.http.delete<void>(url));
-        } catch (e) {
-            this.error.set('Failed to remove library from service');
-            throw e;
-        } finally {
-            this.loading.set(false);
-        }
-    }
     // Visual Components CRUD
     async getVisualComponents(baseUrl: string): Promise<ComponentConfig[]> {
         try {
@@ -569,5 +507,10 @@ export interface LookupItem {
     activeFlag?: boolean;
     defaultComponentId?: number | null;
     defaultComponent?: ComponentConfig;
+    /** Discriminator from the registry.categories view (e.g. 'framework_type', 'server_type'). */
+    type?: string;
+    /** Architecture field (operating_systems). */
+    architecture?: string;
+    /** Family field (operating_systems). */
+    family?: string;
 }
-

@@ -54,9 +54,10 @@ sys.modules["mr"] = mr
 spec.loader.exec_module(mr)
 out = []
 for c in mr.CANDIDATES:
-    port = "" if c.port is None else str(c.port)
-    url = c.health_url or ""
-    out.append(f"{c.name}\t{port}\t{c.kind}\t{url}")
+    port = "-" if c.port is None else str(c.port)
+    url = c.health_url or "-"
+    cmd = c.health_cmd or "-"
+    out.append(f"{c.name}|{port}|{c.kind}|{url}|{cmd}")
 sys.stdout.write("\n".join(out))
 sys.stdout.write("\n")
 PYEOF
@@ -79,12 +80,29 @@ online_count=0
 offline_count=0
 total_count=0
 
-while IFS=$'\t' read -r name port kind url; do
+while IFS='|' read -r name port kind url cmd; do
   [ -z "$name" ] && continue
   total_count=$((total_count + 1))
+
+  # Restore sentinels
+  [ "$port" = "-" ] && port=""
+  [ "$url" = "-" ] && url=""
+  [ "$cmd" = "-" ] && cmd=""
+
+  # ── No health URL — try health_cmd if available ──────────────────
   if [ -z "$url" ]; then
-    ROWS+=("${name}|${port}|${kind}|no|-|----|no health URL")
-    offline_count=$((offline_count + 1))
+    if [ -n "$cmd" ]; then
+      if timeout "$PROBE_TIMEOUT_SECONDS" bash -c "$cmd" > /dev/null 2>&1; then
+        ROWS+=("${name}|${port}|${kind}|yes|200|0|health_cmd ok")
+        online_count=$((online_count + 1))
+      else
+        ROWS+=("${name}|${port}|${kind}|no|-|----|health_cmd failed")
+        offline_count=$((offline_count + 1))
+      fi
+    else
+      ROWS+=("${name}|${port}|${kind}|no|-|----|no health URL")
+      offline_count=$((offline_count + 1))
+    fi
     continue
   fi
   curl --silent --max-time "$PROBE_TIMEOUT_SECONDS" \

@@ -17,27 +17,27 @@ import org.springframework.transaction.annotation.Transactional;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Deployment;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.EnvironmentType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkCategory;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkLanguage;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkVendor;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Host;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Library;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.LibraryCategory;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.LibraryType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.OperatingSystem;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.HostType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Server;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServerType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.EnvironmentTypeRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkCategoryRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkLanguageRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkVendorRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.LibraryCategoryRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerTypeRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.LibraryTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.LibraryRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.OperatingSystemRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceConfigurationRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceDependencyRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
@@ -56,44 +56,44 @@ public class DataInitializer implements CommandLineRunner {
 
     private final ServiceRepository serviceRepository;
     private final FrameworkRepository frameworkRepository;
-    private final FrameworkCategoryRepository categoryRepository;
+    private final FrameworkTypeRepository frameworkTypeRepository;
     private final FrameworkLanguageRepository languageRepository;
     private final ServiceTypeRepository serviceTypeRepository;
-    private final HostTypeRepository hostTypeRepository;
+    private final ServerTypeRepository serverTypeRepository;
     private final EnvironmentTypeRepository environmentTypeRepository;
-    private final HostRepository hostRepository;
+    private final ServerRepository serverRepository;
     private final DeploymentRepository deploymentRepository;
     private final ServiceConfigurationRepository configurationRepository;
     private final ServiceDependencyRepository serviceDependencyRepository;
-    private final LibraryCategoryRepository libraryCategoryRepository;
+    private final LibraryTypeRepository libraryTypeRepository;
     private final LibraryRepository libraryRepository;
     private final OperatingSystemRepository operatingSystemRepository;
     private final FrameworkVendorRepository frameworkVendorRepository;
     private final CacheWarmingService cacheWarmingService;
 
     public DataInitializer(ObjectMapper objectMapper, ResourceLoader resourceLoader, ServiceRepository serviceRepository,
-            FrameworkRepository frameworkRepository, FrameworkCategoryRepository categoryRepository,
+            FrameworkRepository frameworkRepository, FrameworkTypeRepository frameworkTypeRepository,
             FrameworkLanguageRepository languageRepository, ServiceTypeRepository serviceTypeRepository,
-            HostTypeRepository hostTypeRepository, EnvironmentTypeRepository environmentTypeRepository,
-            HostRepository hostRepository, DeploymentRepository deploymentRepository,
+            ServerTypeRepository serverTypeRepository, EnvironmentTypeRepository environmentTypeRepository,
+            ServerRepository serverRepository, DeploymentRepository deploymentRepository,
             ServiceConfigurationRepository configurationRepository, ServiceDependencyRepository serviceDependencyRepository,
-            LibraryCategoryRepository libraryCategoryRepository, LibraryRepository libraryRepository,
+            LibraryTypeRepository libraryTypeRepository, LibraryRepository libraryRepository,
             OperatingSystemRepository operatingSystemRepository, FrameworkVendorRepository frameworkVendorRepository,
             CacheWarmingService cacheWarmingService) {
         this.objectMapper = objectMapper;
         this.resourceLoader = resourceLoader;
         this.serviceRepository = serviceRepository;
         this.frameworkRepository = frameworkRepository;
-        this.categoryRepository = categoryRepository;
+        this.frameworkTypeRepository = frameworkTypeRepository;
         this.languageRepository = languageRepository;
         this.serviceTypeRepository = serviceTypeRepository;
-        this.hostTypeRepository = hostTypeRepository;
+        this.serverTypeRepository = serverTypeRepository;
         this.environmentTypeRepository = environmentTypeRepository;
-        this.hostRepository = hostRepository;
+        this.serverRepository = serverRepository;
         this.deploymentRepository = deploymentRepository;
         this.configurationRepository = configurationRepository;
         this.serviceDependencyRepository = serviceDependencyRepository;
-        this.libraryCategoryRepository = libraryCategoryRepository;
+        this.libraryTypeRepository = libraryTypeRepository;
         this.libraryRepository = libraryRepository;
         this.operatingSystemRepository = operatingSystemRepository;
         this.frameworkVendorRepository = frameworkVendorRepository;
@@ -101,17 +101,17 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     // Cache to store lookup entities during initialization
-    private final Map<String, FrameworkCategory> categoryCache = new HashMap<>();
+    private final Map<String, FrameworkType> frameworkTypeCache = new HashMap<>();
     private final Map<String, FrameworkLanguage> languageCache = new HashMap<>();
     private final Map<String, ServiceType> serviceTypeCache = new HashMap<>();
-    private final Map<String, HostType> hostTypeCache = new HashMap<>();
+    private final Map<String, ServerType> serverTypeCache = new HashMap<>();
     private final Map<String, EnvironmentType> environmentTypeCache = new HashMap<>();
     private final Map<String, OperatingSystem> osCache = new HashMap<>();
     private final Map<String, FrameworkVendor> vendorCache = new HashMap<>();
     private final Map<String, Framework> frameworkCache = new HashMap<>();
-    private final Map<String, Host> hostCache = new HashMap<>();
+    private final Map<String, Server> serverCache = new HashMap<>();
     private final Map<String, Service> serviceCache = new HashMap<>();
-    private final Map<String, LibraryCategory> libraryCategoryCache = new HashMap<>();
+    private final Map<String, LibraryType> libraryTypeCache = new HashMap<>();
 
     @Override
     @Transactional
@@ -122,7 +122,7 @@ public class DataInitializer implements CommandLineRunner {
 
             initializeLookupData();
             initializeFrameworks();
-            initializeHosts();
+            initializeServers();
             initializeServices();
             initializeLibraryData();
             initializeDeployments();
@@ -142,7 +142,7 @@ public class DataInitializer implements CommandLineRunner {
         loadJsonConfig("classpath:config/environment-types.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String name = (String) data.get("name");
-            EnvironmentType entity = environmentTypeCache.computeIfAbsent(name, k -> environmentTypeRepository.findByName(name)
+            EnvironmentType entity = environmentTypeCache.computeIfAbsent(name, k -> environmentTypeRepository.findByNameIgnoreCase(name)
                     .orElseGet(() -> {
                         EnvironmentType et = new EnvironmentType();
                         et.setName(name);
@@ -155,7 +155,7 @@ public class DataInitializer implements CommandLineRunner {
         loadJsonConfig("classpath:config/service-types.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String name = (String) data.get("name");
-            ServiceType entity = serviceTypeCache.computeIfAbsent(name, k -> serviceTypeRepository.findByName(name)
+            ServiceType entity = serviceTypeCache.computeIfAbsent(name, k -> serviceTypeRepository.findByNameIgnoreCase(name)
                     .orElseGet(() -> {
                         ServiceType st = new ServiceType();
                         st.setName(name);
@@ -165,15 +165,15 @@ public class DataInitializer implements CommandLineRunner {
         });
 
         // Server Types
-        loadJsonConfig("classpath:config/host-types.json", new TypeReference<List<Map<String, Object>>>() {
+        loadJsonConfig("classpath:config/server-types.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String name = (String) data.get("name");
-            HostType entity = hostTypeCache.computeIfAbsent(name, k -> hostTypeRepository.findByName(name)
+            ServerType entity = serverTypeCache.computeIfAbsent(name, k -> serverTypeRepository.findByNameIgnoreCase(name)
                     .orElseGet(() -> {
-                        HostType st = new HostType();
+                        ServerType st = new ServerType();
                         st.setName(name);
                         st.setDescription((String) data.get("description"));
-                        return hostTypeRepository.save(st);
+                        return serverTypeRepository.save(st);
                     }));
         });
 
@@ -181,7 +181,7 @@ public class DataInitializer implements CommandLineRunner {
         loadJsonConfig("classpath:config/operating-systems.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String name = (String) data.get("name");
-            OperatingSystem entity = osCache.computeIfAbsent(name, k -> operatingSystemRepository.findByName(name)
+            OperatingSystem entity = osCache.computeIfAbsent(name, k -> operatingSystemRepository.findByNameIgnoreCase(name)
                     .orElseGet(() -> {
                         OperatingSystem os = new OperatingSystem();
                         os.setName(name);
@@ -191,16 +191,16 @@ public class DataInitializer implements CommandLineRunner {
                     }));
         });
 
-        // Framework Categories
-        loadJsonConfig("classpath:config/framework-categories.json", new TypeReference<List<Map<String, Object>>>() {
+        // Framework Types
+        loadJsonConfig("classpath:config/framework-types.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String name = (String) data.get("name");
-            FrameworkCategory entity = categoryCache.computeIfAbsent(name, k -> categoryRepository.findByName(name)
+            FrameworkType entity = frameworkTypeCache.computeIfAbsent(name, k -> frameworkTypeRepository.findByNameIgnoreCase(name)
                     .orElseGet(() -> {
-                        FrameworkCategory fc = new FrameworkCategory();
-                        fc.setName(name);
-                        fc.setDescription((String) data.get("description"));
-                        return categoryRepository.save(fc);
+                        FrameworkType ft = new FrameworkType();
+                        ft.setName(name);
+                        ft.setDescription((String) data.get("description"));
+                        return frameworkTypeRepository.save(ft);
                     }));
         });
 
@@ -208,7 +208,7 @@ public class DataInitializer implements CommandLineRunner {
         loadJsonConfig("classpath:config/framework-languages.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String name = (String) data.get("name");
-            FrameworkLanguage entity = languageCache.computeIfAbsent(name, k -> languageRepository.findByName(name)
+            FrameworkLanguage entity = languageCache.computeIfAbsent(name, k -> languageRepository.findByNameIgnoreCase(name)
                     .orElseGet(() -> {
                         FrameworkLanguage fl = new FrameworkLanguage();
                         fl.setName(name);
@@ -221,7 +221,7 @@ public class DataInitializer implements CommandLineRunner {
         loadJsonConfig("classpath:config/framework-vendors.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String name = (String) data.get("name");
-            FrameworkVendor entity = vendorCache.computeIfAbsent(name, k -> frameworkVendorRepository.findByName(name)
+            FrameworkVendor entity = vendorCache.computeIfAbsent(name, k -> frameworkVendorRepository.findByNameIgnoreCase(name)
                     .orElseGet(() -> {
                         FrameworkVendor fv = new FrameworkVendor();
                         fv.setName(name);
@@ -241,7 +241,7 @@ public class DataInitializer implements CommandLineRunner {
                 Framework f = new Framework();
                 f.setName(name);
                 f.setDescription((String) data.get("description"));
-                f.setCategory(categoryCache.get(data.get("category")));
+                f.setCategory(frameworkTypeCache.get(data.get("category")));
                 f.setLanguage(languageCache.get(data.get("language")));
                 f.setCurrentVersion((String) data.get("current_version"));
                 f.setLtsVersion((String) data.get("lts_version"));
@@ -255,27 +255,27 @@ public class DataInitializer implements CommandLineRunner {
         });
     }
 
-    private void initializeHosts() throws IOException {
-        log.info("Initializing hosts...");
-        loadJsonConfig("classpath:config/hosts.json", new TypeReference<List<Map<String, Object>>>() {
+    private void initializeServers() throws IOException {
+        log.info("Initializing servers...");
+        loadJsonConfig("classpath:config/servers.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String hostname = (String) data.get("hostname");
-            Host host = hostCache.computeIfAbsent(hostname, k -> hostRepository.findByHostname(hostname).orElseGet(() -> {
-                Host h = new Host();
-                h.setHostname(hostname);
-                h.setIpAddress((String) data.get("ipAddress"));
-                h.setType(hostTypeCache.get(data.get("type")));
-                h.setEnvironmentType(environmentTypeCache.get(data.get("environment")));
-                h.setOperatingSystem(osCache.get(data.get("operatingSystem")));
-                h.setCpuCores((Integer) data.get("cpuCores"));
-                h.setMemory((String) data.get("memory"));
-                h.setDisk((String) data.get("disk"));
-                h.setStatus("ACTIVE");
-                if (h.getType() == null || h.getEnvironmentType() == null || h.getOperatingSystem() == null) {
-                    log.warn("Skipping host {} due to missing type/env/os", hostname);
+            Server server = serverCache.computeIfAbsent(hostname, k -> serverRepository.findByHostname(hostname).orElseGet(() -> {
+                Server s = new Server();
+                s.setHostname(hostname);
+                s.setIpAddress((String) data.get("ipAddress"));
+                s.setType(serverTypeCache.get(data.get("type")));
+                s.setEnvironmentType(environmentTypeCache.get(data.get("environment")));
+                s.setOperatingSystem(osCache.get(data.get("operatingSystem")));
+                s.setCpuCores((Integer) data.get("cpuCores"));
+                s.setMemory((String) data.get("memory"));
+                s.setDisk((String) data.get("disk"));
+                s.setStatus("ACTIVE");
+                if (s.getType() == null || s.getEnvironmentType() == null || s.getOperatingSystem() == null) {
+                    log.warn("Skipping server {} due to missing type/env/os", hostname);
                     return null;
                 }
-                return hostRepository.save(h);
+                return serverRepository.save(s);
             }));
         });
     }
@@ -306,16 +306,16 @@ public class DataInitializer implements CommandLineRunner {
 
     private void initializeLibraryData() throws IOException {
         log.info("Initializing library data...");
-        // Categories
-        loadJsonConfig("classpath:config/library-categories.json", new TypeReference<List<Map<String, Object>>>() {
+        // Types
+        loadJsonConfig("classpath:config/library-types.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             String name = (String) data.get("name");
-            LibraryCategory entity = libraryCategoryCache.computeIfAbsent(name, k -> libraryCategoryRepository.findByName(name)
+            LibraryType entity = libraryTypeCache.computeIfAbsent(name, k -> libraryTypeRepository.findByNameIgnoreCase(name)
                     .orElseGet(() -> {
-                        LibraryCategory lc = new LibraryCategory();
-                        lc.setName(name);
-                        lc.setDescription((String) data.get("description"));
-                        return libraryCategoryRepository.save(lc);
+                        LibraryType lt = new LibraryType();
+                        lt.setName(name);
+                        lt.setDescription((String) data.get("description"));
+                        return libraryTypeRepository.save(lt);
                     }));
         });
 
@@ -327,7 +327,7 @@ public class DataInitializer implements CommandLineRunner {
                 Library lib = new Library();
                 lib.setName(name);
                 lib.setDescription((String) data.get("description"));
-                lib.setCategory(libraryCategoryCache.get(data.get("category")));
+                lib.setCategory(libraryTypeCache.get(data.get("category")));
                 lib.setLanguage(languageCache.get(data.get("language")));
                 lib.setCurrentVersion((String) data.get("current_version"));
                 lib.setPackageName((String) data.get("package_name"));
@@ -345,13 +345,13 @@ public class DataInitializer implements CommandLineRunner {
         loadJsonConfig("classpath:config/deployments.json", new TypeReference<List<Map<String, Object>>>() {
         }).forEach(data -> {
             Service service = serviceCache.get(data.get("service"));
-            Host host = hostCache.get(data.get("hostname"));
-            if (service != null && host != null) {
-                if (deploymentRepository.findByServiceAndEnvironment(service, host.getEnvironmentType()).isEmpty()) {
+            Server server = serverCache.get(data.get("hostname"));
+            if (service != null && server != null) {
+                if (deploymentRepository.findByServiceAndEnvironment(service, server.getEnvironmentType()).isEmpty()) {
                     Deployment d = new Deployment();
                     d.setService(service);
-                    d.setHost(host);
-                    d.setEnvironment(host.getEnvironmentType());
+                    d.setServer(server);
+                    d.setEnvironment(server.getEnvironmentType());
                     d.setVersion((String) data.get("version"));
                     d.setStatus((String) data.get("status"));
                     d.setPort((Integer) data.get("port"));
@@ -377,7 +377,7 @@ public class DataInitializer implements CommandLineRunner {
         log.info("Current Data Counts:");
         log.info("Frameworks: {}", frameworkRepository.count());
         log.info("Services: {}", serviceRepository.count());
-        log.info("Hosts: {}", hostRepository.count());
+        log.info("Servers: {}", serverRepository.count());
         log.info("Deployments: {}", deploymentRepository.count());
     }
 }

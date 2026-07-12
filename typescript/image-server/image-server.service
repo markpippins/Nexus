@@ -1,0 +1,33 @@
+[Unit]
+Description=Image Server — Nexus image hosting API
+Documentation=https://github.com/nexus/typescript/image-server
+After=network.target
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/image-server
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=IMAGE_ROOT_DIR=/home/codex/Pictures
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/npx tsx image-serv.ts
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/typescript/image-server /home/codex/Pictures
+
+[Install]
+WantedBy=default.target

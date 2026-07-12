@@ -30,13 +30,15 @@ import urllib.error
 from pathlib import Path
 from collections import defaultdict
 
+from tackle.inference import call_llm
+
 log = logging.getLogger("batch_mark_completed")
 
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 NEBULA_API = "http://localhost:3101/api"
 WORK_REQUESTS_DIR = Path("/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS")
-GEMINI_API_KEY = "AIzaSyD0sfwbXYGGyaa8gCkVziqYzoVbmxbuJqQ"
-GEMINI_MODEL = "gemini-2.5-flash"
+# Model config resolved via tackle-mcp (role: Rover)
+# See tackle/inference.py and config bundles at POST /config/ai/bundles/:role
 
 logging.basicConfig(
     level=logging.INFO,
@@ -212,14 +214,12 @@ Rules:
 
 # ── Gemini call ────────────────────────────────────────────────────────
 
-def call_gemini(plans: list[dict], candidates: list[dict],
-                dco_summary: dict[str, dict]) -> dict | None:
-    """Send a batch to Gemini and parse the matched candidates response."""
-    import google.generativeai as genai
-
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(GEMINI_MODEL)
-
+def call_llm_validation(plans: list[dict], candidates: list[dict],
+                         dco_summary: dict[str, dict]) -> dict | None:
+    """Send a batch to the LLM and parse the matched candidates response.
+    
+    Model config is resolved via tackle-mcp (role: Rover), not hardcoded.
+    """
     # Build plans section — compact
     plan_lines = []
     for p in plans:
@@ -264,14 +264,18 @@ def call_gemini(plans: list[dict], candidates: list[dict],
 For each candidate above, determine if it has been implemented by any of the completed plans. Use both the plan descriptions and the DCO execution evidence (work descriptions + produced file paths) to make your determination. Return a JSON object with "matched" and "unmatched" arrays as specified."""
 
     try:
-        response = model.generate_content(
-            [{"role": "user", "parts": [{"text": VALIDATION_PROMPT + "\n\n" + user_msg}]}],
-            generation_config={
-                "temperature": 0.1,
-                "max_output_tokens": 8192,
-            },
+        text = call_llm(
+            prompt=user_msg,
+            role="Rover",
+            system_prompt=VALIDATION_PROMPT,
+            temperature=0.1,
+            max_tokens=8192,
         )
-        text = response.text.strip()
+        if text is None:
+            log.error("  call_llm returned None — API error")
+            return None
+
+        text = text.strip()
         # Strip markdown fences if present
         if text.startswith("```"):
             lines = text.splitlines()
@@ -287,7 +291,7 @@ For each candidate above, determine if it has been implemented by any of the com
         log.error("  Raw response (first 500): %s", text[:500])
         return None
     except Exception as e:
-        log.error("  Gemini API error: %s", e)
+        log.error("  LLM API error: %s", e)
         return None
 
 
@@ -336,7 +340,7 @@ def main() -> int:
         batch_label = f"batch {batch_start // batch_size + 1}/{(len(candidates) + batch_size - 1) // batch_size}"
         log.info("Processing %s (%d candidates)...", batch_label, len(batch))
 
-        result = call_gemini(plans, batch, dco_summary)
+        result = call_llm_validation(plans, batch, dco_summary)
         if result is None:
             log.error("  Skipping %s due to API error", batch_label)
             continue

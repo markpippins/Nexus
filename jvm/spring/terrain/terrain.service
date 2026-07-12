@@ -1,0 +1,35 @@
+[Unit]
+Description=Terrain Server — infrastructure topology registry (Spring Boot, port 8084)
+Documentation=https://github.com/nexus/jvm/spring/terrain
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/jvm/spring/terrain
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=SERVER_PORT=8084
+Environment=JAVA_HOME=/usr
+Environment=MAVEN_OPTS=-Xmx512m
+Environment=PATH=/usr/bin:/bin:/usr/local/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/usr/bin/mvn spring-boot:run
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=10
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/jvm/spring/terrain /home/codex/.m2
+
+[Install]
+WantedBy=default.target

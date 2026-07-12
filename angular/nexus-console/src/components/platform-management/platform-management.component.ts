@@ -1,17 +1,17 @@
 import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PlatformManagementService, Host } from '../../services/platform-management.service.js';
+import { PlatformManagementService, Server } from '../../services/platform-management.service.js';
+import { UpsertServerDialogComponent } from './upsert-server-dialog/upsert-server-dialog.component.js';
 import { ServiceMeshService } from '../../services/service-mesh.service.js';
 import { ComponentRegistryService } from '../../services/component-registry.service.js';
 import { ServiceInstance, Framework, Deployment, Library } from '../../models/service-mesh.model.js';
 import { UpsertServiceDialogComponent } from './upsert-service-dialog/upsert-service-dialog.component.js';
 import { UpsertFrameworkDialogComponent } from './upsert-framework-dialog/upsert-framework-dialog.component.js';
 import { UpsertDeploymentDialogComponent } from './upsert-deployment-dialog/upsert-deployment-dialog.component.js';
-import { UpsertHostDialogComponent } from './upsert-host-dialog/upsert-host-dialog.component.js';
 import { LookupListComponent } from './lookup-list/lookup-list.component.js';
 import { UpsertLookupDialogComponent } from './upsert-lookup-dialog/upsert-lookup-dialog.component.js';
 import { UpsertLibraryDialogComponent } from './upsert-library-dialog/upsert-library-dialog.component.js';
-import { ServiceLibrariesDialogComponent } from './service-libraries-dialog/service-libraries-dialog.component.js';
+import { CategoriesViewComponent } from './categories-view/categories-view.component.js';
 import { LookupItem } from '../../services/platform-management.service.js';
 
 @Component({
@@ -21,11 +21,11 @@ import { LookupItem } from '../../services/platform-management.service.js';
         UpsertServiceDialogComponent,
         UpsertFrameworkDialogComponent,
         UpsertDeploymentDialogComponent,
-        UpsertHostDialogComponent,
+        UpsertServerDialogComponent,
         LookupListComponent,
         UpsertLookupDialogComponent,
         UpsertLibraryDialogComponent,
-        ServiceLibrariesDialogComponent
+        CategoriesViewComponent
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -116,7 +116,6 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     </span>
                                                 </td>
                                                 <td class="p-2 py-1.5 text-right">
-                                                    <button (click)="onManageServiceLibraries(service)" class="text-purple-500 hover:underline mr-3 text-xs">Libraries</button>
                                                     <button (click)="onEdit(service)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
                                                     <button (click)="onDelete(service)" class="text-red-500 hover:underline text-xs">Delete</button>
                                                 </td>
@@ -200,14 +199,6 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                 </tbody>
                             </table>
                         </div>
-                    }
-                    @case ('library-categories') {
-                         <app-lookup-list
-                            [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
                     }
                     @case ('frameworks') {
                          <div class="overflow-x-auto">
@@ -333,7 +324,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </td>
                                             <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.environment }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.host?.hostname }}</td>
+                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.server?.hostname }}</td>
                                             <td class="p-2 py-1.5">
                                                  <span [class]="'px-2 py-0.5 rounded-full text-xs font-medium ' + getStatusClass(d.status)">
                                                     {{ d.status }}
@@ -377,10 +368,10 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th (click)="onSort('hostTypeId')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('serverTypeId')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Type
-                                                    @if (sortState().column === 'hostTypeId') {
+                                                    @if (sortState().column === 'serverTypeId') {
                                                         <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
                                                     }
                                                 </div>
@@ -389,7 +380,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @for (h of hosts(); track h.id) {
+                                        @for (h of servers(); track h.id) {
                                             <tr 
                                                 tabindex="0"
                                                 (dblclick)="onEdit(h)"
@@ -398,7 +389,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             >
                                                 <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))] font-medium">{{ h.hostname }}</td>
                                                 <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.ipAddress || '-' }}</td>
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.hostTypeId || '-' }}</td>
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.serverTypeId || '-' }}</td>
                                                 <td class="p-2 py-1.5 text-right whitespace-nowrap">
                                                     <button (click)="onEdit(h)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
                                                     <button (click)="onDelete(h)" class="text-red-500 hover:underline text-xs">Delete</button>
@@ -416,39 +407,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             </div>
                         </div>
                     }
-                    @case ('host-types') {
-                         <app-lookup-list
+                    @case ('categories') {
+                        <app-categories-view
                             [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
-                    }
-                    @case ('service-types') {
-                        <app-lookup-list
-                            [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
+                            (onEdit)="onCategoriesEdit($event)"
+                            (onDelete)="onCategoriesDelete($event)"
+                        ></app-categories-view>
                     }
                     @case ('framework-languages') {
-                         <app-lookup-list
-                            [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
-                    }
-                    @case ('framework-vendors') {
-                         <app-lookup-list
-                            [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
-                    }
-                    @case ('framework-categories') {
                          <app-lookup-list
                             [items]="lookupData()"
                             [type]="managementType()"
@@ -506,18 +472,18 @@ import { LookupItem } from '../../services/platform-management.service.js';
             (saved)="onDeploymentSaved()"
         ></app-upsert-deployment-dialog>
 
-        <app-upsert-host-dialog
-            [isOpen]="isHostDialogOpen()"
+        <app-upsert-server-dialog
+            [isOpen]="isServerDialogOpen()"
             [baseUrl]="baseUrl()"
-            [host]="selectedHostForEdit()"
-            (close)="onHostDialogClose()"
-            (saved)="onHostSaved()"
-        ></app-upsert-host-dialog>
+            [server]="selectedServerForEdit()"
+            (close)="onServerDialogClose()"
+            (saved)="onServerSaved()"
+        ></app-upsert-server-dialog>
 
         <app-upsert-lookup-dialog
             [isOpen]="isLookupDialogOpen()"
             [baseUrl]="baseUrl()"
-            [type]="managementType()"
+            [type]="editLookupType()"
             [item]="selectedLookupForEdit()"
             (close)="onLookupDialogClose()"
             (saved)="onLookupSaved()"
@@ -531,15 +497,6 @@ import { LookupItem } from '../../services/platform-management.service.js';
                 (cancelled)="onLibraryDialogClose()"
             ></app-upsert-library-dialog>
         }
-
-        @if (isServiceLibrariesDialogOpen() && selectedServiceForLibraries()) {
-            <app-service-libraries-dialog
-                [baseUrl]="baseUrl()"
-                [service]="selectedServiceForLibraries()!"
-                (closed)="onServiceLibrariesDialogClose()"
-            ></app-service-libraries-dialog>
-        }
-
 
     </div>
   `
@@ -563,7 +520,7 @@ export class PlatformManagementComponent {
     private rawServices = signal<ServiceInstance[]>([]);
     private rawFrameworks = signal<Framework[]>([]);
     private rawDeployments = signal<Deployment[]>([]);
-    private rawHosts = signal<Host[]>([]);
+    private rawServers = signal<Server[]>([]);
     private rawLibraries = signal<Library[]>([]);
 
     loading = signal(false);
@@ -635,7 +592,7 @@ export class PlatformManagementComponent {
             switch (col) {
                 case 'service': return item.service?.name;
                 case 'environment': return item.environment;
-                case 'server': return item.host?.hostname;
+                case 'server': return item.server?.hostname;
                 case 'status': return item.status;
                 case 'version': return item.version;
                 default: return (item as any)[col];
@@ -643,12 +600,12 @@ export class PlatformManagementComponent {
         });
     });
 
-    hosts = computed(() => {
-        return this.sortData(this.rawHosts(), this.sortState(), (item, col) => {
+    servers = computed(() => {
+        return this.sortData(this.rawServers(), this.sortState(), (item, col) => {
             switch (col) {
                 case 'hostname': return item.hostname;
                 case 'ipAddress': return item.ipAddress;
-                case 'type': return item.hostTypeId;
+                case 'type': return item.serverTypeId;
                 case 'os': return item.operatingSystemId;
                 case 'status': return item.status;
                 default: return (item as any)[col];
@@ -679,21 +636,30 @@ export class PlatformManagementComponent {
     isDeploymentDialogOpen = signal(false);
     selectedDeploymentForEdit = signal<Deployment | null>(null);
 
-    isHostDialogOpen = signal(false);
-    selectedHostForEdit = signal<Host | null>(null);
+    isServerDialogOpen = signal(false);
+    selectedServerForEdit = signal<Server | null>(null);
 
     // Lookup State
     lookupData = signal<LookupItem[]>([]);
     isLookupDialogOpen = signal(false);
     selectedLookupForEdit = signal<LookupItem | null>(null);
 
+    /** Override type for the upsert-lookup-dialog when editing from the unified categories view. */
+    private _categoriesEditType = signal<string | null>(null);
+
+    /**
+     * The effective lookup type to pass to the upsert-lookup-dialog.
+     * Normally {@link managementType}, but overridden to the specific
+     * endpoint type (e.g. 'framework-categories') when editing from
+     * the unified categories view.
+     */
+    editLookupType = computed(() => this._categoriesEditType() ?? this.managementType());
+
     // Library Dialog State
     isLibraryDialogOpen = signal(false);
     selectedLibraryForEdit = signal<Library | null>(null);
 
-    // Service Libraries Dialog State
-    isServiceLibrariesDialogOpen = signal(false);
-    selectedServiceForLibraries = signal<ServiceInstance | null>(null);
+    // Service Libraries Dialog State (removed - service_libraries table dropped)
 
     // Tab State for Generic Service View
     activeTab = signal<string>('services');
@@ -761,19 +727,15 @@ export class PlatformManagementComponent {
                     displayType = 'Deployments';
                     break;
                 case 'servers':
-                    count = this.hosts().length;
+                    count = this.servers().length;
                     displayType = 'Servers';
                     break;
                 case 'libraries':
                     count = this.libraries().length;
                     displayType = 'Libraries';
                     break;
-                case 'service-types':
-                case 'host-types':
+                case 'categories':
                 case 'framework-languages':
-                case 'framework-vendors':
-                case 'framework-categories':
-                case 'library-categories':
                 case 'operating-systems':
                 case 'environments':
                     count = this.lookupData().length;
@@ -844,15 +806,11 @@ export class PlatformManagementComponent {
                     this.rawDeployments.set(d);
                     break;
                 case 'servers':
-                    const h = await this.platformService.getHosts(url);
-                    this.rawHosts.set(h);
+                    const h = await this.platformService.getServers(url);
+                    this.rawServers.set(h);
                     break;
-                case 'service-types':
-                case 'host-types':
+                case 'categories':
                 case 'framework-languages':
-                case 'framework-vendors':
-                case 'framework-categories':
-                case 'library-categories':
                 case 'operating-systems':
                 case 'environments':
                     const l = await this.platformService.getLookup(url, actualType);
@@ -890,15 +848,10 @@ export class PlatformManagementComponent {
                 this.isDeploymentDialogOpen.set(true);
                 break;
             case 'servers':
-                this.selectedHostForEdit.set(null);
-                this.isHostDialogOpen.set(true);
+                this.selectedServerForEdit.set(null);
+                this.isServerDialogOpen.set(true);
                 break;
-            case 'service-types':
-            case 'host-types':
             case 'framework-languages':
-            case 'framework-vendors':
-            case 'framework-categories':
-            case 'library-categories':
             case 'operating-systems':
             case 'environments':
                 this.selectedLookupForEdit.set(null);
@@ -930,14 +883,10 @@ export class PlatformManagementComponent {
                 this.isDeploymentDialogOpen.set(true);
                 break;
             case 'servers':
-                this.selectedHostForEdit.set(item);
-                this.isHostDialogOpen.set(true);
+                this.selectedServerForEdit.set(item);
+                this.isServerDialogOpen.set(true);
                 break;
-            case 'service-types':
-            case 'host-types':
             case 'framework-languages':
-            case 'framework-categories':
-            case 'library-categories':
             case 'operating-systems':
             case 'environments':
                 this.selectedLookupForEdit.set(item);
@@ -970,13 +919,9 @@ export class PlatformManagementComponent {
                     await this.platformService.deleteDeployment(url, Number(item.id));
                     break;
                 case 'servers':
-                    await this.platformService.deleteHost(url, Number(item.id));
+                    await this.platformService.deleteServer(url, Number(item.id));
                     break;
-                case 'service-types':
-                case 'host-types':
                 case 'framework-languages':
-                case 'framework-categories':
-                case 'library-categories':
                 case 'operating-systems':
                 case 'environments':
                     await this.platformService.deleteLookup(url, actualType, Number(item.id));
@@ -1030,12 +975,12 @@ export class PlatformManagementComponent {
     }
 
     // Server Dialog Handlers
-    onHostDialogClose() {
-        this.isHostDialogOpen.set(false);
-        this.selectedHostForEdit.set(null);
+    onServerDialogClose() {
+        this.isServerDialogOpen.set(false);
+        this.selectedServerForEdit.set(null);
     }
 
-    onHostSaved() {
+    onServerSaved() {
         this.loadData();
         this.serviceMeshService.fetchAllData();
     }
@@ -1062,8 +1007,40 @@ export class PlatformManagementComponent {
         }
     }
 
+    // --- Categories View Handlers -----------------------------
+
+    /**
+     * Handle edit event from the unified categories view.
+     * Overrides the dialog type to the specific endpoint type
+     * (e.g. 'framework-categories', 'server-types') so that the
+     * upsert dialog sends updates to the correct backend endpoint.
+     */
+    onCategoriesEdit(event: { item: LookupItem; type: string }) {
+        this._categoriesEditType.set(event.type);
+        this.selectedLookupForEdit.set(event.item);
+        this.isLookupDialogOpen.set(true);
+    }
+
+    /** Handle delete event from the unified categories view. */
+    async onCategoriesDelete(event: { item: LookupItem; type: string }) {
+        if (!confirm('Are you sure you want to delete this item?')) return;
+        const url = this.baseUrl();
+        if (!url) return;
+        try {
+            await this.platformService.deleteLookup(url, event.type, Number(event.item.id));
+            this.loadData();
+            this.serviceMeshService.fetchAllData();
+        } catch (e) {
+            console.error('Delete failed', e);
+            alert('Failed to delete item');
+        }
+    }
+
+    // -----------------------------------------------------------
+
     // Lookup Dialog Handlers
     onLookupDialogClose() {
+        this._categoriesEditType.set(null);
         this.isLookupDialogOpen.set(false);
         this.selectedLookupForEdit.set(null);
     }
@@ -1089,14 +1066,5 @@ export class PlatformManagementComponent {
         this.loadData();
     }
 
-    // Service Libraries Dialog Handlers
-    onManageServiceLibraries(service: ServiceInstance) {
-        this.selectedServiceForLibraries.set(service);
-        this.isServiceLibrariesDialogOpen.set(true);
-    }
-
-    onServiceLibrariesDialogClose() {
-        this.isServiceLibrariesDialogOpen.set(false);
-        this.selectedServiceForLibraries.set(null);
-    }
 }
+

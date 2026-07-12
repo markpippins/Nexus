@@ -21,13 +21,15 @@ import sys
 import time
 from pathlib import Path
 
+from tackle.inference import call_llm
+
 log = logging.getLogger("batch_file_candidates")
 
 PROJECT_ROOT = Path("/home/codex/dev")
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 NEBULA_API = "http://localhost:3101/api"
-GEMINI_API_KEY = "AIzaSyD0sfwbXYGGyaa8gCkVziqYzoVbmxbuJqQ"
-GEMINI_MODEL = "gemini-2.5-flash"
+# Model config resolved via tackle-mcp (role: Rover)
+# See tackle/inference.py and config bundles at POST /config/ai/bundles/:role
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,39 +70,8 @@ def nebula_post(path: str, body: dict) -> dict:
         return {"error": True, "status": e.code, "body": body_text[:500]}
 
 
-def call_gemini(prompt: str) -> str | None:
-    import urllib.request, urllib.error
-    import time
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 8192}
-    }
-    data = json.dumps(payload).encode("utf-8")
-    
-    max_retries = 3
-    for attempt in range(1, max_retries + 1):
-        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=120) as r:
-                resp = json.loads(r.read().decode())
-            candidates = resp.get("candidates", [])
-            if not candidates:
-                return None
-            return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-        except urllib.error.HTTPError as e:
-            body = e.read().decode() if e.fp else "(no body)"
-            if e.code == 503 and attempt < max_retries:
-                wait = attempt * 15
-                log.warning("  503 error (attempt %d/%d), waiting %ds...", attempt, max_retries, wait)
-                time.sleep(wait)
-                continue
-            log.error("  Gemini API error %s: %s", e.code, body[:300])
-            return None
-        except Exception as e:
-            log.error("  Gemini call failed: %s", e)
-            return None
-    return None
+# Gemini call replaced by tackle.inference.call_llm — resolves model config
+# via tackle-mcp config bundles / config/ai/resolve/:role (port 3400).
 
 
 def fetch_hierarchy() -> list[dict]:
@@ -399,7 +370,7 @@ def main():
     
     log.info("=" * 60)
     log.info("Batch File Candidates — Stage 2 Inference")
-    log.info("Model: %s | Batch: %d", GEMINI_MODEL, args.batch)
+    log.info("Model: resolved by tackle-mcp for role Rover | Batch: %d", args.batch)
     
     systems = fetch_hierarchy()
     if not systems:
@@ -455,7 +426,7 @@ def main():
         log.info("  Prompt: %d chars", len(prompt))
         
         start = time.time()
-        response = call_gemini(prompt)
+        response = call_llm(prompt, role="Rover", temperature=0.1, max_tokens=8192)
         elapsed = time.time() - start
         
         if not response:
@@ -491,7 +462,7 @@ def main():
                     results[h["id"]] = (0, elapsed)
                 continue
         
-        log.info("  Gemini: %d candidates in %.1fs", len(candidates), elapsed)
+        log.info("  LLM: %d candidates in %.1fs", len(candidates), elapsed)
         
         # Distribute candidates to harvests
         harvest_cands = {h["id"]: [] for h in batch}

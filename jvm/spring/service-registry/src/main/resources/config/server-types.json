@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Physical",
+    "description": "Physical Server"
+  },
+  {
+    "name": "Virtual",
+    "description": "Virtual Machine"
+  },
+  {
+    "name": "Container",
+    "description": "Docker Container"
+  },
+  {
+    "name": "Cloud",
+    "description": "Cloud Instance"
+  },
+  {
+    "name": "None",
+    "description": "None / Unspecified"
+  }
+]

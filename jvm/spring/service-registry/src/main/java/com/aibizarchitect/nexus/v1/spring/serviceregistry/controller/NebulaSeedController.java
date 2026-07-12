@@ -14,12 +14,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.EnvironmentType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Host;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Server;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.EnvironmentTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceTypeRepository;
 
@@ -32,19 +32,19 @@ public class NebulaSeedController {
     private final ServiceRepository serviceRepository;
     private final FrameworkRepository frameworkRepository;
     private final ServiceTypeRepository serviceTypeRepository;
-    private final HostRepository hostRepository;
+    private final ServerRepository serverRepository;
     private final EnvironmentTypeRepository environmentTypeRepository;
 
     public NebulaSeedController(
             ServiceRepository serviceRepository,
             FrameworkRepository frameworkRepository,
             ServiceTypeRepository serviceTypeRepository,
-            HostRepository hostRepository,
+            ServerRepository serverRepository,
             EnvironmentTypeRepository environmentTypeRepository) {
         this.serviceRepository = serviceRepository;
         this.frameworkRepository = frameworkRepository;
         this.serviceTypeRepository = serviceTypeRepository;
-        this.hostRepository = hostRepository;
+        this.serverRepository = serverRepository;
         this.environmentTypeRepository = environmentTypeRepository;
     }
 
@@ -55,34 +55,32 @@ public class NebulaSeedController {
         Map<String, Object> result = new HashMap<>();
         Map<String, Object> created = new HashMap<>();
         Map<String, Object> skipped = new HashMap<>();
-        int createdCount = 0;
-        int skippedCount = 0;
 
         Framework framework = frameworkRepository.findByName("Spring Boot").orElse(null);
-        ServiceType webAppType = serviceTypeRepository.findByName("WEB_APP").orElse(null);
-        ServiceType restApiType = serviceTypeRepository.findByName("REST_API").orElse(null);
-        ServiceType gatewayType = serviceTypeRepository.findByName("GATEWAY").orElse(null);
-        Host host = hostRepository.findByHostname("osmium").orElse(null);
-        EnvironmentType devEnv = environmentTypeRepository.findByName("DEVELOPMENT").orElse(null);
+        ServiceType webAppType = serviceTypeRepository.findByName("Web App").orElse(null);
+        ServiceType restApiType = serviceTypeRepository.findByName("REST API").orElse(null);
+        ServiceType gatewayType = serviceTypeRepository.findByName("Gateway").orElse(null);
+        Server server = serverRepository.findByHostname("osmium").orElse(null);
+        EnvironmentType devEnv = environmentTypeRepository.findByName("Development").orElse(null);
 
         if (framework == null) {
             log.warn("Framework 'Spring Boot' not found — cannot seed");
             result.put("error", "Required lookup data not found. Ensure DataInitializer has run.");
             return ResponseEntity.status(500).body(result);
         }
-        if (host == null) {
-            log.warn("Host 'osmium' not found — cannot seed");
-            result.put("error", "Seed host 'osmium' not found. Ensure DataInitializer has run.");
+        if (server == null) {
+            log.warn("Server 'osmium' not found — cannot seed");
+            result.put("error", "Seed server 'osmium' not found. Ensure DataInitializer has run.");
             return ResponseEntity.status(500).body(result);
         }
         if (devEnv == null) {
-            log.warn("Environment 'DEVELOPMENT' not found");
+            log.warn("Environment 'Development' not found");
             result.put("error", "Required lookup data not found.");
             return ResponseEntity.status(500).body(result);
         }
 
         if (webAppType == null || restApiType == null || gatewayType == null) {
-            log.warn("Required service types not found (WEB_APP, REST_API, GATEWAY)");
+            log.warn("Required service types not found (Web App, REST API, Gateway)");
             result.put("error", "Required service types not found.");
             return ResponseEntity.status(500).body(result);
         }
@@ -109,19 +107,16 @@ public class NebulaSeedController {
             }
         }
 
-        createdCount = created.size();
-        skippedCount = skipped.size();
-
-        result.put("seeded", createdCount > 0);
+        result.put("seeded", created.size() > 0);
         result.put("created", created);
         result.put("skipped", skipped);
-        result.put("createdCount", createdCount);
-        result.put("skippedCount", skippedCount);
-        result.put("message", createdCount > 0
-                ? "Seeded " + createdCount + " nebula default example service(s)"
+        result.put("createdCount", created.size());
+        result.put("skippedCount", skipped.size());
+        result.put("message", created.size() > 0
+                ? "Seeded " + created.size() + " nebula default example service(s)"
                 : "All nebula default example services already exist");
 
-        log.info("Seed complete: created={}, skipped={}", createdCount, skippedCount);
+        log.info("Seed complete: created={}, skipped={}", created.size(), skipped.size());
         return ResponseEntity.ok(result);
     }
 

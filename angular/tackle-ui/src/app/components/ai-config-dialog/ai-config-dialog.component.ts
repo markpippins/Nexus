@@ -4,8 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { AIConfigService, AIProvider, AIHarness, AIModel, AIRoleConfig, LogLevel, FailureRecoveryConfig } from '../../services/ai-config.service';
 import { ToastService } from '../../services/toast.service';
 import { API_BASE_URL } from '../../services/api-config';
+import { RolesService, Role } from '../../roles/roles.service';
 
-type TabId = 'providers' | 'harnesses' | 'models' | 'roles' | 'logging' | 'test' | 'failure-recovery';
+type TabId = 'providers' | 'harnesses' | 'models' | 'roles' | 'role-assignment' | 'logging' | 'test' | 'failure-recovery';
 
 const PROVIDER_TYPES = [
   { value: 'openai', label: 'OpenAI' },
@@ -362,8 +363,65 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
             }
             </div>
 
-            <!-- ─── Roles Tab ─── -->
+            <!-- ─── Roles Registry Tab (CRUD on tackle.roles) ─── -->
             <div *ngSwitchCase="'roles'" class="tab-panel tab-roles">
+              <div class="roles-toolbar">
+                <span class="roles-hint">{{ rolesRegistry().length }} role(s)</span>
+                <div class="roles-toolbar-btns">
+                  <button class="btn-save-sm" (click)="startNewRole()">+ Add</button>
+                </div>
+              </div>
+              <div class="roles-table-wrap">
+                <table class="roles-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Description</th>
+                      <th>Created</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (r of rolesRegistry(); track r.id) {
+                      <tr>
+                        <td class="role-name-cell">{{ r.name }}</td>
+                        <td class="role-desc-cell">{{ r.description || '—' }}</td>
+                        <td class="role-date-cell">{{ r.created_at }}</td>
+                        <td class="role-actions-cell">
+                          <button class="btn-model-move" (click)="editRole(r)" title="Edit">✏</button>
+                          <button class="btn-model-remove" (click)="deleteRole(r)" title="Delete">🗑</button>
+                        </td>
+                      </tr>
+                    }
+                    @empty {
+                      <tr>
+                        <td colspan="4" class="empty-table-cell">No roles registered yet.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <!-- Add/Edit role mini-modal -->
+              @if (editRoleForm()) {
+                <div class="mini-overlay" (click)="cancelEditRole()">
+                <div class="mini-dialog" (click)="$event.stopPropagation()">
+                  <h4>{{ editRoleForm()!.id ? 'Edit' : 'New' }} Role</h4>
+                  <label>Name</label>
+                  <input [(ngModel)]="editRoleForm()!.name" placeholder="e.g. engineer" [disabled]="!!editRoleForm()!.id" />
+                  <label>Description</label>
+                  <input [(ngModel)]="editRoleForm()!.description" placeholder="Role purpose and responsibilities" />
+                  <div class="form-actions">
+                    @if (editRoleForm()!.id) {<button class="btn-delete" (click)="deleteRole(editRoleForm()!.id ?? '')">🗑 Delete</button>}
+                    <button class="btn-cancel" (click)="cancelEditRole()">Cancel</button>
+                    <button class="btn-save" (click)="saveRole()" [disabled]="!editRoleForm()?.name">💾 Save</button>
+                  </div>
+                </div>
+              </div>
+              }
+            </div>
+
+            <!-- ─── Role Assignment Tab ─── -->
+            <div *ngSwitchCase="'role-assignment'" class="tab-panel tab-roles">
               <!-- Empty-state / seed button -->
               @if (config().providers.length === 0) {
                 <div class="roles-empty">
@@ -833,6 +891,12 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
     `.cmd-copy-btn:hover{background:var(--bg-tertiary);color:var(--text-primary);border-color:var(--accent-blue-text)}`,
     `.cmd-preview-textarea{width:100%;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border-default);border-radius:6px;padding:8px 10px;font-size:12px;font-family:'Fira Code','Consolas',monospace;outline:none;resize:vertical;min-height:56px;line-height:1.5;white-space:pre-wrap;word-break:break-all;cursor:text}`,
 
+    // ── Roles Registry tab ────────────────────────────────────
+    `.role-name-cell{font-weight:600;color:var(--accent-blue-text);text-transform:capitalize}`,
+    `.role-desc-cell{color:var(--text-primary)}`,
+    `.role-date-cell{font-size:11px;color:var(--text-muted);white-space:nowrap}`,
+    `.role-actions-cell{display:flex;gap:4px}`,
+
     // ── Responsive ─────────────────────────────────────────────
     `@media(max-width:700px){.dialog{max-width:100%;max-height:95vh;border-radius:0}.tab-panel{flex-direction:column}.panel-form{max-height:50vh}}`,
   ],
@@ -862,7 +926,7 @@ export class AIConfigDialogComponent implements OnDestroy {
     // Ctrl+S / Cmd+S — save roles
     if (ctrl && key.toLowerCase() === 's') {
       e.preventDefault();
-      if (this.activeTab() === 'roles') this.saveAllRoles();
+      if (this.activeTab() === 'role-assignment') this.saveAllRoles();
       return;
     }
 
@@ -901,7 +965,8 @@ export class AIConfigDialogComponent implements OnDestroy {
     { id: 'providers', label: 'Providers' },
     { id: 'harnesses', label: 'Harnesses' },
     { id: 'models', label: 'Models' },
-    { id: 'roles', label: 'Role Assignment' },
+    { id: 'roles', label: 'Roles' },
+    { id: 'role-assignment', label: 'Role Assignment' },
     { id: 'logging', label: 'Logging' },
     { id: 'test', label: 'Test' },
     { id: 'failure-recovery', label: 'Recovery' },
@@ -1030,6 +1095,11 @@ export class AIConfigDialogComponent implements OnDestroy {
   /** MCP server base URL — injected or default to localhost:3100 */
   private apiUrl = inject(API_BASE_URL, { optional: true }) || 'http://localhost:3100';
 
+  /** Roles registry state (tackle.roles table). */
+  readonly rolesRegistry = signal<Role[]>([]);
+  readonly editRoleForm = signal<{ id?: string; name: string; description: string } | null>(null);
+  private rolesService = inject(RolesService);
+
   constructor(public aiConfig: AIConfigService) {
     this.config = this.aiConfig.config;
     this.saving = this.aiConfig.saving;
@@ -1044,10 +1114,88 @@ export class AIConfigDialogComponent implements OnDestroy {
       next: () => this._syncRoleEdits(),
       error: () => {}, // silently ignore — roleEdits stay at empty state
     });
+    this.loadRolesRegistry();
     this.visible.set(true);
     this.activeTab.set('providers');
     this._resetAllForms();
     this._clearAllFilters();
+  }
+
+  // ── Roles Registry (tackle.roles table) ────────────────────
+
+  /** Load the full list of roles from tackle.roles. */
+  loadRolesRegistry(): void {
+    this.rolesService.list().subscribe({
+      next: (res) => this.rolesRegistry.set(res.roles),
+      error: () => this.rolesRegistry.set([]),
+    });
+  }
+
+  /** Open the "add new role" form. */
+  startNewRole(): void {
+    this.editRoleForm.set({ name: '', description: '' });
+  }
+
+  /** Open the "edit role" form with pre-populated data. */
+  editRole(r: Role): void {
+    this.editRoleForm.set({ id: r.id, name: r.name, description: r.description });
+  }
+
+  /** Cancel and close the role edit form. */
+  cancelEditRole(): void {
+    this.editRoleForm.set(null);
+  }
+
+  /** Save the role (create or update). */
+  saveRole(): void {
+    const f = this.editRoleForm();
+    if (!f || !f.name.trim()) return;
+    this.rolesService.upsert({
+      id: f.id,
+      name: f.name.trim(),
+      description: f.description.trim() || undefined,
+    }).subscribe({
+      next: () => {
+        this.cancelEditRole();
+        this.loadRolesRegistry();
+      },
+      error: (err) => {
+        this.toast.push({
+          id: `toast-role-err-${Date.now()}`,
+          type: 'role_saved',
+          title: 'Save Failed',
+          message: `Could not save role: ${err.message || 'Unknown error'}`,
+          icon: '❌',
+          timestamp: new Date().toISOString(),
+          priority: 'high',
+        });
+      },
+    });
+  }
+
+  /** Delete a role from the registry. */
+  deleteRole(r: Role | string | undefined): void {
+    const id = typeof r === 'string' ? r : r?.id;
+    const name = typeof r === 'string' ? r : r?.name ?? '';
+    if (!id) return;
+    if (!confirm(`Delete role "${name}"?\nThis will fail if the role is referenced by config_bundles, sessions, or other tables.`)) return;
+    this.rolesService.delete(id).subscribe({
+      next: () => {
+        this.cancelEditRole();
+        this.loadRolesRegistry();
+      },
+      error: (err) => {
+        this.toast.push({
+          id: `toast-role-del-err-${Date.now()}`,
+          type: 'role_saved',
+          title: 'Delete Failed',
+          message: `Could not delete role: ${err.message || 'Unknown error'}`,
+          icon: '❌',
+          timestamp: new Date().toISOString(),
+          priority: 'high',
+        });
+      },
+    });
   }
 
   /** Switch tabs and clear all filter inputs so each tab starts fresh. */
@@ -1194,7 +1342,8 @@ export class AIConfigDialogComponent implements OnDestroy {
       case 'providers': return c.providers.length;
       case 'harnesses': return c.harnesses.length;
       case 'models': return c.models.length;
-      case 'roles': return c.roles.length;
+      case 'roles': return this.rolesRegistry().length;
+      case 'role-assignment': return c.roles.length;
       case 'logging': return 0;
       case 'failure-recovery': return 0;
       default: return 0;
@@ -1920,6 +2069,7 @@ export class AIConfigDialogComponent implements OnDestroy {
     this.editProviderForm.set(null);
     this.editHarnessForm.set(null);
     this.editModelForm.set(null);
+    this.editRoleForm.set(null);
     this.selectedProviderId.set(null);
     this.selectedHarnessId.set(null);
     this.selectedModelId.set(null);

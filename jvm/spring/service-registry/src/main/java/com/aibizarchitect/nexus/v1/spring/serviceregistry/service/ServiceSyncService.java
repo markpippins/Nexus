@@ -78,7 +78,7 @@ public class ServiceSyncService {
 
         // Fetch default service type
         com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType restApiType =
-                serviceTypeRepository.findByName("REST_API").orElse(null);
+                serviceTypeRepository.findByName("REST API").orElse(null);
 
         int createdCount = 0;
         int updatedCount = 0;
