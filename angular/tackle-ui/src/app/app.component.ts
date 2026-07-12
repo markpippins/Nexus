@@ -1,8 +1,9 @@
-import { Component, ViewChild, computed, AfterViewInit } from '@angular/core';
+import { Component, ViewChild, computed, AfterViewInit, inject } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { NgClass } from '@angular/common';
 import { AIConfigDialogComponent } from './components/ai-config-dialog/ai-config-dialog.component';
 import { ToastService } from './services/toast.service';
+import { ThemeService } from './services/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -14,6 +15,11 @@ import { ToastService } from './services/toast.service';
       <nav>
         <a routerLink="/roles">Roles</a>
         <a class="nav-btn" (click)="openConfig()">AI Config</a>
+        <button class="nav-btn theme-btn" (click)="theme.toggle()" [title]="'Theme: ' + theme.theme()">
+          @if (theme.theme() === 'steel') { ⚙ }
+          @if (theme.theme() === 'light') { ☀ }
+          @if (theme.theme() === 'dark') { 🌙 }
+        </button>
       </nav>
     </header>
     <main>
@@ -38,8 +44,8 @@ import { ToastService } from './services/toast.service';
     :host {
       display: block;
       min-height: 100vh;
-      background: #0f172a;
-      color: #e2e8f0;
+      background: var(--bg-primary);
+      color: var(--text-primary);
       font-family: system-ui, sans-serif;
     }
     header {
@@ -47,8 +53,8 @@ import { ToastService } from './services/toast.service';
       align-items: center;
       gap: 2rem;
       padding: 1rem 2rem;
-      background: #1e293b;
-      border-bottom: 1px solid #334155;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-default);
     }
     header h1 {
       margin: 0;
@@ -59,9 +65,10 @@ import { ToastService } from './services/toast.service';
     nav {
       display: flex;
       gap: 0.5rem;
+      align-items: center;
     }
     nav a, nav .nav-btn {
-      color: #94a3b8;
+      color: var(--text-muted);
       text-decoration: none;
       font-size: 0.875rem;
       padding: 0.25rem 0.75rem;
@@ -72,9 +79,10 @@ import { ToastService } from './services/toast.service';
       background: transparent;
     }
     nav a:hover, nav a.active, nav .nav-btn:hover {
-      color: #e2e8f0;
-      background: #334155;
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
     }
+    .theme-btn { font-size: 1rem; padding: 0.25rem 0.5rem; }
     main {
       max-width: 960px;
       margin: 2rem auto;
@@ -99,13 +107,11 @@ import { ToastService } from './services/toast.service';
 export class AppComponent implements AfterViewInit {
   @ViewChild('aiConfigDialog') aiConfigDialog!: AIConfigDialogComponent;
   readonly toasts = computed(() => this.toastService.toasts());
+  readonly theme = inject(ThemeService);
 
   constructor(private toastService: ToastService) {}
 
   ngAfterViewInit(): void {
-    // Auto-open AI Config as the landing page — the Roles tab inside the dialog
-    // provides role editing, and the full configuration is immediately available.
-    // Press Escape to close the dialog and access the separate Roles page.
     this.aiConfigDialog?.open();
   }
 
