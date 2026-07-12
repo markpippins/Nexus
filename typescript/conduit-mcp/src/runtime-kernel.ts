@@ -102,6 +102,11 @@ export interface CompilerOutput {
 
 // ── Transition table ───────────────────────────────────────────────
 // Maps current status → allowed next event types (and their resulting status).
+//
+// ADR-006: VALIDATED → QUEUED is still a valid manual transition (via transition API),
+// but the Runtime Kernel no longer auto-advances past VALIDATED.
+// The cascade admission subscriber handles VALIDATED → ADMITTED → READY
+// in the execution.requests domain.
 
 interface TransitionEntry {
   event: RuntimeEventType;
@@ -114,7 +119,7 @@ const TRANSITION_TABLE: Record<WorkRequestStatus, TransitionEntry[]> = {
     { event: "WR_REJECTED", nextStatus: "REJECTED" },
   ],
   VALIDATED: [
-    { event: "WR_VALIDATED", nextStatus: "QUEUED" },
+    { event: "WR_VALIDATED", nextStatus: "QUEUED" },  // manual only — no auto-advance
     { event: "WR_REJECTED", nextStatus: "REJECTED" },
   ],
   QUEUED: [
@@ -139,9 +144,15 @@ const TRANSITION_TABLE: Record<WorkRequestStatus, TransitionEntry[]> = {
 };
 
 // ── Status → event mapping for `decide()` ─────────────────────────
+//
+// ADR-006: Vision boundary at VALIDATED.
+// VALIDATED is the handoff point — Vision produces VALIDATED WorkRequests
+// and stops. The cascade admission subscriber (Python pipeline) handles
+// VALIDATED → ADMITTED → READY in execution.requests.
+// The Runtime Kernel does NOT auto-advance past VALIDATED.
 
 const DECISION_MAP: Partial<Record<WorkRequestStatus, RuntimeEventType>> = {
-  VALIDATED: "WR_VALIDATED",
+  // VALIDATED intentionally omitted — Vision stops here (ADR-006)
   QUEUED: "WR_QUEUED",
   CLAIMED: "WR_CLAIMED",
   ACKED: "WR_ACKED",
@@ -265,11 +276,12 @@ export function decide(state: WorkRequestState): RuntimeEvent | null {
 
 /**
  * Select next runnable — priority for decision loop:
- *   VALIDATED (ready to queue) > QUEUED (ready to claim) > CLAIMED (ready to ack)
+ *   QUEUED (ready to claim) > CLAIMED (ready to ack)
+ *
+ * ADR-006: VALIDATED removed — Vision stops here, cascade admission handles the rest.
  */
 export function getDecisionPriority(status: WorkRequestStatus): number {
   switch (status) {
-    case "VALIDATED": return 4;
     case "QUEUED":    return 3;
     case "CLAIMED":   return 2;
     case "ACKED":     return 1;

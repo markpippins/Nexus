@@ -2229,6 +2229,379 @@ const migrations: Migration[] = [
       console.log("[migrations] v31: Migrated vision.tickets.deadline TEXT→TIMESTAMPTZ");
     },
   },
+  // ── Execution Authority Schema (ADR-006) ──────────────────────────
+  {
+    version: 32,
+    description: "Create execution schema and four durable nouns: requests, leases, attempts, receipts (ADR-006 Execution Authority Protocol)",
+    up: async (exec) => {
+      await exec(`
+        BEGIN;
+
+        CREATE SCHEMA IF NOT EXISTS execution;
+
+        -- execution.requests — WorkRequest (immutable intent)
+        CREATE TABLE IF NOT EXISTS execution.requests (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            business_key    TEXT UNIQUE NOT NULL,
+            title           TEXT NOT NULL DEFAULT '',
+            intent_type     TEXT NOT NULL DEFAULT 'task',
+            objective       TEXT NOT NULL DEFAULT '',
+            inputs          JSONB NOT NULL DEFAULT '{}'::jsonb,
+            deterministic   BOOLEAN NOT NULL DEFAULT TRUE,
+            max_retries     INTEGER,
+            timeout_policy  TEXT,
+            resource_hints  TEXT[] DEFAULT '{}',
+            op_trace        JSONB NOT NULL DEFAULT '{}'::jsonb,
+            status          TEXT NOT NULL DEFAULT 'DRAFT'
+                            CHECK (status IN (
+                                'DRAFT','COMPILED','VALIDATED',
+                                'ADMITTED','READY',
+                                'COMPLETED','FAILED','CANCELLED'
+                            )),
+            source_plan_id  TEXT,
+            source_wr_id    TEXT,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_execution_requests_status
+            ON execution.requests (status);
+        CREATE INDEX IF NOT EXISTS idx_execution_requests_source_plan
+            ON execution.requests (source_plan_id)
+            WHERE source_plan_id IS NOT NULL;
+
+        -- execution.leases — temporal permission to execute
+        CREATE TABLE IF NOT EXISTS execution.leases (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            request_id      UUID NOT NULL REFERENCES execution.requests(id),
+            executor_id     TEXT NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'ACTIVE'
+                            CHECK (status IN ('ACTIVE','EXPIRED','RELEASED')),
+            ttl_seconds     INTEGER NOT NULL DEFAULT 300,
+            acquired_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            expires_at      TIMESTAMPTZ NOT NULL,
+            released_at     TIMESTAMPTZ,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_execution_leases_active_per_request
+            ON execution.leases (request_id)
+            WHERE status = 'ACTIVE';
+        CREATE INDEX IF NOT EXISTS idx_execution_leases_request
+            ON execution.leases (request_id);
+        CREATE INDEX IF NOT EXISTS idx_execution_leases_executor
+            ON execution.leases (executor_id);
+
+        -- execution.attempts — one run of the work
+        CREATE TABLE IF NOT EXISTS execution.attempts (
+            id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            lease_id        UUID NOT NULL REFERENCES execution.leases(id),
+            request_id      UUID NOT NULL REFERENCES execution.requests(id),
+            executor_id     TEXT NOT NULL,
+            status          TEXT NOT NULL DEFAULT 'CREATED'
+                            CHECK (status IN ('CREATED','RUNNING','SUCCEEDED','FAILED','TIMED_OUT')),
+            started_at      TIMESTAMPTZ,
+            completed_at    TIMESTAMPTZ,
+            result          JSONB NOT NULL DEFAULT '{}'::jsonb,
+            error           TEXT,
+            exit_code       INTEGER,
+            created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_execution_attempts_request
+            ON execution.attempts (request_id);
+        CREATE INDEX IF NOT EXISTS idx_execution_attempts_lease
+            ON execution.attempts (lease_id);
+        CREATE INDEX IF NOT EXISTS idx_execution_attempts_status
+            ON execution.attempts (status);
+
+        -- execution.receipts — immutable evidence (ADR-006 noun #4)
+        CREATE TABLE IF NOT EXISTS execution.receipts (
+            id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            attempt_id          UUID NOT NULL REFERENCES execution.attempts(id),
+            request_id          UUID NOT NULL REFERENCES execution.requests(id),
+            type                TEXT NOT NULL,
+            agent_role          TEXT NOT NULL DEFAULT '',
+            summary             TEXT NOT NULL DEFAULT '',
+            metadata            JSONB NOT NULL DEFAULT '{}'::jsonb,
+            lineage_source      TEXT,
+            lineage_original_id TEXT,
+            issued_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_execution_receipts_request
+            ON execution.receipts (request_id);
+        CREATE INDEX IF NOT EXISTS idx_execution_receipts_attempt
+            ON execution.receipts (attempt_id);
+        CREATE INDEX IF NOT EXISTS idx_execution_receipts_type
+            ON execution.receipts (type);
+
+        -- updated_at trigger
+        CREATE OR REPLACE FUNCTION execution.set_updated_at()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        DROP TRIGGER IF EXISTS trg_execution_requests_updated_at ON execution.requests;
+        CREATE TRIGGER trg_execution_requests_updated_at
+            BEFORE UPDATE ON execution.requests
+            FOR EACH ROW
+            EXECUTE FUNCTION execution.set_updated_at();
+
+        COMMIT;
+      `);
+      console.log("[migrations] v32: Created execution schema (requests, leases, attempts, receipts) — ADR-006");
+    },
+  },
+  {
+    version: 33,
+    description: "Migrate vision.receipts → execution.receipts with lineage tracking (ADR-006 receipt migration)",
+    up: async (exec) => {
+      // Create legacy execution.requests for each plan with receipts
+      await exec(`
+        INSERT INTO execution.requests (
+            business_key, title, intent_type, objective, status,
+            source_plan_id, created_at, updated_at
+        )
+        SELECT
+            'legacy-plan-' || p.id AS business_key,
+            COALESCE(p.title, 'Legacy plan ' || p.id) AS title,
+            'legacy' AS intent_type,
+            COALESCE(p.goal, '') AS objective,
+            CASE
+                WHEN EXISTS (
+                    SELECT 1 FROM vision.receipts r2
+                    WHERE r2.plan_id = p.id AND r2.type = 'REVIEW_PASS'
+                ) THEN 'COMPLETED'
+                WHEN EXISTS (
+                    SELECT 1 FROM vision.receipts r3
+                    WHERE r3.plan_id = p.id AND r3.type IN ('CANCELLED','ABANDONED')
+                ) THEN 'CANCELLED'
+                ELSE 'READY'
+            END AS status,
+            p.id AS source_plan_id,
+            MIN(r.created_at) AS created_at,
+            MAX(r.created_at) AS updated_at
+        FROM conduit.plans p
+        JOIN vision.receipts r ON r.plan_id = p.id
+        WHERE NOT EXISTS (
+            SELECT 1 FROM execution.requests er
+            WHERE er.source_plan_id = p.id
+        )
+        GROUP BY p.id, p.title, p.goal
+      `);
+
+      // Create synthetic leases for legacy attempts
+      await exec(`
+        INSERT INTO execution.leases (
+            request_id, executor_id, status, ttl_seconds,
+            acquired_at, expires_at, released_at, created_at
+        )
+        SELECT
+            er.id AS request_id,
+            'legacy' AS executor_id,
+            'RELEASED' AS status,
+            0 AS ttl_seconds,
+            er.created_at AS acquired_at,
+            er.created_at AS expires_at,
+            er.updated_at AS released_at,
+            er.created_at AS created_at
+        FROM execution.requests er
+        WHERE er.source_plan_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM execution.leases el
+            WHERE el.request_id = er.id
+          )
+      `);
+
+      // Create legacy execution.attempts
+      await exec(`
+        INSERT INTO execution.attempts (
+            lease_id, request_id, executor_id, status,
+            started_at, completed_at, created_at
+        )
+        SELECT
+            el.id AS lease_id,
+            er.id AS request_id,
+            'legacy' AS executor_id,
+            CASE
+                WHEN er.status = 'COMPLETED' THEN 'SUCCEEDED'
+                WHEN er.status = 'CANCELLED' THEN 'FAILED'
+                ELSE 'RUNNING'
+            END AS status,
+            er.created_at AS started_at,
+            er.updated_at AS completed_at,
+            er.created_at AS created_at
+        FROM execution.requests er
+        JOIN execution.leases el ON el.request_id = er.id
+        WHERE er.source_plan_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM execution.attempts ea
+            WHERE ea.request_id = er.id
+          )
+      `);
+
+      // Migrate vision.receipts → execution.receipts
+      await exec(`
+        INSERT INTO execution.receipts (
+            attempt_id, request_id, type, agent_role,
+            summary, metadata, lineage_source, lineage_original_id,
+            issued_at
+        )
+        SELECT
+            ea.id AS attempt_id,
+            er.id AS request_id,
+            vr.type AS type,
+            vr.agent_role AS agent_role,
+            COALESCE(vr.summary, '') AS summary,
+            COALESCE(vr.metadata_json::jsonb, '{}'::jsonb) AS metadata,
+            'vision.receipts' AS lineage_source,
+            vr.id AS lineage_original_id,
+            vr.created_at AS issued_at
+        FROM vision.receipts vr
+        JOIN execution.requests er ON er.source_plan_id = vr.plan_id
+        JOIN execution.attempts ea ON ea.request_id = er.id
+        WHERE NOT EXISTS (
+            SELECT 1 FROM execution.receipts er2
+            WHERE er2.lineage_original_id = vr.id
+        )
+      `);
+
+      // Log counts
+      const result = await exec(`
+        SELECT
+          (SELECT count(*) FROM vision.receipts) AS vision_count,
+          (SELECT count(*) FROM execution.receipts) AS execution_count,
+          (SELECT count(*) FROM execution.requests WHERE source_plan_id IS NOT NULL) AS request_count
+      `);
+      const row = result?.rows?.[0];
+      console.log(`[migrations] v33: Migrated vision.receipts → execution.receipts (${row?.execution_count || 0} of ${row?.vision_count || 0}, ${row?.request_count || 0} legacy requests)`);
+    },
+  },
+  // ── v34: Corrected receipt migration (nebula.plans, not conduit.plans) ──
+  {
+    version: 34,
+    description: "Re-run receipt migration using nebula.plans (conduit.plans was empty)",
+    up: async (exec) => {
+      // Check if v33 already migrated data
+      const check = await exec(`SELECT count(*) AS cnt FROM execution.receipts WHERE lineage_source = 'vision.receipts'`);
+      const existingCount = check?.rows?.[0]?.cnt ?? 0;
+      if (existingCount > 0) {
+        console.log(`[migrations] v34: Skipping — ${existingCount} receipts already migrated by v33`);
+        return;
+      }
+
+      console.log('[migrations] v34: Re-running receipt migration with nebula.plans...');
+
+      // Create legacy requests from nebula.plans (not conduit.plans)
+      await exec(`
+        INSERT INTO execution.requests (
+            business_key, title, intent_type, objective, status,
+            source_plan_id, created_at, updated_at
+        )
+        SELECT
+            'legacy-plan-' || p.id AS business_key,
+            COALESCE(p.title, 'Legacy plan ' || p.id) AS title,
+            'legacy' AS intent_type,
+            COALESCE(p.goal, '') AS objective,
+            CASE
+                WHEN EXISTS (
+                    SELECT 1 FROM vision.receipts r2
+                    WHERE r2.plan_id = p.id AND r2.type = 'REVIEW_PASS'
+                ) THEN 'COMPLETED'
+                WHEN EXISTS (
+                    SELECT 1 FROM vision.receipts r3
+                    WHERE r3.plan_id = p.id AND r3.type IN ('CANCELLED','ABANDONED')
+                ) THEN 'CANCELLED'
+                ELSE 'READY'
+            END AS status,
+            p.id AS source_plan_id,
+            MIN(r.created_at) AS created_at,
+            MAX(r.created_at) AS updated_at
+        FROM nebula.plans p
+        JOIN vision.receipts r ON r.plan_id = p.id
+        WHERE NOT EXISTS (
+            SELECT 1 FROM execution.requests er
+            WHERE er.source_plan_id = p.id
+        )
+        GROUP BY p.id, p.title, p.goal
+      `);
+
+      // Create synthetic leases for legacy requests
+      await exec(`
+        INSERT INTO execution.leases (
+            request_id, executor_id, status, ttl_seconds,
+            acquired_at, expires_at, released_at, created_at
+        )
+        SELECT
+            er.id, 'legacy', 'RELEASED', 0,
+            er.created_at, er.created_at, er.updated_at, er.created_at
+        FROM execution.requests er
+        WHERE er.source_plan_id IS NOT NULL
+          AND er.intent_type = 'legacy'
+          AND NOT EXISTS (
+            SELECT 1 FROM execution.leases el WHERE el.request_id = er.id
+          )
+      `);
+
+      // Create legacy attempts
+      await exec(`
+        INSERT INTO execution.attempts (
+            lease_id, request_id, executor_id, status,
+            started_at, completed_at, created_at
+        )
+        SELECT
+            el.id, er.id, 'legacy',
+            CASE
+                WHEN er.status = 'COMPLETED' THEN 'SUCCEEDED'
+                WHEN er.status = 'CANCELLED' THEN 'FAILED'
+                ELSE 'RUNNING'
+            END,
+            er.created_at, er.updated_at, er.created_at
+        FROM execution.requests er
+        JOIN execution.leases el ON el.request_id = er.id
+        WHERE er.source_plan_id IS NOT NULL
+          AND er.intent_type = 'legacy'
+          AND NOT EXISTS (
+            SELECT 1 FROM execution.attempts ea WHERE ea.request_id = er.id
+          )
+      `);
+
+      // Migrate vision.receipts → execution.receipts
+      await exec(`
+        INSERT INTO execution.receipts (
+            attempt_id, request_id, type, agent_role,
+            summary, metadata, lineage_source, lineage_original_id,
+            issued_at
+        )
+        SELECT
+            ea.id, er.id, vr.type, vr.agent_role,
+            COALESCE(vr.summary, ''),
+            COALESCE(vr.metadata_json::jsonb, '{}'::jsonb),
+            'vision.receipts', vr.id, vr.created_at
+        FROM vision.receipts vr
+        JOIN execution.requests er ON er.source_plan_id = vr.plan_id
+        JOIN execution.attempts ea ON ea.request_id = er.id
+        WHERE NOT EXISTS (
+            SELECT 1 FROM execution.receipts er2
+            WHERE er2.lineage_original_id = vr.id
+        )
+      `);
+
+      // Log counts
+      const result = await exec(`
+        SELECT
+          (SELECT count(*) FROM vision.receipts) AS vision_count,
+          (SELECT count(*) FROM execution.receipts WHERE lineage_source = 'vision.receipts') AS execution_count,
+          (SELECT count(*) FROM execution.requests WHERE source_plan_id IS NOT NULL AND intent_type = 'legacy') AS request_count
+      `);
+      const row = result?.rows?.[0];
+      console.log(`[migrations] v34: Migrated vision.receipts → execution.receipts (${row?.execution_count || 0} of ${row?.vision_count || 0}, ${row?.request_count || 0} legacy requests)`);
+    },
+  },
 ];
 
 /**

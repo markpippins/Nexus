@@ -2212,13 +2212,58 @@ export function createRoutes(pool: Pool): Router {
         'SELECT id, title, status, completed, system_id, intent_description FROM nebula.harvest_candidates WHERE harvest_id = $1 ORDER BY created_at', [id]
       );
 
+      // Get snapshot context for the segment/override integration
+      // convention: conversation_id = harvest_id (set by auto-segment trigger)
+      let snapshotId: string | null = null;
+      let committedSegments: any[] = [];
+      let activeOverrides: any[] = [];
+      try {
+        const { rows: snapshots } = await pool.query(
+          `SELECT id FROM nebula.conversation_snapshots
+           WHERE conversation_id = $1
+           ORDER BY snapshot_index DESC LIMIT 1`,
+          [id]
+        );
+        if (snapshots.length > 0) {
+          snapshotId = snapshots[0].id;
+          const { rows: segments } = await pool.query(
+            `SELECT id, conversation_id, snapshot_id, start_block_id, end_block_id,
+                    start_block_index, end_block_index, segment_type, state, source,
+                    title, notes_md, created_by,
+                    to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+             FROM nebula.segments
+             WHERE snapshot_id = $1
+             ORDER BY start_block_index`,
+            [snapshotId]
+          );
+          committedSegments = segments;
+          const { rows: overrides } = await pool.query(
+            `SELECT id, conversation_id, snapshot_id, target_type, target_id,
+                    projection_target, override_type, reason_code, notes_md,
+                    source, created_by,
+                    to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+             FROM nebula.projection_overrides
+             WHERE snapshot_id = $1
+             ORDER BY created_at`,
+            [snapshotId]
+          );
+          activeOverrides = overrides;
+        }
+      } catch (_) {
+        // snapshot table may not exist or no snapshots yet — non-fatal
+      }
+
       res.json({
         harvestId: id,
+        conversationId: id,
+        snapshotId,
         title: harvest.title,
         source: harvest.source_filename,
         units,
         stats: stats?.stats || null,
         candidates,
+        committedSegments,
+        activeOverrides,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -4331,6 +4376,407 @@ export function createRoutes(pool: Pool): Router {
         'SELECT * FROM nebula.plans WHERE deleted = 1 ORDER BY updated_at DESC'
       );
       res.json({ plans: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  EXECUTION AUTHORITY (ADR-006)
+  // ════════════════════════════════════════════════════════════════
+
+  // POST /api/execution/requests — create a new WorkRequest
+  router.post('/execution/requests', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const {
+        businessKey, title, intentType, objective, inputs,
+        deterministic, maxRetries, timeoutPolicy, resourceHints,
+        opTrace, status, sourcePlanId, sourceWrId,
+      } = req.body;
+
+      if (!businessKey) {
+        res.status(400).json({ error: 'businessKey is required' });
+        return;
+      }
+
+      const { rows: [row] } = await client.query(
+        `INSERT INTO execution.requests (
+          business_key, title, intent_type, objective, inputs,
+          deterministic, max_retries, timeout_policy, resource_hints,
+          op_trace, status, source_plan_id, source_wr_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        [
+          businessKey, title||'', intentType||'task', objective||'',
+          inputs||{}, deterministic??true, maxRetries||null,
+          timeoutPolicy||null, resourceHints||[], opTrace||{},
+          status||'DRAFT', sourcePlanId||null, sourceWrId||null,
+        ]
+      );
+      await client.query('COMMIT');
+      res.status(201).json(row);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      if (err.code === '23505') { // unique_violation
+        res.status(409).json({ error: `Request with business_key '${req.body.businessKey}' already exists` });
+      } else {
+        res.status(500).json({ error: err.message });
+      }
+    } finally {
+      client.release();
+    }
+  });
+
+  // GET /api/execution/requests — list requests
+  router.get('/execution/requests', async (req: Request, res: Response) => {
+    try {
+      const { status, limit } = req.query;
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (status) { clauses.push(`status = $${i++}`); vals.push(status); }
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+      const lim = Math.min(Number(limit) || 50, 200);
+      const { rows } = await pool.query(
+        `SELECT * FROM execution.requests ${where} ORDER BY created_at DESC LIMIT $${i}`, [...vals, lim]
+      );
+      res.json({ requests: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/execution/requests/:id — get a single request
+  router.get('/execution/requests/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        'SELECT * FROM execution.requests WHERE id = $1', [id]
+      );
+      if (rows.length === 0) { res.status(404).json({ error: 'Request not found' }); return; }
+      // Also fetch leases, attempts, receipts
+      const { rows: leases } = await pool.query(
+        'SELECT * FROM execution.leases WHERE request_id = $1 ORDER BY acquired_at DESC', [id]
+      );
+      const { rows: attempts } = await pool.query(
+        'SELECT * FROM execution.attempts WHERE request_id = $1 ORDER BY created_at DESC', [id]
+      );
+      const { rows: receipts } = await pool.query(
+        'SELECT * FROM execution.receipts WHERE request_id = $1 ORDER BY issued_at DESC', [id]
+      );
+      res.json({ ...rows[0], leases, attempts, receipts });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/execution/requests/:id/transition — transition WorkRequest status
+  router.patch('/execution/requests/:id/transition', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+      const { targetStatus, reason } = req.body;
+
+      const validTransitions: Record<string, string[]> = {
+        DRAFT:     ['COMPILED', 'CANCELLED'],
+        COMPILED:  ['VALIDATED', 'CANCELLED'],
+        VALIDATED: ['ADMITTED', 'CANCELLED'],
+        ADMITTED:  ['READY', 'CANCELLED'],
+        READY:     ['COMPLETED', 'FAILED', 'CANCELLED'],
+        COMPLETED: [],
+        FAILED:    [],
+        CANCELLED: [],
+      };
+
+      const { rows: [current] } = await client.query(
+        'SELECT * FROM execution.requests WHERE id = $1', [id]
+      );
+      if (!current) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Request not found' }); return; }
+
+      const allowed = validTransitions[current.status] || [];
+      if (!allowed.includes(targetStatus)) {
+        await client.query('ROLLBACK');
+        res.status(400).json({
+          error: `Invalid transition: ${current.status} → ${targetStatus}`,
+          allowed,
+        });
+        return;
+      }
+
+      const { rows: [updated] } = await client.query(
+        'UPDATE execution.requests SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        [targetStatus, id]
+      );
+
+      await client.query('COMMIT');
+      res.json({ previous: current.status, request: updated, reason: reason||null });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/leases/acquire — acquire a lease on a request
+  router.post('/execution/leases/acquire', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { requestId, executorId, ttlSeconds } = req.body;
+
+      if (!requestId || !executorId) {
+        res.status(400).json({ error: 'requestId and executorId are required' });
+        return;
+      }
+
+      // Check request exists and is in a leaseable state
+      const { rows: [request] } = await client.query(
+        'SELECT * FROM execution.requests WHERE id = $1', [requestId]
+      );
+      if (!request) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Request not found' }); return; }
+      if (!['ADMITTED', 'READY'].includes(request.status)) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Request must be ADMITTED or READY to lease (current: ${request.status})` });
+        return;
+      }
+
+      // Check no active lease exists
+      const { rows: existing } = await client.query(
+        "SELECT id FROM execution.leases WHERE request_id = $1 AND status = 'ACTIVE'", [requestId]
+      );
+      if (existing.length > 0) {
+        await client.query('ROLLBACK');
+        res.status(409).json({ error: 'Active lease already exists for this request', existingLeaseId: existing[0].id });
+        return;
+      }
+
+      const ttl = ttlSeconds || 300;
+      const { rows: [lease] } = await client.query(
+        `INSERT INTO execution.leases (request_id, executor_id, ttl_seconds, expires_at)
+         VALUES ($1, $2, $3, NOW() + ($4 || ' seconds')::interval) RETURNING *`,
+        [requestId, executorId, ttl, String(ttl)]
+      );
+
+      await client.query('COMMIT');
+      res.status(201).json(lease);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/leases/:id/renew — renew an active lease
+  router.post('/execution/leases/:id/renew', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+      const { ttlSeconds } = req.body;
+      const ttl = ttlSeconds || 300;
+
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM execution.leases WHERE id = $1', [id]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Cannot renew lease in status '${lease.status}' (must be ACTIVE)` });
+        return;
+      }
+      if (new Date(lease.expires_at) < new Date()) {
+        // Auto-expire
+        await client.query("UPDATE execution.leases SET status = 'EXPIRED' WHERE id = $1", [id]);
+        await client.query('COMMIT');
+        res.status(400).json({ error: 'Lease has already expired' });
+        return;
+      }
+
+      const { rows: [updated] } = await client.query(
+        `UPDATE execution.leases
+         SET ttl_seconds = $1, expires_at = NOW() + ($3 || ' seconds')::interval
+         WHERE id = $2 AND status = 'ACTIVE' RETURNING *`,
+        [ttl, id, String(ttl)]
+      );
+
+      await client.query('COMMIT');
+      res.json(updated);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/leases/:id/release — release an active lease
+  router.post('/execution/leases/:id/release', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM execution.leases WHERE id = $1', [id]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Cannot release lease in status '${lease.status}' (must be ACTIVE)` });
+        return;
+      }
+
+      const { rows: [updated] } = await client.query(
+        "UPDATE execution.leases SET status = 'RELEASED', released_at = NOW() WHERE id = $1 RETURNING *",
+        [id]
+      );
+
+      await client.query('COMMIT');
+      res.json(updated);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/attempts — submit an attempt (create + set outcome)
+  router.post('/execution/attempts', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { leaseId, status: attemptStatus, result, error: attemptError, exitCode } = req.body;
+
+      if (!leaseId) {
+        res.status(400).json({ error: 'leaseId is required' });
+        return;
+      }
+
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM execution.leases WHERE id = $1', [leaseId]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Lease is not ACTIVE (current: ${lease.status})` });
+        return;
+      }
+      if (new Date(lease.expires_at) < new Date()) {
+        await client.query("UPDATE execution.leases SET status = 'EXPIRED' WHERE id = $1", [leaseId]);
+        await client.query('COMMIT');
+        res.status(400).json({ error: 'Lease has expired' });
+        return;
+      }
+
+      const finalStatus = attemptStatus || 'SUCCEEDED';
+      const now = new Date().toISOString();
+
+      const { rows: [attempt] } = await client.query(
+        `INSERT INTO execution.attempts (
+          lease_id, request_id, executor_id, status,
+          started_at, completed_at, result, error, exit_code
+        ) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *`,
+        [
+          leaseId, lease.request_id, lease.executor_id, finalStatus,
+          now, result||{}, attemptError||null, exitCode||null,
+        ]
+      );
+
+      await client.query('COMMIT');
+      res.status(201).json(attempt);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/receipts — issue a receipt from an attempt
+  router.post('/execution/receipts', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { attemptId, type, agentRole, summary, metadata } = req.body;
+
+      if (!attemptId) {
+        res.status(400).json({ error: 'attemptId is required' });
+        return;
+      }
+
+      const { rows: [attempt] } = await client.query(
+        'SELECT * FROM execution.attempts WHERE id = $1', [attemptId]
+      );
+      if (!attempt) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Attempt not found' }); return; }
+
+      const receiptType = type || (attempt.status === 'SUCCEEDED' ? 'EXECUTION_COMPLETE' : 'EXECUTION_FAILED');
+
+      const { rows: [receipt] } = await client.query(
+        `INSERT INTO execution.receipts (
+          attempt_id, request_id, type, agent_role, summary, metadata
+        ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [attemptId, attempt.request_id, receiptType, agentRole||attempt.executor_id, summary||'', metadata||{}]
+      );
+
+      await client.query('COMMIT');
+      res.status(201).json(receipt);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // GET /api/execution/receipts — list receipts
+  router.get('/execution/receipts', async (req: Request, res: Response) => {
+    try {
+      const { requestId, type, limit } = req.query;
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (requestId) { clauses.push(`request_id = $${i++}`); vals.push(requestId); }
+      if (type) { clauses.push(`type = $${i++}`); vals.push(type); }
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+      const lim = Math.min(Number(limit) || 50, 200);
+      const { rows } = await pool.query(
+        `SELECT * FROM execution.receipts ${where} ORDER BY issued_at DESC LIMIT $${i}`, [...vals, lim]
+      );
+      res.json({ receipts: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/execution/state — summary of execution domain state
+  router.get('/execution/state', async (req: Request, res: Response) => {
+    try {
+      const { rows: reqs } = await pool.query(
+        `SELECT status, count(*) as count FROM execution.requests GROUP BY status ORDER BY status`
+      );
+      const { rows: leases } = await pool.query(
+        `SELECT status, count(*) as count FROM execution.leases GROUP BY status ORDER BY status`
+      );
+      const { rows: attempts } = await pool.query(
+        `SELECT status, count(*) as count FROM execution.attempts GROUP BY status ORDER BY status`
+      );
+      const { rows: [receiptTotal] } = await pool.query(
+        `SELECT count(*) as total FROM execution.receipts`
+      );
+      const { rows: receiptTypes } = await pool.query(
+        `SELECT type, count(*) as count FROM execution.receipts GROUP BY type ORDER BY count DESC`
+      );
+      res.json({
+        requests: reqs,
+        leases,
+        attempts,
+        receipts: { total: Number(receiptTotal.total), byType: receiptTypes },
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

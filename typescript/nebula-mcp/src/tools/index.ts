@@ -1543,6 +1543,173 @@ export function registerTools(server: McpServer) {
   );
 
   // ════════════════════════════════════════════════════════════════
+  //  EXECUTION AUTHORITY (ADR-006)
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "execution_create_request",
+    "Create a new WorkRequest in the execution domain. Returns the created request with UUID id.",
+    {
+      businessKey: z.string().describe("Unique business key (e.g. 'legacy-plan-0053' or 'wr-2026-07-12-001')"),
+      title: z.string().optional().describe("Human-readable title"),
+      intentType: z.string().optional().describe("Type of intent (default: 'task')"),
+      objective: z.string().optional().describe("What is desired"),
+      inputs: z.any().optional().describe("Intent inputs (any JSON)"),
+      deterministic: z.boolean().optional().describe("Whether this is deterministic (default: true)"),
+      maxRetries: z.number().optional().describe("Max retry hint"),
+      timeoutPolicy: z.string().optional().describe("Timeout policy hint"),
+      resourceHints: z.array(z.string()).optional().describe("Resource hints"),
+      opTrace: z.any().optional().describe("Op resolution trace"),
+      status: z.string().optional().describe("Initial status (default: DRAFT)"),
+      sourcePlanId: z.string().optional().describe("Source conduit plan ID"),
+      sourceWrId: z.string().optional().describe("Source vision.work_requests.wr_id"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createExecutionRequest(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_list_requests",
+    "List execution requests, optionally filtered by status.",
+    {
+      status: z.string().optional().describe("Filter by status (DRAFT, COMPILED, VALIDATED, ADMITTED, READY, COMPLETED, FAILED, CANCELLED)"),
+      limit: z.number().optional().describe("Max results (default 50, max 200)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listExecutionRequests(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_get_request",
+    "Get a single execution request with its full lifecycle (leases, attempts, receipts).",
+    {
+      id: z.string().describe("Request UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getExecutionRequest(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_transition_request",
+    "Transition a WorkRequest to a new status. Enforces valid state transitions per ADR-006.",
+    {
+      id: z.string().describe("Request UUID"),
+      targetStatus: z.enum(["COMPILED","VALIDATED","ADMITTED","READY","COMPLETED","FAILED","CANCELLED"])
+        .describe("Target status"),
+      reason: z.string().optional().describe("Reason for transition"),
+    },
+    async (args) => {
+      const result = await NebulaClient.transitionExecutionRequest(args.id, {
+        targetStatus: args.targetStatus,
+        reason: args.reason,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_acquire_lease",
+    "Acquire a temporal lease on an execution request. Only one active lease per request at a time.",
+    {
+      requestId: z.string().describe("Request UUID to lease"),
+      executorId: z.string().describe("Executor identity (e.g. 'conduit', 'cli', 'jenkins')"),
+      ttlSeconds: z.number().optional().describe("Time-to-live in seconds (default: 300)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.acquireLease(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_renew_lease",
+    "Renew an active lease (extend TTL). Fails if lease is expired or released.",
+    {
+      id: z.string().describe("Lease UUID"),
+      ttlSeconds: z.number().optional().describe("New TTL in seconds (default: 300)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.renewLease(args.id, { ttlSeconds: args.ttlSeconds });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_release_lease",
+    "Release an active lease. The executor voluntarily gives back execution permission.",
+    {
+      id: z.string().describe("Lease UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.releaseLease(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_submit_attempt",
+    "Submit an execution attempt result. Creates an attempt record linked to the lease.",
+    {
+      leaseId: z.string().describe("Lease UUID (must be ACTIVE)"),
+      status: z.enum(["SUCCEEDED","FAILED","TIMED_OUT"]).optional()
+        .describe("Attempt outcome (default: SUCCEEDED)"),
+      result: z.any().optional().describe("Result payload (any JSON)"),
+      error: z.string().optional().describe("Error message if failed"),
+      exitCode: z.number().optional().describe("Exit code"),
+    },
+    async (args) => {
+      const result = await NebulaClient.submitAttempt(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_issue_receipt",
+    "Issue an immutable receipt from a completed attempt. Consumed by the Kernel.",
+    {
+      attemptId: z.string().describe("Attempt UUID"),
+      type: z.string().optional().describe("Receipt type (default: EXECUTION_COMPLETE or EXECUTION_FAILED based on attempt status)"),
+      agentRole: z.string().optional().describe("Agent role (defaults to executor_id)"),
+      summary: z.string().optional().describe("Human-readable summary"),
+      metadata: z.any().optional().describe("Additional metadata"),
+    },
+    async (args) => {
+      const result = await NebulaClient.issueReceipt(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_list_receipts",
+    "List execution receipts, optionally filtered by request or type.",
+    {
+      requestId: z.string().optional().describe("Filter by request UUID"),
+      type: z.string().optional().describe("Filter by receipt type"),
+      limit: z.number().optional().describe("Max results"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listExecutionReceipts(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_state",
+    "Get a summary of the execution domain state (request/lease attempt/receipt counts by status).",
+    {},
+    async () => {
+      const result = await NebulaClient.getExecutionState();
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
   //  HEALTH
   // ════════════════════════════════════════════════════════════════
 

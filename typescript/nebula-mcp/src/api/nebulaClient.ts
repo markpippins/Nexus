@@ -541,4 +541,69 @@ export const NebulaClient = {
   }) => httpRequest("POST", "/api/import", body),
   /** POST /api/seed */
   seedData: () => httpRequest("POST", "/api/seed"),
+
+  // ── Execution Authority (ADR-006) ──────────────────────────
+  /** POST /api/execution/requests */
+  createExecutionRequest: (body: {
+    businessKey: string; title?: string; intentType?: string; objective?: string;
+    inputs?: any; deterministic?: boolean; maxRetries?: number;
+    timeoutPolicy?: string; resourceHints?: string[]; opTrace?: any;
+    status?: string; sourcePlanId?: string; sourceWrId?: string;
+  }) => httpRequest("POST", "/api/execution/requests", body),
+
+  /** GET /api/execution/requests */
+  listExecutionRequests: (query?: { status?: string; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (query?.status) params.set("status", query.status);
+    if (query?.limit) params.set("limit", String(query.limit));
+    const qs = params.toString();
+    return httpGet(`/api/execution/requests${qs ? `?${qs}` : ""}`);
+  },
+
+  /** GET /api/execution/requests/:id */
+  getExecutionRequest: (id: string) =>
+    httpGet(`/api/execution/requests/${encodeURIComponent(id)}`),
+
+  /** PATCH /api/execution/requests/:id/transition */
+  transitionExecutionRequest: (id: string, body: {
+    targetStatus: string; reason?: string;
+  }) => httpRequest("PATCH", `/api/execution/requests/${encodeURIComponent(id)}/transition`, body),
+
+  /** POST /api/execution/leases/acquire */
+  acquireLease: (body: {
+    requestId: string; executorId: string; ttlSeconds?: number;
+  }) => httpRequest("POST", "/api/execution/leases/acquire", body),
+
+  /** POST /api/execution/leases/:id/renew */
+  renewLease: (id: string, body: { ttlSeconds?: number }) =>
+    httpRequest("POST", `/api/execution/leases/${encodeURIComponent(id)}/renew`, body),
+
+  /** POST /api/execution/leases/:id/release */
+  releaseLease: (id: string) =>
+    httpRequest("POST", `/api/execution/leases/${encodeURIComponent(id)}/release`),
+
+  /** POST /api/execution/attempts */
+  submitAttempt: (body: {
+    leaseId: string; status?: string; result?: any;
+    error?: string; exitCode?: number;
+  }) => httpRequest("POST", "/api/execution/attempts", body),
+
+  /** POST /api/execution/receipts */
+  issueReceipt: (body: {
+    attemptId: string; type?: string; agentRole?: string;
+    summary?: string; metadata?: any;
+  }) => httpRequest("POST", "/api/execution/receipts", body),
+
+  /** GET /api/execution/receipts */
+  listExecutionReceipts: (query?: { requestId?: string; type?: string; limit?: number }) => {
+    const params = new URLSearchParams();
+    if (query?.requestId) params.set("requestId", query.requestId);
+    if (query?.type) params.set("type", query.type);
+    if (query?.limit) params.set("limit", String(query.limit));
+    const qs = params.toString();
+    return httpGet(`/api/execution/receipts${qs ? `?${qs}` : ""}`);
+  },
+
+  /** GET /api/execution/state */
+  getExecutionState: () => httpGet("/api/execution/state"),
 };

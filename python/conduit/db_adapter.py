@@ -82,7 +82,7 @@ class _ConnectionProxy:
             )
         try:
             cur = conn.cursor()
-            cur.execute(f"SET search_path TO {schema},vision,peb,tackle")
+            cur.execute(f"SET search_path TO {schema},execution,vision,peb,tackle")
             cur.close()
         except Exception:
             pass
@@ -95,6 +95,12 @@ class _ConnectionProxy:
 
     def commit(self):
         self._conn.commit()
+
+    def rollback(self):
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass  # already rolled back or autocommit
 
     def close(self):
         pass  # PG connections are returned to pool, not closed
@@ -133,8 +139,18 @@ class DBAdapter:
         proxy = _ConnectionProxy(conn, schema=self._schema)
         try:
             yield proxy
+        except Exception:
+            # Rollback on error before returning connection to pool
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
         finally:
-            proxy.commit()
+            try:
+                proxy.commit()
+            except Exception:
+                pass
             pool.putconn(conn)
 
     def _init_db(self):
@@ -1480,3 +1496,254 @@ class DBAdapter:
             events = cursor.dict_fetchall()
             _log.debug("get_lineage_events: returned %d events", len(events))
             return events
+
+    # ── Execution Authority (ADR-006) ─────────────────────────
+
+    def acquire_lease(
+        self,
+        request_id: str,
+        executor_id: str,
+        ttl_seconds: int = 300,
+    ) -> Optional[dict]:
+        """Acquire a temporal lease on an execution request.
+
+        Only one ACTIVE lease per request at a time (enforced by partial unique index).
+        Returns the lease dict, or None if an active lease already exists.
+        """
+        _log.info("acquire_lease: request=%s executor=%s ttl=%d", request_id, executor_id, ttl_seconds)
+        with self._get_connection() as conn:
+            try:
+                cursor = conn.execute(
+                    """INSERT INTO execution.leases
+                       (request_id, executor_id, ttl_seconds, expires_at)
+                       VALUES (%s, %s, %s, NOW() + (%s || ' seconds')::interval)
+                       RETURNING *""",
+                    (request_id, executor_id, ttl_seconds, str(ttl_seconds)),
+                )
+                conn.commit()
+                lease = cursor.dict_fetchone()
+                _log.info("acquire_lease: acquired %s", lease["id"])
+                return lease
+            except Exception as e:
+                conn.rollback()
+                if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                    _log.warning("acquire_lease: active lease already exists for request %s", request_id)
+                    return None
+                raise
+
+    def release_lease(self, lease_id: str) -> bool:
+        """Release an active lease. Returns True if released."""
+        _log.info("release_lease: lease=%s", lease_id)
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE execution.leases SET status = 'RELEASED', released_at = NOW() "
+                "WHERE id = %s AND status = 'ACTIVE'",
+                (lease_id,),
+            )
+            conn.commit()
+            released = cursor.rowcount > 0
+            if released:
+                _log.info("release_lease: released %s", lease_id)
+            else:
+                _log.warning("release_lease: lease %s not found or not ACTIVE", lease_id)
+            return released
+
+    def expire_lease(self, lease_id: str) -> bool:
+        """Mark a lease as expired. Returns True if expired."""
+        _log.info("expire_lease: lease=%s", lease_id)
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE execution.leases SET status = 'EXPIRED' "
+                "WHERE id = %s AND status = 'ACTIVE'",
+                (lease_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def expire_stale_leases(self) -> int:
+        """Mark all leases past their expires_at as EXPIRED. Returns count."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE execution.leases SET status = 'EXPIRED' "
+                "WHERE status = 'ACTIVE' AND expires_at < NOW()"
+            )
+            conn.commit()
+            count = cursor.rowcount
+            if count > 0:
+                _log.info("expire_stale_leases: expired %d leases", count)
+            return count
+
+    def renew_lease(self, lease_id: str, ttl_seconds: int = 300) -> bool:
+        """Renew an active lease (extend TTL). Returns True if renewed."""
+        _log.info("renew_lease: lease=%s ttl=%d", lease_id, ttl_seconds)
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE execution.leases SET ttl_seconds = %s, "
+                "expires_at = NOW() + (%s || ' seconds')::interval "
+                "WHERE id = %s AND status = 'ACTIVE'",
+                (ttl_seconds, str(ttl_seconds), lease_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def create_attempt(
+        self,
+        lease_id: str,
+        request_id: str,
+        executor_id: str,
+    ) -> dict:
+        """Create an execution attempt. Returns the attempt dict."""
+        _log.info("create_attempt: lease=%s request=%s executor=%s", lease_id, request_id, executor_id)
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """INSERT INTO execution.attempts
+                   (lease_id, request_id, executor_id, status)
+                   VALUES (%s, %s, %s, 'CREATED')
+                   RETURNING *""",
+                (lease_id, request_id, executor_id),
+            )
+            conn.commit()
+            return cursor.dict_fetchone()
+
+    def start_attempt(self, attempt_id: str) -> bool:
+        """Mark attempt as RUNNING. Returns True if updated."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                "UPDATE execution.attempts SET status = 'RUNNING', started_at = NOW() "
+                "WHERE id = %s AND status = 'CREATED'",
+                (attempt_id,),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def complete_attempt(
+        self,
+        attempt_id: str,
+        status: str,  # SUCCEEDED, FAILED, TIMED_OUT
+        exit_code: Optional[int] = None,
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+    ) -> bool:
+        """Complete an execution attempt. Returns True if updated."""
+        _log.info("complete_attempt: attempt=%s status=%s exit_code=%s", attempt_id, status, exit_code)
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """UPDATE execution.attempts
+                   SET status = %s, completed_at = NOW(),
+                       exit_code = %s, result = %s, error = %s
+                   WHERE id = %s""",
+                (status, exit_code, json.dumps(result or {}), error, attempt_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def issue_execution_receipt(
+        self,
+        attempt_id: str,
+        request_id: str,
+        receipt_type: str,
+        agent_role: str = "",
+        summary: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> dict:
+        """Issue an immutable receipt from an attempt. Returns the receipt dict."""
+        _log.info("issue_execution_receipt: attempt=%s type=%s role=%s", attempt_id, receipt_type, agent_role)
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """INSERT INTO execution.receipts
+                   (attempt_id, request_id, type, agent_role, summary, metadata)
+                   VALUES (%s, %s, %s, %s, %s, %s)
+                   RETURNING *""",
+                (attempt_id, request_id, receipt_type, agent_role, summary,
+                 json.dumps(metadata or {})),
+            )
+            conn.commit()
+            return cursor.dict_fetchone()
+
+    def get_or_create_execution_request(
+        self,
+        plan_id: str,
+        title: str = "",
+        objective: str = "",
+    ) -> dict:
+        """Get or create an execution request for a plan. Returns the request dict.
+
+        Uses the plan ID as the business key. If a request already exists for this
+        plan, returns the existing one.
+        """
+        business_key = f"plan-{plan_id}"
+        with self._get_connection() as conn:
+            # Try to get existing
+            cursor = conn.execute(
+                "SELECT * FROM execution.requests WHERE source_plan_id = %s",
+                (plan_id,),
+            )
+            existing = cursor.dict_fetchone()
+            if existing:
+                return existing
+
+            # Create new
+            cursor = conn.execute(
+                """INSERT INTO execution.requests
+                   (business_key, title, objective, source_plan_id, status)
+                   VALUES (%s, %s, %s, %s, 'DRAFT')
+                   ON CONFLICT (business_key) DO UPDATE SET title = EXCLUDED.title
+                   RETURNING *""",
+                (business_key, title, objective, plan_id),
+            )
+            conn.commit()
+            return cursor.dict_fetchone()
+
+    # ── Execution Authority (ADR-006): Cascade Admission ─────────────────
+
+    def cascade_admission(self) -> int:
+        """Cascade VALIDATED → ADMITTED → READY for eligible requests.
+
+        This is the admission subscriber that runs as part of the pipeline.
+        It transitions requests through the admission gate automatically.
+
+        Returns the number of requests transitioned to READY.
+        """
+        count = 0
+        with self._get_connection() as conn:
+            # Step 1: VALIDATED → ADMITTED
+            cursor = conn.execute(
+                """UPDATE execution.requests
+                   SET status = 'ADMITTED', updated_at = NOW()
+                   WHERE status = 'VALIDATED'
+                   RETURNING id, title"""
+            )
+            admitted = cursor.fetchall()
+            if admitted:
+                _log.info("cascade_admission: admitted %d request(s)", len(admitted))
+                for row in admitted:
+                    _log.info("cascade_admission: admitted %s (%s)", row[0], row[1])
+
+            # Step 2: ADMITTED → READY
+            cursor = conn.execute(
+                """UPDATE execution.requests
+                   SET status = 'READY', updated_at = NOW()
+                   WHERE status = 'ADMITTED'
+                   RETURNING id, title"""
+            )
+            ready = cursor.fetchall()
+            if ready:
+                _log.info("cascade_admission: ready %d request(s)", len(ready))
+                for row in ready:
+                    _log.info("cascade_admission: ready %s (%s)", row[0], row[1])
+                    count += 1
+
+            conn.commit()
+        return count
+
+    def get_requests_by_status(self, status: str, limit: int = 50) -> list:
+        """Get requests by status. Returns list of dicts."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """SELECT * FROM execution.requests
+                   WHERE status = %s
+                   ORDER BY created_at DESC
+                   LIMIT %s""",
+                (status, limit),
+            )
+            return cursor.dict_fetchall()
