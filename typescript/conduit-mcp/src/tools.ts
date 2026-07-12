@@ -1,5 +1,5 @@
-import crypto from "crypto";
-import http from "http";
+import crypto from "node:crypto";
+import http from "node:http";
 import { PipelineWatcher } from "./watcher";
 import { createError, createSuccess } from "./errors";
 import { validate } from "./validate";
@@ -38,8 +38,8 @@ import {
   WorkRequestStatus,
   CompilerOutput,
 } from "./runtime-kernel";
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 
 import {
   validateImplementationPlan,

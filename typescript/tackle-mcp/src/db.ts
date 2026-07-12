@@ -1,4 +1,11 @@
-import { Pool, PoolClient } from "pg";
+import { Pool, PoolClient, types } from "pg";
+
+// ── Keep timestamps as ISO strings ─────────────────────────────────
+// pg parses TIMESTAMPTZ into Date objects by default. Override to keep
+// strings so all existing code (which writes/expects ISO 8601 strings)
+// continues to work when we migrate TEXT columns to TIMESTAMPTZ.
+types.setTypeParser(types.builtins.TIMESTAMPTZ, (val: string) => val);
+types.setTypeParser(types.builtins.TIMESTAMP, (val: string) => val);
 
 // ── Connection ──────────────────────────────────────────────────────
 
@@ -24,6 +31,8 @@ export async function initDb(): Promise<Pool> {
     await client.query(`SET search_path TO ${TACKLE_SCHEMA}`);
     const exec = (sql: string, params?: any[]) => client.query(sql, params);
     await createSchema(exec);
+    await runMigrations(exec);
+    console.log(`Tackle schema initialized in PG schema ${TACKLE_SCHEMA}.`);
   } finally {
     client.release();
   }
@@ -111,6 +120,12 @@ async function createSchema(
   await exec(`CREATE SCHEMA IF NOT EXISTS ${TACKLE_SCHEMA}`);
 
   await exec(`
+    CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.schema_version (
+      version     INTEGER PRIMARY KEY,
+      description TEXT NOT NULL,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.providers (
       id           TEXT PRIMARY KEY,
       name         TEXT NOT NULL,
@@ -121,24 +136,24 @@ async function createSchema(
       endpoint_url TEXT,
       api_key      TEXT,
       config_json  TEXT NOT NULL DEFAULT '{}',
-      created_at   TEXT NOT NULL,
-      updated_at   TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.roles (
       id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       name        TEXT NOT NULL UNIQUE,
       description TEXT NOT NULL DEFAULT '',
-      created_at  TEXT NOT NULL,
-      updated_at  TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.harnesses (
       id                   TEXT PRIMARY KEY,
       name                 TEXT NOT NULL,
       invocation_semantics TEXT NOT NULL DEFAULT '{}',
-      created_at           TEXT NOT NULL,
-      updated_at           TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.models (
@@ -147,8 +162,8 @@ async function createSchema(
       harness_id       TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.harnesses(id) ON DELETE CASCADE,
       provider_id      TEXT REFERENCES ${TACKLE_SCHEMA}.providers(id),
       model_identifier TEXT NOT NULL,
-      created_at       TEXT NOT NULL,
-      updated_at       TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.config_bundle (
@@ -164,12 +179,12 @@ async function createSchema(
       command         TEXT,
       endpoint_url    TEXT,
       timeout_ms      INTEGER,
-      valid_from      TEXT,
-      valid_to        TEXT,
+      valid_from TIMESTAMPTZ,
+      valid_to TIMESTAMPTZ,
       is_active       INTEGER NOT NULL DEFAULT 1,
       metadata        TEXT NOT NULL DEFAULT '{}',
-      created_at      TEXT NOT NULL,
-      updated_at      TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(role, model_id)
     );
   `);
@@ -179,8 +194,8 @@ async function createSchema(
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.sessions (
       id          TEXT PRIMARY KEY,
       agent_role  TEXT NOT NULL DEFAULT 'test',
-      start_iso   TEXT NOT NULL,
-      end_iso     TEXT,
+      start_iso TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      end_iso TIMESTAMPTZ,
       exit_code   INTEGER,
       pid         INTEGER,
       is_running  INTEGER NOT NULL DEFAULT 1,
@@ -191,7 +206,7 @@ async function createSchema(
       cost_usd    REAL DEFAULT 0,
       workflow_id TEXT,
       run_id      TEXT,
-      created_at TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
 
@@ -200,30 +215,20 @@ async function createSchema(
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.circuit_breaker (
       id                       INTEGER PRIMARY KEY,
       tripped                  INTEGER NOT NULL DEFAULT 0,
-      tripped_at               TEXT,
+      tripped_at TIMESTAMPTZ,
       error                    TEXT,
       detail                   TEXT,
       source                   TEXT,
       retry_after              INTEGER DEFAULT 1800,
       paused                   INTEGER NOT NULL DEFAULT 0,
-      wake_requested_at        TEXT,
+      wake_requested_at TIMESTAMPTZ,
       max_retries_per_model    INTEGER NOT NULL DEFAULT 3,
       retry_delay_seconds      INTEGER NOT NULL DEFAULT 120,
       max_fallbacks            INTEGER NOT NULL DEFAULT 3,
       push_back_to_pending     INTEGER NOT NULL DEFAULT 1,
-      updated_at               TEXT
+      updated_at               TIMESTAMPTZ
     );
   `);
-
-  // Seed default roles (idempotent)
-  await exec(seedDefaultRoles());
-
-  // Seed default circuit breaker row
-  await exec(`
-    INSERT INTO ${TACKLE_SCHEMA}.circuit_breaker (id, tripped, updated_at)
-    VALUES (1, 0, $1)
-    ON CONFLICT (id) DO NOTHING
-  `, [new Date().toISOString()]);
 
   // ── Agent scheduler (cron-driven agent runs) ───────────────────────
   await exec(`
@@ -239,11 +244,11 @@ async function createSchema(
       schedule_value   INTEGER NOT NULL DEFAULT 3600,
       project_dir      TEXT NOT NULL DEFAULT '/home/codex/dev',
       enabled          INTEGER NOT NULL DEFAULT 1,
-      last_run_at      TEXT,
+      last_run_at TIMESTAMPTZ,
       last_run_status  TEXT,
       metadata         TEXT NOT NULL DEFAULT '{}',
-      created_at       TEXT NOT NULL,
-      updated_at       TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
 
@@ -329,10 +334,247 @@ async function createSchema(
     END $$;
   `);
 
-  // Seed memory procedures (idempotent)
-  await exec(seedMemoryProcedures());
+  console.log(`Tackle schema DDL applied in PG schema ${TACKLE_SCHEMA}.`);
+}
 
-  console.log(`Tackle schema initialized in PG schema ${TACKLE_SCHEMA}.`);
+// ── Schema versioning (formal migration system) ─────────────────────
+
+/** A single migration step, ordered by version number. */
+interface Migration {
+  version: number;
+  description: string;
+  up: (exec: (sql: string, params?: any[]) => Promise<any>) => Promise<void>;
+}
+
+/**
+ * Ordered list of schema migrations for the tackle schema.
+ *
+ * - Version 1 is the baseline: all tables and DDL in createSchema() are the
+ *   source of truth. On fresh databases this is a no-op that records v1.
+ * - Version 2 adds missing PRIMARY KEY and UNIQUE constraints to tables
+ *   that were created by older migrations without them (the 2026-07-11
+ *   outage root cause).
+ * - Future migrations should be appended here with incrementing version
+ *   numbers. Each runs exactly once, in order.
+ */
+const migrations: Migration[] = [
+  {
+    version: 1,
+    description: "Baseline — all core tables (providers, roles, harnesses, models, config_bundle, sessions, circuit_breaker, agent_scheduler, memory, role_memory)",
+    up: async () => {
+      // No-op: the DDL in createSchema() is the source of truth for v1.
+    },
+  },
+  {
+    version: 2,
+    description: "Add missing PRIMARY KEY and UNIQUE constraints for tables created by older migrations without them (2026-07-11 outage fix)",
+    up: async (exec) => {
+      await exec(`
+        DO $$
+        BEGIN
+          -- providers.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'providers_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.providers'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.providers ADD PRIMARY KEY (id);
+          END IF;
+          -- roles.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'roles_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.roles'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.roles ADD PRIMARY KEY (id);
+          END IF;
+          -- roles.name UNIQUE
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'roles_name_key'
+            AND conrelid = '${TACKLE_SCHEMA}.roles'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.roles ADD CONSTRAINT roles_name_key UNIQUE (name);
+          END IF;
+          -- harnesses.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'harnesses_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.harnesses'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.harnesses ADD PRIMARY KEY (id);
+          END IF;
+          -- models.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'models_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.models'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.models ADD PRIMARY KEY (id);
+          END IF;
+          -- config_bundle.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'config_bundle_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.config_bundle'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.config_bundle ADD PRIMARY KEY (id);
+          END IF;
+          -- config_bundle (role, model_id) UNIQUE
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'config_bundle_role_model_id_key'
+            AND conrelid = '${TACKLE_SCHEMA}.config_bundle'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.config_bundle
+              ADD CONSTRAINT config_bundle_role_model_id_key UNIQUE (role, model_id);
+          END IF;
+          -- circuit_breaker.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'circuit_breaker_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.circuit_breaker'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.circuit_breaker ADD PRIMARY KEY (id);
+          END IF;
+          -- memory.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'memory_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.memory'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.memory ADD PRIMARY KEY (id);
+          END IF;
+          -- memory.slug UNIQUE
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'memory_slug_key'
+            AND conrelid = '${TACKLE_SCHEMA}.memory'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.memory ADD CONSTRAINT memory_slug_key UNIQUE (slug);
+          END IF;
+          -- role_memory.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'role_memory_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.role_memory'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.role_memory ADD PRIMARY KEY (id);
+          END IF;
+        END $$;
+      `);
+    },
+  },
+  {
+    version: 3,
+    description: "Add missing PRIMARY KEY constraints to tackle.sessions and tackle.agent_scheduler (idempotent)",
+    up: async (exec) => {
+      await exec(`
+        DO $$
+        BEGIN
+          -- tackle.sessions.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'sessions_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.sessions'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.sessions ADD PRIMARY KEY (id);
+          END IF;
+          -- tackle.agent_scheduler.id PK (SERIAL column, should have PK but older migration may have missed it)
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'agent_scheduler_pkey'
+            AND conrelid = '${TACKLE_SCHEMA}.agent_scheduler'::regclass) THEN
+            ALTER TABLE ${TACKLE_SCHEMA}.agent_scheduler ADD PRIMARY KEY (id);
+          END IF;
+        END $$;
+      `);
+      console.log("[tackle-migrations] v3: Added PKs to tackle.sessions, tackle.agent_scheduler");
+    },
+  },
+  {
+    version: 4,
+    description: "Add performance indexes on sessions(created_at, agent_role) and agent_scheduler(enabled, last_run_at)",
+    up: async (exec) => {
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_sessions_created_at
+          ON ${TACKLE_SCHEMA}.sessions (created_at DESC)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_sessions_agent_role
+          ON ${TACKLE_SCHEMA}.sessions (agent_role)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_agent_scheduler_due
+          ON ${TACKLE_SCHEMA}.agent_scheduler (enabled, last_run_at)
+      `);
+      console.log("[tackle-migrations] v4: Added indexes on sessions, agent_scheduler");
+    },
+  },
+  {
+    version: 5,
+    description: "Seed default roles and memory procedures (moved from createSchema to run after constraint-fix migrations)",
+    up: async (exec) => {
+      // Seed default circuit breaker row (idempotent)
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.circuit_breaker (id, tripped, updated_at)
+         VALUES (1, 0, $1)
+         ON CONFLICT (id) DO NOTHING`,
+        [new Date().toISOString()]
+      );
+
+      // Seed default roles (idempotent, parameterized)
+      await seedDefaultRoles(exec);
+
+      // Seed memory procedures (idempotent — all values are hardcoded constants)
+      await exec(seedMemoryProcedures());
+
+      console.log("[tackle-migrations] v5: Seeded circuit breaker, default roles, and memory procedures");
+    },
+  },
+  {
+    version: 6,
+    description: "Migrate TEXT timestamp columns to TIMESTAMPTZ — tackle-owned tables (roles, sessions, circuit_breaker, agent_scheduler, schema_version). Shared tables (providers, harnesses, models, config_bundle) are handled by conduit-mcp v27.",
+    up: async (exec) => {
+      // agent_scheduler.created_at and updated_at have DEFAULT ''::text — drop before ALTER
+      await exec(`ALTER TABLE tackle.agent_scheduler ALTER COLUMN created_at DROP DEFAULT`);
+      await exec(`ALTER TABLE tackle.agent_scheduler ALTER COLUMN updated_at DROP DEFAULT`);
+
+      const tables: [string, string[]][] = [
+        ["tackle.roles", ["created_at", "updated_at"]],
+        ["tackle.sessions", ["created_at", "start_iso", "end_iso"]],
+        ["tackle.circuit_breaker", ["tripped_at", "updated_at", "wake_requested_at"]],
+        ["tackle.agent_scheduler", ["created_at", "updated_at", "last_run_at"]],
+        ["tackle.schema_version", ["applied_at"]],
+      ];
+      for (const [tbl, cols] of tables) {
+        const [sch, tname] = tbl.split('.');
+        for (const col of cols) {
+          await exec(`
+            DO $$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = '${sch}'
+                AND table_name = '${tname}'
+                AND column_name = '${col}'
+                AND data_type = 'text'
+              ) THEN
+                ALTER TABLE ${tbl} ALTER COLUMN ${col} TYPE TIMESTAMPTZ USING CASE WHEN ${col} = '' THEN NULL WHEN ${col} ~ '[+-]\\d{2}:\\d{2}Z$' THEN REPLACE(${col}, 'Z', '')::timestamptz ELSE ${col}::timestamptz END;
+              END IF;
+            END $$;
+          `);
+        }
+      }
+
+      // Restore proper NOW() defaults
+      await exec(`ALTER TABLE tackle.agent_scheduler ALTER COLUMN created_at SET DEFAULT NOW()`);
+      await exec(`ALTER TABLE tackle.agent_scheduler ALTER COLUMN updated_at SET DEFAULT NOW()`);
+
+      console.log("[tackle-migrations] v6: Migrated TEXT→TIMESTAMPTZ for tackle-owned tables");
+    },
+  },
+];
+
+/**
+ * Run pending migrations. Called from initDb() after createSchema(),
+ * using the same dedicated connection so search_path is consistent.
+ *
+ * Reads the current version from schema_version, then applies any
+ * migrations with version > current version in ascending order.
+ */
+/** Advisory lock key to prevent concurrent migration runs from
+ *  multiple instances starting simultaneously. */
+const MIGRATION_LOCK_KEY = 873492874;
+
+async function runMigrations(
+  exec: (sql: string, params?: any[]) => Promise<any>,
+): Promise<void> {
+  // Acquire an advisory lock to prevent concurrent migrations from
+  // multiple instances starting simultaneously.
+  await exec(`SELECT pg_advisory_lock(${MIGRATION_LOCK_KEY})`);
+  try {
+    const result = await exec(
+      `SELECT COALESCE(MAX(version), 0) AS current_version FROM ${TACKLE_SCHEMA}.schema_version`
+    );
+    const currentVersion = (result as any)?.rows?.[0]?.current_version ?? 0;
+
+    for (const m of migrations) {
+      if (m.version <= currentVersion) continue;
+      console.log(`[tackle-migrations] Applying v${m.version}: ${m.description}`);
+      await m.up(exec);
+      const now = new Date().toISOString();
+      await exec(
+        `INSERT INTO ${TACKLE_SCHEMA}.schema_version (version, description, applied_at) VALUES ($1, $2, $3)`,
+        [m.version, m.description, now]
+      );
+      console.log(`[tackle-migrations] v${m.version} applied`);
+    }
+  } finally {
+    await exec(`SELECT pg_advisory_unlock(${MIGRATION_LOCK_KEY})`);
+  }
 }
 
 // ── Default roles seed ─────────────────────────────────────────────
@@ -349,16 +591,18 @@ const DEFAULT_ROLES: { name: string; description: string }[] = [
   { name: "test", description: "Internal test harness role — used for test invoke sessions and ad-hoc agent runs" },
 ];
 
-function seedDefaultRoles(): string {
+async function seedDefaultRoles(
+  exec: (sql: string, params?: any[]) => Promise<any>,
+): Promise<void> {
   const now = new Date().toISOString();
-  let sql = "";
   for (const r of DEFAULT_ROLES) {
-    sql += `
-    INSERT INTO ${TACKLE_SCHEMA}.roles (name, description, created_at, updated_at)
-    VALUES ('${r.name}', '${r.description.replace(/'/g, "''")}', '${now}', '${now}')
-    ON CONFLICT (name) DO NOTHING;\n`;
+    await exec(
+      `INSERT INTO ${TACKLE_SCHEMA}.roles (name, description, created_at, updated_at)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (name) DO NOTHING`,
+      [r.name, r.description, now, now]
+    );
   }
-  return sql;
 }
 
 // ── Memory procedure seed function ─────────────────────────────────
@@ -2094,10 +2338,9 @@ export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
     WHERE enabled = 1
       AND (
         last_run_at IS NULL
-        OR last_run_at = ''
         OR (
           schedule_type = 'interval'
-          AND EXTRACT(EPOCH FROM NOW() - last_run_at::timestamp) >= schedule_value
+          AND EXTRACT(EPOCH FROM NOW() - last_run_at) >= schedule_value
         )
       )
     ORDER BY last_run_at ASC NULLS FIRST

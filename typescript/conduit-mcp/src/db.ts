@@ -1,5 +1,12 @@
-import crypto from "crypto";
-import { Pool, PoolClient } from "pg";
+import crypto from "node:crypto";
+import { Pool, PoolClient, types } from "pg";
+
+// ── Keep timestamps as ISO strings ─────────────────────────────────
+// pg parses TIMESTAMPTZ into Date objects by default. Override to keep
+// strings so all existing code (which writes/expects ISO 8601 strings)
+// continues to work when we migrate TEXT columns to TIMESTAMPTZ.
+types.setTypeParser(types.builtins.TIMESTAMPTZ, (val: string) => val);
+types.setTypeParser(types.builtins.TIMESTAMP, (val: string) => val);
 
 // ── Connection ──────────────────────────────────────────────────────
 
@@ -255,8 +262,8 @@ async function createSchema(
       notes         TEXT NOT NULL DEFAULT '',
       priority      INTEGER NOT NULL DEFAULT 0,
       deleted       INTEGER NOT NULL DEFAULT 0,
-      created_at    TEXT NOT NULL,
-      updated_at    TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_plans_status ON plans(updated_at);
 
@@ -264,7 +271,7 @@ async function createSchema(
     CREATE TABLE IF NOT EXISTS schema_version (
       version     INTEGER PRIMARY KEY,
       description TEXT NOT NULL,
-      applied_at  TEXT NOT NULL
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
 
@@ -285,9 +292,9 @@ async function createSchema(
                           )),
       session_id          TEXT,
       created_by_receipt  TEXT NOT NULL DEFAULT '',
-      created_at          TEXT NOT NULL,
-      claimed_at          TEXT,
-      closed_at           TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      claimed_at TIMESTAMPTZ,
+      closed_at TIMESTAMPTZ,
       token_budget        INTEGER,
       tokens_used         INTEGER,
       cost_budget_usd     REAL,
@@ -297,8 +304,8 @@ async function createSchema(
       owner               TEXT NOT NULL DEFAULT '',
       parent_ticket_id    TEXT REFERENCES ${VISION_SCHEMA}.tickets(id),
       spawn_reason        TEXT,
-      last_activity       TEXT,      expires_at          TEXT,
-          deadline            TEXT,
+      last_activity       TEXT,      expires_at TIMESTAMPTZ,
+          deadline            TIMESTAMPTZ,
           confidence          REAL,
           closure_reason      TEXT,
       replacement_of      TEXT REFERENCES ${VISION_SCHEMA}.tickets(id)
@@ -323,15 +330,15 @@ async function createSchema(
       artifact_path TEXT,
       summary       TEXT NOT NULL DEFAULT '',
       metadata_json TEXT NOT NULL DEFAULT '{}',
-      created_at    TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       ticket_id     TEXT REFERENCES ${VISION_SCHEMA}.tickets(id),
       tokens_used   INTEGER DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS sessions (
       id              TEXT PRIMARY KEY,
       agent_role      TEXT NOT NULL,
-      start_iso       TEXT NOT NULL,
-      end_iso         TEXT,
+      start_iso TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      end_iso TIMESTAMPTZ,
       exit_code       INTEGER,
       retries_used    INTEGER DEFAULT 0,
       plans_processed TEXT NOT NULL DEFAULT '[]',
@@ -345,11 +352,11 @@ async function createSchema(
       total_work_seconds REAL NOT NULL DEFAULT 0,
       workflow_id     TEXT,
       run_id          TEXT,
-      workflow_start_time TEXT,
-      workflow_close_time TEXT,
+      workflow_start_time TIMESTAMPTZ,
+      workflow_close_time TIMESTAMPTZ,
       workflow_run_time_ms REAL,
       workflow_result TEXT,
-      created_at      TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       tags            TEXT NOT NULL DEFAULT '[]'
     );
 
@@ -367,7 +374,7 @@ async function createSchema(
     CREATE TABLE IF NOT EXISTS circuit_breaker (
       id                     INTEGER PRIMARY KEY DEFAULT 1 CHECK(id = 1),
       tripped                INTEGER DEFAULT 0,
-      tripped_at             TEXT,
+      tripped_at TIMESTAMPTZ,
       retry_after            INTEGER DEFAULT 1800,
       error                  TEXT,
       detail                 TEXT,
@@ -378,13 +385,13 @@ async function createSchema(
       retry_delay_seconds    INTEGER DEFAULT 120,
       max_fallbacks          INTEGER DEFAULT 3,
       push_back_to_pending   INTEGER DEFAULT 1,
-      updated_at             TEXT
+      updated_at             TIMESTAMPTZ
     );
 
     INSERT INTO circuit_breaker (id, tripped) VALUES (1, 0)
     ON CONFLICT (id) DO NOTHING;
 
-    ALTER TABLE circuit_breaker ADD COLUMN IF NOT EXISTS wake_requested_at TEXT;
+    ALTER TABLE circuit_breaker ADD COLUMN IF NOT EXISTS wake_requested_at TIMESTAMPTZ;
 
     -- ════════════════════════════════════════════════════════════════
     -- Token cost tracking tables (plan 1018)
@@ -396,7 +403,7 @@ async function createSchema(
       input_price_per_token  DOUBLE PRECISION NOT NULL,
       output_price_per_token DOUBLE PRECISION NOT NULL,
       cache_hit_price        DOUBLE PRECISION,
-      updated_at             TEXT NOT NULL
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS agent_budgets (
@@ -407,8 +414,8 @@ async function createSchema(
       current_tokens  INTEGER NOT NULL DEFAULT 0,
       reset_period    TEXT NOT NULL DEFAULT 'monthly'
                       CHECK(reset_period IN ('daily','weekly','monthly')),
-      reset_at        TEXT,
-      updated_at      TEXT NOT NULL
+      reset_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS cost_logs (
@@ -420,7 +427,7 @@ async function createSchema(
       output_tokens     INTEGER NOT NULL DEFAULT 0,
       estimated_cost_usd REAL,
       actual_cost_usd   REAL,
-      recorded_at       TEXT NOT NULL,
+      recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       tags              TEXT NOT NULL DEFAULT '[]'
     );
 
@@ -431,11 +438,11 @@ async function createSchema(
     CREATE TABLE IF NOT EXISTS ${PEB_SCHEMA}.role_circuit_breaker (
       role            TEXT PRIMARY KEY,
       tripped         INTEGER DEFAULT 0,
-      tripped_at      TEXT,
+      tripped_at TIMESTAMPTZ,
       retry_after     INTEGER DEFAULT 1800,
       error           TEXT,
       failure_count   INTEGER DEFAULT 0,
-      updated_at      TEXT
+      updated_at      TIMESTAMPTZ
     );
 
     -- governance_events: observability spine from vision → peb
@@ -514,16 +521,16 @@ async function createSchema(
       endpoint_url TEXT,
       api_key      TEXT,
       config_json  TEXT NOT NULL DEFAULT '{}',
-      created_at   TEXT NOT NULL,
-      updated_at   TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.harnesses (
       id                   TEXT PRIMARY KEY,
       name                 TEXT NOT NULL,
       invocation_semantics TEXT NOT NULL DEFAULT '{}',
-      created_at           TEXT NOT NULL,
-      updated_at           TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.models (
@@ -532,8 +539,8 @@ async function createSchema(
       harness_id       TEXT NOT NULL REFERENCES ${TACKLE_SCHEMA}.harnesses(id) ON DELETE CASCADE,
       provider_id      TEXT REFERENCES ${TACKLE_SCHEMA}.providers(id),
       model_identifier TEXT NOT NULL,
-      created_at       TEXT NOT NULL,
-      updated_at       TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
     CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.config_bundle (
@@ -549,12 +556,12 @@ async function createSchema(
       command         TEXT,
       endpoint_url    TEXT,
       timeout_ms      INTEGER,
-      valid_from      TEXT,
-      valid_to        TEXT,
+      valid_from TIMESTAMPTZ,
+      valid_to TIMESTAMPTZ,
       is_active       INTEGER NOT NULL DEFAULT 1,
       metadata        TEXT NOT NULL DEFAULT '{}',
-      created_at      TEXT NOT NULL,
-      updated_at      TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE(role, model_id)
     );
 
@@ -705,7 +712,7 @@ const migrations: Migration[] = [
     version: 6,
     description: "Add deadline TEXT column to tickets for target completion date",
     up: async (exec) => {
-      await exec(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS deadline TEXT`);
+      await exec(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS deadline TIMESTAMPTZ`);
     },
   },
   {
@@ -829,7 +836,7 @@ const migrations: Migration[] = [
             'ticket_id', r.ticket_id,
             'tokens_used', r.tokens_used
           ),
-          r.created_at::timestamptz
+          r.created_at
         FROM ${VISION_SCHEMA}.receipts r
         WHERE NOT EXISTS (
           SELECT 1 FROM ${PEB_SCHEMA}.governance_events g WHERE g.receipt_id = r.id
@@ -1065,7 +1072,7 @@ const migrations: Migration[] = [
     version: 16,
     description: "Add last_heartbeat_at TEXT column to sessions for agent-liveness tracking",
     up: async (exec) => {
-      await exec(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_heartbeat_at TEXT`);
+      await exec(`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ`);
     },
   },
   {
@@ -1863,7 +1870,7 @@ const migrations: Migration[] = [
             format(
               'plan %s stuck pending: only PLAN_CREATE receipt(s) for %ss (threshold=%ss), open builder ticket %s',
               p.id,
-              EXTRACT(EPOCH FROM NOW() - MIN(r.created_at::timestamptz))::int,
+              EXTRACT(EPOCH FROM NOW() - MIN(r.created_at))::int,
               p_threshold_seconds,
               t.id
             ) AS detail
@@ -1880,7 +1887,7 @@ const migrations: Migration[] = [
                 AND r2.type != 'PLAN_CREATE'
             )
           GROUP BY p.id, t.id
-          HAVING EXTRACT(EPOCH FROM NOW() - MIN(r.created_at::timestamptz))::int > p_threshold_seconds;
+          HAVING EXTRACT(EPOCH FROM NOW() - MIN(r.created_at))::int > p_threshold_seconds;
         END;
         $FUNC$ LANGUAGE plpgsql STABLE
       `);
@@ -1890,6 +1897,336 @@ const migrations: Migration[] = [
         SELECT count(*) FILTER (WHERE kind = 'STUCK_PENDING_PLAN_AGE') AS kind5_rows
         FROM vision.check_receipt_integrity()
       `);
+    },
+  },
+  {
+    version: 25,
+    description: "Add FK constraints to tackle.config_bundle, agent_scheduler, sessions, and role_memory referencing tackle.roles(name) — idempotent, safe for fresh DB and existing DB",
+    up: async (exec) => {
+      // Seed default tackle roles (idempotent — mirrors tackle-mcp/src/db.ts seedDefaultRoles)
+      // Needed for fresh-DB standalone operation (conduit-mcp creates tackle schema tables)
+      const now = new Date().toISOString();
+      const defaultRoles = [
+        { name: "engineer", desc: "Primary implementation agent — writes code, runs commands, integrates systems" },
+        { name: "architect", desc: "System design authority — owns architecture decisions, cross-system contracts, and design lineage" },
+        { name: "planner", desc: "Work decomposition authority — creates and manages implementation plans, promotes proposals" },
+        { name: "builder", desc: "Implementation executor — picks up pending plans and implements them against acceptance criteria" },
+        { name: "reviewer", desc: "Quality gate — reviews changes, issues approval/rejection receipts" },
+        { name: "critic", desc: "Adversarial evaluator — surfaces risks, contradictions, and blind spots" },
+        { name: "analyst", desc: "Gap and triage analyst — identifies missing coverage, classifies incidents" },
+        { name: "inspector", desc: "Compliance auditor — verifies invariants, issues violation reports" },
+        { name: "test", desc: "Internal test harness role — used for test invoke sessions and ad-hoc agent runs" },
+      ];
+      for (const r of defaultRoles) {
+        await exec(
+          `INSERT INTO tackle.roles (name, description, created_at, updated_at)
+           VALUES ($1, $2, $3, $3)
+           ON CONFLICT (name) DO NOTHING`,
+          [r.name, r.desc, now]
+        );
+      }
+
+      // Add FK constraints idempotently (mirrors tackle-mcp/src/db.ts lines 294-330)
+      await exec(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_config_bundle_role') THEN
+            ALTER TABLE tackle.config_bundle
+              ADD CONSTRAINT fk_config_bundle_role
+              FOREIGN KEY (role) REFERENCES tackle.roles(name);
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_agent_scheduler_role') THEN
+            ALTER TABLE tackle.agent_scheduler
+              ADD CONSTRAINT fk_agent_scheduler_role
+              FOREIGN KEY (role) REFERENCES tackle.roles(name);
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_role_memory_role') THEN
+            ALTER TABLE tackle.role_memory
+              ADD CONSTRAINT fk_role_memory_role
+              FOREIGN KEY (role) REFERENCES tackle.roles(name);
+          END IF;
+
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_sessions_agent_role') THEN
+            ALTER TABLE tackle.sessions
+              ADD CONSTRAINT fk_sessions_agent_role
+              FOREIGN KEY (agent_role) REFERENCES tackle.roles(name);
+          END IF;
+        END $$;
+      `);
+
+      console.log("[migrations] v25: FK constraints added to tackle schema (config_bundle, agent_scheduler, sessions, role_memory → roles.name)");
+    },
+  },
+  {
+    version: 26,
+    description: "Add missing PRIMARY KEY constraints to vision.receipts, vision.vision_ir_artifacts, and peb.role_circuit_breaker (idempotent — safe for fresh and legacy DBs)",
+    up: async (exec) => {
+      await exec(`
+        DO $$
+        BEGIN
+          -- vision.receipts.id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'receipts_pkey'
+            AND conrelid = '${VISION_SCHEMA}.receipts'::regclass) THEN
+            ALTER TABLE ${VISION_SCHEMA}.receipts ADD PRIMARY KEY (id);
+          END IF;
+          -- vision.vision_ir_artifacts.artifact_id PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'vision_ir_artifacts_pkey'
+            AND conrelid = '${VISION_SCHEMA}.vision_ir_artifacts'::regclass) THEN
+            ALTER TABLE ${VISION_SCHEMA}.vision_ir_artifacts ADD PRIMARY KEY (artifact_id);
+          END IF;
+          -- peb.role_circuit_breaker.role PK
+          IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'role_circuit_breaker_pkey'
+            AND conrelid = '${PEB_SCHEMA}.role_circuit_breaker'::regclass) THEN
+            ALTER TABLE ${PEB_SCHEMA}.role_circuit_breaker ADD PRIMARY KEY (role);
+          END IF;
+        END $$;
+      `);
+      console.log("[migrations] v26: Added PKs to vision.receipts, vision.vision_ir_artifacts, peb.role_circuit_breaker");
+    },
+  },
+  {
+    version: 27,
+    description: "Migrate TEXT timestamp columns to TIMESTAMPTZ — conduit core tables and tackle shared tables (providers, harnesses, models, config_bundle)",
+    up: async (exec) => {
+      const tables: [string, string[]][] = [
+        ["conduit.plans", ["created_at", "updated_at"]],
+        ["conduit.schema_version", ["applied_at"]],
+        ["conduit.sessions", ["created_at", "start_iso", "end_iso", "last_heartbeat_at", "last_activity", "workflow_start_time", "workflow_close_time"]],
+        ["conduit.circuit_breaker", ["tripped_at", "updated_at", "wake_requested_at"]],
+        ["conduit.work_requests", ["created_at", "updated_at"]],
+        ["tackle.providers", ["created_at", "updated_at"]],
+        ["tackle.harnesses", ["created_at", "updated_at"]],
+        ["tackle.models", ["created_at", "updated_at"]],
+        ["tackle.config_bundle", ["created_at", "updated_at", "valid_from", "valid_to"]],
+      ];
+      for (const [tbl, cols] of tables) {
+        const [sch, tname] = tbl.split('.');
+        for (const col of cols) {
+          await exec(`
+            DO $$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = '${sch}'
+                AND table_name = '${tname}'
+                AND column_name = '${col}'
+                AND data_type = 'text'
+              ) THEN
+                ALTER TABLE ${tbl} ALTER COLUMN ${col} TYPE TIMESTAMPTZ USING CASE WHEN ${col} = '' THEN NULL WHEN ${col} ~ '[+-]\\d{2}:\\d{2}Z$' THEN REPLACE(${col}, 'Z', '')::timestamptz ELSE ${col}::timestamptz END;
+              END IF;
+            END $$;
+          `);
+        }
+      }
+      console.log("[migrations] v27: Migrated TEXT→TIMESTAMPTZ for conduit core + tackle shared tables");
+    },
+  },
+  {
+    version: 28,
+    description: "Migrate TEXT timestamp columns to TIMESTAMPTZ — conduit utility tables (cost_logs, model_pricing, agent_budgets, pipeline_cursor, role_circuit_breaker)",
+    up: async (exec) => {
+      // role_circuit_breaker.created_at has DEFAULT ''::text — drop it before ALTER
+      await exec(`ALTER TABLE conduit.role_circuit_breaker ALTER COLUMN created_at DROP DEFAULT`);
+
+      const tables: [string, string[]][] = [
+        ["conduit.cost_logs", ["recorded_at"]],
+        ["conduit.model_pricing", ["updated_at"]],
+        ["conduit.agent_budgets", ["reset_at", "updated_at"]],
+        ["conduit.pipeline_cursor", ["updated_at"]],
+        ["conduit.role_circuit_breaker", ["created_at", "tripped_at", "updated_at"]],
+      ];
+      for (const [tbl, cols] of tables) {
+        const [sch, tname] = tbl.split('.');
+        for (const col of cols) {
+          await exec(`
+            DO $$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = '${sch}'
+                AND table_name = '${tname}'
+                AND column_name = '${col}'
+                AND data_type = 'text'
+              ) THEN
+                ALTER TABLE ${tbl} ALTER COLUMN ${col} TYPE TIMESTAMPTZ USING CASE WHEN ${col} = '' THEN NULL WHEN ${col} ~ '[+-]\\d{2}:\\d{2}Z$' THEN REPLACE(${col}, 'Z', '')::timestamptz ELSE ${col}::timestamptz END;
+              END IF;
+            END $$;
+          `);
+        }
+      }
+
+      // Restore proper NOW() default
+      await exec(`ALTER TABLE conduit.role_circuit_breaker ALTER COLUMN created_at SET DEFAULT NOW()`);
+
+      console.log("[migrations] v28: Migrated TEXT→TIMESTAMPTZ for conduit utility tables");
+    },
+  },
+  {
+    version: 29,
+    description: "Migrate TEXT timestamp columns to TIMESTAMPTZ — conduit kernel/log tables (kernel_delta_log, kernel_snapshot, lineage_log, bridge_checkpoint)",
+    up: async (exec) => {
+      // bridge_checkpoint.last_recorded_on_dt has DEFAULT ''::text — drop it before ALTER
+      await exec(`ALTER TABLE conduit.bridge_checkpoint ALTER COLUMN last_recorded_on_dt DROP DEFAULT`);
+
+      // kernel tables have to_char(now(),...)::text defaults — drop before ALTER
+      await exec(`ALTER TABLE conduit.kernel_delta_log ALTER COLUMN created_at DROP DEFAULT`);
+      await exec(`ALTER TABLE conduit.kernel_snapshot ALTER COLUMN created_at DROP DEFAULT`);
+      await exec(`ALTER TABLE conduit.lineage_log ALTER COLUMN created_at DROP DEFAULT`);
+
+      const tables: [string, string[]][] = [
+        ["conduit.kernel_delta_log", ["created_at"]],
+        ["conduit.kernel_snapshot", ["created_at"]],
+        ["conduit.lineage_log", ["created_at"]],
+        ["conduit.bridge_checkpoint", ["last_recorded_on_dt"]],
+      ];
+      for (const [tbl, cols] of tables) {
+        const [sch, tname] = tbl.split('.');
+        for (const col of cols) {
+          await exec(`
+            DO $$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = '${sch}'
+                AND table_name = '${tname}'
+                AND column_name = '${col}'
+                AND data_type = 'text'
+              ) THEN
+                ALTER TABLE ${tbl} ALTER COLUMN ${col} TYPE TIMESTAMPTZ USING CASE WHEN ${col} = '' THEN NULL WHEN ${col} ~ '[+-]\\d{2}:\\d{2}Z$' THEN REPLACE(${col}, 'Z', '')::timestamptz ELSE ${col}::timestamptz END;
+              END IF;
+            END $$;
+          `);
+        }
+      }
+      // Restore proper NOW() defaults on kernel tables
+      await exec(`ALTER TABLE conduit.kernel_delta_log ALTER COLUMN created_at SET DEFAULT NOW()`);
+      await exec(`ALTER TABLE conduit.kernel_snapshot ALTER COLUMN created_at SET DEFAULT NOW()`);
+      await exec(`ALTER TABLE conduit.lineage_log ALTER COLUMN created_at SET DEFAULT NOW()`);
+
+      console.log("[migrations] v29: Migrated TEXT→TIMESTAMPTZ for conduit kernel/log tables");
+    },
+  },
+  {
+    version: 30,
+    description: "Migrate TEXT timestamp columns to TIMESTAMPTZ — vision and peb tables (receipts, tickets, role_circuit_breaker)",
+        up: async (exec) => {
+      // conduit.plan_status VIEW depends on vision.receipts.created_at —
+      // must drop it before altering the column type, then recreate after.
+      await exec(`DROP VIEW IF EXISTS conduit.plan_status CASCADE`);
+
+      const tables: [string, string[]][] = [
+        ["vision.receipts", ["created_at"]],
+        ["vision.tickets", ["created_at", "claimed_at", "closed_at", "expires_at"]],
+        ["peb.role_circuit_breaker", ["tripped_at", "updated_at"]],
+      ];
+      for (const [tbl, cols] of tables) {
+        const [sch, tname] = tbl.split('.');
+        for (const col of cols) {
+          await exec(`
+            DO $$
+            BEGIN
+              IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = '${sch}'
+                AND table_name = '${tname}'
+                AND column_name = '${col}'
+                AND data_type = 'text'
+              ) THEN
+                ALTER TABLE ${tbl} ALTER COLUMN ${col} TYPE TIMESTAMPTZ USING CASE WHEN ${col} = '' THEN NULL WHEN ${col} ~ '[+-]\\d{2}:\\d{2}Z$' THEN REPLACE(${col}, 'Z', '')::timestamptz ELSE ${col}::timestamptz END;
+              END IF;
+            END $$;
+          `);
+        }
+      }
+
+      // Recreate the plan_status and plans_by_status views
+      await exec(`
+        CREATE VIEW conduit.plan_status AS
+        SELECT
+          p.*,
+          CASE
+            WHEN EXISTS (
+              SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'HOLD'
+              AND NOT EXISTS (
+                SELECT 1 FROM vision.receipts r2
+                WHERE r2.plan_id = p.id
+                AND r2.type IN ('CANCELLED', 'ABANDONED')
+                AND r2.created_at > r.created_at
+              )
+            ) THEN 'HOLD'
+            WHEN (
+              SELECT r.type FROM vision.receipts r
+              WHERE r.plan_id = p.id
+              AND r.type NOT IN ('PLANNING', 'HOLD')
+              ORDER BY r.created_at DESC LIMIT 1
+            ) = 'REQUEUED' THEN 'PLAN_CREATE'
+            WHEN EXISTS (
+              SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_PASS'
+              AND NOT EXISTS (
+                SELECT 1 FROM vision.receipts r2
+                WHERE r2.plan_id = p.id
+                AND r2.type IN ('BLOCK', 'PLAN_BLOCK', 'CANCELLED', 'ABANDONED')
+                AND r2.created_at > r.created_at
+              )
+            ) THEN 'REVIEW_PASS'
+            WHEN EXISTS (
+              SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_REJECT'
+            ) THEN COALESCE(
+              (SELECT r.type FROM vision.receipts r
+               WHERE r.plan_id = p.id
+               AND r.type != 'BLOCK'
+               ORDER BY r.created_at DESC LIMIT 1),
+              'PLAN_CREATE'
+            )
+            ELSE COALESCE(
+              (SELECT r.type FROM vision.receipts r
+               WHERE r.plan_id = p.id
+               AND r.type NOT IN ('PLANNING', 'HOLD')
+               ORDER BY r.created_at DESC LIMIT 1),
+              (SELECT r.type FROM vision.receipts r
+               WHERE r.plan_id = p.id
+               ORDER BY r.created_at DESC LIMIT 1),
+              NULL
+            )
+          END AS derived_status
+        FROM nebula.plans p
+        WHERE p.deleted = 0
+      `);
+
+      await exec(`
+        CREATE VIEW conduit.plans_by_status AS
+        SELECT
+          ps.id, ps.file_name, ps.title, ps.project, ps.goal, ps.content,
+          ps.files_affected, ps.acceptance_criteria, ps.dependencies,
+          ps.prompt_ref, ps.notes, ps.priority, ps.deleted,
+          ps.created_at, ps.updated_at, ps.derived_status AS status
+        FROM conduit.plan_status ps
+      `);
+
+      console.log("[migrations] v30: Migrated TEXT→TIMESTAMPTZ for vision + peb tables");
+    },
+  },
+  {
+    version: 31,
+    description: "Migrate vision.tickets.deadline TEXT → TIMESTAMPTZ (missed by original audit — naming pattern didn't match _at/_iso/_dt)",
+    up: async (exec) => {
+      await exec(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'vision'
+            AND table_name = 'tickets'
+            AND column_name = 'deadline'
+            AND data_type = 'text'
+          ) THEN
+            ALTER TABLE vision.tickets ALTER COLUMN deadline TYPE TIMESTAMPTZ USING NULLIF(deadline, '')::timestamptz;
+          END IF;
+        END $$;
+      `);
+      console.log("[migrations] v31: Migrated vision.tickets.deadline TEXT→TIMESTAMPTZ");
     },
   },
 ];
@@ -2416,7 +2753,7 @@ export async function getStaleSessions(staleThresholdSeconds: number): Promise<S
     `SELECT * FROM sessions
      WHERE is_running = 1
      AND last_heartbeat_at IS NOT NULL
-     AND (EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM last_heartbeat_at::timestamptz)) > @threshold`,
+     AND (EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM last_heartbeat_at)) > @threshold`,
     { threshold: staleThresholdSeconds }
   );
 }

@@ -260,6 +260,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+
 DROP TRIGGER IF EXISTS trg_update_wr_state ON conduit.work_request_events;
 CREATE TRIGGER trg_update_wr_state
     AFTER INSERT ON conduit.work_request_events

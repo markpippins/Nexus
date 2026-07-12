@@ -1,9 +1,9 @@
 import express from "express";
 import cors from "cors";
-import path from "path";
-import crypto from "crypto";
-import fs from "fs";
-import { spawn } from "child_process";
+import path from "node:path";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import { spawn } from "node:child_process";
 import { PipelineWatcher } from "./watcher";
 import { registerToolHandlers, toolDefinitions } from "./tools";
 import { createError, createSuccess } from "./errors";
@@ -58,7 +58,7 @@ import {
   WorkRequestState,
   RuntimeEvent,
 } from "./runtime-kernel";
-import http from "http";
+import http from "node:http";
 import { loadEnv } from "./env"; // shared .env loader (no dotenv dependency)
 
 // .env already loaded by env.ts at module evaluation time
