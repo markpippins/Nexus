@@ -48,7 +48,7 @@ const DEFAULT_PREFERENCES: UiPreferences = {
   explorerConsoleHeight: 20,
   detailPaneWidth: null,
   detailPaneSavedHeight: null,
-  theme: 'theme-light',
+  theme: 'theme-steel',
   fontSize: 'base',
   showImportDependencyWarning: true,
 };
