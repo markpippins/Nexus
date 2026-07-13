@@ -146,6 +146,57 @@ def fetch_candidate(candidate_id: str) -> dict | None:
         return None
 
 
+def check_candidate_dedup(title: str, threshold: float = 0.6) -> dict | None:
+    """Check if a candidate title duplicates an existing intent_record or
+    implementation_plan (trigram similarity).
+
+    Returns a dict with match info if duplicate, None if clean.
+    Uses psql() (docker exec) consistent with the rest of this script.
+    """
+    if not title:
+        return None
+
+    escaped = title.replace("'", "''")
+
+    # Check intent_records first (most likely duplicate source)
+    sql = f"""
+        SELECT id, title, similarity(title, '{escaped}') AS score
+        FROM nebula.intent_records
+        WHERE similarity(title, '{escaped}') > {threshold}
+        ORDER BY score DESC LIMIT 1;
+    """
+    rc, out, _ = psql(sql)
+    if rc == 0 and out:
+        parts = out.split("|")
+        if len(parts) >= 3:
+            return {
+                "source": "intent_record",
+                "id": parts[0].strip(),
+                "title": parts[1].strip(),
+                "score": float(parts[2].strip()),
+            }
+
+    # Check implementation_plans
+    sql = f"""
+        SELECT plan_number, title, similarity(title, '{escaped}') AS score
+        FROM nebula.implementation_plans
+        WHERE similarity(title, '{escaped}') > {threshold}
+        ORDER BY score DESC LIMIT 1;
+    """
+    rc, out, _ = psql(sql)
+    if rc == 0 and out:
+        parts = out.split("|")
+        if len(parts) >= 3:
+            return {
+                "source": "implementation_plan",
+                "id": parts[0].strip(),
+                "title": parts[1].strip(),
+                "score": float(parts[2].strip()),
+            }
+
+    return None
+
+
 def create_intent_record(candidate: dict) -> str | None:
     """Create an intent_record linked to this candidate.
 
@@ -214,6 +265,15 @@ def promote_candidate(candidate: dict, dry_run: bool = False, skip_agenda: bool 
     if cpf is None or cpf < 0.0:
         result["error"] = f"Low CPF: {cpf}"
         log.warn("  Skipping: CPF not computed")
+        return result
+
+    # Deduplication gate: check against intent_records and implementation_plans
+    dedup_match = check_candidate_dedup(candidate["title"], threshold=0.6)
+    if dedup_match:
+        result["error"] = f"Duplicate of {dedup_match['source']}:{dedup_match['id']} (score={dedup_match['score']:.2f})"
+        result["duplicate_of"] = dedup_match
+        log.info("  ✗ Skipped (dedup): matches %s '%s' (score=%.2f)",
+                 dedup_match["source"], dedup_match["title"][:50], dedup_match["score"])
         return result
 
     log.info("─" * 60)
@@ -342,8 +402,19 @@ def main():
     # Summary
     log.info("=" * 60)
     successes = [r for r in results if r["success"]]
-    failures = [r for r in results if not r["success"]]
-    log.info("PROMOTION RESULTS: %d success, %d failed", len(successes), len(failures))
+    failures = [r for r in results if not r["success"] and not r.get("duplicate_of")]
+    dedup_skips = [r for r in results if r.get("duplicate_of")]
+    log.info("PROMOTION RESULTS: %d success, %d dedup-skipped, %d failed",
+             len(successes), len(dedup_skips), len(failures))
+
+    if dedup_skips:
+        log.info("─" * 60)
+        log.info("Dedup skipped (%d):", len(dedup_skips))
+        for d in dedup_skips:
+            dup = d.get("duplicate_of", {})
+            log.info("  ⊘ %s → %s:%s (score=%.2f)",
+                     d["title"][:45], dup.get("source", "?"), dup.get("id", "?")[:8],
+                     dup.get("score", 0))
 
     if failures:
         log.info("─" * 60)
