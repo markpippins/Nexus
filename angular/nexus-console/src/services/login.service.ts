@@ -32,6 +32,20 @@ export class LoginService {
     return fullUrl;
   }
 
+  async isLoggedIn(profile: BrokerProfile, token: string): Promise<boolean> {
+    try {
+      const response = await this.brokerService.submitRequest<{ ok: boolean; data: boolean }>(
+        this.constructBrokerUrl(profile.brokerUrl ?? ''),
+        SERVICE_NAME,
+        'isLoggedIn',
+        { token }
+      );
+      return response?.data === true;
+    } catch {
+      return false;
+    }
+  }
+
   async logout(profile: BrokerProfile, token: string): Promise<void> {
     await this.brokerService.submitRequest<boolean>(
       this.constructBrokerUrl(profile.brokerUrl ?? ''),

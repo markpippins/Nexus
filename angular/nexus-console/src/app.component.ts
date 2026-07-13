@@ -1198,19 +1198,13 @@ export class AppComponent implements OnInit, OnDestroy {
       this.healthCheckService.statusMap(); // Dependency
       this.loadFolderTree();
 
-      // Handles auto-connecting on startup, once profiles are loaded.
+      // Handles session restoration and auto-connect on startup, once profiles are loaded.
       if (!this.initialAutoConnectAttempted) {
         const profiles = this.profileService.profiles();
         if (profiles.length > 0) {
           this.initialAutoConnectAttempted = true;
-          for (const profile of profiles) {
-            if (profile.autoConnect) {
-              // Attempt to auto-connect without credentials. This is a placeholder for a
-              // more robust session/token management system. For now, we assume this is
-              // only for profiles that don't need interactive login.
-              this.onLoginAndMount({ profile, email: 'auto@auto.com', password: 'auto-password' });
-            }
-          }
+          // First, try to restore sessions from persisted tokens (survives page refresh)
+          this.restoreSessions();
         }
       }
     }, { allowSignalWrites: true });
@@ -1959,32 +1953,34 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   // --- Login and Connection Management ---
-  async onLoginAndMount({ profile, email, password }: { profile: BrokerProfile, email: string, password: string }): Promise<void> {
+
+  /**
+   * Shared connection logic: creates providers, pulse-checks, lists mounts,
+   * and populates all mounted-state signals. Used by both onLoginAndMount
+   * (after fresh login) and restoreSessions (after page refresh).
+   */
+  private async connectProfile(profile: BrokerProfile, token: string, user: User): Promise<{ fsHealthy: boolean }> {
+    const provider = new RemoteFileSystemService(profile, this.fsService, token);
+    const imageService = new ImageService(profile, this.imageClientService, this.preferencesService, this.healthCheckService, this.localConfigService);
+
+    // Pulse check the file-system server before listing mounts
+    let fsHealthy = false;
     try {
-      const { user, token } = await this.loginService.login(profile, email, password);
+      fsHealthy = await provider.pulseCheck();
+    } catch {
+      // File-system server unreachable
+    }
 
-      const provider = new RemoteFileSystemService(profile, this.fsService, token);
-      const imageService = new ImageService(profile, this.imageClientService, this.preferencesService, this.healthCheckService, this.localConfigService);
+    this.filesystemHealth.update(m => new Map(m).set(profile.name, fsHealthy));
 
-      // Pulse check the file-system server before listing mounts
-      let fsHealthy = false;
+    if (fsHealthy) {
       try {
-        fsHealthy = await provider.pulseCheck();
-      } catch (pulseErr) {
-        this.toastService.show(`File-system server is unreachable for ${profile.name}.`, 'warning');
+        await provider.ensureDefaultDirectory();
+      } catch {
+        console.warn(`Could not ensure default directory for ${profile.name}`);
       }
 
-      this.filesystemHealth.update(m => new Map(m).set(profile.name, fsHealthy));
-
-      if (fsHealthy) {
-        // Ensure the user's default directory exists
-        try {
-          await provider.ensureDefaultDirectory();
-        } catch (dirErr) {
-          console.warn(`Could not ensure default directory for ${profile.name}:`, dirErr);
-        }
-
-        // Load mounts BEFORE updating mountedProfiles so the tree rebuild sees mount data
+      try {
         const mounts = await provider.listMounts();
         provider.setMounts(mounts);
         this.mountedProfileMounts.update(map => {
@@ -1992,19 +1988,105 @@ export class AppComponent implements OnInit, OnDestroy {
           m.set(profile.name, mounts);
           return m;
         });
-      } else {
+      } catch {
+        console.warn(`Could not list mounts for ${profile.name}`);
+      }
+    }
+
+    // Populate mounted state
+    this.mountedProfiles.update(p => [...p, profile]);
+    this.mountedProfileUsers.update(m => new Map(m).set(profile.id, user));
+    this.mountedProfileTokens.update(m => new Map(m).set(profile.id, token));
+    this.remoteProviders.update(m => new Map(m).set(profile.name, provider));
+    this.remoteImageServices.update(m => new Map(m).set(profile.name, imageService));
+    this.notesService.setToken(profile.id, token);
+
+    // Sync mounts to all providers
+    this.syncProviderMounts();
+
+    return { fsHealthy };
+  }
+
+  /**
+   * Attempt to restore sessions from persisted localStorage tokens.
+   * Called once on startup after profiles are loaded.
+   * For each profile with a stored token, validates it against the backend
+   * and re-establishes the connection if still valid.
+   * Falls through to interactive auto-login for autoConnect profiles with no valid stored token.
+   */
+  private async restoreSessions(): Promise<void> {
+    const profiles = this.profileService.profiles();
+
+    for (const profile of profiles) {
+      try {
+        const storedToken = localStorage.getItem(`nexus-token-${profile.id}`);
+        if (!storedToken) {
+          // No stored token — try auto-connect if enabled
+          if (profile.autoConnect) {
+            this.onLoginAndMount({ profile, email: 'auto@auto.com', password: 'auto-password' });
+          }
+          continue;
+        }
+
+        // Validate the stored token against the backend
+        const isValid = await this.loginService.isLoggedIn(profile, storedToken);
+
+        if (!isValid) {
+          // Token expired or invalid — clean up and fall through to auto-connect
+          try {
+            localStorage.removeItem(`nexus-token-${profile.id}`);
+            localStorage.removeItem(`nexus-user-${profile.id}`);
+          } catch { /* ignore */ }
+
+          if (profile.autoConnect) {
+            this.onLoginAndMount({ profile, email: 'auto@auto.com', password: 'auto-password' });
+          }
+          continue;
+        }
+
+        // Token is valid — restore the user from localStorage or create a minimal one
+        let user: User;
+        try {
+          const storedUser = localStorage.getItem(`nexus-user-${profile.id}`);
+          user = storedUser ? JSON.parse(storedUser) : { id: '', profileId: profile.id, alias: profile.name, email: '' };
+        } catch {
+          user = { id: '', profileId: profile.id, alias: profile.name, email: '' };
+        }
+
+        // Re-establish the connection using the shared helper
+        await this.connectProfile(profile, storedToken, user);
+
+        console.log(`[AppComponent] Session restored for ${profile.name}`);
+        this.toastService.showInfo(`Session restored for ${profile.name}`);
+
+      } catch (e) {
+        console.warn(`[AppComponent] Session restore failed for ${profile.name}:`, e);
+        // If restore fails and autoConnect is set, fall through to interactive login
+        if (profile.autoConnect) {
+          try {
+            this.onLoginAndMount({ profile, email: 'auto@auto.com', password: 'auto-password' });
+          } catch { /* ignore fallback failure */ }
+        }
+      }
+    }
+  }
+
+  async onLoginAndMount({ profile, email, password }: { profile: BrokerProfile, email: string, password: string }): Promise<void> {
+    try {
+      const { user, token } = await this.loginService.login(profile, email, password);
+
+      // Use the shared connection helper
+      const { fsHealthy } = await this.connectProfile(profile, token, user);
+
+      if (!fsHealthy) {
         this.toastService.show(`File-system server is unreachable for ${profile.name}.`, 'warning');
       }
 
-      this.mountedProfiles.update(p => [...p, profile]);
-      this.mountedProfileUsers.update(m => new Map(m).set(profile.id, user));
-      this.mountedProfileTokens.update(m => new Map(m).set(profile.id, token));
-      this.remoteProviders.update(m => new Map(m).set(profile.name, provider));
-      this.remoteImageServices.update(m => new Map(m).set(profile.name, imageService));
-      this.notesService.setToken(profile.id, token);
-
-      // Sync mounts to remaining providers (provider already has them via setMounts above)
-      this.syncProviderMounts();
+      // Persist token and user to localStorage so session survives page refresh
+      try {
+        localStorage.setItem(`nexus-token-${profile.id}`, token);
+        localStorage.setItem(`nexus-user-${profile.id}`, JSON.stringify(user));
+      } catch { /* localStorage may be full or unavailable */ }
 
       this.toastService.show(`Successfully connected to ${profile.name}.`);
 
@@ -2064,6 +2146,12 @@ export class AppComponent implements OnInit, OnDestroy {
         return p;
       });
     });
+
+    // Clean up persisted session data
+    try {
+      localStorage.removeItem(`nexus-token-${profile.id}`);
+      localStorage.removeItem(`nexus-user-${profile.id}`);
+    } catch { /* localStorage may be unavailable */ }
 
     this.loadFolderTree();
     this.toastService.show(`Disconnected from ${profile.name}.`);
