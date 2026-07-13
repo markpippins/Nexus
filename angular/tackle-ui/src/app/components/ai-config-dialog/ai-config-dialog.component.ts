@@ -1,4 +1,4 @@
-import { Component, HostListener, signal, inject, OnDestroy } from '@angular/core';
+import { Component, HostListener, signal, computed, inject, OnDestroy } from '@angular/core';
 import { NgFor, NgSwitch, NgSwitchCase, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AIConfigService, AIProvider, AIHarness, AIModel, AIRoleConfig, LogLevel, FailureRecoveryConfig } from '../../services/ai-config.service';
@@ -19,8 +19,6 @@ const PROVIDER_TYPES = [
   { value: 'lm_server', label: 'LM Server' },
   { value: 'custom', label: 'Custom' },
 ];
-
-const ROLES = ['planner', 'builder', 'reviewer', 'critic'];
 
 interface HarnessSemanticsForm {
   binary: string;
@@ -442,7 +440,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                     <input class="filter-input" style="width:240px" [ngModel]="roleFilter()" (ngModelChange)="roleFilter.set($event)" placeholder="🔍 Filter by model, provider, harness…" />
                     @if (roleFilter()) {<button class="filter-clear" (click)="roleFilter.set('')">✕</button>}
                   </span>
-                  <span class="roles-hint">{{ filteredRoles().length }} / {{ ROLES.length }} roles · Each role can have multiple models (ordered by priority), each with its own provider and harness</span>
+                  <span class="roles-hint">{{ filteredRoles().length }} / {{ roleNames().length }} roles · Each role can have multiple models (ordered by priority), each with its own provider and harness</span>
                   <div class="roles-toolbar-btns">
                     <button class="btn-save-sm" (click)="saveAllRoles()" [disabled]="!hasDirtyRoles()">💾 Save</button>
                     @if (hasDirtyRoles()) {<span class="roles-dirty-badge">● Pending changes</span>}
@@ -498,7 +496,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                           </div>
                         </td>
                       </tr>
-                      @if (ROLES.length > 0 && filteredRoles().length === 0) {
+                      @if (roleNames().length > 0 && filteredRoles().length === 0) {
                         <tr>
                           <td colspan="2" class="empty-table-cell">No roles match your filter</td>
                         </tr>
@@ -973,7 +971,8 @@ export class AIConfigDialogComponent implements OnDestroy {
   ];
 
   readonly PROVIDER_TYPES = PROVIDER_TYPES;
-  readonly ROLES = ROLES;
+  /** Dynamic role names derived from the Roles Registry (tackle.roles table). */
+  readonly roleNames = computed(() => this.rolesRegistry().map(r => r.name));
   readonly CAPABILITY_KEYS = CAPABILITY_KEYS;
 
   // ── Edit state (per-tab form) ───────────────────────────────
@@ -1103,18 +1102,20 @@ export class AIConfigDialogComponent implements OnDestroy {
   constructor(public aiConfig: AIConfigService) {
     this.config = this.aiConfig.config;
     this.saving = this.aiConfig.saving;
-    for (const r of ROLES) {
-      this.roleEdits[r] = { model_entries: [] };
-    }
+    // roleEdits initialized dynamically in open() after roles are fetched
   }
 
   // ── Visibility ──────────────────────────────────────────────
   open(): void {
+    this.loadRolesRegistry();
     this.aiConfig.fetch().subscribe({
-      next: () => this._syncRoleEdits(),
+      next: () => {
+        // Initialize roleEdits for all roles from the registry, then sync with server config
+        this._initRoleEditsFromRegistry();
+        this._syncRoleEdits();
+      },
       error: () => {}, // silently ignore — roleEdits stay at empty state
     });
-    this.loadRolesRegistry();
     this.visible.set(true);
     this.activeTab.set('providers');
     this._resetAllForms();
@@ -1806,7 +1807,7 @@ export class AIConfigDialogComponent implements OnDestroy {
       bundles: { model_id: string; priority: number; provider_id?: string | null; harness_id?: string | null }[];
     }[] = [];
 
-    for (const r of ROLES) {
+    for (const r of this.roleNames()) {
       const edits = this.roleEdits[r];
       if (edits.model_entries.length === 0) continue;
       const primary = edits.model_entries[0];
@@ -1881,8 +1882,8 @@ export class AIConfigDialogComponent implements OnDestroy {
   /** Filter roles by searching assigned models' names, provider names, and harness names. */
   filteredRoles(): string[] {
     const q = this.roleFilter().toLowerCase().trim();
-    if (!q) return ROLES;
-    return ROLES.filter(r => {
+    if (!q) return this.roleNames();
+    return this.roleNames().filter(r => {
       const entries = this.roleEdits[r]?.model_entries ?? [];
       return entries.some(e => {
         const model = this.config().models.find(m => m.id === e.model_id);
@@ -1953,7 +1954,7 @@ export class AIConfigDialogComponent implements OnDestroy {
 
   /** True when any role's edits differ from the server config — computed fresh on each call. */
   hasDirtyRoles(): boolean {
-    return ROLES.some(r => this.isRoleDirty(r));
+    return this.roleNames().some(r => this.isRoleDirty(r));
   }
 
   /** Compare a single role's edits against the server config (v098: per-model provider/harness). */
@@ -2075,10 +2076,22 @@ export class AIConfigDialogComponent implements OnDestroy {
     this.selectedModelId.set(null);
   }
 
+  /** Populate roleEdits for all roles from the Roles Registry. */
+  private _initRoleEditsFromRegistry(): void {
+    for (const r of this.roleNames()) {
+      if (!this.roleEdits[r]) {
+        this.roleEdits[r] = { model_entries: [] };
+      }
+    }
+  }
+
   /** Populate roleEdits from the latest config snapshot (v098: per-model provider/harness). */
   private _syncRoleEdits(): void {
     const c = this.config();
-    for (const r of ROLES) {
+    for (const r of this.roleNames()) {
+      if (!this.roleEdits[r]) {
+        this.roleEdits[r] = { model_entries: [] };
+      }
       const existing = c.roles.find(rc => rc.role === r);
       // Build model_entries from bundles (prioritized), fall back to single model_id
       const rm = (c.bundles ?? [])
