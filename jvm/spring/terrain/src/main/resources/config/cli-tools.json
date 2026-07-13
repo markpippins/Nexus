@@ -84,14 +84,14 @@
     "isInternal": true
   },
   {
-    "name": "HTML Chat Transcript Importer",
-    "toolPath": "python/absorb/html/main.py",
-    "description": "Imports HTML chat transcripts from ChatGPT, Copilot, Gemini, OpenCode, markdown. Converts to NormalizedMessages via DoclingAdapter pipeline",
-    "invocation": "python main.py <path> [--json] [-o out.json] [--ocr]",
+    "name": "Harvest Pipeline (Rover)",
+    "toolPath": "python/rover/batch_harvest_to_db.py",
+    "description": "Ingests HTML chat transcripts via Dockling, extracts candidates via LLM, promotes to intent_records",
+    "invocation": "python3 batch_harvest_to_db.py [--dry-run] [--limit N]",
     "language": "Python",
     "category": "tools/data-ingestion",
-    "startup": "python python/absorb/html/main.py",
-    "health": "supports HTML, PDF, DOCX, MD, images",
+    "startup": "python python/rover/batch_harvest_to_db.py",
+    "health": "supports HTML transcripts via Dockling",
     "isInternal": true
   },
   {

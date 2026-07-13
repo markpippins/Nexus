@@ -239,7 +239,6 @@ graph LR
         VS2("vision-srv :3104") --> NS1
         TM1 --> TERR1("terrain :8084")
         SWD1("steward") --> PG1
-        ABS1("absorb") --> PG1
         FS1("fs / media-metadata :8004") --> MONGO1("MongoDB :27017")
         VYG1("voyager") --> NATS1("NATS :4222")
         PK1("peb-kernel :8080") -- "peb-mcp bridge" --> PM1("peb-mcp (stdio)")
@@ -419,11 +418,10 @@ NATS JetStream   ← cascade — event publication
 | **cascade** | Event pipeline | System of Record for Thought — converts activity to history |
 | **conduit** | app/, cli/, bridge/, wrp_kernel/ | WRP orchestrator, bridge daemon, kernel runtime |
 | **meep** | End-to-end pipeline | Minimal deterministic pipeline (text → CER log) |
-| **rover** | Harvest pipeline | Chat/NLP/LOSM → knowledge graph with Ollama embeddings |
+| **rover** | Harvest pipeline | Chat/NLP/LOSM → knowledge graph with Ollama embeddings; HTML transcript ingestion via Dockling (DockLang), candidate extraction via LLM, promotion to intent_records. Includes file_size tracking and reharvest-on-growth logic. |
 | **steward** | migrate_graph.py | Knowledge Graph Migration — reads `nexus/graph/nexus-knowledge-graph.json`, parses entity sections (types, actors, epistemic_types, architectural_observations, decisions, gaps_and_blockers, rules, topology, boundaries), and inserts into `knowledge.graph_entities`, `knowledge.graph_edges`, `knowledge.graph_cross_references`. Maintains migration history in `knowledge.graph_migrations`. Exclusive write path for the knowledge graph. |
 | **voyager** | Scanner, TopologyEngine, Publisher | Filesystem Acquisition Layer — CLI tool and daemon using **Scanner** with **DedupeCache** (Redis) for change detection, **Publisher** (NATS) for emitting observations, and **TopologyEngine** for structural pattern detection (vanishing directories, evolution, containment, adjacency signals). |
 | **fs** | fs-crawler (FastAPI :8004), fs-crawler-adapter (:8001) | Media Metadata Indexing Service — scan/status/search/metadata/duplicate-detection/file-rule operations. Uses Redis + MongoDB + MySQL backends. **Note:** fs-crawler-adapter (:8001) is listed in port allocation but its source code could not be verified — may be aspirational or located outside the main fs/ tree. The broker adapter wraps the REST API for service-registry integration, enabling discovery by broker-gateway. |
-| **absorb** | NexusVM, DoclingAdapter, FSM, multi-parsers (chatgpt, gemini, copilot, markdown, opencode) | Ingestion & Absorption Pipeline — converts chat transcripts, HTML, PDF, DOCX, PPTX, EPUB, and images into structured knowledge using **DoclingAdapter**. Multi-parser architecture (ChatGPT HTML, Gemini, Copilot, OpenCode, markdown). **NexusVM** — temporal DAG execution ledger with fork/merge timeline semantics. Cryptographically chained deterministic Kernel with FSM Controller (5-step trace: schema validation → FSM → causality check → graph mutation → hash chain). |
 
 ### WRP Pipeline — Internal Architecture
 
@@ -504,4 +502,4 @@ NATS JetStream   ← cascade — event publication
 
 ---
 
-*Last updated: 2026-06-29. Sources: `terrain.service_dependencies`, `terrain.runnable_services`, `terrain.mcp_servers`, `nexus/python/conduit/bridge/daemon.py`, `nexus/python/conduit/wrp_kernel/engine.py`, `nexus/python/steward/migrate_graph.py`, `nexus/python/voyager/src/`, `nexus/python/fs/`, `nexus/python/absorb/html/`, `nexus/audit/SERVICE_TOPOLOGY.md` (self-audit), ARCHITECTURE.md.*
+*Last updated: 2026-07-12. Sources: `terrain.service_dependencies`, `terrain.runnable_services`, `terrain.mcp_servers`, `nexus/python/conduit/bridge/daemon.py`, `nexus/python/conduit/wrp_kernel/engine.py`, `nexus/python/steward/migrate_graph.py`, `nexus/python/voyager/src/`, `nexus/python/fs/`, `nexus/python/rover/`, `nexus/audit/SERVICE_TOPOLOGY.md` (self-audit), ARCHITECTURE.md.*
