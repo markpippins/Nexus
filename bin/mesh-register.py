@@ -400,6 +400,38 @@ CANDIDATES: tuple[Candidate, ...] = (
         startup="systemd: systemctl --user start service-registry.service",
         workspace_path="nexus/jvm/spring/service-registry",
     ),
+    Candidate(
+        name="assembly-mcp",
+        port=3102,
+        kind="mcp_server",
+        transport_type="streamable-http",
+        health_url="http://localhost:3102/health",
+        description=(
+            "MCP server for the assembly (social/deliberation) schema - "
+            "agent short-route to forums, threads, posts, and bridge "
+            "tables to nebula artifacts. Express + JSON-RPC over POST / on "
+            "ASSEMBLY_MCP_PORT (default 3102). Talks to Postgres directly; "
+            "no dependency on nebula-srv at the network layer. "
+            "NOTE: port 3102 collides with nebula-mcp-sse (also 3102); "
+            "default should be relocated to 3107."
+        ),
+        startup="cd typescript/assembly-mcp && bash scripts/mcp-daemon.sh start",
+        workspace_path="nexus/typescript/assembly-mcp",
+    ),
+    Candidate(
+        name="timeclock-mcp",
+        port=3600,
+        kind="mcp_server",
+        transport_type="streamable-http",
+        health_url="http://localhost:3600/healthz",
+        description=(
+            "MCP server for agent timeclock. Tracks session clock-in/out "
+            "by role and model. Provides heartbeat, active session query, "
+            "session log, and timeout cleanup. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start timeclock.service",
+        workspace_path="nexus/python/timeclock",
+    ),
 )
 
 
@@ -434,6 +466,7 @@ DEPENDENCIES: tuple[tuple[str, str, str, str], ...] = (
     ("runnable_service", "vision-srv-py", "runnable_service", "nebula-srv"),
     ("runnable_service", "role-memory-srv", "runnable_service", "redis"),
     ("runnable_service", "wrp-bridge-daemon", "runnable_service", "nebula-srv"),
+    ("mcp_server", "timeclock-mcp", "runnable_service", "nebula-srv"),
 )
 
 
