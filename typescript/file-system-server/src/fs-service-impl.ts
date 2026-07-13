@@ -60,20 +60,6 @@ function statToFsItem(name: string, stats: fs.Stats): FsItem {
   };
 }
 
-/**
- * Build user path from alias and request path
- */
-function buildUserPath(alias: string | undefined, requestPath: string[] = []): string[] {
-  const userPath: string[] = ['users'];
-  if (alias) {
-    userPath.push(alias);
-  }
-  if (requestPath && requestPath.length > 0) {
-    userPath.push(...requestPath);
-  }
-  return userPath;
-}
-
 export interface RestFsService {
   listFiles(ctx: HttpContext, input: FsRequest): Promise<FsListResponse>;
   changeDirectory(ctx: HttpContext, input: FsRequest): Promise<FsListResponse>;
@@ -98,8 +84,7 @@ export function createRestFsService(): RestFsService {
 
   return {
     async listFiles(ctx: HttpContext, input: FsRequest): Promise<FsListResponse> {
-      const userPath = buildUserPath(input.alias, input.path);
-      const targetPath = ensurePath(FS_ROOT_DIR, userPath);
+      const targetPath = ensurePath(FS_ROOT_DIR, input.path || []);
       
       logger.info('Listing directory', { path: targetPath, alias: input.alias });
       
@@ -124,8 +109,7 @@ export function createRestFsService(): RestFsService {
     },
 
     async changeDirectory(ctx: HttpContext, input: FsRequest): Promise<FsListResponse> {
-      const userPath = buildUserPath(input.alias, input.path);
-      const targetPath = ensurePath(FS_ROOT_DIR, userPath);
+      const targetPath = ensurePath(FS_ROOT_DIR, input.path || []);
       
       logger.info('Changing directory', { path: targetPath, alias: input.alias });
       
@@ -141,8 +125,7 @@ export function createRestFsService(): RestFsService {
     },
 
     async createDirectory(ctx: HttpContext, input: FsRequest): Promise<FsOperationResponse> {
-      const userPath = buildUserPath(input.alias, input.path);
-      const targetPath = ensurePath(FS_ROOT_DIR, userPath);
+      const targetPath = ensurePath(FS_ROOT_DIR, input.path || []);
       
       logger.info('Creating directory', { path: targetPath, alias: input.alias });
       
@@ -154,8 +137,7 @@ export function createRestFsService(): RestFsService {
     },
 
     async removeDirectory(ctx: HttpContext, input: FsRequest): Promise<FsOperationResponse> {
-      const userPath = buildUserPath(input.alias, input.path);
-      const targetPath = ensurePath(FS_ROOT_DIR, userPath);
+      const targetPath = ensurePath(FS_ROOT_DIR, input.path || []);
       
       logger.info('Removing directory', { path: targetPath, alias: input.alias });
       
@@ -171,8 +153,7 @@ export function createRestFsService(): RestFsService {
         throw new Error('Filename is required for createFile operation');
       }
       
-      const userPath = buildUserPath(input.alias, input.path);
-      const parentDirPath = ensurePath(FS_ROOT_DIR, userPath);
+      const parentDirPath = ensurePath(FS_ROOT_DIR, input.path || []);
       
       logger.info('Creating file', { filename: input.filename, path: parentDirPath, alias: input.alias });
       
@@ -190,8 +171,7 @@ export function createRestFsService(): RestFsService {
         throw new Error('Filename is required for deleteFile operation');
       }
       
-      const userPath = buildUserPath(input.alias, [...(input.path || []), input.filename]);
-      const targetPath = ensurePath(FS_ROOT_DIR, userPath);
+      const targetPath = ensurePath(FS_ROOT_DIR, [...(input.path || []), input.filename]);
       
       logger.info('Deleting file', { path: targetPath, alias: input.alias });
       
@@ -207,8 +187,7 @@ export function createRestFsService(): RestFsService {
         throw new Error('New name is required for rename operation');
       }
       
-      const userPath = buildUserPath(input.alias, input.path);
-      const sourcePath = ensurePath(FS_ROOT_DIR, userPath);
+      const sourcePath = ensurePath(FS_ROOT_DIR, input.path || []);
       const newPath = path.join(path.dirname(sourcePath), input.newName);
       
       logger.info('Renaming', { from: sourcePath, to: newPath, alias: input.alias });
@@ -231,11 +210,8 @@ export function createRestFsService(): RestFsService {
         throw new Error('Destination path is required for copy operation');
       }
       
-      const sourceUserPath = buildUserPath(input.alias, input.path);
-      const destUserPath = buildUserPath(input.toAlias || input.alias, input.toPath);
-      
-      const sourcePath = ensurePath(FS_ROOT_DIR, sourceUserPath);
-      const destPath = ensurePath(FS_ROOT_DIR, destUserPath);
+      const sourcePath = ensurePath(FS_ROOT_DIR, input.path || []);
+      const destPath = ensurePath(FS_ROOT_DIR, input.toPath || []);
       
       logger.info('Copying', { from: sourcePath, to: destPath, alias: input.alias });
       
@@ -252,11 +228,8 @@ export function createRestFsService(): RestFsService {
         throw new Error('Destination path is required for move operation');
       }
       
-      const sourceUserPath = buildUserPath(input.alias, input.path);
-      const destUserPath = buildUserPath(input.toAlias || input.alias, input.toPath);
-      
-      const sourcePath = ensurePath(FS_ROOT_DIR, sourceUserPath);
-      const destPath = ensurePath(FS_ROOT_DIR, destUserPath);
+      const sourcePath = ensurePath(FS_ROOT_DIR, input.path || []);
+      const destPath = ensurePath(FS_ROOT_DIR, input.toPath || []);
       
       logger.info('Moving', { from: sourcePath, to: destPath, alias: input.alias });
       
@@ -273,10 +246,7 @@ export function createRestFsService(): RestFsService {
         throw new Error('Destination path and items are required for moveItems operation');
       }
       
-      const sourceUserPath = buildUserPath(input.alias, input.path);
-      const destUserPath = buildUserPath(input.alias, input.toPath);
-      
-      const destPath = ensurePath(FS_ROOT_DIR, destUserPath);
+      const destPath = ensurePath(FS_ROOT_DIR, input.toPath || []);
       
       logger.info('Moving items', { 
         count: input.items.length, 
@@ -285,7 +255,7 @@ export function createRestFsService(): RestFsService {
       });
       
       for (const item of input.items) {
-        const sourcePath = ensurePath(FS_ROOT_DIR, [...sourceUserPath, item.name]);
+        const sourcePath = ensurePath(FS_ROOT_DIR, [...(input.path || []), item.name]);
         const destItemPath = path.join(destPath, item.name);
         await fs.rename(sourcePath, destItemPath);
       }
@@ -301,8 +271,7 @@ export function createRestFsService(): RestFsService {
         throw new Error('Filename is required for hasFile operation');
       }
       
-      const userPath = buildUserPath(input.alias, [...(input.path || []), input.filename]);
-      const targetPath = ensurePath(FS_ROOT_DIR, userPath);
+      const targetPath = ensurePath(FS_ROOT_DIR, [...(input.path || []), input.filename]);
       
       logger.info('Checking file existence', { path: targetPath, alias: input.alias });
       
@@ -319,8 +288,7 @@ export function createRestFsService(): RestFsService {
         throw new Error('Folder name is required for hasFolder operation');
       }
       
-      const userPath = buildUserPath(input.alias, [...(input.path || []), input.filename]);
-      const targetPath = ensurePath(FS_ROOT_DIR, userPath);
+      const targetPath = ensurePath(FS_ROOT_DIR, [...(input.path || []), input.filename]);
       
       logger.info('Checking folder existence', { path: targetPath, alias: input.alias });
       

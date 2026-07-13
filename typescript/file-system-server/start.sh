@@ -1,4 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-ROOT="${FS_ROOT_DIR:-fs_root}"
+export FS_ROOT_DIR="/home/codex/dev/nexus/typescript/file-system-server/root"
+ROOT="${FS_ROOT_DIR:-root}"
 exec bun run fs-serv.ts "$ROOT"

@@ -38,6 +38,7 @@ export class GatewayEditorComponent {
     // Output: emit when save is complete
     saved = output<void>();
     connectGateway = output<string>();
+    disconnect = output<string>();
 
     // Input: mounted profile IDs for connection status
     mountedProfileIds = input<string[]>([]);

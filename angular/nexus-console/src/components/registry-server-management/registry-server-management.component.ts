@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RegistryServerProfileService } from '../../services/registry-server-profile.service.js';
+import { HostProfileService } from '../../services/host-profile.service.js';
 import { RegistryServerProfile } from '../../models/registry-server-profile.model.js';
 
 @Component({
@@ -96,7 +96,7 @@ import { RegistryServerProfile } from '../../models/registry-server-profile.mode
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RegistryServerManagementComponent {
-  profileService = inject(RegistryServerProfileService);
+  profileService = inject(HostProfileService);
 
   profiles = this.profileService.profiles;
   toolbarAction = input<{ name: string; payload?: any; id: number } | null>(null);

@@ -26,6 +26,7 @@ ALL_SERVICES=(
     "service-registry.service"  # port 8085 — service discovery
     "broker-gateway.service"    # port 8081 — service broker gateway
     "terrain.service"          # port 8084 — topology registry
+    "file-system-server.service" # port 4040 — file system operations
     "peb-kernel.service"       # port 8080 — engineering brain
     "nebula-srv.service"       # Nebula RMS API
     "role-memory-srv.service"  # port 3500 — PG→Redis sync

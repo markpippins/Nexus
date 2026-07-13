@@ -111,7 +111,6 @@ graph TB
         RVR["rover<br/><small>Harvest pipeline</small>"]
         SWD["steward<br/><small>Knowledge Graph Migration<br/>JSON → knowledge.graph_*</small>"]
         VYG["voyager<br/><small>Filesystem Acquisition Layer<br/>Scanner + TopologyEngine → NATS</small>"]
-        ABS["absorb<br/><small>Ingestion Pipeline<br/>DoclingAdapter + NexusVM</small>"]
     end
 
     %% ===== INFRASTRUCTURE LAYER =====

@@ -1003,7 +1003,7 @@ export class AppComponent implements OnInit, OnDestroy {
           };
         });
 
-        // Build host server profile nodes for the Host Servers folder
+        // Build host server profile nodes for the Service Registries folder
         const allHostProfiles = this.hostProfileService.profiles();
         const hostProfileNodes: FileSystemNode[] = allHostProfiles.map(p => ({
           name: p.name,
@@ -1013,7 +1013,7 @@ export class AppComponent implements OnInit, OnDestroy {
           connected: this.healthCheckService.getServiceStatus(p.imageUrl) !== 'DOWN', // Show X overlay when registry is DOWN
           healthStatus: this.healthCheckService.getServiceStatus(p.imageUrl),
           children: [],
-          childrenLoaded: false,
+          childrenLoaded: true, // Leaf nodes — editor opens on selection, no tree children to lazy-load
         }));
 
         // Handle subdirectory paths for virtual organization folders
@@ -1193,6 +1193,7 @@ export class AppComponent implements OnInit, OnDestroy {
       // or when the connection status (mounted profiles) of any profile changes. This ensures
       // the tree view is always in sync with the application's connection state.
       this.profileService.profiles(); // Dependency
+      this.hostProfileService.profiles(); // Dependency — host profiles also drive tree nodes
       this.mountedProfiles(); // Dependency
       this.healthCheckService.statusMap(); // Dependency
       this.loadFolderTree();
@@ -1207,7 +1208,7 @@ export class AppComponent implements OnInit, OnDestroy {
               // Attempt to auto-connect without credentials. This is a placeholder for a
               // more robust session/token management system. For now, we assume this is
               // only for profiles that don't need interactive login.
-              this.onLoginAndMount({ profile, username: 'auto-user', password: 'auto-password' });
+              this.onLoginAndMount({ profile, email: 'auto@auto.com', password: 'auto-password' });
             }
           }
         }
@@ -1488,19 +1489,6 @@ export class AppComponent implements OnInit, OnDestroy {
       sessionTree.children = sessionTree.children.filter((c: FileSystemNode) => c.name !== 'Search & Discovery');
     }
 
-    // Build host server profile nodes for the Service Registries folder
-    const allHostProfiles = this.hostProfileService.profiles();
-    const hostProfileNodes: FileSystemNode[] = allHostProfiles.map(p => ({
-      name: p.name,
-      type: 'folder' as const,
-      isServerRoot: true,
-      profileId: p.id,
-      connected: this.healthCheckService.getServiceStatus(p.imageUrl) !== 'DOWN', // Show X overlay when registry is DOWN
-      healthStatus: this.healthCheckService.getServiceStatus(p.imageUrl),
-      children: [],
-      childrenLoaded: false,
-    }));
-
     // Filter out specific nodes for manual ordering.
     // Service Registries / service-registries clauses were removed: registryServerProvider
     // no longer emits them at root (they live under Platform Management), so the defensive
@@ -1568,9 +1556,15 @@ export class AppComponent implements OnInit, OnDestroy {
       // Calculate the provider-relative path by removing the routing prefix
       let providerPath: string[];
 
-      if (rootName === 'Platform Management' && path.length > 2 && (path[1] === 'Gateways' || path[1] === 'Service Registries')) {
-        // Path is ['Platform Management', 'Gateways', 'ServerName', ...] or
-        // ['Platform Management', 'Service Registries', 'ProfileName', ...]; strip both container
+      if (rootName === 'Platform Management' && path.length > 2 && path[1] === 'Service Registries') {
+        // Service Registry profile nodes are leaf nodes — they show an editor when selected,
+        // not file-system children in the tree. Return early to prevent falling through to
+        // homeProvider.getContents([]) which would incorrectly return the Home root children.
+        return;
+      }
+
+      if (rootName === 'Platform Management' && path.length > 2 && path[1] === 'Gateways') {
+        // Path is ['Platform Management', 'Gateways', 'ServerName', ...]; strip both container
         // levels so the per-profile remoteProvider sees an inner path.
         providerPath = path.slice(3);
       } else if (rootName === 'File Systems' && path.length > 1) {
@@ -1735,6 +1729,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
   toggleConsole(): void {
     this.uiPreferencesService.toggleConsole();
+  }
+
+  onDirectoryChanged(): void {
+    this.loadFolderTree();
+    this.triggerRefresh();
   }
 
   triggerRefresh(): void {
@@ -1960,9 +1959,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   // --- Login and Connection Management ---
-  async onLoginAndMount({ profile, username, password }: { profile: BrokerProfile, username: string, password: string }): Promise<void> {
+  async onLoginAndMount({ profile, email, password }: { profile: BrokerProfile, email: string, password: string }): Promise<void> {
     try {
-      const { user, token } = await this.loginService.login(profile, username, password);
+      const { user, token } = await this.loginService.login(profile, email, password);
 
       const provider = new RemoteFileSystemService(profile, this.fsService, token);
       const imageService = new ImageService(profile, this.imageClientService, this.preferencesService, this.healthCheckService, this.localConfigService);
@@ -2087,6 +2086,26 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Called from the gateway editor's Disconnect button.
+   * Calls the backend logout to invalidate the session token,
+   * then cleans up local state.
+   */
+  async onDisconnectGateway(profileId: string): Promise<void> {
+    const profile = this.mountedProfiles().find(p => p.id === profileId);
+    if (!profile) return;
+
+    const token = this.mountedProfileTokens().get(profileId);
+    if (token) {
+      try {
+        await this.loginService.logout(profile, token);
+      } catch (e) {
+        console.warn(`Backend logout for ${profile.name} failed (proceeding with local cleanup):`, e);
+      }
+    }
+    this.onUnmountProfile(profile);
+  }
+
   onDisconnectFromServer(profileId: string): void {
     const profile = this.mountedProfiles().find(p => p.id === profileId);
     if (profile) {
@@ -2153,10 +2172,10 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadFolderTree();
   }
 
-  onLoginSubmittedFromSidebar({ username, password }: { username: string, password: string }): void {
+  onLoginSubmittedFromSidebar({ email, password }: { email: string, password: string }): void {
     const profile = this.profileForLogin();
     if (profile) {
-      this.onLoginAndMount({ profile, username, password });
+      this.onLoginAndMount({ profile, email, password });
       this.profileForLogin.set(null);
     } else {
       console.error("Login submitted but no profile was selected for login.");
@@ -2281,6 +2300,7 @@ export class AppComponent implements OnInit, OnDestroy {
     provider.createDirectory(providerPath, event.name)
       .then(() => {
         this.loadFolderTree();
+        this.triggerRefresh();
         this.toastService.show('Folder created.');
       })
       .catch(e => this.toastService.show(`Failed to create folder: ${(e as Error).message}`, 'error'));
@@ -2292,6 +2312,7 @@ export class AppComponent implements OnInit, OnDestroy {
     provider.createFile(providerPath, event.name)
       .then(() => {
         this.loadFolderTree();
+        this.triggerRefresh();
         this.toastService.show('File created.');
       })
       .catch(e => this.toastService.show(`Failed to create file: ${(e as Error).message}`, 'error'));

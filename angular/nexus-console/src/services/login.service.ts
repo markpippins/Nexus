@@ -7,6 +7,7 @@ const SERVICE_NAME = 'loginService';
 
 interface LoginResponse {
   token: string;
+  userId?: string;
   message?: string;
   ok: boolean;
   admin?: boolean;
@@ -31,9 +32,18 @@ export class LoginService {
     return fullUrl;
   }
 
-  async login(profile: BrokerProfile, username: string, password: string): Promise<{ user: User; token: string }> {
+  async logout(profile: BrokerProfile, token: string): Promise<void> {
+    await this.brokerService.submitRequest<boolean>(
+      this.constructBrokerUrl(profile.brokerUrl ?? ''),
+      SERVICE_NAME,
+      'logout',
+      { token }
+    );
+  }
+
+  async login(profile: BrokerProfile, email: string, password: string): Promise<{ user: User; token: string }> {
     const response = await this.brokerService.submitRequest<LoginResponse>(this.constructBrokerUrl(profile.brokerUrl ?? ''), SERVICE_NAME, 'login', {
-      alias: username,
+      email,
       identifier: password
     });
 
@@ -42,14 +52,15 @@ export class LoginService {
       throw new Error(errorMessage);
     }
 
-    // Since the user object is no longer returned, we construct a partial user object
-    // for display purposes. The username is the key piece of information we have.
+    // The backend returns userId and admin in the LoginResponse.
+    // We derive the alias from the email prefix for display purposes.
+    const alias = email.split('@')[0];
     const user: User = {
-      id: username,
+      id: response.userId || alias,
       profileId: profile.id,
-      alias: username,
-      email: `${username}@mock.com`, // No email info from this response
-      avatarUrl: '', // No avatar info from this response
+      alias,
+      email,
+      avatarUrl: '',
       admin: response.admin
     };
 

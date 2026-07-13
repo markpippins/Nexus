@@ -15,13 +15,13 @@ import { BrokerProfile } from '../../models/broker-profile.model.js';
 export class LoginDialogComponent {
   profile = input.required<BrokerProfile>();
   close = output<void>();
-  submitLogin = output<{ username: string, password: string }>();
+  submitLogin = output<{ email: string, password: string }>();
 
-  username = signal('');
+  email = signal('');
   password = signal('');
 
-  onUsernameChange(event: Event): void {
-    this.username.set((event.target as HTMLInputElement).value);
+  onEmailChange(event: Event): void {
+    this.email.set((event.target as HTMLInputElement).value);
   }
 
   onPasswordChange(event: Event): void {
@@ -29,8 +29,8 @@ export class LoginDialogComponent {
   }
 
   onSubmit(): void {
-    if (this.username().trim() && this.password().trim()) {
-      this.submitLogin.emit({ username: this.username(), password: this.password() });
+    if (this.email().trim() && this.password().trim()) {
+      this.submitLogin.emit({ email: this.email(), password: this.password() });
     }
   }
 

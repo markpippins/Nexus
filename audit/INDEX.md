@@ -22,7 +22,7 @@
 | **JVM Spring Boot** | §IV | 4 primary + 17 service-broker | **[JVM_PIPELINE_FLOW.md](./JVM_PIPELINE_FLOW.md)** |
 | **Python Cognitive** | §V | nbk, ir, cascade, meep | **[COGNITIVE_RUNTIME_FLOW.md](./COGNITIVE_RUNTIME_FLOW.md)** |
 | **Python WRP** | §V | conduit/bridge + wrp-kernel (in-process lib) | **[WRP_PIPELINE_FLOW.md](./WRP_PIPELINE_FLOW.md)** |
-| **Python Harvest** | §V | rover, steward, absorb | — |
+| **Python Harvest** | §V | rover, steward | — |
 | **Python AI/Vision** | §V | vision, tackle | — |
 | **Python Utilities** | §V | voyager, fs, nats_envelope | — |
 | **Infrastructure** | §VI | PostgreSQL, MongoDB, NATS, Redis, Ollama, Temporal | `SERVICE_TOPOLOGY.md` |
@@ -46,7 +46,7 @@
 | **REST APIs** | nebula-srv, vision-srv, role-memory-srv, tools-aggregator, file-system-server, image-server, broker-service-proxy, fs/media-metadata | 3101, 3104, 3200, 3334, 3500, 4040, 8004, 9081 | HTTP |
 | **Frontend UIs** | nebula-ui, plurality-ui, duality-ui, nexus-console, conduit-ui | 3000-3002, 4200-4201 | HTTP (Angular/React/Vite) |
 | **JVM Services** | peb-kernel, broker-gateway, terrain, service-registry | 8080-8081, 8084-8085 | HTTP (Spring Boot) |
-| **Python Services** | vision-srv-py, agent-chat, wrp-bridge-daemon, nbk, ir, cascade, meep, rover, steward, absorb, voyager | 8003, 3017 | HTTP / process / NATS |
+| **Python Services** | vision-srv-py, agent-chat, wrp-bridge-daemon, nbk, ir, cascade, meep, rover, steward, voyager | 8003, 3017 | HTTP / process / NATS |
 
 ---
 
@@ -187,7 +187,7 @@ ARCHITECTURE.md ──┬── references ── SERVICE_TOPOLOGY.md
 | Spring Boot service | `jvm/spring/<name>/` | `JVM_PIPELINE_FLOW.md` + `ARCHITECTURE.md §IV` |
 | WRP pipeline | `python/conduit/bridge/` or `python/conduit/wrp_kernel/` | `WRP_PIPELINE_FLOW.md` |
 | Cognitive runtime | `python/nbk/`, `python/ir/`, `python/cascade/`, `python/meep/` | `COGNITIVE_RUNTIME_FLOW.md` |
-| Harvest pipeline | `python/rover/`, `python/steward/`, `python/absorb/` | `ARCHITECTURE.md §V` |
+| Harvest pipeline | `python/rover/`, `python/steward/` | `ARCHITECTURE.md §V` |
 | AI / Vision | `python/vision/`, `python/tackle/` | `ARCHITECTURE.md §V` |
 | Infrastructure | PostgreSQL, Redis, NATS, MongoDB | `SERVICE_TOPOLOGY.md` + `ARCHITECTURE.md §VI` |
 

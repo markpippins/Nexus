@@ -35,7 +35,7 @@ export class BrokerProfilesDialogComponent implements OnInit {
   initialProfileForEdit = input<BrokerProfile | null>(null);
 
   close = output<void>();
-  loginAndMount = output<{ profile: BrokerProfile, username: string, password: string }>();
+  loginAndMount = output<{ profile: BrokerProfile, email: string, password: string }>();
   unmountProfile = output<BrokerProfile>();
   profileRenamed = output<{ oldName: string, newName: string, profile: BrokerProfile }>();
 
@@ -164,10 +164,10 @@ export class BrokerProfilesDialogComponent implements OnInit {
     this.profileToLogin.set(null);
   }
 
-  onLoginSubmitted({ username, password }: { username: string, password: string }): void {
+  onLoginSubmitted({ email, password }: { email: string, password: string }): void {
     const profile = this.profileToLogin();
     if (profile) {
-      this.loginAndMount.emit({ profile, username, password });
+      this.loginAndMount.emit({ profile, email, password });
     }
     this.closeLoginDialog();
   }

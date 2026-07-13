@@ -48,6 +48,7 @@
     <div class="flex-1 flex flex-row overflow-hidden min-w-0">
       <!-- Main content area (address bar, toolbar, file explorer, etc.) -->
       <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+        @if (!isIframeMode() && currentViewMode() !== 'kanban') {
         <!-- Address Bar -->
         <div
           class="h-12 px-4 border-b border-[rgb(var(--color-border-base))] flex items-center space-x-2 flex-shrink-0 bg-[rgb(var(--color-surface-muted))]"
@@ -206,6 +207,7 @@
             }
           </div>
         </div>
+        }
 
         <!-- Top toolbar removed — navigation is now in app-bottom-bar -->
         @if (!isFullScreenMode()) {
@@ -335,6 +337,7 @@
                         (saved)="loadFolderTree()"
                         (dirtyStateChange)="activePaneId() === 1 ? editorIsDirty.set($event) : null"
                         (connectGateway)="onConnectToServer($event)"
+                        (disconnect)="onDisconnectGateway($event)"
                       ></app-gateway-editor>
                     } @else if (isServiceRegistriesNodeSelected() && activePaneId() === 1) {
                       <app-registry-server-management
@@ -365,41 +368,40 @@
                           (statusInfo)="contentStatusInfo.set($event)"
                         ></app-platform-management>
                       }
-                    } @else {
-                      <app-file-explorer
-                        [id]="1"
-                        [path]="pane1Path()"
-                        [isActive]="activePaneId() === 1"
-                        [isSplitView]="isSplitView()"
-                        [fileSystemProvider]="pane1Provider()"
-                        [imageService]="pane1ImageService()"
-                        [getImageService]="getImageService"
-                        [folderTree]="folderTree()"
-                        [refresh]="refreshPanes()"
-                        [toolbarAction]="toolbarAction()"
-                        [sortCriteria]="pane1SortCriteria()"
-                        [displayMode]="pane1DisplayMode()"
-                        [filterQuery]="pane1FilterQuery()"
-                        (activated)="setActivePane($event)"
-                        (pathChanged)="onPane1PathChanged($event)"
-                        (itemSelected)="onItemSelectedInPane($event)"
-                        (directoryChanged)="loadFolderTree()"
-                        (statusChanged)="onPane1StatusChanged($event)"
-                        (sortChange)="onSortChange($event)"
-                        (bookmarkDropped)="onBookmarkDroppedOnPane($event)"
-                        (itemRenamed)="onPaneItemRenamed($event, pane1Path())"
-                        (itemsDeleted)="onItemsDeleted($event)"
-                        (itemsMoved)="onItemsMoved($event)"
-                        (connectToServer)="onConnectToServer($event)"
-                        (disconnectFromServer)="onDisconnectFromServer($event)"
-                        (editServerProfile)="onEditServerProfile($event)"
-                        (addGateway)="onAddGateway()"
-                        (editLocalConfig)="openLocalConfigDialog()"
-                        (addServiceRegistry)="onAddServiceRegistry()"
-                      >
-                      </app-file-explorer>
-                    }
-                  } @else if (currentViewMode() === 'service-mesh') {
+                    } @else {                        <app-file-explorer
+                          [id]="1"
+                          [path]="pane1Path()"
+                          [isActive]="activePaneId() === 1"
+                          [isSplitView]="isSplitView()"
+                          [fileSystemProvider]="pane1Provider()"
+                          [imageService]="pane1ImageService()"
+                          [getImageService]="getImageService"
+                          [folderTree]="folderTree()"
+                          [refresh]="refreshPanes()"
+                          [toolbarAction]="toolbarAction()"
+                          [sortCriteria]="pane1SortCriteria()"
+                          [displayMode]="pane1DisplayMode()"
+                          [filterQuery]="pane1FilterQuery()"
+                          (activated)="setActivePane($event)"
+                          (pathChanged)="onPane1PathChanged($event)"
+                          (itemSelected)="onItemSelectedInPane($event)"
+                          (directoryChanged)="onDirectoryChanged()"
+                          (statusChanged)="onPane1StatusChanged($event)"
+                          (sortChange)="onSortChange($event)"
+                          (bookmarkDropped)="onBookmarkDroppedOnPane($event)"
+                          (itemRenamed)="onPaneItemRenamed($event, pane1Path())"
+                          (itemsDeleted)="onItemsDeleted($event)"
+                          (itemsMoved)="onItemsMoved($event)"
+                          (connectToServer)="onConnectToServer($event)"
+                          (disconnectFromServer)="onDisconnectFromServer($event)"
+                          (editServerProfile)="onEditServerProfile($event)"
+                          (addGateway)="onAddGateway()"
+                          (editLocalConfig)="openLocalConfigDialog()"
+                          (addServiceRegistry)="onAddServiceRegistry()"
+                        >
+                        </app-file-explorer>
+                      }
+                    } @else if (currentViewMode() === 'service-mesh') {
                     <app-service-mesh
                       [meshViewMode]="meshViewMode()"
                       [graphSubView]="graphSubView()"
@@ -440,6 +442,7 @@
                         (saved)="loadFolderTree()"
                         (dirtyStateChange)="activePaneId() === 2 ? editorIsDirty.set($event) : null"
                         (connectGateway)="onConnectToServer($event)"
+                        (disconnect)="onDisconnectGateway($event)"
                       ></app-gateway-editor>
                     } @else if (isServiceRegistriesNodeSelected() && activePaneId() === 2) {
                       <app-registry-server-management
@@ -472,42 +475,41 @@
                       }
                     } @else if (currentViewMode() === 'kanban') {
                       <app-nebula-panel></app-nebula-panel>
-                    } @else {
-                      <app-file-explorer
-                        [id]="2"
-                        [path]="pane2Path()"
-                        [isActive]="activePaneId() === 2"
-                        [isSplitView]="isSplitView()"
-                        [fileSystemProvider]="pane2Provider()"
-                        [imageService]="pane2ImageService()"
-                        [getImageService]="getImageService"
-                        [folderTree]="folderTree()"
-                        [refresh]="refreshPanes()"
-                        [toolbarAction]="toolbarAction()"
-                        [sortCriteria]="pane2SortCriteria()"
-                        [displayMode]="pane2DisplayMode()"
-                        [filterQuery]="pane2FilterQuery()"
-                        (activated)="setActivePane($event)"
-                        (pathChanged)="onPane2PathChanged($event)"
-                        (itemSelected)="onItemSelectedInPane($event)"
-                        (directoryChanged)="loadFolderTree()"
-                        (statusChanged)="onPane2StatusChanged($event)"
-                        (sortChange)="onSortChange($event)"
-                        (bookmarkDropped)="onBookmarkDroppedOnPane($event)"
-                        (itemRenamed)="onPaneItemRenamed($event, pane2Path())"
-                        (itemsDeleted)="onItemsDeleted($event)"
-                        (itemsMoved)="onItemsMoved($event)"
-                        (connectToServer)="onConnectToServer($event)"
-                        (disconnectFromServer)="onDisconnectFromServer($event)"
-                        (editServerProfile)="onEditServerProfile($event)"
-                        (addGateway)="onAddGateway()"
-                        (editLocalConfig)="openLocalConfigDialog()"
-                        (addServiceRegistry)="onAddServiceRegistry()"
-                      >
-                      </app-file-explorer>
-                    }
-                  </div>
-                }
+                    } @else {                      <app-file-explorer
+                          [id]="2"
+                          [path]="pane2Path()"
+                          [isActive]="activePaneId() === 2"
+                          [isSplitView]="isSplitView()"
+                          [fileSystemProvider]="pane2Provider()"
+                          [imageService]="pane2ImageService()"
+                          [getImageService]="getImageService"
+                          [folderTree]="folderTree()"
+                          [refresh]="refreshPanes()"
+                          [toolbarAction]="toolbarAction()"
+                          [sortCriteria]="pane2SortCriteria()"
+                          [displayMode]="pane2DisplayMode()"
+                          [filterQuery]="pane2FilterQuery()"
+                          (activated)="setActivePane($event)"
+                          (pathChanged)="onPane2PathChanged($event)"
+                          (itemSelected)="onItemSelectedInPane($event)"
+                          (directoryChanged)="onDirectoryChanged()"
+                          (statusChanged)="onPane2StatusChanged($event)"
+                          (sortChange)="onSortChange($event)"
+                          (bookmarkDropped)="onBookmarkDroppedOnPane($event)"
+                          (itemRenamed)="onPaneItemRenamed($event, pane2Path())"
+                          (itemsDeleted)="onItemsDeleted($event)"
+                          (itemsMoved)="onItemsMoved($event)"
+                          (connectToServer)="onConnectToServer($event)"
+                          (disconnectFromServer)="onDisconnectFromServer($event)"
+                          (editServerProfile)="onEditServerProfile($event)"
+                          (addGateway)="onAddGateway()"
+                          (editLocalConfig)="openLocalConfigDialog()"
+                          (addServiceRegistry)="onAddServiceRegistry()"
+                        >
+                        </app-file-explorer>
+                      }
+                    </div>
+                  }
               </div>
             </div>
 

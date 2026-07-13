@@ -410,9 +410,8 @@ wrp-bridge-daemon (polls every 30s) → KernelDelta → KernelEngine.reduce()
 - **cascade** (`python/cascade/`) — Pure event bus, polls `events/` directory, publishes via NATS
 - **conduit** (`python/conduit/`) — Cron-driven orchestrator dispatching WorkRequests to AI executors
 - **meep** (`python/meep/`) — 6-station deterministic pipeline (IRL classifier → spec compiler → scheduler → replay)
-- **rover** (`python/rover/`) — Harvest pipeline for chat transcripts and NLP output
+- **rover** (`python/rover/`) — Harvest pipeline for chat transcripts, NLP output, and document ingestion via Docling
 - **steward** (`python/steward/`) — Knowledge graph migration (JSON → PostgreSQL `knowledge.*`)
-- **absorb** (`python/absorb/`) — Multi-format document ingestion via Docling
 
 See detailed flow diagrams in:
 - `audit/WRP_PIPELINE_FLOW.md` — WRP kernel state machine and bridge daemon
