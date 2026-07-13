@@ -402,18 +402,17 @@ CANDIDATES: tuple[Candidate, ...] = (
     ),
     Candidate(
         name="assembly-mcp",
-        port=3102,
+        port=3107,
         kind="mcp_server",
         transport_type="streamable-http",
-        health_url="http://localhost:3102/health",
+        health_url="http://localhost:3107/health",
         description=(
             "MCP server for the assembly (social/deliberation) schema - "
             "agent short-route to forums, threads, posts, and bridge "
             "tables to nebula artifacts. Express + JSON-RPC over POST / on "
-            "ASSEMBLY_MCP_PORT (default 3102). Talks to Postgres directly; "
+            "ASSEMBLY_MCP_PORT (default 3107). Talks to Postgres directly; "
             "no dependency on nebula-srv at the network layer. "
-            "NOTE: port 3102 collides with nebula-mcp-sse (also 3102); "
-            "default should be relocated to 3107."
+            "Note: 3107 chosen to avoid collision with nebula-mcp-sse@3102."
         ),
         startup="cd typescript/assembly-mcp && bash scripts/mcp-daemon.sh start",
         workspace_path="nexus/typescript/assembly-mcp",

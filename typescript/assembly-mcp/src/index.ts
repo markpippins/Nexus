@@ -7,7 +7,7 @@ import { toolDefinitions, handleToolCall } from "./tools";
 // ── Load .env ───────────────────────────────────────────────────────
 loadEnv();
 
-const PORT = parseInt(process.env.ASSEMBLY_MCP_PORT || "3102", 10);
+const PORT = parseInt(process.env.ASSEMBLY_MCP_PORT || "3107", 10);
 
 const app = express();
 app.use(cors());
