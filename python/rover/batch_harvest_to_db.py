@@ -101,7 +101,8 @@ def dockling_html_path(html_path: Path) -> dict | None:
 
 
 def insert_harvest(source_path: str, source_filename: str,
-                   source_text: str | None, docklang: dict | None) -> bool:
+                   source_text: str | None, docklang: dict | None,
+                   file_size: int | None = None) -> bool:
     """Insert a harvest record with docklang via POST /api/harvests."""
     body = {
         "sourcePath": source_path,
@@ -113,6 +114,7 @@ def insert_harvest(source_path: str, source_filename: str,
         "tags": ["harvest", "rover", "dockling"],
         "metadata": {"dockling_version": "v0.3"},
         "docklang": docklang,
+        "fileSize": file_size,
     }
 
     try:
@@ -164,12 +166,19 @@ def process_transcript(html_path: Path) -> bool:
 
     source_path = str(html_path.relative_to(PROJECT_ROOT))
 
+    # Get file size for reharvest detection
+    try:
+        file_size = html_path.stat().st_size
+    except OSError:
+        file_size = None
+
     # Step 2: Insert to DB
     return insert_harvest(
         source_path=source_path,
         source_filename=html_path.name,
         source_text=None,
         docklang=docklang,
+        file_size=file_size,
     )
 
 
