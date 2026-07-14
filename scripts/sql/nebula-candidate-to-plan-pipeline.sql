@@ -215,37 +215,33 @@ COMMENT ON FUNCTION nebula.candidate_surrounding_discourse(uuid, integer) IS
      p_context_units: how many discourse units before/after each match to include.';
 
 -- ============================================================================
--- GAP B: Candidate → Plan Pipeline
+-- GAP B: Candidate → Agenda Pipeline
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION nebula.candidates_to_plan(
+-- Drop old plan pipeline function
+DROP FUNCTION IF EXISTS nebula.candidates_to_plan(uuid[], text, text);
+
+CREATE OR REPLACE FUNCTION nebula.candidates_to_agenda(
     p_candidate_ids uuid[],
     p_project       text DEFAULT 'nexus',
     p_goal          text DEFAULT NULL
 )
 RETURNS TABLE(
-    plan_id      integer,
-    plan_title   text,
-    plan_goal    text,
+    agenda_id      uuid,
+    agenda_title   text,
     candidates_used integer,
     status_results text[]
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    v_plan_id        integer;
+    v_agenda_id      uuid;
     v_title          text;
-    v_goal           text;
-    v_content        text;
-    v_files_affected text;
-    v_acceptance     text;
-    v_candidate_row  record;
-    v_discourse_row  record;
+    v_planner_analysis text;
     v_candidate_count integer;
-    v_system_name    text;
-    v_subsystem_name text;
     v_results        text[] := '{}';
     v_status_result  text;
+    v_candidate_row  record;
 BEGIN
     -- Count candidates
     SELECT count(*) INTO v_candidate_count
@@ -256,122 +252,79 @@ BEGIN
         RAISE EXCEPTION 'No candidates found for the given IDs';
     END IF;
 
-    -- Build title: use first candidate title, or a summary
-    SELECT string_agg(DISTINCT c.title, ' + ' ORDER BY c.title) INTO v_title
-    FROM nebula.harvest_candidates c
-    WHERE c.id = ANY(p_candidate_ids);
+    -- Use user-supplied project as title when explicitly provided (non-null, non-empty)
+    IF p_project IS NOT NULL AND p_project <> '' THEN
+        v_title := p_project;
+    ELSE
+        -- Auto-generate title from candidate titles
+        SELECT string_agg(DISTINCT c.title, ' + ' ORDER BY c.title) INTO v_title
+        FROM nebula.harvest_candidates c
+        WHERE c.id = ANY(p_candidate_ids);
+    END IF;
 
     IF length(v_title) > 200 THEN
         v_title := left(v_title, 197) || '...';
     END IF;
 
-    -- Goal: use provided goal, or generate one from candidate intents
-    IF p_goal IS NOT NULL THEN
-        v_goal := p_goal;
-    ELSE
-        SELECT string_agg(DISTINCT c.intent_description, E'\n- ') INTO v_goal
-        FROM nebula.harvest_candidates c
-        WHERE c.id = ANY(p_candidate_ids) AND c.intent_description IS NOT NULL;
+    -- Build planner_analysis from candidate intents (full text, no truncation)
+    SELECT string_agg(
+        format('- **%s**: %s',
+            COALESCE(c.title, 'Untitled'),
+            COALESCE(c.intent_description, 'No intent description')
+        ),
+        E'\n'
+    ) INTO v_planner_analysis
+    FROM nebula.harvest_candidates c
+    WHERE c.id = ANY(p_candidate_ids);
 
-        IF v_goal IS NULL OR v_goal = '' THEN
-            v_goal := 'Implementation derived from harvest candidates: ' || v_title;
-        ELSE
-            v_goal := '- ' || v_goal;
-        END IF;
-    END IF;
-
-    -- Build content from candidate data + discourse context
-    WITH candidates_data AS (
-        SELECT
-            c.id,
-            c.title,
-            c.intent_description,
-            c.implementation_notes,
-            c.code_snippets,
-            c.open_questions,
-            c.tags,
-            s.name AS system_name,
-            ss.name AS subsystem_name,
-            (SELECT string_agg(du.heading, E'\n' ORDER BY du.turn_index)
-             FROM nebula.harvests h,
-                  LATERAL jsonb_array_elements(h.docklang -> 'discourse_units') AS du_elem,
-                  LATERAL (SELECT (du_elem #>> '{provenance,turn_index}')::int AS turn_index, du_elem #>> '{heading}' AS heading) du
-             WHERE h.id = c.harvest_id AND h.docklang IS NOT NULL
-               AND (SELECT count(*) FROM regexp_split_to_table(lower(c.title), E'\\s+') AS w
-                    WHERE lower(du_elem #>> '{body}') LIKE '%' || w || '%') > 0
-            ) AS relevant_headings,
-            (SELECT string_agg(b #>> '{content}', E'\n---\n' ORDER BY du.turn_index, (b #>> '{provenance,block_index}')::int)
-             FROM nebula.harvests h,
-                  LATERAL jsonb_array_elements(h.docklang -> 'discourse_units') AS du_elem,
-                  LATERAL jsonb_array_elements(du_elem -> 'blocks') AS b
-             WHERE h.id = c.harvest_id AND h.docklang IS NOT NULL
-               AND (du_elem #>> '{provenance,turn_index}')::int IN (
-                    SELECT DISTINCT fu.turn_index
-                    FROM LATERAL (VALUES (du_elem #>> '{provenance,turn_index}')::int) AS du_ti(turn_index)
-                    CROSS JOIN LATERAL (
-                        SELECT du2.turn_index
-                        FROM LATERAL jsonb_array_elements(h.docklang -> 'discourse_units') AS du2_elem,
-                             LATERAL (SELECT (du2_elem #>> '{provenance,turn_index}')::int AS turn_index) du2
-                        WHERE (SELECT count(*) FROM regexp_split_to_table(lower(c.title), E'\\s+') AS w
-                               WHERE lower(du2_elem #>> '{body}') LIKE '%' || w || '%') > 0
-                    ) AS matched
-                    WHERE du_ti.turn_index BETWEEN matched.turn_index - 2 AND matched.turn_index + 2
-               )
-               AND b #>> '{type}' IN ('paragraph', 'code', 'quote', 'list')
-            ) AS discourse_context
-        FROM nebula.harvest_candidates c
-        LEFT JOIN nebula.systems s ON s.id = c.system_id
-        LEFT JOIN nebula.subsystems ss ON ss.id = c.subsystem_id
-        WHERE c.id = ANY(p_candidate_ids)
+    -- Create the agenda
+    INSERT INTO nebula.agendas (title, scope, status, source_count, planner_analysis, metadata)
+    VALUES (
+        v_title,
+        'harvest',
+        'draft',
+        v_candidate_count,
+        v_planner_analysis,
+        jsonb_build_object(
+            'source', 'harvest_pipeline',
+            'project', COALESCE(p_project, 'nexus'),
+            'goal', p_goal,
+            'candidate_ids', p_candidate_ids
+        )
     )
-    SELECT
-        format(E'# Plan: %s\n\n## Source Candidates\n\n%s\n\n## Intent\n\n%s\n\n## Implementation Notes\n\n%s\n\n## Code Snippets\n\n%s\n\n## Open Questions\n\n%s\n\n## Discourse Context\n\n%s',
-            v_title,
-            string_agg(format(E'- **%s** (System: %s, Subsystem: %s)\n  Intent: %s',
-                COALESCE(cd.title, '?'),
-                COALESCE(cd.system_name, '—'),
-                COALESCE(cd.subsystem_name, '—'),
-                COALESCE(left(cd.intent_description, 500), '—')
-            ), E'\n'),
-            COALESCE(string_agg(DISTINCT cd.intent_description, E'\n\n'), '—'),
-            COALESCE(string_agg(DISTINCT cd.implementation_notes::text, E'\n'), '[]'),
-            COALESCE(string_agg(DISTINCT cd.code_snippets::text, E'\n'), '[]'),
-            COALESCE(string_agg(DISTINCT cd.open_questions::text, E'\n'), '[]'),
-            COALESCE(string_agg(DISTINCT cd.discourse_context, E'\n\n---\n\n'), '—')
-        ) INTO v_content
-    FROM candidates_data cd;
+    RETURNING id INTO v_agenda_id;
 
-    -- Build files_affected (from linked systems)
-    SELECT json_agg(DISTINCT val)::text INTO v_files_affected
-    FROM (
-        SELECT COALESCE(s.name, c.title) AS val
+    -- Link each candidate as an agenda item + cross-reference
+    FOR v_candidate_row IN
+        SELECT c.id, c.title, c.intent_description, c.open_questions
         FROM nebula.harvest_candidates c
-        LEFT JOIN nebula.systems s ON s.id = c.system_id
         WHERE c.id = ANY(p_candidate_ids)
-    ) sub
-    WHERE val IS NOT NULL;
+    LOOP
+        INSERT INTO nebula.agenda_items (
+            agenda_id, source_type, source_id, title, body,
+            open_questions, included
+        ) VALUES (
+            v_agenda_id,
+            'harvest_candidate',
+            v_candidate_row.id,
+            v_candidate_row.title,
+            v_candidate_row.intent_description,
+            v_candidate_row.open_questions,
+            true
+        );
 
-    IF v_files_affected IS NULL THEN
-        v_files_affected := '[]';
-    END IF;
-
-    -- Build acceptance criteria from open questions
-    SELECT json_agg(DISTINCT val)::text INTO v_acceptance
-    FROM (
-        SELECT trim(both '\"' FROM jsonb_array_elements_text(c.open_questions)) AS val
-        FROM nebula.harvest_candidates c
-        WHERE c.id = ANY(p_candidate_ids) AND jsonb_typeof(c.open_questions) = 'array'
-    ) sub
-    WHERE val IS NOT NULL AND val != '';
-
-    IF v_acceptance IS NULL OR v_acceptance = '[]' THEN
-        v_acceptance := format('["Implement %s successfully"]', v_title);
-    END IF;
-
-    -- Insert into nebula.plans
-    INSERT INTO nebula.plans (title, project, goal, content, files_affected, acceptance_criteria)
-    VALUES (v_title, p_project, v_goal, v_content, v_files_affected, v_acceptance)
-    RETURNING id INTO v_plan_id;
+        -- Create cross-reference: harvest_candidate → agenda
+        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        SELECT 'harvest_candidate', v_candidate_row.id::text, 'agenda', v_agenda_id::text, 'promotes_to', '{}'::jsonb
+        WHERE NOT EXISTS (
+            SELECT 1 FROM nebula.cross_references
+            WHERE source_type = 'harvest_candidate'
+              AND source_id = v_candidate_row.id::text
+              AND target_type = 'agenda'
+              AND target_id = v_agenda_id::text
+              AND rel_type = 'promotes_to'
+        );
+    END LOOP;
 
     -- Mark candidates as promoted
     FOR v_status_result IN
@@ -381,23 +334,22 @@ BEGIN
     END LOOP;
 
     -- Return
-    plan_id := v_plan_id;
-    plan_title := v_title;
-    plan_goal := v_goal;
+    agenda_id := v_agenda_id;
+    agenda_title := v_title;
     candidates_used := v_candidate_count;
     status_results := v_results;
     RETURN NEXT;
 END;
 $$;
 
-COMMENT ON FUNCTION nebula.candidates_to_plan(uuid[], text, text) IS
-    'Collate harvest candidates into a conduit plan proposal.
+COMMENT ON FUNCTION nebula.candidates_to_agenda(uuid[], text, text) IS
+    'Collate harvest candidates into an agenda.
      Args:
        p_candidate_ids: array of harvest_candidate UUIDs to collate
-       p_project:       project name for the plan (default: nexus)
-       p_goal:          optional custom goal; auto-generated from candidate intents if NULL
-     Returns: plan_id, plan_title, plan_goal, candidate count, per-candidate status results
-     Side effects: marks all candidates as ''promoted''';
+       p_project:       project name (stored in metadata)
+       p_goal:          optional custom goal (stored in metadata)
+     Returns: agenda_id, agenda_title, candidates_used, per-candidate status results
+     Side effects: creates agenda + agenda_items + cross_references, marks candidates as ''promoted''';
 
 -- ============================================================================
 -- Quick status check: show candidate status distribution
