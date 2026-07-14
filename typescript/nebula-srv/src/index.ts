@@ -28,14 +28,18 @@ app.use(express.json({ limit: '1mb' }));
 app.use('/api', createRoutes(pool));
 
 // ── Health Check ───────────────────────────────────────────────────
-app.get('/health', async (_req, res) => {
+async function healthHandler(_req: express.Request, res: express.Response) {
   try {
     const { rows } = await pool.query('SELECT 1 as ok');
     res.json({ status: 'ok', db: rows[0].ok === 1 });
   } catch (err: any) {
     res.status(503).json({ status: 'error', message: err.message });
   }
-});
+}
+
+app.get('/health', healthHandler);
+// Mount /api/health too — the Nebula UI proxy forwards /api/health here
+app.get('/api/health', healthHandler);
 
 // ── Redis init ──────────────────────────────────────────────────────
 try {

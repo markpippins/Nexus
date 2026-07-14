@@ -2812,6 +2812,58 @@ export function createRoutes(pool: Pool): Router {
 
 
   // ════════════════════════════════════════════════════════════════
+  // DELETE /api/agendas/:id/items — remove an agenda item by source_id
+  // Query: ?sourceId=<uuid> — finds and deletes the item matching that source
+  router.delete('/agendas/:id/items', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const sourceId = req.query.sourceId as string;
+      if (!sourceId) return res.status(400).json({ error: 'sourceId query parameter is required' });
+      const { rowCount } = await pool.query(
+        `DELETE FROM nebula.agenda_items WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT id FROM nebula.intent_records WHERE candidate_id = $2))`,
+        [id, sourceId]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'Agenda item not found' });
+      res.json({ ok: true, deleted: rowCount });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/agendas/:id/finalize — create a specification from an agenda
+  router.post('/agendas/:id/finalize', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { revisionType = 'created' } = req.body;
+      const { rows: [result] } = await pool.query(
+        'SELECT nebula.agenda_to_specification($1, $2) AS spec_id',
+        [id, revisionType]
+      );
+      res.status(201).json({ ok: true, spec_id: result.spec_id });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/agendas/:id/items — add a single item to an existing agenda
+  router.post('/agendas/:id/items', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { sourceType, sourceId, title, body, decisions, openQuestions, supportingRefs, included, plannerNote } = req.body;
+      if (!sourceType || !sourceId || !title) {
+        return res.status(400).json({ error: 'sourceType, sourceId, and title are required' });
+      }
+      const { rows: [item] } = await pool.query(
+        'INSERT INTO nebula.agenda_items (agenda_id, source_type, source_id, title, body, decisions, open_questions, supporting_refs, included, planner_note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+        [id, sourceType, sourceId, title, body || null, JSON.stringify(decisions || []), JSON.stringify(openQuestions || []), JSON.stringify(supportingRefs || []), included ?? true, plannerNote || null]
+      );
+      res.status(201).json({ ok: true, item });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
   //  SPECIFICATIONS (settled output from agendas — scoped via specs view)
   // ════════════════════════════════════════════════════════════════
 
@@ -2824,15 +2876,11 @@ export function createRoutes(pool: Pool): Router {
       const limit = Math.min(parseInt(qLimit as string) || 500, 1000);
       const { rows } = await pool.query(
         `SELECT s.id, s.agenda_id,
-                s.item_snapshot->0->>'source_type' AS source_type,
-                s.item_snapshot->0->>'source_id' AS source_id,
-                s.item_snapshot->0->>'title' AS title,
-                s.item_snapshot->0->>'body' AS body,
-                s.item_snapshot->0->'decisions' AS decisions,
-                s.item_snapshot->0->'open_questions' AS open_questions,
-                s.item_snapshot->0->'supporting_refs' AS supporting_refs,
-                (s.item_snapshot->0->>'included')::boolean AS included,
-                s.item_snapshot->0->>'planner_note' AS planner_note,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
                 s.valid_from AS item_created_at,
                 s.created_at AS item_updated_at,
                 s.revision_number,
@@ -2856,15 +2904,11 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows: [row] } = await pool.query(
         `SELECT s.id, s.agenda_id,
-                s.item_snapshot->0->>'source_type' AS source_type,
-                s.item_snapshot->0->>'source_id' AS source_id,
-                s.item_snapshot->0->>'title' AS title,
-                s.item_snapshot->0->>'body' AS body,
-                s.item_snapshot->0->'decisions' AS decisions,
-                s.item_snapshot->0->'open_questions' AS open_questions,
-                s.item_snapshot->0->'supporting_refs' AS supporting_refs,
-                (s.item_snapshot->0->>'included')::boolean AS included,
-                s.item_snapshot->0->>'planner_note' AS planner_note,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
                 s.valid_from AS item_created_at,
                 s.created_at AS item_updated_at,
                 s.revision_number,
@@ -2888,16 +2932,12 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id } = req.params;
       const { rows } = await pool.query(
-        `SELECT s.id, s.agenda_id,
-                s.item_snapshot->0->>'source_type' AS source_type,
-                s.item_snapshot->0->>'source_id' AS source_id,
-                s.item_snapshot->0->>'title' AS title,
-                s.item_snapshot->0->>'body' AS body,
-                s.item_snapshot->0->'decisions' AS decisions,
-                s.item_snapshot->0->'open_questions' AS open_questions,
-                s.item_snapshot->0->'supporting_refs' AS supporting_refs,
-                (s.item_snapshot->0->>'included')::boolean AS included,
-                s.item_snapshot->0->>'planner_note' AS planner_note,
+`SELECT s.id, s.agenda_id,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
                 s.valid_from AS item_created_at,
                 s.created_at AS item_updated_at,
                 s.revision_number,
@@ -2906,11 +2946,11 @@ export function createRoutes(pool: Pool): Router {
                 s.agenda_title,
                 s.agenda_status
          FROM nebula.active_specifications s
-         LEFT JOIN nebula.intent_records ir ON ir.id::text = s.item_snapshot->0->>'source_id'
-             AND s.item_snapshot->0->>'source_type' = 'intent_record'
+         LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
          LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-         LEFT JOIN nebula.requirements req ON req.id::text = s.item_snapshot->0->>'source_id'
-             AND s.item_snapshot->0->>'source_type' = 'requirement'
+         LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
          WHERE hc.system_id = $1 OR req.system_id = $1
          ORDER BY s.created_at DESC`,
         [id]
@@ -2927,15 +2967,11 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows } = await pool.query(
         `SELECT s.id, s.agenda_id,
-                s.item_snapshot->0->>'source_type' AS source_type,
-                s.item_snapshot->0->>'source_id' AS source_id,
-                s.item_snapshot->0->>'title' AS title,
-                s.item_snapshot->0->>'body' AS body,
-                s.item_snapshot->0->'decisions' AS decisions,
-                s.item_snapshot->0->'open_questions' AS open_questions,
-                s.item_snapshot->0->'supporting_refs' AS supporting_refs,
-                (s.item_snapshot->0->>'included')::boolean AS included,
-                s.item_snapshot->0->>'planner_note' AS planner_note,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
                 s.valid_from AS item_created_at,
                 s.created_at AS item_updated_at,
                 s.revision_number,
@@ -2944,11 +2980,11 @@ export function createRoutes(pool: Pool): Router {
                 s.agenda_title,
                 s.agenda_status
          FROM nebula.active_specifications s
-         LEFT JOIN nebula.intent_records ir ON ir.id::text = s.item_snapshot->0->>'source_id'
-             AND s.item_snapshot->0->>'source_type' = 'intent_record'
+         LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
          LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-         LEFT JOIN nebula.requirements req ON req.id::text = s.item_snapshot->0->>'source_id'
-             AND s.item_snapshot->0->>'source_type' = 'requirement'
+         LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
          WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1
          ORDER BY s.created_at DESC`,
         [id]
@@ -2965,15 +3001,11 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows } = await pool.query(
         `SELECT s.id, s.agenda_id,
-                s.item_snapshot->0->>'source_type' AS source_type,
-                s.item_snapshot->0->>'source_id' AS source_id,
-                s.item_snapshot->0->>'title' AS title,
-                s.item_snapshot->0->>'body' AS body,
-                s.item_snapshot->0->'decisions' AS decisions,
-                s.item_snapshot->0->'open_questions' AS open_questions,
-                s.item_snapshot->0->'supporting_refs' AS supporting_refs,
-                (s.item_snapshot->0->>'included')::boolean AS included,
-                s.item_snapshot->0->>'planner_note' AS planner_note,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
                 s.valid_from AS item_created_at,
                 s.created_at AS item_updated_at,
                 s.revision_number,
@@ -2982,11 +3014,11 @@ export function createRoutes(pool: Pool): Router {
                 s.agenda_title,
                 s.agenda_status
          FROM nebula.active_specifications s
-         LEFT JOIN nebula.intent_records ir ON ir.id::text = s.item_snapshot->0->>'source_id'
-             AND s.item_snapshot->0->>'source_type' = 'intent_record'
+         LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
          LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-         LEFT JOIN nebula.requirements req ON req.id::text = s.item_snapshot->0->>'source_id'
-             AND s.item_snapshot->0->>'source_type' = 'requirement'
+         LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
          WHERE hc.feature_id = $1 OR req.feature_id = $1
          ORDER BY s.created_at DESC`,
         [id]
@@ -3409,6 +3441,93 @@ export function createRoutes(pool: Pool): Router {
   });
 
   // ════════════════════════════════════════════════════════════════
+  // POST /api/specifications/:id/link-requirements — create cross-references
+  // from specification to requirements by matching candidate_ids in the item_snapshot
+  router.post('/specifications/:id/link-requirements', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Fetch the spec and its item_snapshot
+      const { rows: [spec] } = await pool.query(
+        'SELECT id, item_snapshot FROM nebula.specifications WHERE id = $1',
+        [id]
+      );
+      if (!spec) return res.status(404).json({ error: 'Specification not found' });
+
+      // Extract candidate IDs from items:
+      // - harvest_candidate items: source_id IS the candidate ID
+      // - intent_record items: look up intent_records.candidate_id
+      const directCandidateIds: string[] = [];
+      const intentRecordIds: string[] = [];
+      const items = spec.item_snapshot || [];
+      for (const item of items) {
+        if (!item.source_id) continue;
+        if (item.source_type === 'harvest_candidate') {
+          directCandidateIds.push(item.source_id);
+        } else if (item.source_type === 'intent_record') {
+          intentRecordIds.push(item.source_id);
+        }
+      }
+
+      // Resolve intent_record IDs to candidate IDs
+      let candidateIds = [...directCandidateIds];
+      candidateIds = [...new Set(candidateIds)];  // deduplicate
+      if (intentRecordIds.length > 0) {
+        const { rows: resolved } = await pool.query(
+          'SELECT candidate_id FROM nebula.intent_records WHERE id = ANY($1::uuid[]) AND candidate_id IS NOT NULL',
+          [intentRecordIds]
+        );
+        for (const r of resolved) {
+          candidateIds.push(r.candidate_id);
+        }
+      }
+
+      if (candidateIds.length === 0) {
+        return res.status(200).json({ ok: true, linked: 0, message: 'No harvest_candidate items in snapshot' });
+      }
+
+      // Find requirements matching those candidate IDs
+      const { rows: reqs } = await pool.query(
+        'SELECT id, title FROM nebula.requirements WHERE candidate_id = ANY($1::uuid[])',
+        [candidateIds]
+      );
+
+      // Create cross-references idempotently (in a transaction for atomicity)
+      let linked = 0;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const req of reqs) {
+          const { rowCount } = await client.query(
+          `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+           SELECT 'specification', $1, 'requirement', $2, 'spec:defines_req', '{}'::jsonb
+           WHERE NOT EXISTS (
+             SELECT 1 FROM nebula.cross_references
+             WHERE source_type = 'specification'
+               AND source_id = $1
+               AND target_type = 'requirement'
+               AND target_id = $2
+               AND rel_type = 'spec:defines_req'
+           )`,
+          [id, req.id]
+        );
+        linked += rowCount ?? 0;
+        }
+        await client.query('COMMIT');
+      } catch (txErr) {
+        await client.query('ROLLBACK');
+        throw txErr;
+      } finally {
+        client.release();
+      }
+
+      res.json({ ok: true, linked, candidate_count: candidateIds.length, requirement_count: reqs.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
   //  HARVEST CANDIDATE DISCOVERY — semantic search against project hierarchy
   // ════════════════════════════════════════════════════════════════
 
