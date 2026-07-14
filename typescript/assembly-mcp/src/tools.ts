@@ -47,6 +47,52 @@ export const toolDefinitions: MCPToolDefinition[] = [
       required: ["name"],
     },
   },
+  // ── Moderator tools ────────────────────────────────────────────
+  {
+    name: "assembly_expire_forum",
+    description: "Soft-delete a forum by setting its expiration date to now. The forum disappears from list results but data is preserved.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        forum_id: { type: "string", description: "Forum UUID" },
+      },
+      required: ["forum_id"],
+    },
+  },
+  {
+    name: "assembly_move_thread",
+    description: "Move a thread (post) from its current forum to a different forum",
+    inputSchema: {
+      type: "object",
+      properties: {
+        post_id: { type: "string", description: "Post UUID to move" },
+        forum_id: { type: "string", description: "Destination forum UUID" },
+      },
+      required: ["post_id", "forum_id"],
+    },
+  },
+  {
+    name: "assembly_find_forum_by_name",
+    description: "Search forums by name (case-insensitive partial match). Returns up to 20 results with id, name, slug, and expiration status.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Search pattern (partial match, e.g. 'todo' matches 'To Do')" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "assembly_find_thread_by_title",
+    description: "Search threads by title (case-insensitive partial match). Returns up to 20 results with id, title, forum, and dates.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Search pattern (partial match, e.g. 'magnet' matches 'Investigation: Magnetize button...')" },
+      },
+      required: ["title"],
+    },
+  },
   // ── User tools ──────────────────────────────────────────────────
   {
     name: "assembly_list_users",
@@ -373,6 +419,47 @@ const handlers: Record<string, ToolHandler> = {
       if (err.code === "23505") return createError("DUPLICATE", `Forum already exists: ${err.message}`);
       throw err;
     }
+  },
+
+  // ── Moderator ──────────────────────────────────────────────────
+  assembly_expire_forum: async (args) => {
+    const { forum_id } = args;
+    if (!forum_id) return createError("INVALID_ARGUMENTS", "forum_id is required");
+    const forum = await db.getForumById(forum_id);
+    if (!forum) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
+    const ok = await db.expireForum(forum_id);
+    if (!ok) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
+    return createSuccess({ expired: true, forum_id, name: forum.name });
+  },
+
+  assembly_move_thread: async (args) => {
+    const { post_id, forum_id } = args;
+    if (!post_id || !forum_id) return createError("INVALID_ARGUMENTS", "post_id and forum_id are required");
+    const post = await db.getPostById(post_id);
+    if (!post) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
+    const moved = await db.moveThread(post_id, forum_id);
+    if (!moved) return createError("FORUM_NOT_FOUND", `Destination forum not found: ${forum_id}`);
+    return createSuccess({
+      moved: true,
+      post_id,
+      title: post.title,
+      from_forum_id: post.forum_uuid,
+      to_forum_id: forum_id,
+    });
+  },
+
+  assembly_find_forum_by_name: async (args) => {
+    const { name } = args;
+    if (!name) return createError("INVALID_ARGUMENTS", "name is required");
+    const forums = await db.findForumsByName(name);
+    return createSuccess(forums);
+  },
+
+  assembly_find_thread_by_title: async (args) => {
+    const { title } = args;
+    if (!title) return createError("INVALID_ARGUMENTS", "title is required");
+    const threads = await db.findThreadsByTitle(title);
+    return createSuccess(threads);
   },
 
   // ── Users ────────────────────────────────────────────────────────

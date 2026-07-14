@@ -69,6 +69,8 @@ export interface ForumRow {
   name: string;
   slug: string;
   description: string | null;
+  as_of_dt?: Date;
+  expiration_dt?: Date;
 }
 
 export interface UserRow {
@@ -126,7 +128,10 @@ export interface PostArtifactRefRow {
 
 export async function listForums(): Promise<ForumRow[]> {
   const { rows } = await getDb().query(
-    `SELECT id, name, slug, description FROM ${SCHEMA}.forums ORDER BY name ASC`
+    `SELECT id, name, slug, description
+     FROM ${SCHEMA}.forums
+     WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt > now()
+     ORDER BY name ASC`
   );
   return rows;
 }
@@ -173,6 +178,54 @@ export async function updateForum(id: string, updates: { name?: string; slug?: s
     params
   );
   return rows[0] || null;
+}
+
+export async function expireForum(id: string): Promise<boolean> {
+  const { rowCount } = await getDb().query(
+    `UPDATE ${SCHEMA}.forums SET expiration_dt = now() WHERE id = $1`,
+    [id]
+  );
+  return (rowCount || 0) > 0;
+}
+
+export async function moveThread(postId: string, newForumId: string): Promise<PostRow | null> {
+  // Verify the target forum exists and is not expired
+  const forum = await getForumById(newForumId);
+  if (!forum) return null;
+
+  const { rows } = await getDb().query(
+    `UPDATE ${SCHEMA}.posts SET forum_uuid = $1, updated = now()
+     WHERE id = $2
+     RETURNING id, created, updated, text, url, rating, posted_by_id, posted_to_id,
+               forum_id, forum_uuid, source_url, title`,
+    [newForumId, postId]
+  );
+  return rows[0] || null;
+}
+
+export async function findForumsByName(pattern: string): Promise<ForumRow[]> {
+  const { rows } = await getDb().query(
+    `SELECT id, name, slug, description, as_of_dt, expiration_dt
+     FROM ${SCHEMA}.forums
+     WHERE name ILIKE $1
+     ORDER BY name ASC
+     LIMIT 20`,
+    [`%${pattern}%`]
+  );
+  return rows;
+}
+
+export async function findThreadsByTitle(pattern: string): Promise<PostRow[]> {
+  const { rows } = await getDb().query(
+    `SELECT id, created, updated, text, url, rating, posted_by_id, posted_to_id,
+            forum_id, forum_uuid, source_url, title
+     FROM ${SCHEMA}.posts
+     WHERE title ILIKE $1
+     ORDER BY created DESC
+     LIMIT 20`,
+    [`%${pattern}%`]
+  );
+  return rows;
 }
 
 // ── Users ───────────────────────────────────────────────────────────
