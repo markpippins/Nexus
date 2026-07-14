@@ -94,5 +94,21 @@
     "health": "direct PG query — no HTTP health endpoint",
     "notes": "Knowledge graph MCP interface — stdio transport, direct PostgreSQL to knowledge schema",
     "isInternal": true
+  },
+  {
+    "name": "service-broker-mcp",
+    "port": 3108,
+    "workspacePath": "typescript/service-broker-mcp",
+    "serviceTypeId": 1,
+    "healthCheckUrl": "http://localhost:3108/health",
+    "status": "ONLINE",
+    "transportType": "sse",
+    "version": "1.0.0",
+    "description": "MCP server for service-broker — login, token validation, and service-broker operations. Proxies to broker-service at localhost:8081.",
+    "repositoryUrl": "typescript/service-broker-mcp",
+    "startup": "npm run dev:sse",
+    "health": "/health",
+    "notes": "Service broker MCP — proxies submitRequest to Spring broker-service :8081",
+    "isInternal": true
   }
 ]

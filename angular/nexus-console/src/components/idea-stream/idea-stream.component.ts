@@ -221,7 +221,10 @@ export class IdeaStreamComponent {
       let isMagnetFolder = false;
       if (path.length > 0) {
         const provider = this.getProvider()(path);
-        const providerPath = path.slice(1);
+        // For remote paths ["File Systems", gateway, ...] strip first 2 segments;
+        // for local/other paths strip only 1.
+        const isRemote = path[0] === 'File Systems' && path.length > 2;
+        const providerPath = isRemote ? path.slice(2) : path.slice(1);
         isMagnetFolder = await provider.hasFile(providerPath, '.magnet');
       }
 
