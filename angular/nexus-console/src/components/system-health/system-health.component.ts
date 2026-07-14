@@ -1,11 +1,12 @@
 import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, RunnableService } from '../../services/terrain.service.js';
+import { ServicePollMonitorComponent } from './service-poll-monitor.component.js';
 
 @Component({
   selector: 'app-system-health',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ServicePollMonitorComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="h-full flex flex-col bg-[rgb(var(--color-surface))] overflow-auto">
@@ -354,6 +355,9 @@ import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, 
               </p>
             </div>
           }
+
+          <!-- ── HTTP Service Health Monitor (transplanted from nebula-ui) ── -->
+          <app-service-poll-monitor />
         }
       </div>
 
