@@ -396,7 +396,7 @@ def create_candidate(harvest_id: str, candidate: dict) -> bool:
     return True
 
 
-ASSEMBLY_MCP_URL = "http://localhost:3104"
+ASSEMBLY_MCP_URL = "http://localhost:3107"
 
 
 def assembly_mcp_call(method: str, params: dict) -> dict:
