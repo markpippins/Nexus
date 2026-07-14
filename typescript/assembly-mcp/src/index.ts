@@ -59,7 +59,7 @@ app.get("/state", async (_req, res) => {
     const { getDb } = await import("./db");
     const pool = getDb();
     const { rows } = await pool.query(
-      `SELECT COUNT(*) as forum_count FROM assembly.forums`
+      `SELECT COUNT(*) as forum_count FROM assembly.forums WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt > now()`
     );
     res.json({
       status: "ok",

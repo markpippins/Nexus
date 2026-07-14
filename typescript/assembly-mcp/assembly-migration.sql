@@ -87,3 +87,19 @@ ON CONFLICT (slug) DO NOTHING;
 INSERT INTO assembly.users (id, alias, email, password, admin)
 VALUES (gen_random_uuid(), 'Rover', 'rover@nexus.local', 'rover-bot', false)
 ON CONFLICT (alias) DO NOTHING;
+
+-- 9. Forums: as_of_dt / expiration_dt — soft-delete via row expiry.
+--    Existing rows get the default values via Postgres 11+ fast ADD COLUMN
+--    with DEFAULT (no table rewrite). `expiration_dt = now()` retires a row;
+--    the read filter `(expiration_dt = 'infinity'::timestamptz OR > now())`
+--    excludes it everywhere assembly.forums is surfaced.
+ALTER TABLE assembly.forums
+  ADD COLUMN IF NOT EXISTS as_of_dt      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS expiration_dt TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT 'infinity'::timestamptz;
+
+-- 9a. Partial index over the dominant "live + unbounded" case. Filters
+--     that resolve to this predicate hit the index; finite-future expirations
+--     are rare and fall through to the seqscan or other indexes as needed.
+CREATE INDEX IF NOT EXISTS idx_forums_live_unbounded
+  ON assembly.forums(expiration_dt)
+  WHERE expiration_dt = 'infinity'::timestamptz;
