@@ -248,6 +248,8 @@ export class AppComponent implements OnInit, OnDestroy {
   // --- Status Bar State ---
   pane1Status = signal<PaneStatus>({ selectedItemsCount: 0, totalItemsCount: 0, filteredItemsCount: null });
   pane2Status = signal<PaneStatus>({ selectedItemsCount: 0, totalItemsCount: 0, filteredItemsCount: null });
+  pane1FolderIsMagnet = signal(false);
+  pane2FolderIsMagnet = signal(false);
 
   activePaneStatus = computed<PaneStatus>(() => {
     const activeId = this.activePaneId();
@@ -257,10 +259,18 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.pane2Status();
   });
 
+  /** Whether the directory currently shown in the active pane is magnetized. */
+  activePaneFolderIsMagnet = computed<boolean>(() => {
+    return this.activePaneId() === 1 ? this.pane1FolderIsMagnet() : this.pane2FolderIsMagnet();
+  });
+
   statusBarSelectionInfo = computed(() => {
     const item = this.selectedDetailItem();
+    const folderIsMagnet = this.activePaneFolderIsMagnet();
+
     if (!item) {
-      return 'Ready';
+      // Nothing selected: reflect the magnet status of the current directory.
+      return folderIsMagnet ? '🧲 Magnet Folder' : 'Ready';
     }
 
     if (item.isServerRoot) {
@@ -1693,6 +1703,14 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onPane2StatusChanged(status: PaneStatus): void {
     this.pane2Status.set(status);
+  }
+
+  onPane1FolderMagnetChanged(isMagnet: boolean): void {
+    this.pane1FolderIsMagnet.set(isMagnet);
+  }
+
+  onPane2FolderMagnetChanged(isMagnet: boolean): void {
+    this.pane2FolderIsMagnet.set(isMagnet);
   }
 
 

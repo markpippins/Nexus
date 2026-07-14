@@ -89,6 +89,8 @@ export class FileExplorerComponent implements OnDestroy {
   addServiceRegistry = output<void>();
   addGateway = output<void>();
   editLocalConfig = output<void>();
+  /** Emits whether the directory currently displayed by this pane is magnetized. */
+  currentFolderMagnet = output<boolean>();
 
   state = signal<FileSystemState>({ status: 'loading', items: [] });
   status = signal<{
@@ -352,18 +354,36 @@ export class FileExplorerComponent implements OnDestroy {
   }
 
   private async _loadContents(): Promise<void> {
+    const requestedPath = this.providerPath();
     this.state.set({ status: 'loading', items: [] });
     this.readmeContent.set(null); // Clear readme on navigation
     this.isReadmeLoading.set(false);
     try {
-      const items = await this.fileSystemProvider().getContents(this.providerPath());
+      const items = await this.fileSystemProvider().getContents(requestedPath);
+
+      // Ignore the result if the user navigated away while we were loading.
+      if (JSON.stringify(this.providerPath()) !== JSON.stringify(requestedPath)) return;
+
       this.state.set({ status: 'success', items: items });
+
+      // Determine whether the directory we just entered is itself magnetized.
+      // RemoteFileSystemService.getContents only flags *child* folders via hasFile,
+      // so we must explicitly check the CURRENT folder here to surface its magnet
+      // status in the footer.
+      try {
+        const isMagnet = await this.fileSystemProvider().hasFile(requestedPath, '.magnet');
+        if (JSON.stringify(this.providerPath()) === JSON.stringify(requestedPath)) {
+          this.currentFolderMagnet.emit(isMagnet);
+        }
+      } catch {
+        this.currentFolderMagnet.emit(false);
+      }
 
       // Check for README.md
       const readmeFile = items.find(item => item.name.toLowerCase() === 'readme.md' && item.type === 'file');
       if (readmeFile) {
         this.isReadmeLoading.set(true);
-        this.fileSystemProvider().getFileContent(this.providerPath(), readmeFile.name)
+        this.fileSystemProvider().getFileContent(requestedPath, readmeFile.name)
           .then(content => {
             this.readmeContent.set(content);
           })
