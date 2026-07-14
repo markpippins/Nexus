@@ -170,6 +170,7 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
     ENTITY_SECTIONS = [
         "types", "actors", "epistemic_types", "state_machines",
         "architectural_observations", "decisions", "gaps_and_blockers",
+        "work_requests",
     ]
 
     entities: list[dict] = []
