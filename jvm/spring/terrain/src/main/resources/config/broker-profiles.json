@@ -1,9 +1,9 @@
 [
   {
-    "profileId": "strontium",
-    "name": "Strontium Gateway",
-    "brokerUrl": "strontium:8081",
-    "imageUrl": "http://strontium:9081",
+    "profileId": "titanium",
+    "name": "Titanium Gateway",
+    "brokerUrl": "localhost:8081",
+    "imageUrl": "http://localhost:9081",
     "autoConnect": false,
     "healthCheckDelayMinutes": 3
   }
