@@ -146,7 +146,12 @@ CANDIDATES: tuple[Candidate, ...] = (
         port=3102,
         kind="mcp_server",
         transport_type="sse",
-        health_url="http://localhost:3102/sse",
+        # Probe uses the non-streaming /health endpoint rather than /sse:
+        # the SSE handler holds the connection open, which causes curl /
+        # urllib.request.urlopen to time out at PROBE_TIMEOUT_SECONDS and
+        # mark the server OFFLINE even when the socket is healthy. The
+        # /health endpoint returns a small JSON body and closes.
+        health_url="http://localhost:3102/health",
         description=(
             "SSE wrapper around nebula-srv so stdio-only MCP clients (e.g. "
             "Claude Desktop) can speak to the canonical DB API."
@@ -277,7 +282,17 @@ CANDIDATES: tuple[Candidate, ...] = (
         port=None,
         kind="mcp_server",
         transport_type="stdio",
+        # Stdio-only candidate; no HTTP health endpoint. Use the systemd
+        # unit as the liveness proxy: terrain-mcp.service is a stdio
+        # launcher stub with RemainAfterExit=yes, so is-active returns 0
+        # once the unit has been started even with no client currently
+        # spawned. This measures "MCP launch stub loaded", not "actively
+        # serving requests". A return of "inactive" correctly reflects a
+        # not-yet-registered unit (a transient bootstrap condition).
+        # Replaces the prior behaviour of always writing OFFLINE because
+        # probe_one() short-circuited on empty health_url alone.
         health_url="",
+        health_cmd="systemctl --user is-active terrain-mcp.service",
         description=(
             "TS stdio MCP server. Read+write surface over terrain.* tables. "
             "Not currently running on a TCP port — stdio-only."
@@ -508,6 +523,24 @@ def probe_one(c: Candidate) -> ProbeResult:
                 error=f"health_cmd failed: {e}",
             )
 
+    # Refuse streaming-shaped endpoints up-front. urlopen() against
+    # /sse, /events, /ws, or /stream holds the connection open and
+    # exhausts PROBE_TIMEOUT_SECONDS, silently reporting OFFLINE even
+    # when the socket is healthy. Surface this as an actionable error
+    # so candidate authors wire up /health or health_cmd instead.
+    if c.health_url and any(
+        c.health_url.endswith(sfx)
+        for sfx in ("/sse", "/events", "/ws", "/stream")
+    ):
+        return ProbeResult(
+            candidate=c,
+            reachable=False,
+            error=(
+                f"streaming endpoint; configure /health or health_cmd "
+                f"instead of {c.health_url}"
+            ),
+        )
+
     if not c.health_url:
         return ProbeResult(
             candidate=c,
@@ -517,6 +550,34 @@ def probe_one(c: Candidate) -> ProbeResult:
     req = urllib.request.Request(c.health_url, headers={"Accept": "*/*"})
     try:
         with urllib.request.urlopen(req, timeout=PROBE_TIMEOUT_SECONDS) as r:
+            # Inspect Content-Type BEFORE reading the body. urllib only
+            # reads response headers here; the body stream is still
+            # untouched, so closing via the `with` exit tears down the
+            # stream without consuming chunked frames. This catches
+            # streaming endpoints whose URL shape does not advertise
+            # SSE/WS, e.g. notify, /stream/agent-events, gRPC-web.
+            #
+            # Use the canonical media type (lowercased, parameter-
+            # stripped) and exact match against the marker set, rather
+            # than a substring scan, so vendor extensions whose media
+            # type contains "event-stream" as a substring do not falsely
+            # reject. RFC 9110 §8.3 lets servers vary case; lower-case
+            # before compare.
+            ctype = str(r.headers.get("Content-Type", "")).lower().split(";", 1)[0].strip()
+            if ctype in (
+                "text/event-stream",
+                "multipart/x-mixed-replace",
+                "application/grpc-web",
+            ):
+                return ProbeResult(
+                    candidate=c,
+                    reachable=False,
+                    error=(
+                        f"streaming endpoint detected via Content-Type "
+                        f"({ctype!r}); configure /health or health_cmd "
+                        f"instead of {c.health_url}"
+                    ),
+                )
             body = r.read(512).decode(errors="replace")
             return ProbeResult(
                 candidate=c,

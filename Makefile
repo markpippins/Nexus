@@ -3,6 +3,7 @@
         cir5-lint cir5-validate \
         cir-arl cir-verify install-hooks \
         test-db-setup test-db-reset test \
+        mesh-test \
         mcp-start mcp-stop mcp-restart mcp-status mcp-watch
 
 # ─── CIR-1: Full pipeline (read-only) ─────────────────────────────────────────
@@ -152,6 +153,18 @@ mcp-watch:
 	@echo "Starting MCP server in watch mode — auto-restarts on file changes."
 	@echo "Kill with Ctrl-C."
 	@cd typescript/conduit-mcp && npx tsx watch src/index.ts
+
+# ─── mesh-register probe tests (Python pytest) ────────────────────────────────
+# Backed by nexus/.github/workflows/mesh-pytest.yml — same command locally
+# and in CI. Keeps the vendor-extension regression locked in (see commit
+# history for context).
+#
+# `mesh-test` only RUNS pytest; it does NOT install it. First-time setup
+# is `pip install -r requirements-dev.txt` (the same file CI uses).
+
+mesh-test:
+	@echo "[mesh-test] running mesh-register probe tests..."
+	@python3 -m pytest bin/tests/test_mesh_register_probe.py -v
 
 # ─── Git hooks ────────────────────────────────────────────────────────────────
 
