@@ -1,0 +1,624 @@
+<div class="app-container">
+  <!-- ═══════════ Header ═══════════ -->
+  <header class="app-header">
+    <div class="header-left">
+      <span class="logo">Cascade</span>
+      <span class="logo-sub">event monitor</span>
+    </div>
+    <div class="header-center">
+      <span class="event-count-badge" [class.has-events]="totalEvents() > 0">
+        {{ totalEvents() }} events
+      </span>
+      @if (analytics()?.pipelineFunnel; as funnel) {
+        <div class="mini-funnel">
+          <span class="funnel-step" title="Candidates discovered">
+            <span class="dot dot-candidate"></span>{{ funnel.candidates }}
+          </span>
+          <span class="funnel-arrow">→</span>
+          <span class="funnel-step" title="Promoted">
+            <span class="dot dot-promoted"></span>{{ funnel.promoted }}
+          </span>
+          <span class="funnel-arrow">→</span>
+          <span class="funnel-step" title="Intent Records">
+            <span class="dot dot-intent"></span>{{ funnel.intent_records }}
+          </span>
+          <span class="funnel-arrow">→</span>
+          <span class="funnel-step" title="Plans">
+            <span class="dot dot-plan"></span>{{ funnel.plans }}
+          </span>
+        </div>
+      }
+    </div>
+    <div class="header-right">
+      <span class="bus-dot" [class.connected]="busConnected()" [title]="(busConnected() ? '✅ Connected' : '⛔ Disconnected') + (busLastEvent() ? '\nLast: ' + busLastEvent() : '\nNo events yet')"></span>
+      <span class="refresh-time" [class.loading]="loading()">{{ refreshTime() }}</span>
+      <label class="auto-refresh-toggle" title="Auto-refresh every 15s">
+        <input type="checkbox" [(ngModel)]="autoRefresh" />
+        <span>Auto</span>
+      </label>
+      <select [(ngModel)]="range" (change)="loadAll()" class="range-select" title="Time range">
+        <option value="1h">1h</option>
+        <option value="6h">6h</option>
+        <option value="24h">24h</option>
+        <option value="7d">7d</option>
+        <option value="30d">30d</option>
+      </select>
+      <button class="btn btn-icon btn-theme" (click)="toggleTheme()" [title]="'Theme: ' + theme()">
+        @switch (theme()) {
+          @case ('light') {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          }
+          @case ('dark') {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          }
+          @default {
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="20" rx="4" ry="4"/>
+              <circle cx="12" cy="12" r="4"/>
+              <line x1="12" y1="2" x2="12" y2="6"/>
+              <line x1="12" y1="18" x2="12" y2="22"/>
+              <line x1="2" y1="12" x2="6" y2="12"/>
+              <line x1="18" y1="12" x2="22" y2="12"/>
+            </svg>
+          }
+        }
+      </button>
+      <button class="btn btn-primary" (click)="loadAll()" [disabled]="loading()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" [class.spin]="loading()">
+          <path d="M1 4v6h6M23 20v-6h-6"/>
+          <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+        </svg>
+        Refresh
+      </button>
+      <button class="btn btn-secondary" (click)="showSubscribers.set(!showSubscribers())" [class.active]="showSubscribers()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>                        @if (subscriberCount() > 0) {
+                          <span class="badge-dot">{{ subscriberCount() }}</span>
+                        }
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══════════ Main Content ═══════════ -->
+  <div class="main-layout">
+    <!-- Left: analytics + event feed -->
+    <div class="main-content">
+      <!-- ── Error Banner ── -->
+      @if (error(); as err) {
+        <div class="error-banner">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          {{ err }}
+          <button class="btn btn-ghost" (click)="error.set(null)">&times;</button>
+        </div>
+      }
+
+      <!-- ── Analytics Dashboard ── -->
+      @if (analytics(); as a) {
+        <section class="analytics-section">
+          <div class="analytics-grid">
+            <!-- Pipeline Funnel -->
+            <div class="analytics-card funnel-card">
+              <div class="card-title">Pipeline Funnel</div>
+              <div class="funnel-bars">
+                <div class="funnel-row">
+                  <span class="funnel-label">Harvests</span>
+                  <div class="funnel-bar-track">
+                    <div class="funnel-bar bar-harvest" [style.width.%]="(a.pipelineFunnel.harvests / funnelMax) * 100">
+                      <span>{{ a.pipelineFunnel.harvests }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="funnel-row">
+                  <span class="funnel-label">Candidates</span>
+                  <div class="funnel-bar-track">
+                    <div class="funnel-bar bar-candidate" [style.width.%]="(a.pipelineFunnel.candidates / funnelMax) * 100">
+                      <span>{{ a.pipelineFunnel.candidates }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="funnel-row">
+                  <span class="funnel-label">Promoted</span>
+                  <div class="funnel-bar-track">
+                    <div class="funnel-bar bar-promoted" [style.width.%]="(a.pipelineFunnel.promoted / funnelMax) * 100">
+                      <span>{{ a.pipelineFunnel.promoted }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="funnel-row">
+                  <span class="funnel-label">Intent Rec.</span>
+                  <div class="funnel-bar-track">
+                    <div class="funnel-bar bar-intent" [style.width.%]="(a.pipelineFunnel.intent_records / funnelMax) * 100">
+                      <span>{{ a.pipelineFunnel.intent_records }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="funnel-row">
+                  <span class="funnel-label">Plans</span>
+                  <div class="funnel-bar-track">
+                    <div class="funnel-bar bar-plan" [style.width.%]="(a.pipelineFunnel.plans / funnelMax) * 100">
+                      <span>{{ a.pipelineFunnel.plans }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Throughput -->
+            <div class="analytics-card throughput-card">
+              <div class="card-title">Throughput</div>
+              <div class="throughput-list">
+                @for (t of a.throughput; track t.event_type) {
+                  <div class="throughput-row">
+                    <span class="throughput-dot" [style.background]="eventTypeColor(t.event_type)"></span>
+                    <span class="throughput-type">{{ t.event_type }}</span>
+                    <span class="throughput-count">{{ t.count }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Top Sources -->
+            <div class="analytics-card sources-card">
+              <div class="card-title">Top Sources</div>
+              <div class="sources-list">
+                @for (s of a.topSources; track s.source) {
+                  <div class="source-row">
+                    <span class="source-name">{{ s.source }}</span>
+                    <div class="source-bar-track">
+                      <div class="source-bar" [style.width.%]="(s.count / a.topSources[0].count) * 100"></div>
+                    </div>
+                    <span class="source-count">{{ s.count }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Timeline mini-chart -->
+            <div class="analytics-card timeline-card">
+              <div class="card-title">Timeline ({{ a.granularity }})</div>
+              <div class="timeline-chart">
+                @for (t of a.timeline; track t.bucket + t.event_type) {
+                  <div class="timeline-bar-wrapper" [title]="(t.bucket | date:'short') + ': ' + t.count + 'x ' + t.event_type">
+                    <div class="timeline-bar" [style.height.%]="(t.count / maxTimelineCount) * 100"
+                         [style.background]="eventTypeColor(t.event_type)">
+                    </div>
+                  </div>
+                }
+              </div>
+              <div class="timeline-footer">
+                <span>{{ a.timeline.length ? (a.timeline[0].bucket | date:'HH:mm') : '' }}</span>
+                <span>{{ a.timeline.length ? (a.timeline[a.timeline.length-1].bucket | date:'HH:mm') : '' }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      }
+
+      <!-- ── Filter Bar ── -->
+      <section class="filter-section">
+        <div class="filter-row">
+          <div class="filter-group">
+            <label>Type</label>
+            <select [(ngModel)]="filterType" (change)="applyFilters()">
+              <option value="">All types</option>
+              @for (t of eventTypes(); track t) {
+                <option [value]="t">{{ t }}</option>
+              }
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Source</label>
+            <select [(ngModel)]="filterSource" (change)="applyFilters()">
+              <option value="">All sources</option>
+              @for (s of eventSources(); track s) {
+                <option [value]="s">{{ s }}</option>
+              }
+            </select>
+          </div>
+          <div class="filter-group">
+            <label>Per page</label>
+            <select [(ngModel)]="limit" (change)="applyFilters()">
+              <option [value]="20">20</option>
+              <option [value]="50">50</option>
+              <option [value]="100">100</option>
+            </select>
+          </div>
+          <div class="filter-spacer"></div>
+          <span class="event-range-label">
+            Showing {{ offset() + 1 }}–{{ Math.min(offset() + limit(), totalEvents()) }} of {{ totalEvents() }}
+          </span>
+        </div>
+      </section>
+
+      <!-- ── Event Table ── -->
+      <section class="events-section">
+        @if (loading() && events().length === 0) {
+          <div class="loading-state">
+            <div class="spinner"></div>
+            <span>Loading events…</span>
+          </div>
+        } @else if (events().length === 0) {
+          <div class="empty-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+              <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+            </svg>
+            <span>No events found</span>
+          </div>
+        } @else {
+          <div class="event-list">
+            @for (ev of events(); track ev.event_id) {
+              <div class="event-row" [class.selected]="selectedEvent()?.event_id === ev.event_id"
+                   (click)="selectEvent(ev)">
+                <div class="event-indicator" [style.background]="eventTypeColor(ev.event_type)"></div>
+                <div class="event-body">
+                  <div class="event-header-row">
+                    <span class="event-type-badge">{{ ev.event_type }}</span>
+                    <span class="event-source">{{ ev.source }}</span>
+                    <span class="event-time">{{ timeAgo(ev.event_timestamp) }}</span>
+                    <span class="event-seq">#{{ ev.sequence_number }}</span>
+                  </div>
+                  <div class="event-title">{{ eventTitle(ev) }}</div>
+                  <div class="event-meta">
+                    <span class="meta-item" title="Event ID">{{ truncate(ev.event_id) }}</span>
+                    @if (ev.aggregate_type) {
+                      <span class="meta-item">{{ ev.aggregate_type }}: {{ truncate(ev.aggregate_id) }}</span>
+                    }
+                    @if (ev.causation_id) {
+                      <span class="meta-item">&larr; {{ truncate(ev.causation_id) }}</span>
+                    }
+                    @if (ev.actor_type) {
+                      <span class="meta-item actor">{{ ev.actor_type }}{{ ev.actor_id ? ':' + truncate(ev.actor_id) : '' }}</span>
+                    }
+                  </div>
+                </div>
+                <div class="event-chevron">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- ── Pagination ── -->
+      @if (totalPages() > 1) {
+        <section class="pagination-section">
+          <button class="btn btn-ghost" (click)="prevPage()" [disabled]="offset() === 0">
+            &larr; Prev
+          </button>
+          @for (p of pages; track p) {
+            <button class="btn btn-page" [class.active]="p === currentPage()" (click)="goToPage(p)">
+              {{ p }}
+            </button>
+          }
+          <button class="btn btn-ghost" (click)="nextPage()" [disabled]="offset() + limit() >= totalEvents()">
+            Next &rarr;
+          </button>
+        </section>
+      }
+    </div>
+
+    <!-- ═══════════ Right Panel: Detail View ═══════════ -->
+    @if (selectedEvent(); as ev) {
+      <div class="detail-panel">
+        <div class="detail-header">
+          <div class="detail-header-left">
+            <span class="detail-indicator" [style.background]="eventTypeColor(ev.event_type)"></span>
+            <span class="detail-type">{{ ev.event_type }}</span>
+          </div>
+          <button class="btn btn-ghost" (click)="closeDetail()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Tab buttons -->
+        <div class="detail-tabs">
+          <button class="tab-btn" [class.active]="detailView() === 'detail'" (click)="detailView.set('detail')">Detail</button>
+          <button class="tab-btn" [class.active]="detailView() === 'lineage'" (click)="loadLineage()">
+            Lineage @if (lineageEvents().length > 0) { <span class="tab-count">{{ lineageEvents().length }}</span> }
+          </button>
+          <button class="tab-btn" [class.active]="detailView() === 'children'" (click)="loadChildren()">
+            Children @if (childrenEvents().length > 0) { <span class="tab-count">{{ childrenEvents().length }}</span> }
+          </button>
+          <button class="tab-btn" [class.active]="detailView() === 'graph'" (click)="loadGraph()">
+            Graph @if (graphNodeCount() > 0) { <span class="tab-count">{{ graphNodeCount() }}</span> }
+          </button>
+        </div>
+
+        <div class="detail-scroll">
+          @if (detailView() === 'detail') {
+            <!-- Detail view -->
+            <div class="detail-section">
+              <div class="detail-field">
+                <span class="field-label">Event ID</span>
+                <span class="field-value mono">{{ ev.event_id }}</span>
+              </div>
+              <div class="detail-field">
+                <span class="field-label">Timestamp</span>
+                <span class="field-value">{{ formatTimestamp(ev.event_timestamp) }}</span>
+              </div>
+              <div class="detail-field">
+                <span class="field-label">Source</span>
+                <span class="field-value">{{ ev.source }}</span>
+              </div>
+              <div class="detail-field">
+                <span class="field-label">Aggregate</span>
+                <span class="field-value">{{ ev.aggregate_type }} <span class="mono">{{ truncate(ev.aggregate_id) }}</span></span>
+              </div>
+              @if (ev.causation_id) {
+                <div class="detail-field">
+                  <span class="field-label">Caused By</span>
+                  <span class="field-value mono">{{ ev.causation_id }}</span>
+                </div>
+              }
+              @if (ev.correlation_id) {
+                <div class="detail-field">
+                  <span class="field-label">Correlation</span>
+                  <span class="field-value mono">{{ ev.correlation_id }}</span>
+                </div>
+              }
+              <div class="detail-field">
+                <span class="field-label">Sequence</span>
+                <span class="field-value">{{ ev.sequence_number }}</span>
+              </div>
+              <div class="detail-field">
+                <span class="field-label">Received</span>
+                <span class="field-value">{{ formatTimestamp(ev.received_at) }}</span>
+              </div>
+            </div>
+
+            <!-- Payload -->
+            <div class="detail-section">
+              <div class="section-header">
+                <span class="section-title">Payload</span>
+                <button class="btn btn-ghost btn-xs" (click)="showAsJson.set(!showAsJson())">
+                  {{ showAsJson() ? 'Formatted' : 'Raw JSON' }}
+                </button>
+              </div>
+              @if (ev.payload?.title) {
+                <div class="detail-field">
+                  <span class="field-label">Title</span>
+                  <span class="field-value payload-title">{{ ev.payload.title }}</span>
+                </div>
+              }
+              @if (ev.payload.harvest_id) {
+                <div class="detail-field">
+                  <span class="field-label">Harvest ID</span>
+                  <span class="field-value mono">{{ ev.payload.harvest_id }}</span>
+                </div>
+              }
+              @if (showAsJson()) {
+                <pre class="json-block">{{ jsonStringify(ev.payload) }}</pre>
+              }
+            </div>
+          }
+
+          @if (detailView() === 'lineage') {
+            <!-- Lineage view -->
+            <div class="detail-section">
+              <div class="section-header">
+                <span class="section-title">Causation Chain</span>
+              </div>
+              @if (lineageLoading()) {
+                <div class="loading-inline"><div class="spinner-sm"></div> Loading lineage…</div>
+              } @else if (lineageEvents().length === 0) {
+                <div class="empty-inline">No causation chain — root event</div>
+              } @else {
+                <div class="lineage-chain">
+                  @for (ev of lineageEvents(); track ev.event_id) {
+                    <div class="chain-node" [class.is-anchor]="ev.event_id === selectedEvent()?.event_id">
+                      <div class="chain-line"></div>
+                      <div class="chain-content">
+                        <div class="chain-header">
+                          <span class="chain-badge">{{ ev.event_type }}</span>
+                          <span class="chain-time">{{ timeAgo(ev.event_timestamp) }}</span>
+                          <span class="chain-depth">depth {{ ev.depth }}</span>
+                        </div>
+                        <div class="chain-id mono">{{ truncate(ev.event_id) }}</div>
+                        @if (ev.payload?.title) {
+                          <div class="chain-title">{{ ev.payload.title }}</div>
+                        }
+                        @if (ev.caused_by_event_type) {
+                          <div class="chain-cause">triggered by: {{ ev.caused_by_event_type }}</div>
+                        }
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @if (detailView() === 'children') {
+            <!-- Children view -->
+            <div class="detail-section">
+              <div class="section-header">
+                <span class="section-title">Triggered Events</span>
+              </div>
+              @if (childrenLoading()) {
+                <div class="loading-inline"><div class="spinner-sm"></div> Loading children…</div>
+              } @else if (childrenEvents().length === 0) {
+                <div class="empty-inline">No events were triggered by this one</div>
+              } @else {
+                <div class="children-list">
+                  @for (ch of childrenEvents(); track ch.event_id) {
+                    <div class="child-item">
+                      <div class="child-indicator" [style.background]="eventTypeColor(ch.event_type)"></div>
+                      <div class="child-body">
+                        <span class="child-type">{{ ch.event_type }}</span>
+                        <span class="child-source">{{ ch.source }}</span>
+                        <span class="child-time">{{ timeAgo(ch.event_timestamp) }}</span>
+                      </div>
+                      <div class="child-id mono">{{ truncate(ch.event_id) }}</div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+
+          @if (detailView() === 'graph') {
+            <!-- Force-directed graph view -->
+            <div class="detail-section">
+              <div class="section-header">
+                <span class="section-title">Event Graph</span>
+                @if (graphNodes().length > 0) {
+                  <span class="graph-stats">{{ graphNodeCount() }} nodes · {{ graphEdgeCount() }} edges</span>
+                }
+              </div>
+              @if (graphLoading()) {
+                <div class="loading-inline"><div class="spinner-sm"></div> Computing force layout…</div>
+              } @else if (graphNodes().length > 0) {
+                <div class="graph-container">
+                  <svg [attr.viewBox]="'0 0 ' + graphSvgW() + ' ' + graphSvgH()" class="lineage-svg">
+                    <!-- Arrow marker definition -->
+                    <defs>
+                      <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                        <polygon points="0 0, 8 3, 0 6" fill="var(--text-dim)" opacity="0.6" />
+                      </marker>
+                    </defs>
+
+                    <!-- Edges -->
+                    @for (e of graphEdges(); track e.source + '→' + e.target) {
+                      @let src = getNode(e.source, graphNodes());
+                      @let tgt = getNode(e.target, graphNodes());
+                      @if (src && tgt) {
+                        <line
+                          [attr.x1]="src.x" [attr.y1]="src.y"
+                          [attr.x2]="tgt.x" [attr.y2]="tgt.y"
+                          class="graph-edge"
+                          [class.edge-dim]="hoveredNode() && !isConnectedToHovered(e.source, graphEdges()) && !isConnectedToHovered(e.target, graphEdges())"
+                          marker-end="url(#arrowhead)"
+                        />
+                      }
+                    }
+
+                    <!-- Nodes -->
+                    @for (n of graphNodes(); track n.id) {
+                      <g class="graph-node-group"
+                         [class.node-dim]="hoveredNode() && !isConnectedToHovered(n.id, graphEdges())"
+                         (mouseenter)="hoveredNode.set(n.id)"
+                         (mouseleave)="hoveredNode.set(null)">
+                        <!-- Node circle -->
+                        <circle
+                          [attr.cx]="n.x" [attr.cy]="n.y" r="14"
+                          [attr.fill]="n.color"
+                          class="graph-node"
+                          [class.node-highlight]="hoveredNode() === n.id"
+                        />
+                        <!-- Node label -->
+                        <text
+                          [attr.x]="n.x" [attr.y]="n.y + 28"
+                          class="graph-label"
+                          text-anchor="middle"
+                        >{{ n.label }}</text>
+                        <!-- Tooltip on hover -->
+                        @if (hoveredNode() === n.id) {
+                          <title>{{ n.type }} · {{ n.source }} · depth {{ n.depth }}</title>
+                        }
+                      </g>
+                    }
+
+                    <!-- No edges message -->
+                    <text [attr.x]="graphSvgW() / 2" [attr.y]="graphSvgH() / 2"
+                          text-anchor="middle" class="graph-empty-label"
+                          [style.opacity]="graphEdgeCount() === 0 && graphNodeCount() > 0 ? 1 : 0"
+                    >No causal connections — root event</text>
+
+                    <!-- Truncated warning -->
+                    <text [attr.x]="graphSvgW() / 2" [attr.y]="14"
+                          text-anchor="middle" class="graph-truncated-label"
+                          [style.opacity]="graphTruncated() ? 1 : 0"
+                    >⚠ Graph truncated — showing first 8 levels</text>
+                  </svg>
+
+                  <!-- Legend -->
+                  <div class="graph-legend">
+                    <span class="legend-item">
+                      <span class="legend-dot" style="background:#8b5cf6"></span> Discovered
+                    </span>
+                    <span class="legend-item">
+                      <span class="legend-dot" style="background:#10b981"></span> Promoted
+                    </span>
+                    <span class="legend-item">
+                      <span class="legend-dot" style="background:#3b82f6"></span> Created
+                    </span>
+                    <span class="legend-item">
+                      <span class="legend-dot" style="background:#f59e0b"></span> Captured
+                    </span>
+                    <span class="legend-item">
+                      <span class="legend-dot" style="background:#6b7280"></span> Test
+                    </span>
+                  </div>
+                </div>
+              } @else {
+                <div class="empty-inline">No graph data available</div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- ═══════════ Right Panel: Subscribers ═══════════ -->
+    @if (showSubscribers()) {
+      <div class="detail-panel subscribers-panel">
+        <div class="detail-header">
+          <div class="detail-header-left">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+            </svg>
+            <span>Subscribers ({{ subscriberCount() }})</span>
+          </div>
+          <button class="btn btn-ghost" (click)="showSubscribers.set(false)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="detail-scroll">
+          @for (sub of subscribers(); track sub.subject_pattern) {
+            <div class="subscriber-card">
+              <div class="sub-header">
+                <span class="sub-name">{{ sub.handler_name }}</span>
+                <span class="sub-lag-badge" [class]="subscriberLagClass(sub.lag)">
+                  {{ sub.lag }} behind
+                </span>
+              </div>
+              <div class="sub-pattern mono">{{ sub.subject_pattern }}</div>
+              @if (sub.description) {
+                <div class="sub-desc">{{ sub.description }}</div>
+              }
+              <div class="sub-status">
+                <span class="status-dot" [class.enabled]="sub.enabled" [class.disabled]="!sub.enabled"></span>
+                {{ sub.enabled ? 'Enabled' : 'Disabled' }}
+                @if (sub.last_processed_at) {
+                  <span class="sub-last">last: {{ timeAgo(sub.last_processed_at) }}</span>
+                }
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-inline">No subscribers registered</div>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</div>

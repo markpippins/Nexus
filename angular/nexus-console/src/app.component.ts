@@ -178,7 +178,7 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui' | 'kanban'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms' | 'tackle-ui' | 'kanban' | 'cascade-ui'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -189,6 +189,7 @@ export class AppComponent implements OnInit, OnDestroy {
     'plurality': 'http://localhost:9003',
     'nebula-rms': 'http://localhost:3000',
     'tackle-ui': 'http://localhost:4202',
+    'cascade-ui': 'http://localhost:4203',
   };
 
   isIframeMode = computed(() =>
@@ -196,7 +197,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.currentViewMode() === 'duality' ||
     this.currentViewMode() === 'plurality' ||
     this.currentViewMode() === 'nebula-rms' ||
-    this.currentViewMode() === 'tackle-ui'
+    this.currentViewMode() === 'tackle-ui' ||
+    this.currentViewMode() === 'cascade-ui'
   );
 
   isKanbanMode = computed(() => this.currentViewMode() === 'kanban');

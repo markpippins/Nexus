@@ -1,0 +1,86 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Cascade UI — Global Styles (no view encapsulation)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Reset & Base ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── Light theme (default) ─────────────────────── */
+  --bg: hsl(0, 0%, 96%);
+  --surface: hsl(0, 0%, 100%);
+  --surface-2: hsl(0, 0%, 92%);
+  --surface-3: hsl(0, 0%, 85%);
+  --border: hsl(0, 0%, 82%);
+  --text: hsl(240, 10%, 3.9%);
+  --text-muted: hsl(240, 3.8%, 46.1%);
+  --text-dim: hsl(240, 3.8%, 55%);
+  --accent: #8b5cf6;
+  --accent-hover: #a78bfa;
+  --green: #10b981;
+  --blue: hsl(217, 91%, 50%);
+  --amber: #f59e0b;
+  --red: hsl(0, 62.8%, 50%);
+  --radius: 8px;
+  --radius-sm: 6px;
+  --font: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --font-ui: 'PT Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-heading: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+.steel {
+  /* ── Steel theme ───────────────────────────────── */
+  --bg: hsl(222, 47%, 11%);
+  --surface: hsl(217, 33%, 17%);
+  --surface-2: hsl(217, 19%, 27%);
+  --surface-3: hsl(217, 19%, 32%);
+  --border: hsl(217, 19%, 27%);
+  --text: hsl(210, 40%, 98%);
+  --text-muted: hsl(215, 20%, 65%);
+  --text-dim: hsl(215, 16%, 47%);
+  --accent: #8b5cf6;
+  --accent-hover: #a78bfa;
+  --green: #10b981;
+  --blue: hsl(217, 91%, 60%);
+  --amber: #f59e0b;
+  --red: hsl(0, 62.8%, 50%);
+}
+
+.dark {
+  /* ── Dark theme ────────────────────────────────── */
+  --bg: hsl(240, 6%, 10%);
+  --surface: hsl(240, 6%, 14%);
+  --surface-2: hsl(240, 5%, 20%);
+  --surface-3: hsl(240, 5%, 26%);
+  --border: hsl(240, 5%, 20%);
+  --text: hsl(0, 0%, 98%);
+  --text-muted: hsl(0, 0%, 63.9%);
+  --text-dim: hsl(240, 5%, 50%);
+  --accent: #8b5cf6;
+  --accent-hover: #a78bfa;
+  --green: #10b981;
+  --blue: hsl(217, 91%, 65%);
+  --amber: #f59e0b;
+  --red: hsl(0, 62.8%, 55%);
+}
+
+/* The radius, font, and font-ui are shared across themes (set once on :root, inherited via cascade) */
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ── Keyframes ─────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }

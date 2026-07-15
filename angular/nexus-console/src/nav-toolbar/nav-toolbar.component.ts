@@ -55,6 +55,12 @@ export const NAV_ITEMS: NavItem[] = [
     iconPath: 'M5 5a2 2 0 00-2 2v8a2 2 0 002 2h1a2 2 0 002-2V7a2 2 0 00-2-2H5zm5 4a2 2 0 012-2h1a2 2 0 012 2v6a2 2 0 01-2 2h-1a2 2 0 01-2-2V9zm5-2a2 2 0 00-2 2v4a2 2 0 002 2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1z',
   },
   {
+    key: 'cascade-ui',
+    label: 'Cascade',
+    title: 'Cascade Event Monitor',
+    iconPath: 'M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605',
+  },
+  {
     key: 'tackle-ui',
     label: 'Tackle',
     title: 'Tackle',
