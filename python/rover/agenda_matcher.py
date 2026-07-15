@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 import numpy as np
 
 from embed_util import embed_texts, cosine_similarity_matrix
+from event_emitter import emit_agenda_item_added, emit_requirement_promoted
 
 log = logging.getLogger("agenda_matcher")
 
@@ -514,6 +515,19 @@ def add_item_to_agenda(
         return None
 
     log.info("  → Agenda item: %s → agenda %s", item_id[:8], agenda_id[:8])
+
+    # Cascade event: agenda.item_added
+    try:
+        emit_agenda_item_added(
+            agenda_id=agenda_id,
+            item_id=item_id,
+            source_id=source_id,
+            source_type="intent_record",
+            title=title,
+            source="rover.agenda_matcher",
+        )
+    except Exception as e:
+        log.debug("  agenda.item_added emission failed: %s", e)
 
     # Invalidate cached centroid so next match call recomputes it.
     # Skip when using incremental updates (batch reclustering).

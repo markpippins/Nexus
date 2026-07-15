@@ -22,6 +22,7 @@ import time
 from pathlib import Path
 
 from tackle.inference import call_llm
+from event_emitter import emit_candidate_discovered
 
 log = logging.getLogger("batch_file_candidates")
 
@@ -386,14 +387,19 @@ def resolve_hierarchy_ids(candidates: list[dict], systems: list[dict]) -> list[d
     return resolved
 
 
-def create_candidate(harvest_id: str, candidate: dict) -> bool:
+def create_candidate(harvest_id: str, candidate: dict) -> str | None:
+    """Create a candidate via the nebula-srv REST API.
+
+    Returns the candidate UUID on success, None on failure.
+    """
     body = {"harvestId": harvest_id, **candidate}
     for k in ["systemMatch", "subsystemMatch", "featureMatch"]:
         body.pop(k, None)
     result = nebula_post("/harvest-candidates", body)
     if isinstance(result, dict) and result.get("error"):
-        return False
-    return True
+        return None
+    # API returns the full row with 'id'
+    return result.get("id")
 
 
 ASSEMBLY_MCP_URL = "http://localhost:3107"
@@ -576,9 +582,19 @@ def main():
             resolved = resolve_hierarchy_ids(cands, systems)
             created = 0
             for c in resolved:
-                if create_candidate(h["id"], c):
+                cand_id = create_candidate(h["id"], c)
+                if cand_id:
                     created += 1
                     total_candidates += 1
+
+                    # Cascade event: candidate.discovered
+                    emit_candidate_discovered(
+                        candidate_id=cand_id,
+                        harvest_id=h["id"],
+                        title=c.get("title", ""),
+                        cpf=c.get("compilationReadiness"),
+                        source="rover.batch_file_candidates",
+                    )
             results[h["id"]] = (created, elapsed)
             
             # ── Emit observation.captured kernel event ──

@@ -30,6 +30,7 @@ ALL_SERVICES=(
     "file-system-server.service" # port 4040 — file system operations
     "peb-kernel.service"       # port 8080 — engineering brain
     "nebula-srv.service"       # Nebula RMS API
+    "cascade-srv.service"      # port 3106 — Cascade Event API
     "role-memory-srv.service"  # port 3500 — PG→Redis sync
     "wrp-bridge-daemon.service" # conduit→kernel sync
 
@@ -63,6 +64,7 @@ SERVICE_PORTS=(
     ["file-system-server.service"]="4040"
     ["peb-kernel.service"]="8080"
     ["nebula-srv.service"]="3101"
+    ["cascade-srv.service"]="3106"
     ["role-memory-srv.service"]="3500"
     # wrp-bridge-daemon — no HTTP health endpoint
     ["vision-srv.service"]="3103"

@@ -49,6 +49,8 @@ import uuid as uuidlib
 from datetime import datetime
 from typing import Any
 
+from event_emitter import emit_requirement_promoted
+
 log = logging.getLogger("req_compiler")
 
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
@@ -745,6 +747,17 @@ def compile_requirement(
             result["success"] = True  # Compilation succeeded, plan creation failed
             return result
         result["implementation_plan_id"] = impl_plan_id
+
+        # Cascade event: requirement.promoted_to_plan
+        try:
+            emit_requirement_promoted(
+                requirement_id=req_id,
+                plan_id=impl_plan_id,
+                title=normalized.get("title", ""),
+                source="rover.req_compiler",
+            )
+        except Exception as e:
+            log.debug("  requirement.promoted_to_plan emission failed: %s", e)
 
         # 2. Cross-reference requirement → implementation_plan
         create_cross_reference(req_id, impl_plan_id, rel_type="compiles_to")

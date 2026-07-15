@@ -4,6 +4,8 @@
 import json, logging, sys, subprocess, time
 import urllib.request, urllib.error
 
+from event_emitter import emit_candidate_classified
+
 log = logging.getLogger("classify")
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 NEBULA_API = "http://localhost:3101/api"
@@ -231,6 +233,17 @@ for short_id, (sys_name, sub_name) in classifications.items():
         sql += f" WHERE id = '{full_id}';"
         rc, _ = psql(sql)
         if rc == 0:
+            # Cascade event: candidate.classified
+            try:
+                emit_candidate_classified(
+                    candidate_id=full_id,
+                    system_id=sid,
+                    subsystem_id=subid,
+                    source="rover.batch_classify_unmapped",
+                )
+            except Exception as e:
+                log.debug("  candidate.classified emission failed: %s", e)
+
             # Create cross-reference for system
             xref_body = {
                 "sourceType": "harvest_candidate",

@@ -24,6 +24,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from event_emitter import emit_harvest_captured
+
 log = logging.getLogger("batch_harvest_db")
 
 PROJECT_ROOT = Path("/home/codex/dev")
@@ -102,8 +104,11 @@ def dockling_html_path(html_path: Path) -> dict | None:
 
 def insert_harvest(source_path: str, source_filename: str,
                    source_text: str | None, docklang: dict | None,
-                   file_size: int | None = None) -> bool:
-    """Insert a harvest record with docklang via POST /api/harvests."""
+                   file_size: int | None = None) -> str | None:
+    """Insert a harvest record with docklang via POST /api/harvests.
+
+    Returns the harvest UUID on success, None on failure.
+    """
     body = {
         "sourcePath": source_path,
         "sourceFilename": source_filename,
@@ -130,11 +135,11 @@ def insert_harvest(source_path: str, source_filename: str,
 
         if result.get("error"):
             log.error("  → API error: %s", result["error"])
-            return False
+            return None
 
         harvest_id = result.get("id", "?")
         log.info("  → DB harvest %s", harvest_id)
-        return True
+        return harvest_id
 
     except urllib.error.HTTPError as e:
         body_text = ""
@@ -143,13 +148,13 @@ def insert_harvest(source_path: str, source_filename: str,
         except Exception:
             pass
         log.error("  → API HTTP %d: %s", e.code, body_text)
-        return False
+        return None
     except urllib.error.URLError as e:
         log.error("  → API unreachable: %s", e.reason)
-        return False
+        return None
     except Exception as e:
         log.error("  → Unexpected error: %s", e)
-        return False
+        return None
 
 
 def process_transcript(html_path: Path) -> bool:
@@ -173,13 +178,28 @@ def process_transcript(html_path: Path) -> bool:
         file_size = None
 
     # Step 2: Insert to DB
-    return insert_harvest(
+    harvest_id = insert_harvest(
         source_path=source_path,
         source_filename=html_path.name,
         source_text=None,
         docklang=docklang,
         file_size=file_size,
     )
+    if not harvest_id:
+        return False
+
+    # Cascade event: harvest.captured
+    try:
+        emit_harvest_captured(
+            harvest_id=harvest_id,
+            source_file=html_path.name,
+            total_candidates=0,
+            source="rover.batch_harvest_to_db",
+        )
+    except Exception as e:
+        log.warning("  harvest.captured emission failed: %s", e)
+
+    return True
 
 
 def find_unharvested(limit: int) -> list[Path]:

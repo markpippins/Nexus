@@ -28,6 +28,8 @@ import time
 import urllib.request
 import urllib.error
 from pathlib import Path
+
+from event_emitter import emit_candidate_completed
 from collections import defaultdict
 
 from tackle.inference import call_llm
@@ -365,6 +367,19 @@ def main() -> int:
                 if "error" not in result:
                     log.info("  Marked %s completed (confidence=%s): %s",
                              cid, conf, reasoning[:80])
+
+                    # Cascade event: candidate.completed
+                    try:
+                        plan_ids = m.get("matched_plan_ids", [])
+                        plan_id = plan_ids[0] if plan_ids else None
+                        emit_candidate_completed(
+                            candidate_id=cid,
+                            plan_id=plan_id,
+                            confidence=conf,
+                            source="rover.batch_mark_completed",
+                        )
+                    except Exception as e:
+                        log.debug("  candidate.completed emission failed: %s", e)
                 else:
                     log.error("  Failed to update %s: %s", cid, result.get("error", "unknown"))
 

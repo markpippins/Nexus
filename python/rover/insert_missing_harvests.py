@@ -21,6 +21,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from event_emitter import emit_harvest_captured
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -313,6 +315,18 @@ def process_one(slug: str) -> bool:
             model,
             "yes" if has_source_text else "no",
         )
+
+        # Cascade event: harvest.captured
+        try:
+            emit_harvest_captured(
+                harvest_id=result["id"],
+                source_file=result["filename"],
+                total_candidates=result["candidates"],
+                source="rover.insert_missing_harvests",
+            )
+        except Exception as e:
+            log.warning("  harvest.captured emission failed: %s", e)
+
         return True
     else:
         log.error("  ❌ INSERT failed")

@@ -42,6 +42,11 @@ import uuid as uuidlib
 from datetime import datetime, timezone
 
 import agenda_matcher
+from event_emitter import (
+    emit_candidate_promoted,
+    emit_intent_record_created,
+    emit_agenda_item_added,
+)
 
 log = logging.getLogger("candidate_promote")
 
@@ -242,6 +247,15 @@ def create_intent_record(candidate: dict) -> str | None:
 
     ir_id = out.strip()
     log.info("  → IntentRecord created: %s (from candidate %s)", ir_id[:8], cid[:8])
+
+    # Cascade event: intent_record.created (caused by candidate.promoted)
+    emit_intent_record_created(
+        intent_id=ir_id,
+        source_candidate_id=cid,
+        cpf=candidate.get("compilation_readiness"),
+        source="rover.candidate_promote",
+    )
+
     return ir_id
 
 
@@ -311,6 +325,15 @@ def promote_candidate(candidate: dict, dry_run: bool = False, skip_agenda: bool 
             iid = agenda_matcher.add_item_to_agenda(match.agenda_id, ir_id)
             result["agenda_id"] = match.agenda_id
             result["agenda_item_id"] = iid
+
+            # Cascade event: agenda.item_added
+            emit_agenda_item_added(
+                agenda_id=match.agenda_id,
+                item_id=iid or "",
+                source_type="intent_record",
+                source_id=ir_id,
+                source="rover.candidate_promote",
+            )
     else:
         log.info("  Agenda matching skipped (--skip-agenda)")
         result["agenda_id"] = None
@@ -327,6 +350,15 @@ def promote_candidate(candidate: dict, dry_run: bool = False, skip_agenda: bool 
     rc, out, err = psql(sql)
     if rc == 0:
         log.info("  → Candidate status → promoted")
+
+        # Cascade event: candidate.promoted
+        emit_candidate_promoted(
+            candidate_id=candidate["id"],
+            intent_record_id=ir_id,
+            from_state=candidate.get("status", "unknown"),
+            cpf=candidate.get("compilation_readiness"),
+            source="rover.candidate_promote",
+        )
     else:
         details = err[:100] if err else out[:100]
         log.warning("  Could not update candidate status: %s", details)
