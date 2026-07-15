@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PlatformManagementService, Server } from '../../services/platform-management.service.js';
+import { PlatformManagementService, Server, getCategoryEndpointType } from '../../services/platform-management.service.js';
 import { UpsertServerDialogComponent } from './upsert-server-dialog/upsert-server-dialog.component.js';
 import { ServiceMeshService } from '../../services/service-mesh.service.js';
 import { ComponentRegistryService } from '../../services/component-registry.service.js';
@@ -43,7 +43,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                     {{ error() }}
                 </div>
             } @else {
-                @switch (managementType()) {
+                @switch (displayType()) {
                     @case ('services') {
                         <div class="flex flex-col h-full">
                             <!-- Services List -->
@@ -410,6 +410,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                     @case ('categories') {
                         <app-categories-view
                             [items]="lookupData()"
+                            [filteredType]="filteredCategoryType()"
                             (onEdit)="onCategoriesEdit($event)"
                             (onDelete)="onCategoriesDelete($event)"
                         ></app-categories-view>
@@ -655,6 +656,28 @@ export class PlatformManagementComponent {
      */
     editLookupType = computed(() => this._categoriesEditType() ?? this.managementType());
 
+    /**
+     * Display type for the template switch — normalizes {@code categories:*} to {@code categories}
+     * so child nodes under Categories render the same categories view.
+     */
+    displayType = computed(() => {
+        const t = this.managementType();
+        if (t.startsWith('categories:')) return 'categories';
+        return t;
+    });
+
+    /**
+     * When managementType is {@code categories:{discriminator}}, extracts the discriminator
+     * (e.g. {@code framework_type}). Returns null otherwise.
+     */
+    filteredCategoryType = computed<string | null>(() => {
+        const t = this.managementType();
+        if (t.startsWith('categories:')) {
+            return t.slice('categories:'.length);
+        }
+        return null;
+    });
+
     // Library Dialog State
     isLibraryDialogOpen = signal(false);
     selectedLibraryForEdit = signal<Library | null>(null);
@@ -669,8 +692,11 @@ export class PlatformManagementComponent {
     constructor() {
         effect(() => {
             // Reset active tab when management type changes
-            if (this.managementType()) {
-                this.activeTab.set(this.managementType() === 'services' ? 'services' : this.managementType());
+            // Normalize categories:* to just 'categories' for the tab check
+            const type = this.managementType();
+            const displayType = type.startsWith('categories:') ? 'categories' : type;
+            if (displayType) {
+                this.activeTab.set(displayType === 'services' ? 'services' : displayType);
                 // Reset sort on type change
                 this.sortState.set({ column: 'name', direction: 'asc' });
             }
@@ -713,7 +739,10 @@ export class PlatformManagementComponent {
             let count = 0;
             let displayType = type;
 
-            switch (type) {
+            // Normalize categories:* for display in status bar
+            const statusType = type.startsWith('categories:') ? 'categories' : type;
+
+            switch (statusType) {
                 case 'services':
                     count = this.services().length;
                     displayType = 'Services';
@@ -787,7 +816,9 @@ export class PlatformManagementComponent {
 
         // Determine what to load based on type and active tab
         // If type is services, we might be looking at a lookup map
-        const actualType = (type === 'services' && activeTab !== 'services') ? activeTab : type;
+        // Normalize categories:* to categories for data loading
+        const normalizedType = type.startsWith('categories:') ? 'categories' : type;
+        const actualType = (normalizedType === 'services' && activeTab !== 'services') ? activeTab : normalizedType;
 
         try {
             switch (actualType) {
@@ -833,6 +864,16 @@ export class PlatformManagementComponent {
         const type = this.managementType();
         const currentTab = this.activeTab();
         const actualType = (type === 'services' && currentTab !== 'services') ? currentTab : type;
+
+        // Handle categories with filter — open lookup dialog with the specific endpoint type
+        if (actualType.startsWith('categories:')) {
+            const filterType = actualType.slice('categories:'.length);
+            const endpointType = getCategoryEndpointType(filterType);
+            this._categoriesEditType.set(endpointType);
+            this.selectedLookupForEdit.set(null);
+            this.isLookupDialogOpen.set(true);
+            return;
+        }
 
         switch (actualType) {
             case 'services':

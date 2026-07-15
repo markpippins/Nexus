@@ -2,8 +2,7 @@ import { Component, ChangeDetectionStrategy, input, output, ViewEncapsulation } 
 import { CommonModule } from '@angular/common';
 import { ViewMode } from '../bottom-bar/bottom-bar.component.js';
 import { OrbComponent } from '../orb/orb.component.js';
-
-export type Theme = 'theme-light' | 'theme-steel' | 'theme-dark';
+import { Theme } from '../services/ui-preferences.service.js';
 
 export interface NavItem {
   key: ViewMode;

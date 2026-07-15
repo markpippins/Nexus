@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, output, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
-import { PlatformManagementService, LookupItem, DeploymentPayload, Server } from '../../../services/platform-management.service.js';
+import { PlatformManagementService, LookupItem, DeploymentPayload, Server, LOOKUP_ENVIRONMENTS } from '../../../services/platform-management.service.js';
 import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.js';
 
 @Component({
@@ -179,7 +179,7 @@ export class UpsertDeploymentDialogComponent implements OnInit {
 
         try { srvs = await this.platformService.getServices(url); } catch (e) { console.error('Failed to load services', e); }
         try { hosts = await this.platformService.getServers(url); } catch (e) { console.error('Failed to load servers', e); }
-        try { envs = await this.platformService.getLookup(url, 'environments'); } catch (e) { console.error('Failed to load environments', e); }
+        try { envs = await this.platformService.getLookup(url, LOOKUP_ENVIRONMENTS); } catch (e) { console.error('Failed to load environments', e); }
 
         const standalone = srvs.filter(s => !s.parentServiceId);
         this.standaloneServices.set(standalone);

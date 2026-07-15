@@ -9,6 +9,7 @@ import { RegistryServerProfile } from '../models/registry-server-profile.model.j
 import { ServiceInstance, Deployment, Framework } from '../models/service-mesh.model.js';
 import { ServiceMeshService } from './service-mesh.service.js';
 import { LocalConfigService } from './local-config.service.js';
+import { TYPE_LABELS, TYPE_ORDER, CATEGORY_ICONS } from './platform-management.service.js';
 
 @Injectable({
     providedIn: 'root'
@@ -270,6 +271,74 @@ export class RegistryServerProvider implements TreeProvider {
             return [];
         }
 
+        // Categories type children — dynamically generated from the categories API
+        if (nodeId.startsWith('platform-dict-categories-')) {
+            // Format: platform-dict-categories-{profileId}  (parent)
+            //         platform-dict-categories-{type}-{profileId}  (child — no further children)
+            // If it already has a type segment, it's a leaf node.
+            const parts = nodeId.split('-');
+            // platform-dict-categories has 4 parts: platform, dict, categories, profileId
+            // With type: platform, dict, categories, {type}, profileId -> 5 parts
+            if (parts.length > 4) {
+                return []; // Leaf node — type-specific child has no further children
+            }
+
+            // Parent Categories node — fetch categories and extract unique types
+            const profileId = nodeId.replace('platform-dict-categories-', '');
+            const profile = this.profileService.profiles().find(p => p.id === profileId);
+            if (!profile) return [];
+
+            const baseUrl = this.getBaseUrl(profile);
+            try {
+                const url = `${baseUrl}/api/v1/categories`;
+                const response = await firstValueFrom(this.http.get<any>(url));
+                const items: any[] = Array.isArray(response) ? response : (response.data || []);
+
+                // Collect unique types, preserving first-seen order
+                const seen = new Set<string>();
+                const uniqueTypes: { discriminator: string; label: string }[] = [];
+                for (const item of items) {
+                    const type = item.type;
+                    if (type && !seen.has(type)) {
+                        seen.add(type);
+                        uniqueTypes.push({
+                            discriminator: type,
+                            label: TYPE_LABELS[type] || type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+                        });
+                    }
+                }
+
+                // Sort by predefined order, then alphabetically
+                uniqueTypes.sort((a, b) => {
+                    const ai = TYPE_ORDER.indexOf(a.discriminator);
+                    const bi = TYPE_ORDER.indexOf(b.discriminator);
+                    if (ai !== -1 && bi !== -1) return ai - bi;
+                    if (ai !== -1) return -1;
+                    if (bi !== -1) return 1;
+                    return a.label.localeCompare(b.label);
+                });
+
+                return uniqueTypes.map(t => ({
+                    id: `platform-dict-categories-${t.discriminator}-${profile.id}`,
+                    name: t.label,
+                    type: NodeType.FOLDER,
+                    icon: CATEGORY_ICONS[t.discriminator] || 'label',
+                    hasChildren: false,
+                    operations: ['manage-categories'],
+                    metadata: {
+                        hostProfileId: profile.id,
+                        url: `${baseUrl}/api/v1/categories`,
+                        managementType: 'categories',
+                        categoryFilterType: t.discriminator,
+                    },
+                    lastUpdated: new Date(),
+                }));
+            } catch (e) {
+                console.warn('Failed to fetch categories for tree children', e);
+                return [];
+            }
+        }
+
 
 
         if (nodeId === 'filesystems') {
@@ -434,7 +503,7 @@ export class RegistryServerProvider implements TreeProvider {
                 name: 'Categories',
                 type: NodeType.FOLDER,
                 icon: 'class',
-                hasChildren: false,
+                hasChildren: true,
                 operations: ['manage-categories'],
                 metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/categories`, managementType: 'categories' },
                 lastUpdated: new Date()
@@ -483,8 +552,7 @@ export class RegistryServerProvider implements TreeProvider {
                 baseUrl = baseUrl.slice(0, -1);
             }
 
-            // Fetch only standalone services (those without a parent) for top-level display
-            const servicesUrl = `${baseUrl}/api/v1/services/standalone`;
+            const servicesUrl = `${baseUrl}/api/v1/services?size=100`;
             const servicesResponseRaw = await firstValueFrom(this.http.get<any>(servicesUrl));
             const servicesResponse: ServiceInstance[] = Array.isArray(servicesResponseRaw) ? servicesResponseRaw : (servicesResponseRaw.data || []);
 

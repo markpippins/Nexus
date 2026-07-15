@@ -498,6 +498,77 @@ export class PlatformManagementService {
     }
 }
 
+/** Canonical lookup endpoint string constants — single source of truth. */
+export const LOOKUP_SERVICE_TYPES = 'service-types';
+export const LOOKUP_SERVER_TYPES = 'server-types';
+export const LOOKUP_FRAMEWORK_CATEGORIES = 'framework-categories';
+export const LOOKUP_FRAMEWORK_LANGUAGES = 'framework-languages';
+export const LOOKUP_LIBRARY_CATEGORIES = 'library-categories';
+export const LOOKUP_ENVIRONMENTS = 'environments';
+export const LOOKUP_OPERATING_SYSTEMS = 'operating-systems';
+
+/**
+ * Map of DB discriminator values → endpoint type strings used for API routing.
+ */
+export const TYPE_ENDPOINT_MAP: Record<string, string> = {
+    framework_type: 'framework-categories',
+    server_type: 'server-types',
+    library_type: 'library-categories',
+    environment_type: 'environments',
+    service_type: 'service-types',
+    service_config_type: 'service-config-types',
+    operating_systems: 'operating-systems',
+};
+
+/**
+ * Human-readable labels for each type discriminator.
+ */
+export const TYPE_LABELS: Record<string, string> = {
+    all: 'All',
+    framework_type: 'Framework',
+    server_type: 'Server',
+    library_type: 'Library',
+    environment_type: 'Environment',
+    service_type: 'Service',
+    service_config_type: 'Config',
+    operating_systems: 'OS',
+};
+
+/**
+ * Display ordering for category types.
+ */
+export const TYPE_ORDER = ['framework_type', 'server_type', 'library_type', 'environment_type', 'service_type', 'service_config_type', 'operating_systems'];
+
+/** Ordered list of types for the filter toolbar (excludes service_config_type). */
+export const FILTER_TYPES = [
+    'all',
+    'framework_type',
+    'server_type',
+    'library_type',
+    'environment_type',
+    'service_type',
+    'operating_systems',
+];
+
+/**
+ * Map a category discriminator (e.g. 'framework_type') to its icon name for tree display.
+ */
+export const CATEGORY_ICONS: Record<string, string> = {
+    framework_type: 'category',
+    server_type: 'storage',
+    library_type: 'local_library',
+    environment_type: 'environment',
+    service_type: 'dns',
+    operating_systems: 'os',
+};
+
+/**
+ * Map a category discriminator (e.g. 'framework_type') to its API endpoint string.
+ */
+export function getCategoryEndpointType(dbType: string): string {
+    return TYPE_ENDPOINT_MAP[dbType] || dbType;
+}
+
 export interface LookupItem {
     id: number;
     name: string;

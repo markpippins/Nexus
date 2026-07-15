@@ -12,7 +12,7 @@ import { HostProfileService } from './services/host-profile.service.js';
 import { DetailPaneComponent } from './components/detail-pane/detail-pane.component.js';
 import { SessionService } from './services/in-memory-file-system.service.js';
 import { BrokerProfile } from './models/broker-profile.model.js';
-import { PlatformManagementService, ServicePayload, FrameworkPayload, Server } from './services/platform-management.service.js';
+import { PlatformManagementService, ServicePayload, FrameworkPayload, Server, LOOKUP_SERVER_TYPES, LOOKUP_ENVIRONMENTS, LOOKUP_OPERATING_SYSTEMS, LOOKUP_SERVICE_TYPES, LOOKUP_FRAMEWORK_CATEGORIES, LOOKUP_FRAMEWORK_LANGUAGES } from './services/platform-management.service.js';
 import { RemoteFileSystemService } from './services/remote-file-system.service.js';
 import { FsService } from './services/fs.service.js';
 import { ImageService } from './services/image.service.js';
@@ -361,6 +361,17 @@ export class AppComponent implements OnInit, OnDestroy {
     return profile?.id ?? null;
   }
 
+  /** Map of category type labels → DB discriminator values for child nodes under Categories. */
+  private readonly CATEGORY_LABEL_TO_TYPE: Record<string, string> = {
+    'framework': 'framework_type',
+    'server': 'server_type',
+    'library': 'library_type',
+    'environment': 'environment_type',
+    'service': 'service_type',
+    'config': 'service_config_type',
+    'os': 'operating_systems',
+  };
+
   private getPlatformNodeForPath(path: string[]) {
     // Valid management types (System Health is now a top-level sibling, not a Platform Management child).
     const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments'];
@@ -434,6 +445,13 @@ export class AppComponent implements OnInit, OnDestroy {
           // Special case: if type is "data dictionary", check if there's a sub-type segment
           if (type === 'data dictionary' && remaining.length > typeIndex + 1) {
             const subType = remaining[remaining.length - 1].toLowerCase();
+            // Check if the subType is a category label (child under Categories)
+            const categoryType = this.CATEGORY_LABEL_TO_TYPE[subType];
+            if (categoryType) {
+              // Return categories:{discriminator} format so PlatformManagementComponent
+              // can show the categories view filtered to this type
+              return { type: `categories:${categoryType}`, baseUrl: this.resolveBaseUrl(remaining, profiles, activeProfile, pmIndex, path) };
+            }
             if (validTypes.includes(subType)) {
               type = subType;
             }
@@ -462,14 +480,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
         // 'Service Registries' was previously a root sibling and had a special branch here;
         // it now lives inside 'Platform Management', so the special case is unreachable.
-        const profile = targetProfileName
-          ? profiles.find(p => p.name === targetProfileName)
-          : (path[0].toLowerCase() !== 'platform management' ? profiles.find(p => p.name === path[0]) : activeProfile);
-
-        const finalProfile = profile || activeProfile;
-        if (finalProfile) {
-          const baseUrl = finalProfile.registryServerUrl.startsWith('http') ? finalProfile.registryServerUrl.replace(/\/$/, '') : `http://${finalProfile.registryServerUrl.replace(/\/$/, '')}`;
-          console.log('[AppComponent] Matched Platform Management path', { type, baseUrl, targetProfileName });
+        const baseUrl = this.resolveBaseUrl(remaining, profiles, activeProfile, pmIndex, path);
+        if (baseUrl) {
+          console.log('[AppComponent] Matched Platform Management path', { type: normalizedType, baseUrl, targetProfileName });
           return { type: normalizedType, baseUrl };
         }
       }
@@ -502,6 +515,34 @@ export class AppComponent implements OnInit, OnDestroy {
     console.log('[AppComponent] No match found, returning null');
     return null;
   }
+
+  /** Resolve the baseUrl from a Platform Management path. */
+  private resolveBaseUrl(remaining: string[], profiles: any[], activeProfile: any, pmIndex: number, path: string[]): string | null {
+    // Find the first element in remaining that matches a valid type
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments'];
+    const typeIndex = remaining.findIndex(p => validTypes.includes(p.toLowerCase()));
+
+    let targetProfileName: string | null = null;
+    if (typeIndex > 0) {
+      targetProfileName = remaining[0];
+    }
+
+    const profile = targetProfileName
+      ? profiles.find((p: any) => p.name === targetProfileName)
+      : (path[0].toLowerCase() !== 'platform management' ? profiles.find((p: any) => p.name === path[0]) : activeProfile);
+
+    const finalProfile = profile || activeProfile;
+    if (finalProfile) {
+      return finalProfile.registryServerUrl.startsWith('http') ? finalProfile.registryServerUrl.replace(/\/$/, '') : `http://${finalProfile.registryServerUrl.replace(/\/$/, '')}`;
+    }
+    return null;
+  }
+
+  /** True when the active platform node is exactly 'categories' (no type filter). */
+  isPlainCategoriesSelected = computed(() => {
+    const node = this.activePaneId() === 1 ? this.pane1PlatformNode() : this.pane2PlatformNode();
+    return node?.type === 'categories';
+  });
 
   // --- Gateway Context Signals ---
   // Gateways now lives at ['Platform Management', 'Gateways', ...] — context = at-or-below the container.
@@ -707,6 +748,9 @@ export class AppComponent implements OnInit, OnDestroy {
       return this.mountedProfileIds().includes(profile.id);
     }
 
+    // Plain Categories node (no child type selected) — disable add/action buttons
+    if (this.isPlainCategoriesSelected()) return false;
+
     // It's not a server profile path, so it must be the local session, which is always actionable.
     // Also include management nodes (e.g., Infrastructure, Services) which are handled by getPlatformNodeForPath
     if (this.activePaneId() === 1 && this.pane1PlatformNode()) return true;
@@ -789,9 +833,9 @@ export class AppComponent implements OnInit, OnDestroy {
           try {
             if (node.type === 'servers') {
               const [st, et, os] = await Promise.all([
-                this.platformManagementService.getLookup(baseUrl, 'server-types'),
-                this.platformManagementService.getLookup(baseUrl, 'environments'),
-                this.platformManagementService.getLookup(baseUrl, 'operating-systems')
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_SERVER_TYPES),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_ENVIRONMENTS),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_OPERATING_SYSTEMS)
               ]);
               serverTypes = st;
               environmentTypes = et;
@@ -799,14 +843,14 @@ export class AppComponent implements OnInit, OnDestroy {
             } else if (node.type === 'services') {
               const [fw, st] = await Promise.all([
                 this.platformManagementService.getFrameworks(baseUrl),
-                this.platformManagementService.getLookup(baseUrl, 'service-types')
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_SERVICE_TYPES)
               ]);
               frameworks = fw;
               serviceTypes = st;
             } else if (node.type === 'frameworks') {
               const [fc, fl] = await Promise.all([
-                this.platformManagementService.getLookup(baseUrl, 'framework-categories'),
-                this.platformManagementService.getLookup(baseUrl, 'framework-languages')
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_FRAMEWORK_CATEGORIES),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_FRAMEWORK_LANGUAGES)
               ]);
               frameworkCategories = fc;
               frameworkLanguages = fl;

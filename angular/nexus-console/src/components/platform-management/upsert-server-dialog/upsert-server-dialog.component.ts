@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, output, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
-import { PlatformManagementService, LookupItem, Server } from '../../../services/platform-management.service.js';
+import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOOKUP_ENVIRONMENTS, LOOKUP_OPERATING_SYSTEMS } from '../../../services/platform-management.service.js';
 
 @Component({
     selector: 'app-upsert-server-dialog',
@@ -200,9 +200,9 @@ export class UpsertServerDialogComponent implements OnInit {
         try {
             // Load all lookups in parallel
             const [st, et, os] = await Promise.all([
-                this.platformService.getLookup(url, 'server-types').catch(() => []),
-                this.platformService.getLookup(url, 'environments').catch(() => []),
-                this.platformService.getLookup(url, 'operating-systems').catch(() => [])
+                this.platformService.getLookup(url, LOOKUP_SERVER_TYPES).catch(() => []),
+                this.platformService.getLookup(url, LOOKUP_ENVIRONMENTS).catch(() => []),
+                this.platformService.getLookup(url, LOOKUP_OPERATING_SYSTEMS).catch(() => [])
             ]);
             this.serverTypes.set(st);
             this.environmentTypes.set(et);

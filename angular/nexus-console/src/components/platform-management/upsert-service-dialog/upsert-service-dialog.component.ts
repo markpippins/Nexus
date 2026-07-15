@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, output, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
-import { PlatformManagementService, LookupItem, ServicePayload } from '../../../services/platform-management.service.js';
+import { PlatformManagementService, LookupItem, ServicePayload, LOOKUP_SERVICE_TYPES } from '../../../services/platform-management.service.js';
 import { Framework, ServiceInstance } from '../../../models/service-mesh.model.js';
 import { ComponentRegistryService } from '../../../services/component-registry.service.js';
 
@@ -199,7 +199,7 @@ export class UpsertServiceDialogComponent implements OnInit {
             console.error('Failed to load frameworks', e);
         }
         try {
-            const types = await this.platformService.getLookup(url, 'service-types');
+            const types = await this.platformService.getLookup(url, LOOKUP_SERVICE_TYPES);
             this.serviceTypes.set(types);
         } catch (e) {
             console.error('Failed to load service types', e);

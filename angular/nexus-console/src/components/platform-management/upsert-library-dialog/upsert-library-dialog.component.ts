@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal, computed, OnInit, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { PlatformManagementService, LibraryPayload, LookupItem } from '../../../services/platform-management.service.js';
+import { PlatformManagementService, LibraryPayload, LookupItem, LOOKUP_LIBRARY_CATEGORIES, LOOKUP_FRAMEWORK_LANGUAGES } from '../../../services/platform-management.service.js';
 import { Library } from '../../../models/service-mesh.model.js';
 
 @Component({
@@ -230,8 +230,8 @@ export class UpsertLibraryDialogComponent implements OnInit {
     private async loadLookups() {
         try {
             const [cats, langs] = await Promise.all([
-                this.platformService.getLookup(this.baseUrl(), 'library-categories').catch(() => []),
-                this.platformService.getLookup(this.baseUrl(), 'framework-languages').catch(() => [])
+                this.platformService.getLookup(this.baseUrl(), LOOKUP_LIBRARY_CATEGORIES).catch(() => []),
+                this.platformService.getLookup(this.baseUrl(), LOOKUP_FRAMEWORK_LANGUAGES).catch(() => [])
             ]);
             this.categories.set(cats);
             this.languages.set(langs);

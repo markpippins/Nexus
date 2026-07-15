@@ -1,47 +1,6 @@
 import { Component, ChangeDetectionStrategy, input, output, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LookupItem } from '../../../services/platform-management.service.js';
-
-/**
- * Map of DB discriminator values → endpoint type strings used by the
- * {@link UpsertLookupDialogComponent} and the CRUD service methods.
- */
-const TYPE_ENDPOINT_MAP: Record<string, string> = {
-    framework_type: 'framework-categories',
-    server_type: 'server-types',
-    library_type: 'library-categories',
-    environment_type: 'environments',
-    service_type: 'service-types',
-    service_config_type: 'service-config-types',
-    operating_systems: 'operating-systems',
-};
-
-/**
- * Human-readable labels for each type discriminator.
- */
-const TYPE_LABELS: Record<string, string> = {
-    all: 'All',
-    framework_type: 'Framework',
-    server_type: 'Server',
-    library_type: 'Library',
-    environment_type: 'Environment',
-    service_type: 'Service',
-    service_config_type: 'Config',
-    operating_systems: 'OS',
-};
-
-/**
- * Ordered list of types for the filter toolbar.
- */
-const FILTER_TYPES = [
-    'all',
-    'framework_type',
-    'server_type',
-    'library_type',
-    'environment_type',
-    'service_type',
-    'operating_systems',
-];
+import { LookupItem, TYPE_LABELS, FILTER_TYPES, getCategoryEndpointType } from '../../../services/platform-management.service.js';
 
 @Component({
     selector: 'app-categories-view',
@@ -50,23 +9,25 @@ const FILTER_TYPES = [
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
     <div class="flex flex-col h-full">
-        <!-- Type Filter Toolbar -->
-        <div class="flex flex-wrap gap-2 mb-4 pb-3 border-b border-[rgb(var(--color-border-base))]">
-            @for (t of filterTypes; track t) {
-                <button
-                    (click)="selectedType.set(t)"
-                    class="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
-                    [class]="selectedType() === t
-                        ? 'bg-[rgb(var(--color-accent-ring))] text-white shadow-sm'
-                        : 'bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                >
-                    {{ typeLabels[t] }}
-                    <span class="ml-1.5 opacity-70">
-                        ({{ t === 'all' ? totalCount() : typeCounts()[t] || 0 }})
-                    </span>
-                </button>
-            }
-        </div>
+        <!-- Type Filter Toolbar (hidden when filteredType is provided) -->
+        @if (!hideFilterBar()) {
+            <div class="flex flex-wrap gap-2 mb-4 pb-3 border-b border-[rgb(var(--color-border-base))]">
+                @for (t of filterTypes; track t) {
+                    <button
+                        (click)="selectedType.set(t)"
+                        class="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
+                        [class]="selectedType() === t
+                            ? 'bg-[rgb(var(--color-accent-ring))] text-white shadow-sm'
+                            : 'bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                    >
+                        {{ typeLabels[t] }}
+                        <span class="ml-1.5 opacity-70">
+                            ({{ t === 'all' ? totalCount() : typeCounts()[t] || 0 }})
+                        </span>
+                    </button>
+                }
+            </div>
+        }
 
         <!-- Table -->
         <div class="overflow-x-auto flex-1">
@@ -129,10 +90,10 @@ const FILTER_TYPES = [
                     } @empty {
                         <tr>
                             <td colspan="4" class="p-8 text-center text-[rgb(var(--color-text-muted))]">
-                                @if (selectedType() === 'all') {
+                                @if (effectiveType() === 'all') {
                                     No categories found.
                                 } @else {
-                                    No {{ typeLabels[selectedType()] || selectedType() }} categories found.
+                                    No {{ typeLabels[effectiveType()] || effectiveType() }} categories found.
                                 }
                             </td>
                         </tr>
@@ -146,6 +107,8 @@ const FILTER_TYPES = [
 export class CategoriesViewComponent {
     items = input<LookupItem[]>([]);
     type = input<string>('categories');
+    /** When set, auto-filters to this type and hides the type filter toolbar. */
+    filteredType = input<string | null>(null);
 
     /** Emits { item, type } where `type` is the endpoint string for the dialog. */
     onEdit = output<{ item: LookupItem; type: string }>();
@@ -155,6 +118,12 @@ export class CategoriesViewComponent {
     /** Available filter types (excludes service_config_type from filter for simplicity). */
     filterTypes = FILTER_TYPES;
     typeLabels = TYPE_LABELS;
+
+    /** Whether to hide the filter toolbar — true when a filteredType is provided. */
+    hideFilterBar = computed(() => this.filteredType() !== null);
+
+    /** The effective selected type: uses filteredType when provided, otherwise the user's selected type. */
+    effectiveType = computed(() => this.filteredType() ?? this.selectedType());
 
     selectedType = signal<string>('all');
     sortState = signal<{ column: string; direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
@@ -176,8 +145,8 @@ export class CategoriesViewComponent {
     filteredItems = computed(() => {
         let data = this.items();
 
-        // Filter by type
-        const sel = this.selectedType();
+        // Filter by type — use effectiveType (respects filteredType override)
+        const sel = this.effectiveType();
         if (sel !== 'all') {
             data = data.filter(item => item.type === sel);
         }
@@ -197,7 +166,7 @@ export class CategoriesViewComponent {
 
     /** Map a DB discriminator value to an endpoint type string. */
     getEndpointType(dbType: string): string {
-        return TYPE_ENDPOINT_MAP[dbType] || dbType;
+        return getCategoryEndpointType(dbType);
     }
 
     /** Generate a color badge class based on the type discriminator. */
