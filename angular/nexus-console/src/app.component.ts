@@ -1204,10 +1204,12 @@ export class AppComponent implements OnInit, OnDestroy {
       // Rebuilds the master folder tree whenever the list of server profiles changes,
       // or when the connection status (mounted profiles) of any profile changes. This ensures
       // the tree view is always in sync with the application's connection state.
+      // NOTE: healthCheckService.statusMap() is intentionally NOT included here because
+      //       health pings don't change the tree structure — only visual indicators.
+      //       Including it caused constant tree rebuilds that reset expansion state.
       this.profileService.profiles(); // Dependency
       this.hostProfileService.profiles(); // Dependency — host profiles also drive tree nodes
       this.mountedProfiles(); // Dependency
-      this.healthCheckService.statusMap(); // Dependency
       this.loadFolderTree();
 
       // Handles session restoration and auto-connect on startup, once profiles are loaded.

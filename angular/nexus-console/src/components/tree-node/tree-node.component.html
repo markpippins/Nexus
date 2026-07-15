@@ -13,7 +13,7 @@
   [style.padding-left.px]="level() * 16 + 8">
   
   <button 
-    (click)="toggleExpand($event)"
+    (click)="onToggleClick($event)"
     class="mr-1 w-5 h-5 flex-shrink-0 flex items-center justify-center text-[rgb(var(--color-text-subtle))] hover:bg-[rgb(var(--color-surface-hover-subtle))] rounded"
     [class.invisible]="!isExpandable()">
     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform duration-150" [class.rotate-90]="isExpanded()" viewBox="0 0 20 20" fill="currentColor">
@@ -73,13 +73,15 @@
         [currentPath]="currentPath()"
         [level]="level() + 1"
         [expansionCommand]="expansionCommand()"
+        [expandedPaths]="expandedPaths()"
         [getImageService]="getImageService()"
         [getProvider]="getProvider()"
         (pathChange)="onChildPathChange($event)"
         (loadChildren)="onLoadChildren($event)"
         (itemsDropped)="onChildItemsDropped($event)"
         (bookmarkDropped)="onChildBookmarkDropped($event)"
-        (contextMenuRequest)="onChildContextMenuRequest($event)">
+        (contextMenuRequest)="onChildContextMenuRequest($event)"
+        (toggleExpand)="onToggleExpand($event)">
       </app-tree-node>
     }
   </div>

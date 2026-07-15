@@ -326,6 +326,7 @@
                   [rootNode]="tree"
                   [currentPath]="currentPath()"
                   [expansionCommand]="treeExpansionCommand()"
+                  [expandedPaths]="expandedPaths()"
                   [getImageService]="getImageService()"
                   [getProvider]="getProvider()"
                   (pathChange)="onTreeViewPathChange($event)"
@@ -333,6 +334,7 @@
                   (itemsDropped)="onItemsDropped($event)"
                   (bookmarkDropped)="onBookmarkDropped($event)"
                   (contextMenuRequest)="onTreeContextMenu($event)"
+                  (toggleExpand)="onToggleExpand($event)"
                 >
                 </app-tree-view>
               }

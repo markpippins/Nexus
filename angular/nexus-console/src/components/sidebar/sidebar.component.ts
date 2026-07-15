@@ -76,6 +76,7 @@ export class SidebarComponent implements OnDestroy {
   width = signal(this.uiPreferencesService.sidebarWidth() ?? 288);
   isResizing = signal(false);
   treeExpansionCommand = signal<{ command: 'expand' | 'collapse', id: number } | null>(null);
+  expandedPaths = signal(new Set<string>());
   isHamburgerMenuOpen = signal(false);
   showRunningOnly = signal(false); // Filter to show only running services
 
@@ -238,6 +239,37 @@ export class SidebarComponent implements OnDestroy {
 
   onCollapseAll(): void {
     this.treeExpansionCommand.set({ command: 'collapse', id: Date.now() });
+  }
+
+  onToggleExpand(event: { path: string[]; expanded: boolean }): void {
+    const key = event.path.join('/');
+    this.expandedPaths.update(set => {
+      const next = new Set(set);
+      if (event.expanded) {
+        next.add(key);
+      } else {
+        next.delete(key);
+      }
+      return next;
+    });
+  }
+
+  onExpandPath(path: string[]): void {
+    const key = path.join('/');
+    this.expandedPaths.update(set => {
+      const next = new Set(set);
+      next.add(key);
+      return next;
+    });
+  }
+
+  onCollapsePath(path: string[]): void {
+    const key = path.join('/');
+    this.expandedPaths.update(set => {
+      const next = new Set(set);
+      next.delete(key);
+      return next;
+    });
   }
 
   onLoadChildren(path: string[]): void {

@@ -18,6 +18,7 @@ export class TreeViewComponent {
   rootNode = input.required<FileSystemNode>();
   currentPath = input.required<string[]>();
   expansionCommand = input<{ command: 'expand' | 'collapse', id: number } | null>();
+  expandedPaths = input<ReadonlySet<string>>(new Set());
   getImageService = input.required<(path: string[]) => ImageService>();
   getProvider = input.required<(path: string[]) => FileSystemProvider>();
 
@@ -26,6 +27,7 @@ export class TreeViewComponent {
   itemsDropped = output<{ destPath: string[]; payload: DragDropPayload }>();
   bookmarkDropped = output<{ bookmark: NewBookmark, destPath: string[] }>();
   contextMenuRequest = output<{ event: MouseEvent; path: string[]; node: FileSystemNode; }>();
+  toggleExpand = output<{ path: string[]; expanded: boolean }>();
 
   onPathChange(path: string[]): void {
     this.pathChange.emit(path);
@@ -45,5 +47,9 @@ export class TreeViewComponent {
 
   onContextMenuRequest(event: { event: MouseEvent; path: string[]; node: FileSystemNode; }): void {
     this.contextMenuRequest.emit(event);
+  }
+
+  onToggleExpand(event: { path: string[]; expanded: boolean }): void {
+    this.toggleExpand.emit(event);
   }
 }

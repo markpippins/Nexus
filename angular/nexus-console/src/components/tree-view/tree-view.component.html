@@ -5,13 +5,15 @@
       [path]="[]"
       [currentPath]="currentPath()"
       [expansionCommand]="expansionCommand()"
+      [expandedPaths]="expandedPaths()"
       [getImageService]="getImageService()"
       [getProvider]="getProvider()"
       (pathChange)="onPathChange($event)"
       (loadChildren)="onLoadChildren($event)"
       (itemsDropped)="onItemsDropped($event)"
       (bookmarkDropped)="onBookmarkDropped($event)"
-      (contextMenuRequest)="onContextMenuRequest($event)">
+      (contextMenuRequest)="onContextMenuRequest($event)"
+      (toggleExpand)="onToggleExpand($event)">
     </app-tree-node>
   }
 </div>
