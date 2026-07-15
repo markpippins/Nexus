@@ -4,7 +4,9 @@
   <!-- Left Nav Toolbar (always visible — stays up when iframes are shown) -->
   <app-nav-toolbar
     [viewMode]="currentViewMode()"
+    [theme]="currentTheme()"
     (viewModeChange)="currentViewMode.set($event)"
+    (themeChange)="setTheme($event)"
   ></app-nav-toolbar>
 
   <div class="flex flex-col flex-1 min-w-0">
