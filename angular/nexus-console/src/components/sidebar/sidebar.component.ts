@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal, inject, Renderer2, NgZone, OnDestroy, input, output, HostListener, ElementRef, computed, ViewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, inject, Renderer2, NgZone, OnDestroy, input, output, HostListener, ElementRef, computed, ViewChild, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FileSystemNode } from '../../models/file-system.model.js';
 import { TreeViewComponent } from '../tree-view/tree-view.component.js';
@@ -111,6 +111,35 @@ export class SidebarComponent implements OnDestroy {
   confirmDialogConfig = signal<{ title: string; message: string; confirmText: string }>({ title: '', message: '', confirmText: 'OK' });
 
   currentProvider = computed(() => this.getProvider()(this.currentPath()));
+
+  constructor() {
+    // Prune stale expanded paths when the tree structure changes (e.g., a profile disconnects).
+    // Only depends on folderTree() — expandedPaths reads/writes are untracked.
+    effect(() => {
+      const tree = this.folderTree();
+      if (!tree?.children) return;
+
+      // Collect valid root-level names from the current tree
+      const validRootNames = new Set(tree.children.map(c => c.name));
+
+      untracked(() => {
+        const current = this.expandedPaths();
+        let changed = false;
+        const next = new Set(current);
+        for (const key of next) {
+          if (!key) continue;
+          const firstSegment = key.split('/')[0];
+          if (!validRootNames.has(firstSegment)) {
+            next.delete(key);
+            changed = true;
+          }
+        }
+        if (changed) {
+          this.expandedPaths.set(next);
+        }
+      });
+    });
+  }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event) {
