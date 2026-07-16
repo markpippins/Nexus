@@ -64,7 +64,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
           <div class="header-actions">
             <button class="header-btn" (click)="exportConfig()" title="Export config as JSON">📥 Export</button>
             <button class="header-btn" (click)="importConfigClick()" title="Import config from JSON file">📤 Import</button>
-            <input data-import-input type="file" accept=".json" (change)="onImportFileSelected($event)" style="display:none" />
+            <input data-import-input name="importFile" id="import-file-input" type="file" accept=".json" (change)="onImportFileSelected($event)" style="display:none" />
           </div>
         </div>
 
@@ -88,7 +88,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
             <div *ngSwitchCase="'providers'" class="tab-panel tab-models">
               <div class="roles-toolbar">
                 <span class="filter-wrap">
-                  <input class="filter-input" style="width:240px" [ngModel]="providerFilter()" (ngModelChange)="providerFilter.set($event)" placeholder="🔍 Filter by name, type, endpoint…" />
+                  <input name="providerFilter" id="provider-filter-input" class="filter-input" style="width:240px" [ngModel]="providerFilter()" (ngModelChange)="providerFilter.set($event)" placeholder="🔍 Filter by name, type, endpoint…" />
                   @if (providerFilter()) {<button class="filter-clear" (click)="providerFilter.set('')">✕</button>}
                 </span>
                 <span class="roles-hint">{{ filteredProviders().length }} / {{ config().providers.length }} provider(s)</span>
@@ -164,7 +164,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
             <div *ngSwitchCase="'harnesses'" class="tab-panel tab-models">
               <div class="roles-toolbar">
                 <span class="filter-wrap">
-                  <input class="filter-input" style="width:240px" [ngModel]="harnessFilter()" (ngModelChange)="harnessFilter.set($event)" placeholder="🔍 Filter by name, mode, capability…" />
+                  <input name="harnessFilter" id="harness-filter-input" class="filter-input" style="width:240px" [ngModel]="harnessFilter()" (ngModelChange)="harnessFilter.set($event)" placeholder="🔍 Filter by name, mode, capability…" />
                   @if (harnessFilter()) {<button class="filter-clear" (click)="harnessFilter.set('')">✕</button>}
                 </span>
                 <span class="roles-hint">{{ filteredHarnesses().length }} / {{ config().harnesses.length }} harness(es)</span>
@@ -272,7 +272,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
               <!-- Toolbar -->
               <div class="roles-toolbar">
                 <span class="filter-wrap">
-                  <input class="filter-input" style="width:240px" [ngModel]="modelFilter()" (ngModelChange)="modelFilter.set($event)" placeholder="🔍 Filter by name, identifier, provider, harness…" />
+                  <input name="modelFilter" id="model-filter-input" class="filter-input" style="width:240px" [ngModel]="modelFilter()" (ngModelChange)="modelFilter.set($event)" placeholder="🔍 Filter by name, identifier, provider, harness…" />
                   @if (modelFilter()) {<button class="filter-clear" (click)="modelFilter.set('')">✕</button>}
                 </span>
                 <span class="roles-hint">{{ filteredModels().length }} / {{ config().models.length }} model(s)</span>
@@ -437,7 +437,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                 
                 <div class="roles-toolbar">
                   <span class="filter-wrap">
-                    <input class="filter-input" style="width:240px" [ngModel]="roleFilter()" (ngModelChange)="roleFilter.set($event)" placeholder="🔍 Filter by model, provider, harness…" />
+                    <input name="roleFilter" id="role-filter-input" class="filter-input" style="width:240px" [ngModel]="roleFilter()" (ngModelChange)="roleFilter.set($event)" placeholder="🔍 Filter by model, provider, harness…" />
                     @if (roleFilter()) {<button class="filter-clear" (click)="roleFilter.set('')">✕</button>}
                   </span>
                   <span class="roles-hint">{{ filteredRoles().length }} / {{ roleNames().length }} roles · Each role can have multiple models (ordered by priority), each with its own provider and harness</span>

@@ -1,153 +1,931 @@
-Chapter 1: Introduction and the human side of engineering
-0:011 second[music]
-0:2020 secondsHowdy folks.
-0:2323 secondsSo, good afternoon or good whatever time it is when you're watching this on YouTube. I'm really excited to be here
-0:3131 secondsand um today I want to talk to you about really uh what it takes to keep the human in the loop where engineering is
-0:3939 secondsconcerned. I really want to start with the human side before we talk about the architecture here. I think that the engineer of the future is going to be
-0:4848 secondsreally defined by the person who is able to choose what is worth doing. They're going to own the evidence.
-0:5656 secondsThey're going to own the understanding as well as the verdict around increasingly automated work that's being
-1:021 minute, 2 secondsdone by agents. Now, when I use the term verdict, I don't mean that we're suddenly all going to be Judge Judy.
-1:101 minute, 10 secondsWe're not. But what I mean really is something just a little bit different. I mean we're going to be accountable for
-1:171 minute, 17 secondsthe production decisions. Does something ship? Do we block it? Do we redirect it or accept the risk?
-1:251 minute, 25 secondsQuality is something that we all talk about a lot, but quality produces evidence. A verdict assigns responsibility
-1:331 minute, 33 secondsand answerability is really what lets us stand behind a verdict. And this, of course, is not the only way that our
-1:411 minute, 41 secondsindustry is starting to think about our roles evolving.
-Chapter 2: Rebundling roles and ownership of systems
-1:461 minute, 46 secondsBoris Churnney recently put some useful language around what many teams are starting to feel. The old craft boundaries are getting blurry. and roles are rebundling around the work itself.
-1:581 minute, 58 secondsAnd the important question here becomes a lot less about what is your title and more what part of the system can you own.
-2:062 minutes, 6 secondsNow I like this taxonomy quite a lot. Um it's optimistic without being overly vague. So things like prototype, build,
-2:152 minutes, 15 secondssweep, grow, and maintain. And these are real engineering modes. Agents are going to help with all of them. But the scarce
-2:222 minutes, 22 secondsthing is not merely doing the task. It's going to be knowing which mode your product needs and what quality bar applies and who owns the result. At the
-2:312 minutes, 31 secondsend of the day, now we've been talking about harnesses and loop engineering and software factories over the last couple of days. We can talk why this shift is
-Chapter 3: Harnesses, loop engineering, and software factories
-2:402 minutes, 40 secondshappening. We move past the model as the whole story, right? With harness engineering, the coding agent is the model plus the harness around it, right?
-2:492 minutes, 49 secondsyour context, your tools, your file system, git. And the harness is what turns intelligence into something that you can delegate to. The next move was
-2:572 minutes, 57 secondsloop engineering where we weren't just prompting one run anymore. We were designing systems that kept prompting, checking, and remembering, and deciding
-3:053 minutes, 5 secondswhat happened next. And that's really when agents [clears throat] started to feel like infrastructure. And once you start putting all of those things together, you get that software factory.
-3:153 minutes, 15 secondsDex covered this well in his talk, but you have agents that are running inside that inner loop and evidence that comes
-3:213 minutes, 21 secondsout. Humans still end up making the production decisions in this loop. And the wind really isn't moving us from it.
-3:293 minutes, 29 secondsThe wind is moving human judgments the highest leveraged checkpoint, I think. And this is why it starts to matter now.
-Chapter 4: The shift to answerability as an engineering requirement
-3:373 minutes, 37 secondsAI generated and AI assisted code is becoming normal code for a lot of us.
-3:423 minutes, 42 secondsOne of Sonar's 2026 surveys said that AI assisted code is no longer marginal.
-3:473 minutes, 47 secondsIt's increasingly having a large role in our code bases. And once that happens, answerability stops being this philosophical world. It becomes an
-3:563 minutes, 56 secondsengineering requirement. And there's a quality point here as well, right? Like we used to care about clean code, code that people could read, but cleaner code
-4:054 minutes, 5 secondsis actually not just going to help the next human and the next person on your teams. It actually helps the next agent.
-4:104 minutes, 10 secondsAnother one of Sonar's research uh studies found that clean and messy repos had roughly the same pass rates, but
-4:184 minutes, 18 secondsclean code actually used fewer tokens and cost fewer revisits. So there's a lot of benefit to maintainability that can fuel efficiency for your factories.
-Chapter 5: Reviewing AI-assisted code and organizational bottlenecks
-4:264 minutes, 26 secondsNow making generation cheaper does not automatically make review cheaper, right? I think a lot of us are facing this moment and we know that engineers
-4:354 minutes, 35 secondsare not naive. The sonar numbers say that almost everybody is skeptical of AI code. Now, I love working in my software
-4:434 minutes, 43 secondsfactory. I love building my engineering loops. But the problem is still capacity. If 96% of people don't fully
-4:504 minutes, 50 secondstrust that code, but only about half always verify before committing, we have this danger that we've got distrust without bandwidth. And so safety comes
-4:594 minutes, 59 secondsfrom making verification cheaper, clearer, and harder for people to skip.
-5:045 minutes, 4 secondsAnd if you zoom out from the individual reviewer to the organization, review and validation start becoming a bottleneck
-5:105 minutes, 10 secondswhen governance isn't able to catch up and adoption is already moving way faster than any company can go and set their policies. And this means that we
-5:195 minutes, 19 secondshave some hard questions we have to deal with like did a model actually touch this file and the hard questions are also like what constraints guided that
-5:275 minutes, 27 secondswork? What evidence was produced? What risk was accepted? And who owned the result? Now, the agent can ship more
-5:355 minutes, 35 secondsthan any of us can review, right? So, what are we still good for? I It's a question that's on a lot of our minds,
-5:425 minutes, 42 secondsright? And you know, if Homer Simpson's experience automating computers can teach us anything, maybe this is our
-5:505 minutes, 50 secondsfuture. I don't think it is, but it's one direction things can take. Now, let's try that again. If change is where
-Chapter 6: Redefining leverage through human judgment
-5:585 minutes, 58 secondshumans enter the loop, if generation scales faster than comprehension, the scarce resource becomes judgment that's backed by evidence. So the question is
-6:076 minutes, 7 secondsno longer how much can the agent do, but where does human judgment still create leverage. Now I want to talk to you
-Chapter 7: Alpha, decay, and the role of "taste"
-6:156 minutes, 15 secondsabout two terms that I'm going to use for the career part of this talk. Alpha and decay. Alpha is the gap between what
-6:246 minutes, 24 secondsyou can do today and what current models can do. That gap is a very real thing
-6:316 minutes, 31 secondsand decay is the clock on that gap. If the thing that makes you special is a capability, the frontier is eventually
-6:396 minutes, 39 secondsgoing to come for it. Right? And there's a whole conversation around this. This is one of the reasons why taste keeps coming up. Paul Graham had a point here
-6:486 minutes, 48 secondsthat I think is very right. When anyone can make anything, choosing what to make becomes very important. And I buy that.
-6:556 minutes, 55 secondsBut I also think that we have to be very careful because taste can become a magic word for whatever part of the work we don't want to explain just yet.
-7:067 minutes, 6 secondsMitchell Hashimoto gave us a more useful version of this definition. Taste is the ability to make highquality qualitative
-7:137 minutes, 13 secondsjudgments where no objective metric exists yet. That matters because it puts tastes before the benchmark and before
-7:207 minutes, 20 secondsthe market has fully voted. When you try out a model and you see the kind of UX and the kind of experiences that it
-7:277 minutes, 27 secondsbuilds, you can often tell when you think it has taste or lacks taste or when there's a gap there that humans can fill. Now, this is also only useful if
-7:367 minutes, 36 secondswe can turn some of this concept around taste into critique, examples, and better judgment over time. So yes, taste matters when production gets cheaper.
-7:477 minutes, 47 secondsAnd if anyone can generate 10 options, the scarce skill is really knowing which option deserves to exist. But taste is not some eternal moat.
-7:587 minutes, 58 secondsIt's alpha as well. Now the people with taste are still going to matter. I personally think they're still going to matter for a long time. But the best version of that skill is not mystique.
-8:118 minutes, 11 secondsIt's making better calls and leaving behind examples that your team in the system can learn from. Now let's apply
-8:188 minutes, 18 secondsthe decay test. Well, we used to have speed that decayed. We used to have recall. You know, harnesses have memory.
-8:268 minutes, 26 secondsVerification is moving into harnesses, eval static checks, and model critique.
-8:318 minutes, 31 secondsTaste. I continue to think this is going to decay much more slowly, but it still resets as models learn from examples and preferences. Even judgment in some ways
-8:408 minutes, 40 secondsis a slope rather than a wall. So the strategy is not to cling to any one capability. It's for us to keep moving our edges up a level. So this is one of
-Chapter 8: Defining the modern software engineer
-8:498 minutes, 49 secondsthe reasons why what can the agent do is not the best strategic question anymore.
-8:548 minutes, 54 secondsThe list of things that agents can't do just keeps shrinking. The better question for us is really what can only
-9:009 minutesa human be answerable for. Not because you know any of us are are magical in any way, but because some decisions
-9:089 minutes, 8 secondsactually require ownership. They require context, risk acceptance, and responsibility after that work shifts.
-9:169 minutes, 16 secondsThis is why the word engineer has to get just a little bit stricter. More people than ever can now make computers do things. And I think that's truly
-9:259 minutes, 25 secondsawesome. The total addressable market for builders has never been larger, and that's so cool. But it's a huge expansion of the leverage. An engineer
-9:349 minutes, 34 secondsis not merely somebody who can code, you know, and and get things to exist. An engineer can reason about systems. They think about constraints. You defend
-9:439 minutes, 43 secondstrade-offs. You can manage risk. And you're the person that can be reached out to when things start to break. So what are things that engineers should
-Chapter 9: Risks to avoid: cognitive debt and surrender
-9:509 minutes, 50 secondsavoid if we want to stay effective and accountable in this moment? Well, the first thing to avoid really is cognitive
-9:589 minutes, 58 secondsdebt. Now, cognitive debt is the erosion of your understanding and memory around how to solve problems. I think a lot of
-10:0610 minutes, 6 secondsus start to feel this the more that we're using agents every single day. I know that I feel this a lot. And it's because we're deferring more and more to
-10:1310 minutes, 13 secondsAI to solve our problems. For code, it's the gap between how much code exists in your repo and how much any human on your
-10:2110 minutes, 21 secondsteam genuinely understands. And this is why things like delegation depth end up mattering. You can have a build that
-10:2810 minutes, 28 secondspasses you know your tests a PR that you can merge but your team can still end up losing its ability to actually explain the system that they are shipping to production.
-10:3810 minutes, 38 secondsNow a very real pressure is much is also how much we delegate. So agents can now stay inside the system long enough for
-10:4510 minutes, 45 secondsthe human to lose the thread. So a 30 secondond run right can feel like an interaction but an hour or a daycale
-10:5310 minutes, 53 secondstask so something long horizon that's a work stream and when tasks can end up you know lasting that long especially when you begin running many of them in
-11:0111 minutes, 1 secondparallel review can't just be a glance at the end it has to become a whole control system
-11:0811 minutes, 8 secondsto avoid is cognitive surrender now this is when you blindly accept AI's um responses like delegation ation is
-11:1711 minutes, 17 secondsimportant because delegation says do the work then show me enough evidence that I can judge it. I still make a judgment in that situation. Surrender is really
-11:2611 minutes, 26 secondssaying hey your answer is now my answer before I have formed any opinions myself. Now Wharton did a study that kind of offers us a warning light here.
-11:3611 minutes, 36 secondsWhen AI was wrong 73% of people still thought that they you know they picked the wrong answer and they felt more
-11:4411 minutes, 44 secondssure. So the failure mode is not using AI but it's borrowed confidence. The third thing to avoid is orchestration
-Chapter 10: Orchestration tax and system design
-11:5211 minutes, 52 secondstax. Now if you've been in the Bay Area, you will see people who for better or worse are still walking around with their laptops open or are talking to you
-12:0012 minutesabout cloud agents. And we're increasingly trying to run more and more and more in parallel or telling each other that we're shipping with hundreds
-12:0812 minutes, 8 secondsof agents or thousands of agents. More AI agents running does not mean that there is more of you available. Your
-12:1512 minutes, 15 secondscognitive bandwidth does not parallelize. So every loop that you create ends up causing more decisions to
-12:2212 minutes, 22 secondsroute, merge, verify, and integrate. And the fix is not necessarily fewer agents, but it's about designing your attention
-12:3012 minutes, 30 secondslike a system. Like where you enter, what you require, what you reuse, you just want to be very intentional about
-12:3612 minutes, 36 secondsit. Now, accountability can be a scary word for a lot of people, and I wouldn't be surprised if it made you want to go
-Chapter 11: Accountability as the foundation for scaling
-12:4412 minutes, 44 secondshide in the bushes and just tell your agent to deal with it.
-12:4912 minutes, 49 secondsBut accountability is not what remains after agents get good. It's what lets the rest of the whole system scale. If
-12:5612 minutes, 56 secondsagents can do more work, if they can do it faster in parallel, better than what many of us could do, the scarce thing
-13:0413 minutes, 4 secondsbecomes the ability to explain intent, to inspect evidence, to accept risk, and improve the system when the decision was wrong.
-13:1413 minutes, 14 secondsNow, here is the career math. The half-life of an edge might be one model release. speed, recall, verification,
-Chapter 12: Career math: credibility vs. capability
-13:2213 minutes, 22 secondseven taste all move as the frontier moves. But the half-life of a signature, your credibility, your expertise is much
-13:3113 minutes, 31 secondslonger. And by signature, I really mean the name on the work, the person, the team, the institution, whoever stands
-13:3813 minutes, 38 secondsbehind what's actually shipped. So skills can earn leverage. Accountability can turn leverage into trust. And this
-13:4613 minutes, 46 secondsis one of the lines that I want to draw pretty clearly. Agents can choose, they can route, they can merge, they can escalate, they can operate inside
-13:5313 minutes, 53 secondspolicy. And in many systems, you know, they can, they should, but execution and responsibility are very different things. The agent can follow your
-14:0114 minutes, 1 secondrunbook, but it can't inherit the consequences. When something fails, the question is, who understood the policy?
-14:0814 minutes, 8 secondsWho accepted the risk? And who owns the blast radius? High agency is something that a lot of us talk about these days as being like this thing that we're
-Chapter 13: High agency and the decision-making ladder
-14:1614 minutes, 16 secondslooking for when we're hiring. High agency is actively taking ownership of your outcomes. So knowing when to delegate, when to inspect, when to stop, and when to put your name on the result.
-14:2714 minutes, 27 secondsHigh agency in this world is not I personally do everything. You know, that version doesn't really scale. It's not just hustle theater, but it's ownership
-14:3614 minutes, 36 secondswith judgment attached. This agency ladder tries to make that a little bit more concrete. At the bottom, you've got
-14:4414 minutes, 44 secondssomeone that flags a problem and leaves it for the system. higher up they execute, diagnose, propose, recommend,
-14:5114 minutes, 51 secondsand resolved. And the rare top movement is discernment. You know, maybe you find a problem and you decide whether or not it's worth investing in. Maybe it's not
-15:0015 minutesand maybe you move on. But when agents make more paths possible, agency is not chasing every single path. It's really
-15:0815 minutes, 8 secondsjust deciding which paths deserve your ownership and attention. So translate that into an operating model. agents can
-Chapter 14: Defining the boundary between agents and humans
-15:1515 minutes, 15 secondsrun much more of the inner execution loop. They can investigate, implement, test and report. I think that there's leverage in that, but that outer loop is
-15:2415 minutes, 24 secondsstill engineering. So deciding, verifying, approving, owning, that inner loop is capability. The outer loop is agency.
-15:3215 minutes, 32 secondsAnd this is a boundary that I really care about. Your agent returns evidence.
-15:3715 minutes, 37 secondsIt returns diffs, tests, logs, rationale, traces, trajectories, screenshots, whatever the work itself
-15:4515 minutes, 45 secondsrequires. But then the engineering really begins. We decide whether the work was worth doing. We verify whether
-15:5215 minutes, 52 secondsthe evidence is enough and we approve or redirect or own what reaches production.
-15:5815 minutes, 58 secondsIt doesn't matter if you're someone that's just working with a small number of agents or whether you're working with thousands of agents. I still very much think that these ideas apply. So the
-16:0616 minutes, 6 secondsboundary is not human looks at AI output. The boundary is evidence and responsibility.
-Chapter 15: Operational rule: explain it or don't ship it
-16:1316 minutes, 13 secondsSo here's an operational rule. Explain it or don't ship it. And it's not because humans have to type every line or read every line, but because someone
-16:2216 minutes, 22 secondshas to understand the work well enough to defend it. If you've ever worked in a large codebase or an enterprise codebase, some code bases have this
-16:2916 minutes, 29 secondsconcept of an owner's file or c certain subdirectories where there are people who are on the hook for that part of the system. You can think about this in a
-16:3716 minutes, 37 secondsvery similar way. Who's accountable for that part of your architecture in your codebase? Your model might write the code and the question is really still
-16:4516 minutes, 45 secondswhether you can explain those changes that the agent is shipping, whether you've got the evidence where you understand the risks. Now, this is one of the things I want you to remember
-16:5416 minutes, 54 secondsnear the end. Automation moves the floor for all of us. Engineering continues to
-17:0017 minutesmove up a level. And our new work might be loop design, evidence design, and brownfield stewardship, but fewer
-17:0717 minutes, 7 secondskeystrokes doesn't mean less engineering over the next few years. It means that there is more surface area that needs
-17:1517 minutes, 15 secondstaste, verification, ownership, and ultimately care.
-Chapter 16: Future outlook: unlocking latent demand
-17:2017 minutes, 20 secondsI don't think I've ever been more excited about the future of this field.
-17:2517 minutes, 25 secondsEvery time that we've made it easier to write software, we've predicted that the world would need less of it. And in fact, the opposite happened. Higher
-17:3417 minutes, 34 secondslevel languages happened, frameworks, cloud, low code. The pattern always went the other way. And when you lower the cost, latent demand ends up appearing.
-17:4417 minutes, 44 secondsThose ideas that people didn't think were feasible to build and get out there are suddenly unlocked. And agents are going to do the same thing for a lot of people. It's not going to remove
-17:5217 minutes, 52 secondsengineering work. It's going to move the bottleneck from can we build this to should this exist and can we answer for it. So build the factories, keep the
-18:0218 minutes, 2 secondslights on, own the verdict. I hope this was useful. Thank you.
+About five months ago, I made a video about how I build with AI. A lot of you guys really liked it, just seeing into a
+0:05
+workflow of somebody who's trying a little too hard to push the limits of these tools and build awesome things. And since then, I've kind of entirely
+0:12
+changed my workflow. Back in that video, I was heavily using cursor and plan mode with Opus models and going really in
+0:19
+depth on how I would use plans as the core piece to generate the outputs. That's not really how I'm building at
+0:25
+all anymore. from the idees that I work in to the models that I use to the workflows that I've built for myself to
+0:32
+get the most value out of these agentic tools, everything's kind of changed and I really want to go in depth on it
+0:38
+because to be frank going back to this old video now just hurts me a little bit because I wouldn't make most of the
+0:44
+recommendations I made there today. So, what am I doing now? That's a really
+0:50
+good question and I can't wait to answer it after I tell you guys a bit about today's sponsor. I don't know about you guys, but I'm shipping more apps than
+0:56
+ever. Little things for my team, big things I put in front of people, and more. But I keep hitting the same friction points when I do that. Building
+1:03
+the stuff's easy, but authenticating users and charging them money tends to be really hard. I could just use today's
+1:08
+sponsor, Clerk, but that would get kind of expensive. If I have 30 different projects and I'm paying 20 bucks a month
+1:14
+for all of them, that's way too much, right? Nope. Because I successfully bullied them into doing unlimited apps
+1:20
+on the paid plan and on the free plan. I still can't believe I won on this one because I was pushing them for a while
+1:25
+about this because I always was the guy that wanted a bunch of different apps and I hated that Clerk was becoming my biggest expense. Now it's basically
+1:32
+free. I pay the 20 bucks per month. I already have like 40 projects on my Clerk for $20 a month and I couldn't be
+1:39
+happier with it. Especially now that I'm using their billing product. Yes, they built a Stripe alternative in. Don't
+1:45
+worry, it's still using Stripe. They just have the best Stripe implementation I've ever seen. And believe me, I've
+1:50
+tried a lot of them and I've invested in a bunch, too. The cost comes out to exactly the same as if you use Stripe
+1:55
+yourself, but it's a 100 times easier to set up. All the billing data is set up on users. They have access to it through
+2:01
+the user component that you already should be using. And setting up a pricing table couldn't be easier. You just call the pricing table component.
+2:07
+Waste less time on billing and off and spend more time making good software at soyv.link/cler.
+2:12
+There's a lot to break down here from the models I pick to the harnesses I use to what UIs I'm working within IDEs,
+2:18
+apps, etc. The way I style my prompts, the way I use or don't use plans, how I
+2:24
+manage things remotely, which is a really fun angle I want to dive into as well. And most importantly, I would argue, how I actually think about the
+2:30
+poll requests that I am making when I build with AI. I want to give a bit of context on where my experience is coming
+2:36
+from here because the way I've been building and the things I've been building has been very different recently. I took on a pretty bold,
+2:43
+pretty stupid project called Lakebed. It's a new full stack framework, a new runtime, a new backend, a new database,
+2:49
+a new cloud, a new lot of things to try and make it easier to build quick apps with agents. The point is to be a shitty
+2:55
+cloud for shitty apps. But this means I had to do a lot of different things. Thankfully, I was mostly working on it
+3:00
+myself, though, which balances out some of the chaos I put myself through when making it. But it gave me a lot to
+3:07
+reflect on in terms of how I want to build with agents now. And I've shifted a lot of my perspectives through the
+3:13
+experiences I've had here. When working on LakeBed, I tried a lot of different tools. I used cursor a little bit. I
+3:19
+used the codeex app a lot. I used T3 code. I tried using cloud code a good bit as well. I even played with open
+3:26
+code and some of the cool new like open source models throughout. It was a very eye-opening experience to see how those
+3:32
+different models could work in a codebase like this, but also more importantly, how they handled different
+3:37
+prompt styles, different harnesses, and different agent MD and Claude MD files in particular. But I want to answer this
+3:43
+first question around models. What models am I using? Now, obviously saying anything about this is going to make the
+3:49
+video incredibly dated. In fact, by the time this video is published, it's possible that a new state-of-the-art is
+3:54
+out. But at this point in time, I really struggled to use anything other than GPT 5.5. I will explain more on why I'm
+4:02
+enjoying 55 so much now, especially compared to how little I enjoyed it in the past. I've pretty much entirely
+4:08
+stopped using clawed models. I'll occasionally pull one in to like make a quick landing page for me. But for the
+4:13
+most part, I'm just using 55. I do think Composer 25 is really cool, but I have
+4:18
+effectively unlimited inference on 55 because I'm on the $200 a month plan and I still am under that weird 10x thing
+4:24
+they did for people who attended the 55 event. So I despite my best attempts cannot get these numbers down. They just
+4:31
+did a reset that they probably didn't even need to do, but the worst I could get is about 6% down on my weekly usage
+4:39
+when building a full cloud from scratch. So yeah, I think the limits are very
+4:44
+generous on that plan. They are 10x more generous for me cuz I'm on that weird things of the event. I don't know how drastically that will change when the
+4:50
+10x is gone, but like the worst I was able to do damage wise would have been the equivalent of 60% with the normal
+4:56
+limits. So I don't think it's a big deal. That said, the cheaper plans are much easier to hit limits on, especially
+5:02
+if you use some of the cool new features in the harness. Harnesses are a much more interesting conversation in various
+5:09
+ways. If you're not familiar with what a harness is, you should definitely watch my video on how cloud code works. It is
+5:14
+an in-depth overview of what it takes to allow an AI to use your computer to edit
+5:20
+code and actually do things for the work you're trying to do. To be very very simple with it, the harness is the set
+5:25
+of tools and the actual application runtime, whatever that allows an agent to do things on your computer to edit
+5:32
+code and whatnot. Most harnesses come as some form of CLI, whether that is the harness in cloud code or the harness in
+5:38
+something like codeex, but some aren't necessarily focused on that. They are more like an SDK. The cursor harness,
+5:45
+for example, is more in that direction. They do have a CLI for it, but yeah, there are a lot of really cool harnesses
+5:52
+nowadays, especially in the experimental space. Things like PI are really, really cool, and I do need to do a better deep
+5:58
+dive on it, and I haven't yet. That said, as part of me using 55 more, I
+6:04
+have found myself pretty much always defaulting to the codeex harness. There are a lot of things that Codex has been
+6:10
+doing really well lately. One of the biggest ones is that they've kept the CLI boring. They're not loading it up
+6:16
+with all sorts of crazy stuff. The CLI has just kind of stayed a simple, minimal, boring CLI, but they have been
+6:22
+building really cool things into the Codeex app. And a lot of those do carry over to the CLI as well, which means
+6:28
+they carry over to other things using the harness. Like, you know, my favorite way to actually build these things, T3
+6:33
+code. A lot of you seem to be confused about what T3 code is. T3 code is not a
+6:38
+harness. It is not able to be paid for, and it is not, most importantly, T3 chat. T3 Chat is a different thing. T3
+6:47
+Chat is an app for chatting with AI agents, similar to chat GPT. T3 code is
+6:52
+an app for managing your other AI harnesses, similar to something like conductor or kind of cursor, but really
+7:00
+it's more similar to the codeex app. I'm very proud of what we have built with T3 code. And by we, I mostly mean Julius.
+7:06
+He's done the vast vast majority of the work. I have put a lot of time into the codeex app, though. I was using it for
+7:13
+most of the building of Lakebed because I wanted to just do another deep dive on the competition, see what its strengths
+7:18
+are, see what its weaknesses are, and get a rough idea of where things are at. As I mentioned before, the Codex app is
+7:25
+really good. And if you're just using the GPT models and you're happy with Codeex, totally fine to stick with it.
+7:31
+If you've never tried one of these styles of agentic idees where you have
+7:36
+multiple projects open at the same time, you have threads that are easy to swap between onset projects. This style of
+7:44
+building is really, really nice. When anti-gravity added a view like this in its original release, I started to see
+7:51
+the potential value in this way of building. Since then, I've quadrupled down. This is how I build. I only really
+7:56
+open up editors to edit environment variables now. So, if I do actually use
+8:02
+cursor, which I'll be real, I don't use it on my computer very much. I usually use it in their new cursor glass UI,
+8:07
+which has for my experience been very broken and laggy. Apparently, it's getting better. I still have not had a good experience with it. The codeex app
+8:13
+is very, very good and is probably the best bet for most people right now. Obviously, I'm biased and I find T3 code
+8:20
+to be much more pleasant, much more stable, much more reliable, especially with remote stuff. But realistically,
+8:26
+codeex is what most people are going to experience. It's a great experience. I will also say if your only experience
+8:32
+with an app like this is the Cloud Code desktop app, then you've not experienced an app like this because the Cloud Code
+8:38
+desktop app is like a third class citizen at Anthropic. No one there really uses it. No one there's really
+8:45
+trying to make it great. It's been stapled into the cloud desktop app in a way that isn't very pleasant. The Codex
+8:51
+app is how most people at OpenAI interface with Codeex. In fact, I've heard many more people who aren't even technical using it as an alternative to
+8:57
+CHBT itself. The Codex desktop app is the best way to use Codex. If you've only used it through the CLI, you've not
+9:02
+really used Codex. So, I'm using T3 code. I would absolutely support people for choosing Codex instead. There's lots
+9:08
+of other cool options to consider like conductor. My main gripes with conductor are that I had a really rough time
+9:14
+trying to give them feedback. I was surprised how quickly my team got ghosted because we really wanted
+9:19
+Conductor to be good. It's also closed source, which means if you don't like anything about it, you're kind of stuck.
+9:24
+Whereas T3 Code is entirely open source. So you can do whatever you want to and in fact a huge portion of our users are
+9:31
+running forks of T3 code. It is also worth noting that if you're primarily using a claude code subscription, we are
+9:36
+about to get heavily limited because they marketed a [ __ ] change where they started giving you credits when
+9:43
+you're a subscriber. The credits are what we would use instead of your actual subscription limits, which is absolute
+9:49
+[ __ ] If you use Cloud Code via the Claude Code CLI or the Cloud Code
+9:54
+desktop app, you can get up to $5,000 of usage for 200 bucks a month. But if you
+10:00
+use it in something like Conductor or T3 Code or if you SSH into a computer and call Claude-P instead of just the Claude
+10:07
+CLI directly, then you only get $200 of usage. And if you go over that, it costs you money directly. It is a [ __ ] change.
+10:13
+I can't believe they actually did it. I have a whole dedicated video on that. But again, we can't do anything. It
+10:19
+sucks that we can't do anything. We will probably have a crappy terminal UI that will open when you use cloud code in T3
+10:26
+code because there isn't really another option for us. Blame anthropic. We can't do anything. We do support everything
+10:33
+else you might want to use though. We support cursor and open code. You can enable them in settings. They just use
+10:38
+the existing CLIs through ACP. It's nice. It's really cool having a tool like this that supports everything in
+10:44
+one consistent cohesive UI, especially once you get into the remote stuff. I know I'm skipping some steps here, but I
+10:51
+really want to emphasize this when we're talking about the apps because I think it's one of the most important things. I know what a lot of y'all are thinking.
+10:56
+Why don't you just SSH into a computer instead? Cuz like the problem we're trying to solve with remote control is what happens when I shut my laptop and
+11:03
+an agent is running. I want to open and see the result. I don't want it to get stopped. I don't want to have the meme where I have the laptop half open as I
+11:09
+walk around. I just want to be able to run the thing, close my laptop or go offline or code from an Uber and then
+11:16
+have it updated reliably. I really thought Codeex would have this figured out. And to their credit, the mobile
+11:22
+integration is largely there. The fact that there's this little button you can click to set up your phone through the
+11:29
+chat GBT app to control codecs on your computer remotely is actually really, really cool. As I hinted at before, I
+11:35
+like to code on machines that aren't this laptop, but I still like to control it from this laptop. And on this local network, I have my Mac Mini, and I try
+11:43
+to control it from the Codeex app here with Codeex running on there. This is an actual Mac Mini running on my network that I can connect to remotely over like
+11:50
+the Mac screen share stuff. I have Codeex on here open and ready to go. I also have T3 Code open on here ready to
+11:55
+go. I spent the last week trying to do everything through codecs. God damn did I hit a lot of issues. The mobile
+12:01
+integration is mostly fine, but I'm just going to quickly go over some of the insultingly bad problems I had trying to
+12:08
+control it remotely through the desktop app. The first one, and this was like an absolute stopper for me. Occasionally,
+12:14
+the model picker would disappear. And when that happened, even though I was connected, I was unable to do anything
+12:21
+on the remote machine. So, I had to connect back over to it via the screen share, close and reopen the Codeex app,
+12:28
+come back here, close and reopen the Codeex app, and maybe it would work. Like, maybe. Usually not, but sometimes
+12:35
+it would. When it does work, it still has all sorts of fun issues. when you actually just like send a prompt usually
+12:41
+responds faster. But do you see how slow that was to pop up like the history? It's really bad. And where it gets even
+12:47
+rougher is if you have to open up the terminal for any reason. I'm going to type 1 through nine just by sliding my
+12:54
+hand down the keyboard starting now. Oh, it actually did it kind of fast that time. It's still like super sticky keys.
+13:00
+Like I am typing as I speak. When I was trying this yesterday, there
+13:05
+was up to a 30 second to two minute delay. I cannot stand. God, it's sticky
+13:10
+keys so bad. Even when you type correctly, it's it's unusably bad. And then when you try to paste an image, it's like 5050 if it works at all. I
+13:17
+have not been happy with the remote experience outside of mobile on Codeex. I tried it because I wanted to try the
+13:23
+mobile stuff. Was pretty impressed with that. Assumed the desktop app would work well and it just didn't. Then my team reminded me that Julius went really hard
+13:30
+on the remote stuff for T3 code. So I decided to try that instead. And I'm actually trying this a few different
+13:36
+ways. I'm trying the baked into the app remote version, but I'm also trying the remote hosted version that was very easy
+13:42
+to set up. I hop over to Helium. You'll see here I have my T3 code instance over
+13:48
+my local network fully functioning. I can hop here. I can go to an existing
+13:53
+thing. I can open the terminal. It types full speed. No issues because it's effectively actually sshing over. It has
+14:01
+been significantly easier to build. image paste work perfectly and I actually love having it in the browser
+14:06
+because now this is a different thing from my local instance. I don't have to like remember which ones on which
+14:11
+machine and deal with all of that. It's been very very nice. One of the coolest examples I've seen of somebody pushing
+14:17
+the limits of the T3 Code remote stuff is Jack here. He doesn't have a computer. He does most of his work from
+14:24
+an Android tablet. So what he did in order to get T3 code working on his tablet is he actually spun it up as a T3
+14:31
+code server in Replet. This gives him the ability to use the T3 code web app hosted on Replet to build projects
+14:37
+remotely on Replet, which I think is really really cool. Point being T3 code
+14:42
+remote hosting is great, especially if you combine it with something like Tailscale, which allows you to connect to devices on other networks very
+14:49
+trivially without having to expose it to the whole web. It's been very nice to work with. I have been blown away with
+14:54
+how stable it is. I've used this for the majority of the changes I've been making to LakeBed for the last day and a half.
+15:00
+And I'm also using it to spin up new projects remotely, too, which has been very surprisingly solid. The one catch
+15:05
+here is mobile. We do have mobile web, and it works better than I would have expected. Julius is cooking a React
+15:11
+Native app now. We should hopefully have that pretty soon. Fingers crossed. And if you do want to test this out
+15:17
+yourself, you can just go to settings in T3 Code, hop over to connections, and
+15:22
+relatively easily set up tail scale or network access remotely or on your existing network very easily. You can
+15:30
+even do custom SSH connections even though in codecs they're a bit rough. We actually have a UI to store a password
+15:35
+when you set it up yourself in T3 code. As I mentioned before, Julius went really hard on this stuff because he
+15:41
+really likes these remote flows. And the result is that it is one of the best experiences I've ever had doing remote
+15:46
+coding with AI by far. No longer am I stuck using tools like Termius to SSH
+15:51
+into some shitty Linux box and try to make a terminal UI work on my phone. I still can't believe people are doing
+15:56
+that. I will crash out briefly on the SSH terminal people for a second because I need you guys to understand how much
+16:03
+you're suffering when you do that. First off, you have to deal with T-Mux or Zelj or GNU screen or something. So if you
+16:09
+disconnect, you don't kill the work that you're doing. Second off, you now have to have a bunch of weird key bindings or
+16:15
+some other abstraction to switch between different threads you're working on. God forbid you want to go do something in a
+16:20
+work tree. Good luck. Have fun with that. You're going to be writing a lot of handwritten git commands to spin up
+16:25
+that work tree. And then what happens when you want to paste an image? I would estimate that a third to half of my
+16:30
+prompts have an image in them. Whether I'm just quickly grabbing an error screenshot and pasting it or if I have
+16:36
+some UI that I want to throw over to the agent to tell it like, "Hey, can you make this better? Hey, can you make it look like this other thing?" I use
+16:43
+images a lot in my prompts. The fact that they kind of almost work in traditional CLIs and then don't work at
+16:49
+all over SSH is insulting. I've been fighting this fight for a while. I as a
+16:54
+person who spent the vast majority of their computer time in terminals throughout their life, I really really
+17:00
+don't like doing agent coding in terminals anymore. I'll still do it occasionally for like quick demos or
+17:05
+like editing things on my computer. Like if I'm trying to config some directory or like fix my dot file, stuff like
+17:12
+that, I absolutely will still use codec cli. But when I'm trying to do real work in a real codebase, I want the app every
+17:20
+single time. I still can't believe the pasting images over SSH thing is as absurd as it is. And while it's cool
+17:26
+people are like building raycast workflows in order to upload an image easily to send it as a URL over for the
+17:34
+agent, like it's cool, you shouldn't have to do that. The amount of workarounds I've seen people make just to be able to use cloud code over SSH is
+17:40
+hilarious and painful and no, I I I will not support that mental illness. Please
+17:46
+try a good desktop app for agentic coding before assuming the terminals are the only solution because you tried the
+17:53
+codeex desktop app six months ago and it was [ __ ] It's still [ __ ] I understand if that's the only experience you've had
+17:58
+that you think CLIs are better. They're not. A good desktop app for coding will [ __ ] all over a CLI any day. As I
+18:05
+mentioned before, working remotely is really, really nice. Especially if you're like me and you find yourself
+18:11
+randomly having to like leave your office to go to some event or go to some coffee shop meeting or you just like
+18:18
+want to check in on your work as you're pacing around the office. I really like being able to do work remotely and I
+18:23
+find myself spinning up more and more of my work remotely. when I know I'm going to be sitting at my desk for a while, like when I'm streaming or when I'm
+18:29
+working with my team, I will still often run things in T3 Code locally, but almost all the time otherwise, I am
+18:35
+connecting to that remote Mac and doing things through that. But now I need to talk about how I actually do the work in
+18:41
+these tools. Cuz thus far, we've just been focusing on the tooling side. And in order to understand why I like 55 so
+18:47
+much and why I like remote coding so much, I think my actual ways of working with the models are worth understanding
+18:54
+more. Context management really is the name of the game for getting these things right. An underrated trick that I
+19:01
+found really useful is giving the agent the ability to explore other code bases
+19:06
+that might be relevant. In this case, I was trying to set up O for the userfacing apps people would deploy and
+19:11
+generate with Lakebed. So I needed it to have a good O solution. I wanted to see if my implementation for my O service I
+19:18
+built before called Shu would be a good fit. So rather than like describing it or throwing it at the docs, I just
+19:23
+cloned down the repo and told the model take advantage of the O implementation I have in Shu with a link to the path on
+19:31
+this computer with that implementation so it could use that as a reference point. This type of context manipulation
+19:38
+results in much more reliable outputs from the models and has been one of the biggest improvements I have personally
+19:43
+experienced. Even just telling the model like go clone this repo and throw it in some scratch directory in order to figure things out. There's one other
+19:50
+super reliable thing I want you to know about though. Our sponsor agents can write surprisingly good software as long
+19:56
+as the problems they're solving are simple. There are certain things that just aren't though. You know, like DNS, the thing that sucks for everybody. Be
+20:03
+really nice if DNS was simpler. Oh, Dian Simple's on the screen, isn't it? I I love these guys. I've been so blown away
+20:09
+with every interaction I've had with them, all of the cool things they do. The fact that they made a good SDK for
+20:15
+managing your DNS is incredible. If you're trying to build services where users can like register domains or
+20:21
+subdomains or manage masks and set up forwarding and do all these types of things, good luck doing that
+20:27
+programmatically because the APIs that exist for it suck unless you're using D and Simple. Like, how cool is it that I
+20:32
+can call client.registar register our check domain to see if a domain's available and then buy it all from just writing TypeScript. This is so useful
+20:39
+that I wish I could do it through a CLI. Oh. Oh, is the CLI on the screen now? Yeah, this one was so cool. I did a call
+20:46
+with the guy who made it because I was blown away and I wanted to give him some feedback to make it better for agents because having an agent able to run a
+20:52
+CLI to debug DNS issues is like a thing that I would have killed four years ago. And now that I have it, it's like, oh
+20:58
+yeah, obviously the CLI is no joke. This is a full-time project for one of the engineers there and he went hard on it.
+21:05
+Everything you would do through the SDK is available and it's all also exposed with the help commands so that your
+21:11
+agent can see how to use it. You're too busy to be debugging DNS. Let your agents do it for you at soyv.link/dnsimple.
+21:17
+Here is the original thread where I started span aka lakebed, my new cloud
+21:23
+framework everything project that I'm very proud of. You might notice this is quite a blob of text. The reason for
+21:29
+this is that I used voiceto text. I found that using whisper flow or other voicetoext tools makes me write much
+21:37
+better prompts and this one was meant to be a very much thought dump like I
+21:42
+wanted to plan out with the model especially for these types of large changes. I do like planning and I want
+21:50
+to be clear about something. I do not mean plan mode. I like to work with the
+21:55
+model and not be scared of letting it write code or make changes or test things. And plan mode is a little too
+22:01
+restrictive. And there are problems here. Like I've had times where I wanted to talk to the model about a thing and
+22:07
+it just went and did the thing. 55 is really guilty of this. But again, I prefer working this way where I'm not
+22:13
+necessarily in the plan mindset and then in the edit mindset. It's more of a
+22:18
+natural back and forth. So here I started with a very important thing. my end goal and I find that this is the
+22:25
+thing most developers miss. You guys love focusing on the details and I understand why that's been what mattered
+22:31
+our whole career. Especially when you're advising more junior engineers, it is important to be detailed about how the
+22:37
+thing should work, not just what the thing is. I found myself moving over to
+22:42
+this more higher level like here is what I want it to do, not how I want you to
+22:48
+implement it. And I started with roughly that this directory is for a new project. I want to start called span.
+22:54
+The goal is admittedly complex. I want to rethink how clouds work from first principles. I want to build a new full stack TypeScript framework that is all
+23:00
+the pieces you need to build full applications including simple, minimal, reliable offlayer database synchronization, file storage, and more.
+23:06
+The goal is to make everything you need available via the code instead of having to go through other layers of platforms. If a user has to open a dashboard, we
+23:11
+have failed because I want this to work for agents in all different ways that they would need to initialize projects. The formatting got all screwed up cuz I
+23:17
+was voice detecting. I wasn't even paying attention. I thought this was going to be a throwaway, but the fact that I did this as a throwaway and it
+23:23
+went so well shows how powerful these tools have gotten. To open, I said I wanted first for it to roast the plan
+23:29
+and give me all my thoughts and feedback before we proceed. Do whatever research you need, yada yada. Says, I love the
+23:34
+ambition, but the roast is simple. This is not one project. It's a runtime database, sync engine, object store, deployment control plane, local
+23:40
+emulator, security model, migration system, observability stack, and agent interface wearing one trench coat. The idea is viable only if span starts with
+23:47
+a brutally small thesis. It tried to insist that things like convex instant
+23:53
+and jazz meant it wasn't necessary. Also, Cloudflare being as good as Cloudflare is yada yada. I had to slowly
+24:00
+convince it. The important thing here, and I know this is hard for people, you have to read what it says. I know people
+24:07
+tend to gloss over the text the model puts out and instead read the code it
+24:13
+puts out or maybe they'll even read the plan it puts out but rarely. I find that devs have this instinct where they care
+24:19
+more about the code output and not enough about what it said and that's entirely backwards. You have to read
+24:27
+what it says. And if you don't like how it's saying things or it says too much,
+24:32
+steer it the way you want it to talk instead. Tell it to be more brief and concise. Tell it that it wrote way too
+24:39
+much [ __ ] Tell it to format things in the ways you want to read. But you need
+24:44
+to get the model talking to you in a way you'll actually read what it says. Mark is a victim of this. And I was planning
+24:50
+on yelling at him about this when he was here and I forgot. I will do it later. You got to read the text, especially
+24:56
+when you're doing big sweeping changes. And accordingly, you have to respond to the model based on what it said. So, I
+25:03
+went through here and typed by hand the different sections and my thoughts on what it had to say, saying, "Here are
+25:09
+the things that I agree with. Here's the parts I don't agree with." Trying to get the context of this thread to be more in
+25:16
+the direction I want this project in. You got to kind of treat it like you're convincing somebody of your way of
+25:22
+wanting to do things. I put the work in to convince the model to do the thing I
+25:28
+want. I see a lot of questions in chat already, like, "What skill command or
+25:33
+framework are you using to get the grilling? What skills do you have set up? Have I tried the superpowers plugin?
+25:38
+All this shit." No, you're all coping. You don't need all of that [ __ ] I have
+25:44
+almost zero skills installed. Just talk to the [ __ ] model. They're smart enough now. I don't even have the super
+25:50
+small and useful grill me skill for a matt set up because I just have it as a binding in Whisper Flow. Grill me skill.
+25:57
+I just hold down my whisper flow key. I say grill me skill and it just pastes the exact markdown into the input. So I
+26:03
+can just do that and it will do the same thing. Super easy. Even then I can just tell it to and it usually does it. You
+26:08
+guys care too much. I don't bother with skills usually. After I gave my feedback, the model agreed more. This
+26:14
+context makes the idea much sharper. I buy it more now. The category isn't new cloud. It's an agentnative app substrate
+26:21
+for tiny fullstack apps. Yes, it got it now. And this is why you talk to the model and you read what it says. You
+26:27
+need to make sure you and the agent and the context are on the same page. And this is the biggest thing I want you to
+26:34
+take from this video. The most important thing when you're building with AI is that the AI understands what you want
+26:40
+and how you build. You can do that by writing a 5,000line agent MD that's global on your computer with all of the
+26:47
+things you like and do and such. You could also become a famous influencer and tell the model, "I'm Theo, build the
+26:52
+way I like to build." which works sometimes, but the easiest thing to do is to just read the outputs and steer
+26:59
+the model in the direction you want to go in. And if you notice it making the same mistakes over and over again, go
+27:05
+into the agent MD and try to give the model your psychosis. That's what I've done. And I think that's one of the
+27:10
+strongest things I did that made it possible for me to make this project so quickly. You'll notice that in this
+27:16
+Lakebed Agents MD, there are no file paths. There are no technical decisions
+27:22
+or enforcements. There's a couple small general rules at the bottom that I might even delete because I haven't found them
+27:28
+to be super useful. The point of the agents MD, at least how I use it now, is
+27:34
+to make the model more steered towards what I'm trying to do. I wrote this one
+27:39
+almost like a letter from me to the agent to tell it how we're thinking, what we're building, and why we're doing
+27:46
+this so that it's less likely to have bad assumptions or ask weird questions
+27:52
+or work outside of the technical constraints that I want it to work within. This document has helped so
+27:58
+much. I noticed almost immediately after writing this by hand, by the way, my agents did not write this file. I wrote
+28:03
+this file. After I wrote that, I found that I didn't really have to do much to get the agent to build how I wanted it
+28:09
+to. Once it had the context of how I was thinking about this, it started behaving
+28:14
+way, way better. The craziest thing that I did throughout this project, and I know this is going to be hard for a lot
+28:20
+of you, when the agent pushed back, I listened. When it said certain things were not necessarily the right idea or
+28:27
+were too hard to justify, I listened and I delayed those. And one more hack that I found really nice is one that comes
+28:34
+from our friends over at Enthropic. Having the model write an HTML file for the plan. It's so much nicer to read.
+28:43
+I found this much easier to like read and go through the whole plan and give feedback and answer all of the remaining
+28:49
+questions. It was so nice. That said, the first HTML page it made was
+28:54
+horrible. It looked awful. So, I had to like yell at the model a whole bunch about that. Also, apparently in the
+29:00
+Codeex app, the questions tool just didn't work in the remote mode because at this point, I was controlling this
+29:06
+from my phone because I was busy and it couldn't ask me questions. It might be that mode. It might be the not using
+29:11
+play mode. I don't know what it was, but it was insisting it couldn't ask me questions. So, I had to like go through and answer all of them directly. And
+29:17
+then I was like, the UI for the pages is awful. I got it to clean it up. After a while, it like still was full of useless
+29:23
+crap. I gave it as much as feedback. This is also another trick that I found really useful. Get a screenshot tool
+29:29
+that lets you actually do [ __ ] Like being able to point an arrow at a thing and say, "This sucks." And makes it so
+29:35
+much easier to steer the model to make the right changes with things. I press control C, the thing goes away. It's on
+29:41
+my clipboard. I use Shotter. It's great. There's lots of other options that are good, too. Get a good screenshot tool.
+29:46
+It makes life so much easier. Once I got the HTML in a good state, I found that
+29:51
+every plan I did from that point was really nice looking because it would just look at the existing one and be
+29:57
+like, "Oh [ __ ] I'm gonna copy this formatting." And this is like one of the coolest things is once you get the agent
+30:02
+to behave how you want if there is enough proof of that behavior in your codebase whether that is HTML plans
+30:10
+whether that is your agents MD steering it certain ways whether it's the code itself once you get the model to behave
+30:16
+how you want it to everything else almost stops mattering and that's one of the coolest things to discover as I've
+30:23
+been using 55 like in its default state copying the prompts I used to use with the big bloated useless agents MD
+30:29
+55 sucks. When you take the time to condense and steer it the way you want it to work, it becomes the coolest way
+30:37
+to work I've ever built with. And here's where we're going to get into the other things about how I built. You might have noticed I have a lot of threads here.
+30:44
+These are just the ones I did in the codeex app. I have another few dozen in T3 code all for the same project that I
+30:50
+did in 5 days. I probably started over a 100 threads on this one project in 5 days. And I know what you're thinking
+30:55
+already. Oh, so you have all of those running in separate work trees and you're hopping between 15 of them. Cool.
+31:01
+Everyone says they do that now, but there's no way you're productive. Nope. Almost every single one of these threads
+31:06
+was run by itself on main alone. I found that I am just genuinely way less
+31:12
+interested in these more parallel workflows lately because it's just too much context to keep track of. And when
+31:19
+you spin up a smart enough model, especially if you're taking advantage of fast mode, which I've surprisingly been
+31:25
+using a lot, it's not worth the price increase. But if you're not getting close to hitting your limits on the Codeex plan, it's very nice to use. The
+31:32
+fact that fast mode is included on your plan, it just increases how fast you go through your limits on Codeex when it
+31:38
+costs actual money on cloud code is hilarious to me. But yeah, I've been
+31:43
+using fast mode on my codec subscription. I've never come even close to hitting my limits. It's been very nice. So much so that I don't even find
+31:49
+myself leaving extra high as much. If I'm just doing UI stuff or I want it to respond faster, I'll hop over to low.
+31:55
+But I've gotten good enough at keeping extra high on tasks that I found it fine. You'll notice a lot of these threads are literally just one prompt.
+32:02
+This one was very simple. What would it look like to let users bring environment variables for serverside code? Ideally, they'd be able to update
+32:08
+aenv.lakeb.server file and run npxlbed deploy to push those environment variables into the
+32:14
+cloud for their deployment. A minute and 54 seconds later, it wrote a whole model for how this should work that I thought
+32:20
+was great and it really seemed to understand what I wanted here. The important design choice section shows
+32:26
+the name of the file. It said this should be the source of truth with replace semantics. If we add something in deploy, it gets created and updated.
+32:32
+If we edit something locally, the deploy will rotate it. And if we delete something from it, then lake deploy will delete it. Exactly what I wanted. I
+32:39
+didn't have to get more specific. I didn't have to write a longass prompt. I wrote two sentences and then it speced out exactly what I wanted. To which I
+32:47
+responded, "Love it. Build it." 10 minutes later, the whole thing is working exactly how I wanted. No
+32:53
+additional changes needed to be made. I just pushed it to GitHub and I was done. It was great. And I started my next
+33:00
+thread, which was I want to be able to manually bump rate limits for a given user. This is cuz one of my friends who was trying it out was loving it and
+33:06
+wanted a higher rate limit. So, I just told it add this feature. And I gave it a little more detail here. I want a new
+33:12
+users table in the admin dashboards. I want to be able to control this myself with the ability for me, specifically
+33:17
+me, to set custom overrides for someone's limits. Another important thing, and I had this in my agent MD, I
+33:23
+didn't talk about it before. A glossery of terms and language to help the model understand what you're saying, can be
+33:29
+very, very helpful. I found that with this project, it was difficult because there is me, the person working on this
+33:36
+thing. There's also me as a user of the thing. There's the agent building lakebed and then there's the agent using
+33:43
+lakebed to build apps for you the user of lakebed. So I gave it these specific
+33:49
+terms where you is the agent that is actually going to make changes. Me we and us are the humans that are building
+33:56
+lake bed itself. Developers refers to our users people who are going to build things on top of lakebed and then agents
+34:03
+which is the thing the developers are using to build with this. Again, the point here is to make it easier for the
+34:10
+model to know what I'm referring to as I discuss these things. Is another one of
+34:15
+the themes you'll notice. Generally speaking, you should try to keep things simple. And if it doesn't work, that
+34:21
+doesn't mean make it more complex. It means fix the things that prevent it from being simple. If talking with the
+34:26
+model in plain language was preventing it from getting what you're saying, you
+34:32
+shouldn't get way more oversp specific in all of your prompts. You should make slight changes to your agents MD and to
+34:37
+your claude MD so that you can keep your prompt simple. And you'll notice almost all of my prompts here are two sentences
+34:43
+or less. Oh no, this one was three sentences in a list of things, but it did exactly what I wanted the first try.
+34:50
+And you'll notice this looks almost identical to how the homepage looks now. Nice and simple. And as I said before,
+34:55
+none of these threads were run in parallel. I would do a task, I would complete the task, and then I would make a new thread and start the next task.
+35:01
+And I would just do that over and over again. As Morg just said in chat, make the difficult change easy, then make the
+35:08
+change easily. Yep. Why new threads? I always make new threads because I don't want old context getting in the way. I
+35:15
+treat every thread as a pile of information that is steering the model. And if I'm doing something different,
+35:22
+like this thread, I was working on environment variables and then this thread I'm working on user limits. These
+35:27
+are different concerns. and having the same thread with different concerns within it just biases the model towards
+35:34
+things that aren't necessarily correct. Remember the way these models work is a bunch of parameterization. All of these
+35:41
+sets of characters that are in your history that are in the model, your history changes what points to what in
+35:48
+the model. So the more stuff in your history, the more customized the model is to an extent. Every additional word
+35:54
+in your chat history is changing how the model behaves. I don't want to deal with that. And to those saying, "Wait, does
+36:00
+that mean the model has to explore the codebase every time?" Yeah, it does. It doesn't [ __ ] matter. It does a great job. It still completes all of these
+36:06
+things in seconds. And I find that in real code bases, there is so much stuff going on that the history of your
+36:12
+previous change is just going to confuse the next one. Also, chat pointing out they notice that I'm not mentioning file
+36:19
+specifically or applying skills for it to work on. Correct. I'm not doing anything more specific. I trust the
+36:25
+model to find the right file. I am more likely to recommend the wrong file than the model is half the time. If it turns
+36:31
+out the file that I set isn't necessarily the right one for the change, the model's going to get confused and try to make it work in that
+36:37
+file. If I have a good dev on the team, I'm not telling them what file to edit. I'm telling them what to do and they'll figure out what to change. And I would
+36:44
+find half the time when I look at the diff for the changes it made that I am surprised what files it ended up
+36:49
+changing. Again, don't add details unless it needs the details. Try to be more sparse with your requests and
+36:56
+prompts. Figure out what it doesn't understand and figure out how to fix that without making your [ __ ] too
+37:01
+complex. Yeah, I'm just looking through all my threads here. Almost all of them are actually just two sentences. This
+37:07
+was a voice to text, which is why it's a bit longer and I need a little more context. What I wanted there. Yeah, for the most part, all of these are very
+37:13
+simple. Here's an example of me sharing a log screenshot instead of actually copy pasting logs cuz it's so much
+37:19
+easier to do. One more pro tip. When you have ideas that are a bit complex or the model struggles to understand it, don't
+37:25
+overexlain. Just give examples. The more simple an example you give that contains
+37:32
+the problem you're trying to solve, the better job the model will do at solving it. So this example I was trying to
+37:38
+discuss custom domain flows for LakeBed, which coming soon. I have a lot of layers to fix here to get it right. I
+37:44
+gave the example of I have a project on Lake Bed and gave it an actual URL to an actual lake bed project I had deployed.
+37:50
+I have a domain on Verscell T3.gg. I've configured a CNAME for lake bed demo T3gg where the value is this. What's the
+37:58
+best path to make this work? Handling SSL and whatnot. This is to tell it like specifically what my question is, like
+38:03
+what my where my problem is located. And then the goal as well. The goal is to be as easy as possible for our users
+38:10
+without massively ballooning costs. It's silly, but I think this is a great example of a prompt for something
+38:15
+complex. I said what I wanted. I gave it a very clear, concise example so it would understand exactly what I wanted
+38:22
+to do. And then I steered it towards the parts that I wanted the most help with and gave it specific goals in order to
+38:29
+keep it within my constraints. Gave me a bunch of info. It did not give me enough info about costs though, so I asked it
+38:34
+very specifically, give me a breakdown of all of the costs I would incur by going with your proposal. And then it
+38:40
+did exactly that. I didn't like the proposal. So I got more specific with an exact flow I would want the user to go
+38:47
+through. This example I say the user would run this command npx lake bed domains add demo 1.t3.gg. Then the CLI
+38:54
+would output to add the domain set the following records and you go set these records and I specify I would go and
+39:00
+assign those values wait for lake to pick up the change issue SSL and good to go. ask more questions for more clarification. But I really just use
+39:08
+this thread to figure out the how to do this. What I would normally do at the
+39:13
+end if I was ready to go with this is I would ask it to write down a simple plan based on what we discussed that I could
+39:19
+have as the markdown or the HTML plan that I would read, confirm, and then
+39:25
+hand off to a new thread to go actually build it. Once you actually get the model to start doing the work, one of
+39:30
+the most important things is to give it the tools it needs to verify that the work was done. This could be CLI
+39:36
+commands it can run. This could be a test suite it writes. This could be computer use where it actually goes to the page to see if it's correct or not.
+39:43
+This is one of the things I have found to be the best about using Codex. Their plugins and specifically the computer
+39:50
+use stuff that they have built is really really good. Codex's computer use will let Codeex control apps on your
+39:55
+computer. It'll let it control a full browser with an extension and it can even do it when the computer's locked
+40:01
+now, which is really, really cool. I've been blown away with how useful this is. My issue is that I don't like it working
+40:08
+on my computer cuz I want to use my computer when the agents are running. So, again, this is where the remote stuff got really nice. I've also noticed
+40:15
+that once you set these things up in the Codeex app that you can use them through the Codex CLI, which means you can use
+40:21
+them through T3 code. So I set up all the computer use stuff in the codeex app and then I went back to using T3 code
+40:27
+remotely and now my T3 code can verify changes by deploying an app on Lakebed
+40:32
+and then going to Lakebed to see if it actually deployed or not and make sure it behaves as expected. It's so powerful
+40:38
+and I found that it makes the likelihood that by the time the agent pings me that it's done that it actually did it
+40:43
+correctly is way higher. Throughout this whole project, I would say of the like 50 plus threads I've done, maybe four or
+40:51
+five of them didn't do what I wanted first try. The rest all behaved exactly how I expected them to and it worked
+40:58
+very well. And also to be very clear, I'm not using the new like goal skill feature thing inside of Codeex. It seems
+41:05
+really cool. It didn't work in the app for me when I tried it and I don't use the CLI a whole lot and certainly not
+41:11
+for these long running things. And most of the stuff I'm doing, even the stuff that seems really difficult, ends up
+41:17
+being done under 10 minutes, especially on fast mode. Here, I overhauled the runtime for anonymous deployments and it
+41:24
+took 7 minutes. Code Rabbit found issues, so I screenshotted the issues in the Code Rabbit PR, told it to fix them,
+41:31
+and it did. And then there was conflicts on Maine, so I told it there's conflicts with latest Maine. Please address them
+41:37
+and push up your changes when done. And then it did. And then I merged it. and
+41:42
+then it was good. If your takeaway so far is that this is surprisingly simple, you have the right takeaway. It's very
+41:48
+simple. The simpler your flow, the better. Do things the stupid easy way. And if it doesn't work, figure out how
+41:54
+to make it work. I want to talk a bit about my PR flow now, cuz I think this is important. When I start work, I
+42:02
+usually start it with a rough idea of how complex the change will be in my head. It varies a lot depending on what
+42:09
+I'm doing. Sometimes a task ends up being a lot more complex than I expected it to be. If I'm unsure of the complexity of the task, I'll usually
+42:15
+start by asking the model for its thoughts and we'll have that back and forth. When I have a good gut feel of
+42:21
+how big the change is, at that point, I'll often decide if it's worth doing on
+42:26
+the branch I'm currently on and in the work tree I'm currently on, or if I should go make a new work tree to finish
+42:32
+up this task. Sometimes once I'm halfway through the planning process, I realize
+42:37
+this is going to be a lot more work than expected. So I just copy the initial prompt. I go spin up a new thread in a
+42:42
+work tree. I paste that prompt with a couple additional steering comments to make sure it doesn't go down the bad
+42:47
+path I was going down earlier. This has worked very well for me. That said, in this project that I've done hundreds of
+42:54
+commits on, again, it's a solo project, so it is different in that sense. I have
+43:00
+not actually found myself reaching to make PRs that often and I even closed two of the ones that I made because I
+43:05
+didn't find myself needing it. when I made big enough changes that I really wanted to sit with and get second
+43:11
+opinions on, things that are security related, things that change the hosting layer, thinking through what changes
+43:19
+need extra eyes, not just like a human looking at it, but other agents or code review tools looking at it, like
+43:25
+building the intuition for what changes would benefit from that is really important. And sometimes you'll put up
+43:32
+the PR and something like code rabbit, macroscope, grapile, whatever you're using will catch a bunch of issues and
+43:38
+then you tell the agent to fix them and it does and then it catches more. At that point, I'll just tell the agent to
+43:44
+run in a loop until it resolves all of the issues. Usually using something like the CLI for code rev, which has been
+43:50
+very helpful for this type of thing. I had two or so of these where there were just so many pieces of feedback that I
+43:56
+didn't want to keep copy pasting back and forth or telling the agent go check the PR again over and over and instead
+44:01
+just told it run the CLI until you don't get any feedback. And that worked great. That ended up working specifically for a
+44:07
+lot of the ownership stuff that I was trying to get right with this project. That said, in real projects with lots of
+44:14
+developers, you're gonna start running into problems with PR bloat, especially, and this is one of the coolest, but also
+44:20
+the most painful things in a tool like T3 Code. We made it a bit too easy to make a PR. You can spin up a new thread,
+44:27
+make changes, and then click one button to commit them, branch them, PR them.
+44:32
+Super nice when you're using PRs as an artifact for review. Not so nice when you're accidentally spamming your
+44:39
+projects with a bunch of PRs that'll never merge. I do love the one-click. I file a lot more PRs when I have that
+44:44
+feature. Getting a good workflow in codeex for turning your changes into a PR was annoying. So yeah, this was very
+44:51
+very helpful. But sometimes those PRs will just sit around and you don't know
+44:57
+if they're worth merging or not anymore or even looking at. I've had that happen a few times even solo on this. And again, bring in the agent. I noticed one
+45:04
+of my branches kind of got stale and had a lot of conflicts. So I brought this branch up in a new thread. I asked how
+45:10
+up to date is the theo/aban overhaul branch. Compare against the latest main. If these changes are still worth
+45:16
+merging, fix the conflicts and push up the finished branch. It inspected it. The work tree is clean and currently on
+45:21
+a local helper branch branch is significantly behind. It has 49 commits not in this while the admin overhaul has
+45:27
+two commits on a main diff concentrated reading the changes. And at the end here it said after
+45:33
+inspecting both sides the branch's useful works already been superseded on main. Maine already has the admin user
+45:39
+detail route. This route user detail UI and smokeote coverage for the admin user shell API. Board of the merge and did
+45:45
+not push because pushing a fixed branch would just add noise for changes that are already represented in newer forms on main. Recommendation close and
+45:51
+delete. Awesome. Generally it is important to try and keep PRs from getting too stale because it gets really
+45:58
+bad really fast. Take it from us with 414 open PRs on T3 Code right now. It
+46:05
+gets bad. I think I covered everything I have to here. I know this video is a bit chaotic, but I kind of just wanted to
+46:11
+show you the chaos. What does it actually look like with real projects I'm working on? That's why I showed you
+46:17
+the actual threads that I was using to build real projects that I'm deploying now. I've never been happier with my
+46:23
+flow, which means it's probably all about to change again. And I'll be sure to do another updated video if these things shift over time. But for now,
+46:30
+just try to keep it simple. I find most developers are trying too hard to
+46:35
+engineer their workflows. And I get that. I love engineering my stuff, too. But generally speaking, keeping it
+46:42
+simpler makes things much better. And the fact that I have made my set of tools here and my way of thinking about
+46:48
+things here so simple has made me way, way more productive as a result. And
+46:54
+while I do dearly love T3 Code and what it enables for me, especially around the remote stuff, the Codeex app is fine.
+47:00
+Just like stop using sidebars in your IDEs, guys. Stop using CLI. Stop using
+47:05
+these things that make it too hard to just start a new thread or start working on a new change. If you're looking at
+47:12
+the code more than you're looking at the conversation about the code, you're already behind. It's time for us all to
+47:19
+let go a little bit and try to build the way the AI is strongest, which is with a good conversation that builds the right
+47:25
+context for the model to go do the right thing. I know this is a bit different and I really hope it was helpful for y'all. Let me know how you guys feel.
+47:31
+And until next time, peace nerds.

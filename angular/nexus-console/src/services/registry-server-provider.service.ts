@@ -290,7 +290,7 @@ export class RegistryServerProvider implements TreeProvider {
 
             const baseUrl = this.getBaseUrl(profile);
             try {
-                const url = `${baseUrl}/api/v1/categories`;
+                const url = `${baseUrl}/api/v1/categories?size=1000`;
                 const response = await firstValueFrom(this.http.get<any>(url));
                 const items: any[] = Array.isArray(response) ? response : (response.data || []);
 
@@ -552,12 +552,12 @@ export class RegistryServerProvider implements TreeProvider {
                 baseUrl = baseUrl.slice(0, -1);
             }
 
-            const servicesUrl = `${baseUrl}/api/v1/services?size=100`;
+            const servicesUrl = `${baseUrl}/api/v1/services?size=1000`;
             const servicesResponseRaw = await firstValueFrom(this.http.get<any>(servicesUrl));
             const servicesResponse: ServiceInstance[] = Array.isArray(servicesResponseRaw) ? servicesResponseRaw : (servicesResponseRaw.data || []);
 
             // Fetch deployments to get the health status
-            const deploymentsUrl = `${baseUrl}/api/v1/deployments`;
+            const deploymentsUrl = `${baseUrl}/api/v1/deployments?size=1000`;
             const deploymentsResponseRaw = await firstValueFrom(this.http.get<any>(deploymentsUrl));
             const deploymentsResponse: Deployment[] = Array.isArray(deploymentsResponseRaw) ? deploymentsResponseRaw : (deploymentsResponseRaw.data || []);
 
@@ -639,7 +639,7 @@ export class RegistryServerProvider implements TreeProvider {
             }
 
             // Fetch deployments to determine health status for each sub-module
-            const deploymentsUrl = `${baseUrl}/api/v1/deployments`;
+            const deploymentsUrl = `${baseUrl}/api/v1/deployments?size=1000`;
             let deploymentsResponse: Deployment[] = [];
             try {
                 const depsRaw = await firstValueFrom(this.http.get<any>(deploymentsUrl));

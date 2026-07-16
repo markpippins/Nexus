@@ -68,6 +68,10 @@ export class ArchitectureVizService {
     public readonly viewMode = signal<ViewMode>('auto');
     private savedCameraState: { pos: THREE.Vector3; target: THREE.Vector3; controlsEnabled: boolean } | null = null;
 
+    // Camera transition animation state (smooth lerp instead of instant jump)
+    private cameraTransitionTarget: { pos: THREE.Vector3; lookAt: THREE.Vector3 } | null = null;
+    private cameraTransitionOnComplete: (() => void) | null = null;
+
     // Dragging State
     private isDragging = false;
     private dragPlane = new THREE.Plane();
@@ -267,6 +271,10 @@ export class ArchitectureVizService {
     public setViewMode(mode: ViewMode): void {
         this.viewMode.set(mode);
 
+        // Cancel any active camera transition
+        this.cameraTransitionTarget = null;
+        this.cameraTransitionOnComplete = null;
+
         // Reset saved camera state if switching away from auto
         if (mode !== 'auto') {
             this.savedCameraState = null;
@@ -314,48 +322,56 @@ export class ArchitectureVizService {
         return { min, max };
     }
 
-    /** Switch the camera to a 2D orthographic top-down view of the current scene. */
-    public switchTo2D(): void {
+    /** Switch the camera to a 2D orthographic top-down view of the clicked node. */
+    public switchTo2D(nodeWorldPos?: THREE.Vector3): void {
         if (!this.camera || !this.controls) return;
 
-        // Save current 3D camera state so we can return to it
-        this.savedCameraState = {
-            pos: this.camera.position.clone(),
-            target: (this.controls as any).target.clone(),
-            controlsEnabled: this.controls.enabled
-        };
+        // Save current 3D camera state only on first entry to 2D (don't overwrite mid-transition)
+        if (!this.savedCameraState) {
+            this.savedCameraState = {
+                pos: this.camera.position.clone(),
+                target: (this.controls as any).target.clone(),
+                controlsEnabled: this.controls.enabled
+            };
+        }
 
-        // Compute scene bounds to frame all nodes
+        // Compute scene bounds
         const bounds = this.computeNodeBounds();
-        const center = new THREE.Vector3(
-            (bounds.min.x + bounds.max.x) / 2,
-            0,
-            (bounds.min.z + bounds.max.z) / 2
-        );
+        const centerX = nodeWorldPos ? nodeWorldPos.x : (bounds.min.x + bounds.max.x) / 2;
+        const centerZ = nodeWorldPos ? nodeWorldPos.z : (bounds.min.z + bounds.max.z) / 2;
 
-        // Position camera looking straight down
+        // Position camera looking straight down, centered on clicked node
         const dist = Math.max(
             bounds.max.x - bounds.min.x,
             bounds.max.z - bounds.min.z,
             10
         ) * 1.2;
-        this.camera.position.set(center.x, dist, center.z);
-        (this.controls as any).target.copy(center);
-        this.controls.enabled = false;
-        this.controls.update();
-        this.renderer.domElement.style.cursor = 'default';
+
+        this.cameraTransitionTarget = {
+            pos: new THREE.Vector3(centerX, dist, centerZ),
+            lookAt: new THREE.Vector3(centerX, 0, centerZ)
+        };
+        this.cameraTransitionOnComplete = () => {
+            this.controls.enabled = false;
+            this.renderer.domElement.style.cursor = 'default';
+        };
+        this.controls.enabled = false; // Disable during transition
     }
 
-    /** Restore the camera to the last saved 3D perspective state. */
+    /** Restore the camera to the last saved 3D perspective state (with smooth transition). */
     public switchTo3D(): void {
         if (!this.savedCameraState || !this.camera || !this.controls) return;
 
-        this.camera.position.copy(this.savedCameraState.pos);
-        (this.controls as any).target.copy(this.savedCameraState.target);
-        this.controls.enabled = this.savedCameraState.controlsEnabled;
-        this.controls.update();
-        this.renderer.domElement.style.cursor = this.controls.enabled ? 'grab' : 'default';
-        this.savedCameraState = null;
+        const restoreEnabled = this.savedCameraState.controlsEnabled;
+        this.cameraTransitionTarget = {
+            pos: this.savedCameraState.pos.clone(),
+            lookAt: this.savedCameraState.target.clone()
+        };
+        this.cameraTransitionOnComplete = () => {
+            this.controls.enabled = restoreEnabled;
+            this.renderer.domElement.style.cursor = restoreEnabled ? 'grab' : 'default';
+            this.savedCameraState = null;
+        };
     }
 
     public exportScene(): object {
@@ -718,12 +734,13 @@ export class ArchitectureVizService {
         if (this.viewMode() === 'auto') {
             const intersects = this.raycast(event);
             if (intersects.length > 0) {
-                // Node clicked → select and switch to 2D
+                // Node clicked → select and smoothly transition to 2D top-down view
                 const id = intersects[0].object.userData['id'];
+                const nodeWorldPos = intersects[0].object.position.clone();
                 this.selectNode(id);
-                this.switchTo2D();
+                this.switchTo2D(nodeWorldPos);
             } else {
-                // Empty canvas clicked → switch back to 3D
+                // Empty canvas clicked → smoothly return to 3D
                 this.deselect();
                 this.switchTo3D();
             }
@@ -895,6 +912,28 @@ export class ArchitectureVizService {
 
         // Keep connections in sync with floating nodes
         this.updateAllConnections();
+
+        // Smooth camera transition (lerp to target for 2D/3D switch)
+        if (this.cameraTransitionTarget) {
+            const target = this.cameraTransitionTarget;
+            const lerpFactor = 0.08;
+
+            this.camera.position.lerp(target.pos, lerpFactor);
+            (this.controls as any).target.lerp(target.lookAt, lerpFactor);
+            this.controls.update();
+
+            // Check if we're close enough to snap
+            if (this.camera.position.distanceTo(target.pos) < 0.5) {
+                this.camera.position.copy(target.pos);
+                (this.controls as any).target.copy(target.lookAt);
+                this.controls.update();
+                this.cameraTransitionTarget = null;
+                if (this.cameraTransitionOnComplete) {
+                    this.cameraTransitionOnComplete();
+                    this.cameraTransitionOnComplete = null;
+                }
+            }
+        }
 
         this.renderer.render(this.scene, this.camera);
         this.labelRenderer.render(this.scene, this.camera);

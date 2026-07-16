@@ -28,6 +28,7 @@ UI_NAMES=(
     "tackle-ui"
     "nebula-ui"
     "duality-ui"
+    "plurality-ui"
     "nexus-assembly"
     "cascade-ui"
     "view-architect"
@@ -60,6 +61,10 @@ UI_PORTS[nexus-assembly]=9003
 UI_PATHS[cascade-ui]="nexus/angular/cascade-ui"
 UI_COMMANDS[cascade-ui]="npm start"
 UI_PORTS[cascade-ui]=4203
+
+UI_PATHS[plurality-ui]="nexus/angular/plurality-ui"
+UI_COMMANDS[plurality-ui]="npm run dev"
+UI_PORTS[plurality-ui]=3004
 
 UI_PATHS[view-architect]="nexus/angular/view-architect"
 UI_COMMANDS[view-architect]="npm run dev"

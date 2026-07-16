@@ -408,7 +408,7 @@ export class ServiceMeshService {
 
   private async fetchFrameworks(baseUrl: string): Promise<Framework[]> {
     try {
-      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/frameworks`));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/frameworks?size=1000`));
       return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];
@@ -417,7 +417,7 @@ export class ServiceMeshService {
 
   private async fetchServices(baseUrl: string): Promise<ServiceInstance[]> {
     try {
-      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/services`));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/services?size=1000`));
       const services = Array.isArray(response) ? response : (response.data || []);
       console.log('[ServiceMeshService] Fetched services from /api/v1/services:', services.length);
       console.log('[ServiceMeshService] Service names from /api/v1/services:', services.map((s: any) => s.name));
@@ -434,7 +434,7 @@ export class ServiceMeshService {
    */
   private async fetchServicesWithHosted(baseUrl: string): Promise<ServiceWithHosted[]> {
     try {
-      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/registry/services/with-hosted`));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/registry/services/with-hosted?size=1000`));
       const services: ServiceWithHosted[] = Array.isArray(response) ? response : (response.data || []);
       console.log('[ServiceMeshService] Fetched services with hosted:', services.length);
       services.forEach(s => {
@@ -452,7 +452,7 @@ export class ServiceMeshService {
 
   private async fetchHosts(baseUrl: string): Promise<any[]> {
     try {
-      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/servers`));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/servers?size=1000`));
       return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];
@@ -461,7 +461,7 @@ export class ServiceMeshService {
 
   private async fetchDeployments(baseUrl: string): Promise<Deployment[]> {
     try {
-      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/deployments`));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/deployments?size=1000`));
       const deployments: Deployment[] = Array.isArray(response) ? response : (response.data || []);
 
       console.log('[ServiceMeshService] Fetched deployments:', deployments.length);
@@ -511,7 +511,7 @@ export class ServiceMeshService {
         lastHeartbeat?: string;
       }
 
-      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/status`));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/status?size=1000`));
       const statuses: ServiceStatusResponse[] = Array.isArray(response) ? response : (response.data || []);
 
       console.log('[ServiceMeshService] Raw /api/v1/status response:', statuses);
@@ -557,7 +557,7 @@ export class ServiceMeshService {
 
   private async fetchDependencies(baseUrl: string): Promise<ServiceDependency[]> {
     try {
-      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/dependencies`));
+      const response = await firstValueFrom(this.http.get<any>(`${baseUrl}/api/v1/dependencies?size=1000`));
       return Array.isArray(response) ? response : (response.data || []);
     } catch {
       return [];

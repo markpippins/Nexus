@@ -23,12 +23,16 @@ import { RolesService, Role } from './roles.service';
         <h3>{{ editingRole ? 'Edit Role' : 'Add Role' }}</h3>
         <div class="form-row">
           <input
+            id="role-name-input"
+            name="roleName"
             type="text"
             placeholder="Role name (e.g. engineer)"
             [(ngModel)]="newName"
             [disabled]="!!editingRole"
           />
           <input
+            id="role-description-input"
+            name="roleDescription"
             type="text"
             placeholder="Description"
             [(ngModel)]="newDescription"

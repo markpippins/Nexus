@@ -86,7 +86,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/services`;
+            const url = `${baseUrl}/api/v1/services?size=1000`;
             const response = await firstValueFrom(this.http.get<PagedResponse<ServiceInstance>>(url));
             return response.data;
         } catch (e) {
@@ -144,7 +144,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/frameworks`;
+            const url = `${baseUrl}/api/v1/frameworks?size=1000`;
             const response = await firstValueFrom(this.http.get<PagedResponse<Framework>>(url));
             return response.data;
         } catch (e) {
@@ -202,7 +202,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/deployments`;
+            const url = `${baseUrl}/api/v1/deployments?size=1000`;
             const response = await firstValueFrom(this.http.get<PagedResponse<Deployment>>(url));
             return response.data;
         } catch (e) {
@@ -260,7 +260,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/servers`;
+            const url = `${baseUrl}/api/v1/servers?size=1000`;
             const response = await firstValueFrom(this.http.get<PagedResponse<Server>>(url));
             return response.data;
         } catch (e) {
@@ -317,7 +317,7 @@ export class PlatformManagementService {
     async getLookup(baseUrl: string, type: string): Promise<LookupItem[]> {
         const endpoint = this.getLookupEndpoint(type);
         try {
-            const url = `${baseUrl}/api/v1/${endpoint}`;
+            const url = `${baseUrl}/api/v1/${endpoint}?size=1000`;
             const response = await firstValueFrom(this.http.get<PagedResponse<LookupItem>>(url));
             return response.data;
         } catch (e) {
@@ -392,7 +392,7 @@ export class PlatformManagementService {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/libraries`;
+            const url = `${baseUrl}/api/v1/libraries?size=1000`;
             const response = await firstValueFrom(this.http.get<PagedResponse<Library>>(url));
             return response.data;
         } catch (e) {
@@ -458,7 +458,7 @@ export class PlatformManagementService {
     // Visual Components CRUD
     async getVisualComponents(baseUrl: string): Promise<ComponentConfig[]> {
         try {
-            const url = `${baseUrl}/api/v1/visual-components`;
+            const url = `${baseUrl}/api/v1/visual-components?size=1000`;
             const response = await firstValueFrom(this.http.get<PagedResponse<ComponentConfig>>(url));
             return response.data;
         } catch (e) {
