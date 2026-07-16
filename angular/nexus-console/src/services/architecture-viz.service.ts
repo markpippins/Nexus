@@ -9,7 +9,7 @@ import { ComponentRegistryService } from './component-registry.service.js';
 
 export type { NodeType } from '../models/component-config.js';
 
-export type ViewMode = 'camera' | 'auto' | 'edit';
+export type ViewMode = 'camera' | 'edit';
 
 export interface NodeData {
     id: string;
@@ -65,12 +65,7 @@ export class ArchitectureVizService {
     private interactionMode: 'camera' | 'edit' = 'camera';
 
     // View Mode (3-way: camera | auto | edit)
-    public readonly viewMode = signal<ViewMode>('auto');
-    private savedCameraState: { pos: THREE.Vector3; target: THREE.Vector3; controlsEnabled: boolean } | null = null;
-
-    // Camera transition animation state (smooth lerp instead of instant jump)
-    private cameraTransitionTarget: { pos: THREE.Vector3; lookAt: THREE.Vector3 } | null = null;
-    private cameraTransitionOnComplete: (() => void) | null = null;
+    public readonly viewMode = signal<ViewMode>('camera');
 
     // Dragging State
     private isDragging = false;
@@ -89,6 +84,8 @@ export class ArchitectureVizService {
     public selectedNodeData: WritableSignal<NodeData | null> = signal(null);
     public allNodes: WritableSignal<NodeData[]> = signal([]);
     public nodeDoubleClicked = new Subject<string>();
+    public nodePositionChanged = new Subject<string>(); // emits node ID when position changes (drag end or updateNode)
+    public cameraChanged = new Subject<void>(); // emits when orbit controls stop moving
     public modeSignal: WritableSignal<'camera' | 'edit'> = signal('camera');
     public webglError: WritableSignal<string | null> = signal(null);
 
@@ -174,6 +171,7 @@ export class ArchitectureVizService {
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
+        this.controls.addEventListener('end', () => this.cameraChanged.next());
 
         // 6. Lights
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -199,6 +197,15 @@ export class ArchitectureVizService {
         this.renderer.domElement.addEventListener('pointermove', (e) => this.onPointerMove(e));
         this.renderer.domElement.addEventListener('pointerup', (e) => this.onPointerUp(e));
         this.renderer.domElement.addEventListener('dblclick', (e) => this.onDoubleClick(e));
+
+        // Middle-click (mousewheel click) toggles between Camera and Edit modes
+        this.renderer.domElement.addEventListener('auxclick', (e) => {
+            if (e.button === 1) {
+                e.preventDefault();
+                const newMode: ViewMode = this.viewMode() === 'camera' ? 'edit' : 'camera';
+                this.setViewMode(newMode);
+            }
+        });
 
         // 9. Start Loop
         // this.loadDefaultScene(); // Disabled automatic demo loading. Driven by ServiceGraphComponent inputs.
@@ -264,21 +271,52 @@ export class ArchitectureVizService {
         this.controls.update();
     }
 
-    public setMode(mode: 'camera' | 'edit') {
+    /** Get current camera position (clone — safe to mutate). */
+    public getCameraPosition(): THREE.Vector3 {
+        return this.camera ? this.camera.position.clone() : new THREE.Vector3(-20, 40, 120);
+    }
+
+    /** Get current orbit controls target (clone — safe to mutate). */
+    public getCameraTarget(): THREE.Vector3 {
+        if (this.controls) {
+            return (this.controls as any).target.clone();
+        }
+        return new THREE.Vector3(0, 15, 0);
+    }
+
+    /** Set camera position + target immediately (no animation). */
+    public setCameraState(pos: THREE.Vector3, target: THREE.Vector3): void {
+        if (!this.camera || !this.controls) return;
+        this.camera.position.copy(pos);
+        (this.controls as any).target.copy(target);
+        this.camera.lookAt(this.controls.target);
+        this.controls.update();
+    }
+
+    /** Move a node and persist its position in savedPositions. */
+    public setNodePosition(id: string, x: number, y: number, z: number): void {
+        const node = this.nodes.get(id);
+        if (!node) return;
+        node.mesh.position.set(x, y, z);
+        node.data.position = { x, y, z };
+        this.savedPositions.set(id, { x, y, z });
+    }
+
+    /** Get all node positions (current live positions, not just saved). */
+    public getAllNodePositions(): Map<string, { x: number; y: number; z: number }> {
+        const result = new Map<string, { x: number; y: number; z: number }>();
+        this.nodes.forEach((node, id) => {
+            result.set(id, { ...node.data.position });
+        });
+        return result;
+    }
+
+    public setMode(mode: ViewMode) {
         this.setViewMode(mode);
     }
 
     public setViewMode(mode: ViewMode): void {
         this.viewMode.set(mode);
-
-        // Cancel any active camera transition
-        this.cameraTransitionTarget = null;
-        this.cameraTransitionOnComplete = null;
-
-        // Reset saved camera state if switching away from auto
-        if (mode !== 'auto') {
-            this.savedCameraState = null;
-        }
 
         if (mode === 'camera') {
             this.interactionMode = 'camera';
@@ -286,92 +324,11 @@ export class ArchitectureVizService {
             this.controls.enabled = true;
             this.renderer.domElement.style.cursor = 'grab';
             this.deselect();
-        } else if (mode === 'auto') {
-            // Auto mode: start in 3D with orbit controls, default cursor
-            this.interactionMode = 'camera';
-            this.modeSignal.set('camera');
-            this.controls.enabled = true;
-            this.renderer.domElement.style.cursor = 'default';
-            this.deselect();
         } else if (mode === 'edit') {
             this.setInteractionMode('edit');
         }
 
         this.updateAllConnections();
-    }
-
-    /** Compute bounding box of all graph nodes. */
-    private computeNodeBounds(): { min: THREE.Vector3; max: THREE.Vector3 } {
-        const min = new THREE.Vector3(Infinity, Infinity, Infinity);
-        const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
-        this.nodes.forEach(node => {
-            const pos = node.mesh.position;
-            min.x = Math.min(min.x, pos.x);
-            min.y = Math.min(min.y, pos.y);
-            min.z = Math.min(min.z, pos.z);
-            max.x = Math.max(max.x, pos.x);
-            max.y = Math.max(max.y, pos.y);
-            max.z = Math.max(max.z, pos.z);
-        });
-        if (this.nodes.size === 0) {
-            return {
-                min: new THREE.Vector3(-10, 0, -10),
-                max: new THREE.Vector3(10, 0, 10)
-            };
-        }
-        return { min, max };
-    }
-
-    /** Switch the camera to a 2D orthographic top-down view of the clicked node. */
-    public switchTo2D(nodeWorldPos?: THREE.Vector3): void {
-        if (!this.camera || !this.controls) return;
-
-        // Save current 3D camera state only on first entry to 2D (don't overwrite mid-transition)
-        if (!this.savedCameraState) {
-            this.savedCameraState = {
-                pos: this.camera.position.clone(),
-                target: (this.controls as any).target.clone(),
-                controlsEnabled: this.controls.enabled
-            };
-        }
-
-        // Compute scene bounds
-        const bounds = this.computeNodeBounds();
-        const centerX = nodeWorldPos ? nodeWorldPos.x : (bounds.min.x + bounds.max.x) / 2;
-        const centerZ = nodeWorldPos ? nodeWorldPos.z : (bounds.min.z + bounds.max.z) / 2;
-
-        // Position camera looking straight down, centered on clicked node
-        const dist = Math.max(
-            bounds.max.x - bounds.min.x,
-            bounds.max.z - bounds.min.z,
-            10
-        ) * 1.2;
-
-        this.cameraTransitionTarget = {
-            pos: new THREE.Vector3(centerX, dist, centerZ),
-            lookAt: new THREE.Vector3(centerX, 0, centerZ)
-        };
-        this.cameraTransitionOnComplete = () => {
-            this.controls.enabled = false;
-            this.renderer.domElement.style.cursor = 'default';
-        };
-        this.controls.enabled = false; // Disable during transition
-    }
-
-    /** Restore the camera to the last saved 3D perspective state (with smooth transition). */
-    public switchTo3D(): void {
-        if (!this.savedCameraState || !this.camera || !this.controls) return;
-
-        const restoreEnabled = this.savedCameraState.controlsEnabled;
-        this.cameraTransitionTarget = {
-            pos: this.savedCameraState.pos.clone(),
-            lookAt: this.savedCameraState.target.clone()
-        };
-        this.cameraTransitionOnComplete = () => {
-            this.controls.enabled = restoreEnabled;
-            this.renderer.domElement.style.cursor = restoreEnabled ? 'grab' : 'default';
-            this.savedCameraState = null;
-        };
     }
 
     public exportScene(): object {
@@ -537,6 +494,33 @@ export class ArchitectureVizService {
             case 'icosahedron': geometry = new THREE.IcosahedronGeometry(1); break;
             case 'box': geometry = new THREE.BoxGeometry(1, 1, 1); break;
             case 'tall-cylinder': geometry = new THREE.CylinderGeometry(0.8, 0.8, 3, 32); break;
+            case 'dodecahedron': geometry = new THREE.DodecahedronGeometry(1); break;
+            case 'cone': geometry = new THREE.ConeGeometry(0.7, 1.5, 32); break;
+            case 'tetrahedron': geometry = new THREE.TetrahedronGeometry(1); break;
+            case 'capsule': geometry = new THREE.CapsuleGeometry(0.5, 1, 8, 16); break;
+            case 'torus-knot': geometry = new THREE.TorusKnotGeometry(0.7, 0.2, 100, 16); break;
+            case 'ring': geometry = new THREE.TorusGeometry(0.7, 0.3, 16, 40); break;
+            case 'lathe': {
+                const points = [];
+                for (let i = 0; i <= 10; i++) {
+                    const t = i / 10;
+                    const r = 0.5 + Math.sin(t * Math.PI) * 0.3;
+                    points.push(new THREE.Vector2(r, t * 2 - 1));
+                }
+                geometry = new THREE.LatheGeometry(points, 32);
+                break;
+            }
+            case 'tube': {
+                const curvePoints = [];
+                for (let i = 0; i <= 32; i++) {
+                    const t = i / 32;
+                    const angle = t * Math.PI * 2;
+                    curvePoints.push(new THREE.Vector3(Math.cos(angle) * 0.5, t * 2 - 1, Math.sin(angle) * 0.5));
+                }
+                const curve = new (THREE as any).CatmullRomCurve3(curvePoints);
+                geometry = new THREE.TubeGeometry(curve, 64, 0.15, 8, false);
+                break;
+            }
             default: geometry = new THREE.BoxGeometry(1, 1, 1);
         }
         const material = new THREE.MeshPhongMaterial({
@@ -584,6 +568,9 @@ export class ArchitectureVizService {
 
         if (updates.position) {
             node.mesh.position.set(updates.position.x, updates.position.y, updates.position.z);
+            node.data.position = updates.position;
+            this.savedPositions.set(id, updates.position);
+            this.nodePositionChanged.next(id);
             // Connections will be updated in the next frame of animate loop
         }
 
@@ -730,23 +717,6 @@ export class ArchitectureVizService {
     private onPointerDown(event: PointerEvent) {
         if (event.button !== 0) return; // Only Left Click
 
-        // Auto mode: click-to-toggle between 2D and 3D views
-        if (this.viewMode() === 'auto') {
-            const intersects = this.raycast(event);
-            if (intersects.length > 0) {
-                // Node clicked → select and smoothly transition to 2D top-down view
-                const id = intersects[0].object.userData['id'];
-                const nodeWorldPos = intersects[0].object.position.clone();
-                this.selectNode(id);
-                this.switchTo2D(nodeWorldPos);
-            } else {
-                // Empty canvas clicked → smoothly return to 3D
-                this.deselect();
-                this.switchTo3D();
-            }
-            return;
-        }
-
         const intersects = this.raycast(event);
 
         if (intersects.length > 0) {
@@ -817,6 +787,7 @@ export class ArchitectureVizService {
             if (node) {
                 this.selectedNodeData.set({ ...node.data }); // Trigger UI update
                 this.updateAllNodesSignal();
+                this.nodePositionChanged.next(this.draggedNodeId);
             }
 
             this.isDragging = false;
@@ -912,28 +883,6 @@ export class ArchitectureVizService {
 
         // Keep connections in sync with floating nodes
         this.updateAllConnections();
-
-        // Smooth camera transition (lerp to target for 2D/3D switch)
-        if (this.cameraTransitionTarget) {
-            const target = this.cameraTransitionTarget;
-            const lerpFactor = 0.08;
-
-            this.camera.position.lerp(target.pos, lerpFactor);
-            (this.controls as any).target.lerp(target.lookAt, lerpFactor);
-            this.controls.update();
-
-            // Check if we're close enough to snap
-            if (this.camera.position.distanceTo(target.pos) < 0.5) {
-                this.camera.position.copy(target.pos);
-                (this.controls as any).target.copy(target.lookAt);
-                this.controls.update();
-                this.cameraTransitionTarget = null;
-                if (this.cameraTransitionOnComplete) {
-                    this.cameraTransitionOnComplete();
-                    this.cameraTransitionOnComplete = null;
-                }
-            }
-        }
 
         this.renderer.render(this.scene, this.camera);
         this.labelRenderer.render(this.scene, this.camera);

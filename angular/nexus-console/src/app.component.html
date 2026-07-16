@@ -25,6 +25,7 @@
         [viewMode]="currentViewMode()"
         [meshViewMode]="meshViewMode()"
         [graphSubView]="graphSubView()"
+        [showRunningOnly]="showRunningOnly()"
         (pathChange)="onSidebarNavigation($event)"
         (refreshTree)="loadFolderTree()"
         (loadChildren)="onLoadChildren($event)"
@@ -32,6 +33,7 @@
         (bookmarkDropped)="onBookmarkDroppedOnSidebar($event)"
         (meshViewModeChange)="onMeshViewModeChange($event)"
         (refreshServices)="onRefreshServices()"
+        (collapsePalette)="onCollapsePalette()"
         (localConfigMenuClick)="openLocalConfigDialog()"
         (importClick)="isImportDialogOpen.set(true)"
         (exportClick)="isExportDialogOpen.set(true)"
@@ -212,7 +214,7 @@
         }
 
         <!-- Top toolbar removed — navigation is now in app-bottom-bar -->
-        @if (!isFullScreenMode()) {
+        @if (!isFullScreenMode() && !(currentViewMode() === 'service-mesh' && meshViewMode() === 'graph')) {
         <app-toolbar
           [viewMode]="currentViewMode()"
           [meshViewMode]="meshViewMode()"
@@ -408,8 +410,11 @@
                     <app-service-mesh
                       [meshViewMode]="meshViewMode()"
                       [graphSubView]="graphSubView()"
+                      [paletteCollapsed]="paletteCollapsed()"
+                      [(showRunningOnly)]="showRunningOnly"
                       (viewModeChange)="onMeshViewModeChange($event)"
                       (graphSubViewChange)="onGraphSubViewChange($event)"
+                      (refreshServices)="onRefreshServices()"
                     ></app-service-mesh>
                   } @else if (isIframeMode()) {
                     <app-iframe-view [src]="viewModeUrls[currentViewMode()]"></app-iframe-view>

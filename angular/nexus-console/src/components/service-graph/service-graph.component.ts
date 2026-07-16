@@ -2,6 +2,7 @@ import {
   Component,
   input,
   output,
+  model,
   effect,
   signal,
   AfterViewInit,
@@ -23,6 +24,8 @@ import {
 import { ArchitectureVizService, NodeData } from '../../services/architecture-viz.service.js';
 import { ComponentRegistryService } from '../../services/component-registry.service.js';
 import { NodeType } from '../../models/component-config.js';
+import { AtlasService } from '../../services/atlas.service.js';
+import * as THREE from 'three';
 
 @Component({
   selector: 'app-service-graph',
@@ -37,14 +40,21 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   dependencies = input<ServiceDependency[]>([]);
   deployments = input<Deployment[]>([]);
   showInternalPanels = input(true); // When false, hide internal palette and inspector sidebars
+  graphSubView = input<'canvas' | 'creator'>('canvas');
+  paletteCollapsed = input(false);
+  showRunningOnly = model(false);
+
+  // Outputs
   selectedNode = output<ServiceInstance>();
+  graphSubViewChange = output<'canvas' | 'creator'>();
+  refreshServices = output<void>();
 
   @ViewChild('canvasContainer') canvasContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('labelInput') labelInput!: ElementRef<HTMLInputElement>;
-  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   private vizService = inject(ArchitectureVizService);
   private registry = inject(ComponentRegistryService);
+  private atlas = inject(AtlasService);
 
   // UI Panels
   isPaletteOpen = signal(true);
@@ -126,7 +136,11 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Connection Form
   selectedTargetId = '';
 
+  // Load View Dialog
+  showLoadDialog = signal(false);
+
   private sub = new Subscription();
+  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     // Sync Services Input to Graph
@@ -218,6 +232,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         this.vizService.connectNodes(String(dep.sourceServiceId), String(dep.targetServiceId));
       });
 
+      // Try to load the default graph view for camera + position overrides
+      this.loadDefaultView();
+
     }, { allowSignalWrites: true });
 
     // Sync Selected Node to Form (Inspector)
@@ -249,6 +266,46 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         if (this.labelInput) this.labelInput.nativeElement.focus();
       }, 50);
     }));
+
+    // Watch for view load requests from toolbar
+    effect(() => {
+      const viewId = this.atlas.loadRequested();
+      if (viewId !== null) {
+        this.loadView(viewId);
+        this.atlas.loadRequested.set(null);
+      }
+    }, { allowSignalWrites: true });
+
+    // Watch for save requests from toolbar
+    effect(() => {
+      const name = this.atlas.saveRequested();
+      if (name !== null) {
+        this.saveCurrentView(name);
+        this.atlas.saveRequested.set(null);
+      }
+    }, { allowSignalWrites: true });
+
+    // Watch for palette collapse toggle from sidebar
+    effect(() => {
+      const collapsed = this.paletteCollapsed();
+      this.isPaletteOpen.set(!collapsed);
+    }, { allowSignalWrites: true });
+
+    // Auto-save after position or camera changes (debounced 500ms)
+    const scheduleAutoSave = () => {
+      if (this.atlas.selectedViewId() === null) return; // no view loaded yet
+      if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+      this.autoSaveTimer = setTimeout(() => {
+        const currentId = this.atlas.selectedViewId();
+        if (currentId === null) return;
+        const existingView = this.atlas.views().find(v => v.id === currentId);
+        if (!existingView?.name) return; // skip if views list is stale
+        this.saveCurrentView(existingView.name).catch(e => console.error('Auto-save failed', e));
+      }, 500);
+    };
+
+    this.sub.add(this.vizService.nodePositionChanged.subscribe(() => scheduleAutoSave()));
+    this.sub.add(this.vizService.cameraChanged.subscribe(() => scheduleAutoSave()));
   }
 
   ngAfterViewInit() {
@@ -259,6 +316,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
     this.vizService.dispose();
     this.sub.unsubscribe();
   }
@@ -316,7 +374,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // --- Actions ---
 
-  setMode(mode: 'camera' | 'auto' | 'edit') {
+  setMode(mode: 'camera' | 'edit') {
     this.vizService.setViewMode(mode);
   }
 
@@ -333,6 +391,78 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
     // Auto switch to edit mode when adding so they can move it
     this.setMode('edit');
+  }
+
+  // --- Graph Views (Atlas) ---
+
+  async loadView(id: number): Promise<void> {
+    try {
+      const view = await this.atlas.getById(id);
+      this.atlas.selectedViewId.set(id);
+
+      // Apply camera state
+      this.vizService.setCameraState(
+        new THREE.Vector3(view.cameraPositionX, view.cameraPositionY, view.cameraPositionZ),
+        new THREE.Vector3(view.cameraTargetX, view.cameraTargetY, view.cameraTargetZ)
+      );
+
+      // Apply node positions
+      if (view.positions) {
+        for (const pos of view.positions) {
+          this.vizService.setNodePosition(pos.nodeId, pos.positionX, pos.positionY, pos.positionZ);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load graph view', e);
+    }
+  }
+
+  async saveCurrentView(name: string): Promise<void> {
+    try {
+      const camPos = this.vizService.getCameraPosition();
+      const camTarget = this.vizService.getCameraTarget();
+      const positions = this.vizService.getAllNodePositions();
+
+      const view: any = {
+        name,
+        cameraPositionX: camPos.x,
+        cameraPositionY: camPos.y,
+        cameraPositionZ: camPos.z,
+        cameraTargetX: camTarget.x,
+        cameraTargetY: camTarget.y,
+        cameraTargetZ: camTarget.z,
+        positions: Array.from(positions.entries()).map(([nodeId, pos]) => ({
+          nodeId,
+          positionX: pos.x,
+          positionY: pos.y,
+          positionZ: pos.z
+        }))
+      };
+
+      const currentId = this.atlas.selectedViewId();
+      if (currentId !== null) {
+        // Update existing view (re-save)
+        await this.atlas.update(currentId, view);
+      } else {
+        // Create new view
+        await this.atlas.create(view);
+      }
+    } catch (e) {
+      console.error('Failed to save graph view', e);
+    }
+  }
+
+  async loadDefaultView(): Promise<void> {
+    try {
+      await this.atlas.refresh();
+      const views = this.atlas.views();
+      const defaultView = views.find(v => v.isDefault);
+      if (defaultView && defaultView.id) {
+        await this.loadView(defaultView.id);
+      }
+    } catch (e) {
+      console.error('Failed to load default graph view', e);
+    }
   }
 
   clearCanvas() {
@@ -357,38 +487,39 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   rotateLeft() { this.vizService.rotateCamera(0.2); }
   rotateRight() { this.vizService.rotateCamera(-0.2); }
 
-  // --- Save / Load ---
+  // --- Save / Load (Atlas DB) ---
 
-  saveJson() {
-    const json = this.vizService.exportSceneToJson();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'architecture-diagram.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  triggerLoad() {
-    this.fileInput.nativeElement.click();
-  }
-
-  onFileSelected(event: Event) {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-      const file = input.files[0];
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result;
-        if (typeof result === 'string') {
-          this.vizService.importSceneFromJson(result);
-          input.value = ''; // Reset
-        }
-      };
-      reader.readAsText(file);
+  saveToAtlas() {
+    const currentId = this.atlas.selectedViewId();
+    if (currentId !== null) {
+      // Re-save the already-loaded view (no prompt, keep existing name)
+      const existingView = this.atlas.views().find(v => v.id === currentId);
+      const name = existingView?.name ?? 'View';
+      this.saveCurrentView(name).then(() => this.atlas.refresh());
+    } else {
+      // No view loaded yet — prompt for a new name
+      const name = window.prompt('View name:');
+      if (name && name.trim()) {
+        this.saveCurrentView(name.trim()).then(() => this.atlas.refresh());
+      }
     }
   }
+
+  openLoadDialog() {
+    this.atlas.refresh();
+    this.showLoadDialog.set(true);
+  }
+
+  closeLoadDialog() {
+    this.showLoadDialog.set(false);
+  }
+
+  async onSelectLoadView(id: number) {
+    this.showLoadDialog.set(false);
+    await this.loadView(id);
+  }
+
+  // --- File methods removed, using Atlas DB ---
 
   // --- Form Handling ---
 
