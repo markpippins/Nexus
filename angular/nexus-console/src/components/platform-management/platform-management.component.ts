@@ -483,6 +483,53 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                     }
                                 </tbody>
                             </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1 || totalItems() > 0) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
+                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
                     @case ('servers') {
