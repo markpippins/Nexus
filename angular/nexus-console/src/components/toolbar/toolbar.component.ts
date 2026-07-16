@@ -20,8 +20,7 @@ export interface SortCriteria {
     '(document:click)': 'onDocumentClick($event)',
   }
 })
-export class ToolbarComponent {
-  private elementRef = inject(ElementRef);
+export class ToolbarComponent {    private elementRef = inject(ElementRef);
   isNewDropdownOpen = signal(false);
   isSortDropdownOpen = signal(false);
   isCopyToOpen = signal(false);
@@ -76,10 +75,9 @@ export class ToolbarComponent {
   showAllControls = input(true);
 
   // Service Mesh / Graph inputs
-  graphInteractionMode = input<'camera' | 'auto' | 'edit'>('auto');
+  graphInteractionMode = input<'camera' | 'edit'>('camera');
   isSimulationActive = input(false);
   backgroundColor = input('#000510');
-  graphSubView = input<'canvas' | 'creator'>('canvas');
 
   // Outputs for events (file explorer)
   newFolderClick = output<void>();
@@ -114,7 +112,7 @@ export class ToolbarComponent {
   toggleStream = output<void>();
 
   // Graph/Mesh outputs
-  graphModeChange = output<'camera' | 'auto' | 'edit'>();
+  graphModeChange = output<'camera' | 'edit'>();
   toggleSimulation = output<void>();
   saveGraph = output<void>();
   loadGraph = output<void>();
@@ -125,7 +123,6 @@ export class ToolbarComponent {
   rotateRight = output<void>();
   resetCamera = output<void>();
   clearGraph = output<void>();
-  graphSubViewChange = output<'canvas' | 'creator'>();
 
   // Import capability
   canImport = input(false);

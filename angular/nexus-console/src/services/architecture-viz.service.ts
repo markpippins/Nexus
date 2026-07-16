@@ -66,7 +66,16 @@ export class ArchitectureVizService {
     // Selection & Interaction
     private selectionBox!: THREE.BoxHelper;
     private selectedNodeId: string | null = null;
+    private multiSelectedNodeIds = new Set<string>();
+    private multiSelectionBoxes = new Map<string, THREE.BoxHelper>();
     private interactionMode: 'camera' | 'edit' = 'camera';
+
+    /** Signal for external consumers — number of selected nodes (0 = none selected). */
+    public readonly multiSelectedCount: WritableSignal<number> = signal(0);
+
+    // Track nodes the user dragged this session — prevents loadView from
+    // overwriting fresh drags with stale DB data during initial async load.
+    private readonly userDraggedNodeIds = new Set<string>();
 
     // View Mode (3-way: camera | auto | edit)
     public readonly viewMode = signal<ViewMode>('camera');
@@ -75,7 +84,13 @@ export class ArchitectureVizService {
     private isDragging = false;
     private dragPlane = new THREE.Plane();
     private dragOffset = new THREE.Vector3();
+    private dragStartPositions = new Map<string, THREE.Vector3>();
     private draggedNodeId: string | null = null;
+
+    // Lasso State
+    private isLassoing = false;
+    private lassoStart = new THREE.Vector2();
+    private lassoDiv: HTMLDivElement | null = null;
 
     // Simulation State
     public isSimulationActive: WritableSignal<boolean> = signal(false);
@@ -362,13 +377,20 @@ export class ArchitectureVizService {
         this.cameraPresets.set(slot, { pos: pos.clone(), target: target.clone() });
     }
 
-    /** Move a node and persist its position in savedPositions. */
-    public setNodePosition(id: string, x: number, y: number, z: number): void {
+    /** Move a node and persist its position in savedPositions.
+     *  If fromLoadView is true, skips nodes the user already dragged this session. */
+    public setNodePosition(id: string, x: number, y: number, z: number, fromLoadView = false): void {
+        if (fromLoadView && this.userDraggedNodeIds.has(id)) return; // don't overwrite user drags
         const node = this.nodes.get(id);
         if (!node) return;
         node.mesh.position.set(x, y, z);
         node.data.position = { x, y, z };
         this.savedPositions.set(id, { x, y, z });
+    }
+
+    /** Clear the user-dragged tracking set (called after initial load completes). */
+    public clearUserDraggedNodes(): void {
+        this.userDraggedNodeIds.clear();
     }
 
     /** Get all node positions (current live positions, not just saved). */
@@ -680,7 +702,20 @@ export class ArchitectureVizService {
         this.scene.remove(node.mesh);
         this.nodes.delete(id);
 
-        if (this.selectedNodeId === id) this.deselect();
+        // Clean up multi-selection
+        this.multiSelectedNodeIds.delete(id);
+        this.removeMultiBox(id);
+        this.multiSelectedCount.set(this.multiSelectedNodeIds.size);
+
+        if (this.selectedNodeId === id) {
+            // Pick a new primary from remaining multi-set, or deselect
+            const remaining = [...this.multiSelectedNodeIds];
+            if (remaining.length > 0) {
+                this.setPrimarySelection(remaining[0]);
+            } else {
+                this.deselect();
+            }
+        }
         this.updateAllNodesSignal();
     }
 
@@ -735,14 +770,17 @@ export class ArchitectureVizService {
         for (const conn of connections) {
             this.connectNodes(conn.sourceNodeId, conn.targetNodeId);
             if (conn.direction === 'BIDIRECTIONAL') {
-                // Also create the reverse in connectedTo
+                // Also create the reverse in connectedTo and flag as bidirectional
                 const toNode = this.nodes.get(conn.targetNodeId);
                 if (toNode && !toNode.data.connectedTo.includes(conn.sourceNodeId)) {
                     toNode.data.connectedTo.push(conn.sourceNodeId);
                 }
                 this.bidirectionalEdges.add(ArchitectureVizService.edgeKey(conn.sourceNodeId, conn.targetNodeId));
+                // Recolor the line — it was created as blue before the flag was set
+                this.updateConnectionColor(conn.sourceNodeId, conn.targetNodeId);
             }
         }
+        this.updateAllNodesSignal();
     }
 
     /** Toggle a connection between OUTBOUND and BIDIRECTIONAL. */
@@ -763,6 +801,7 @@ export class ArchitectureVizService {
                 toNode.data.connectedTo.push(fromId);
             }
         }
+        this.updateConnectionColor(fromId, toId);
         this.updateAllNodesSignal();
     }
 
@@ -782,8 +821,16 @@ export class ArchitectureVizService {
         }
 
         // If reverse connection already exists, upgrade to bidirectional
+        // but don't create a duplicate line — just recolor the existing one
         if (toNode.data.connectedTo.includes(fromId)) {
             this.bidirectionalEdges.add(ArchitectureVizService.edgeKey(fromId, toId));
+            this.updateConnectionColor(fromId, toId);
+            if (!fromNode.data.connectedTo.includes(toId)) {
+                fromNode.data.connectedTo.push(toId);
+            }
+            if (this.selectedNodeId === fromId) this.selectedNodeData.set(fromNode.data);
+            this.updateAllNodesSignal();
+            return;
         }
 
         if (fromNode.data.connectedTo.includes(toId)) return;
@@ -817,7 +864,12 @@ export class ArchitectureVizService {
 
         const points = [fromNode.mesh.position, toNode.mesh.position];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const material = new THREE.LineBasicMaterial({ color: 0x4aa8d8, transparent: true, opacity: 0.4 });
+        const isBidir = this.bidirectionalEdges.has(ArchitectureVizService.edgeKey(fromId, toId));
+        const material = new THREE.LineBasicMaterial({
+            color: isBidir ? 0xf59e0b : 0x4aa8d8,
+            transparent: true,
+            opacity: isBidir ? 0.7 : 0.4
+        });
         const line = new THREE.Line(geometry, material);
 
         // Store IDs in userData so we don't have to parse the string key later
@@ -825,6 +877,19 @@ export class ArchitectureVizService {
 
         this.scene.add(line);
         this.connectionLines.set(key, line);
+    }
+
+    /** Update a connection line's color/opacity to reflect its directionality. */
+    private updateConnectionColor(fromId: string, toId: string): void {
+        // The visual line may be stored under either key orientation
+        const line = this.connectionLines.get(`${fromId}::${toId}`)
+                  || this.connectionLines.get(`${toId}::${fromId}`);
+        if (!line) return;
+
+        const isBidir = this.bidirectionalEdges.has(ArchitectureVizService.edgeKey(fromId, toId));
+        const mat = line.material as THREE.LineBasicMaterial;
+        mat.color.setHex(isBidir ? 0xf59e0b : 0x4aa8d8);
+        mat.opacity = isBidir ? 0.7 : 0.4;
     }
 
     private removeVisualConnection(fromId: string, toId: string) {
@@ -870,40 +935,92 @@ export class ArchitectureVizService {
         if (event.button !== 0) return; // Only Left Click
 
         const intersects = this.raycast(event);
+        const ctrl = event.ctrlKey || event.metaKey;
 
         if (intersects.length > 0) {
             // Hit a node
             const object = intersects[0].object;
             const id = object.userData['id'];
 
-            // Select it
-            this.selectNode(id);
+            if (ctrl) {
+                // Ctrl+Click: toggle node in multi-selection
+                this.toggleMultiSelect(id);
+            } else if (!this.multiSelectedNodeIds.has(id)) {
+                // Plain click on unselected node: clear multi-set, select this one
+                this.clearMultiSelection();
+                this.selectNode(id);
+            } else {
+                // Plain click on already-selected node: make it primary (for inspector)
+                this.setPrimarySelection(id);
+            }
 
             // If Edit Mode, Start Dragging
             if (this.interactionMode === 'edit') {
                 this.isDragging = true;
                 this.draggedNodeId = id;
-                this.controls.enabled = false; // Ensure controls don't fight
+                this.controls.enabled = false;
 
-                // Create a drag plane at the object's position, facing the camera
+                // Snapshot starting positions for all multi-selected nodes
+                this.dragStartPositions.clear();
+                for (const selId of this.multiSelectedNodeIds) {
+                    const n = this.nodes.get(selId);
+                    if (n) this.dragStartPositions.set(selId, n.mesh.position.clone());
+                }
+                // Also snapshot the primary if not already in multi-set
+                if (!this.dragStartPositions.has(id)) {
+                    const n = this.nodes.get(id);
+                    if (n) this.dragStartPositions.set(id, n.mesh.position.clone());
+                }
+
+                // Create a drag plane at the hit object's position, facing the camera
                 const normal = new THREE.Vector3();
                 this.camera.getWorldDirection(normal);
-                normal.negate(); // Plane normal faces camera
+                normal.negate();
                 this.dragPlane.setFromNormalAndCoplanarPoint(normal, object.position);
 
-                // Calculate offset
+                // Calculate offset from the intersection point
                 const intersectionPoint = intersects[0].point;
                 this.dragOffset.subVectors(object.position, intersectionPoint);
 
                 this.renderer.domElement.style.cursor = 'grabbing';
             }
         } else {
-            // Hit nothing
-            this.deselect();
+            // Hit empty space
+            if (this.interactionMode === 'edit' && !ctrl) {
+                // Start lasso (rectangle select)
+                this.isLassoing = true;
+                const rect = this.renderer.domElement.getBoundingClientRect();
+                this.lassoStart.set(event.clientX - rect.left, event.clientY - rect.top);
+                this.ensureLassoDiv();
+                this.lassoDiv!.style.left = this.lassoStart.x + 'px';
+                this.lassoDiv!.style.top = this.lassoStart.y + 'px';
+                this.lassoDiv!.style.width = '0px';
+                this.lassoDiv!.style.height = '0px';
+                this.lassoDiv!.style.display = 'block';
+            } else {
+                this.deselect();
+            }
         }
     }
 
     private onPointerMove(event: PointerEvent) {
+        if (this.isLassoing) {
+            const rect = this.renderer.domElement.getBoundingClientRect();
+            const cx = event.clientX - rect.left;
+            const cy = event.clientY - rect.top;
+            const l = Math.min(this.lassoStart.x, cx);
+            const t = Math.min(this.lassoStart.y, cy);
+            const w = Math.abs(cx - this.lassoStart.x);
+            const h = Math.abs(cy - this.lassoStart.y);
+            if (this.lassoDiv) {
+                this.lassoDiv.style.left = l + 'px';
+                this.lassoDiv.style.top = t + 'px';
+                this.lassoDiv.style.width = w + 'px';
+                this.lassoDiv.style.height = h + 'px';
+            }
+            return;
+        }
+
         if (this.isDragging && this.draggedNodeId && this.interactionMode === 'edit') {
             const rect = this.renderer.domElement.getBoundingClientRect();
             this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -912,36 +1029,66 @@ export class ArchitectureVizService {
             this.raycaster.setFromCamera(this.mouse, this.camera);
             const targetPoint = new THREE.Vector3();
 
-            // Raycast against the invisible drag plane
             if (this.raycaster.ray.intersectPlane(this.dragPlane, targetPoint)) {
-                // Apply offset
                 targetPoint.add(this.dragOffset);
 
-                // Update Mesh Position
-                const node = this.nodes.get(this.draggedNodeId);
-                if (node) {
-                    node.mesh.position.copy(targetPoint);
-                    node.data.position = { x: targetPoint.x, y: targetPoint.y, z: targetPoint.z };
-                    // Persist the adjusted position so it survives clearScene rebuilds
-                    this.savedPositions.set(node.data.id, { ...node.data.position });
+                // Compute delta from the dragged node's start position
+                const startPos = this.dragStartPositions.get(this.draggedNodeId);
+                const delta = startPos
+                    ? new THREE.Vector3().subVectors(targetPoint, startPos)
+                    : new THREE.Vector3();
 
-                    this.selectionBox.update();
-                    // Connections are updated in the animate loop now
+                // Move ALL multi-selected nodes by the same delta
+                const idsToMove = this.multiSelectedNodeIds.size > 0
+                    ? this.multiSelectedNodeIds
+                    : new Set([this.draggedNodeId]);
+
+                for (const id of idsToMove) {
+                    const node = this.nodes.get(id);
+                    if (!node) continue;
+                    const base = this.dragStartPositions.get(id);
+                    if (!base) continue;
+                    const newPos = base.clone().add(delta);
+                    node.mesh.position.copy(newPos);
+                    node.data.position = { x: newPos.x, y: newPos.y, z: newPos.z };
+                    this.savedPositions.set(id, { ...node.data.position });
+
+                    // Update selection box if this is the primary
+                    if (id === this.selectedNodeId) this.selectionBox.update();
+                    // Update multi-selection box
+                    const multiBox = this.multiSelectionBoxes.get(id);
+                    if (multiBox) multiBox.setFromObject(node.mesh);
                 }
             }
         }
     }
 
     private onPointerUp(event: PointerEvent) {
+        if (this.isLassoing) {
+            this.isLassoing = false;
+            if (this.lassoDiv) this.lassoDiv.style.display = 'none';
+            this.resolveLasso();
+            return;
+        }
+
         if (this.isDragging && this.draggedNodeId) {
-            // Finalize Drag
-            const node = this.nodes.get(this.draggedNodeId);
-            if (node) {
-                this.selectedNodeData.set({ ...node.data }); // Trigger UI update
-                this.updateAllNodesSignal();
-                this.nodePositionChanged.next(this.draggedNodeId);
+            // Finalize Drag — emit position changed for every moved node
+            const primaryNode = this.nodes.get(this.draggedNodeId);
+            if (primaryNode) {
+                this.selectedNodeData.set({ ...primaryNode.data });
             }
 
+            for (const id of this.multiSelectedNodeIds) {
+                this.nodePositionChanged.next(id);
+                this.userDraggedNodeIds.add(id);
+            }
+            // Also emit for the primary if not in multi-set
+            if (!this.multiSelectedNodeIds.has(this.draggedNodeId)) {
+                this.nodePositionChanged.next(this.draggedNodeId);
+                this.userDraggedNodeIds.add(this.draggedNodeId);
+            }
+
+            this.updateAllNodesSignal();
             this.isDragging = false;
             this.draggedNodeId = null;
             this.renderer.domElement.style.cursor = 'default';
@@ -949,11 +1096,16 @@ export class ArchitectureVizService {
     }
 
     private onDoubleClick(event: MouseEvent) {
-        // Double click always selects and focuses
+        // Double click selects and focuses, but preserves multi-selection
         const intersects = this.raycast(event);
         if (intersects.length > 0) {
             const id = intersects[0].object.userData['id'];
-            this.selectNode(id);
+            if (!this.multiSelectedNodeIds.has(id)) {
+                this.clearMultiSelection();
+                this.selectNode(id);
+            } else {
+                this.setPrimarySelection(id);
+            }
             this.nodeDoubleClicked.next(id);
         }
     }
@@ -974,16 +1126,17 @@ export class ArchitectureVizService {
         const node = this.nodes.get(id);
         if (!node) return;
 
-        // De-select previous if different
-        if (this.selectedNodeId && this.selectedNodeId !== id) {
-            // logic if needed
-        }
-
         this.selectedNodeId = id;
         this.selectionBox.setFromObject(node.mesh);
         this.selectionBox.visible = true;
 
-        // We create a new object ref to trigger signal
+        // Add to multi-set as sole member (single-select on plain click)
+        if (!this.multiSelectedNodeIds.has(id)) {
+            this.multiSelectedNodeIds = new Set([id]);
+            this.refreshMultiSelectionBoxes();
+        }
+        this.multiSelectedCount.set(this.multiSelectedNodeIds.size);
+
         this.selectedNodeData.set({ ...node.data });
     }
 
@@ -993,7 +1146,163 @@ export class ArchitectureVizService {
             this.selectionBox.visible = false;
         }
         this.selectedNodeData.set(null);
+        this.clearMultiSelection();
     }
+
+    // --- Multi-Selection Helpers ---
+
+    /** Toggle a node in/out of the multi-selection set. */
+    private toggleMultiSelect(id: string): void {
+        if (this.multiSelectedNodeIds.has(id)) {
+            this.multiSelectedNodeIds.delete(id);
+            this.removeMultiBox(id);
+            // If we removed the primary, pick a new one
+            if (this.selectedNodeId === id) {
+                const remaining = [...this.multiSelectedNodeIds];
+                if (remaining.length > 0) {
+                    this.setPrimarySelection(remaining[0]);
+                } else {
+                    this.deselect();
+                    return;
+                }
+            }
+        } else {
+            this.multiSelectedNodeIds.add(id);
+            this.refreshMultiSelectionBoxes();
+            // Make this the primary
+            this.setPrimarySelection(id);
+        }
+        this.multiSelectedCount.set(this.multiSelectedNodeIds.size);
+    }
+
+    /** Clear the multi-selection set and all associated BoxHelpers. */
+    private clearMultiSelection(): void {
+        this.multiSelectedNodeIds.clear();
+        for (const [id, box] of this.multiSelectionBoxes) {
+            this.scene.remove(box);
+            box.dispose();
+        }
+        this.multiSelectionBoxes.clear();
+        this.multiSelectedCount.set(0);
+    }
+
+    /** Remove the multi-selection BoxHelper for a specific node. */
+    private removeMultiBox(id: string): void {
+        const box = this.multiSelectionBoxes.get(id);
+        if (box) {
+            this.scene.remove(box);
+            box.dispose();
+            this.multiSelectionBoxes.delete(id);
+        }
+    }
+
+    /** Set a node as the primary (focused) selection without changing the multi-set. */
+    private setPrimarySelection(id: string): void {
+        const node = this.nodes.get(id);
+        if (!node) return;
+        this.selectedNodeId = id;
+        this.selectionBox.setFromObject(node.mesh);
+        this.selectionBox.visible = true;
+        this.selectedNodeData.set({ ...node.data });
+    }
+
+    /** Rebuild all multi-selection BoxHelpers (thin cyan boxes). */
+    private refreshMultiSelectionBoxes(): void {
+        // Remove existing multi boxes
+        for (const [id, box] of this.multiSelectionBoxes) {
+            this.scene.remove(box);
+            box.dispose();
+        }
+        this.multiSelectionBoxes.clear();
+
+        // Create new cyan boxes for each multi-selected node (except primary, which uses the yellow box)
+        for (const id of this.multiSelectedNodeIds) {
+            if (id === this.selectedNodeId) continue;
+            const node = this.nodes.get(id);
+            if (!node) continue;
+            const box = new THREE.BoxHelper(node.mesh, 0x06b6d4); // cyan
+            this.scene.add(box);
+            this.multiSelectionBoxes.set(id, box);
+        }
+    }
+
+    /** Whether a node is in the multi-selection set. */
+    public isNodeMultiSelected(id: string): boolean {
+        return this.multiSelectedNodeIds.has(id);
+    }
+
+    /** Delete all currently selected (multi-selected + primary) nodes. */
+    public deleteSelectedNodes(): void {
+        const ids = [...this.multiSelectedNodeIds];
+        for (const id of ids) {
+            this.deleteNode(id);
+        }
+    }
+
+    // --- Lasso Helpers ---
+
+    /** Create or retrieve the lasso overlay div. */
+    private ensureLassoDiv(): void {
+        if (this.lassoDiv) return;
+        const div = document.createElement('div');
+        div.style.cssText = `
+            position: absolute;
+            border: 1px solid #06b6d4;
+            background: rgba(6, 182, 212, 0.1);
+            pointer-events: none;
+            z-index: 100;
+            display: none;
+        `;
+        this.container.appendChild(div);
+        this.lassoDiv = div;
+    }
+
+    /** Resolve the lasso: project all nodes to screen space, add those inside the rect. */
+    private resolveLasso(): void {
+        if (!this.lassoDiv) return;
+
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        const l = parseFloat(this.lassoDiv.style.left);
+        const t = parseFloat(this.lassoDiv.style.top);
+        const r = l + parseFloat(this.lassoDiv.style.width);
+        const b = t + parseFloat(this.lassoDiv.style.height);
+
+        // Min size threshold — treat tiny lassos as deselect
+        if (Math.abs(r - l) < 5 && Math.abs(b - t) < 5) {
+            this.deselect();
+            return;
+        }
+
+        const screenPos = new THREE.Vector3();
+        const hitIds: string[] = [];
+
+        for (const [id, node] of this.nodes) {
+            node.mesh.getWorldPosition(screenPos);
+            screenPos.project(this.camera);
+            const sx = ((screenPos.x + 1) / 2) * rect.width;
+            const sy = ((-screenPos.y + 1) / 2) * rect.height;
+
+            if (sx >= l && sx <= r && sy >= t && sy <= b) {
+                hitIds.push(id);
+            }
+        }
+
+        if (hitIds.length === 0) {
+            this.deselect();
+            return;
+        }
+
+        // Replace selection with lasso results
+        this.clearMultiSelection();
+        for (const id of hitIds) {
+            this.multiSelectedNodeIds.add(id);
+        }
+        this.setPrimarySelection(hitIds[0]);
+        this.refreshMultiSelectionBoxes();
+        this.multiSelectedCount.set(hitIds.length);
+    }
+
+    // --- Update ---
 
     private updateAllNodesSignal() {
         this.allNodes.set(Array.from(this.nodes.values()).map(n => n.data));
@@ -1053,8 +1362,9 @@ export class ArchitectureVizService {
         }
 
         this.nodes.forEach(node => {
-            // Only float if not selected and not dragging
-            if (node.data.id !== this.selectedNodeId && !this.isDragging) {
+            // Don't float if selected (primary or multi) and not dragging
+            const isSelected = node.data.id === this.selectedNodeId || this.multiSelectedNodeIds.has(node.data.id);
+            if (!isSelected && !this.isDragging) {
                 node.mesh.position.y = node.data.position.y + Math.sin(time + node.mesh.position.x) * 0.02;
             }
             node.mesh.rotation.y += 0.002;
@@ -1127,6 +1437,7 @@ export class ArchitectureVizService {
         if (this.animationId) cancelAnimationFrame(this.animationId);
         if (this.resizeObserver) this.resizeObserver.disconnect();
         if (this.renderer) this.renderer.dispose();
+        if (this.lassoDiv) { this.lassoDiv.remove(); this.lassoDiv = null; }
     }
 
     // --- Import / Export ---

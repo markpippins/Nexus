@@ -85,6 +85,17 @@
       <button (click)="resetDemo()">Reset</button>
       <button (click)="clearCanvas()" class="danger">Clear</button>
     </div>
+
+    <div class="toolbar-separator"></div>
+
+    <button
+      (click)="showDeleteConfirm.set(true)"
+      [disabled]="!selectedNodeData() && multiSelectedCount() === 0"
+      class="icon-btn danger"
+      title="Delete selected components"
+    >
+      🗑️
+    </button>
   </div>
 
   <!-- Main Content Area -->
@@ -158,6 +169,30 @@
     </div>
     }
 
+    <!-- Delete Confirmation Dialog -->
+    @if (showDeleteConfirm()) {
+    <div class="dialog-overlay" (click)="showDeleteConfirm.set(false)">
+      <div class="dialog-panel" (click)="$event.stopPropagation()">
+        <div class="dialog-header">
+          <h3>Delete {{ multiSelectedCount() > 1 ? multiSelectedCount() + ' Components' : 'Component' }}</h3>
+          <button (click)="showDeleteConfirm.set(false)" class="dialog-close">✕</button>
+        </div>
+        <div class="dialog-body">
+          @if (multiSelectedCount() > 1) {
+            <p>Are you sure you want to delete <strong>{{ multiSelectedCount() }} components</strong>?</p>
+          } @else {
+            <p>Are you sure you want to delete <strong>{{ selectedNodeData()?.label }}</strong>?</p>
+          }
+          <p class="hint">This action cannot be undone.</p>
+          <div class="dialog-actions">
+            <button (click)="showDeleteConfirm.set(false)" class="dialog-cancel">Cancel</button>
+            <button (click)="confirmDelete()" class="dialog-delete">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    }
+
     <!-- Left Sidebar: Palette -->
     @if (showInternalPanels()) {
     <div class="sidebar left" [class.collapsed]="!isPaletteOpen()">
@@ -197,10 +232,6 @@
       <div class="sidebar-content">
         @if (selectedNodeData(); as node) {
         <div class="inspector">
-          <div class="inspector-header">
-            <h2>Object Inspector</h2>
-            <button (click)="deleteSelected()" class="delete-btn">Delete</button>
-          </div>
 
           <div class="field-group">
             <label>Name</label>
@@ -310,4 +341,11 @@
     </div>
     }
   </div>
+
+  <!-- Toast notification -->
+  @if (toastVisible()) {
+  <div class="save-toast" [class.error]="toastIsError()">
+    {{ toastMessage() }}
+  </div>
+  }
 </div>

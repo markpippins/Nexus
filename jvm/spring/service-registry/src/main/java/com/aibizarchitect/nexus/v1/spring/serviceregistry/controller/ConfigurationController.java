@@ -65,6 +65,22 @@ public class ConfigurationController {
         }
     }
 
+    /**
+     * List configurations by service ID (path-based, e.g. /configurations/service/44).
+     * The frontend (service-mesh.service.ts) calls this path rather than the
+     * query-parameter style (?serviceId=44).
+     */
+    @GetMapping("/service/{serviceId}")
+    public ResponseEntity<?> getConfigurationsByServiceId(
+            @PathVariable Long serviceId,
+            org.springframework.data.domain.Pageable pageable) {
+        log.info("Fetching configurations by service ID (path): {}", serviceId);
+        org.springframework.data.domain.Page<ServiceConfiguration> configurations =
+                configurationRepository.findByServiceId(serviceId, pageable);
+        log.debug("Fetched {} configurations for service ID: {}", configurations.getNumberOfElements(), serviceId);
+        return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(configurations));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ServiceConfiguration> getConfigurationById(@PathVariable Long id) {
         log.info("Fetching configuration by ID: {}", id);

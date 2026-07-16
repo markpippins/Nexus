@@ -113,11 +113,11 @@ def _get_pg_conn():
 
 
 def _get_pending_plan_count(pg_conn) -> int:
-    """Count pending work requests from conduit.work_requests."""
+    """Count pending work requests from nebula.work_requests."""
     try:
         with pg_conn.cursor() as cur:
             cur.execute(
-                "SELECT COUNT(*) FROM conduit.work_requests WHERE status = 'pending'"
+                "SELECT COUNT(*) FROM nebula.work_requests WHERE status = 'pending'"
             )
             row = cur.fetchone()
             return row[0] if row else 0
@@ -145,7 +145,7 @@ def _get_blocked_plan_count(pg_conn) -> int:
     try:
         with pg_conn.cursor() as cur:
             cur.execute(
-                "SELECT COUNT(*) FROM conduit.work_requests WHERE status = 'failed'"
+                "SELECT COUNT(*) FROM nebula.work_requests WHERE status = 'failed'"
             )
             row = cur.fetchone()
             return row[0] if row else 0
@@ -338,8 +338,8 @@ def _build_work_request_summary(wr_id: str) -> str:
                     COALESCE(wr.title, ''),
                     COALESCE(wr.status, '')
                 FROM conduit.work_request_state wrs
-                LEFT JOIN conduit.work_requests wr
-                    ON wrs.work_request_id::text = wr.id
+                LEFT JOIN nebula.work_requests wr
+                    ON wr.legacy_id = wrs.work_request_id::text
                 WHERE wrs.work_request_id = %s::uuid
                 """,
                 (wr_id,),

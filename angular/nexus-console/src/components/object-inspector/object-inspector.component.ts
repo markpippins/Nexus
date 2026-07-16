@@ -1,6 +1,7 @@
 import {
     Component,
     ChangeDetectionStrategy,
+    ChangeDetectorRef,
     inject,
     computed,
     input,
@@ -22,6 +23,7 @@ import { ComponentRegistryService } from '../../services/component-registry.serv
 export class ObjectInspectorComponent {
     private vizService = inject(ArchitectureVizService);
     private registry = inject(ComponentRegistryService);
+    private cdr = inject(ChangeDetectorRef);
 
     // Get selected node from viz service
     selectedNodeData = this.vizService.selectedNodeData;
@@ -77,6 +79,7 @@ export class ObjectInspectorComponent {
                 this.formY = Number(node.position.y.toFixed(2));
                 this.formZ = Number(node.position.z.toFixed(2));
                 this.selectedTargetId = '';
+                this.cdr.markForCheck();
             }
         });
     }

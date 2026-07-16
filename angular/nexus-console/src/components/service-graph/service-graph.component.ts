@@ -11,7 +11,8 @@ import {
   ElementRef,
   inject,
   computed,
-  ChangeDetectionStrategy
+  ChangeDetectionStrategy,
+  ChangeDetectorRef
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -56,6 +57,10 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   private vizService = inject(ArchitectureVizService);
   private registry = inject(ComponentRegistryService);
   private atlas = inject(AtlasService);
+  private cdr = inject(ChangeDetectorRef);
+
+  /** Exposed for template — number of multi-selected nodes. */
+  multiSelectedCount = this.vizService.multiSelectedCount;
 
   // UI Panels
   isPaletteOpen = signal(true);
@@ -172,8 +177,18 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Load View Dialog
   showLoadDialog = signal(false);
 
+  // Delete Confirmation Dialog
+  showDeleteConfirm = signal(false);
+
+  // Toast notification for save/load debugging
+  toastMessage = signal('');
+  toastVisible = signal(false);
+  toastIsError = signal(false);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+
   private sub = new Subscription();
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingAutoSave = false;
 
   constructor() {
     // Sync Services Input to Graph
@@ -284,6 +299,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
         this.isInspectorOpen.set(true);
         this.selectedTargetId = '';
+        this.cdr.markForCheck();
 
         // Find corresponding service if any
         const match = this.services().find(s => String(s.id) === node.id);
@@ -324,21 +340,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       this.isPaletteOpen.set(!collapsed);
     }, { allowSignalWrites: true });
 
-    // Auto-save after position or camera changes (debounced 500ms)
-    const scheduleAutoSave = () => {
-      if (this.atlas.selectedViewId() === null) return; // no view loaded yet
-      if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
-      this.autoSaveTimer = setTimeout(() => {
-        const currentId = this.atlas.selectedViewId();
-        if (currentId === null) return;
-        const existingView = this.atlas.views().find(v => v.id === currentId);
-        if (!existingView?.name) return; // skip if views list is stale
-        this.saveCurrentView(existingView.name).catch(e => console.error('Auto-save failed', e));
-      }, 500);
-    };
-
-    this.sub.add(this.vizService.nodePositionChanged.subscribe(() => scheduleAutoSave()));
-    this.sub.add(this.vizService.cameraChanged.subscribe(() => scheduleAutoSave()));
+    // Auto-save after drag or camera changes (debounced 500ms)
+    this.sub.add(this.vizService.nodePositionChanged.subscribe(() => this.scheduleAutoSave()));
+    this.sub.add(this.vizService.cameraChanged.subscribe(() => this.scheduleAutoSave()));
   }
 
   ngAfterViewInit() {
@@ -434,6 +438,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   async loadView(id: number): Promise<void> {
     try {
+      this.vizService.clearUserDraggedNodes(); // fresh slate for each load
       const view = await this.atlas.getById(id);
       this.atlas.selectedViewId.set(id);
 
@@ -451,10 +456,10 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         );
       }
 
-      // Apply node positions + metadata
+      // Apply node positions + metadata (fromLoadView skips nodes user already dragged)
       if (view.positions) {
         for (const pos of view.positions) {
-          this.vizService.setNodePosition(pos.nodeId, pos.positionX, pos.positionY, pos.positionZ);
+          this.vizService.setNodePosition(pos.nodeId, pos.positionX, pos.positionY, pos.positionZ, true);
           // Only apply metadata fields that are actually present (avoid undefined overwrites)
           const updates: Partial<NodeData> = {};
           if (pos.label !== undefined) updates.label = pos.label;
@@ -466,9 +471,13 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         }
       }
 
-      // Restore connections
-      if (view.connections && view.connections.length > 0) {
-        this.vizService.restoreConnections(view.connections);
+      // Restore connections (backend stores as JSON string in JSONB column)
+      const rawConns = view.connections;
+      if (rawConns) {
+        const conns: ConnectionData[] = typeof rawConns === 'string' ? JSON.parse(rawConns) : rawConns as any;
+        if (conns.length > 0) {
+          this.vizService.restoreConnections(conns);
+        }
       }
 
       // Always start on camera 1 after loading a view
@@ -499,7 +508,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       cameraTargetX: cam1.target.x, cameraTargetY: cam1.target.y, cameraTargetZ: cam1.target.z,
       camera2PositionX: cam2.pos.x, camera2PositionY: cam2.pos.y, camera2PositionZ: cam2.pos.z,
       camera2TargetX: cam2.target.x, camera2TargetY: cam2.target.y, camera2TargetZ: cam2.target.z,
-      connections: this.vizService.getAllConnections(),
+      connections: JSON.stringify(this.vizService.getAllConnections()),
       positions: Array.from(positions.entries()).map(([nodeId, pos]) => {
         const node = allNodes.find(n => n.id === nodeId);
         return {
@@ -519,21 +528,45 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       const currentId = this.atlas.selectedViewId();
       if (currentId !== null) {
         await this.atlas.update(currentId, view);
+        this.showToast(`Saved "${name}"`);
       } else {
-        await this.atlas.create(view);
+        const created = await this.atlas.create(view);
+        this.showToast(`Created "${name}"`);
       }
     } catch (e) {
       console.error('Failed to save graph view', e);
+      this.showToast('Save failed — check console', true);
     }
   }
 
   async loadDefaultView(): Promise<void> {
     try {
+      // Only run on initial load — don't switch views mid-session
+      if (this.atlas.selectedViewId() !== null) return;
+
       await this.atlas.refresh();
       const views = this.atlas.views();
-      const defaultView = views.find(v => v.isDefault);
-      if (defaultView && defaultView.id) {
-        await this.loadView(defaultView.id);
+      if (views.length === 0) return;
+
+      // Load the most recently updated view, not just isDefault.
+      // This ensures auto-saved changes survive restarts even after a "Save As"
+      // switches selectedViewId to a new (non-default) view.
+      const latest = views
+        .filter(v => v.updatedAt)
+        .sort((a, b) => new Date(b.updatedAt!).getTime() - new Date(a.updatedAt!).getTime())[0]
+        ?? views[0];
+
+      if (latest.id) {
+        await this.loadView(latest.id);
+        this.showToast(`Loaded "${latest.name ?? 'view'}"`);
+        // User-dragged nodes during load take priority over DB — clear tracking now
+        this.vizService.clearUserDraggedNodes();
+      }
+
+      // If there are pending auto-saves queued before the view was loaded, flush now.
+      if (this.pendingAutoSave) {
+        this.pendingAutoSave = false;
+        this.flushAutoSave();
       }
     } catch (e) {
       console.error('Failed to load default graph view', e);
@@ -571,8 +604,10 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
     try {
       await this.atlas.create(this.buildViewPayload(name.trim()));
+      this.showToast(`Created "${name.trim()}"`);
     } catch (e) {
       console.error('Save As failed', e);
+      this.showToast('Save As failed — check console', true);
     }
   }
 
@@ -604,6 +639,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       color: this.formColor,
       position: { x: this.formX, y: this.formY, z: this.formZ }
     });
+
+    // Auto-save whenever inspector values change
+    this.scheduleAutoSave();
   }
 
   deleteSelected() {
@@ -659,4 +697,42 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   togglePalette() { this.isPaletteOpen.update(v => !v); }
   toggleInspector() { this.isInspectorOpen.update(v => !v); }
+
+  confirmDelete() {
+    this.vizService.deleteSelectedNodes();
+    this.showDeleteConfirm.set(false);
+  }
+
+  /** Debounce auto-save so rapid inspector edits don't hammer the API. */
+  private scheduleAutoSave(): void {
+    if (this.atlas.selectedViewId() === null) {
+      this.pendingAutoSave = true;
+      console.warn('[auto-save] deferred — no view loaded yet (selectedViewId is null)');
+      return;
+    }
+    if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = setTimeout(() => this.flushAutoSave(), 500);
+  }
+
+  /** Execute auto-save immediately (called from debounced timer or pending flush). */
+  private flushAutoSave(): void {
+    const currentId = this.atlas.selectedViewId();
+    if (currentId === null) return;
+    const existingView = this.atlas.views().find(v => v.id === currentId);
+    if (!existingView?.name) return;
+    this.saveCurrentView(existingView.name);
+  }
+
+  /** Show a toast notification (auto-fades after 2.5s). */
+  private showToast(message: string, isError = false): void {
+    this.toastMessage.set(message);
+    this.toastIsError.set(isError);
+    this.toastVisible.set(true);
+    this.cdr.markForCheck();
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => {
+      this.toastVisible.set(false);
+      this.cdr.markForCheck();
+    }, 2500);
+  }
 }

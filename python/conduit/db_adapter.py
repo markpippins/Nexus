@@ -678,22 +678,35 @@ class DBAdapter:
         _log.debug("insert_receipt: created %s", receipt_id)
 
     def add_work_request(self, wr_id: str, plan_id: str, dco_json: str, title: str = ''):
+        """Insert a work request into nebula.work_requests.
+        
+        Args:
+            wr_id: Legacy TEXT ID (e.g., wr-0130-1781781240) - stored in legacy_id column
+            plan_id: Implementation plan ID
+            dco_json: Decomposition Command Object JSON
+            title: Work request title
+        """
+        import uuid
         _log.info("add_work_request: wr=%s plan=%s title=%s", wr_id, plan_id, title or '(empty)')
         now = datetime.utcnow().isoformat() + "Z"
         with self._get_connection() as conn:
             conn.execute(
-                "INSERT INTO work_requests (id, plan_id, title, status, dco_json, created_at, updated_at) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s) "
-                "ON CONFLICT (id) DO NOTHING",
-                (wr_id, plan_id, title, 'pending', dco_json, now, now),
+                "INSERT INTO nebula.work_requests (id, legacy_id, plan_id, title, status, dco_json, created_at, updated_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+                "ON CONFLICT (legacy_id) DO NOTHING",
+                (str(uuid.uuid4()), wr_id, plan_id, title, 'pending', dco_json, now, now),
             )
             conn.commit()
 
     def update_work_request_status(self, wr_id: str, status: str):
+        """Update work request status by legacy_id (TEXT ID)."""
         _log.debug("update_work_request_status: wr=%s status=%s", wr_id, status)
         now = datetime.utcnow().isoformat() + "Z"
         with self._get_connection() as conn:
-            conn.execute("UPDATE work_requests SET status = %s, updated_at = %s WHERE id = %s", (status, now, wr_id))
+            conn.execute(
+                "UPDATE nebula.work_requests SET status = %s, updated_at = %s WHERE legacy_id = %s",
+                (status, now, wr_id)
+            )
             conn.commit()
 
     def get_active_session(self, agent_role: str) -> Optional[Dict[str, Any]]:

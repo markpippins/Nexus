@@ -237,5 +237,6 @@
         <module>user-creation-service</module>
         <module>user-service</module>
         <module>shrapnel-data</module>
+        <module>../atlas</module>
     </modules>
 </project>

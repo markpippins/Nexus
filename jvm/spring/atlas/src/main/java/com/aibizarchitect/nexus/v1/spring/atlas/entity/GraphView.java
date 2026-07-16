@@ -1,6 +1,8 @@
 package com.aibizarchitect.nexus.v1.spring.atlas.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,6 +67,7 @@ public class GraphView {
 
     /** JSON array of connections: [{sourceNodeId, targetNodeId, direction}] */
     @Column(name = "connections", columnDefinition = "JSONB")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String connections;
 
     @Column(name = "created_at")

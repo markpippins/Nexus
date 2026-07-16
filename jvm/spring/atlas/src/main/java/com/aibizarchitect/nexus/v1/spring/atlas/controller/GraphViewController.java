@@ -2,6 +2,7 @@ package com.aibizarchitect.nexus.v1.spring.atlas.controller;
 
 import com.aibizarchitect.nexus.v1.spring.atlas.entity.GraphView;
 import com.aibizarchitect.nexus.v1.spring.atlas.entity.GraphViewPosition;
+import com.aibizarchitect.nexus.v1.spring.atlas.repository.GraphViewPositionRepository;
 import com.aibizarchitect.nexus.v1.spring.atlas.repository.GraphViewRepository;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -19,9 +20,11 @@ import java.util.List;
 public class GraphViewController {
 
     private final GraphViewRepository repository;
+    private final GraphViewPositionRepository positionRepository;
 
-    public GraphViewController(GraphViewRepository repository) {
+    public GraphViewController(GraphViewRepository repository, GraphViewPositionRepository positionRepository) {
         this.repository = repository;
+        this.positionRepository = positionRepository;
     }
 
     /** List all views (positions are lazy — loaded on demand). */
@@ -81,16 +84,27 @@ public class GraphViewController {
                     existing.setCamera2TargetY(details.getCamera2TargetY());
                     existing.setCamera2TargetZ(details.getCamera2TargetZ());
 
+                    // Connections (JSON string stored in JSONB column)
+                    existing.setConnections(details.getConnections());
+
                     // Replace positions (only if explicitly provided)
                     if (details.getPositions() != null) {
+                        // HACK: Hibernate flushes INSERT before DELETE, which violates the
+                        // unique (graph_view_id, node_id) constraint when clear()+add() is
+                        // used with orphanRemoval=true. Explicitly delete positions via a
+                        // @Modifying JPQL query that executes immediately, then clear the
+                        // managed collection to keep the entity graph consistent.
+                        positionRepository.deleteByGraphViewId(existing.getId());
                         existing.getPositions().clear();
                         for (GraphViewPosition pos : details.getPositions()) {
+                            pos.setId(null); // ensure treated as new, not detached
                             pos.setGraphView(existing);
                             existing.getPositions().add(pos);
                         }
                     }
 
-                    return ResponseEntity.ok(repository.save(existing));
+                    // Return the managed entity directly — @Transactional auto-flushes.
+                    return ResponseEntity.ok(existing);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

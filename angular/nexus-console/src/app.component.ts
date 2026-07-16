@@ -182,6 +182,8 @@ export class AppComponent implements OnInit, OnDestroy {
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
+  showRunningOnly = signal(false);  // Toggle to show only running services in mesh
+  paletteCollapsed = signal(false);  // Toggle to collapse component palette in service graph
 
   viewModeUrls: Record<string, string> = {
     'conduit-ui': 'http://localhost:4201',
@@ -1818,6 +1820,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onRefreshServices(): void {
     this.serviceMeshService.fetchAllData();
+  }
+
+  onCollapsePalette(): void {
+    this.paletteCollapsed.update(v => !v);
   }
 
   // --- Graph Visualization Control Handlers ---

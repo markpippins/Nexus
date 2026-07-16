@@ -50,6 +50,7 @@ export class SidebarComponent implements OnDestroy {
 
   meshViewModeChange = output<'console' | 'graph'>(); // For toggling between console and graph
   refreshServices = output<void>(); // For refreshing service mesh data
+  collapsePalette = output<void>();
   serversMenuClick = output<void>();
   hostServersMenuClick = output<void>();
   localConfigMenuClick = output<void>();
@@ -78,7 +79,7 @@ export class SidebarComponent implements OnDestroy {
   treeExpansionCommand = signal<{ command: 'expand' | 'collapse', id: number } | null>(null);
   expandedPaths = signal(new Set<string>());
   isHamburgerMenuOpen = signal(false);
-  showRunningOnly = signal(false); // Filter to show only running services
+  showRunningOnly = input(false); // Filter to show only running services
 
   // --- Vertical Resizing State for internal panes ---
   // We keep treePaneHeight around only if we want to refer to it, but now Tree will be flex-1
@@ -256,10 +257,6 @@ export class SidebarComponent implements OnDestroy {
 
   onRefreshServices(): void {
     this.refreshServices.emit();
-  }
-
-  onToggleShowRunningOnly(): void {
-    this.showRunningOnly.update(v => !v);
   }
 
   onExpandAll(): void {

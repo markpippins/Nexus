@@ -149,6 +149,15 @@
   background: rgba(127, 29, 29, 0.8);
 }
 
+/* Toolbar separator */
+.toolbar-separator {
+  width: 1px;
+  height: 24px;
+  background: #334155;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
 .camera-controls {
   display: flex;
   align-items: center;
@@ -511,13 +520,14 @@
 }
 
 .color-row input[type="color"] {
-  width: 48px;
+  width: 36px;
   height: 36px;
   border: 1px solid #334155;
   border-radius: 4px;
   background: transparent;
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .color-row input[type="text"] {
@@ -591,11 +601,12 @@
   color: white;
   border: none;
   border-radius: 4px;
-  padding: 6px 10px;
+  padding: 6px 8px;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s;
+  flex-shrink: 0;
 }
 
 .connection-add button:hover {
@@ -772,6 +783,45 @@
   color: #e2e8f0;
 }
 
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  justify-content: flex-end;
+}
+
+.dialog-cancel {
+  background: #1e293b;
+  color: #94a3b8;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.dialog-cancel:hover {
+  background: #334155;
+  color: #e2e8f0;
+}
+
+.dialog-delete {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.dialog-delete:hover {
+  background: #ef4444;
+}
+
 .dialog-body {
   padding: 16px 20px;
   overflow-y: auto;
@@ -853,4 +903,33 @@
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
   pointer-events: none;
   white-space: nowrap;
+}
+
+/* Save/Load toast notification */
+.save-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #065f46;
+  color: #6ee7b7;
+  border: 1px solid #059669;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 200;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  animation: toast-in 0.25s ease-out;
+  pointer-events: none;
+}
+
+.save-toast.error {
+  background: #7f1d1d;
+  color: #fecaca;
+  border-color: #991b1b;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

@@ -23,8 +23,14 @@ from datetime import datetime, timezone
 
 import numpy as np
 
-from embed_util import embed_texts, cosine_similarity_matrix
-from event_emitter import emit_agenda_item_added, emit_requirement_promoted
+try:
+    from embed_util import embed_texts, cosine_similarity_matrix
+except ImportError:
+    from rover.embed_util import embed_texts, cosine_similarity_matrix
+try:
+    from event_emitter import emit_agenda_item_added, emit_requirement_promoted_to_plan
+except ImportError:
+    from rover.event_emitter import emit_agenda_item_added, emit_requirement_promoted_to_plan
 
 log = logging.getLogger("agenda_matcher")
 

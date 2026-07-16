@@ -128,6 +128,32 @@ export class ComponentPreviewComponent implements AfterViewInit, OnDestroy {
             case 'icosahedron': geo = new THREE.IcosahedronGeometry(1); break;
             case 'box': geo = new THREE.BoxGeometry(1, 1, 1); break;
             case 'tall-cylinder': geo = new THREE.CylinderGeometry(0.5, 0.5, 2, 32); break;
+            case 'dodecahedron': geo = new THREE.DodecahedronGeometry(1); break;
+            case 'cone': geo = new THREE.ConeGeometry(0.7, 1.5, 32); break;
+            case 'tetrahedron': geo = new THREE.TetrahedronGeometry(1); break;
+            case 'capsule': geo = new THREE.CapsuleGeometry(0.5, 1, 8, 16); break;
+            case 'torus-knot': geo = new THREE.TorusKnotGeometry(0.7, 0.2, 100, 16); break;
+            case 'ring': geo = new THREE.TorusGeometry(0.6, 0.25, 16, 40); break;
+            case 'lathe': {
+                const pts = [];
+                for (let i = 0; i <= 10; i++) {
+                    const t = i / 10;
+                    const r = 0.5 + Math.sin(t * Math.PI) * 0.3;
+                    pts.push(new THREE.Vector2(r, t * 2 - 1));
+                }
+                geo = new THREE.LatheGeometry(pts, 32);
+                break;
+            }
+            case 'tube': {
+                const cp = [];
+                for (let i = 0; i <= 32; i++) {
+                    const t = i / 32;
+                    const a = t * Math.PI * 2;
+                    cp.push(new THREE.Vector3(Math.cos(a) * 0.5, t * 2 - 1, Math.sin(a) * 0.5));
+                }
+                geo = new THREE.TubeGeometry(new (THREE as any).CatmullRomCurve3(cp), 64, 0.15, 8, false);
+                break;
+            }
             default: geo = new THREE.BoxGeometry(1, 1, 1);
         }
 

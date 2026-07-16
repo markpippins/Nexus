@@ -62,7 +62,12 @@
         [dependencies]="dependencies()"
         [deployments]="deployments()"
         [showInternalPanels]="false"
+        [graphSubView]="graphSubView()"
+        [paletteCollapsed]="paletteCollapsed()"
+        [(showRunningOnly)]="showRunningOnly"
         (selectedNode)="onServiceSelected($event)"
+        (graphSubViewChange)="graphSubViewChange.emit($event)"
+        (refreshServices)="refreshServices.emit()"
       ></app-service-graph>
     </div>
     } @else {
