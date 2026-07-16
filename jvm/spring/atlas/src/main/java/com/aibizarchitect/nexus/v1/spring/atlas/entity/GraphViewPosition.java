@@ -29,6 +29,15 @@ public class GraphViewPosition {
     @Column(name = "position_z", nullable = false)
     private Double positionZ = 0.0;
 
+    @Column(name = "label")
+    private String label;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "color")
+    private String color;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -69,6 +78,15 @@ public class GraphViewPosition {
 
     public Double getPositionZ() { return positionZ; }
     public void setPositionZ(Double positionZ) { this.positionZ = positionZ; }
+
+    public String getLabel() { return label; }
+    public void setLabel(String label) { this.label = label; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public String getColor() { return color; }
+    public void setColor(String color) { this.color = color; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

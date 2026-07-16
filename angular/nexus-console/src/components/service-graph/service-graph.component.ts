@@ -25,6 +25,7 @@ import { ArchitectureVizService, NodeData } from '../../services/architecture-vi
 import { ComponentRegistryService } from '../../services/component-registry.service.js';
 import { NodeType } from '../../models/component-config.js';
 import { AtlasService } from '../../services/atlas.service.js';
+import type { ConnectionData } from '../../models/graph-view.model.js';
 import * as THREE from 'three';
 
 @Component({
@@ -117,15 +118,44 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
     }).sort((a, b) => a.label.localeCompare(b.label));
   });
 
-  // Derived list of actual connection objects for display
-  currentConnections = computed(() => {
+  /** All connections involving the selected node (outbound, inbound, bidirectional). */
+  allConnections = computed(() => {
     const current = this.selectedNodeData();
     const all = this.allNodes();
     if (!current) return [];
-    return current.connectedTo.map(targetId => {
+
+    const result: { nodeId: string; label: string; direction: 'out' | 'in' | 'bidirectional' }[] = [];
+    const seen = new Set<string>();
+
+    // Outbound + bidirectional from current
+    for (const targetId of current.connectedTo) {
+      const key = [current.id, targetId].sort().join('::');
+      if (seen.has(key)) continue;
+      seen.add(key);
       const target = all.find(n => n.id === targetId);
-      return target ? { id: targetId, label: target.label } : { id: targetId, label: 'Unknown' };
-    });
+      const bidir = this.vizService.isBidirectional(current.id, targetId);
+      result.push({
+        nodeId: targetId,
+        label: target?.label ?? targetId,
+        direction: bidir ? 'bidirectional' : 'out'
+      });
+    }
+
+    // Incoming (other nodes point to current, not already covered)
+    for (const n of all) {
+      if (n.id === current.id) continue;
+      if (n.connectedTo.includes(current.id)) {
+        const key = [current.id, n.id].sort().join('::');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push({
+          nodeId: n.id,
+          label: n.label,
+          direction: 'in'
+        });
+      }
+    }
+    return result;
   });
 
   // Form Models (synced with effect)
@@ -421,11 +451,24 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         );
       }
 
-      // Apply node positions
+      // Apply node positions + metadata
       if (view.positions) {
         for (const pos of view.positions) {
           this.vizService.setNodePosition(pos.nodeId, pos.positionX, pos.positionY, pos.positionZ);
+          // Only apply metadata fields that are actually present (avoid undefined overwrites)
+          const updates: Partial<NodeData> = {};
+          if (pos.label !== undefined) updates.label = pos.label;
+          if (pos.description !== undefined) updates.description = pos.description;
+          if (pos.color !== undefined) updates.color = pos.color;
+          if (Object.keys(updates).length > 0) {
+            this.vizService.updateNode(pos.nodeId, updates);
+          }
         }
+      }
+
+      // Restore connections
+      if (view.connections && view.connections.length > 0) {
+        this.vizService.restoreConnections(view.connections);
       }
 
       // Always start on camera 1 after loading a view
@@ -448,6 +491,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
     const cam1 = activeCam === 1 ? live : preset1;
     const cam2 = activeCam === 2 ? live : preset2;
     const positions = this.vizService.getAllNodePositions();
+    const allNodes = this.vizService.allNodes();
 
     return {
       name,
@@ -455,9 +499,17 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       cameraTargetX: cam1.target.x, cameraTargetY: cam1.target.y, cameraTargetZ: cam1.target.z,
       camera2PositionX: cam2.pos.x, camera2PositionY: cam2.pos.y, camera2PositionZ: cam2.pos.z,
       camera2TargetX: cam2.target.x, camera2TargetY: cam2.target.y, camera2TargetZ: cam2.target.z,
-      positions: Array.from(positions.entries()).map(([nodeId, pos]) => ({
-        nodeId, positionX: pos.x, positionY: pos.y, positionZ: pos.z
-      }))
+      connections: this.vizService.getAllConnections(),
+      positions: Array.from(positions.entries()).map(([nodeId, pos]) => {
+        const node = allNodes.find(n => n.id === nodeId);
+        return {
+          nodeId,
+          positionX: pos.x, positionY: pos.y, positionZ: pos.z,
+          label: node?.label,
+          description: node?.description,
+          color: node?.color
+        };
+      })
     };
   }
 
@@ -563,18 +615,45 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // --- Connections ---
 
-  addConnection() {
+  addConnection(direction: 'out' | 'in' | 'bidirectional' = 'out') {
     const current = this.selectedNodeData();
-    if (current && this.selectedTargetId) {
-      this.vizService.connectNodes(current.id, this.selectedTargetId);
-      this.selectedTargetId = ''; // Reset
+    if (!current || !this.selectedTargetId) return;
+
+    let fromId: string, toId: string;
+    if (direction === 'in') {
+      fromId = this.selectedTargetId;
+      toId = current.id;
+    } else {
+      fromId = current.id;
+      toId = this.selectedTargetId;
     }
+
+    this.vizService.connectNodes(fromId, toId);
+    if (direction === 'bidirectional') {
+      this.vizService.toggleConnectionDirection(fromId, toId);
+    }
+    this.selectedTargetId = '';
   }
 
   removeConnection(targetId: string) {
     const current = this.selectedNodeData();
-    if (current) {
+    if (!current) return;
+    // If this is an inbound connection (targetId has current in its connectedTo),
+    // disconnect from their side so the visual line is properly removed
+    const targetNode = this.vizService.getNode(targetId);
+    if (targetNode?.connectedTo.includes(current.id)) {
+      this.vizService.disconnectNodes(targetId, current.id);
+    } else {
       this.vizService.disconnectNodes(current.id, targetId);
+    }
+  }
+
+  toggleConnectionDirection(targetId: string) {
+    const current = this.selectedNodeData();
+    if (current) {
+      this.vizService.toggleConnectionDirection(current.id, targetId);
+      // Force inspector refresh
+      this.vizService.selectNode(current.id);
     }
   }
 

@@ -591,8 +591,8 @@
   color: white;
   border: none;
   border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 14px;
+  padding: 6px 10px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s;
@@ -623,22 +623,58 @@
   border: 1px solid rgba(51, 65, 85, 0.5);
 }
 
-.connection-item span {
+.conn-dir-badge {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 18px;
+  text-align: center;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.conn-dir-badge.dir-out { color: #4ade80; background: rgba(74, 222, 128, 0.15); }
+.conn-dir-badge.dir-in  { color: #f472b6; background: rgba(244, 114, 182, 0.15); }
+.conn-dir-badge.dir-bidi { color: #facc15; background: rgba(250, 204, 21, 0.15); }
+
+.conn-label {
   font-size: 12px;
   color: #cbd5e1;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conn-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .connection-item button {
-  color: #f87171;
+  color: #64748b;
   background: none;
   border: none;
   cursor: pointer;
   font-size: 10px;
   padding: 2px 4px;
+  border-radius: 2px;
+  transition: all 0.15s;
 }
 
 .connection-item button:hover {
   color: white;
+  background: #334155;
+}
+
+.connection-item button.conn-remove {
+  color: #f87171;
+}
+
+.connection-item button.conn-remove:hover {
+  color: white;
+  background: rgba(127, 29, 29, 0.5);
 }
 
 .empty-connections {

@@ -63,11 +63,33 @@ public class GraphView {
     @OneToMany(mappedBy = "graphView", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<GraphViewPosition> positions = new ArrayList<>();
 
+    /** JSON array of connections: [{sourceNodeId, targetNodeId, direction}] */
+    @Column(name = "connections", columnDefinition = "JSONB")
+    private String connections;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    /** Inner class for JSON serialization of connection data. */
+    public static class ConnectionData {
+        private String sourceNodeId;
+        private String targetNodeId;
+        private String direction; // OUTBOUND or BIDIRECTIONAL
+
+        public ConnectionData() {}
+        public ConnectionData(String sourceNodeId, String targetNodeId, String direction) {
+            this.sourceNodeId = sourceNodeId; this.targetNodeId = targetNodeId; this.direction = direction;
+        }
+        public String getSourceNodeId() { return sourceNodeId; }
+        public void setSourceNodeId(String s) { this.sourceNodeId = s; }
+        public String getTargetNodeId() { return targetNodeId; }
+        public void setTargetNodeId(String t) { this.targetNodeId = t; }
+        public String getDirection() { return direction; }
+        public void setDirection(String d) { this.direction = d; }
+    }
 
     public GraphView() {
     }
@@ -143,4 +165,7 @@ public class GraphView {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getConnections() { return connections; }
+    public void setConnections(String connections) { this.connections = connections; }
 }

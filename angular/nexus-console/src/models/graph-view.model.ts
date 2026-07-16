@@ -18,6 +18,7 @@ export interface GraphView {
     camera2TargetY: number;
     camera2TargetZ: number;
     isDefault?: boolean;
+    connections?: ConnectionData[];
     positions?: GraphViewPosition[];
     createdAt?: string;
     updatedAt?: string;
@@ -30,4 +31,14 @@ export interface GraphViewPosition {
     positionX: number;
     positionY: number;
     positionZ: number;
+    label?: string;
+    description?: string;
+    color?: string;
+}
+
+/** A connection between two nodes within a graph view. */
+export interface ConnectionData {
+    sourceNodeId: string;
+    targetNodeId: string;
+    direction: 'OUTBOUND' | 'BIDIRECTIONAL';
 }

@@ -6,6 +6,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRe
 import { Subject } from 'rxjs';
 import { NodeType } from '../models/component-config.js';
 import { ComponentRegistryService } from './component-registry.service.js';
+import type { ConnectionData } from '../models/graph-view.model.js';
 
 export type { NodeType } from '../models/component-config.js';
 
@@ -55,6 +56,9 @@ export class ArchitectureVizService {
     private nodes: Map<string, VisualNode> = new Map();
     // Key: "fromId::toId" (using :: as separator because UUIDs contain -)
     private connectionLines: Map<string, THREE.Line> = new Map();
+
+    // Bidirectional edges — normalized key so A↔B is stored once
+    private readonly bidirectionalEdges = new Set<string>();
 
     // Persistent position store — survives clearScene() and component lifecycle
     private readonly savedPositions = new Map<string, { x: number; y: number; z: number }>();
@@ -504,6 +508,7 @@ export class ArchitectureVizService {
             line.geometry.dispose();
         });
         this.connectionLines.clear();
+        this.bidirectionalEdges.clear();
         this.deselect();
         this.cleanupParticles();
         this.allNodes.set([]);
@@ -661,7 +666,10 @@ export class ArchitectureVizService {
         const node = this.nodes.get(id);
         if (!node) return;
 
-        node.data.connectedTo.forEach(targetId => this.removeVisualConnection(id, targetId));
+        node.data.connectedTo.forEach(targetId => {
+            this.bidirectionalEdges.delete(ArchitectureVizService.edgeKey(id, targetId));
+            this.removeVisualConnection(id, targetId);
+        });
 
         this.nodes.forEach(otherNode => {
             if (otherNode.data.connectedTo.includes(id)) {
@@ -691,6 +699,73 @@ export class ArchitectureVizService {
 
     // --- Connection Management ---
 
+    private static edgeKey(a: string, b: string): string {
+        return [a, b].sort().join('::');
+    }
+
+    /** Check whether an edge between two nodes is bidirectional. */
+    public isBidirectional(fromId: string, toId: string): boolean {
+        return this.bidirectionalEdges.has(ArchitectureVizService.edgeKey(fromId, toId));
+    }
+
+    /** Get all connections in the graph as ConnectionData array (for persistence). */
+    public getAllConnections(): ConnectionData[] {
+        const seen = new Set<string>();
+        const result: ConnectionData[] = [];
+
+        for (const node of this.nodes.values()) {
+            for (const targetId of node.data.connectedTo) {
+                const key = ArchitectureVizService.edgeKey(node.data.id, targetId);
+                if (seen.has(key)) continue;
+                seen.add(key);
+
+                const bidir = this.bidirectionalEdges.has(key);
+                result.push({
+                    sourceNodeId: node.data.id,
+                    targetNodeId: targetId,
+                    direction: bidir ? 'BIDIRECTIONAL' : 'OUTBOUND'
+                });
+            }
+        }
+        return result;
+    }
+
+    /** Restore connections from persisted data. */
+    public restoreConnections(connections: ConnectionData[]): void {
+        for (const conn of connections) {
+            this.connectNodes(conn.sourceNodeId, conn.targetNodeId);
+            if (conn.direction === 'BIDIRECTIONAL') {
+                // Also create the reverse in connectedTo
+                const toNode = this.nodes.get(conn.targetNodeId);
+                if (toNode && !toNode.data.connectedTo.includes(conn.sourceNodeId)) {
+                    toNode.data.connectedTo.push(conn.sourceNodeId);
+                }
+                this.bidirectionalEdges.add(ArchitectureVizService.edgeKey(conn.sourceNodeId, conn.targetNodeId));
+            }
+        }
+    }
+
+    /** Toggle a connection between OUTBOUND and BIDIRECTIONAL. */
+    public toggleConnectionDirection(fromId: string, toId: string): void {
+        const key = ArchitectureVizService.edgeKey(fromId, toId);
+        if (this.bidirectionalEdges.has(key)) {
+            // Downgrade to outbound: remove reverse connectedTo entry
+            this.bidirectionalEdges.delete(key);
+            const toNode = this.nodes.get(toId);
+            if (toNode) {
+                toNode.data.connectedTo = toNode.data.connectedTo.filter(id => id !== fromId);
+            }
+        } else {
+            // Upgrade to bidirectional: add reverse connectedTo entry
+            this.bidirectionalEdges.add(key);
+            const toNode = this.nodes.get(toId);
+            if (toNode && !toNode.data.connectedTo.includes(fromId)) {
+                toNode.data.connectedTo.push(fromId);
+            }
+        }
+        this.updateAllNodesSignal();
+    }
+
     public connectNodes(fromId: string, toId: string) {
         if (!this.scene) return;
         const fromNode = this.nodes.get(fromId);
@@ -706,18 +781,30 @@ export class ArchitectureVizService {
             return;
         }
 
+        // If reverse connection already exists, upgrade to bidirectional
+        if (toNode.data.connectedTo.includes(fromId)) {
+            this.bidirectionalEdges.add(ArchitectureVizService.edgeKey(fromId, toId));
+        }
+
         if (fromNode.data.connectedTo.includes(toId)) return;
         fromNode.data.connectedTo.push(toId);
         this.createVisualConnection(fromId, toId);
         if (this.selectedNodeId === fromId) this.selectedNodeData.set(fromNode.data);
+        this.updateAllNodesSignal();
     }
 
     public disconnectNodes(fromId: string, toId: string) {
         const fromNode = this.nodes.get(fromId);
         if (!fromNode) return;
+
+        // Remove bidirectional flag if set
+        const key = ArchitectureVizService.edgeKey(fromId, toId);
+        this.bidirectionalEdges.delete(key);
+
         fromNode.data.connectedTo = fromNode.data.connectedTo.filter(id => id !== toId);
         this.removeVisualConnection(fromId, toId);
         if (this.selectedNodeId === fromId) this.selectedNodeData.set(fromNode.data);
+        this.updateAllNodesSignal();
     }
 
     private createVisualConnection(fromId: string, toId: string) {
