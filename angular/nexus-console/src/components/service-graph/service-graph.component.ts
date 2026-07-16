@@ -75,6 +75,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Scene Settings
   bgColor = '#000510';
 
+  // Active Camera — 1 or 2, toggled via the camera switch button
+  activeCamera = this.vizService.activeCamera;
+
   // Initialization flag
   private isInitialized = signal(false);
 
@@ -378,6 +381,10 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
     this.vizService.setViewMode(mode);
   }
 
+  switchCamera() {
+    this.vizService.switchActiveCamera();
+  }
+
   toggleSimulation() {
     this.vizService.toggleSimulation(!this.isSimulationActive());
   }
@@ -400,11 +407,19 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       const view = await this.atlas.getById(id);
       this.atlas.selectedViewId.set(id);
 
-      // Apply camera state
+      // Apply camera 1 state to the live camera (preset 1 is set inside setCameraState)
       this.vizService.setCameraState(
         new THREE.Vector3(view.cameraPositionX, view.cameraPositionY, view.cameraPositionZ),
         new THREE.Vector3(view.cameraTargetX, view.cameraTargetY, view.cameraTargetZ)
       );
+
+      // Load camera 2 preset from saved data
+      if (view.camera2PositionX !== undefined) {
+        this.vizService.setCameraPreset(2,
+          new THREE.Vector3(view.camera2PositionX, view.camera2PositionY, view.camera2PositionZ),
+          new THREE.Vector3(view.camera2TargetX, view.camera2TargetY, view.camera2TargetZ)
+        );
+      }
 
       // Apply node positions
       if (view.positions) {
@@ -412,39 +427,47 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
           this.vizService.setNodePosition(pos.nodeId, pos.positionX, pos.positionY, pos.positionZ);
         }
       }
+
+      // Always start on camera 1 after loading a view
+      if (this.vizService.activeCamera() === 2) {
+        this.vizService.switchActiveCamera();
+      }
     } catch (e) {
       console.error('Failed to load graph view', e);
     }
   }
 
+  /** Build a view payload from the current scene state. */
+  private buildViewPayload(name: string): any {
+    const activeCam = this.vizService.activeCamera();
+    const live = { pos: this.vizService.getCameraPosition(), target: this.vizService.getCameraTarget() };
+    const defaultPos = new THREE.Vector3(-20, 40, 120);
+    const defaultTarget = new THREE.Vector3(0, 15, 0);
+    const preset1 = this.vizService.getCameraPreset(1) ?? { pos: defaultPos, target: defaultTarget };
+    const preset2 = this.vizService.getCameraPreset(2) ?? { pos: defaultPos, target: defaultTarget };
+    const cam1 = activeCam === 1 ? live : preset1;
+    const cam2 = activeCam === 2 ? live : preset2;
+    const positions = this.vizService.getAllNodePositions();
+
+    return {
+      name,
+      cameraPositionX: cam1.pos.x, cameraPositionY: cam1.pos.y, cameraPositionZ: cam1.pos.z,
+      cameraTargetX: cam1.target.x, cameraTargetY: cam1.target.y, cameraTargetZ: cam1.target.z,
+      camera2PositionX: cam2.pos.x, camera2PositionY: cam2.pos.y, camera2PositionZ: cam2.pos.z,
+      camera2TargetX: cam2.target.x, camera2TargetY: cam2.target.y, camera2TargetZ: cam2.target.z,
+      positions: Array.from(positions.entries()).map(([nodeId, pos]) => ({
+        nodeId, positionX: pos.x, positionY: pos.y, positionZ: pos.z
+      }))
+    };
+  }
+
   async saveCurrentView(name: string): Promise<void> {
     try {
-      const camPos = this.vizService.getCameraPosition();
-      const camTarget = this.vizService.getCameraTarget();
-      const positions = this.vizService.getAllNodePositions();
-
-      const view: any = {
-        name,
-        cameraPositionX: camPos.x,
-        cameraPositionY: camPos.y,
-        cameraPositionZ: camPos.z,
-        cameraTargetX: camTarget.x,
-        cameraTargetY: camTarget.y,
-        cameraTargetZ: camTarget.z,
-        positions: Array.from(positions.entries()).map(([nodeId, pos]) => ({
-          nodeId,
-          positionX: pos.x,
-          positionY: pos.y,
-          positionZ: pos.z
-        }))
-      };
-
+      const view = this.buildViewPayload(name);
       const currentId = this.atlas.selectedViewId();
       if (currentId !== null) {
-        // Update existing view (re-save)
         await this.atlas.update(currentId, view);
       } else {
-        // Create new view
         await this.atlas.create(view);
       }
     } catch (e) {
@@ -489,19 +512,15 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // --- Save / Load (Atlas DB) ---
 
-  saveToAtlas() {
-    const currentId = this.atlas.selectedViewId();
-    if (currentId !== null) {
-      // Re-save the already-loaded view (no prompt, keep existing name)
-      const existingView = this.atlas.views().find(v => v.id === currentId);
-      const name = existingView?.name ?? 'View';
-      this.saveCurrentView(name).then(() => this.atlas.refresh());
-    } else {
-      // No view loaded yet — prompt for a new name
-      const name = window.prompt('View name:');
-      if (name && name.trim()) {
-        this.saveCurrentView(name.trim()).then(() => this.atlas.refresh());
-      }
+  async saveToAtlas() {
+    // Always "Save As" — prompt for a name and create a brand-new view copy
+    const name = window.prompt('Save view as:');
+    if (!name || !name.trim()) return;
+
+    try {
+      await this.atlas.create(this.buildViewPayload(name.trim()));
+    } catch (e) {
+      console.error('Save As failed', e);
     }
   }
 

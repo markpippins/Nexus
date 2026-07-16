@@ -37,6 +37,26 @@ public class GraphView {
     @Column(name = "camera_target_z", nullable = false)
     private Double cameraTargetZ = 0.0;
 
+    // --- Camera 2 (secondary viewpoint) ---
+
+    @Column(name = "camera2_position_x", nullable = false)
+    private Double camera2PositionX = 0.0;
+
+    @Column(name = "camera2_position_y", nullable = false)
+    private Double camera2PositionY = 40.0;
+
+    @Column(name = "camera2_position_z", nullable = false)
+    private Double camera2PositionZ = 120.0;
+
+    @Column(name = "camera2_target_x", nullable = false)
+    private Double camera2TargetX = 0.0;
+
+    @Column(name = "camera2_target_y", nullable = false)
+    private Double camera2TargetY = 15.0;
+
+    @Column(name = "camera2_target_z", nullable = false)
+    private Double camera2TargetZ = 0.0;
+
     @Column(name = "is_default", nullable = false)
     private Boolean isDefault = false;
 
@@ -91,6 +111,26 @@ public class GraphView {
 
     public Double getCameraTargetZ() { return cameraTargetZ; }
     public void setCameraTargetZ(Double cameraTargetZ) { this.cameraTargetZ = cameraTargetZ; }
+
+    // --- Camera 2 getters/setters ---
+
+    public Double getCamera2PositionX() { return camera2PositionX; }
+    public void setCamera2PositionX(Double camera2PositionX) { this.camera2PositionX = camera2PositionX; }
+
+    public Double getCamera2PositionY() { return camera2PositionY; }
+    public void setCamera2PositionY(Double camera2PositionY) { this.camera2PositionY = camera2PositionY; }
+
+    public Double getCamera2PositionZ() { return camera2PositionZ; }
+    public void setCamera2PositionZ(Double camera2PositionZ) { this.camera2PositionZ = camera2PositionZ; }
+
+    public Double getCamera2TargetX() { return camera2TargetX; }
+    public void setCamera2TargetX(Double camera2TargetX) { this.camera2TargetX = camera2TargetX; }
+
+    public Double getCamera2TargetY() { return camera2TargetY; }
+    public void setCamera2TargetY(Double camera2TargetY) { this.camera2TargetY = camera2TargetY; }
+
+    public Double getCamera2TargetZ() { return camera2TargetZ; }
+    public void setCamera2TargetZ(Double camera2TargetZ) { this.camera2TargetZ = camera2TargetZ; }
 
     public Boolean getIsDefault() { return isDefault; }
     public void setIsDefault(Boolean isDefault) { this.isDefault = isDefault; }

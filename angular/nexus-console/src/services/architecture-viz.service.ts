@@ -89,6 +89,20 @@ export class ArchitectureVizService {
     public modeSignal: WritableSignal<'camera' | 'edit'> = signal('camera');
     public webglError: WritableSignal<string | null> = signal(null);
 
+    // Dual camera presets — two saved viewpoints the user can toggle between
+    public readonly activeCamera: WritableSignal<1 | 2> = signal(1);
+    private readonly cameraPresets = new Map<1 | 2, { pos: THREE.Vector3; target: THREE.Vector3 }>();
+
+    // Camera animation state (lerp transition between presets)
+    private cameraAnimating = false;
+    private cameraAnimStartPos = new THREE.Vector3();
+    private cameraAnimStartTarget = new THREE.Vector3();
+    private cameraAnimEndPos = new THREE.Vector3();
+    private cameraAnimEndTarget = new THREE.Vector3();
+    private cameraAnimElapsed = 0;
+    private cameraAnimLastTime = 0;
+    private readonly CAMERA_ANIM_DURATION = 0.8; // seconds
+
     private raycaster = new THREE.Raycaster();
     private mouse = new THREE.Vector2();
     private resizeObserver: ResizeObserver | null = null;
@@ -172,6 +186,15 @@ export class ArchitectureVizService {
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
         this.controls.addEventListener('end', () => this.cameraChanged.next());
+
+        // Seed camera 1 (near-horizontal, looking at the ring)
+        // and camera 2 (top-down, vertical view on the ring)
+        const pos1 = new THREE.Vector3(-20, 40, 120);
+        const target1 = new THREE.Vector3(0, 15, 0);
+        const pos2 = new THREE.Vector3(0, 80, 1);
+        const target2 = new THREE.Vector3(0, 0, 0);
+        this.cameraPresets.set(1, { pos: pos1.clone(), target: target1.clone() });
+        this.cameraPresets.set(2, { pos: pos2.clone(), target: target2.clone() });
 
         // 6. Lights
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -291,6 +314,48 @@ export class ArchitectureVizService {
         (this.controls as any).target.copy(target);
         this.camera.lookAt(this.controls.target);
         this.controls.update();
+        // Keep the active preset in sync so toggle doesn't revert to a stale value
+        const slot = this.activeCamera();
+        this.cameraPresets.set(slot, { pos: pos.clone(), target: target.clone() });
+    }
+
+    /** Switch between camera preset 1 and 2, saving the current viewpoint first.
+     *  Animates the transition with a smooth ease-out lerp. */
+    public switchActiveCamera(): void {
+        if (!this.camera || !this.controls) return;
+        if (this.cameraAnimating) return; // don't interrupt an in-progress transition
+
+        // Save current camera state into the current slot
+        const currentSlot = this.activeCamera();
+        this.cameraPresets.set(currentSlot, {
+            pos: this.camera.position.clone(),
+            target: (this.controls as any).target.clone()
+        });
+
+        // Toggle to the other slot
+        const newSlot: 1 | 2 = currentSlot === 1 ? 2 : 1;
+        this.activeCamera.set(newSlot);
+
+        // Start animation from current position to the new preset
+        const preset = this.cameraPresets.get(newSlot)!;
+        this.cameraAnimStartPos.copy(this.camera.position);
+        this.cameraAnimStartTarget.copy((this.controls as any).target);
+        this.cameraAnimEndPos.copy(preset.pos);
+        this.cameraAnimEndTarget.copy(preset.target);
+        this.cameraAnimElapsed = 0;
+        this.cameraAnimating = true;
+        this.controls.enabled = false;
+    }
+
+    /** Get a specific camera preset's position + target (clone — safe to mutate). */
+    public getCameraPreset(slot: 1 | 2): { pos: THREE.Vector3; target: THREE.Vector3 } | null {
+        const preset = this.cameraPresets.get(slot);
+        return preset ? { pos: preset.pos.clone(), target: preset.target.clone() } : null;
+    }
+
+    /** Set a specific camera preset without moving the live camera. */
+    public setCameraPreset(slot: 1 | 2, pos: THREE.Vector3, target: THREE.Vector3): void {
+        this.cameraPresets.set(slot, { pos: pos.clone(), target: target.clone() });
     }
 
     /** Move a node and persist its position in savedPositions. */
@@ -873,6 +938,33 @@ export class ArchitectureVizService {
         }
 
         const time = Date.now() * 0.001;
+
+        // Camera transition animation (smooth lerp between presets)
+        if (this.cameraAnimating) {
+            const now = performance.now() / 1000;
+            if (this.cameraAnimLastTime === 0) this.cameraAnimLastTime = now;
+            const dt = now - this.cameraAnimLastTime;
+            this.cameraAnimLastTime = now;
+            this.cameraAnimElapsed += dt;
+            const rawT = Math.min(this.cameraAnimElapsed / this.CAMERA_ANIM_DURATION, 1);
+            const t = 1 - Math.pow(1 - rawT, 3); // ease-out cubic
+
+            this.camera.position.lerpVectors(this.cameraAnimStartPos, this.cameraAnimEndPos, t);
+            (this.controls as any).target.lerpVectors(this.cameraAnimStartTarget, this.cameraAnimEndTarget, t);
+            this.camera.lookAt(this.controls.target);
+
+            if (rawT >= 1) {
+                // Snap to exact target
+                this.camera.position.copy(this.cameraAnimEndPos);
+                (this.controls as any).target.copy(this.cameraAnimEndTarget);
+                this.cameraAnimating = false;
+                this.cameraAnimLastTime = 0;
+                this.controls.enabled = this.viewMode() === 'camera';
+                this.controls.update();
+                this.cameraChanged.next();
+            }
+        }
+
         this.nodes.forEach(node => {
             // Only float if not selected and not dragging
             if (node.data.id !== this.selectedNodeId && !this.isDragging) {

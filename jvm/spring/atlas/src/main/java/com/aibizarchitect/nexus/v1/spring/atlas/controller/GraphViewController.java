@@ -73,6 +73,14 @@ public class GraphViewController {
                     existing.setCameraTargetY(details.getCameraTargetY());
                     existing.setCameraTargetZ(details.getCameraTargetZ());
 
+                    // Camera 2 (secondary viewpoint)
+                    existing.setCamera2PositionX(details.getCamera2PositionX());
+                    existing.setCamera2PositionY(details.getCamera2PositionY());
+                    existing.setCamera2PositionZ(details.getCamera2PositionZ());
+                    existing.setCamera2TargetX(details.getCamera2TargetX());
+                    existing.setCamera2TargetY(details.getCamera2TargetY());
+                    existing.setCamera2TargetZ(details.getCamera2TargetZ());
+
                     // Replace positions (only if explicitly provided)
                     if (details.getPositions() != null) {
                         existing.getPositions().clear();
