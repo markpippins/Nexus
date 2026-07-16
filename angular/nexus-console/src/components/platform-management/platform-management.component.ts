@@ -124,11 +124,43 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             <tr>
                                                 <td colspan="5" class="p-8 text-center text-[rgb(var(--color-text-muted))]">No services found.</td>
                                             </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
+                                        }                                </tbody>
+                            </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            (click)="onPrevPage()"
+                                            [disabled]="currentPage() === 0"
+                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            [class]="currentPage() === 0
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            ← Previous
+                                        </button>
+                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
+                                            Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                        </span>
+                                        <button
+                                            (click)="onNextPage()"
+                                            [disabled]="currentPage() >= totalPages() - 1"
+                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            [class]="currentPage() >= totalPages() - 1
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            Next →
+                                        </button>
+                                    </div>
+                                </div>
+                            }
                         </div>
+                    </div>
                     }
                     @case ('libraries') {
                         <div class="overflow-x-auto flex-1">
@@ -198,6 +230,39 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                     }
                                 </tbody>
                             </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            (click)="onPrevPage()"
+                                            [disabled]="currentPage() === 0"
+                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            [class]="currentPage() === 0
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            ← Previous
+                                        </button>
+                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
+                                            Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                        </span>
+                                        <button
+                                            (click)="onNextPage()"
+                                            [disabled]="currentPage() >= totalPages() - 1"
+                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            [class]="currentPage() >= totalPages() - 1
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            Next →
+                                        </button>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
                     @case ('frameworks') {
@@ -259,6 +324,39 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                     }
                                 </tbody>
                             </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            (click)="onPrevPage()"
+                                            [disabled]="currentPage() === 0"
+                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            [class]="currentPage() === 0
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            ← Previous
+                                        </button>
+                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
+                                            Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                        </span>
+                                        <button
+                                            (click)="onNextPage()"
+                                            [disabled]="currentPage() >= totalPages() - 1"
+                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            [class]="currentPage() >= totalPages() - 1
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            Next →
+                                        </button>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
                     @case ('deployments') {
@@ -402,12 +500,45 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 </td>
                                             </tr>
                                         }
-                                    </tbody>
-                                </table>
-                            </div>
+                                </tbody>
+                            </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button
+                                            (click)="onPrevPage()"
+                                            [disabled]="currentPage() === 0"
+                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            [class]="currentPage() === 0
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            ← Previous
+                                        </button>
+                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
+                                            Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                        </span>
+                                        <button
+                                            (click)="onNextPage()"
+                                            [disabled]="currentPage() >= totalPages() - 1"
+                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            [class]="currentPage() >= totalPages() - 1
+                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                        >
+                                            Next →
+                                        </button>
+                                    </div>
+                                </div>
+                            }
                         </div>
-                    }
-                    @case ('categories') {
+                    </div>
+                }
+                @case ('categories') {
                         <app-categories-view
                             [items]="lookupData()"
                             [filteredType]="filteredCategoryType()"
@@ -529,6 +660,16 @@ export class PlatformManagementComponent {
 
     // Sort State
     sortState = signal<{ column: string; direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
+
+    // Pagination State
+    currentPage = signal(0);
+    totalPages = signal(0);
+    totalItems = signal(0);
+    perPage = signal(100);
+
+    // Computed pagination display helpers
+    pageStartIndex = computed(() => this.currentPage() * this.perPage() + 1);
+    pageEndIndex = computed(() => Math.min((this.currentPage() + 1) * this.perPage(), this.totalItems()));
 
     // Computed Sorted Signals
     services = computed(() => {
@@ -697,8 +838,9 @@ export class PlatformManagementComponent {
             const displayType = type.startsWith('categories:') ? 'categories' : type;
             if (displayType) {
                 this.activeTab.set(displayType === 'services' ? 'services' : displayType);
-                // Reset sort on type change
+                // Reset sort + page on type change
                 this.sortState.set({ column: 'name', direction: 'asc' });
+                this.currentPage.set(0);
             }
         });
 
@@ -819,37 +961,56 @@ export class PlatformManagementComponent {
         // Normalize categories:* to categories for data loading
         const normalizedType = type.startsWith('categories:') ? 'categories' : type;
         const actualType = (normalizedType === 'services' && activeTab !== 'services') ? activeTab : normalizedType;
+        const page = this.currentPage();
 
         try {
             switch (actualType) {
                 case 'services':
-                    console.log('[PlatformManagement] Fetching services from', `${url}/api/v1/services`);
-                    const s = await this.platformService.getServices(url);
-                    console.log('[PlatformManagement] Services loaded', s.length);
-                    this.rawServices.set(s);
+                    console.log('[PlatformManagement] Fetching services from', `${url}/api/v1/services?page=${page}`);
+                    const sResp = await this.platformService.getServices(url, page);
+                    console.log('[PlatformManagement] Services loaded', sResp.data.length, 'of', sResp.meta.total);
+                    this.rawServices.set(sResp.data);
+                    this.totalPages.set(sResp.meta.last_page);
+                    this.totalItems.set(sResp.meta.total);
+                    this.perPage.set(sResp.meta.per_page);
                     break;
                 case 'frameworks':
-                    const f = await this.platformService.getFrameworks(url);
-                    this.rawFrameworks.set(f);
+                    const fResp = await this.platformService.getFrameworks(url, page);
+                    this.rawFrameworks.set(fResp.data);
+                    this.totalPages.set(fResp.meta.last_page);
+                    this.totalItems.set(fResp.meta.total);
+                    this.perPage.set(fResp.meta.per_page);
                     break;
                 case 'deployments':
-                    const d = await this.platformService.getDeployments(url);
-                    this.rawDeployments.set(d);
+                    const dResp = await this.platformService.getDeployments(url, page);
+                    this.rawDeployments.set(dResp.data);
+                    this.totalPages.set(dResp.meta.last_page);
+                    this.totalItems.set(dResp.meta.total);
+                    this.perPage.set(dResp.meta.per_page);
                     break;
                 case 'servers':
-                    const h = await this.platformService.getServers(url);
-                    this.rawServers.set(h);
+                    const hResp = await this.platformService.getServers(url, page);
+                    this.rawServers.set(hResp.data);
+                    this.totalPages.set(hResp.meta.last_page);
+                    this.totalItems.set(hResp.meta.total);
+                    this.perPage.set(hResp.meta.per_page);
                     break;
                 case 'categories':
                 case 'framework-languages':
                 case 'operating-systems':
                 case 'environments':
-                    const l = await this.platformService.getLookup(url, actualType);
-                    this.lookupData.set(l);
+                    const lResp = await this.platformService.getLookup(url, actualType, page);
+                    this.lookupData.set(lResp.data);
+                    this.totalPages.set(lResp.meta.last_page);
+                    this.totalItems.set(lResp.meta.total);
+                    this.perPage.set(lResp.meta.per_page);
                     break;
                 case 'libraries':
-                    const libs = await this.platformService.getLibraries(url);
-                    this.rawLibraries.set(libs);
+                    const libsResp = await this.platformService.getLibraries(url, page);
+                    this.rawLibraries.set(libsResp.data);
+                    this.totalPages.set(libsResp.meta.last_page);
+                    this.totalItems.set(libsResp.meta.total);
+                    this.perPage.set(libsResp.meta.per_page);
                     break;
             }
         } catch (e) {
@@ -857,6 +1018,18 @@ export class PlatformManagementComponent {
             this.error.set(`Failed to load ${actualType}`);
         } finally {
             this.loading.set(false);
+        }
+    }
+
+    onPrevPage() {
+        if (this.currentPage() > 0) {
+            this.currentPage.update(p => p - 1);
+        }
+    }
+
+    onNextPage() {
+        if (this.currentPage() < this.totalPages() - 1) {
+            this.currentPage.update(p => p + 1);
         }
     }
 

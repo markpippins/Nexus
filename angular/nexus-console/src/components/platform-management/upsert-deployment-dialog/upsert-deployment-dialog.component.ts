@@ -177,9 +177,9 @@ export class UpsertDeploymentDialogComponent implements OnInit {
         let hosts: Server[] = [];
         let envs: LookupItem[] = [];
 
-        try { srvs = await this.platformService.getServices(url); } catch (e) { console.error('Failed to load services', e); }
-        try { hosts = await this.platformService.getServers(url); } catch (e) { console.error('Failed to load servers', e); }
-        try { envs = await this.platformService.getLookup(url, LOOKUP_ENVIRONMENTS); } catch (e) { console.error('Failed to load environments', e); }
+        try { srvs = (await this.platformService.getServices(url)).data; } catch (e) { console.error('Failed to load services', e); }
+        try { hosts = (await this.platformService.getServers(url)).data; } catch (e) { console.error('Failed to load servers', e); }
+        try { envs = (await this.platformService.getLookup(url, LOOKUP_ENVIRONMENTS)).data; } catch (e) { console.error('Failed to load environments', e); }
 
         const standalone = srvs.filter(s => !s.parentServiceId);
         this.standaloneServices.set(standalone);

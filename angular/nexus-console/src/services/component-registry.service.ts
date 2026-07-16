@@ -50,7 +50,8 @@ export class ComponentRegistryService {
         const baseUrl = this.getBaseUrl();
         for (let attempt = 0; attempt <= retries; attempt++) {
             try {
-                const components = await this.platformService.getVisualComponents(baseUrl);
+                const response = await this.platformService.getVisualComponents(baseUrl);
+                const components = response.data;
                 if (components && components.length > 0) {
                     this.registry.set(components);
                     this.backendLoaded.set(true);

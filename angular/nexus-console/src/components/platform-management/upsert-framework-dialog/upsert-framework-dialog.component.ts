@@ -152,8 +152,8 @@ export class UpsertFrameworkDialogComponent implements OnInit {
 
         try {
             const [cats, langs] = await Promise.all([
-                this.platformService.getLookup(url, LOOKUP_FRAMEWORK_CATEGORIES).catch(() => []),
-                this.platformService.getLookup(url, LOOKUP_FRAMEWORK_LANGUAGES).catch(() => [])
+                this.platformService.getLookup(url, LOOKUP_FRAMEWORK_CATEGORIES).then(r => r.data).catch(() => []),
+                this.platformService.getLookup(url, LOOKUP_FRAMEWORK_LANGUAGES).then(r => r.data).catch(() => [])
             ]);
             this.categories.set(cats);
             this.languages.set(langs);

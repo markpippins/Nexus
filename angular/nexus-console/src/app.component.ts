@@ -837,24 +837,24 @@ export class AppComponent implements OnInit, OnDestroy {
           try {
             if (node.type === 'servers') {
               const [st, et, os] = await Promise.all([
-                this.platformManagementService.getLookup(baseUrl, LOOKUP_SERVER_TYPES),
-                this.platformManagementService.getLookup(baseUrl, LOOKUP_ENVIRONMENTS),
-                this.platformManagementService.getLookup(baseUrl, LOOKUP_OPERATING_SYSTEMS)
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_SERVER_TYPES).then(r => r.data),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_ENVIRONMENTS).then(r => r.data),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_OPERATING_SYSTEMS).then(r => r.data)
               ]);
               serverTypes = st;
               environmentTypes = et;
               operatingSystems = os;
             } else if (node.type === 'services') {
               const [fw, st] = await Promise.all([
-                this.platformManagementService.getFrameworks(baseUrl),
-                this.platformManagementService.getLookup(baseUrl, LOOKUP_SERVICE_TYPES)
+                this.platformManagementService.getFrameworks(baseUrl).then(r => r.data),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_SERVICE_TYPES).then(r => r.data)
               ]);
               frameworks = fw;
               serviceTypes = st;
             } else if (node.type === 'frameworks') {
               const [fc, fl] = await Promise.all([
-                this.platformManagementService.getLookup(baseUrl, LOOKUP_FRAMEWORK_CATEGORIES),
-                this.platformManagementService.getLookup(baseUrl, LOOKUP_FRAMEWORK_LANGUAGES)
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_FRAMEWORK_CATEGORIES).then(r => r.data),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_FRAMEWORK_LANGUAGES).then(r => r.data)
               ]);
               frameworkCategories = fc;
               frameworkLanguages = fl;
