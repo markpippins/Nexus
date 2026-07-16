@@ -35,6 +35,7 @@ public class ServiceStatusCacheService {
     private static final String STATUS_KEY_PREFIX = "service:status:";
     private static final String HEARTBEAT_KEY_PREFIX = "service:heartbeat:";
     private static final String METRICS_KEY_PREFIX = "service:metrics:";
+    private static final String MAINTENANCE_KEY_PREFIX = "service:maintenance:";
     private static final String ALL_SERVICES_KEY = "services:active";
 
     // Pub/Sub channels
@@ -128,6 +129,8 @@ public class ServiceStatusCacheService {
     /**
      * Record heartbeat with rich metadata (version, build, metrics).
      * All parameters except serviceName and serviceId are optional.
+     * If the service is in maintenance mode, heartbeats are recorded but
+     * status updates are skipped (maintenance state is preserved).
      */
     public void recordHeartbeatRich(String serviceName, Long serviceId,
                                      String version, String build,
@@ -153,6 +156,12 @@ public class ServiceStatusCacheService {
                         "service:meta:" + serviceName,
                         objectMapper.writeValueAsString(metadata),
                         HEARTBEAT_TTL_SECONDS, TimeUnit.SECONDS);
+            }
+
+            // Skip status update if in maintenance mode
+            if (isMaintenanceMode(serviceName)) {
+                log.debug("Maintenance mode active for {} — heartbeat recorded, status not updated", serviceName);
+                return;
             }
 
             // Update status if exists
@@ -593,5 +602,73 @@ public class ServiceStatusCacheService {
         } catch (Exception e) {
             log.debug("Failed to persist status transition for {}: {}", serviceName, e.getMessage());
         }
+    }
+
+    // --- Maintenance mode ---
+
+    /**
+     * Set a service into maintenance mode with a target state (OFFLINE or DEGRADED).
+     * While in maintenance mode, heartbeat-driven status updates are ignored,
+     * and the service remains in the specified state.
+     */
+    public void setMaintenanceMode(String serviceName, String targetState, @Nullable String reason) {
+        String key = MAINTENANCE_KEY_PREFIX + serviceName;
+        String value = targetState + "|" + (reason != null ? reason : "");
+        stringRedisTemplate.opsForValue().set(key, value);
+        log.info("Maintenance mode ON for {}: state={}", serviceName, targetState);
+
+        // Immediately force the service into the target state
+        ServiceStatus status = getServiceStatus(serviceName).orElse(
+                ServiceStatus.builder()
+                        .serviceId(0L)
+                        .serviceName(serviceName)
+                        .build());
+        status.setHealthState(HealthState.valueOf(targetState));
+        status.setErrorMessage(reason);
+        updateServiceStatus(status);
+    }
+
+    /**
+     * Clear maintenance mode for a service.
+     * The next heartbeat will restore the service to its actual state.
+     */
+    public void clearMaintenanceMode(String serviceName) {
+        stringRedisTemplate.delete(MAINTENANCE_KEY_PREFIX + serviceName);
+        log.info("Maintenance mode OFF for {}", serviceName);
+    }
+
+    /**
+     * Check if a service is currently in maintenance mode.
+     */
+    public boolean isMaintenanceMode(String serviceName) {
+        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(MAINTENANCE_KEY_PREFIX + serviceName));
+    }
+
+    /**
+     * Get the maintenance mode target state for a service, or null if not in maintenance.
+     * Format: "OFFLINE|reason" or "DEGRADED|reason"
+     */
+    @Nullable
+    public String getMaintenanceMode(String serviceName) {
+        String val = stringRedisTemplate.opsForValue().get(MAINTENANCE_KEY_PREFIX + serviceName);
+        return val;
+    }
+
+    /**
+     * List all services currently in maintenance mode.
+     */
+    public java.util.Map<String, String> getAllMaintenanceMode() {
+        java.util.Map<String, String> result = new java.util.HashMap<>();
+        var keys = stringRedisTemplate.keys(MAINTENANCE_KEY_PREFIX + "*");
+        if (keys != null) {
+            for (String key : keys) {
+                String serviceName = key.substring(MAINTENANCE_KEY_PREFIX.length());
+                String val = stringRedisTemplate.opsForValue().get(key);
+                if (val != null) {
+                    result.put(serviceName, val);
+                }
+            }
+        }
+        return result;
     }
 }

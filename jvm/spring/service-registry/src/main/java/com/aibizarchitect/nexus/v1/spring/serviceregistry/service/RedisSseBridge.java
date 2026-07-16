@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.stereotype.Component;
 
@@ -30,13 +29,15 @@ public class RedisSseBridge implements MessageListener {
     public static final String STATUS_CHANNEL = "service-status-updates";
     public static final String HEARTBEAT_CHANNEL = "service-heartbeats";
     public static final String STATUS_CHANGE_CHANNEL = "service-status-changes";
+    public static final String CASCADE_CHANNEL = "cascade-events";
 
     private final SseEmitterRegistry emitterRegistry;
     private final StringRedisSerializer stringSerializer = new StringRedisSerializer();
-    private final GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer();
+    private final com.fasterxml.jackson.databind.ObjectMapper plainMapper;
 
-    public RedisSseBridge(SseEmitterRegistry emitterRegistry) {
+    public RedisSseBridge(SseEmitterRegistry emitterRegistry, com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.emitterRegistry = emitterRegistry;
+        this.plainMapper = objectMapper;
     }
 
     @Override
@@ -51,6 +52,8 @@ public class RedisSseBridge implements MessageListener {
                 handleHeartbeat(body);
             } else if (STATUS_CHANGE_CHANNEL.equals(channel)) {
                 handleStatusChange(body);
+            } else if (CASCADE_CHANNEL.equals(channel)) {
+                handleCascadeEvent(body);
             } else {
                 log.debug("Received message on unknown channel: {}", channel);
             }
@@ -61,15 +64,9 @@ public class RedisSseBridge implements MessageListener {
 
     private void handleStatusUpdate(byte[] body) {
         try {
-            Object deserialized = jsonSerializer.deserialize(body, Object.class);
-
-            Map<String, Object> eventData;
-            if (deserialized instanceof Map) {
-                eventData = new HashMap<>((Map<String, Object>) deserialized);
-            } else {
-                eventData = new HashMap<>();
-                eventData.put("raw", deserialized != null ? deserialized.toString() : null);
-            }
+            String json = stringSerializer.deserialize(body);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> eventData = plainMapper.readValue(json, Map.class);
 
             // Ensure we have a service name for routing
             String serviceName = eventData.containsKey("serviceName")
@@ -88,15 +85,9 @@ public class RedisSseBridge implements MessageListener {
 
     private void handleHeartbeat(byte[] body) {
         try {
-            Object deserialized = jsonSerializer.deserialize(body, Object.class);
-
-            Map<String, Object> eventData;
-            if (deserialized instanceof Map) {
-                eventData = new HashMap<>((Map<String, Object>) deserialized);
-            } else {
-                eventData = new HashMap<>();
-                eventData.put("raw", deserialized != null ? deserialized.toString() : null);
-            }
+            String json = stringSerializer.deserialize(body);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> eventData = plainMapper.readValue(json, Map.class);
 
             String serviceName = eventData.containsKey("serviceName")
                     ? String.valueOf(eventData.get("serviceName"))
@@ -113,15 +104,9 @@ public class RedisSseBridge implements MessageListener {
 
     private void handleStatusChange(byte[] body) {
         try {
-            Object deserialized = jsonSerializer.deserialize(body, Object.class);
-
-            Map<String, Object> eventData;
-            if (deserialized instanceof Map) {
-                eventData = new HashMap<>((Map<String, Object>) deserialized);
-            } else {
-                eventData = new HashMap<>();
-                eventData.put("raw", deserialized != null ? deserialized.toString() : null);
-            }
+            String json = stringSerializer.deserialize(body);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> eventData = plainMapper.readValue(json, Map.class);
 
             String serviceName = eventData.containsKey("serviceName")
                     ? String.valueOf(eventData.get("serviceName"))
@@ -134,6 +119,21 @@ public class RedisSseBridge implements MessageListener {
 
         } catch (Exception e) {
             log.warn("Error handling status-change: {}", e.getMessage());
+        }
+    }
+
+    private void handleCascadeEvent(byte[] body) {
+        try {
+            String json = stringSerializer.deserialize(body);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> eventData = plainMapper.readValue(json, Map.class);
+
+            log.debug("Bridging cascade event: {}", eventData.get("type"));
+
+            emitterRegistry.broadcastCascade(eventData);
+
+        } catch (Exception e) {
+            log.warn("Error handling cascade event: {}", e.getMessage());
         }
     }
 }

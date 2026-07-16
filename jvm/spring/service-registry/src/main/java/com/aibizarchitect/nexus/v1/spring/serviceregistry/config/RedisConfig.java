@@ -134,6 +134,8 @@ public class RedisConfig implements CachingConfigurer {
                 new ChannelTopic(RedisSseBridge.HEARTBEAT_CHANNEL));
         container.addMessageListener(redisSseBridge,
                 new ChannelTopic(RedisSseBridge.STATUS_CHANGE_CHANNEL));
+        container.addMessageListener(redisSseBridge,
+                new ChannelTopic(RedisSseBridge.CASCADE_CHANNEL));
 
         return container;
     }

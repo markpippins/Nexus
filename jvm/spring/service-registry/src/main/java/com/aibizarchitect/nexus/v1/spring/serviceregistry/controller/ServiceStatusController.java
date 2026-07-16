@@ -289,11 +289,16 @@ public class ServiceStatusController {
      * Try it:
      *   curl -N http://localhost:8085/api/v1/status/stream
      *   curl -N "http://localhost:8085/api/v1/status/stream?services=conduit-mcp&events=status-update,status-change"
+     *
+     * Reconnection:
+     *   Clients that send a Last-Event-Id header will receive all events
+     *   after that ID before joining the live broadcast.
      */
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamStatusUpdates(
             @org.springframework.web.bind.annotation.RequestParam(required = false) String services,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String events) {
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String events,
+            jakarta.servlet.http.HttpServletRequest request) {
 
         SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
 
@@ -301,10 +306,22 @@ public class ServiceStatusController {
         Set<String> serviceNames = parseCommaSeparated(services);
         Set<String> eventTypes = parseCommaSeparated(events);
 
-        // Register with filters — events flow via RedisSseBridge
-        emitterRegistry.register(emitter, serviceNames, eventTypes);
+        // Read Last-Event-Id for reconnection replay
+        Long lastEventId = null;
+        String lastEventIdHeader = request.getHeader("Last-Event-Id");
+        if (lastEventIdHeader != null && !lastEventIdHeader.isEmpty()) {
+            try {
+                lastEventId = Long.parseLong(lastEventIdHeader);
+                log.info("SSE client reconnecting with Last-Event-Id: {}", lastEventId);
+            } catch (NumberFormatException e) {
+                log.debug("Invalid Last-Event-Id header: {}", lastEventIdHeader);
+            }
+        }
 
-        // Build and send snapshot immediately
+        // Register with filters and optional replay — events flow via RedisSseBridge
+        emitterRegistry.register(emitter, serviceNames, eventTypes, lastEventId);
+
+        // Build and send snapshot immediately (replay happens before this via register)
         sendSnapshot(emitter, serviceNames);
 
         log.info("SSE client connected for status updates (total: {})", emitterRegistry.getClientCount());

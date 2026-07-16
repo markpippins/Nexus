@@ -186,8 +186,12 @@ class ServiceStatusControllerTest {
     void streamStatusUpdates() {
         when(cacheService.getSnapshotStatuses()).thenReturn(List.of());
 
+        jakarta.servlet.http.HttpServletRequest mockRequest =
+                org.mockito.Mockito.mock(jakarta.servlet.http.HttpServletRequest.class);
+        when(mockRequest.getHeader("Last-Event-Id")).thenReturn(null);
+
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
-                controller.streamStatusUpdates(null, null);
+                controller.streamStatusUpdates(null, null, mockRequest);
 
         assertNotNull(emitter);
     }

@@ -22,6 +22,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *   - eventTypes: if non-empty, only events whose type is in this set are sent.
  *     "snapshot" and "keepalive" are always sent regardless of this filter.
  *
+ * Supports event IDs for Last-Event-Id reconnection. Each event sent
+ * through this emitter is stamped with a monotonic ID.
+ *
  * Tracks per-client metrics: events sent, events filtered, connected since.
  */
 public class FilteredSseEmitter {
@@ -50,13 +53,13 @@ public class FilteredSseEmitter {
     }
 
     /**
-     * Attempt to send an event. Returns true if the event was sent,
+     * Attempt to send an event with a monotonic ID. Returns true if the event was sent,
      * false if it was filtered out.
      */
-    public boolean send(String eventName, Object data) {
+    public boolean send(String eventName, Object data, long eventId) {
         // Always send snapshot, keepalive
         if ("snapshot".equals(eventName) || "keepalive".equals(eventName)) {
-            doSend(eventName, data);
+            doSend(eventName, data, eventId);
             eventsSent.incrementAndGet();
             return true;
         }
@@ -76,12 +79,22 @@ public class FilteredSseEmitter {
             }
         }
 
-        doSend(eventName, data);
+        doSend(eventName, data, eventId);
         eventsSent.incrementAndGet();
         return true;
     }
 
-    private void doSend(String eventName, Object data) {
+    /**
+     * Attempt to send an event (backward-compatible, no ID).
+     */
+    public boolean send(String eventName, Object data) {
+        return send(eventName, data, -1);
+    }
+
+    /**
+     * Send an event with an ID. Snapshot and keepalive bypass filters.
+     */
+    private void doSend(String eventName, Object data, long eventId) {
         try {
             String json;
             if (data instanceof String) {
@@ -89,11 +102,52 @@ public class FilteredSseEmitter {
             } else {
                 json = objectMapper.writeValueAsString(data);
             }
-            delegate.send(SseEmitter.event()
+            var builder = SseEmitter.event()
                     .name(eventName)
-                    .data(json, org.springframework.http.MediaType.APPLICATION_JSON));
+                    .data(json, org.springframework.http.MediaType.APPLICATION_JSON);
+
+            // Add event ID if provided (skip for snapshot/keepalive)
+            if (eventId > 0 && !"snapshot".equals(eventName) && !"keepalive".equals(eventName)) {
+                builder.id(String.valueOf(eventId));
+            }
+
+            delegate.send(builder);
         } catch (IOException e) {
             log.debug("Failed to send SSE event {}: {}", eventName, e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Replay a buffered event to this client (for Last-Event-Id reconnection).
+     * The event is sent with its original ID.
+     */
+    public void replayEvent(Map<String, Object> entry) {
+        try {
+            String eventType = String.valueOf(entry.get("type"));
+            Object data = entry.get("data");
+            Object idObj = entry.get("id");
+            long eventId = idObj instanceof Number ? ((Number) idObj).longValue() : -1;
+
+            String json;
+            if (data instanceof String) {
+                json = (String) data;
+            } else {
+                json = objectMapper.writeValueAsString(data);
+            }
+
+            var builder = SseEmitter.event()
+                    .name(eventType)
+                    .data(json, org.springframework.http.MediaType.APPLICATION_JSON);
+
+            if (eventId > 0) {
+                builder.id(String.valueOf(eventId));
+            }
+
+            delegate.send(builder);
+            eventsSent.incrementAndGet();
+        } catch (Exception e) {
+            log.debug("Failed to replay event: {}", e.getMessage());
             throw new RuntimeException(e);
         }
     }
@@ -108,7 +162,6 @@ public class FilteredSseEmitter {
             return name != null ? name.toString() : null;
         }
         if (data instanceof String) {
-            // JSON string — parse minimally
             try {
                 Map<String, Object> map = objectMapper.readValue((String) data, Map.class);
                 Object name = map.get("serviceName");

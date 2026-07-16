@@ -31,6 +31,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepo
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.ExternalServiceRegistrationService;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.ServiceStatusCacheService;
 import com.aibizarchitect.nexus.v1.dto.ExternalServiceRegistration;
+import com.aibizarchitect.nexus.v1.dto.HeartbeatPayload;
 
 @ExtendWith(MockitoExtension.class)
 class RegistryControllerTest {

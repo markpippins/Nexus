@@ -262,6 +262,71 @@ public class RegistryController {
         }
     }
 
+    // --- Maintenance mode admin endpoints ---
+
+    /**
+     * Set a service into maintenance mode.
+     * The service will be forced into the specified state (OFFLINE or DEGRADE)
+     * and will remain there until maintenance mode is cleared, regardless of
+     * heartbeat status.
+     *
+     * POST /api/v1/registry/admin/maintenance/{serviceName}
+     * { "targetState": "OFFLINE", "reason": "Planned maintenance" }
+     */
+    @PostMapping("/admin/maintenance/{serviceName}")
+    public ResponseEntity<Map<String, String>> setMaintenanceMode(
+            @PathVariable String serviceName,
+            @RequestBody Map<String, String> body) {
+        String targetState = body.getOrDefault("targetState", "OFFLINE");
+        String reason = body.getOrDefault("reason", "maintenance");
+
+        // Validate target state
+        if (!"OFFLINE".equals(targetState) && !"DEGRADED".equals(targetState)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "targetState must be OFFLINE or DEGRADED"));
+        }
+
+        log.info("Setting maintenance mode for {}: state={}", serviceName, targetState);
+        cacheService.setMaintenanceMode(serviceName, targetState, reason);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Maintenance mode enabled",
+                "serviceName", serviceName,
+                "targetState", targetState,
+                "reason", reason));
+    }
+
+    /**
+     * Clear maintenance mode for a service.
+     * The next heartbeat will restore the service to its actual state.
+     *
+     * DELETE /api/v1/registry/admin/maintenance/{serviceName}
+     */
+    @org.springframework.web.bind.annotation.DeleteMapping("/admin/maintenance/{serviceName}")
+    public ResponseEntity<Map<String, String>> clearMaintenanceMode(@PathVariable String serviceName) {
+        if (!cacheService.isMaintenanceMode(serviceName)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Service is not in maintenance mode"));
+        }
+
+        log.info("Clearing maintenance mode for {}", serviceName);
+        cacheService.clearMaintenanceMode(serviceName);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Maintenance mode cleared",
+                "serviceName", serviceName));
+    }
+
+    /**
+     * List all services currently in maintenance mode.
+     *
+     * GET /api/v1/registry/admin/maintenance
+     */
+    @GetMapping("/admin/maintenance")
+    public ResponseEntity<Map<String, String>> listMaintenanceMode() {
+        return ResponseEntity.ok(cacheService.getAllMaintenanceMode());
+    }
+
     // --- Inner classes for batch heartbeat request ---
 
     public static class BatchHeartbeatRequest {

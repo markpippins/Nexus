@@ -22,8 +22,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * services and/or event types via query parameters. Snapshot and keepalive
  * events are always delivered regardless of filters.
  *
+ * Supports Last-Event-Id reconnection via {@link SseEventBuffer}. When a
+ * client reconnects with a Last-Event-Id header, all events since that ID
+ * are replayed before the client joins the live broadcast.
+ *
  * Usage:
- *   1. Controller adds emitter via {@link #register(SseEmitter, Set, Set)}
+ *   1. Controller adds emitter via {@link #register(SseEmitter, Set, Set, Long)}
  *   2. Redis bridge calls {@link #broadcastStatus(Map)} or {@link #broadcastHeartbeat(Map)}
  *   3. Dead emitters are auto-removed on send failure
  */
@@ -34,9 +38,11 @@ public class SseEmitterRegistry {
 
     private final List<FilteredSseEmitter> emitters = new CopyOnWriteArrayList<>();
     private final ObjectMapper objectMapper;
+    private final SseEventBuffer eventBuffer;
 
-    public SseEmitterRegistry(ObjectMapper objectMapper) {
+    public SseEmitterRegistry(ObjectMapper objectMapper, SseEventBuffer eventBuffer) {
         this.objectMapper = objectMapper;
+        this.eventBuffer = eventBuffer;
     }
 
     /**
@@ -45,13 +51,19 @@ public class SseEmitterRegistry {
      * @param emitter       The raw SseEmitter from Spring
      * @param serviceNames  If non-empty, only events for these services are sent
      * @param eventTypes    If non-empty, only these event types are sent
+     * @param lastEventId   If non-null, replay events after this ID before joining live
      */
-    public void register(SseEmitter emitter, Set<String> serviceNames, Set<String> eventTypes) {
+    public void register(SseEmitter emitter, Set<String> serviceNames, Set<String> eventTypes, Long lastEventId) {
         FilteredSseEmitter filtered = new FilteredSseEmitter(emitter, serviceNames, eventTypes, objectMapper);
         emitters.add(filtered);
 
         String filterDesc = describeFilters(serviceNames, eventTypes);
         log.info("SSE client connected{} (total: {})", filterDesc, emitters.size());
+
+        // Replay missed events if Last-Event-Id was provided
+        if (lastEventId != null && lastEventId > 0) {
+            replayEvents(filtered, lastEventId, serviceNames);
+        }
 
         emitter.onCompletion(() -> {
             emitters.remove(filtered);
@@ -70,10 +82,17 @@ public class SseEmitterRegistry {
     }
 
     /**
-     * Register a new SSE client with no filters (receives everything).
+     * Register with no replay (backward-compatible).
+     */
+    public void register(SseEmitter emitter, Set<String> serviceNames, Set<String> eventTypes) {
+        register(emitter, serviceNames, eventTypes, null);
+    }
+
+    /**
+     * Register with no filters and no replay.
      */
     public void register(SseEmitter emitter) {
-        register(emitter, Set.of(), Set.of());
+        register(emitter, Set.of(), Set.of(), null);
     }
 
     /**
@@ -81,7 +100,7 @@ public class SseEmitterRegistry {
      * Event type: "status-update"
      */
     public void broadcastStatus(Map<String, Object> statusData) {
-        broadcast("status-update", statusData);
+        broadcastWithBuffer("status-update", statusData, extractServices(statusData));
     }
 
     /**
@@ -89,7 +108,7 @@ public class SseEmitterRegistry {
      * Event type: "heartbeat"
      */
     public void broadcastHeartbeat(Map<String, Object> heartbeatData) {
-        broadcast("heartbeat", heartbeatData);
+        broadcastWithBuffer("heartbeat", heartbeatData, extractServices(heartbeatData));
     }
 
     /**
@@ -97,7 +116,15 @@ public class SseEmitterRegistry {
      * Event type: "status-change"
      */
     public void broadcastStatusChange(Map<String, Object> changeData) {
-        broadcast("status-change", changeData);
+        broadcastWithBuffer("status-change", changeData, extractServices(changeData));
+    }
+
+    /**
+     * Broadcast a cascade (pipeline) event to all connected clients.
+     * Event type: "cascade"
+     */
+    public void broadcastCascade(Map<String, Object> cascadeData) {
+        broadcastWithBuffer("cascade", cascadeData, Set.of());
     }
 
     /**
@@ -109,23 +136,35 @@ public class SseEmitterRegistry {
             client.send("snapshot", snapshotData);
         } catch (Exception e) {
             log.debug("Failed to send snapshot to client: {}", e.getMessage());
-            // Client will be cleaned up by the error handler
         }
     }
 
     /**
      * Broadcast a generic event to all connected clients.
+     * Events are stored in the buffer with IDs for Last-Event-Id reconnection.
      */
     public void broadcast(String eventName, Object data) {
+        broadcastWithBuffer(eventName, data, Set.of());
+    }
+
+    /**
+     * Broadcast an event, store it in the buffer, and deliver to all clients.
+     */
+    private void broadcastWithBuffer(String eventName, Object data, Set<String> services) {
+        // Allocate event ID and store in buffer even if no clients connected
+        // (clients connecting later with Last-Event-Id need these events)
+        long eventId = eventBuffer.nextEventId();
+        eventBuffer.append(eventId, eventName, data, services);
+
         if (emitters.isEmpty()) {
             return;
         }
 
-        List<FilteredSseEmitter> deadEmitters = new java.util.ArrayList<>();
+        List<FilteredSseEmitter> deadEmitters = new ArrayList<>();
 
         for (FilteredSseEmitter emitter : emitters) {
             try {
-                emitter.send(eventName, data);
+                emitter.send(eventName, data, eventId);
             } catch (Exception e) {
                 deadEmitters.add(emitter);
             }
@@ -147,7 +186,7 @@ public class SseEmitterRegistry {
             return;
         }
 
-        List<FilteredSseEmitter> deadEmitters = new java.util.ArrayList<>();
+        List<FilteredSseEmitter> deadEmitters = new ArrayList<>();
 
         for (FilteredSseEmitter emitter : emitters) {
             try {
@@ -168,9 +207,14 @@ public class SseEmitterRegistry {
     }
 
     /**
+     * Get the latest event ID from the buffer (for observability).
+     */
+    public long getLatestEventId() {
+        return eventBuffer.getCurrentEventId();
+    }
+
+    /**
      * Get observability info about all connected SSE clients.
-     * Returns a list of maps with: connectedAt, eventsSent, eventsFiltered,
-     * serviceFilter, eventFilter.
      */
     public List<Map<String, Object>> getClientInfo() {
         List<Map<String, Object>> info = new ArrayList<>();
@@ -185,6 +229,55 @@ public class SseEmitterRegistry {
                             ? "all" : emitter.getEventFilter()));
         }
         return info;
+    }
+
+    /**
+     * Replay buffered events to a reconnecting client.
+     */
+    private void replayEvents(FilteredSseEmitter client, long lastEventId, Set<String> serviceFilter) {
+        List<Map<String, Object>> events = eventBuffer.getEventsSince(lastEventId);
+        if (events.isEmpty()) {
+            log.debug("No events to replay since ID {}", lastEventId);
+            return;
+        }
+
+        int replayed = 0;
+        for (Map<String, Object> entry : events) {
+            try {
+                // Apply service filter during replay
+                if (serviceFilter != null && !serviceFilter.isEmpty()) {
+                    Object servicesObj = entry.get("services");
+                    if (servicesObj instanceof Set) {
+                        @SuppressWarnings("unchecked")
+                        Set<String> eventServices = (Set<String>) servicesObj;
+                        if (!eventServices.isEmpty() && eventServices.stream().noneMatch(serviceFilter::contains)) {
+                            continue;
+                        }
+                    }
+                }
+                client.replayEvent(entry);
+                replayed++;
+            } catch (Exception e) {
+                log.debug("Failed to replay event during reconnect: {}", e.getMessage());
+                break; // Stop replay on error
+            }
+        }
+
+        log.info("Replayed {} events to reconnecting client (since ID {})", replayed, lastEventId);
+    }
+
+    /**
+     * Extract service names from event data for buffer indexing.
+     */
+    @SuppressWarnings("unchecked")
+    private Set<String> extractServices(Object data) {
+        if (data instanceof Map) {
+            Object name = ((Map<String, Object>) data).get("serviceName");
+            if (name != null) {
+                return Set.of(name.toString());
+            }
+        }
+        return Set.of();
     }
 
     private String describeFilters(Set<String> serviceNames, Set<String> eventTypes) {
