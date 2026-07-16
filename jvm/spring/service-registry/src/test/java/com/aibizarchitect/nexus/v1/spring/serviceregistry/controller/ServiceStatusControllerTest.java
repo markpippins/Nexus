@@ -25,7 +25,9 @@ import org.springframework.http.ResponseEntity;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.controller.ServiceStatusController;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.StatusEventRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.ServiceStatusCacheService;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.SseEmitterRegistry;
 import com.aibizarchitect.nexus.v1.dto.ServiceStatus;
 import com.aibizarchitect.nexus.v1.dto.ServiceStatus.HealthState;
 
@@ -37,6 +39,15 @@ class ServiceStatusControllerTest {
 
     @Mock
     private DeploymentRepository deploymentRepository;
+
+    @Mock
+    private StatusEventRepository statusEventRepository;
+
+    @Mock
+    private SseEmitterRegistry emitterRegistry;
+
+    @Mock
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @InjectMocks
     private ServiceStatusController controller;
@@ -173,7 +184,10 @@ class ServiceStatusControllerTest {
 
     @Test
     void streamStatusUpdates() {
-        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter = controller.streamStatusUpdates();
+        when(cacheService.getSnapshotStatuses()).thenReturn(List.of());
+
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter emitter =
+                controller.streamStatusUpdates(null, null);
 
         assertNotNull(emitter);
     }
