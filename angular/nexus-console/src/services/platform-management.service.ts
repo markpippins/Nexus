@@ -82,11 +82,11 @@ export class PlatformManagementService {
     error = signal<string | null>(null);
 
     // Services CRUD
-    async getServices(baseUrl: string, page: number = 0): Promise<PagedResponse<ServiceInstance>> {
+    async getServices(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<ServiceInstance>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/services?page=${page}&size=100`;
+            const url = `${baseUrl}/api/v1/services?page=${page}&size=${size}`;
             return await firstValueFrom(this.http.get<PagedResponse<ServiceInstance>>(url));
         } catch (e) {
             this.error.set('Failed to fetch services');
@@ -139,11 +139,11 @@ export class PlatformManagementService {
     }
 
     // Frameworks CRUD
-    async getFrameworks(baseUrl: string, page: number = 0): Promise<PagedResponse<Framework>> {
+    async getFrameworks(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<Framework>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/frameworks?page=${page}&size=100`;
+            const url = `${baseUrl}/api/v1/frameworks?page=${page}&size=${size}`;
             return await firstValueFrom(this.http.get<PagedResponse<Framework>>(url));
         } catch (e) {
             this.error.set('Failed to fetch frameworks');
@@ -196,11 +196,11 @@ export class PlatformManagementService {
     }
 
     // Deployments CRUD
-    async getDeployments(baseUrl: string, page: number = 0): Promise<PagedResponse<Deployment>> {
+    async getDeployments(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<Deployment>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/deployments?page=${page}&size=100`;
+            const url = `${baseUrl}/api/v1/deployments?page=${page}&size=${size}`;
             return await firstValueFrom(this.http.get<PagedResponse<Deployment>>(url));
         } catch (e) {
             this.error.set('Failed to fetch deployments');
@@ -253,11 +253,11 @@ export class PlatformManagementService {
     }
 
     // Servers CRUD
-    async getServers(baseUrl: string, page: number = 0): Promise<PagedResponse<Server>> {
+    async getServers(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<Server>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/servers?page=${page}&size=100`;
+            const url = `${baseUrl}/api/v1/servers?page=${page}&size=${size}`;
             return await firstValueFrom(this.http.get<PagedResponse<Server>>(url));
         } catch (e) {
             this.error.set('Failed to fetch servers');
@@ -310,10 +310,10 @@ export class PlatformManagementService {
     }
 
     // Lookup
-    async getLookup(baseUrl: string, type: string, page: number = 0): Promise<PagedResponse<LookupItem>> {
+    async getLookup(baseUrl: string, type: string, page: number = 0, size: number = 100): Promise<PagedResponse<LookupItem>> {
         const endpoint = this.getLookupEndpoint(type);
         try {
-            const url = `${baseUrl}/api/v1/${endpoint}?page=${page}&size=100`;
+            const url = `${baseUrl}/api/v1/${endpoint}?page=${page}&size=${size}`;
             return await firstValueFrom(this.http.get<PagedResponse<LookupItem>>(url));
         } catch (e) {
             console.error(`Failed to fetch lookup ${type}`, e);
@@ -383,11 +383,11 @@ export class PlatformManagementService {
     }
 
     // Libraries CRUD
-    async getLibraries(baseUrl: string, page: number = 0): Promise<PagedResponse<Library>> {
+    async getLibraries(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<Library>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/libraries?page=${page}&size=100`;
+            const url = `${baseUrl}/api/v1/libraries?page=${page}&size=${size}`;
             return await firstValueFrom(this.http.get<PagedResponse<Library>>(url));
         } catch (e) {
             this.error.set('Failed to fetch libraries');
@@ -450,9 +450,9 @@ export class PlatformManagementService {
     }
 
     // Visual Components CRUD
-    async getVisualComponents(baseUrl: string, page: number = 0): Promise<PagedResponse<ComponentConfig>> {
+    async getVisualComponents(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<ComponentConfig>> {
         try {
-            const url = `${baseUrl}/api/v1/visual-components?page=${page}&size=100`;
+            const url = `${baseUrl}/api/v1/visual-components?page=${page}&size=${size}`;
             return await firstValueFrom(this.http.get<PagedResponse<ComponentConfig>>(url));
         } catch (e) {
             console.error('Failed to fetch visual components', e);

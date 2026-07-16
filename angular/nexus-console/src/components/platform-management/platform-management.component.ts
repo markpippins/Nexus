@@ -127,35 +127,49 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                         }                                </tbody>
                             </table>
                             <!-- Pagination -->
-                            @if (totalPages() > 1) {
+                            @if (totalPages() > 1 || totalItems() > 0) {
                                 <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                     <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <button
-                                            (click)="onPrevPage()"
-                                            [disabled]="currentPage() === 0"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                            [class]="currentPage() === 0
-                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                        >
-                                            ← Previous
-                                        </button>
-                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
-                                            Page {{ currentPage() + 1 }} of {{ totalPages() }}
-                                        </span>
-                                        <button
-                                            (click)="onNextPage()"
-                                            [disabled]="currentPage() >= totalPages() - 1"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                            [class]="currentPage() >= totalPages() - 1
-                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                        >
-                                            Next →
-                                        </button>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
+                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             }
@@ -231,35 +245,49 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                 </tbody>
                             </table>
                             <!-- Pagination -->
-                            @if (totalPages() > 1) {
+                            @if (totalPages() > 1 || totalItems() > 0) {
                                 <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                     <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <button
-                                            (click)="onPrevPage()"
-                                            [disabled]="currentPage() === 0"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                            [class]="currentPage() === 0
-                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                        >
-                                            ← Previous
-                                        </button>
-                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
-                                            Page {{ currentPage() + 1 }} of {{ totalPages() }}
-                                        </span>
-                                        <button
-                                            (click)="onNextPage()"
-                                            [disabled]="currentPage() >= totalPages() - 1"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                            [class]="currentPage() >= totalPages() - 1
-                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                        >
-                                            Next →
-                                        </button>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
+                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             }
@@ -325,35 +353,49 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                 </tbody>
                             </table>
                             <!-- Pagination -->
-                            @if (totalPages() > 1) {
+                            @if (totalPages() > 1 || totalItems() > 0) {
                                 <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                     <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <button
-                                            (click)="onPrevPage()"
-                                            [disabled]="currentPage() === 0"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                            [class]="currentPage() === 0
-                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                        >
-                                            ← Previous
-                                        </button>
-                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
-                                            Page {{ currentPage() + 1 }} of {{ totalPages() }}
-                                        </span>
-                                        <button
-                                            (click)="onNextPage()"
-                                            [disabled]="currentPage() >= totalPages() - 1"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                            [class]="currentPage() >= totalPages() - 1
-                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                        >
-                                            Next →
-                                        </button>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
+                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             }
@@ -503,35 +545,49 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                 </tbody>
                             </table>
                             <!-- Pagination -->
-                            @if (totalPages() > 1) {
+                            @if (totalPages() > 1 || totalItems() > 0) {
                                 <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                     <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
-                                    <div class="flex items-center gap-2">
-                                        <button
-                                            (click)="onPrevPage()"
-                                            [disabled]="currentPage() === 0"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                            [class]="currentPage() === 0
-                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                        >
-                                            ← Previous
-                                        </button>
-                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
-                                            Page {{ currentPage() + 1 }} of {{ totalPages() }}
-                                        </span>
-                                        <button
-                                            (click)="onNextPage()"
-                                            [disabled]="currentPage() >= totalPages() - 1"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
-                                            [class]="currentPage() >= totalPages() - 1
-                                                ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
-                                                : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
-                                        >
-                                            Next →
-                                        </button>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
+                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             }
@@ -666,6 +722,7 @@ export class PlatformManagementComponent {
     totalPages = signal(0);
     totalItems = signal(0);
     perPage = signal(100);
+    readonly pageSizes = [25, 50, 100];
 
     // Computed pagination display helpers
     pageStartIndex = computed(() => this.currentPage() * this.perPage() + 1);
@@ -962,12 +1019,13 @@ export class PlatformManagementComponent {
         const normalizedType = type.startsWith('categories:') ? 'categories' : type;
         const actualType = (normalizedType === 'services' && activeTab !== 'services') ? activeTab : normalizedType;
         const page = this.currentPage();
+        const size = this.perPage();
 
         try {
             switch (actualType) {
                 case 'services':
-                    console.log('[PlatformManagement] Fetching services from', `${url}/api/v1/services?page=${page}`);
-                    const sResp = await this.platformService.getServices(url, page);
+                    console.log('[PlatformManagement] Fetching services from', `${url}/api/v1/services?page=${page}&size=${size}`);
+                    const sResp = await this.platformService.getServices(url, page, size);
                     console.log('[PlatformManagement] Services loaded', sResp.data.length, 'of', sResp.meta.total);
                     this.rawServices.set(sResp.data);
                     this.totalPages.set(sResp.meta.last_page);
@@ -975,21 +1033,21 @@ export class PlatformManagementComponent {
                     this.perPage.set(sResp.meta.per_page);
                     break;
                 case 'frameworks':
-                    const fResp = await this.platformService.getFrameworks(url, page);
+                    const fResp = await this.platformService.getFrameworks(url, page, size);
                     this.rawFrameworks.set(fResp.data);
                     this.totalPages.set(fResp.meta.last_page);
                     this.totalItems.set(fResp.meta.total);
                     this.perPage.set(fResp.meta.per_page);
                     break;
                 case 'deployments':
-                    const dResp = await this.platformService.getDeployments(url, page);
+                    const dResp = await this.platformService.getDeployments(url, page, size);
                     this.rawDeployments.set(dResp.data);
                     this.totalPages.set(dResp.meta.last_page);
                     this.totalItems.set(dResp.meta.total);
                     this.perPage.set(dResp.meta.per_page);
                     break;
                 case 'servers':
-                    const hResp = await this.platformService.getServers(url, page);
+                    const hResp = await this.platformService.getServers(url, page, size);
                     this.rawServers.set(hResp.data);
                     this.totalPages.set(hResp.meta.last_page);
                     this.totalItems.set(hResp.meta.total);
@@ -999,14 +1057,14 @@ export class PlatformManagementComponent {
                 case 'framework-languages':
                 case 'operating-systems':
                 case 'environments':
-                    const lResp = await this.platformService.getLookup(url, actualType, page);
+                    const lResp = await this.platformService.getLookup(url, actualType, page, size);
                     this.lookupData.set(lResp.data);
                     this.totalPages.set(lResp.meta.last_page);
                     this.totalItems.set(lResp.meta.total);
                     this.perPage.set(lResp.meta.per_page);
                     break;
                 case 'libraries':
-                    const libsResp = await this.platformService.getLibraries(url, page);
+                    const libsResp = await this.platformService.getLibraries(url, page, size);
                     this.rawLibraries.set(libsResp.data);
                     this.totalPages.set(libsResp.meta.last_page);
                     this.totalItems.set(libsResp.meta.total);
@@ -1031,6 +1089,12 @@ export class PlatformManagementComponent {
         if (this.currentPage() < this.totalPages() - 1) {
             this.currentPage.update(p => p + 1);
         }
+    }
+
+    onPageSizeChange(event: Event) {
+        const size = Number((event.target as HTMLSelectElement).value);
+        this.perPage.set(size);
+        this.currentPage.set(0);
     }
 
     onAdd() {
