@@ -34,6 +34,7 @@ export interface ServicePayload {
     status?: string;
     componentOverrideId?: number;
     parentServiceId?: number;
+    systemId?: string;
 }
 
 export interface FrameworkPayload {
@@ -69,6 +70,20 @@ export interface LibraryPayload {
     url?: string;
     repositoryUrl?: string;
     license?: string;
+}
+
+export interface SystemItem {
+    id: number;
+    name: string;
+    description?: string;
+    type?: string;
+    serviceCount?: number;
+}
+
+export interface SystemPayload {
+    name: string;
+    description?: string;
+    type?: string;
 }
 
 @Injectable({
@@ -376,6 +391,7 @@ export class PlatformManagementService {
             case 'framework-languages': return 'framework-languages';
             case 'library-categories': return 'library-categories';
             case 'library-types': return 'library-categories';
+            case 'system-types': return 'registry/systems/types';
             case 'operating-systems': return 'operating-systems';
             case 'environments': return 'environments';
             default: return type;
@@ -480,6 +496,59 @@ export class PlatformManagementService {
         }
     }
 
+    // Systems CRUD
+    async getSystems(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<SystemItem>> {
+        this.loading.set(true);
+        this.error.set(null);
+        try {
+            const url = `${baseUrl}/api/v1/registry/systems?page=${page}&size=${size}`;
+            return await firstValueFrom(this.http.get<PagedResponse<SystemItem>>(url));
+        } catch (e) {
+            this.error.set('Failed to fetch systems');
+            throw e;
+        } finally {
+            this.loading.set(false);
+        }
+    }
+
+    async createSystem(baseUrl: string, system: SystemPayload): Promise<SystemItem> {
+        this.loading.set(true);
+        this.error.set(null);
+        try {
+            const url = `${baseUrl}/api/v1/registry/systems`;
+            return await firstValueFrom(this.http.post<SystemItem>(url, system));
+        } catch (e) {
+            this.error.set('Failed to create system');
+            throw e;
+        } finally {
+            this.loading.set(false);
+        }
+    }
+
+    async deleteSystem(baseUrl: string, id: number): Promise<void> {
+        this.loading.set(true);
+        this.error.set(null);
+        try {
+            const url = `${baseUrl}/api/v1/registry/systems/${id}`;
+            await firstValueFrom(this.http.delete<void>(url));
+        } catch (e) {
+            this.error.set('Failed to delete system');
+            throw e;
+        } finally {
+            this.loading.set(false);
+        }
+    }
+
+    async associateServiceWithSystem(baseUrl: string, systemName: string, serviceName: string): Promise<void> {
+        try {
+            const url = `${baseUrl}/api/v1/registry/systems/${encodeURIComponent(systemName)}/services/${encodeURIComponent(serviceName)}`;
+            await firstValueFrom(this.http.post(url, null));
+        } catch (e) {
+            console.warn('Failed to associate service with system', e);
+            throw e;
+        }
+    }
+
     async deleteVisualComponent(baseUrl: string, id: string): Promise<void> {
         this.loading.set(true);
         try {
@@ -510,6 +579,7 @@ export const TYPE_ENDPOINT_MAP: Record<string, string> = {
     environment_type: 'environments',
     service_type: 'service-types',
     service_config_type: 'service-config-types',
+    system_type: 'system-types',
     operating_systems: 'operating-systems',
 };
 
@@ -524,13 +594,14 @@ export const TYPE_LABELS: Record<string, string> = {
     environment_type: 'Environment',
     service_type: 'Service',
     service_config_type: 'Config',
+    system_type: 'System',
     operating_systems: 'OS',
 };
 
 /**
  * Display ordering for category types.
  */
-export const TYPE_ORDER = ['framework_type', 'server_type', 'library_type', 'environment_type', 'service_type', 'service_config_type', 'operating_systems'];
+export const TYPE_ORDER = ['framework_type', 'server_type', 'library_type', 'environment_type', 'service_type', 'service_config_type', 'system_type', 'operating_systems'];
 
 /** Ordered list of types for the filter toolbar (excludes service_config_type). */
 export const FILTER_TYPES = [
@@ -540,6 +611,7 @@ export const FILTER_TYPES = [
     'library_type',
     'environment_type',
     'service_type',
+    'system_type',
     'operating_systems',
 ];
 
@@ -552,6 +624,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
     library_type: 'local_library',
     environment_type: 'environment',
     service_type: 'dns',
+    system_type: 'dns',
     operating_systems: 'os',
 };
 

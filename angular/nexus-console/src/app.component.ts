@@ -373,12 +373,13 @@ export class AppComponent implements OnInit, OnDestroy {
     'environment': 'environment_type',
     'service': 'service_type',
     'config': 'service_config_type',
+    'system': 'system_type',
     'os': 'operating_systems',
   };
 
   private getPlatformNodeForPath(path: string[]) {
     // Valid management types (System Health is now a top-level sibling, not a Platform Management child).
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments'];
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems'];
     const profiles = this.hostProfileService.profiles();
     const activeProfile = this.hostProfileService.activeProfile();
 
@@ -523,7 +524,7 @@ export class AppComponent implements OnInit, OnDestroy {
   /** Resolve the baseUrl from a Platform Management path. */
   private resolveBaseUrl(remaining: string[], profiles: any[], activeProfile: any, pmIndex: number, path: string[]): string | null {
     // Find the first element in remaining that matches a valid type
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments'];
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems'];
     const typeIndex = remaining.findIndex(p => validTypes.includes(p.toLowerCase()));
 
     let targetProfileName: string | null = null;

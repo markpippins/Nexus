@@ -1,6 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PlatformManagementService, Server, getCategoryEndpointType } from '../../services/platform-management.service.js';
+import { PlatformManagementService, Server, SystemItem, getCategoryEndpointType } from '../../services/platform-management.service.js';
 import { UpsertServerDialogComponent } from './upsert-server-dialog/upsert-server-dialog.component.js';
 import { ServiceMeshService } from '../../services/service-mesh.service.js';
 import { ComponentRegistryService } from '../../services/component-registry.service.js';
@@ -11,6 +11,7 @@ import { UpsertDeploymentDialogComponent } from './upsert-deployment-dialog/upse
 import { LookupListComponent } from './lookup-list/lookup-list.component.js';
 import { UpsertLookupDialogComponent } from './upsert-lookup-dialog/upsert-lookup-dialog.component.js';
 import { UpsertLibraryDialogComponent } from './upsert-library-dialog/upsert-library-dialog.component.js';
+import { UpsertSystemDialogComponent } from './upsert-system-dialog/upsert-system-dialog.component.js';
 import { CategoriesViewComponent } from './categories-view/categories-view.component.js';
 import { LookupItem } from '../../services/platform-management.service.js';
 
@@ -25,6 +26,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
         LookupListComponent,
         UpsertLookupDialogComponent,
         UpsertLibraryDialogComponent,
+        UpsertSystemDialogComponent,
         CategoriesViewComponent
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -723,6 +725,123 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             (onDelete)="onDelete($event)"
                         ></app-lookup-list>
                     }
+                    @case ('systems') {
+                        <div class="flex flex-col h-full">
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+                                        <tr>
+                                            <th (click)="onSort('name')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Name
+                                                    @if (sortState().column === 'name') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('type')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Type
+                                                    @if (sortState().column === 'type') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('description')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Description
+                                                    @if (sortState().column === 'description') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th class="p-2 font-semibold text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (s of rawSystems(); track s.id) {
+                                            <tr 
+                                                tabindex="0"
+                                                (dblclick)="onEdit(s)"
+                                                (keydown.enter)="onEdit(s)"
+                                                class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]"
+                                            >
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))] font-medium">{{ s.name }}</td>
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.type || '-' }}</td>
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))] text-sm max-w-md truncate">{{ s.description || '-' }}</td>
+                                                <td class="p-2 py-1.5 text-right whitespace-nowrap">
+                                                    <button (click)="onEdit(s)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
+                                                    <button (click)="onDelete(s)" class="text-red-500 hover:underline text-xs">Delete</button>
+                                                </td>
+                                            </tr>
+                                        } @empty {
+                                            <tr>
+                                                <td colspan="4" class="p-8 text-center text-[rgb(var(--color-text-muted))]">
+                                                    No systems found.
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                                <!-- Pagination -->
+                                @if (totalPages() > 1 || totalItems() > 0) {
+                                    <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                        <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                            {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex items-center gap-1.5">
+                                                <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                                <select
+                                                    (change)="onPageSizeChange($event)"
+                                                    class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                                >
+                                                    @for (s of pageSizes; track s) {
+                                                        <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <button
+                                                    (click)="onPrevPage()"
+                                                    [disabled]="currentPage() === 0"
+                                                    class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                    [class]="currentPage() === 0
+                                                        ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                        : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                                >
+                                                    ← Previous
+                                                </button>
+                                                <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                    <span>Page</span>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        [max]="totalPages()"
+                                                        [value]="currentPage() + 1"
+                                                        (keydown.enter)="goToPage($event)"
+                                                        (blur)="goToPage($event)"
+                                                        class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                    >
+                                                    <span>of {{ totalPages() }}</span>
+                                                </span>
+                                                <button
+                                                    (click)="onNextPage()"
+                                                    [disabled]="currentPage() >= totalPages() - 1"
+                                                    class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                    [class]="currentPage() >= totalPages() - 1
+                                                        ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                        : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                                >
+                                                    Next →
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
                     @default {
                         <div class="p-8 text-center text-[rgb(var(--color-text-muted))]">
                             Management UI for {{ managementType() }} coming soon.
@@ -783,6 +902,15 @@ import { LookupItem } from '../../services/platform-management.service.js';
             ></app-upsert-library-dialog>
         }
 
+        @if (isSystemDialogOpen()) {
+            <app-upsert-system-dialog
+                [baseUrl]="baseUrl()"
+                [system]="selectedSystemForEdit()"
+                (saved)="onSystemSaved()"
+                (cancelled)="onSystemDialogClose()"
+            ></app-upsert-system-dialog>
+        }
+
     </div>
   `
 })
@@ -807,6 +935,7 @@ export class PlatformManagementComponent {
     private rawDeployments = signal<Deployment[]>([]);
     private rawServers = signal<Server[]>([]);
     private rawLibraries = signal<Library[]>([]);
+    private rawSystems = signal<SystemItem[]>([]);
 
     loading = signal(false);
     error = signal<string | null>(null);
@@ -922,6 +1051,17 @@ export class PlatformManagementComponent {
         });
     });
 
+    systems = computed(() => {
+        return this.sortData(this.rawSystems(), this.sortState(), (item, col) => {
+            switch (col) {
+                case 'name': return item.name;
+                case 'type': return item.type;
+                case 'description': return item.description;
+                default: return (item as any)[col];
+            }
+        });
+    });
+
     // Dialog State
     isServiceDialogOpen = signal(false);
     selectedServiceForEdit = signal<ServiceInstance | null>(null);
@@ -976,6 +1116,9 @@ export class PlatformManagementComponent {
     // Library Dialog State
     isLibraryDialogOpen = signal(false);
     selectedLibraryForEdit = signal<Library | null>(null);
+
+    isSystemDialogOpen = signal(false);
+    selectedSystemForEdit = signal<SystemItem | null>(null);
 
     // Service Libraries Dialog State (removed - service_libraries table dropped)
 
@@ -1065,6 +1208,10 @@ export class PlatformManagementComponent {
                 case 'environments':
                     count = this.lookupData().length;
                     displayType = type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    break;
+                case 'systems':
+                    count = this.systems().length;
+                    displayType = 'Systems';
                     break;
             }
 
@@ -1167,6 +1314,13 @@ export class PlatformManagementComponent {
                     this.totalItems.set(libsResp.meta.total);
                     this.perPage.set(libsResp.meta.per_page);
                     break;
+                case 'systems':
+                    const sysResp = await this.platformService.getSystems(url, page, size);
+                    this.rawSystems.set(sysResp.data);
+                    this.totalPages.set(sysResp.meta.last_page);
+                    this.totalItems.set(sysResp.meta.total);
+                    this.perPage.set(sysResp.meta.per_page);
+                    break;
             }
         } catch (e) {
             console.error('Error loading data', e);
@@ -1241,12 +1395,15 @@ export class PlatformManagementComponent {
             case 'environments':
                 this.selectedLookupForEdit.set(null);
                 this.isLookupDialogOpen.set(true);
-                break;
-            case 'libraries':
-                this.selectedLibraryForEdit.set(null);
-                this.isLibraryDialogOpen.set(true);
-                break;
-        }
+                break;                case 'libraries':
+                    this.selectedLibraryForEdit.set(null);
+                    this.isLibraryDialogOpen.set(true);
+                    break;
+                case 'systems':
+                    this.selectedSystemForEdit.set(null);
+                    this.isSystemDialogOpen.set(true);
+                    break;
+            }
     }
 
     onEdit(item: any) {
@@ -1281,6 +1438,10 @@ export class PlatformManagementComponent {
                 this.selectedLibraryForEdit.set(item);
                 this.isLibraryDialogOpen.set(true);
                 break;
+            case 'systems':
+                this.selectedSystemForEdit.set(item);
+                this.isSystemDialogOpen.set(true);
+                break;
         }
     }
 
@@ -1313,6 +1474,9 @@ export class PlatformManagementComponent {
                     break;
                 case 'libraries':
                     await this.platformService.deleteLibrary(url, Number(item.id));
+                    break;
+                case 'systems':
+                    await this.platformService.deleteSystem(url, Number(item.id));
                     break;
             }
             this.loadData(); // Refresh
@@ -1449,6 +1613,18 @@ export class PlatformManagementComponent {
         this.isLibraryDialogOpen.set(false);
         this.selectedLibraryForEdit.set(null);
         this.loadData();
+    }
+
+    // System Dialog Handlers
+
+    onSystemDialogClose() {
+        this.isSystemDialogOpen.set(false);
+        this.selectedSystemForEdit.set(null);
+    }
+
+    onSystemSaved() {
+        this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
 
 }

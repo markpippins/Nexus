@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, output, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
-import { PlatformManagementService, LookupItem, ServicePayload, LOOKUP_SERVICE_TYPES } from '../../../services/platform-management.service.js';
+import { PlatformManagementService, LookupItem, ServicePayload, SystemItem, LOOKUP_SERVICE_TYPES } from '../../../services/platform-management.service.js';
 import { Framework, ServiceInstance } from '../../../models/service-mesh.model.js';
 import { ComponentRegistryService } from '../../../services/component-registry.service.js';
 
@@ -108,6 +108,18 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
                     <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Repository URL</label>
                     <input type="text" formControlName="repositoryUrl" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="https://github.com/...">
                  </div>
+
+                 <!-- System -->
+                 <div class="flex flex-col gap-1">
+                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">System</label>
+                    <select formControlName="systemId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                        <option [value]="null">-- No System --</option>
+                        @for (sys of systems(); track sys.id) {
+                            <option [value]="sys.name">{{ sys.name }}</option>
+                        }
+                    </select>
+                    <span class="text-xs text-[rgb(var(--color-text-muted))]">Assign this service to a domain system</span>
+                 </div>
              </form>
           </div>
 
@@ -138,6 +150,7 @@ export class UpsertServiceDialogComponent implements OnInit {
     frameworks = signal<Framework[]>([]);
     serviceTypes = signal<LookupItem[]>([]);
     parentServices = signal<ServiceInstance[]>([]);
+    systems = signal<SystemItem[]>([]);
     isSaving = signal(false);
 
     constructor() {
@@ -151,7 +164,8 @@ export class UpsertServiceDialogComponent implements OnInit {
             status: ['ACTIVE'],
             apiBasePath: [''],
             repositoryUrl: [''],
-            componentOverrideId: [null]
+            componentOverrideId: [null],
+            systemId: [null]
         });
 
         // Effect to patch values when service changes or dialog opens
@@ -214,6 +228,12 @@ export class UpsertServiceDialogComponent implements OnInit {
         } catch (e) {
             console.error('Failed to load services for parent dropdown', e);
         }
+        try {
+            const sysResp = await this.platformService.getSystems(url);
+            this.systems.set(sysResp.data);
+        } catch (e) {
+            console.error('Failed to load systems', e);
+        }
     }
 
     onCancel() {
@@ -238,6 +258,8 @@ export class UpsertServiceDialogComponent implements OnInit {
         if (payload.componentOverrideId) payload.componentOverrideId = Number(payload.componentOverrideId) || undefined;
         // if null/0, it might be effectively resetting to default.
         // Backend should handle null.
+        const systemName: string | undefined = payload.systemId;
+        delete payload.systemId;
 
         try {
             let result: ServiceInstance;
@@ -250,6 +272,14 @@ export class UpsertServiceDialogComponent implements OnInit {
                 // Create
                 result = await this.platformService.createService(url, payload);
             }
+
+            // Associate the service with the selected system via the domain systems API
+            if (systemName && result.name) {
+                await this.platformService.associateServiceWithSystem(url, systemName, result.name)
+                    .catch(err => console.warn('Failed to associate service with system', err));
+                // Non-blocking — the service was still created/updated
+            }
+
             this.saved.emit(result);
             this.close.emit();
         } catch (e) {

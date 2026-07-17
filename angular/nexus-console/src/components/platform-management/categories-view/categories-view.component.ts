@@ -178,6 +178,7 @@ export class CategoriesViewComponent {
             case 'environment_type': return 'bg-yellow-500/10 text-yellow-600';
             case 'service_type':   return 'bg-orange-500/10 text-orange-500';
             case 'service_config_type': return 'bg-pink-500/10 text-pink-500';
+            case 'system_type':    return 'bg-teal-500/10 text-teal-500';
             case 'operating_systems': return 'bg-cyan-500/10 text-cyan-500';
             default:               return 'bg-gray-500/10 text-gray-500';
         }
