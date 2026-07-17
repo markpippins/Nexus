@@ -31,6 +31,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepo
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.ExternalServiceRegistrationService;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.ServiceStatusCacheService;
 import com.aibizarchitect.nexus.v1.dto.ExternalServiceRegistration;
+import com.aibizarchitect.nexus.v1.dto.HeartbeatPayload;
 
 @ExtendWith(MockitoExtension.class)
 class RegistryControllerTest {
@@ -91,7 +92,7 @@ class RegistryControllerTest {
     void heartbeat_Success() {
         when(registrationService.updateHeartbeat("test-service")).thenReturn(true);
 
-        ResponseEntity<Map<String, String>> response = registryController.heartbeat("test-service");
+        ResponseEntity<Map<String, String>> response = registryController.heartbeat("test-service", null);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
@@ -103,7 +104,7 @@ class RegistryControllerTest {
     void heartbeat_NotFound() {
         when(registrationService.updateHeartbeat("test-service")).thenReturn(false);
 
-        ResponseEntity<Map<String, String>> response = registryController.heartbeat("test-service");
+        ResponseEntity<Map<String, String>> response = registryController.heartbeat("test-service", null);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
@@ -114,7 +115,7 @@ class RegistryControllerTest {
         when(serviceRepository.findByName("test-service")).thenReturn(Optional.of(testService));
         doNothing().when(cacheService).recordHeartbeat(anyString(), anyLong());
 
-        ResponseEntity<Map<String, String>> response = registryController.heartbeat("test-service");
+        ResponseEntity<Map<String, String>> response = registryController.heartbeat("test-service", null);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(cacheService).recordHeartbeat("test-service", 1L);

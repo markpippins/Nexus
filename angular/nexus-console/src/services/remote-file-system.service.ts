@@ -85,7 +85,7 @@ export class RemoteFileSystemService implements FileSystemProvider {
     // This is extensible for other file/folder decorators in the future.
     if (folderNodes.length > 0) {
       const magnetChecks = folderNodes.map(folder =>
-        this.hasFile([...resolvedPath, folder.name], '.magnet').catch(() => false) // Gracefully handle errors
+        this.hasFileResolved([...resolvedPath, folder.name], '.magnet').catch(() => false) // Gracefully handle errors
       );
 
       const magnetResults = await Promise.all(magnetChecks);
@@ -155,6 +155,11 @@ export class RemoteFileSystemService implements FileSystemProvider {
 
   hasFile(path: string[], filename: string): Promise<boolean> {
     return this.fsService.hasFile(this.profile.brokerUrl ?? '', this.token, this.resolveMountPath(path), filename);
+  }
+
+  /** Check for a file using an already-resolved path (no second mount resolution). */
+  hasFileResolved(resolvedPath: string[], filename: string): Promise<boolean> {
+    return this.fsService.hasFile(this.profile.brokerUrl ?? '', this.token, resolvedPath, filename);
   }
 
   hasFolder(path: string[], folderName: string): Promise<boolean> {

@@ -1,11 +1,12 @@
 import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, RunnableService } from '../../services/terrain.service.js';
+import { ServicePollMonitorComponent } from './service-poll-monitor.component.js';
 
 @Component({
   selector: 'app-system-health',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ServicePollMonitorComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="h-full flex flex-col bg-[rgb(var(--color-surface))] overflow-auto">
@@ -66,12 +67,20 @@ import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, 
             </div>
           </div>
         } @else if (summary(); as s) {
+          <!--
+            Service taxonomy for this view:
+              • Third-Party Dependencies  ← MCP Servers (typically external integrations we connect to)
+              • Internal Services         ← Runnable Services (services we deploy and operate)
+              • Host Servers              ← infrastructure / machines (shown separately, no taxonomy applied)
+            Override per-item by adding an &quot;isThirdParty&quot; boolean to McpServer, or by
+            deriving it from &quot;repositoryUrl&quot;; this is the current default.
+          -->
           <!-- Summary Cards -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <!-- MCP Servers Card -->
+            <!-- Third-Party Dependencies Card (MCP Servers are typically external integrations) -->
             <div class="p-5 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))]">
               <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">MCP Servers</span>
+                <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Third-Party Dependencies</span>
                 <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ s.mcpServers.length }}</span>
               </div>
               <div class="flex gap-2 text-xs">
@@ -83,10 +92,10 @@ import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, 
               </div>
             </div>
 
-            <!-- Runnable Services Card -->
+            <!-- Internal Services Card (Runnable Services are services we deploy and operate) -->
             <div class="p-5 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))]">
               <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Runnable Services</span>
+                <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Internal Services</span>
                 <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ s.runnableServices.length }}</span>
               </div>
               <div class="flex gap-2 text-xs">
@@ -149,10 +158,10 @@ import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, 
             </div>
           </div>
 
-          <!-- MCP Servers Table -->
+          <!-- Third-Party Dependencies Table (MCP Servers we connect to) -->
           @if (s.mcpServers.length > 0) {
             <div class="mb-8">
-              <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">MCP Servers</h3>
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Third-Party Dependencies</h3>
               <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
                 <table class="w-full text-left border-collapse">
                   <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase">
@@ -211,14 +220,14 @@ import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, 
             </div>
           } @else {
             <div class="mb-8 p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
-              <p class="text-sm">No MCP servers registered in terrain.</p>
+              <p class="text-sm">No third-party dependencies registered in terrain (no MCP servers).</p>
             </div>
           }
 
-          <!-- Runnable Services Table -->
+          <!-- Internal Services Table (services we deploy and run) -->
           @if (s.runnableServices.length > 0) {
             <div class="mb-8">
-              <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Runnable Services</h3>
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Internal Services</h3>
               <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
                 <table class="w-full text-left border-collapse">
                   <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase">
@@ -277,7 +286,7 @@ import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, 
             </div>
           } @else {
             <div class="mb-8 p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
-              <p class="text-sm">No runnable services registered in terrain.</p>
+              <p class="text-sm">No internal services deployed yet (no runnable services).</p>
             </div>
           }
 
@@ -342,10 +351,13 @@ import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, 
               </svg>
               <h3 class="text-lg font-medium text-[rgb(var(--color-text-muted))] mb-1">No Services Registered</h3>
               <p class="text-sm text-[rgb(var(--color-text-muted))] max-w-md">
-                The terrain server is online but has no MCP servers, runnable services, or host servers registered yet.
+                The terrain server is online but has no internal services, third-party dependencies, or host servers registered yet.
               </p>
             </div>
           }
+
+          <!-- ── HTTP Service Health Monitor (transplanted from nebula-ui) ── -->
+          <app-service-poll-monitor />
         }
       </div>
 

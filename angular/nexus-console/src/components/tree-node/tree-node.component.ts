@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, computed, effect, OnInit, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, computed, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FileSystemNode } from '../../models/file-system.model.js';
 import { ImageService } from '../../services/image.service.js';
@@ -14,7 +14,7 @@ import { FolderPropertiesService } from '../../services/folder-properties.servic
   imports: [CommonModule, TreeNodeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TreeNodeComponent implements OnInit {
+export class TreeNodeComponent {
   private dragDropService = inject(DragDropService);
   private folderPropertiesService = inject(FolderPropertiesService);
 
@@ -23,6 +23,7 @@ export class TreeNodeComponent implements OnInit {
   currentPath = input.required<string[]>();
   level = input(0);
   expansionCommand = input<{ command: 'expand' | 'collapse', id: number } | null>();
+  expandedPaths = input<ReadonlySet<string>>(new Set());
   getImageService = input.required<(path: string[]) => ImageService>();
   getProvider = input.required<(path: string[]) => FileSystemProvider>();
 
@@ -31,8 +32,10 @@ export class TreeNodeComponent implements OnInit {
   itemsDropped = output<{ destPath: string[]; payload: DragDropPayload }>();
   bookmarkDropped = output<{ bookmark: NewBookmark, destPath: string[] }>();
   contextMenuRequest = output<{ event: MouseEvent; path: string[]; node: FileSystemNode }>();
+  toggleExpand = output<{ path: string[]; expanded: boolean }>();
 
-  isExpanded = signal(false);
+  /** Derive expansion state from the externally-owned expandedPaths set so it survives tree rebuilds */
+  isExpanded = computed(() => this.expandedPaths()?.has(this.path().join('/')) ?? false);
   imageHasError = signal(false);
   imageIsLoaded = signal(false);
   isDragOver = signal(false);
@@ -98,7 +101,7 @@ export class TreeNodeComponent implements OnInit {
   });
 
   constructor() {
-    // Effect for auto-expanding. It does NOT emit or load children.
+    // Effect for auto-expanding ancestor of current path. Emits toggleExpand to persist to external set.
     effect(() => {
       const currentStr = this.currentPath().join('/');
       const myPathStr = this.path().join('/');
@@ -107,7 +110,7 @@ export class TreeNodeComponent implements OnInit {
       }
     });
 
-    // Effect for handling commands. It does NOT emit or load children.
+    // Effect for handling expand/collapse-all commands. Emits toggleExpand to persist.
     effect(() => {
       const command = this.expansionCommand();
       if (!command) return;
@@ -127,24 +130,28 @@ export class TreeNodeComponent implements OnInit {
       this.imageIsLoaded.set(false);
       this.imageHasError.set(false);
     });
+
+    // Ensure root node is expanded by default if not already in expandedPaths
+    effect(() => {
+      if (this.level() === 0) {
+        const key = this.path().join('/');
+        if (!this.expandedPaths()?.has(key)) {
+          this.expandProgrammatically();
+        }
+      }
+    });
   }
 
-  ngOnInit(): void {
-    // Expand the root node by default after initialization.
-    if (this.level() === 0) {
-      this.isExpanded.set(true);
-    }
-  }
-
-  // This method only changes local state and may emit loadChildren.
-  // SAFE to be called from effects.
+  // This method emits toggleExpand to persist state to the external set.
+  // SAFE to be called from effects — it doesn't mutate local state.
   private expandProgrammatically(): void {
     const node = this.node();
     if (this.isExpandable() && !this.isExpanded()) {
       if (node.isServerRoot && !node.connected) {
         return;
       }
-      this.isExpanded.set(true);
+      // Emit to parent to update the external expandedPaths set
+      this.toggleExpand.emit({ path: this.path(), expanded: true });
 
       // If we expand and children are not loaded, we must load them.
       if (!node.childrenLoaded) {
@@ -155,23 +162,21 @@ export class TreeNodeComponent implements OnInit {
 
   private collapse(): void {
     if (this.isExpandable() && this.isExpanded()) {
-      this.isExpanded.set(false);
+      this.toggleExpand.emit({ path: this.path(), expanded: false });
     }
   }
 
-  toggleExpand(event: MouseEvent): void {
+  onToggleClick(event: MouseEvent): void {
     event.stopPropagation();
     const node = this.node();
     if (!this.isExpandable()) return;
     if (node.isServerRoot && !node.connected) {
-      // Do not expand and do not try to load children if disconnected
       return;
     }
 
-    const expanding = !this.isExpanded();
-    this.isExpanded.set(expanding);
+    this.toggleExpand.emit({ path: this.path(), expanded: !this.isExpanded() });
 
-    if (expanding && !node.childrenLoaded) {
+    if (!this.isExpanded() && !node.childrenLoaded) {
       this.loadChildren.emit(this.path());
     }
   }
@@ -272,5 +277,9 @@ export class TreeNodeComponent implements OnInit {
 
   onChildContextMenuRequest(event: { event: MouseEvent; path: string[]; node: FileSystemNode; }): void {
     this.contextMenuRequest.emit(event);
+  }
+
+  onToggleExpand(event: { path: string[]; expanded: boolean }): void {
+    this.toggleExpand.emit(event);
   }
 }

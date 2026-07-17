@@ -1,11 +1,12 @@
-import { Component, HostListener, signal, inject, OnDestroy } from '@angular/core';
+import { Component, HostListener, signal, computed, inject, OnDestroy } from '@angular/core';
 import { NgFor, NgSwitch, NgSwitchCase, TitleCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AIConfigService, AIProvider, AIHarness, AIModel, AIRoleConfig, LogLevel, FailureRecoveryConfig } from '../../services/ai-config.service';
 import { ToastService } from '../../services/toast.service';
 import { API_BASE_URL } from '../../services/api-config';
+import { RolesService, Role } from '../../roles/roles.service';
 
-type TabId = 'providers' | 'harnesses' | 'models' | 'roles' | 'logging' | 'test' | 'failure-recovery';
+type TabId = 'providers' | 'harnesses' | 'models' | 'roles' | 'role-assignment' | 'logging' | 'test' | 'failure-recovery';
 
 const PROVIDER_TYPES = [
   { value: 'openai', label: 'OpenAI' },
@@ -18,8 +19,6 @@ const PROVIDER_TYPES = [
   { value: 'lm_server', label: 'LM Server' },
   { value: 'custom', label: 'Custom' },
 ];
-
-const ROLES = ['planner', 'builder', 'reviewer', 'critic'];
 
 interface HarnessSemanticsForm {
   binary: string;
@@ -65,7 +64,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
           <div class="header-actions">
             <button class="header-btn" (click)="exportConfig()" title="Export config as JSON">📥 Export</button>
             <button class="header-btn" (click)="importConfigClick()" title="Import config from JSON file">📤 Import</button>
-            <input data-import-input type="file" accept=".json" (change)="onImportFileSelected($event)" style="display:none" />
+            <input data-import-input name="importFile" id="import-file-input" type="file" accept=".json" (change)="onImportFileSelected($event)" style="display:none" />
           </div>
         </div>
 
@@ -89,7 +88,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
             <div *ngSwitchCase="'providers'" class="tab-panel tab-models">
               <div class="roles-toolbar">
                 <span class="filter-wrap">
-                  <input class="filter-input" style="width:240px" [ngModel]="providerFilter()" (ngModelChange)="providerFilter.set($event)" placeholder="🔍 Filter by name, type, endpoint…" />
+                  <input name="providerFilter" id="provider-filter-input" class="filter-input" style="width:240px" [ngModel]="providerFilter()" (ngModelChange)="providerFilter.set($event)" placeholder="🔍 Filter by name, type, endpoint…" />
                   @if (providerFilter()) {<button class="filter-clear" (click)="providerFilter.set('')">✕</button>}
                 </span>
                 <span class="roles-hint">{{ filteredProviders().length }} / {{ config().providers.length }} provider(s)</span>
@@ -165,7 +164,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
             <div *ngSwitchCase="'harnesses'" class="tab-panel tab-models">
               <div class="roles-toolbar">
                 <span class="filter-wrap">
-                  <input class="filter-input" style="width:240px" [ngModel]="harnessFilter()" (ngModelChange)="harnessFilter.set($event)" placeholder="🔍 Filter by name, mode, capability…" />
+                  <input name="harnessFilter" id="harness-filter-input" class="filter-input" style="width:240px" [ngModel]="harnessFilter()" (ngModelChange)="harnessFilter.set($event)" placeholder="🔍 Filter by name, mode, capability…" />
                   @if (harnessFilter()) {<button class="filter-clear" (click)="harnessFilter.set('')">✕</button>}
                 </span>
                 <span class="roles-hint">{{ filteredHarnesses().length }} / {{ config().harnesses.length }} harness(es)</span>
@@ -273,7 +272,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
               <!-- Toolbar -->
               <div class="roles-toolbar">
                 <span class="filter-wrap">
-                  <input class="filter-input" style="width:240px" [ngModel]="modelFilter()" (ngModelChange)="modelFilter.set($event)" placeholder="🔍 Filter by name, identifier, provider, harness…" />
+                  <input name="modelFilter" id="model-filter-input" class="filter-input" style="width:240px" [ngModel]="modelFilter()" (ngModelChange)="modelFilter.set($event)" placeholder="🔍 Filter by name, identifier, provider, harness…" />
                   @if (modelFilter()) {<button class="filter-clear" (click)="modelFilter.set('')">✕</button>}
                 </span>
                 <span class="roles-hint">{{ filteredModels().length }} / {{ config().models.length }} model(s)</span>
@@ -362,8 +361,65 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
             }
             </div>
 
-            <!-- ─── Roles Tab ─── -->
+            <!-- ─── Roles Registry Tab (CRUD on tackle.roles) ─── -->
             <div *ngSwitchCase="'roles'" class="tab-panel tab-roles">
+              <div class="roles-toolbar">
+                <span class="roles-hint">{{ rolesRegistry().length }} role(s)</span>
+                <div class="roles-toolbar-btns">
+                  <button class="btn-save-sm" (click)="startNewRole()">+ Add</button>
+                </div>
+              </div>
+              <div class="roles-table-wrap">
+                <table class="roles-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Description</th>
+                      <th>Created</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (r of rolesRegistry(); track r.id) {
+                      <tr>
+                        <td class="role-name-cell">{{ r.name }}</td>
+                        <td class="role-desc-cell">{{ r.description || '—' }}</td>
+                        <td class="role-date-cell">{{ r.created_at }}</td>
+                        <td class="role-actions-cell">
+                          <button class="btn-model-move" (click)="editRole(r)" title="Edit">✏</button>
+                          <button class="btn-model-remove" (click)="deleteRole(r)" title="Delete">🗑</button>
+                        </td>
+                      </tr>
+                    }
+                    @empty {
+                      <tr>
+                        <td colspan="4" class="empty-table-cell">No roles registered yet.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <!-- Add/Edit role mini-modal -->
+              @if (editRoleForm()) {
+                <div class="mini-overlay" (click)="cancelEditRole()">
+                <div class="mini-dialog" (click)="$event.stopPropagation()">
+                  <h4>{{ editRoleForm()!.id ? 'Edit' : 'New' }} Role</h4>
+                  <label>Name</label>
+                  <input [(ngModel)]="editRoleForm()!.name" placeholder="e.g. engineer" [disabled]="!!editRoleForm()!.id" />
+                  <label>Description</label>
+                  <input [(ngModel)]="editRoleForm()!.description" placeholder="Role purpose and responsibilities" />
+                  <div class="form-actions">
+                    @if (editRoleForm()!.id) {<button class="btn-delete" (click)="deleteRole(editRoleForm()!.id ?? '')">🗑 Delete</button>}
+                    <button class="btn-cancel" (click)="cancelEditRole()">Cancel</button>
+                    <button class="btn-save" (click)="saveRole()" [disabled]="!editRoleForm()?.name">💾 Save</button>
+                  </div>
+                </div>
+              </div>
+              }
+            </div>
+
+            <!-- ─── Role Assignment Tab ─── -->
+            <div *ngSwitchCase="'role-assignment'" class="tab-panel tab-roles">
               <!-- Empty-state / seed button -->
               @if (config().providers.length === 0) {
                 <div class="roles-empty">
@@ -381,10 +437,10 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                 
                 <div class="roles-toolbar">
                   <span class="filter-wrap">
-                    <input class="filter-input" style="width:240px" [ngModel]="roleFilter()" (ngModelChange)="roleFilter.set($event)" placeholder="🔍 Filter by model, provider, harness…" />
+                    <input name="roleFilter" id="role-filter-input" class="filter-input" style="width:240px" [ngModel]="roleFilter()" (ngModelChange)="roleFilter.set($event)" placeholder="🔍 Filter by model, provider, harness…" />
                     @if (roleFilter()) {<button class="filter-clear" (click)="roleFilter.set('')">✕</button>}
                   </span>
-                  <span class="roles-hint">{{ filteredRoles().length }} / {{ ROLES.length }} roles · Each role can have multiple models (ordered by priority), each with its own provider and harness</span>
+                  <span class="roles-hint">{{ filteredRoles().length }} / {{ roleNames().length }} roles · Each role can have multiple models (ordered by priority), each with its own provider and harness</span>
                   <div class="roles-toolbar-btns">
                     <button class="btn-save-sm" (click)="saveAllRoles()" [disabled]="!hasDirtyRoles()">💾 Save</button>
                     @if (hasDirtyRoles()) {<span class="roles-dirty-badge">● Pending changes</span>}
@@ -440,7 +496,7 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
                           </div>
                         </td>
                       </tr>
-                      @if (ROLES.length > 0 && filteredRoles().length === 0) {
+                      @if (roleNames().length > 0 && filteredRoles().length === 0) {
                         <tr>
                           <td colspan="2" class="empty-table-cell">No roles match your filter</td>
                         </tr>
@@ -833,6 +889,12 @@ const DEFAULT_MODEL_IDENTIFIER = 'opencode/big-pickle';
     `.cmd-copy-btn:hover{background:var(--bg-tertiary);color:var(--text-primary);border-color:var(--accent-blue-text)}`,
     `.cmd-preview-textarea{width:100%;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border-default);border-radius:6px;padding:8px 10px;font-size:12px;font-family:'Fira Code','Consolas',monospace;outline:none;resize:vertical;min-height:56px;line-height:1.5;white-space:pre-wrap;word-break:break-all;cursor:text}`,
 
+    // ── Roles Registry tab ────────────────────────────────────
+    `.role-name-cell{font-weight:600;color:var(--accent-blue-text);text-transform:capitalize}`,
+    `.role-desc-cell{color:var(--text-primary)}`,
+    `.role-date-cell{font-size:11px;color:var(--text-muted);white-space:nowrap}`,
+    `.role-actions-cell{display:flex;gap:4px}`,
+
     // ── Responsive ─────────────────────────────────────────────
     `@media(max-width:700px){.dialog{max-width:100%;max-height:95vh;border-radius:0}.tab-panel{flex-direction:column}.panel-form{max-height:50vh}}`,
   ],
@@ -862,7 +924,7 @@ export class AIConfigDialogComponent implements OnDestroy {
     // Ctrl+S / Cmd+S — save roles
     if (ctrl && key.toLowerCase() === 's') {
       e.preventDefault();
-      if (this.activeTab() === 'roles') this.saveAllRoles();
+      if (this.activeTab() === 'role-assignment') this.saveAllRoles();
       return;
     }
 
@@ -901,14 +963,16 @@ export class AIConfigDialogComponent implements OnDestroy {
     { id: 'providers', label: 'Providers' },
     { id: 'harnesses', label: 'Harnesses' },
     { id: 'models', label: 'Models' },
-    { id: 'roles', label: 'Role Assignment' },
+    { id: 'roles', label: 'Roles' },
+    { id: 'role-assignment', label: 'Role Assignment' },
     { id: 'logging', label: 'Logging' },
     { id: 'test', label: 'Test' },
     { id: 'failure-recovery', label: 'Recovery' },
   ];
 
   readonly PROVIDER_TYPES = PROVIDER_TYPES;
-  readonly ROLES = ROLES;
+  /** Dynamic role names derived from the Roles Registry (tackle.roles table). */
+  readonly roleNames = computed(() => this.rolesRegistry().map(r => r.name));
   readonly CAPABILITY_KEYS = CAPABILITY_KEYS;
 
   // ── Edit state (per-tab form) ───────────────────────────────
@@ -1030,24 +1094,109 @@ export class AIConfigDialogComponent implements OnDestroy {
   /** MCP server base URL — injected or default to localhost:3100 */
   private apiUrl = inject(API_BASE_URL, { optional: true }) || 'http://localhost:3100';
 
+  /** Roles registry state (tackle.roles table). */
+  readonly rolesRegistry = signal<Role[]>([]);
+  readonly editRoleForm = signal<{ id?: string; name: string; description: string } | null>(null);
+  private rolesService = inject(RolesService);
+
   constructor(public aiConfig: AIConfigService) {
     this.config = this.aiConfig.config;
     this.saving = this.aiConfig.saving;
-    for (const r of ROLES) {
-      this.roleEdits[r] = { model_entries: [] };
-    }
+    // roleEdits initialized dynamically in open() after roles are fetched
   }
 
   // ── Visibility ──────────────────────────────────────────────
   open(): void {
+    this.loadRolesRegistry();
     this.aiConfig.fetch().subscribe({
-      next: () => this._syncRoleEdits(),
+      next: () => {
+        // Initialize roleEdits for all roles from the registry, then sync with server config
+        this._initRoleEditsFromRegistry();
+        this._syncRoleEdits();
+      },
       error: () => {}, // silently ignore — roleEdits stay at empty state
     });
     this.visible.set(true);
     this.activeTab.set('providers');
     this._resetAllForms();
     this._clearAllFilters();
+  }
+
+  // ── Roles Registry (tackle.roles table) ────────────────────
+
+  /** Load the full list of roles from tackle.roles. */
+  loadRolesRegistry(): void {
+    this.rolesService.list().subscribe({
+      next: (res) => this.rolesRegistry.set(res.roles),
+      error: () => this.rolesRegistry.set([]),
+    });
+  }
+
+  /** Open the "add new role" form. */
+  startNewRole(): void {
+    this.editRoleForm.set({ name: '', description: '' });
+  }
+
+  /** Open the "edit role" form with pre-populated data. */
+  editRole(r: Role): void {
+    this.editRoleForm.set({ id: r.id, name: r.name, description: r.description });
+  }
+
+  /** Cancel and close the role edit form. */
+  cancelEditRole(): void {
+    this.editRoleForm.set(null);
+  }
+
+  /** Save the role (create or update). */
+  saveRole(): void {
+    const f = this.editRoleForm();
+    if (!f || !f.name.trim()) return;
+    this.rolesService.upsert({
+      id: f.id,
+      name: f.name.trim(),
+      description: f.description.trim() || undefined,
+    }).subscribe({
+      next: () => {
+        this.cancelEditRole();
+        this.loadRolesRegistry();
+      },
+      error: (err) => {
+        this.toast.push({
+          id: `toast-role-err-${Date.now()}`,
+          type: 'role_saved',
+          title: 'Save Failed',
+          message: `Could not save role: ${err.message || 'Unknown error'}`,
+          icon: '❌',
+          timestamp: new Date().toISOString(),
+          priority: 'high',
+        });
+      },
+    });
+  }
+
+  /** Delete a role from the registry. */
+  deleteRole(r: Role | string | undefined): void {
+    const id = typeof r === 'string' ? r : r?.id;
+    const name = typeof r === 'string' ? r : r?.name ?? '';
+    if (!id) return;
+    if (!confirm(`Delete role "${name}"?\nThis will fail if the role is referenced by config_bundles, sessions, or other tables.`)) return;
+    this.rolesService.delete(id).subscribe({
+      next: () => {
+        this.cancelEditRole();
+        this.loadRolesRegistry();
+      },
+      error: (err) => {
+        this.toast.push({
+          id: `toast-role-del-err-${Date.now()}`,
+          type: 'role_saved',
+          title: 'Delete Failed',
+          message: `Could not delete role: ${err.message || 'Unknown error'}`,
+          icon: '❌',
+          timestamp: new Date().toISOString(),
+          priority: 'high',
+        });
+      },
+    });
   }
 
   /** Switch tabs and clear all filter inputs so each tab starts fresh. */
@@ -1194,7 +1343,8 @@ export class AIConfigDialogComponent implements OnDestroy {
       case 'providers': return c.providers.length;
       case 'harnesses': return c.harnesses.length;
       case 'models': return c.models.length;
-      case 'roles': return c.roles.length;
+      case 'roles': return this.rolesRegistry().length;
+      case 'role-assignment': return c.roles.length;
       case 'logging': return 0;
       case 'failure-recovery': return 0;
       default: return 0;
@@ -1657,7 +1807,7 @@ export class AIConfigDialogComponent implements OnDestroy {
       bundles: { model_id: string; priority: number; provider_id?: string | null; harness_id?: string | null }[];
     }[] = [];
 
-    for (const r of ROLES) {
+    for (const r of this.roleNames()) {
       const edits = this.roleEdits[r];
       if (edits.model_entries.length === 0) continue;
       const primary = edits.model_entries[0];
@@ -1732,8 +1882,8 @@ export class AIConfigDialogComponent implements OnDestroy {
   /** Filter roles by searching assigned models' names, provider names, and harness names. */
   filteredRoles(): string[] {
     const q = this.roleFilter().toLowerCase().trim();
-    if (!q) return ROLES;
-    return ROLES.filter(r => {
+    if (!q) return this.roleNames();
+    return this.roleNames().filter(r => {
       const entries = this.roleEdits[r]?.model_entries ?? [];
       return entries.some(e => {
         const model = this.config().models.find(m => m.id === e.model_id);
@@ -1804,7 +1954,7 @@ export class AIConfigDialogComponent implements OnDestroy {
 
   /** True when any role's edits differ from the server config — computed fresh on each call. */
   hasDirtyRoles(): boolean {
-    return ROLES.some(r => this.isRoleDirty(r));
+    return this.roleNames().some(r => this.isRoleDirty(r));
   }
 
   /** Compare a single role's edits against the server config (v098: per-model provider/harness). */
@@ -1920,15 +2070,28 @@ export class AIConfigDialogComponent implements OnDestroy {
     this.editProviderForm.set(null);
     this.editHarnessForm.set(null);
     this.editModelForm.set(null);
+    this.editRoleForm.set(null);
     this.selectedProviderId.set(null);
     this.selectedHarnessId.set(null);
     this.selectedModelId.set(null);
   }
 
+  /** Populate roleEdits for all roles from the Roles Registry. */
+  private _initRoleEditsFromRegistry(): void {
+    for (const r of this.roleNames()) {
+      if (!this.roleEdits[r]) {
+        this.roleEdits[r] = { model_entries: [] };
+      }
+    }
+  }
+
   /** Populate roleEdits from the latest config snapshot (v098: per-model provider/harness). */
   private _syncRoleEdits(): void {
     const c = this.config();
-    for (const r of ROLES) {
+    for (const r of this.roleNames()) {
+      if (!this.roleEdits[r]) {
+        this.roleEdits[r] = { model_entries: [] };
+      }
       const existing = c.roles.find(rc => rc.role === r);
       // Build model_entries from bundles (prioritized), fall back to single model_id
       const rm = (c.bundles ?? [])

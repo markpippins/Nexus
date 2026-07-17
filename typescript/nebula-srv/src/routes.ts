@@ -4,8 +4,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { randomUUID } from 'crypto';
 import * as bs from './block-segmentation.service';
 import * as bsRedis from './services/block-segmentation-redis.service';
+import { CrossReferenceType } from './crossref-taxonomy';
 
 const execFileAsync = promisify(execFile);
 
@@ -145,36 +147,15 @@ function normalizeStatus(input: string | null | undefined): string | null {
   return STATUS_NORMALIZATION[key] ?? null;
 }
 
-// ── Plans Display (Plan 0134) ─────────────────────────────────
-const PLANS_ROOT = path.resolve('/home/codex/dev/nexus/audit/IMPLEMENTATION_PLANS');
-const PLAN_STATUS_DIRS = ['pending', 'planning', 'proposed', 'completed'] as const;
-type PlanStatus = typeof PLAN_STATUS_DIRS[number];
-
-function parsePlanTitle(md: string): string {
-  const m = md.match(/^\s*#\s+(.+?)\s*$/m);
-  return m ? m[1] : '';
-}
-
-function readPlanEntries(): { id: string; status: PlanStatus; absPath: string; sizeBytes: number; modifiedAt: string }[] {
-  const out: ReturnType<typeof readPlanEntries> = [];
-  for (const status of PLAN_STATUS_DIRS) {
-    const dir = path.join(PLANS_ROOT, status);
-    if (!fs.existsSync(dir)) continue;
-    for (const name of fs.readdirSync(dir)) {
-      if (!name.endsWith('.md')) continue;
-      const abs = path.join(dir, name);
-      if (!fs.statSync(abs).isFile()) continue;
-      const st = fs.statSync(abs);
-      out.push({
-        id: name.replace(/\.md$/, ''),
-        status,
-        absPath: abs,
-        sizeBytes: st.size,
-        modifiedAt: st.mtime.toISOString(),
-      });
-    }
-  }
-  return out;
+// ── Requirement Type Constants ────────────────────────────────
+const REQ_TYPES = ['Epic', 'Story', 'Task', 'Bug'] as const;
+type ReqType = typeof REQ_TYPES[number];
+function normalizeReqType(input: string | null | undefined): string | null {
+  if (input === undefined || input === null) return null;
+  const key = String(input).trim();
+  if (!key) return null;
+  // Case-sensitive match (DB CHECK constraint is case-sensitive)
+  return (REQ_TYPES as readonly string[]).includes(key) ? key : null;
 }
 
 function toEpochMs(row: any, ...cols: string[]): any {
@@ -446,7 +427,135 @@ export function createRoutes(pool: Pool): Router {
         featureId: r.feature_id,
         startDate: r.start_date,
         completionDate: r.completion_date,
+        parentId: r.parent_id,
+        reqType: r.req_type,
+        acceptanceCriteria: r.acceptance_criteria,
+        candidateId: r.candidate_id,
+        conduitPlanId: r.conduit_plan_id,
       })));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/requirements/:id/children — fetch direct child requirements
+  router.get('/requirements/:id/children', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT * FROM requirements WHERE parent_id = $1 ORDER BY created_at ASC`,
+        [id]
+      );
+      res.json(rows.map((r: any) => ({
+        ...toEpochMs(r, 'created_at'),
+        systemId: r.system_id,
+        subsystemId: r.subsystem_id,
+        featureId: r.feature_id,
+        startDate: r.start_date,
+        completionDate: r.completion_date,
+        parentId: r.parent_id,
+        reqType: r.req_type,
+        acceptanceCriteria: r.acceptance_criteria,
+        candidateId: r.candidate_id,
+        conduitPlanId: r.conduit_plan_id,
+      })));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/requirements/:id/dependencies — list blockers and blocked-by
+  router.get('/requirements/:id/dependencies', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT cr.id, cr.source_type, cr.source_id, cr.target_type, cr.target_id,
+                cr.rel_type, cr.metadata, cr.created_at,
+                CASE WHEN cr.source_id = $1 THEN cr.target_id ELSE cr.source_id END AS other_id,
+                CASE WHEN cr.source_id = $1 THEN 'outgoing' ELSE 'incoming' END AS direction
+         FROM nebula.cross_references cr
+         WHERE ((cr.source_type = 'requirement' AND cr.source_id = $1)
+            OR (cr.target_type = 'requirement' AND cr.target_id = $1))
+           AND cr.rel_type IN ('req:blocks', 'req:depends_on')
+         ORDER BY cr.created_at ASC`,
+        [id]
+      );
+      res.json(rows.map((r: any) => ({
+        id: r.id,
+        relType: r.rel_type,
+        sourceType: r.source_type,
+        sourceId: r.source_id,
+        targetType: r.target_type,
+        targetId: r.target_id,
+        direction: r.direction,
+        otherId: r.other_id,
+        metadata: r.metadata,
+        createdAt: r.created_at ? new Date(r.created_at).getTime() : null,
+      })));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/requirements/:id/dependencies — create a dependency link
+  router.post('/requirements/:id/dependencies', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { targetId, relType = 'req:blocks' } = req.body;
+      if (!targetId) return res.status(400).json({ error: 'targetId is required' });
+      if (id === targetId) return res.status(400).json({ error: 'A requirement cannot depend on itself' });
+
+      const validRelTypes = [CrossReferenceType.REQ_BLOCKS, CrossReferenceType.REQ_DEPENDS_ON];
+      if (!validRelTypes.includes(relType)) {
+        return res.status(400).json({ error: `relType must be one of: ${validRelTypes.join(', ')}` });
+      }
+
+      // Verify both requirements exist
+      const { rows } = await pool.query(
+        'SELECT id FROM requirements WHERE id = ANY($1::uuid[])',
+        [[id, targetId]]
+      );
+      if (rows.length !== 2) {
+        return res.status(404).json({ error: 'One or both requirements not found' });
+      }
+
+      // Idempotent insert (WHERE NOT EXISTS)
+      const { rows: [xref] } = await pool.query(
+        `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+         SELECT 'requirement', $1, 'requirement', $2, $3, '{}'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM nebula.cross_references
+           WHERE source_type = 'requirement'
+             AND source_id = $1
+             AND target_type = 'requirement'
+             AND target_id = $2
+             AND rel_type = $3
+         )
+         RETURNING *`,
+        [id, targetId, relType]
+      );
+
+      res.status(201).json(xref || { ok: true, message: 'Dependency already exists' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/requirements/:id/dependencies/:depId — remove a dependency link
+  router.delete('/requirements/:id/dependencies/:depId', async (req: Request, res: Response) => {
+    try {
+      const { id, depId } = req.params;
+      const { rowCount } = await pool.query(
+        `DELETE FROM nebula.cross_references
+         WHERE id = $1
+           AND source_type = 'requirement'
+           AND target_type = 'requirement'
+           AND rel_type IN ('req:blocks', 'req:depends_on')
+           AND (source_id = $2 OR target_id = $2)`,
+        [depId, id]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'Dependency not found' });
+      res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -455,14 +564,18 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/requirements
   router.post('/requirements', async (req: Request, res: Response) => {
     try {
-      const { systemId, subsystemId, featureId = null, title, description = '', status = 'Backlog', priority = 'Medium', startDate = null, completionDate = null } = req.body;
-      if (!systemId || !subsystemId || !title) return res.status(400).json({ error: 'systemId, subsystemId, and title are required' });
+      const { systemId, subsystemId = null, featureId = null, title, description = '', status = 'Backlog', priority = 'Medium', startDate = null, completionDate = null, parentId = null, reqType = null, acceptanceCriteria = null, candidateId = null } = req.body;
+      if (!systemId || !title) return res.status(400).json({ error: 'systemId and title are required' });
       const normalizedStatus = normalizeStatus(status);
       if (!normalizedStatus) return res.status(400).json({ error: `status, if provided, must be one of: ${Array.from(STATUS_CANONICAL).join(', ')}` });
+      // Validate reqType if provided
+      if (reqType && !(REQ_TYPES as readonly string[]).includes(reqType)) {
+        return res.status(400).json({ error: `reqType, if provided, must be one of: ${REQ_TYPES.join(', ')}` });
+      }
       const { rows: [reqt] } = await pool.query(
-        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-        [systemId, subsystemId, featureId, title, description, normalizedStatus, priority, startDate, completionDate]
+        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date, parent_id, req_type, acceptance_criteria, candidate_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        [systemId, subsystemId, featureId, title, description, normalizedStatus, priority, startDate, completionDate, parentId, reqType, acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null, candidateId]
       );
       res.status(201).json({
         ...toEpochMs(reqt, 'created_at'),
@@ -471,6 +584,11 @@ export function createRoutes(pool: Pool): Router {
         featureId: reqt.feature_id,
         startDate: reqt.start_date,
         completionDate: reqt.completion_date,
+        parentId: reqt.parent_id,
+        reqType: reqt.req_type,
+        acceptanceCriteria: reqt.acceptance_criteria,
+        candidateId: reqt.candidate_id,
+        conduitPlanId: reqt.conduit_plan_id,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -498,7 +616,7 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/requirements/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId } = req.body;
+      const { title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId, parentId, reqType, acceptanceCriteria, candidateId, conduitPlanId } = req.body;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -515,6 +633,14 @@ export function createRoutes(pool: Pool): Router {
       if (systemId !== undefined) { sets.push(`system_id = $${i++}`); vals.push(systemId); }
       if (subsystemId !== undefined) { sets.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
       if (featureId !== undefined) { sets.push(`feature_id = $${i++}`); vals.push(featureId); }
+      if (parentId !== undefined) { sets.push(`parent_id = $${i++}`); vals.push(parentId); }
+      if (reqType !== undefined) {
+        if (reqType && !(REQ_TYPES as readonly string[]).includes(reqType)) return res.status(400).json({ error: `reqType must be one of: ${REQ_TYPES.join(', ')}` });
+        sets.push(`req_type = $${i++}`); vals.push(reqType);
+      }
+      if (acceptanceCriteria !== undefined) { sets.push(`acceptance_criteria = $${i++}`); vals.push(acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null); }
+      if (candidateId !== undefined) { sets.push(`candidate_id = $${i++}`); vals.push(candidateId); }
+      if (conduitPlanId !== undefined) { sets.push(`conduit_plan_id = $${i++}`); vals.push(conduitPlanId); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [reqt] } = await pool.query(
@@ -522,10 +648,23 @@ export function createRoutes(pool: Pool): Router {
         vals
       );
       if (!reqt) return res.status(404).json({ error: 'Requirement not found' });
+      // ── Backlog→ToDo auto-compile trigger (Plan 1062) ────────────
+      // When a requirement transitions to ToDo, fire-and-forget the
+      // two-stage compiler to generate WorkRequest IR + conduit plan.
+      if (status !== undefined && reqt.status === 'ToDo') {
+        fetch(`http://localhost:3101/api/requirements/${id}/compile`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ createPlan: true }),
+        }).catch(() => { /* compilation is best-effort */ });
+      }
       res.json({
         ...toEpochMs(reqt, 'created_at'),
         systemId: reqt.system_id, subsystemId: reqt.subsystem_id, featureId: reqt.feature_id,
         startDate: reqt.start_date, completionDate: reqt.completion_date,
+        parentId: reqt.parent_id, reqType: reqt.req_type,
+        acceptanceCriteria: reqt.acceptance_criteria, candidateId: reqt.candidate_id,
+        conduitPlanId: reqt.conduit_plan_id,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -591,12 +730,273 @@ export function createRoutes(pool: Pool): Router {
         ...toEpochMs(reqt, 'created_at'),
         systemId: reqt.system_id, subsystemId: reqt.subsystem_id, featureId: reqt.feature_id,
         startDate: reqt.start_date, completionDate: reqt.completion_date,
+        parentId: reqt.parent_id, reqType: reqt.req_type,
+        acceptanceCriteria: reqt.acceptance_criteria, candidateId: reqt.candidate_id,
+        conduitPlanId: reqt.conduit_plan_id,
       });
     } catch (err: any) {
       await client.query('ROLLBACK');
       res.status(500).json({ error: err.message });
     } finally {
       client.release();
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  REQUIREMENT → WORKREQUEST COMPILATION (Plan 1062)
+  // ════════════════════════════════════════════════════════════════
+
+  // POST /api/requirements/:id/compile — compile a requirement into a WorkRequest IR
+  // Runs the two-stage compiler (Stage 1 normalization + Stage 2 op_registry compilation).
+  // Optionally creates a conduit plan if createPlan=true.
+  router.post('/requirements/:id/compile', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { stage1Only = false, createPlan = false, dryRun = false } = req.body;
+
+      // Fetch requirement with hierarchy context
+      const { rows: [reqt] } = await pool.query(
+        `SELECT req.id, req.title, req.description, req.status, req.priority, req.req_type,
+                req.acceptance_criteria, req.candidate_id,
+                req.system_id, req.subsystem_id, req.feature_id, req.parent_id,
+                COALESCE(sys.name, '') AS system_name,
+                COALESCE(sys.description, '') AS system_description,
+                COALESCE(sub.name, '') AS subsystem_name,
+                COALESCE(sub.description, '') AS subsystem_description,
+                COALESCE(feat.name, '') AS feature_name,
+                COALESCE(feat.description, '') AS feature_description
+         FROM nebula.requirements req
+         LEFT JOIN nebula.systems sys ON sys.id = req.system_id
+         LEFT JOIN nebula.subsystems sub ON sub.id = req.subsystem_id
+         LEFT JOIN nebula.features feat ON feat.id = req.feature_id
+         WHERE req.id = $1`,
+        [id]
+      );
+      if (!reqt) return res.status(404).json({ error: 'Requirement not found' });
+
+      // ── Stage 1: Semantic Normalization ──────────────────────────
+      const hierarchyContext = {
+        system: { id: reqt.system_id, name: reqt.system_name, description: reqt.system_description },
+        subsystem: { id: reqt.subsystem_id, name: reqt.subsystem_name, description: reqt.subsystem_description },
+        feature: { id: reqt.feature_id, name: reqt.feature_name, description: reqt.feature_description },
+      };
+
+      // Normalize acceptance criteria
+      let normalizedCriteria: string[] = [];
+      const rawAC = reqt.acceptance_criteria;
+      if (rawAC) {
+        const parsed = typeof rawAC === 'string' ? JSON.parse(rawAC) : rawAC;
+        if (Array.isArray(parsed)) {
+          normalizedCriteria = parsed.map((item: any) =>
+            typeof item === 'string' ? item.trim() :
+            (item?.condition || item?.title || item?.criterion || '').trim()
+          ).filter(Boolean);
+        } else if (typeof parsed === 'object' && parsed?.condition) {
+          normalizedCriteria = [parsed.condition];
+        }
+      }
+
+      // Resolve cross-references
+      const { rows: crossRefs } = await pool.query(
+        `SELECT cr.rel_type, cr.target_type, cr.target_id,
+                CASE WHEN cr.target_type = 'requirement' THEN
+                  (SELECT title FROM nebula.requirements WHERE id = cr.target_id::uuid)
+                ELSE cr.target_id::text END AS target_label
+         FROM nebula.cross_references cr
+         WHERE cr.source_type = 'requirement' AND cr.source_id = $1
+         ORDER BY cr.created_at`,
+        [id]
+      );
+
+      // Synthesize intent summary
+      const intentParts = [reqt.title];
+      if (reqt.description) intentParts.push(reqt.description);
+      if (reqt.subsystem_name) intentParts.push(`Subsystem: ${reqt.subsystem_name}`);
+      if (reqt.feature_name) intentParts.push(`Feature: ${reqt.feature_name}`);
+      const intentSummary = intentParts.filter(Boolean).join(' — ');
+
+      const stage1 = {
+        requirement_id: id,
+        title: reqt.title,
+        hierarchy_context: hierarchyContext,
+        normalized_criteria: normalizedCriteria,
+        cross_references: crossRefs,
+        intent_summary: intentSummary,
+      };
+
+      if (stage1Only) {
+        return res.json({ ok: true, stage: 1, result: stage1 });
+      }
+
+      // ── Stage 2: Engineering Compilation ─────────────────────────
+      // Match against op_registry
+      const { rows: registry } = await pool.query(
+        `SELECT id, intent_id, version, label, match_patterns, opcode_template,
+                required_params, idempotency_key
+         FROM nebula.op_registry
+         WHERE status = 'active' AND deleted_at IS NULL`
+      );
+
+      let matchedEntry: any = null;
+      let bestScore = 0;
+      const intentText = `${reqt.title} ${intentSummary}`.toLowerCase();
+      for (const entry of registry) {
+        const patterns = entry.match_patterns || [];
+        for (const pattern of patterns) {
+          try {
+            const match = new RegExp(pattern, 'i').exec(intentText);
+            if (match && match[0].length > bestScore) {
+              bestScore = match[0].length;
+              matchedEntry = entry;
+            }
+          } catch { /* skip invalid regex */ }
+        }
+      }
+
+      // Generate opcode sequence
+      let opSequence: any[] = [];
+      if (matchedEntry?.opcode_template) {
+        const template = typeof matchedEntry.opcode_template === 'string'
+          ? JSON.parse(matchedEntry.opcode_template) : matchedEntry.opcode_template;
+        if (Array.isArray(template)) {
+          opSequence = template.map((step: any, i: number) => ({
+            step: i + 1,
+            op: step.op || 'WRITE_FILE',
+            target: step.target || '',
+            args: step.params || {},
+            idempotency_key: `${matchedEntry.idempotency_key || ''}-${id.slice(0, 8)}`,
+          }));
+        }
+      }
+      if (opSequence.length === 0) {
+        // Default: generate from acceptance criteria
+        const reqShort = id.slice(0, 8);
+        normalizedCriteria.slice(0, 5).forEach((criterion: string, i: number) => {
+          opSequence.push({
+            step: i + 1, op: 'WRITE_SOURCE_FILE',
+            target: `src/${reqShort}/step_${i+1}`,
+            args: { content_template: 'acceptance-criterion', criterion },
+            idempotency_key: `req-${reqShort}-step-${i+1}`,
+          });
+        });
+        opSequence.push({
+          step: opSequence.length + 1, op: 'VALIDATE_SYNTAX',
+          target: `src/${reqShort}/`, args: { language: 'auto' },
+          idempotency_key: `req-${reqShort}-validate`,
+        });
+      }
+
+      // Resolve files affected
+      const filesAffected: string[] = [];
+      const fileSet = new Set<string>();
+      for (const step of opSequence) {
+        if (step.target && !step.target.startsWith('spec/') && !step.target.startsWith('files/')) {
+          let t = step.target;
+          if (!t.match(/\.(py|ts|js|go|java|sql|md)$/)) t = t.replace(/\/$/, '') + '/__init__.py';
+          fileSet.add(t);
+        }
+      }
+      if (reqt.system_name) {
+        let base = reqt.system_name.toLowerCase().replace(/\s/g, '-');
+        if (reqt.subsystem_name) base += '/' + reqt.subsystem_name.toLowerCase().replace(/\s/g, '-');
+        fileSet.add(`${base}/__init__.py`);
+      }
+      filesAffected.push(...Array.from(fileSet).sort());
+
+      // Resolve dependencies from cross-refs
+      const dependencies = crossRefs
+        .filter((r: any) => r.rel_type === 'req:depends_on' || r.rel_type === 'req:blocks')
+        .map((r: any) => r.target_label)
+        .filter(Boolean);
+
+      const idempotencyKey = matchedEntry?.idempotency_key || `req-${id.slice(0, 8)}`;
+      const acceptanceForPlan = normalizedCriteria.slice(0, 5).length > 0
+        ? normalizedCriteria.slice(0, 5)
+        : [`Implement: ${reqt.title}`];
+
+      const stage2 = {
+        requirement_id: id,
+        intent_id: matchedEntry?.intent_id || `REQ-${id.slice(0, 8)}`,
+        registry_version: matchedEntry?.version || 'default',
+        op_sequence: opSequence,
+        files_affected: filesAffected,
+        dependencies,
+        acceptance_criteria: acceptanceForPlan,
+        idempotency_key: idempotencyKey,
+        matched_op_registry_id: matchedEntry?.id || null,
+      };
+
+      if (dryRun) {
+        return res.json({ ok: true, stage: 2, stage1, stage2, dryRun: true });
+      }
+
+      // ── Audit: journal entry via agent_records ───────────────────
+      const journalId = randomUUID();
+      const now = new Date().toISOString();
+      const journalContent = JSON.stringify({
+        requirement_id: id,
+        stage1: { normalized_criteria_count: normalizedCriteria.length, cross_references_count: crossRefs.length },
+        stage2: { matched: !!matchedEntry, op_count: opSequence.length, files_count: filesAffected.length, idempotency_key: idempotencyKey },
+      });
+      try {
+        await pool.query(
+          `INSERT INTO nebula.agent_records (id, record_type, role, title, content, tags, created_at, updated_at)
+           VALUES ($1::uuid, 'engineering_log', 'architect', $2, $3, $4, $5, $5)`,
+          [journalId, `Requirement Compilation: ${reqt.title.slice(0, 80)}`, journalContent,
+           JSON.stringify(['req-compilation', `requirement:${id.slice(0, 8)}`, 'audit']), now]
+        );
+      } catch (journalErr) {
+        console.warn('[compile] Journal entry write failed:', journalErr);
+      }
+
+      // ── Optional: create conduit plan ────────────────────────────
+      let planNumber: string | null = null;
+      if (createPlan) {
+        const project = (reqt.system_name || 'nexus').toLowerCase().replace(/\s/g, '-');
+        try {
+          const planResponse = await fetch('http://localhost:3100/tools/call', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: 'create_plan',
+              arguments: {
+                title: reqt.title, project, goal: intentSummary,
+                acceptanceCriteria: acceptanceForPlan,
+                filesAffected, dependencies,
+              },
+            }),
+          });
+          const planResult = await planResponse.json() as any;
+          const inner = planResult.result || planResult;
+          if (inner.created && inner.planNumber) {
+            planNumber = inner.planNumber;
+            // Create cross-reference: requirement → plan (matches existing pattern — let DB defaults handle id/created_at)
+            await pool.query(
+              `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+               SELECT 'requirement', $1, 'plan', $2, 'compiles_to', '{}'::jsonb
+               WHERE NOT EXISTS (
+                 SELECT 1 FROM nebula.cross_references
+                 WHERE source_type = 'requirement' AND source_id = $1
+                   AND target_type = 'plan' AND target_id = $2 AND rel_type = 'compiles_to'
+               )`,
+              [id, planNumber]
+            );
+          }
+        } catch (planErr) {
+          console.warn('[compile] Conduit plan creation failed:', planErr);
+        }
+      }
+
+      res.json({
+        ok: true,
+        stage: 2,
+        stage1,
+        stage2,
+        journal_entry_id: journalId,
+        plan_number: planNumber,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -994,59 +1394,145 @@ export function createRoutes(pool: Pool): Router {
   //  PLANS DISPLAY (Plan 0134)
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/plans?status=pending|planning|proposed|completed|all
+  // GET /api/plans — list implementation plans from nebula.implementation_plans
+  // ?status=archived|pending|... & ?limit=N
   router.get('/plans', async (req: Request, res: Response) => {
     try {
-      const raw = (req.query.status as string | undefined) ?? 'all';
-      const normalized = (raw || 'all').toLowerCase();
-      if (normalized !== 'all' && !(PLAN_STATUS_DIRS as readonly string[]).includes(normalized)) {
-        return res.status(400).json({ error: `status, if provided, must be one of: ${PLAN_STATUS_DIRS.join(', ')}, all` });
+      const { status, limit: qLimit } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 500, 1000);
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (status && status !== 'all') {
+        clauses.push(`p.status = $${i++}`);
+        vals.push(status);
       }
-      const all = readPlanEntries();
-      const filtered = normalized === 'all' ? all : all.filter(e => e.status === normalized);
-      res.json({
-        plans: filtered.map(e => {
-          const content = fs.readFileSync(e.absPath, 'utf-8');
-          return {
-            id: e.id,
-            status: e.status,
-            path: `${e.status}/${e.id}.md`,
-            title: parsePlanTitle(content) || e.id,
-            sizeBytes: e.sizeBytes,
-            modifiedAt: e.modifiedAt,
-          };
-        }),
-        count: filtered.length,
-      });
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+      vals.push(limit);
+      const { rows } = await pool.query(
+        `SELECT p.plan_number AS id, p.title, p.goal, p.content,
+                p.files_affected, p.acceptance_criteria, p.dependencies,
+                p.status, p.metadata, p.created_at, p.updated_at,
+                char_length(p.content)::int AS "sizeBytes",
+                p.updated_at AS "modifiedAt"
+         FROM nebula.implementation_plans p
+         ${where}
+         ORDER BY p.updated_at DESC
+         LIMIT $${i}`,
+        vals
+      );
+      res.json({ plans: rows, count: rows.length });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // GET /api/plans/:id — collision-resilient (first match in pending→planning→proposed→completed order)
+  // GET /api/plans/:id — fetch a single implementation plan by plan_number
   router.get('/plans/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      if (id.includes('..') || id.includes('/') || id.includes('\\')) {
-        return res.status(400).json({ error: 'id must be a plan basename, with no path separators' });
-      }
-      for (const status of PLAN_STATUS_DIRS) {
-        const candidate = path.join(PLANS_ROOT, status, `${id}.md`);
-        if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-          const content = fs.readFileSync(candidate, 'utf-8');
-          const st = fs.statSync(candidate);
-          return res.json({
-            id,
-            status,
-            path: `${status}/${id}.md`,
-            title: parsePlanTitle(content) || id,
-            content,
-            sizeBytes: st.size,
-            modifiedAt: st.mtime.toISOString(),
-          });
-        }
-      }
-      return res.status(404).json({ error: `Plan ${id} not found in ${PLAN_STATUS_DIRS.join(', ')}` });
+      const { rows: [plan] } = await pool.query(
+        `SELECT p.plan_number AS id, p.title, p.goal, p.content,
+                p.files_affected, p.acceptance_criteria, p.dependencies,
+                p.status, p.metadata, p.created_at, p.updated_at,
+                char_length(p.content)::int AS "sizeBytes",
+                p.updated_at AS "modifiedAt"
+         FROM nebula.implementation_plans p
+         WHERE p.plan_number = $1`,
+        [id]
+      );
+      if (!plan) return res.status(404).json({ error: `Plan ${id} not found` });
+      res.json(plan);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/implementation-plans/statuses — distinct status values for filter tabs
+  router.get('/implementation-plans/statuses', async (_req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT DISTINCT status FROM nebula.implementation_plans ORDER BY status`
+      );
+      res.json({ statuses: rows.map((r: any) => r.status) });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/systems/:id/implementation-plans — plans linked to a system via cross-refs
+  router.get('/systems/:id/implementation-plans', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
+                p.files_affected, p.acceptance_criteria, p.dependencies,
+                p.status, p.metadata, p.created_at, p.updated_at,
+                char_length(p.content)::int AS "sizeBytes",
+                p.updated_at AS "modifiedAt"
+         FROM nebula.implementation_plans p
+         JOIN nebula.cross_references cr ON cr.target_type = 'plan'
+             AND cr.target_id = p.plan_number
+             AND cr.rel_type = 'spawns_plan'
+         JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
+             AND cr.source_type = 'harvest_candidate'
+         WHERE hc.system_id = $1
+         ORDER BY p.updated_at DESC`,
+        [id]
+      );
+      res.json({ systemId: id, plans: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/subsystems/:id/implementation-plans — plans linked to a subsystem
+  router.get('/subsystems/:id/implementation-plans', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
+                p.files_affected, p.acceptance_criteria, p.dependencies,
+                p.status, p.metadata, p.created_at, p.updated_at,
+                char_length(p.content)::int AS "sizeBytes",
+                p.updated_at AS "modifiedAt"
+         FROM nebula.implementation_plans p
+         JOIN nebula.cross_references cr ON cr.target_type = 'plan'
+             AND cr.target_id = p.plan_number
+             AND cr.rel_type = 'spawns_plan'
+         JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
+             AND cr.source_type = 'harvest_candidate'
+         WHERE hc.subsystem_id = $1
+         ORDER BY p.updated_at DESC`,
+        [id]
+      );
+      res.json({ subsystemId: id, plans: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/features/:id/implementation-plans — plans linked to a feature
+  router.get('/features/:id/implementation-plans', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
+                p.files_affected, p.acceptance_criteria, p.dependencies,
+                p.status, p.metadata, p.created_at, p.updated_at,
+                char_length(p.content)::int AS "sizeBytes",
+                p.updated_at AS "modifiedAt"
+         FROM nebula.implementation_plans p
+         JOIN nebula.cross_references cr ON cr.target_type = 'plan'
+             AND cr.target_id = p.plan_number
+             AND cr.rel_type = 'spawns_plan'
+         JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
+             AND cr.source_type = 'harvest_candidate'
+         WHERE hc.feature_id = $1
+         ORDER BY p.updated_at DESC`,
+        [id]
+      );
+      res.json({ featureId: id, plans: rows, count: rows.length });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1640,7 +2126,7 @@ export function createRoutes(pool: Pool): Router {
         SELECT h.id, h.source_path, h.source_filename, h.model,
                h.total_candidates, h.tags, h.metadata, h.created_at,
                h.level, h.visibility_scope,
-               h.source_hash, h.version, h.run_metadata,
+               h.source_hash, h.file_size, h.version, h.run_metadata,
                COALESCE((h.docklang #>> '{stats,by_type,code}')::int, 0) AS code_blocks,
                COALESCE(jsonb_array_length(h.docklang -> 'discourse_units'), 0) AS turns,
                CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0
@@ -1777,16 +2263,61 @@ export function createRoutes(pool: Pool): Router {
 
       // Get candidates
       const { rows: candidates } = await pool.query(
-        'SELECT id, title, status, system_id, intent_description FROM nebula.harvest_candidates WHERE harvest_id = $1 ORDER BY created_at', [id]
+        'SELECT id, title, status, completed, system_id, intent_description FROM nebula.harvest_candidates WHERE harvest_id = $1 ORDER BY created_at', [id]
       );
+
+      // Get snapshot context for the segment/override integration
+      // convention: conversation_id = harvest_id (set by auto-segment trigger)
+      let snapshotId: string | null = null;
+      let committedSegments: any[] = [];
+      let activeOverrides: any[] = [];
+      try {
+        const { rows: snapshots } = await pool.query(
+          `SELECT id FROM nebula.conversation_snapshots
+           WHERE conversation_id = $1
+           ORDER BY snapshot_index DESC LIMIT 1`,
+          [id]
+        );
+        if (snapshots.length > 0) {
+          snapshotId = snapshots[0].id;
+          const { rows: segments } = await pool.query(
+            `SELECT id, conversation_id, snapshot_id, start_block_id, end_block_id,
+                    start_block_index, end_block_index, segment_type, state, source,
+                    title, notes_md, created_by,
+                    to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+             FROM nebula.segments
+             WHERE snapshot_id = $1
+             ORDER BY start_block_index`,
+            [snapshotId]
+          );
+          committedSegments = segments;
+          const { rows: overrides } = await pool.query(
+            `SELECT id, conversation_id, snapshot_id, target_type, target_id,
+                    projection_target, override_type, reason_code, notes_md,
+                    source, created_by,
+                    to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+             FROM nebula.projection_overrides
+             WHERE snapshot_id = $1
+             ORDER BY created_at`,
+            [snapshotId]
+          );
+          activeOverrides = overrides;
+        }
+      } catch (_) {
+        // snapshot table may not exist or no snapshots yet — non-fatal
+      }
 
       res.json({
         harvestId: id,
+        conversationId: id,
+        snapshotId,
         title: harvest.title,
         source: harvest.source_filename,
         units,
         stats: stats?.stats || null,
         candidates,
+        committedSegments,
+        activeOverrides,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -1833,14 +2364,14 @@ export function createRoutes(pool: Pool): Router {
   router.post('/harvests', async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
-      const { sourcePath, sourceFilename, model, totalCandidates, candidates, sourceText, tags, metadata, level, visibilityScope, sourceHash, runMetadata, docklang } = req.body;
+      const { sourcePath, sourceFilename, model, totalCandidates, candidates, sourceText, tags, metadata, level, visibilityScope, sourceHash, fileSize, runMetadata, docklang } = req.body;
       if (!sourcePath) return res.status(400).json({ error: 'sourcePath is required' });
       await client.query('BEGIN');
 
       // 1. Insert the harvest (trigger auto-computes version and source_hash)
       const { rows: [row] } = await client.query(
-        `INSERT INTO nebula.harvests (source_path, source_filename, model, total_candidates, candidates, source_text, tags, metadata, level, visibility_scope, source_hash, run_metadata, docklang)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        `INSERT INTO nebula.harvests (source_path, source_filename, model, total_candidates, candidates, source_text, tags, metadata, level, visibility_scope, source_hash, file_size, run_metadata, docklang)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
         [
           sourcePath,
           sourceFilename || '',
@@ -1853,6 +2384,7 @@ export function createRoutes(pool: Pool): Router {
           level ?? 1,
           visibilityScope || 'all',
           sourceHash || null,
+          fileSize || null,
           runMetadata || {},
           docklang || null,
         ]
@@ -1921,7 +2453,7 @@ export function createRoutes(pool: Pool): Router {
       const { planRef } = req.params;
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source,
                 cr.created_at AS linked_at
@@ -1948,7 +2480,7 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source
          FROM nebula.harvest_candidates hc
@@ -1970,7 +2502,7 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source
          FROM nebula.harvest_candidates hc
@@ -1992,7 +2524,7 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description,
-                hc.status, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.status, hc.completed, hc.tags, hc.system_id, hc.subsystem_id, hc.feature_id,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source
          FROM nebula.harvest_candidates hc
@@ -2007,6 +2539,601 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+
+  // ════════════════════════════════════════════════════════════════
+  //  INTENT RECORDS (scoped by hierarchy via harvest_candidates JOIN)
+  // ════════════════════════════════════════════════════════════════
+
+
+  // GET /api/intent-records — list ALL intent records (unscoped, when no hierarchy selected)
+  router.get('/intent-records', async (req: Request, res: Response) => {
+    try {
+      const { limit: qLimit } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 500, 1000);
+      const { rows } = await pool.query(
+        `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id,
+                h.source_filename AS harvest_source
+         FROM nebula.intent_records ir
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+         ORDER BY ir.created_at DESC
+         LIMIT $1`,
+        [limit]
+      );
+      res.json({ intentRecords: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  // GET /api/systems/:id/intent-records — list intent records scoped to a system
+  router.get('/systems/:id/intent-records', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT ir.id, ir.candidate_id, ir.parent_id, ir.title, ir.description,
+                ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
+                ir.created_at, ir.updated_at
+         FROM nebula.intent_records ir
+         JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         WHERE hc.system_id = $1
+         ORDER BY ir.created_at DESC`,
+        [id]
+      );
+      res.json({ systemId: id, intentRecords: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/subsystems/:id/intent-records — list intent records scoped to a subsystem
+  router.get('/subsystems/:id/intent-records', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT ir.id, ir.candidate_id, ir.parent_id, ir.title, ir.description,
+                ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
+                ir.created_at, ir.updated_at
+         FROM nebula.intent_records ir
+         JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         WHERE hc.subsystem_id = $1
+         ORDER BY ir.created_at DESC`,
+        [id]
+      );
+      res.json({ subsystemId: id, intentRecords: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/features/:id/intent-records — list intent records scoped to a feature
+  router.get('/features/:id/intent-records', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT ir.id, ir.candidate_id, ir.parent_id, ir.title, ir.description,
+                ir.source_type, ir.source_ref, ir.tags, ir.status, ir.metadata,
+                ir.created_at, ir.updated_at
+         FROM nebula.intent_records ir
+         JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         WHERE hc.feature_id = $1
+         ORDER BY ir.created_at DESC`,
+        [id]
+      );
+      res.json({ featureId: id, intentRecords: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
+
+  // GET /api/intent-records/:id — full intent record with candidate info
+  router.get('/intent-records/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        `SELECT ir.*, hc.system_id, hc.subsystem_id, hc.feature_id, h.source_filename AS harvest_source\n         FROM nebula.intent_records ir\n         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id\n         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id\n         WHERE ir.id = $1`,
+        [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Intent record not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  //  AGENDAS (scoped by hierarchy via agenda_items → intent_records → harvest_candidates)
+  // ════════════════════════════════════════════════════════════════
+
+
+  // GET /api/agendas — list ALL agendas (unscoped, when no hierarchy selected)
+  router.get('/agendas', async (req: Request, res: Response) => {
+    try {
+      const { limit: qLimit } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 500, 1000);
+      const { rows: agendas } = await pool.query(
+        `SELECT a.*,
+                (SELECT jsonb_agg(jsonb_build_object(
+                  'id', ai.id, 'source_type', ai.source_type, 'source_id', ai.source_id,
+                  'title', ai.title, 'body', ai.body, 'decisions', ai.decisions,
+                  'open_questions', ai.open_questions, 'supporting_refs', ai.supporting_refs,
+                  'included', ai.included, 'planner_note', ai.planner_note,
+                  'created_at', ai.created_at
+                ) ORDER BY ai.created_at)
+                 FROM nebula.agenda_items ai WHERE ai.agenda_id = a.id) AS items,
+                (SELECT count(*) FROM nebula.agenda_items ai WHERE ai.agenda_id = a.id) AS item_count
+         FROM nebula.agendas a
+         ORDER BY a.created_at DESC
+         LIMIT $1`,
+        [limit]
+      );
+      res.json({ agendas, count: agendas.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+    // GET /api/agendas/:id — single agenda with items
+  router.get('/agendas/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        `SELECT a.*,
+                (SELECT jsonb_agg(jsonb_build_object(
+                  'id', ai.id, 'source_type', ai.source_type, 'source_id', ai.source_id,
+                  'title', ai.title, 'body', ai.body, 'decisions', ai.decisions,
+                  'open_questions', ai.open_questions, 'supporting_refs', ai.supporting_refs,
+                  'included', ai.included, 'planner_note', ai.planner_note,
+                  'created_at', ai.created_at
+                ) ORDER BY ai.created_at)
+                 FROM nebula.agenda_items ai WHERE ai.agenda_id = a.id) AS items,
+                (SELECT count(*) FROM nebula.agenda_items ai WHERE ai.agenda_id = a.id) AS item_count
+         FROM nebula.agendas a
+         WHERE a.id = $1`,
+        [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Agenda not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/systems/:id/agendas — list agendas scoped to a system, with nested items
+  router.get('/systems/:id/agendas', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      // Fetch agendas that have items linked to this system (through intent_records or requirements)
+      const { rows: agendas } = await pool.query(
+        `SELECT DISTINCT a.id, a.title, a.scope, a.status, a.cohesion_score,
+                a.overlap_matrix, a.source_count, a.planner_analysis,
+                a.planner_conflicts, a.planner_gaps, a.metadata,
+                a.created_at, a.updated_at
+         FROM nebula.agendas a
+         JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
+         LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
+         WHERE hc.system_id = $1 OR req.system_id = $1
+         ORDER BY a.created_at DESC`,
+        [id]
+      );
+      // Fetch items for each agenda
+      for (const a of agendas) {
+        const { rows: items } = await pool.query(
+          `SELECT ai.id, ai.source_type, ai.source_id, ai.title, ai.body,
+                  ai.decisions, ai.open_questions, ai.supporting_refs,
+                  ai.included, ai.planner_note, ai.created_at, ai.updated_at
+           FROM nebula.agenda_items ai
+           WHERE ai.agenda_id = $1
+           ORDER BY ai.created_at ASC`,
+          [a.id]
+        );
+        a.items = items;
+        a.item_count = items.length;
+      }
+      res.json({ systemId: id, agendas, count: agendas.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/subsystems/:id/agendas — list agendas scoped to a subsystem, with nested items
+  router.get('/subsystems/:id/agendas', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: agendas } = await pool.query(
+        `SELECT DISTINCT a.id, a.title, a.scope, a.status, a.cohesion_score,
+                a.overlap_matrix, a.source_count, a.planner_analysis,
+                a.planner_conflicts, a.planner_gaps, a.metadata,
+                a.created_at, a.updated_at
+         FROM nebula.agendas a
+         JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
+         LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
+         WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1
+         ORDER BY a.created_at DESC`,
+        [id]
+      );
+      for (const a of agendas) {
+        const { rows: items } = await pool.query(
+          `SELECT ai.id, ai.source_type, ai.source_id, ai.title, ai.body,
+                  ai.decisions, ai.open_questions, ai.supporting_refs,
+                  ai.included, ai.planner_note, ai.created_at, ai.updated_at
+           FROM nebula.agenda_items ai
+           WHERE ai.agenda_id = $1
+           ORDER BY ai.created_at ASC`,
+          [a.id]
+        );
+        a.items = items;
+        a.item_count = items.length;
+      }
+      res.json({ subsystemId: id, agendas, count: agendas.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/features/:id/agendas — list agendas scoped to a feature, with nested items
+  router.get('/features/:id/agendas', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: agendas } = await pool.query(
+        `SELECT DISTINCT a.id, a.title, a.scope, a.status, a.cohesion_score,
+                a.overlap_matrix, a.source_count, a.planner_analysis,
+                a.planner_conflicts, a.planner_gaps, a.metadata,
+                a.created_at, a.updated_at
+         FROM nebula.agendas a
+         JOIN nebula.agenda_items ai ON ai.agenda_id = a.id
+         LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         LEFT JOIN nebula.requirements req ON req.id = ai.source_id AND ai.source_type = 'requirement'
+         WHERE hc.feature_id = $1 OR req.feature_id = $1
+         ORDER BY a.created_at DESC`,
+        [id]
+      );
+      for (const a of agendas) {
+        const { rows: items } = await pool.query(
+          `SELECT ai.id, ai.source_type, ai.source_id, ai.title, ai.body,
+                  ai.decisions, ai.open_questions, ai.supporting_refs,
+                  ai.included, ai.planner_note, ai.created_at, ai.updated_at
+           FROM nebula.agenda_items ai
+           WHERE ai.agenda_id = $1
+           ORDER BY ai.created_at ASC`,
+          [a.id]
+        );
+        a.items = items;
+        a.item_count = items.length;
+      }
+      res.json({ featureId: id, agendas, count: agendas.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
+  // ════════════════════════════════════════════════════════════════
+  // DELETE /api/agendas/:id/items — remove an agenda item by source_id
+  // Query: ?sourceId=<uuid> — finds and deletes the item matching that source
+  router.delete('/agendas/:id/items', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const sourceId = req.query.sourceId as string;
+      if (!sourceId) return res.status(400).json({ error: 'sourceId query parameter is required' });
+      const { rowCount } = await pool.query(
+        `DELETE FROM nebula.agenda_items WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT id FROM nebula.intent_records WHERE candidate_id = $2))`,
+        [id, sourceId]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'Agenda item not found' });
+      res.json({ ok: true, deleted: rowCount });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/agendas/:id/finalize — create a specification from an agenda
+  router.post('/agendas/:id/finalize', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { revisionType = 'created' } = req.body;
+      const { rows: [result] } = await pool.query(
+        'SELECT nebula.agenda_to_specification($1, $2) AS spec_id',
+        [id, revisionType]
+      );
+      res.status(201).json({ ok: true, spec_id: result.spec_id });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/agendas/:id/items — add a single item to an existing agenda
+  router.post('/agendas/:id/items', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { sourceType, sourceId, title, body, decisions, openQuestions, supportingRefs, included, plannerNote } = req.body;
+      if (!sourceType || !sourceId || !title) {
+        return res.status(400).json({ error: 'sourceType, sourceId, and title are required' });
+      }
+      const { rows: [item] } = await pool.query(
+        'INSERT INTO nebula.agenda_items (agenda_id, source_type, source_id, title, body, decisions, open_questions, supporting_refs, included, planner_note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+        [id, sourceType, sourceId, title, body || null, JSON.stringify(decisions || []), JSON.stringify(openQuestions || []), JSON.stringify(supportingRefs || []), included ?? true, plannerNote || null]
+      );
+      res.status(201).json({ ok: true, item });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
+  //  SPECIFICATIONS (settled output from agendas — scoped via specs view)
+  // ════════════════════════════════════════════════════════════════
+
+
+
+  // GET /api/specifications — list ALL specification revisions (unscoped, from nebula.specifications versioned snapshots)
+  router.get('/specifications', async (req: Request, res: Response) => {
+    try {
+      const { limit: qLimit } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 500, 1000);
+      const { rows } = await pool.query(
+        `SELECT s.id, s.agenda_id,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
+                s.valid_from AS item_created_at,
+                s.created_at AS item_updated_at,
+                s.revision_number,
+                s.revision_type,
+                s.change_summary,
+                s.agenda_title,
+                s.agenda_status
+         FROM nebula.active_specifications s
+         ORDER BY s.created_at DESC
+         LIMIT $1`,
+        [limit]
+      );
+      res.json({ specifications: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+    // GET /api/specifications/:id — single specification revision
+  router.get('/specifications/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        `SELECT s.id, s.agenda_id,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
+                s.valid_from AS item_created_at,
+                s.created_at AS item_updated_at,
+                s.revision_number,
+                s.revision_type,
+                s.change_summary,
+                s.agenda_title,
+                s.agenda_status
+         FROM nebula.active_specifications s
+         WHERE s.id = $1`,
+        [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Specification not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/systems/:id/specifications — list specification revisions scoped to a system
+  router.get('/systems/:id/specifications', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+`SELECT s.id, s.agenda_id,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
+                s.valid_from AS item_created_at,
+                s.created_at AS item_updated_at,
+                s.revision_number,
+                s.revision_type,
+                s.change_summary,
+                s.agenda_title,
+                s.agenda_status
+         FROM nebula.active_specifications s
+         LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
+         WHERE hc.system_id = $1 OR req.system_id = $1
+         ORDER BY s.created_at DESC`,
+        [id]
+      );
+      res.json({ systemId: id, specifications: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/subsystems/:id/specifications — list specification revisions scoped to a subsystem
+  router.get('/subsystems/:id/specifications', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT s.id, s.agenda_id,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
+                s.valid_from AS item_created_at,
+                s.created_at AS item_updated_at,
+                s.revision_number,
+                s.revision_type,
+                s.change_summary,
+                s.agenda_title,
+                s.agenda_status
+         FROM nebula.active_specifications s
+         LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
+         WHERE hc.subsystem_id = $1 OR req.subsystem_id = $1
+         ORDER BY s.created_at DESC`,
+        [id]
+      );
+      res.json({ subsystemId: id, specifications: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/features/:id/specifications — list specification revisions scoped to a feature
+  router.get('/features/:id/specifications', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT s.id, s.agenda_id,
+               s.item_snapshot AS items,
+               (SELECT count(*) FROM nebula.cross_references cr
+                WHERE cr.source_type = 'specification'
+                  AND cr.source_id = s.id::text
+                  AND cr.rel_type = 'spec:defines_req')::int AS linked_requirement_count,
+                s.valid_from AS item_created_at,
+                s.created_at AS item_updated_at,
+                s.revision_number,
+                s.revision_type,
+                s.change_summary,
+                s.agenda_title,
+                s.agenda_status
+         FROM nebula.active_specifications s
+         LEFT JOIN nebula.intent_records ir ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = ir.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'intent_record')
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         LEFT JOIN nebula.requirements req ON EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_id' = req.id::text)
+             AND EXISTS (SELECT 1 FROM jsonb_array_elements(s.item_snapshot) AS item WHERE item->>'source_type' = 'requirement')
+         WHERE hc.feature_id = $1 OR req.feature_id = $1
+         ORDER BY s.created_at DESC`,
+        [id]
+      );
+      res.json({ featureId: id, specifications: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
+  // ════════════════════════════════════════════════════════════════
+  //  WORK REQUESTS (scoped via requirements OR specifications → agenda items → harvest_candidates)
+  // ════════════════════════════════════════════════════════════════
+
+
+  // GET /api/work-requests — list ALL work requests (unscoped, when no hierarchy selected)
+  router.get('/work-requests', async (req: Request, res: Response) => {
+    try {
+      const { limit: qLimit } = req.query;
+      const limit = Math.min(parseInt(qLimit as string) || 500, 1000);
+      const { rows } = await pool.query(
+        `SELECT wr.*
+         FROM nebula.work_requests wr
+         ORDER BY wr.created_at DESC
+         LIMIT $1`,
+        [limit]
+      );
+      res.json({ workRequests: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+    // GET /api/work-requests/:id — single work request
+  router.get('/work-requests/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        `SELECT wr.*
+         FROM nebula.work_requests wr
+         WHERE wr.id = $1`,
+        [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Work request not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/systems/:id/work-requests — list work requests scoped to a system
+  router.get('/systems/:id/work-requests', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT DISTINCT ON (wr.id) wr.*
+         FROM nebula.work_requests wr
+         LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
+         LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
+         LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
+         LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         WHERE req.system_id = $1 OR hc.system_id = $1
+         ORDER BY wr.id, wr.created_at DESC`,
+        [id]
+      );
+      res.json({ systemId: id, workRequests: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/subsystems/:id/work-requests — list work requests scoped to a subsystem
+  router.get('/subsystems/:id/work-requests', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT DISTINCT ON (wr.id) wr.*
+         FROM nebula.work_requests wr
+         LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
+         LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
+         LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
+         LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1
+         ORDER BY wr.id, wr.created_at DESC`,
+        [id]
+      );
+      res.json({ subsystemId: id, workRequests: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/features/:id/work-requests — list work requests scoped to a feature
+  router.get('/features/:id/work-requests', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT DISTINCT ON (wr.id) wr.*
+         FROM nebula.work_requests wr
+         LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
+         LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
+         LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
+         LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+         WHERE req.feature_id = $1 OR hc.feature_id = $1
+         ORDER BY wr.id, wr.created_at DESC`,
+        [id]
+      );
+      res.json({ featureId: id, workRequests: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
   // GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy
   router.get('/harvest-candidates', async (req: Request, res: Response) => {
     try {
@@ -2028,6 +3155,7 @@ export function createRoutes(pool: Pool): Router {
       const { rows } = await pool.query(
         `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description, hc.status, hc.tags,
                 hc.system_id, hc.subsystem_id, hc.feature_id,
+                hc.work_request_id, hc.completed,
                 hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
                 h.source_filename AS harvest_source
          FROM nebula.harvest_candidates hc
@@ -2062,7 +3190,7 @@ export function createRoutes(pool: Pool): Router {
     const client = await pool.connect();
     try {
       const { id } = req.params;
-      const { title, intentDescription, status, systemId, subsystemId, featureId, tags, planRef } = req.body;
+      const { title, intentDescription, status, systemId, subsystemId, featureId, tags, planRef, workRequestId, completed } = req.body;
 
       await client.query('BEGIN');
 
@@ -2076,6 +3204,8 @@ export function createRoutes(pool: Pool): Router {
       if (subsystemId !== undefined) { sets.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
       if (featureId !== undefined) { sets.push(`feature_id = $${i++}`); vals.push(featureId); }
       if (tags !== undefined) { sets.push(`tags = $${i++}`); vals.push(tags); }
+      if (workRequestId !== undefined) { sets.push(`work_request_id = $${i++}`); vals.push(workRequestId); }
+      if (completed !== undefined) { sets.push(`completed = $${i++}`); vals.push(completed); }
 
       // planRef creates a cross-reference but doesn't update the candidate row;
       // still count it as a "change" to avoid the early no-op return.
@@ -2144,17 +3274,22 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const {
         systemId,
-        subsystemId,
+        subsystemId = null,
         featureId = null,
         planRef,
         priority = 'Medium',
         status = 'Backlog',
         title,
         description,
+        parentId = null,
+        reqType = null,
+        acceptanceCriteria = null,
       } = req.body;
 
       if (!systemId) return res.status(400).json({ error: 'systemId is required' });
-      if (!subsystemId) return res.status(400).json({ error: 'subsystemId is required (requirement must belong to a subsystem)' });
+      if (reqType && !(REQ_TYPES as readonly string[]).includes(reqType)) {
+        return res.status(400).json({ error: `reqType must be one of: ${REQ_TYPES.join(', ')}` });
+      }
       await client.query('BEGIN');
 
       // 1. Fetch the harvest candidate (must exist)
@@ -2179,7 +3314,7 @@ export function createRoutes(pool: Pool): Router {
         await upsertHarvestContextTab(client, systemId, candidate);
       }
 
-      // 4. Create a requirement derived from the candidate
+      // 4. Create a requirement derived from the candidate, linked via candidate_id
       const reqTitle = title || candidate.title;
       const reqDescription = description || candidate.intent_description || '';
       const normalizedStatus = normalizeStatus(status);
@@ -2188,9 +3323,9 @@ export function createRoutes(pool: Pool): Router {
         return res.status(400).json({ error: `status, if provided, must be one of: ${Array.from(STATUS_CANONICAL).join(', ')}` });
       }
       const { rows: [requirement] } = await client.query(
-        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-        [systemId, subsystemId, featureId, reqTitle, reqDescription, normalizedStatus, priority, null, null]
+        `INSERT INTO requirements (system_id, subsystem_id, feature_id, title, description, status, priority, start_date, completion_date, parent_id, req_type, acceptance_criteria, candidate_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
+        [systemId, subsystemId, featureId, reqTitle, reqDescription, normalizedStatus, priority, null, null, parentId, reqType, acceptanceCriteria ? JSON.stringify(acceptanceCriteria) : null, candidate.id]
       );
 
       // 5. Create cross-reference: candidate → plan (if planRef provided)
@@ -2201,6 +3336,31 @@ export function createRoutes(pool: Pool): Router {
         requirementId: requirement.id,
         linkedAt: new Date().toISOString(),
       });
+
+      // 5b. Create cross-reference: requirement → plan (if planRef provided)
+      let reqCrossRef: any = null;
+      if (hasPlanRef(planRef)) {
+        const planRefStr = String(planRef).trim();
+        const { rows: [rcr] } = await client.query(
+          `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+           SELECT 'requirement', $1, 'plan', $2, 'req:spawns_plan', $3
+           WHERE NOT EXISTS (
+             SELECT 1 FROM nebula.cross_references
+             WHERE source_type = 'requirement'
+               AND source_id = $1
+               AND target_type = 'plan'
+               AND target_id = $2
+               AND rel_type = 'req:spawns_plan'
+           )
+           RETURNING *`,
+          [requirement.id, planRefStr, JSON.stringify({
+            candidateId: candidate.id,
+            systemId,
+            linkedAt: new Date().toISOString(),
+          })]
+        );
+        reqCrossRef = rcr || null;
+      }
 
       await client.query('COMMIT');
 
@@ -2213,9 +3373,16 @@ export function createRoutes(pool: Pool): Router {
           featureId: requirement.feature_id,
           startDate: requirement.start_date,
           completionDate: requirement.completion_date,
+          parentId: requirement.parent_id,
+          reqType: requirement.req_type,
+          acceptanceCriteria: requirement.acceptance_criteria,
+          candidateId: requirement.candidate_id,
         },
         crossReference: crossRef
           ? { ...toEpochMs(crossRef, 'created_at'), sourceType: crossRef.source_type, sourceId: crossRef.source_id, targetType: crossRef.target_type, targetId: crossRef.target_id, relType: crossRef.rel_type }
+          : null,
+        reqCrossReference: reqCrossRef
+          ? { ...toEpochMs(reqCrossRef, 'created_at'), sourceType: reqCrossRef.source_type, sourceId: reqCrossRef.source_id, targetType: reqCrossRef.target_type, targetId: reqCrossRef.target_id, relType: reqCrossRef.rel_type }
           : null,
       });
     } catch (err: any) {
@@ -2274,6 +3441,93 @@ export function createRoutes(pool: Pool): Router {
   });
 
   // ════════════════════════════════════════════════════════════════
+  // POST /api/specifications/:id/link-requirements — create cross-references
+  // from specification to requirements by matching candidate_ids in the item_snapshot
+  router.post('/specifications/:id/link-requirements', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Fetch the spec and its item_snapshot
+      const { rows: [spec] } = await pool.query(
+        'SELECT id, item_snapshot FROM nebula.specifications WHERE id = $1',
+        [id]
+      );
+      if (!spec) return res.status(404).json({ error: 'Specification not found' });
+
+      // Extract candidate IDs from items:
+      // - harvest_candidate items: source_id IS the candidate ID
+      // - intent_record items: look up intent_records.candidate_id
+      const directCandidateIds: string[] = [];
+      const intentRecordIds: string[] = [];
+      const items = spec.item_snapshot || [];
+      for (const item of items) {
+        if (!item.source_id) continue;
+        if (item.source_type === 'harvest_candidate') {
+          directCandidateIds.push(item.source_id);
+        } else if (item.source_type === 'intent_record') {
+          intentRecordIds.push(item.source_id);
+        }
+      }
+
+      // Resolve intent_record IDs to candidate IDs
+      let candidateIds = [...directCandidateIds];
+      candidateIds = [...new Set(candidateIds)];  // deduplicate
+      if (intentRecordIds.length > 0) {
+        const { rows: resolved } = await pool.query(
+          'SELECT candidate_id FROM nebula.intent_records WHERE id = ANY($1::uuid[]) AND candidate_id IS NOT NULL',
+          [intentRecordIds]
+        );
+        for (const r of resolved) {
+          candidateIds.push(r.candidate_id);
+        }
+      }
+
+      if (candidateIds.length === 0) {
+        return res.status(200).json({ ok: true, linked: 0, message: 'No harvest_candidate items in snapshot' });
+      }
+
+      // Find requirements matching those candidate IDs
+      const { rows: reqs } = await pool.query(
+        'SELECT id, title FROM nebula.requirements WHERE candidate_id = ANY($1::uuid[])',
+        [candidateIds]
+      );
+
+      // Create cross-references idempotently (in a transaction for atomicity)
+      let linked = 0;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const req of reqs) {
+          const { rowCount } = await client.query(
+          `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+           SELECT 'specification', $1, 'requirement', $2, 'spec:defines_req', '{}'::jsonb
+           WHERE NOT EXISTS (
+             SELECT 1 FROM nebula.cross_references
+             WHERE source_type = 'specification'
+               AND source_id = $1
+               AND target_type = 'requirement'
+               AND target_id = $2
+               AND rel_type = 'spec:defines_req'
+           )`,
+          [id, req.id]
+        );
+        linked += rowCount ?? 0;
+        }
+        await client.query('COMMIT');
+      } catch (txErr) {
+        await client.query('ROLLBACK');
+        throw txErr;
+      } finally {
+        client.release();
+      }
+
+      res.json({ ok: true, linked, candidate_count: candidateIds.length, requirement_count: reqs.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
   //  HARVEST CANDIDATE DISCOVERY — semantic search against project hierarchy
   // ════════════════════════════════════════════════════════════════
 
@@ -2520,7 +3774,7 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/agent-records — list records with optional filters
   router.get('/agent-records', async (req: Request, res: Response) => {
     try {
-      const { type, role, systemId, planRef, tag, level, visibilityScope, limit: qLimit, offset: qOffset } = req.query;
+      const { type, role, systemId, subsystemId, featureId, planRef, tag, search, createdAfter, createdBefore, level, visibilityScope, limit: qLimit, offset: qOffset } = req.query;
       const limit = Math.min(parseInt(qLimit as string) || 100, 500);
       const offset = parseInt(qOffset as string) || 0;
 
@@ -2531,14 +3785,49 @@ export function createRoutes(pool: Pool): Router {
       if (type) { clauses.push(`record_type = $${i++}`); vals.push(type); }
       if (role) { clauses.push(`role = $${i++}`); vals.push(role); }
       if (systemId) { clauses.push(`system_id = $${i++}`); vals.push(systemId); }
+      if (subsystemId) { clauses.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
+      if (featureId) { clauses.push(`feature_id = $${i++}`); vals.push(featureId); }
       if (planRef) { clauses.push(`plan_ref = $${i++}`); vals.push(planRef); }
-      if (tag) { clauses.push(`$${i} = ANY(tags)`); vals.push(tag); i++; }
+      // Multi-tag support: ?tag=val, ?tag=a,b (comma-separated), or ?tag=a&tag=b (AND conjunction)
+      if (tag) {
+        const raw = Array.isArray(tag) ? tag as string[] : [tag as string];
+        // Flatten and split any comma-separated values
+        const tagArr: string[] = [];
+        for (const item of raw) {
+          for (const part of item.split(',')) {
+            const trimmed = part.trim();
+            if (trimmed) tagArr.push(trimmed);
+          }
+        }
+        if (tagArr.length === 1) {
+          clauses.push(`$${i} = ANY(tags)`);
+          vals.push(tagArr[0]);
+          i++;
+        } else if (tagArr.length > 1) {
+          clauses.push(`tags @> $${i}::text[]`);
+          vals.push(tagArr);
+          i++;
+        }
+      }
+      if (search) {
+        clauses.push(`(title ILIKE $${i} OR content ILIKE $${i})`);
+        vals.push(`%${search}%`);
+        i++;
+      }
+      if (createdAfter) {
+        clauses.push(`created_at >= $${i++}`);
+        vals.push(createdAfter);
+      }
+      if (createdBefore) {
+        clauses.push(`created_at <= $${i++}`);
+        vals.push(createdBefore);
+      }
       if (level) { clauses.push(`level = $${i++}`); vals.push(parseInt(level as string)); }
       if (visibilityScope) { clauses.push(`visibility_scope = $${i++}`); vals.push(visibilityScope); }
 
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
       const { rows } = await pool.query(
-        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
+        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
          FROM nebula.agent_records ${where}
          ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
         [...vals, limit, offset]
@@ -2558,6 +3847,73 @@ export function createRoutes(pool: Pool): Router {
       );
       if (!row) return res.status(404).json({ error: 'Agent record not found' });
       res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/agent-records/search — multi-tag AND/OR agent record search
+  router.post('/agent-records/search', async (req: Request, res: Response) => {
+    try {
+      const { tags, recordType, role, level, visibilityScope, match = 'all', limit: qLimit, offset: qOffset } = req.body;
+      const maxLimit = Math.min(parseInt(qLimit as string) || 100, 500);
+      const offset = parseInt(qOffset as string) || 0;
+
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+
+      if (recordType) { clauses.push(`record_type = $${i++}`); vals.push(recordType); }
+      if (role) { clauses.push(`role = $${i++}`); vals.push(role); }
+      if (level !== undefined && level !== null) {
+        const levelNum = parseInt(level);
+        if (levelNum >= 1 && levelNum <= 4) {
+          clauses.push(`level = $${i++}`); vals.push(levelNum);
+        }
+      }
+      if (visibilityScope) { clauses.push(`visibility_scope = $${i++}`); vals.push(visibilityScope); }
+
+      // Multi-tag search with match mode
+      if (tags && Array.isArray(tags) && tags.length > 0) {
+        const cleanTags = tags.filter((t: any) => typeof t === 'string' && t.trim()).map((t: string) => t.trim());
+        if (cleanTags.length > 0) {
+          if (match === 'any') {
+            // OR semantics: any of the tags match
+            clauses.push(`tags && $${i}::text[]`);
+            vals.push(cleanTags);
+            i++;
+          } else {
+            // AND semantics (default): all tags must match (same as GET handler)
+            if (cleanTags.length === 1) {
+              clauses.push(`$${i} = ANY(tags)`);
+              vals.push(cleanTags[0]);
+              i++;
+            } else {
+              clauses.push(`tags @> $${i}::text[]`);
+              vals.push(cleanTags);
+              i++;
+            }
+          }
+        }
+      }
+
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+
+      const { rows } = await pool.query(
+        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
+         FROM nebula.agent_records ${where}
+         ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+        [...vals, maxLimit, offset]
+      );
+
+      // Also fetch total count for the same query (without pagination)
+      const countWhere = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+      const { rows: [{ count }] } = await pool.query(
+        `SELECT COUNT(*)::int AS count FROM nebula.agent_records ${countWhere}`,
+        vals
+      );
+
+      res.json({ records: rows, count: parseInt(count), limit: maxLimit, offset });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3831,6 +5187,407 @@ export function createRoutes(pool: Pool): Router {
         'SELECT * FROM nebula.plans WHERE deleted = 1 ORDER BY updated_at DESC'
       );
       res.json({ plans: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  EXECUTION AUTHORITY (ADR-006)
+  // ════════════════════════════════════════════════════════════════
+
+  // POST /api/execution/requests — create a new WorkRequest
+  router.post('/execution/requests', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const {
+        businessKey, title, intentType, objective, inputs,
+        deterministic, maxRetries, timeoutPolicy, resourceHints,
+        opTrace, status, sourcePlanId, sourceWrId,
+      } = req.body;
+
+      if (!businessKey) {
+        res.status(400).json({ error: 'businessKey is required' });
+        return;
+      }
+
+      const { rows: [row] } = await client.query(
+        `INSERT INTO execution.requests (
+          business_key, title, intent_type, objective, inputs,
+          deterministic, max_retries, timeout_policy, resource_hints,
+          op_trace, status, source_plan_id, source_wr_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+        [
+          businessKey, title||'', intentType||'task', objective||'',
+          inputs||{}, deterministic??true, maxRetries||null,
+          timeoutPolicy||null, resourceHints||[], opTrace||{},
+          status||'DRAFT', sourcePlanId||null, sourceWrId||null,
+        ]
+      );
+      await client.query('COMMIT');
+      res.status(201).json(row);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      if (err.code === '23505') { // unique_violation
+        res.status(409).json({ error: `Request with business_key '${req.body.businessKey}' already exists` });
+      } else {
+        res.status(500).json({ error: err.message });
+      }
+    } finally {
+      client.release();
+    }
+  });
+
+  // GET /api/execution/requests — list requests
+  router.get('/execution/requests', async (req: Request, res: Response) => {
+    try {
+      const { status, limit } = req.query;
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (status) { clauses.push(`status = $${i++}`); vals.push(status); }
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+      const lim = Math.min(Number(limit) || 50, 200);
+      const { rows } = await pool.query(
+        `SELECT * FROM execution.requests ${where} ORDER BY created_at DESC LIMIT $${i}`, [...vals, lim]
+      );
+      res.json({ requests: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/execution/requests/:id — get a single request
+  router.get('/execution/requests/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        'SELECT * FROM execution.requests WHERE id = $1', [id]
+      );
+      if (rows.length === 0) { res.status(404).json({ error: 'Request not found' }); return; }
+      // Also fetch leases, attempts, receipts
+      const { rows: leases } = await pool.query(
+        'SELECT * FROM execution.leases WHERE request_id = $1 ORDER BY acquired_at DESC', [id]
+      );
+      const { rows: attempts } = await pool.query(
+        'SELECT * FROM execution.attempts WHERE request_id = $1 ORDER BY created_at DESC', [id]
+      );
+      const { rows: receipts } = await pool.query(
+        'SELECT * FROM execution.receipts WHERE request_id = $1 ORDER BY issued_at DESC', [id]
+      );
+      res.json({ ...rows[0], leases, attempts, receipts });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/execution/requests/:id/transition — transition WorkRequest status
+  router.patch('/execution/requests/:id/transition', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+      const { targetStatus, reason } = req.body;
+
+      const validTransitions: Record<string, string[]> = {
+        DRAFT:     ['COMPILED', 'CANCELLED'],
+        COMPILED:  ['VALIDATED', 'CANCELLED'],
+        VALIDATED: ['ADMITTED', 'CANCELLED'],
+        ADMITTED:  ['READY', 'CANCELLED'],
+        READY:     ['COMPLETED', 'FAILED', 'CANCELLED'],
+        COMPLETED: [],
+        FAILED:    [],
+        CANCELLED: [],
+      };
+
+      const { rows: [current] } = await client.query(
+        'SELECT * FROM execution.requests WHERE id = $1', [id]
+      );
+      if (!current) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Request not found' }); return; }
+
+      const allowed = validTransitions[current.status] || [];
+      if (!allowed.includes(targetStatus)) {
+        await client.query('ROLLBACK');
+        res.status(400).json({
+          error: `Invalid transition: ${current.status} → ${targetStatus}`,
+          allowed,
+        });
+        return;
+      }
+
+      const { rows: [updated] } = await client.query(
+        'UPDATE execution.requests SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+        [targetStatus, id]
+      );
+
+      await client.query('COMMIT');
+      res.json({ previous: current.status, request: updated, reason: reason||null });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/leases/acquire — acquire a lease on a request
+  router.post('/execution/leases/acquire', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { requestId, executorId, ttlSeconds } = req.body;
+
+      if (!requestId || !executorId) {
+        res.status(400).json({ error: 'requestId and executorId are required' });
+        return;
+      }
+
+      // Check request exists and is in a leaseable state
+      const { rows: [request] } = await client.query(
+        'SELECT * FROM execution.requests WHERE id = $1', [requestId]
+      );
+      if (!request) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Request not found' }); return; }
+      if (!['ADMITTED', 'READY'].includes(request.status)) {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Request must be ADMITTED or READY to lease (current: ${request.status})` });
+        return;
+      }
+
+      // Check no active lease exists
+      const { rows: existing } = await client.query(
+        "SELECT id FROM execution.leases WHERE request_id = $1 AND status = 'ACTIVE'", [requestId]
+      );
+      if (existing.length > 0) {
+        await client.query('ROLLBACK');
+        res.status(409).json({ error: 'Active lease already exists for this request', existingLeaseId: existing[0].id });
+        return;
+      }
+
+      const ttl = ttlSeconds || 300;
+      const { rows: [lease] } = await client.query(
+        `INSERT INTO execution.leases (request_id, executor_id, ttl_seconds, expires_at)
+         VALUES ($1, $2, $3, NOW() + ($4 || ' seconds')::interval) RETURNING *`,
+        [requestId, executorId, ttl, String(ttl)]
+      );
+
+      await client.query('COMMIT');
+      res.status(201).json(lease);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/leases/:id/renew — renew an active lease
+  router.post('/execution/leases/:id/renew', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+      const { ttlSeconds } = req.body;
+      const ttl = ttlSeconds || 300;
+
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM execution.leases WHERE id = $1', [id]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Cannot renew lease in status '${lease.status}' (must be ACTIVE)` });
+        return;
+      }
+      if (new Date(lease.expires_at) < new Date()) {
+        // Auto-expire
+        await client.query("UPDATE execution.leases SET status = 'EXPIRED' WHERE id = $1", [id]);
+        await client.query('COMMIT');
+        res.status(400).json({ error: 'Lease has already expired' });
+        return;
+      }
+
+      const { rows: [updated] } = await client.query(
+        `UPDATE execution.leases
+         SET ttl_seconds = $1, expires_at = NOW() + ($3 || ' seconds')::interval
+         WHERE id = $2 AND status = 'ACTIVE' RETURNING *`,
+        [ttl, id, String(ttl)]
+      );
+
+      await client.query('COMMIT');
+      res.json(updated);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/leases/:id/release — release an active lease
+  router.post('/execution/leases/:id/release', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { id } = req.params;
+
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM execution.leases WHERE id = $1', [id]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Cannot release lease in status '${lease.status}' (must be ACTIVE)` });
+        return;
+      }
+
+      const { rows: [updated] } = await client.query(
+        "UPDATE execution.leases SET status = 'RELEASED', released_at = NOW() WHERE id = $1 RETURNING *",
+        [id]
+      );
+
+      await client.query('COMMIT');
+      res.json(updated);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/attempts — submit an attempt (create + set outcome)
+  router.post('/execution/attempts', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { leaseId, status: attemptStatus, result, error: attemptError, exitCode } = req.body;
+
+      if (!leaseId) {
+        res.status(400).json({ error: 'leaseId is required' });
+        return;
+      }
+
+      const { rows: [lease] } = await client.query(
+        'SELECT * FROM execution.leases WHERE id = $1', [leaseId]
+      );
+      if (!lease) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Lease not found' }); return; }
+      if (lease.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        res.status(400).json({ error: `Lease is not ACTIVE (current: ${lease.status})` });
+        return;
+      }
+      if (new Date(lease.expires_at) < new Date()) {
+        await client.query("UPDATE execution.leases SET status = 'EXPIRED' WHERE id = $1", [leaseId]);
+        await client.query('COMMIT');
+        res.status(400).json({ error: 'Lease has expired' });
+        return;
+      }
+
+      const finalStatus = attemptStatus || 'SUCCEEDED';
+      const now = new Date().toISOString();
+
+      const { rows: [attempt] } = await client.query(
+        `INSERT INTO execution.attempts (
+          lease_id, request_id, executor_id, status,
+          started_at, completed_at, result, error, exit_code
+        ) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8) RETURNING *`,
+        [
+          leaseId, lease.request_id, lease.executor_id, finalStatus,
+          now, result||{}, attemptError||null, exitCode||null,
+        ]
+      );
+
+      await client.query('COMMIT');
+      res.status(201).json(attempt);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/execution/receipts — issue a receipt from an attempt
+  router.post('/execution/receipts', async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { attemptId, type, agentRole, summary, metadata } = req.body;
+
+      if (!attemptId) {
+        res.status(400).json({ error: 'attemptId is required' });
+        return;
+      }
+
+      const { rows: [attempt] } = await client.query(
+        'SELECT * FROM execution.attempts WHERE id = $1', [attemptId]
+      );
+      if (!attempt) { await client.query('ROLLBACK'); res.status(404).json({ error: 'Attempt not found' }); return; }
+
+      const receiptType = type || (attempt.status === 'SUCCEEDED' ? 'EXECUTION_COMPLETE' : 'EXECUTION_FAILED');
+
+      const { rows: [receipt] } = await client.query(
+        `INSERT INTO execution.receipts (
+          attempt_id, request_id, type, agent_role, summary, metadata
+        ) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        [attemptId, attempt.request_id, receiptType, agentRole||attempt.executor_id, summary||'', metadata||{}]
+      );
+
+      await client.query('COMMIT');
+      res.status(201).json(receipt);
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  // GET /api/execution/receipts — list receipts
+  router.get('/execution/receipts', async (req: Request, res: Response) => {
+    try {
+      const { requestId, type, limit } = req.query;
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (requestId) { clauses.push(`request_id = $${i++}`); vals.push(requestId); }
+      if (type) { clauses.push(`type = $${i++}`); vals.push(type); }
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+      const lim = Math.min(Number(limit) || 50, 200);
+      const { rows } = await pool.query(
+        `SELECT * FROM execution.receipts ${where} ORDER BY issued_at DESC LIMIT $${i}`, [...vals, lim]
+      );
+      res.json({ receipts: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/execution/state — summary of execution domain state
+  router.get('/execution/state', async (req: Request, res: Response) => {
+    try {
+      const { rows: reqs } = await pool.query(
+        `SELECT status, count(*) as count FROM execution.requests GROUP BY status ORDER BY status`
+      );
+      const { rows: leases } = await pool.query(
+        `SELECT status, count(*) as count FROM execution.leases GROUP BY status ORDER BY status`
+      );
+      const { rows: attempts } = await pool.query(
+        `SELECT status, count(*) as count FROM execution.attempts GROUP BY status ORDER BY status`
+      );
+      const { rows: [receiptTotal] } = await pool.query(
+        `SELECT count(*) as total FROM execution.receipts`
+      );
+      const { rows: receiptTypes } = await pool.query(
+        `SELECT type, count(*) as count FROM execution.receipts GROUP BY type ORDER BY count DESC`
+      );
+      res.json({
+        requests: reqs,
+        leases,
+        attempts,
+        receipts: { total: Number(receiptTotal.total), byType: receiptTypes },
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

@@ -1,9 +1,9 @@
 import express from "express";
 import cors from "cors";
-import path from "path";
-import crypto from "crypto";
-import fs from "fs";
-import { spawn } from "child_process";
+import path from "node:path";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import { spawn } from "node:child_process";
 import { PipelineWatcher } from "./watcher";
 import { registerToolHandlers, toolDefinitions } from "./tools";
 import { createError, createSuccess } from "./errors";
@@ -58,7 +58,7 @@ import {
   WorkRequestState,
   RuntimeEvent,
 } from "./runtime-kernel";
-import http from "http";
+import http from "node:http";
 import { loadEnv } from "./env"; // shared .env loader (no dotenv dependency)
 
 // .env already loaded by env.ts at module evaluation time
@@ -1297,6 +1297,7 @@ app.post("/vision/work-requests", async (req, res) => {
       dco_json: dco_json || "{}",
       context: context || {},
       status: status || "pending",
+      title: req.body.title || "",
     });
     res.json({ ...result });
   } catch (err: any) {
@@ -1397,6 +1398,7 @@ app.post("/wr/submit", async (req, res) => {
       dco_json: JSON.stringify(output),
       context: { intent: output.intent, constraints: output.constraints, opTrace: output.opTrace },
       status: "draft",
+      title: output.intent?.objective || "",
     });
     // Append the WR_SUBMITTED event
     await appendEvent(event.wrId, event.type, event.payload as Record<string, unknown>);

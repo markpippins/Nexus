@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, output, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
-import { PlatformManagementService, LookupItem, FrameworkPayload } from '../../../services/platform-management.service.js';
+import { PlatformManagementService, LookupItem, FrameworkPayload, LOOKUP_FRAMEWORK_CATEGORIES, LOOKUP_FRAMEWORK_LANGUAGES } from '../../../services/platform-management.service.js';
 import { Framework } from '../../../models/service-mesh.model.js';
 
 @Component({
@@ -152,8 +152,8 @@ export class UpsertFrameworkDialogComponent implements OnInit {
 
         try {
             const [cats, langs] = await Promise.all([
-                this.platformService.getLookup(url, 'framework-categories').catch(() => []),
-                this.platformService.getLookup(url, 'framework-languages').catch(() => [])
+                this.platformService.getLookup(url, LOOKUP_FRAMEWORK_CATEGORIES).then(r => r.data).catch(() => []),
+                this.platformService.getLookup(url, LOOKUP_FRAMEWORK_LANGUAGES).then(r => r.data).catch(() => [])
             ]);
             this.categories.set(cats);
             this.languages.set(langs);

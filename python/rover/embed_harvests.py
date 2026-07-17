@@ -24,6 +24,8 @@ from pathlib import Path
 
 import httpx
 
+from event_emitter import emit_embedding_created
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -320,6 +322,21 @@ def main():
 
     if args.dry_run:
         return 0
+
+    # Cascade event: embedding.created (aggregate by harvest)
+    if inserted > 0:
+        harvest_ids = list(set(e["harvest_id"] for e in embeddings if e.get("harvest_id")))
+        for hid in harvest_ids:
+            count = sum(1 for e in embeddings if e.get("harvest_id") == hid)
+            try:
+                emit_embedding_created(
+                    harvest_id=hid,
+                    candidate_count=count,
+                    model=EMBED_MODEL,
+                    source="rover.embed_harvests",
+                )
+            except Exception as e:
+                log.debug("  embedding.created emission failed for %s: %s", hid[:8], e)
 
     # Step 4: Rebuild index for better recall
     if not args.skip_reindex and inserted > 0:

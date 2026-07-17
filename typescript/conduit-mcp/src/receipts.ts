@@ -1,13 +1,17 @@
 import { getLatestReceiptType } from "./db";
 
 // Allowed transitions: from → to (v018: removed PROPOSED, added HOLD)
+// v019: added CCNF_EXECUTION — sub-event within implementation phase
 const ALLOWED: Record<string, string[]> = {
   // Anything can be created, or start from a requirement idea:
   "": ["PLAN_CREATE", "BLOCK"],
   // After creation, builder can implement, hold, or route to critique:
   PLAN_CREATE: ["IMPLEMENTATION", "BLOCK", "CRITIQUE", "HOLD"],
   // After implementation, reviewer can pass, reject, or hold:
-  IMPLEMENTATION: ["REVIEW_PASS", "REVIEW_REJECT", "REVIEW", "HOLD"],
+  // CCNF_EXECUTION is a sub-event that records CCNF conformance runs
+  IMPLEMENTATION: ["REVIEW_PASS", "REVIEW_REJECT", "REVIEW", "HOLD", "CCNF_EXECUTION"],
+  // CCNF execution returns to implementation or chains another run:
+  CCNF_EXECUTION: ["IMPLEMENTATION", "CCNF_EXECUTION", "HOLD"],
   // Rejection → builder re-implements, or manual REVIEW_PASS override, or hold:
   REVIEW_REJECT: ["IMPLEMENTATION", "REVIEW_PASS", "HOLD"],
   // Block → implement (unblocked), hold while blocked is allowed:

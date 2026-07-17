@@ -35,6 +35,7 @@ from app.models.error import (
 from app.api.routes_delta import router as delta_router
 from app.api.routes_state import router as state_router
 from app.api.routes_replay import router as replay_router
+from app.api.routes_admin import router as admin_router
 
 # ── Logging ──────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -198,6 +199,7 @@ async def metrics_auth_middleware(request: Request, call_next):
 app.include_router(delta_router, prefix="/delta", tags=["delta"])
 app.include_router(state_router, prefix="/state", tags=["state"])
 app.include_router(replay_router, prefix="/replay", tags=["replay"])
+app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 
 # ── Exception handlers ──────────────────────────────────────────────

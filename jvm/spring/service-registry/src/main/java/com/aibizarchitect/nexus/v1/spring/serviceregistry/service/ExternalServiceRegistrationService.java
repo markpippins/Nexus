@@ -11,12 +11,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkCategory;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkLanguage;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkVendor;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceConfiguration;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkCategoryRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkLanguageRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkVendorRepository;
@@ -32,7 +32,7 @@ public class ExternalServiceRegistrationService {
 
     private final ServiceRepository serviceRepository;
     private final FrameworkRepository frameworkRepository;
-    private final FrameworkCategoryRepository frameworkCategoryRepository;
+    private final FrameworkTypeRepository frameworkTypeRepository;
     private final FrameworkLanguageRepository frameworkLanguageRepository;
     private final FrameworkVendorRepository frameworkVendorRepository;
     private final ServiceTypeRepository serviceTypeRepository;
@@ -40,14 +40,14 @@ public class ExternalServiceRegistrationService {
 
     public ExternalServiceRegistrationService(ServiceRepository serviceRepository,
                                                FrameworkRepository frameworkRepository,
-                                               FrameworkCategoryRepository frameworkCategoryRepository,
+                                               FrameworkTypeRepository frameworkTypeRepository,
                                                FrameworkLanguageRepository frameworkLanguageRepository,
                                                FrameworkVendorRepository frameworkVendorRepository,
                                                ServiceTypeRepository serviceTypeRepository,
                                                ServiceConfigurationRepository serviceConfigurationRepository) {
         this.serviceRepository = serviceRepository;
         this.frameworkRepository = frameworkRepository;
-        this.frameworkCategoryRepository = frameworkCategoryRepository;
+        this.frameworkTypeRepository = frameworkTypeRepository;
         this.frameworkLanguageRepository = frameworkLanguageRepository;
         this.frameworkVendorRepository = frameworkVendorRepository;
         this.serviceTypeRepository = serviceTypeRepository;
@@ -101,12 +101,12 @@ public class ExternalServiceRegistrationService {
                         });
                 newFramework.setVendor(vendor);
 
-                FrameworkCategory category = frameworkCategoryRepository.findByName("OTHER")
+                FrameworkType category = frameworkTypeRepository.findByName("Other")
                         .orElseGet(() -> {
-                            FrameworkCategory c = new FrameworkCategory();
-                            c.setName("OTHER");
+                            FrameworkType c = new FrameworkType();
+                            c.setName("Other");
                             c.setDescription("Other");
-                            return frameworkCategoryRepository.save(c);
+                            return frameworkTypeRepository.save(c);
                         });
                 newFramework.setCategory(category);
 
@@ -125,11 +125,11 @@ public class ExternalServiceRegistrationService {
             }
         }
 
-        ServiceType serviceType = serviceTypeRepository.findByName("REST_API")
+        ServiceType serviceType = serviceTypeRepository.findByName("REST API")
                 .orElseGet(() -> {
-                    log.debug("Creating default REST_API service type");
+                    log.debug("Creating default REST API service type");
                     ServiceType newType = new ServiceType();
-                    newType.setName("REST_API");
+                    newType.setName("REST API");
                     newType.setDescription("REST API Service");
                     return serviceTypeRepository.save(newType);
                 });

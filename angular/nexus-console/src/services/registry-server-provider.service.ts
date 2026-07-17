@@ -9,6 +9,7 @@ import { RegistryServerProfile } from '../models/registry-server-profile.model.j
 import { ServiceInstance, Deployment, Framework } from '../models/service-mesh.model.js';
 import { ServiceMeshService } from './service-mesh.service.js';
 import { LocalConfigService } from './local-config.service.js';
+import { TYPE_LABELS, TYPE_ORDER, CATEGORY_ICONS } from './platform-management.service.js';
 
 @Injectable({
     providedIn: 'root'
@@ -43,11 +44,14 @@ export class RegistryServerProvider implements TreeProvider {
             nodeId.startsWith('search') ||
             nodeId.startsWith('filesystems') ||
             nodeId.startsWith('platform') ||
-            nodeId.startsWith('platform-dictionary-');
+            nodeId.startsWith('platform-dictionary-') ||
+            // System Health is now a top-level sibling (no longer nested under Platform Management).
+            nodeId === 'system-health-terrain';
     }
 
     async getChildren(nodeId: string): Promise<TreeNode[]> {
         if (nodeId === 'root') {
+            const terrainUrl = this.localConfigService.terrainServerUrl();
             return [
                 {
                     id: 'filesystems',
@@ -57,6 +61,22 @@ export class RegistryServerProvider implements TreeProvider {
                     hasChildren: true,
                     operations: [],
                     metadata: {},
+                    lastUpdated: new Date()
+                },
+                // System Health lives at root (promoted up from Platform Management) because
+                // it connects directly to the terrain server, never to a profile.
+                {
+                    id: 'system-health-terrain',
+                    name: 'System Health',
+                    type: NodeType.HEALTH_CHECK,
+                    icon: 'monitor_heart',
+                    hasChildren: false,
+                    operations: ['check-health'],
+                    metadata: {
+                        url: `${terrainUrl}/api/v1/platform/health`,
+                        managementType: 'system-health',
+                        baseUrl: terrainUrl
+                    },
                     lastUpdated: new Date()
                 },
                 {
@@ -140,25 +160,10 @@ export class RegistryServerProvider implements TreeProvider {
 
         if (nodeId === 'platform') {
             const profiles = this.profileService.profiles();
-            const terrainUrl = this.localConfigService.terrainServerUrl();
 
-            // Always include System Health (connects directly to terrain server, no profile needed)
-            const nodes: TreeNode[] = [
-                {
-                    id: `platform-health-terrain`,
-                    name: 'System Health',
-                    type: NodeType.HEALTH_CHECK,
-                    icon: 'monitor_heart',
-                    hasChildren: false,
-                    operations: ['check-health'],
-                    metadata: {
-                        url: `${terrainUrl}/api/v1/platform/health`,
-                        managementType: 'system-health',
-                        baseUrl: terrainUrl
-                    },
-                    lastUpdated: new Date()
-                }
-            ];
+            // System Health used to live here; it has been promoted to root (see getChildren('root')).
+            // We keep the platform node set strictly to profile-dependent management nodes below.
+            const nodes: TreeNode[] = [];
 
             // If profiles exist, also show profile-dependent management nodes
             if (profiles.length > 0) {
@@ -220,6 +225,35 @@ export class RegistryServerProvider implements TreeProvider {
                 );
             }
 
+            // Nested virtual folders under Platform Management.
+            // Order: System Health leads, profile-dependent nodes unshifted to front,
+            // then Gateways + Service Registries appended at the end. Together with the
+            // downstream homeProvider path handlers in app.component.ts, the user
+            // navigates: Platform Management → Gateways → <broker profile> OR
+            //                          Platform Management → Service Registries → <host profile>.
+            nodes.push(
+                {
+                    id: `platform-gateways`,
+                    name: 'Gateways',
+                    type: NodeType.FOLDER,
+                    icon: 'cloud',
+                    hasChildren: true,
+                    operations: [],
+                    metadata: { virtualContainer: 'gateways' },
+                    lastUpdated: new Date()
+                },
+                {
+                    id: `platform-service-registries`,
+                    name: 'Service Registries',
+                    type: NodeType.FOLDER,
+                    icon: 'storage',
+                    hasChildren: true,
+                    operations: [],
+                    metadata: { virtualContainer: 'service-registries' },
+                    lastUpdated: new Date()
+                }
+            );
+
             return nodes;
         }
 
@@ -235,6 +269,74 @@ export class RegistryServerProvider implements TreeProvider {
             const profile = this.profileService.profiles().find(p => p.id === profileId);
             if (profile) return this.getDataDictionaryNodes(profile);
             return [];
+        }
+
+        // Categories type children — dynamically generated from the categories API
+        if (nodeId.startsWith('platform-dict-categories-')) {
+            // Format: platform-dict-categories-{profileId}  (parent)
+            //         platform-dict-categories-{type}-{profileId}  (child — no further children)
+            // If it already has a type segment, it's a leaf node.
+            const parts = nodeId.split('-');
+            // platform-dict-categories has 4 parts: platform, dict, categories, profileId
+            // With type: platform, dict, categories, {type}, profileId -> 5 parts
+            if (parts.length > 4) {
+                return []; // Leaf node — type-specific child has no further children
+            }
+
+            // Parent Categories node — fetch categories and extract unique types
+            const profileId = nodeId.replace('platform-dict-categories-', '');
+            const profile = this.profileService.profiles().find(p => p.id === profileId);
+            if (!profile) return [];
+
+            const baseUrl = this.getBaseUrl(profile);
+            try {
+                const url = `${baseUrl}/api/v1/categories?size=1000`;
+                const response = await firstValueFrom(this.http.get<any>(url));
+                const items: any[] = Array.isArray(response) ? response : (response.data || []);
+
+                // Collect unique types, preserving first-seen order
+                const seen = new Set<string>();
+                const uniqueTypes: { discriminator: string; label: string }[] = [];
+                for (const item of items) {
+                    const type = item.type;
+                    if (type && !seen.has(type)) {
+                        seen.add(type);
+                        uniqueTypes.push({
+                            discriminator: type,
+                            label: TYPE_LABELS[type] || type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+                        });
+                    }
+                }
+
+                // Sort by predefined order, then alphabetically
+                uniqueTypes.sort((a, b) => {
+                    const ai = TYPE_ORDER.indexOf(a.discriminator);
+                    const bi = TYPE_ORDER.indexOf(b.discriminator);
+                    if (ai !== -1 && bi !== -1) return ai - bi;
+                    if (ai !== -1) return -1;
+                    if (bi !== -1) return 1;
+                    return a.label.localeCompare(b.label);
+                });
+
+                return uniqueTypes.map(t => ({
+                    id: `platform-dict-categories-${t.discriminator}-${profile.id}`,
+                    name: t.label,
+                    type: NodeType.FOLDER,
+                    icon: CATEGORY_ICONS[t.discriminator] || 'label',
+                    hasChildren: false,
+                    operations: ['manage-categories'],
+                    metadata: {
+                        hostProfileId: profile.id,
+                        url: `${baseUrl}/api/v1/categories`,
+                        managementType: 'categories',
+                        categoryFilterType: t.discriminator,
+                    },
+                    lastUpdated: new Date(),
+                }));
+            } catch (e) {
+                console.warn('Failed to fetch categories for tree children', e);
+                return [];
+            }
         }
 
 
@@ -387,26 +489,6 @@ export class RegistryServerProvider implements TreeProvider {
                 lastUpdated: new Date()
             },
             {
-                id: `platform-dict-servicetypes-${profile.id}`,
-                name: 'Service Types',
-                type: NodeType.FOLDER,
-                icon: 'dns',
-                hasChildren: false,
-                operations: ['manage-servicetypes'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/service-types`, managementType: 'service-types' },
-                lastUpdated: new Date()
-            },
-            {
-                id: `platform-dict-servertypes-${profile.id}`,
-                name: 'Host Types',
-                type: NodeType.FOLDER,
-                icon: 'storage',
-                hasChildren: false,
-                operations: ['manage-servertypes'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/server-types`, managementType: 'server-types' },
-                lastUpdated: new Date()
-            },
-            {
                 id: `platform-dict-languages-${profile.id}`,
                 name: 'Languages',
                 type: NodeType.FOLDER,
@@ -421,19 +503,9 @@ export class RegistryServerProvider implements TreeProvider {
                 name: 'Categories',
                 type: NodeType.FOLDER,
                 icon: 'class',
-                hasChildren: false,
+                hasChildren: true,
                 operations: ['manage-categories'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/framework-categories`, managementType: 'framework-categories' },
-                lastUpdated: new Date()
-            },
-            {
-                id: `platform-dict-libcategories-${profile.id}`,
-                name: 'Library Categories',
-                type: NodeType.FOLDER,
-                icon: 'style',
-                hasChildren: false,
-                operations: ['manage-libcategories'],
-                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/library-categories`, managementType: 'library-categories' },
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/categories`, managementType: 'categories' },
                 lastUpdated: new Date()
             },
             {
@@ -480,13 +552,12 @@ export class RegistryServerProvider implements TreeProvider {
                 baseUrl = baseUrl.slice(0, -1);
             }
 
-            // Fetch only standalone services (those without a parent) for top-level display
-            const servicesUrl = `${baseUrl}/api/v1/services/standalone`;
+            const servicesUrl = `${baseUrl}/api/v1/services?size=1000`;
             const servicesResponseRaw = await firstValueFrom(this.http.get<any>(servicesUrl));
             const servicesResponse: ServiceInstance[] = Array.isArray(servicesResponseRaw) ? servicesResponseRaw : (servicesResponseRaw.data || []);
 
             // Fetch deployments to get the health status
-            const deploymentsUrl = `${baseUrl}/api/v1/deployments`;
+            const deploymentsUrl = `${baseUrl}/api/v1/deployments?size=1000`;
             const deploymentsResponseRaw = await firstValueFrom(this.http.get<any>(deploymentsUrl));
             const deploymentsResponse: Deployment[] = Array.isArray(deploymentsResponseRaw) ? deploymentsResponseRaw : (deploymentsResponseRaw.data || []);
 
@@ -538,7 +609,7 @@ export class RegistryServerProvider implements TreeProvider {
 
             return deploymentsResponse.map(deployment => ({
                 id: `deployment-${profile.id}-${deployment.id}`,
-                name: `${deployment.host.hostname}:${deployment.port}`,
+                name: `${deployment.server.hostname}:${deployment.port}`,
                 type: NodeType.REGISTRY_SERVER, // Using HOST_SERVER as a deployment node type
                 icon: 'settings',
                 hasChildren: false,
@@ -568,7 +639,7 @@ export class RegistryServerProvider implements TreeProvider {
             }
 
             // Fetch deployments to determine health status for each sub-module
-            const deploymentsUrl = `${baseUrl}/api/v1/deployments`;
+            const deploymentsUrl = `${baseUrl}/api/v1/deployments?size=1000`;
             let deploymentsResponse: Deployment[] = [];
             try {
                 const depsRaw = await firstValueFrom(this.http.get<any>(deploymentsUrl));

@@ -19,7 +19,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "deployments")
-@JsonIgnoreProperties({ "service.deployments", "service.configurations", "service.dependents", "host.deployments" })
+@JsonIgnoreProperties({ "service.deployments", "service.configurations", "service.dependents", "server.deployments" })
 public class Deployment {
 
     @Id
@@ -36,7 +36,7 @@ public class Deployment {
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "host_id")
-    private Host host;
+    private Server server;
 
     @Column
     private String version;
@@ -113,12 +113,12 @@ public class Deployment {
         this.environment = environment;
     }
 
-    public Host getHost() {
-        return host;
+    public Server getServer() {
+        return server;
     }
 
-    public void setHost(Host host) {
-        this.host = host;
+    public void setServer(Server server) {
+        this.server = server;
     }
 
     public String getVersion() {
@@ -259,7 +259,7 @@ public class Deployment {
     }
 
     public Long getHostId() {
-        return host != null ? host.getId() : null;
+        return server != null ? server.getId() : null;
     }
 
     public void setHostId(Long hostId) {

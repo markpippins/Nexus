@@ -1,13 +1,14 @@
 /* ================================================================
-   Pipeline Viewer — Theme System (v041)
+   Pipeline Viewer — Theme System (v042)
    Tailwind-style slate/blue palette matching nebula-ui.
-   Dark theme is default (:root). Light theme via [data-theme="light"].
+   Steel theme is default (:root). Light via [data-theme="light"].
+   True-dark via [data-theme="dark"].
    ================================================================ */
 
 /* ── Reset ── */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* ── Dark theme (default) — Tailwind slate/blue palette ── */
+/* ── Steel theme (default) — Tailwind slate/blue palette ── */
 :root {
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
@@ -113,6 +114,60 @@
   --code-bg: rgba(0,0,0,0.05);
   --nav-tab-hover-bg: #f1f5f9;
   --nav-tab-active-border: #2563eb;
+}
+
+/* ── True-dark theme — deeper/blacker palette ── */
+[data-theme="dark"] {
+  --bg-primary: #09090b;
+  --bg-secondary: #18181b;
+  --bg-tertiary: #27272a;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-dim: #52525b;
+  --border-default: #3f3f46;
+  --border-subtle: #27272a;
+  --accent-blue: #818cf8;
+  --accent-blue-text: #a5b4fc;
+  --accent-blue-bg: #312e81;
+  --accent-green: #4ade80;
+  --accent-green-text: #86efac;
+  --accent-green-bg: #14532d;
+  --accent-red: #f87171;
+  --accent-red-text: #fca5a5;
+  --accent-red-bg: #7f1d1d;
+  --accent-yellow: #facc15;
+  --accent-yellow-text: #fde68a;
+  --accent-yellow-bg: rgba(250,204,21,0.15);
+  --accent-neutral-bg: #3f3f46;
+  --accent-neutral-text: #a1a1aa;
+  --offline-bg: #dc2626;
+  --scrollbar-track: #18181b;
+  --scrollbar-thumb: #3f3f46;
+  --scrollbar-thumb-hover: #52525b;
+  --card-shadow: rgba(0,0,0,0.4);
+  --border-divider: rgba(255,255,255,0.04);
+  --tag-blue-bg: rgba(129,140,248,0.2);
+  --tag-green-bg: rgba(74,222,128,0.2);
+  --tag-red-bg: rgba(248,113,113,0.2);
+  --tag-gray-bg: rgba(161,161,170,0.2);
+  --tag-neutral-bg: rgba(113,113,122,0.2);
+  --status-running-bg: rgba(74,222,128,0.15);
+  --status-running-border: rgba(74,222,128,0.3);
+  --status-stale-bg: rgba(250,204,21,0.15);
+  --status-stale-border: rgba(250,204,21,0.3);
+  --status-killed-bg: rgba(248,113,113,0.15);
+  --status-killed-border: rgba(248,113,113,0.3);
+  --status-idle-bg: rgba(161,161,170,0.1);
+  --status-idle-border: rgba(161,161,170,0.2);
+  --agent-working-bg: rgba(74,222,128,0.1);
+  --agent-working-border: rgba(74,222,128,0.2);
+  --agent-idle-bg: rgba(161,161,170,0.08);
+  --agent-idle-border: rgba(161,161,170,0.15);
+  --agent-gone-opacity: 0.35;
+  --code-bg: rgba(255,255,255,0.04);
+  --nav-tab-hover-bg: #27272a;
+  --nav-tab-active-border: #818cf8;
 }
 
 /* ── Theme transition ── */

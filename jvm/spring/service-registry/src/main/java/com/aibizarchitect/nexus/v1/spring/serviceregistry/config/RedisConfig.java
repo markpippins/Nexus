@@ -20,11 +20,14 @@ import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.RedisSseBridge;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -117,9 +120,23 @@ public class RedisConfig implements CachingConfigurer {
     }
 
     @Bean
-    public RedisMessageListenerContainer redisMessageListenerContainer(RedisConnectionFactory connectionFactory) {
+    public RedisMessageListenerContainer redisMessageListenerContainer(
+            RedisConnectionFactory connectionFactory,
+            RedisSseBridge redisSseBridge) {
         RedisMessageListenerContainer container = new RedisMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
+
+        // Subscribe to service status, heartbeat, and status-change channels
+        // These are published by ServiceStatusCacheService and consumed by RedisSseBridge
+        container.addMessageListener(redisSseBridge,
+                new ChannelTopic(RedisSseBridge.STATUS_CHANNEL));
+        container.addMessageListener(redisSseBridge,
+                new ChannelTopic(RedisSseBridge.HEARTBEAT_CHANNEL));
+        container.addMessageListener(redisSseBridge,
+                new ChannelTopic(RedisSseBridge.STATUS_CHANGE_CHANNEL));
+        container.addMessageListener(redisSseBridge,
+                new ChannelTopic(RedisSseBridge.CASCADE_CHANNEL));
+
         return container;
     }
 

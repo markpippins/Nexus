@@ -26,7 +26,7 @@ export class DataService {
       return 'http://localhost:8085';
     }
 
-    let url = profile.hostServerUrl;
+    let url = profile.registryServerUrl;
     if (!url.startsWith('http')) {
       url = `http://${url}`;
     }

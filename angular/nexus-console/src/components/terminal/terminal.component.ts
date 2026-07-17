@@ -16,8 +16,40 @@ import { CommonModule } from '@angular/common';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal } from 'xterm';
 import 'xterm/css/xterm.css';
-import { Bash, type BashExecResult } from 'just-bash/browser';
+import { Bash, defineCommand, type BashExecResult } from 'just-bash/browser';
 import { UiPreferencesService } from '../../services/ui-preferences.service.js';
+
+// ── Custom commands ────────────────────────────────────────────────────
+
+const helpCommand = defineCommand('help', async (_args, _ctx) => {
+  const lines = [
+    'Welcome to Nexus Console Terminal',
+    '',
+    '  Built-in commands:',
+    '    ls, cd, pwd, cat, echo, mkdir, rm, rmdir, cp, mv, grep, find,',
+    '    head, tail, sort, wc, tee, sed, awk, cut, tr, uniq,',
+    '    ps, kill, sleep, echo, printf, date, env, export, source,',
+    '    chmod, chown, ln, readlink, stat, du, df, touch,',
+    '    which, type, command, hash, alias, unalias,',
+    '    help, man, info, whatis, apropos,',
+    '    ping, curl, wget, ssh, scp, rsync,',
+    '    git, tar, gzip, gunzip, zip, unzip,',
+    '    python3, node, npx,',
+    '    clear, history, logout, exit',
+    '',
+    '  Custom commands:',
+    '    help       - Show this message',
+    '',
+    '  Tips:',
+    '    Use up/down arrows to navigate command history',
+    '    Ctrl+C to interrupt a running command',
+    '    Ctrl+L to clear the screen',
+    '    Type start-logging to stream broker traffic logs',
+    '    Type stop-logging to stop log streaming',
+    '',
+  ];
+  return { stdout: lines.join('\n'), stderr: '', exitCode: 0 };
+});
 
 interface TerminalSession {
   id: string;
@@ -224,6 +256,7 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
     const bash = new Bash({
       cwd: this.initialCwd,
       env: { TERM: 'xterm-256color' },
+      customCommands: [helpCommand],
     });
     const terminal = new Terminal({
       cursorBlink: true,

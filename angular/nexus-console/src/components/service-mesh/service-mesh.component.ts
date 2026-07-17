@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal, OnInit, effect, output, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, model, OnInit, effect, output, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -38,6 +38,8 @@ export class ServiceMeshComponent implements OnInit {
   // Input from parent (controlled mode)
   meshViewMode = input<'console' | 'graph'>('console');
   graphSubView = input<'canvas' | 'creator'>('canvas');
+  showRunningOnly = model(false);
+  paletteCollapsed = input(false);
 
   // State
   services = signal<ServiceInstance[]>([]);
@@ -50,6 +52,7 @@ export class ServiceMeshComponent implements OnInit {
   // Output for parent synchronization
   viewModeChange = output<'console' | 'graph'>();
   graphSubViewChange = output<'canvas' | 'creator'>();
+  refreshServices = output<void>();
 
   // Computed properties
   summary = computed(() => this.serviceMeshService.summary());

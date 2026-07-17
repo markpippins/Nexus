@@ -41,6 +41,10 @@ import {
   deleteSchedulerEntry,
   getDueSchedulerEntries,
 } from "./db";
+import {
+  getRoles,
+  getRole,
+} from "./db";
 
 // ── Nebula RMS API helpers (HTTP calls to nebula-srv) ───────────────
 
@@ -353,6 +357,25 @@ export const toolDefinitions: MCPToolDefinition[] = [
     },
   },
 
+  // ── Roles Registry ────────────────────────────────────────────
+
+  {
+    name: "list_roles",
+    description: "List all roles registered in the tackle roles table. Returns role metadata including id, name, and description.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "get_role",
+    description: "Get a single role by ID or name from the tackle roles table.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Role UUID or name (e.g. 'engineer', 'architect')" },
+      },
+      required: ["id"],
+    },
+  },
+
   // ── Memory Procedure Registry ─────────────────────────────────
 
   {
@@ -544,7 +567,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
       properties: {
         id: { type: "string", description: "Harvest candidate UUID" },
         systemId: { type: "string", description: "System UUID to link the candidate to" },
-        subsystemId: { type: "string", description: "Subsystem UUID (required — requirement must belong to a subsystem)" },
+        subsystemId: { type: "string", description: "Optional subsystem UUID — requirement can live at system level" },
         featureId: { type: "string", description: "Optional feature UUID" },
         planRef: { type: "string", description: "Optional conduit plan reference (e.g. '0136') — creates spawns_plan cross-reference" },
         priority: { type: "string", description: "Requirement priority: Low, Medium, High (default Medium)" },
@@ -552,7 +575,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
         title: { type: "string", description: "Requirement title (defaults to candidate title)" },
         description: { type: "string", description: "Requirement description (defaults to candidate intent)" },
       },
-      required: ["id", "systemId", "subsystemId"],
+      required: ["id", "systemId"],
     },
   },
   {
@@ -783,6 +806,20 @@ export function registerToolHandlers(): Record<string, Function> {
       const deleted = await deleteConfigBundle(args.id);
       if (!deleted) throw createError("NOT_FOUND", `Bundle '${args.id}' not found`);
       return { deleted: true, id: args.id };
+    },
+
+    // ── Roles Registry ──────────────────────────────────────────
+
+    list_roles: async (_args: any) => {
+      const roles = await getRoles();
+      return { count: roles.length, roles };
+    },
+
+    get_role: async (args: { id: string }) => {
+      if (!args.id) throw createError("INVALID_ARGUMENTS", "id is required");
+      const role = await getRole(args.id);
+      if (!role) throw createError("NOT_FOUND", `Role '${args.id}' not found`);
+      return role;
     },
 
     // ── Memory Procedure Registry ───────────────────────────────

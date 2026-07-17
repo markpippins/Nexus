@@ -61,7 +61,7 @@ def _get_log() -> logging.Logger:
 DEFAULT_DB_PATH = os.environ.get("CONDUIT_DATA_DIR", "/home/codex/dev/nexus/.conduit-data")
 LOCK_PATH = os.environ.get("PIPELINE_LOCK_PATH", "/tmp/pipeline-manager.lock")
 DCO_DIR = os.environ.get("PIPELINE_DCO_DIR", "/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS")
-PROJECT_ROOT = os.environ.get("PIPELINE_ROOT", "/home/codex/dev/nexus")
+PROJECT_ROOT = os.environ.get("PIPELINE_ROOT", "/home/codex/dev")
 
 EXECUTOR_TIMEOUT_SECONDS = int(os.environ.get("PIPELINE_EXECUTOR_TIMEOUT", "1800"))
 WATCHDOG_STALE_SECONDS = int(os.environ.get("PIPELINE_WATCHDOG_STALE", "1500"))
@@ -442,6 +442,19 @@ def _resolve_model_chain(db: DBAdapter, role: str) -> list:
             "model": fb.get("model_identifier", ""),
             "priority": fb.get("priority", 0),
         })
+
+    # Fallback: if chain is still empty, try PIPELINE_MODEL env var
+    # (allows local execution without tackle-mcp / DB role config)
+    if not chain:
+        env_model = os.environ.get("PIPELINE_MODEL", "")
+        if env_model:
+            log.info("_resolve_model_chain: PIPELINE_MODEL fallback role=%s model=%s", role, env_model)
+            chain.append({
+                "harness": "opencode",
+                "model": env_model,
+                "priority": -1,
+            })
+
     return chain
 
 
@@ -531,10 +544,28 @@ def _dispatch_one(
         return
     print(f"  Ticket {ticket_id} claimed for {role} on plan {plan_id}.")
 
+    # ── Execution Authority (ADR-006): acquire lease ───────────
+    exec_request = db.get_or_create_execution_request(
+        plan_id=plan_id,
+        title=plan.get("title", ""),
+        objective=plan.get("goal", ""),
+    )
+    request_id = exec_request["id"]
+    lease = db.acquire_lease(request_id=request_id, executor_id=role, ttl_seconds=3600)
+    if not lease:
+        print(f"  Could not acquire lease for {role} on plan {plan_id}. Skipping.")
+        db.close_ticket(plan_id, role, session_id, "failed")
+        db.close_session(session_id, 1)
+        return
+    lease_id = lease["id"]
+    lease_released = False
+    print(f"  Lease {lease_id} acquired.")
+
     # ── Resolve model chain (primary + fallbacks) ─────────────────
     chain = _resolve_model_chain(db, role)
     if not chain:
         _insert_empty_chain_block(db, plan_id, role, session_id, ticket_id)
+        db.release_lease(lease_id)
         db.advance_cursor(role, plan_id, "")
         db.close_session(session_id, 1)
         return
@@ -577,7 +608,8 @@ def _dispatch_one(
         with open(dco_path, "w") as f:
             json.dump(dco.model_dump(by_alias=True), f, indent=2)
 
-        db.add_work_request(wr_id, plan_id, json.dumps(dco.model_dump(by_alias=True)))
+        db.add_work_request(wr_id, plan_id, json.dumps(dco.model_dump(by_alias=True)),
+                             title=plan.get('title', '') or plan.get('goal', '')[:100])
 
         # ── Budget check ───────────────────────────────────────
         if not _check_budget(db, plan, role, session_id, ticket_id, model):
@@ -608,8 +640,11 @@ def _dispatch_one(
         tokens_used = 0
         exit_code = -1
         try:
-            for attempt in range(1, _retry_max_attempts + 1):
-                print(f"  [{model_label}] attempt {attempt}/{_retry_max_attempts}")
+            for attempt_num in range(1, _retry_max_attempts + 1):
+                # ── Execution Authority: create fresh attempt for each retry ──
+                attempt_rec = db.create_attempt(lease_id=lease_id, request_id=request_id, executor_id=role)
+                attempt_id = attempt_rec["id"]
+                print(f"  [{model_label}] attempt {attempt_num}/{_retry_max_attempts} (attempt={attempt_id})")
                 work_start = time.time()
                 proc = subprocess.Popen(
                     [sys.executable, executor_cmd, dco_path],
@@ -619,6 +654,7 @@ def _dispatch_one(
                     start_new_session=True,
                 )
                 db.update_session_activity(session_id, pid=proc.pid)
+                db.start_attempt(attempt_id)
                 try:
                     stdout, _ = proc.communicate(timeout=EXECUTOR_TIMEOUT_SECONDS)
                     exit_code = proc.returncode
@@ -662,6 +698,18 @@ def _dispatch_one(
                         },
                         tokens_used=tokens_used,
                     )
+                    # ── Execution Authority (ADR-006): complete attempt + receipt ──
+                    db.complete_attempt(attempt_id, "SUCCEEDED", exit_code=0,
+                                       result={"work_request_id": wr_id, "model": model})
+                    db.issue_execution_receipt(
+                        attempt_id=attempt_id, request_id=request_id,
+                        receipt_type=_SUCCESS_RECEIPTS.get(role, "IMPLEMENTATION"),
+                        agent_role=role,
+                        summary=f"{role} completed via {wr_id} (model={model})",
+                        metadata={"work_request_id": wr_id, "model": model, "harness": harness},
+                    )
+                    db.release_lease(lease_id)
+                    lease_released = True
                     if tokens_used > 0:
                         db.increment_ticket_tokens(ticket_id, tokens_used)
                     _record_cost(db, output_text, ticket_id, session_id, role, model)
@@ -679,7 +727,7 @@ def _dispatch_one(
 
                 # ── Rate limit → sleep & retry (or try next model) ──
                 if _detect_api_limit_error(exit_code, output_text):
-                    print(f"  [{model_label}] Rate limit hit (attempt {attempt}/{_retry_max_attempts}).")
+                    print(f"  [{model_label}] Rate limit hit (attempt {attempt_num}/{_retry_max_attempts}).")
                     error_summary = "API usage limit reached"
                     for line in output_text.splitlines():
                         line_lower = line.lower()
@@ -694,23 +742,32 @@ def _dispatch_one(
                         agent_role=role,
                         session_id=session_id,
                         ticket_id=ticket_id,
-                        summary=f"Rate limit retry {attempt}/{_retry_max_attempts}: {error_summary}",
+                        summary=f"Rate limit retry {attempt_num}/{_retry_max_attempts}: {error_summary}",
                         metadata={
                             "work_request_id": wr_id,
                             "role": role,
                             "harness": harness,
                             "model": model,
                             "exit_code": exit_code,
-                            "attempt": attempt,
+                            "attempt": attempt_num,
                             "chain_index": chain_idx,
                         },
                         tokens_used=tokens_used,
+                    )
+                    # ── Execution Authority (ADR-006): complete attempt + receipt ──
+                    db.complete_attempt(attempt_id, "FATAL_ERROR", exit_code=exit_code,
+                                       error=error_summary)
+                    db.issue_execution_receipt(
+                        attempt_id=attempt_id, request_id=request_id,
+                        receipt_type="API_LIMIT", agent_role=role,
+                        summary=f"Rate limit {attempt_num}/{_retry_max_attempts}: {error_summary}",
+                        metadata={"model": model, "harness": harness, "exit_code": exit_code},
                     )
                     if tokens_used > 0:
                         db.increment_ticket_tokens(ticket_id, tokens_used)
                     _record_cost(db, output_text, ticket_id, session_id, role, model)
 
-                    if attempt < _retry_max_attempts:
+                    if attempt_num < _retry_max_attempts:
                         print(f"  [{model_label}] Waiting {_retry_delay_seconds}s before retry...")
                         time.sleep(_retry_delay_seconds)
                         continue  # retry same model
@@ -744,6 +801,15 @@ def _dispatch_one(
                     },
                     tokens_used=tokens_used,
                 )
+                # ── Execution Authority (ADR-006): complete attempt + receipt ──
+                db.complete_attempt(attempt_id, "FAILED", exit_code=exit_code,
+                                   error=f"exit code {exit_code}")
+                db.issue_execution_receipt(
+                    attempt_id=attempt_id, request_id=request_id,
+                    receipt_type=_FAIL_RECEIPTS.get(role, "BLOCK"), agent_role=role,
+                    summary=f"{role} failed exit={exit_code} model={model}",
+                    metadata={"model": model, "harness": harness, "exit_code": exit_code},
+                )
                 if tokens_used > 0:
                     db.increment_ticket_tokens(ticket_id, tokens_used)
                 _record_cost(db, output_text, ticket_id, session_id, role, model)
@@ -759,6 +825,17 @@ def _dispatch_one(
             log.warning("_dispatch_one: exception role=%s plan=%s model=%s: %s",
                         role, plan_id, model, e)
             db.update_work_request_status(wr_id, "failed")
+            # ── Execution Authority (ADR-006): complete attempt + receipt ──
+            try:
+                db.complete_attempt(attempt_id, "FAILED", exit_code=-1, error=str(e))
+                db.issue_execution_receipt(
+                    attempt_id=attempt_id, request_id=request_id,
+                    receipt_type=_FAIL_RECEIPTS.get(role, "BLOCK"), agent_role=role,
+                    summary=f"{role} exception: {e}",
+                    metadata={"model": model, "harness": harness},
+                )
+            except Exception as inner_e:
+                log.warning("_dispatch_one: failed to record execution authority for exception: %s", inner_e)
             last_exit_code = -1
             model_failed = True
             # Continue to next model in chain
@@ -793,6 +870,14 @@ def _dispatch_one(
             },
             tokens_used=last_tokens_used,
         )
+        # ── Execution Authority (ADR-006): release lease (all attempts completed) ──
+        if not lease_released:
+            try:
+                db.release_lease(lease_id)
+                lease_released = True
+                print(f"  Lease {lease_id} released after all models exhausted.")
+            except Exception as e:
+                log.warning("_dispatch_one: failed to release lease %s: %s", lease_id, e)
         if last_tokens_used > 0:
             db.increment_ticket_tokens(ticket_id, last_tokens_used)
         created = db.create_next_tickets(
@@ -894,6 +979,22 @@ def run_role(db_path: str, role: str, registry: RegistryConfig):
     expired = db.detect_expired_tickets()
     if stale or expired:
         print(f"Ticket lifecycle: {stale} stale, {expired} expired.")
+
+    # ── Execution Authority (ADR-006): expire stale leases ──
+    try:
+        expired_leases = db.expire_stale_leases()
+        if expired_leases:
+            print(f"Execution Authority: expired {expired_leases} stale lease(s).")
+    except Exception as e:
+        log.warning("run_role: failed to expire stale leases: %s", e)
+
+    # ── Execution Authority (ADR-006): cascade admission ──
+    try:
+        ready_count = db.cascade_admission()
+        if ready_count:
+            print(f"Execution Authority: {ready_count} request(s) transitioned to READY.")
+    except Exception as e:
+        log.warning("run_role: failed to cascade admission: %s", e)
 
     eligible_plans = db.get_eligible_plans(role)
 

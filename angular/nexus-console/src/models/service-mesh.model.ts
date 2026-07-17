@@ -9,23 +9,23 @@
 // Framework Models
 // ============================================================================
 
-export type FrameworkCategory =
-  | 'JAVA_SPRING'
-  | 'JAVA_QUARKUS'
-  | 'JAVA_MICRONAUT'
-  | 'JAVA_HELIDON'
-  | 'NODE_NESTJS'
-  | 'NODE_ADONISJS'
-  | 'NODE_MOLECULER'
-  | 'NODE_EXPRESS'
-  | 'PYTHON_DJANGO'
-  | 'PYTHON_FLASK'
-  | 'PYTHON_FASTAPI'
-  | 'DOTNET_ASPNET'
-  | 'GO_GIN'
-  | 'GO_FIBER'
-  | 'RUST_ACTIX'
-  | 'OTHER';
+export type FrameworkType =
+  | 'Java Spring'
+  | 'Java Quarkus'
+  | 'Java Micronaut'
+  | 'Java Helidon'
+  | 'Node NestJS'
+  | 'Node AdonisJS'
+  | 'Node Moleculer'
+  | 'Node Express'
+  | 'Python Django'
+  | 'Python Flask'
+  | 'Python FastAPI'
+  | 'ASP.NET'
+  | 'Go Gin'
+  | 'Go Fiber'
+  | 'Rust Actix'
+  | 'Other';
 
 export interface FrameworkLanguage {
   id: string;
@@ -33,9 +33,9 @@ export interface FrameworkLanguage {
   description?: string;
 }
 
-export interface FrameworkCategoryEntity {
+export interface FrameworkTypeEntity {
   id: string;
-  name: string; // This corresponds to the FrameworkCategory (string union) values potentially
+  name: string; // This corresponds to the FrameworkType (string union) values potentially
   description?: string;
 }
 
@@ -52,7 +52,7 @@ export interface Framework {
   id: string;
   name: string;
   description?: string;
-  category: FrameworkCategoryEntity;
+  category: FrameworkTypeEntity;
   language: FrameworkLanguage;
   currentVersion?: string;
   ltsVersion?: string;
@@ -68,16 +68,16 @@ export interface Framework {
 // ============================================================================
 
 export type ServiceType =
-  | 'REST_API'
-  | 'GRAPHQL_API'
-  | 'GRPC_SERVICE'
-  | 'MESSAGE_QUEUE'
-  | 'DATABASE'
-  | 'CACHE'
-  | 'GATEWAY'
-  | 'PROXY'
-  | 'WEB_APP'
-  | 'BACKGROUND_JOB';
+  | 'REST API'
+  | 'GraphQL API'
+  | 'gRPC Service'
+  | 'Message Queue'
+  | 'Database'
+  | 'Cache'
+  | 'Gateway'
+  | 'Proxy'
+  | 'Web App'
+  | 'Background Job';
 
 export type ServiceStatus = 'ACTIVE' | 'DEPRECATED' | 'ARCHIVED' | 'PLANNED';
 
@@ -136,11 +136,11 @@ export interface ServiceWithHosted {
 // Host Models
 // ============================================================================
 
-export type HostType = 'PHYSICAL' | 'VIRTUAL' | 'CONTAINER' | 'CLOUD';
+export type ServerType = 'Physical' | 'Virtual' | 'Container' | 'Cloud';
 
-export type HostEnvironment = 'DEVELOPMENT' | 'STAGING' | 'PRODUCTION' | 'TEST';
+export type EnvironmentType = 'Development' | 'Staging' | 'Production' | 'Test';
 
-export type HostStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE' | 'DECOMMISSIONED';
+export type ServerStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE' | 'DECOMMISSIONED';
 
 // ============================================================================
 // Deployment Models
@@ -159,11 +159,11 @@ export type HealthStatus = 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' | 'UNKNOWN';
 export interface Deployment {
   id: string;
   service: ServiceInstance;
-  host: any;
+  server: any;
   port: number;
   version: string;
   status: DeploymentStatus;
-  environment: HostEnvironment;
+  environment: EnvironmentType;
   healthCheckUrl?: string;
   healthStatus: HealthStatus;
   deploymentPath?: string;
@@ -177,7 +177,7 @@ export interface Deployment {
 // Configuration Models
 // ============================================================================
 
-export type ConfigEnvironment = 'ALL' | 'DEVELOPMENT' | 'STAGING' | 'PRODUCTION' | 'TEST';
+export type ConfigEnvironment = 'All' | 'Development' | 'Staging' | 'Production' | 'Test';
 
 export type ConfigType =
   | 'STRING'
@@ -217,7 +217,7 @@ export interface ServiceDependency {
 // Library Models (Compile-Time Dependencies)
 // ============================================================================
 
-export interface LibraryCategory {
+export interface LibraryType {
   id: number;
   name: string;
   description?: string;
@@ -228,7 +228,7 @@ export interface Library {
   id: number;
   name: string;
   description?: string;
-  category?: LibraryCategory;
+  category?: LibraryType;
   language?: FrameworkLanguage;
   currentVersion?: string;
   packageName?: string;
@@ -294,7 +294,7 @@ export interface ServiceMeshSummary {
   totalHosts: number;
   activeHosts: number;
   frameworkBreakdown: { framework: string; count: number }[];
-  environmentBreakdown: { environment: HostEnvironment; count: number }[];
+  environmentBreakdown: { environment: EnvironmentType; count: number }[];
 }
 
 export interface FrameworkGroup {
@@ -309,7 +309,7 @@ export interface ServiceTreeNode {
   name: string;
   type: 'framework' | 'service' | 'deployment' | 'server';
   icon: string;
-  status?: HealthStatus | DeploymentStatus | ServiceStatus | HostStatus;
+  status?: HealthStatus | DeploymentStatus | ServiceStatus | ServerStatus;
   children?: ServiceTreeNode[];
   metadata: Record<string, unknown>;
   isExpanded?: boolean;
@@ -392,28 +392,28 @@ export function getDeploymentStatusColor(status: DeploymentStatus): string {
   }
 }
 
-export function getFrameworkIcon(category: FrameworkCategory | string): string {
+export function getFrameworkIcon(category: FrameworkType | string): string {
   switch (category) {
-    case 'JAVA_SPRING':
-    case 'JAVA_QUARKUS':
-    case 'JAVA_MICRONAUT':
-    case 'JAVA_HELIDON':
+    case 'Java Spring':
+    case 'Java Quarkus':
+    case 'Java Micronaut':
+    case 'Java Helidon':
       return 'coffee';
-    case 'NODE_NESTJS':
-    case 'NODE_ADONISJS':
-    case 'NODE_MOLECULER':
-    case 'NODE_EXPRESS':
+    case 'Node NestJS':
+    case 'Node AdonisJS':
+    case 'Node Moleculer':
+    case 'Node Express':
       return 'hexagon';
-    case 'PYTHON_DJANGO':
-    case 'PYTHON_FLASK':
-    case 'PYTHON_FASTAPI':
+    case 'Python Django':
+    case 'Python Flask':
+    case 'Python FastAPI':
       return 'code';
-    case 'DOTNET_ASPNET':
+    case 'ASP.NET':
       return 'window';
-    case 'GO_GIN':
-    case 'GO_FIBER':
+    case 'Go Gin':
+    case 'Go Fiber':
       return 'zap';
-    case 'RUST_ACTIX':
+    case 'Rust Actix':
       return 'settings';
     default:
       return 'box';

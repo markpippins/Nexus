@@ -23,19 +23,19 @@ public class UserAccessService {
     }
 
     @BrokerOperation("validateUser")
-    public UserRegistrationDTO validateUser(@BrokerParam("alias") String alias,
+    public UserRegistrationDTO validateUser(@BrokerParam("email") String email,
             @BrokerParam("identifier") String password) {
 
-        log.info("Validating user {}", alias);
+        log.info("Validating user {}", email);
 
-        UserRegistration userReg = userRepository.findByAlias(alias).orElse(null);
+        UserRegistration userReg = userRepository.findByEmail(email).orElse(null);
 
-        if (userReg == null || !password.equals(userReg.getIdentifier())) {
+        if (userReg == null || !password.equals(userReg.getPassword())) {
             return null;
         }
 
-        if (!password.equals(userReg.getIdentifier())) {
-            log.info("Password mismatch for user {}", alias);
+        if (!password.equals(userReg.getPassword())) {
+            log.info("Password mismatch for user {}", email);
             return null;
         }
 

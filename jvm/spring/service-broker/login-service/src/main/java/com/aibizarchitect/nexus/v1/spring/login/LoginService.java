@@ -31,10 +31,10 @@ public class LoginService {
     }
 
     @BrokerOperation("login")
-    public ServiceResponse<LoginResponse> login(@BrokerParam("alias") String alias,
+    public ServiceResponse<LoginResponse> login(@BrokerParam("email") String email,
             @BrokerParam("identifier") String password) {
 
-        log.info("Login user {}", alias);
+        log.info("Login user {}", email);
 
         ServiceResponse<LoginResponse> serviceResponse = new ServiceResponse<>();
 
@@ -45,7 +45,7 @@ public class LoginService {
                 ServiceRequest request = new ServiceRequest(
                     "userAccessService",
                     "validateUser",
-                    Map.of("alias", alias, "identifier", password),
+                    Map.of("email", email, "identifier", password),
                     "login-validate-" + System.currentTimeMillis()
                 );
                 ServiceResponse<?> response = broker.submit(request);

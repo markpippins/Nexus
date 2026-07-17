@@ -8,11 +8,12 @@ export interface ExternalSite {
 }
 
 export const EXTERNAL_SITES: ExternalSite[] = [
-  { name: 'Google',  url: 'https://www.google.com',          shortName: 'google' },
-  { name: 'GitHub',  url: 'https://github.com',              shortName: 'github' },
-  { name: 'ChatGPT', url: 'https://chatgpt.com',             shortName: 'chatgpt' },
-  { name: 'Copilot', url: 'https://copilot.microsoft.com',   shortName: 'copilot' },
-  { name: 'Gemini',  url: 'https://gemini.google.com',       shortName: 'gemini' },
+  { name: 'View Architect',  url: 'http://localhost:3003',                shortName: 'view-architect' },
+  { name: 'Google',          url: 'https://www.google.com',               shortName: 'google' },
+  { name: 'GitHub',          url: 'https://github.com',                   shortName: 'github' },
+  { name: 'ChatGPT',         url: 'https://chatgpt.com',                  shortName: 'chatgpt' },
+  { name: 'Copilot',         url: 'https://copilot.microsoft.com',        shortName: 'copilot' },
+  { name: 'Gemini',          url: 'https://gemini.google.com',            shortName: 'gemini' },
 ];
 
 @Component({

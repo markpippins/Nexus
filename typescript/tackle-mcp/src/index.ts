@@ -39,6 +39,10 @@ import {
   updateSessionPid,
   getAllSessions,
   getResolvedRoleConfig,
+  getRoles,
+  getRole,
+  upsertRole,
+  deleteRole,
 } from "./db";
 import { initRedis, closeRedis } from "./memory";
 import { registerToolHandlers, toolDefinitions } from "./tools";
@@ -616,6 +620,53 @@ app.post("/config/ai/bundles/:role", async (req, res) => {
     }
     await upsertConfigBundles(req.params.role, bundles);
     res.json({ saved: true, role: req.params.role, count: bundles.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Roles Registry ─────────────────────────────────────────────────
+
+app.get("/config/roles", async (_req, res) => {
+  try {
+    const roles = await getRoles();
+    res.json({ count: roles.length, roles });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/config/role/:id", async (req, res) => {
+  try {
+    const role = await getRole(req.params.id);
+    if (!role) {
+      res.status(404).json({ error: "Role not found" });
+      return;
+    }
+    res.json(role);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/config/role", async (req, res) => {
+  try {
+    const { id, name, description } = req.body || {};
+    if (!name) {
+      res.status(400).json({ error: "name is required" });
+      return;
+    }
+    const role = await upsertRole({ id, name, description });
+    res.json({ saved: true, role });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/config/role/:id", async (req, res) => {
+  try {
+    const deleted = await deleteRole(req.params.id);
+    res.json({ deleted, id: req.params.id });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

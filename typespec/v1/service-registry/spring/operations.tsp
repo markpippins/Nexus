@@ -47,29 +47,29 @@ namespace com.aibizarchitect.nexus.v1.serviceregistry {
   }
 
   // ========================================================================
-  // Framework Category Operations
+  // Framework Type Operations
   // ========================================================================
 
   @route("/api/v1/framework-categories")
-  @tag("Framework Categories")
-  interface FrameworkCategories {
-    @doc("Get all framework categories")
+  @tag("Framework Types")
+  interface FrameworkTypes {
+    @doc("Get all framework types")
     @get
-    list(...PaginationParameters): Core.PagedResponse<Registry.FrameworkCategory>;
+    list(...PaginationParameters): Core.PagedResponse<Registry.FrameworkType>;
 
-    @doc("Get a framework category by ID")
+    @doc("Get a framework type by ID")
     @get
-    get(@path id: int64): Registry.FrameworkCategory;
+    get(@path id: int64): Registry.FrameworkType;
 
-    @doc("Create a new framework category")
+    @doc("Create a new framework type")
     @post
-    create(@body category: FrameworkCategoryCreate): Registry.FrameworkCategory;
+    create(@body category: FrameworkTypeCreate): Registry.FrameworkType;
 
-    @doc("Update a framework category")
+    @doc("Update a framework type")
     @put
-    update(@path id: int64, @body category: FrameworkCategoryUpdate): Registry.FrameworkCategory;
+    update(@path id: int64, @body category: FrameworkTypeUpdate): Registry.FrameworkType;
 
-    @doc("Delete a framework category")
+    @doc("Delete a framework type")
     @delete
     delete(@path id: int64): void;
   }

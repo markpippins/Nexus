@@ -268,11 +268,12 @@ public class RestFsService {
     @BrokerOperation("ensureDefaultDirectory")
     public Map<String, Object> ensureDefaultDirectory(@BrokerParam("token") String token) {
         String alias = getUserAliasFromToken(token);
-        List<String> defaultPath = List.of("users", alias, "default");
+        // FsRequest constructor prepends ["users", alias] — pass only the relative path
+        List<String> defaultPath = List.of("default");
 
         try {
             // Check if default directory already exists
-            Map<String, Object> hasResult = restFsClient.hasFolder(alias, List.of("users", alias), "default");
+            Map<String, Object> hasResult = restFsClient.hasFolder(alias, List.of(), "default");
             boolean exists = hasResult != null && Boolean.TRUE.equals(hasResult.get("exists"));
 
             if (!exists) {
@@ -280,7 +281,7 @@ public class RestFsService {
             }
 
             // Verify it was created
-            Map<String, Object> verifyResult = restFsClient.hasFolder(alias, List.of("users", alias), "default");
+            Map<String, Object> verifyResult = restFsClient.hasFolder(alias, List.of(), "default");
             boolean verified = verifyResult != null && Boolean.TRUE.equals(verifyResult.get("exists"));
 
             return Map.of("ok", verified, "path", defaultPath);

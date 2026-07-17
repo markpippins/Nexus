@@ -35,6 +35,7 @@ export type ConduitReceiptType =
   | "CRITIQUE_PASS"   // Critique approved → can implement
   | "CRITIQUE_REJECT" // Critique failed → back to planning
   | "IMPLEMENTATION"  // Builder is executing the plan
+  | "CCNF_EXECUTION"  // CCNF conformance sub-event during implementation
   | "REVIEW"          // Reviewer is reviewing implementation
   | "REVIEW_PASS"     // Implementation approved (terminal success)
   | "REVIEW_REJECT"   // Implementation rejected → must re-implement
@@ -162,6 +163,7 @@ export function receiptToWrpState(type: ConduitReceiptType): WRPState {
     case "CRITIQUE_PASS":   return "SPECIFICATION";
     case "CRITIQUE_REJECT": return "PLANNING";
     case "IMPLEMENTATION":  return "EXECUTING";
+    case "CCNF_EXECUTION":  return "EXECUTING";  // CCNF conformance is a sub-event within execution
     case "REVIEW":          return "APPROVED";
     case "REVIEW_PASS":     return "COMPLETED";
     case "REVIEW_REJECT":   return "EXECUTING";

@@ -1,6 +1,7 @@
-import { Component, signal, effect, OnInit, OnDestroy, Inject } from '@angular/core';
+import { Component, signal, effect, computed, OnInit, OnDestroy, Inject } from '@angular/core';
 import { NgFor } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
+import { Router, RouterModule, NavigationEnd } from '@angular/router';
+import { filter } from 'rxjs/operators';
 import { DOCUMENT } from '@angular/common';
 import { BuilderStatusComponent } from './components/builder-status/builder-status.component';
 import { AgentStatusBarComponent } from './components/agent-status-bar/agent-status-bar.component';
@@ -48,43 +49,35 @@ interface NavItem {
         </div>
       }
 
-      <!-- Top horizontal toolbar -->
-      <nav class="top-navbar">
-        <div class="top-nav-items">
-          <a
-            *ngFor="let item of navItems"
-            class="nav-icon-btn"
-            [routerLink]="item.route"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: !!item.exact }"
-            [title]="item.label + ' (' + item.shortcut + ')'"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.svgPath" />
-            </svg>
-          </a>
+      <!-- Top Row: Branding Box + Splitter + Address Bar -->
+      <div class="top-row">
+        <div
+          class="top-branding"
+          [style.width.px]="sidebarCollapsed() ? 32 : sidebarWidth()"
+        >
+          <span class="branding-label">Conduit</span>
         </div>
-        <div class="nav-spacer"></div>
-        <div class="top-nav-actions">
-          <button class="nav-icon-btn" (click)="toggleTheme()" [title]="'Switch theme (Ctrl+T)'">
-            @if (theme.theme() === 'dark') {
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
+        <div class="top-splitter"></div>
+        <div class="address-bar">
+          <svg class="address-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+          </svg>
+          <div class="address-box">
+            @for (part of breadcrumbParts(); track part.label; let i = $index) {
+              @if (i > 0) {
+                <span class="crumb-sep">\</span>
+              }
+              @if (part.route) {
+                <button class="crumb-btn" (click)="router.navigateByUrl(part.route!)" [title]="'Go to ' + part.label">
+                  {{ part.label }}
+                </button>
+              } @else {
+                <span class="crumb-text">{{ part.label }}</span>
+              }
             }
-            @if (theme.theme() === 'light') {
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-            }
-          </button>
-          <a class="nav-icon-btn temporal-btn" href="http://localhost:8233" target="_blank" rel="noopener noreferrer" title="Temporal Web UI">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </a>
+          </div>
         </div>
-      </nav>
+      </div>
 
       <div class="layout-body">
         <!-- Plans sidebar (resizable) -->
@@ -95,6 +88,51 @@ interface NavItem {
 
         <!-- Main content area -->
         <div class="main-content">
+
+          <!-- Content toolbar (moved inside main-content) -->
+          <nav class="content-toolbar">
+            <div class="top-nav-items">
+              <a
+                *ngFor="let item of navItems"
+                class="nav-icon-btn"
+                [routerLink]="item.route"
+                routerLinkActive="active"
+                [routerLinkActiveOptions]="{ exact: !!item.exact }"
+                [title]="item.label + ' (' + item.shortcut + ')'"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.svgPath" />
+                </svg>
+              </a>
+            </div>
+            <div class="nav-spacer"></div>
+            <div class="top-nav-actions">
+              <button class="nav-icon-btn" (click)="toggleTheme()" [title]="'Switch theme: ' + theme.theme() + ' (Ctrl+T)'">
+                @if (theme.theme() === 'steel') {
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                }
+                @if (theme.theme() === 'dark') {
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+                }
+                @if (theme.theme() === 'light') {
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                }
+              </button>
+              <a class="nav-icon-btn temporal-btn" href="http://localhost:8233" target="_blank" rel="noopener noreferrer" title="Temporal Web UI">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </a>
+            </div>
+          </nav>
+
           <!-- Builder status bar -->
           <app-builder-status></app-builder-status>
 
@@ -119,8 +157,22 @@ interface NavItem {
     `.global-error{background:var(--accent-red-bg,#fef2f2);color:var(--accent-red-text,#991b1b);padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:12px;flex-shrink:0;border-bottom:1px solid var(--accent-red,#dc2626)}`,
     `.dismiss-btn{margin-left:auto;background:none;border:none;color:var(--accent-red-text);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px}.dismiss-btn:hover{background:rgba(0,0,0,0.1)}`,
 
-    /* ── Top Toolbar ── */
-    `.top-navbar{height:48px;min-height:48px;display:flex;align-items:center;background:var(--bg-primary,#0f172a);border-bottom:1px solid var(--border-default,#475569);padding:0 8px;flex-shrink:0;z-index:5;gap:4px}`,
+    /* ── Top Row: Branding + Address Bar ── */
+    `.top-row{display:flex;align-items:center;height:48px;min-height:48px;background:var(--bg-secondary,#1e293b);border-bottom:1px solid var(--border-default,#475569);flex-shrink:0;z-index:10}`,
+    `.top-branding{display:flex;align-items:center;height:100%;padding:0 16px;flex-shrink:0;overflow:hidden;border-right:1px solid var(--border-default,#475569)}`,
+    `.branding-label{font-size:14px;font-weight:600;color:var(--text-primary,#f1f5f9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}`,
+    `.top-splitter{width:1.5px;height:100%;background:var(--border-default,#475569);flex-shrink:0}`,
+    `.address-bar{flex:1;height:100%;display:flex;align-items:center;padding:0 12px;gap:8px}`,
+    `.address-icon{width:16px;height:16px;color:var(--text-dim,#64748b);flex-shrink:0}`,
+    `.address-box{flex:1;display:flex;align-items:center;height:28px;background:var(--bg-primary,#0f172a);border:1px solid var(--border-subtle,#334155);border-radius:6px;padding:0 10px;min-width:0}`,
+    `.crumb-sep{margin:0 2px;color:var(--text-dim,#475569);flex-shrink:0;user-select:none}`,
+    `.crumb-btn{background:none;border:none;color:var(--accent-blue-text,#93c5fd);font-size:12px;cursor:pointer;padding:0 3px;border-radius:3px;white-space:nowrap}.crumb-btn:hover{background:var(--accent-blue-bg,#1e3a5f);text-decoration:underline}`,
+    `.crumb-text{font-size:12px;color:var(--text-muted,#94a3b8);white-space:nowrap;padding:0 1px;overflow:hidden;text-overflow:ellipsis}`,
+
+    /* ── Content Toolbar ── */
+    `.content-toolbar{height:48px;min-height:48px;display:flex;align-items:center;background:var(--bg-primary,#0f172a);border-bottom:1px solid var(--border-default,#475569);padding:0 8px;flex-shrink:0;z-index:5;gap:4px}`,
+    `.layout-body{display:flex;flex:1;min-height:0;overflow:hidden}`,
+    `.main-content{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}`,
     `.top-nav-items{display:flex;align-items:center;gap:2px;overflow-x:auto;flex-shrink:0}`,
     `.nav-spacer{margin-left:auto}`,
     `.top-nav-actions{display:flex;align-items:center;gap:2px;flex-shrink:0}`,
@@ -130,8 +182,6 @@ interface NavItem {
     `.nav-icon-btn.active{background:var(--accent-blue-bg,#1e3a5f);color:var(--accent-blue-text,#93c5fd)}`,
     `.nav-icon-btn:active{transform:scale(.92)}`,
     `.temporal-btn{opacity:.5}.temporal-btn:hover{opacity:1}`,
-    `.layout-body{display:flex;flex:1;min-height:0;overflow:hidden}`,
-    `.main-content{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}`,
     `.offline-banner{background:#fef3c7;color:#92400e;text-align:center;padding:6px;font-size:12px;flex-shrink:0}`,
   ],
 })
@@ -192,11 +242,39 @@ export class AppComponent implements OnInit, OnDestroy {
     '9': '/sessions',
   };
 
+  readonly currentUrl = signal<string>('/');
+
+  readonly breadcrumbParts = computed<{ label: string; route?: string }[]>(() => {
+    const url = this.currentUrl();
+    const labels: Record<string, string> = {
+      '/': 'Pipeline',
+      '/kanban': 'Kanban',
+      '/archive': 'Archive',
+      '/inspections': 'Inspections',
+      '/prompts': 'Prompts',
+      '/analytics': 'Analytics',
+      '/changes': 'Changes',
+      '/graph': 'Graph',
+      '/sessions': 'Sessions',
+    };
+    const base = url.split('?')[0];
+    const label = labels[base] || url;
+    const parts: { label: string; route?: string }[] = [
+      { label: 'Conduit', route: '/' },
+      { label, route: base },
+    ];
+    const planMatch = url.match(/[?&]plan=([^&]+)/);
+    if (planMatch) {
+      parts.push({ label: `#${planMatch[1]}` });
+    }
+    return parts;
+  });
+
   constructor(
     private pipeline: ConduitService,
     public theme: ThemeService,
     private errorService: GlobalErrorService,
-    private router: Router,
+    public router: Router,
     private kb: KeyboardShortcutService,
     @Inject(DOCUMENT) private doc: Document,
   ) {
@@ -205,6 +283,13 @@ export class AppComponent implements OnInit, OnDestroy {
     });
     effect(() => {
       this.globalError.set(this.errorService.lastError());
+    });
+
+    // Track router URL changes for the address bar
+    this.router.events.pipe(
+      filter(e => e instanceof NavigationEnd)
+    ).subscribe((e: NavigationEnd) => {
+      this.currentUrl.set(e.urlAfterRedirects || e.url);
     });
   }
 
@@ -233,7 +318,7 @@ export class AppComponent implements OnInit, OnDestroy {
     // Theme toggle
     this.kb.registerGlobal({
       key: 't',
-      description: 'Toggle dark/light theme',
+      description: 'Toggle theme (steel/light/dark)',
       handler: () => this.theme.toggle(),
     });
 

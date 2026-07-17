@@ -1,7 +1,8 @@
 """
 KernelEngine — the core deterministic reduce engine for the WRP kernel.
 
-Defines the KernelResult type and the 5-step reduce pipeline:
+Imports shared primitives from nexus_core and provides the conduit-specific
+KernelState composite structure and the 5-step reduce pipeline:
   1. Receipt Materialization  — insert receipts into KernelState
   2. Identity Resolution       — node_id → identity_id mapping
   3. Graph Update              — build identity-based GraphEdges
@@ -12,70 +13,24 @@ The engine is a pure function: same input → same output, no IO, no side effect
 
 Design reference: kernel-projection-answers.md §8 (engine.py)
 Plan: #1023 WRP Kernel Reduce Function (Two-Layer Architecture)
+
+# CANONICAL SOURCE
+# WRP adjacency matrix, receipt-to-state mapping: nexus_core.wrp.states
+# KernelDelta, KernelError, KernelResult: nexus_core.wrp.kernel
+# TypeScript canonical: typescript/conduit-mcp/src/receipts.ts
+#                       typescript/nebula-mcp/src/conduit-wrp-contract.ts
 """
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Set, Optional, Any, Tuple
 
-from .delta import KernelDelta
+# Shared primitives from nexus_core
+from nexus_core.wrp.kernel import KernelDelta, KernelError, KernelResult
+from nexus_core.wrp.states import WRP_ADJACENCY_MATRIX, RECEIPT_TO_WRP_STATE, is_valid_transition
+
 from .identity import IdentityEngine, Identity
 from .graph import GraphIndex, GraphEdge
 from .lineage import LineageEngine, LineageEvent
-
-
-# ── Error model ───────────────────────────────────────────────────────
-
-
-@dataclass(frozen=True)
-class KernelError:
-    """A first-class error node in the kernel lineage graph.
-
-    Errors are NOT exceptions — they are recorded semantic events
-    that become part of the causal trace.
-
-    Fields:
-        type: Error classification:
-              - INVARIANT_VIOLATION  — state machine invariant broken
-              - IDENTITY_CONFLICT    — identity resolution ambiguity
-              - GRAPH_CYCLE          — cycle detected in graph
-              - VERSION_MISMATCH     — optimistic concurrency failure
-              - INVALID_TRANSITION   — transition not in adjacency matrix
-              - VALIDATION_ERROR     — KernelDelta validation failure
-        message: Human-readable description.
-        affected_nodes: List of entity IDs touched by this error.
-        recoverable: Whether the error can be retried.
-        step: Which reduce step produced this error.
-    """
-    type: str = "INVARIANT_VIOLATION"
-    message: str = ""
-    affected_nodes: List[str] = field(default_factory=list)
-    recoverable: bool = False
-    step: str = "unknown"
-
-
-@dataclass
-class KernelResult:
-    """The result of a KernelEngine.reduce() call.
-
-    Either value or error is set, never both.
-    The lineage_event_id links this result into the causal trace.
-
-    Fields:
-        value: New KernelState if reduce succeeded.
-        error: KernelError if reduce failed.
-        lineage_event_id: ID of the lineage event for this reduce attempt.
-    """
-    value: Optional["KernelState"] = None
-    error: Optional[KernelError] = None
-    lineage_event_id: Optional[str] = None
-
-    @property
-    def is_ok(self) -> bool:
-        return self.value is not None and self.error is None
-
-    @property
-    def is_error(self) -> bool:
-        return self.error is not None
 
 
 # ── Kernel state ──────────────────────────────────────────────────────
@@ -175,51 +130,6 @@ class KernelState:
                 detail=ev.get("detail"),
             ))
         return state
-
-
-# ── The adjacency matrix ──────────────────────────────────────────────
-
-WRP_ADJACENCY_MATRIX: Dict[str, Set[str]] = {
-    "CREATED":       {"INTAKE", "FAILED"},
-    "INTAKE":        {"PLANNING", "FAILED"},
-    "PLANNING":      {"CRITIQUE", "FAILED"},
-    "CRITIQUE":      {"PLANNING", "SPECIFICATION", "FAILED"},
-    "SPECIFICATION": {"CRITIQUE", "APPROVED", "FAILED"},
-    "APPROVED":      {"SPECIFICATION", "QUEUED", "FAILED"},
-    "QUEUED":        {"EXECUTING", "FAILED"},
-    "EXECUTING":     {"COMPLETED", "FAILED"},
-    "COMPLETED":     {"ARCHIVED", "FAILED"},
-    "ARCHIVED":      set(),
-    "FAILED":        set(),
-}
-
-
-def is_valid_transition(from_state: str, to_state: str) -> bool:
-    """Check if a WRP state transition is valid per the adjacency matrix."""
-    allowed = WRP_ADJACENCY_MATRIX.get(from_state, set())
-    return to_state in allowed
-
-
-# ── The receipt → WRP state mapping ───────────────────────────────────
-
-RECEIPT_TO_WRP_STATE: Dict[str, str] = {
-    "PROPOSED": "CREATED",
-    "PLANNING": "INTAKE",
-    "PLAN_CREATE": "PLANNING",
-    "CRITIQUE": "CRITIQUE",
-    "CRITIQUE_PASS": "SPECIFICATION",
-    "CRITIQUE_REJECT": "PLANNING",
-    "IMPLEMENTATION": "EXECUTING",
-    "REVIEW": "APPROVED",
-    "REVIEW_PASS": "COMPLETED",
-    "REVIEW_REJECT": "EXECUTING",
-    "BLOCK": "FAILED",
-    "PLAN_BLOCK": "FAILED",
-    "API_LIMIT": "FAILED",
-    "REQUEUED": "QUEUED",
-    "CANCELLED": "ARCHIVED",
-    "ABANDONED": "FAILED",
-}
 
 
 # ── Kernel engine ─────────────────────────────────────────────────────

@@ -35,7 +35,7 @@ graph TB
         ENR["📎 Enrich from conduit.plans<br/><small>dependencies, files_affected</small>"]:::daemon
         MAP["🔄 Semantic Mapping<br/><small>Conduit receipt → Kernel receipt<br/>Critical BP: deterministic mapping</small>"]:::daemon
         BUILD["📦 Build KernelDelta<br/><small>delta_id, batch_id, receipts,<br/>affected_plans</small>"]:::daemon
-        POST["📤 POST /delta/<br/><small>URL: {KERNEL_API_URL}/delta/</small>"]:::daemon
+        REDUCE["📦 In-process call: KernelEngine.reduce(delta)<br/><small>python/conduit/wrp_kernel/engine.py</small>"]:::kernel
         SAVE["💾 Save Checkpoint<br/><small>response.success=True → save<br/>response.success=False → retry</small>"]:::daemon
     end
 
@@ -120,9 +120,9 @@ ABANDONED     → FAILED
     QRY -->|"receipt rows"| ENR
     ENR -->|"enriched receipts"| MAP
     MAP -->|"kernel-format receipts"| BUILD
-    BUILD -->|"KernelDelta JSON"| POST
-    POST -->|"success=true"| SAVE
-    POST -->|"KernelDelta"| STEP1
+    BUILD -->|"KernelDelta JSON"| REDUCE
+    REDUCE -->|"is_ok=true"| SAVE
+    REDUCE -->|"KernelDelta"| STEP1
 
     %% PG connections
     QRY -.->|"SELECT"| VISION
@@ -182,7 +182,7 @@ sequenceDiagram
     BD->>BD: Map each receipt to kernel format
     BD->>BD: Build KernelDelta payload
 
-    BD->>WK: POST /delta/ (KernelDelta JSON)
+    BD->>WK: KernelEngine.reduce(KernelDelta) [in-process call] (KernelDelta JSON)
     activate WK
 
     WK->>WK: Step 1: Materialize receipts
@@ -200,7 +200,7 @@ sequenceDiagram
     WK->>WK: Step 5: Commit (version++)
     WK->>KS: Persist KernelState
 
-    WK-->>BD: {success: true, version: N, plan_count, receipt_count}
+    WK-->>BD: KernelResult(value=state_v=N, plan_count, receipt_count) | KernelError
     deactivate WK
 
     BD->>BD: Save checkpoint (last_id, last_recorded_on_dt)
@@ -226,11 +226,11 @@ stateDiagram-v2
         QUERY --> [*]: No new receipts
         ENRICH --> MAP: Plan data fetched
         MAP --> BUILD: Kernel-format receipts
-        BUILD --> POST: KernelDelta ready
+        BUILD --> REDUCE: KernelDelta ready
     }
 
-    POST --> ACCEPTED: Kernel accepts (success=true)
-    POST --> RETRY: Kernel rejects (success=false)
+    REDUCE --> ACCEPTED: KernelEngine.reduce() returns is_ok
+    REDUCE --> RETRY: KernelEngine.reduce() returns KernelError
 
     ACCEPTED --> COMMIT: 5-Step Reduce
     ACCEPTED --> CHECKPOINT: Save position
@@ -312,3 +312,5 @@ FAILED        → []
 ---
 
 *Sources: `python/conduit/bridge/daemon.py`, `python/conduit/bridge/sync.py`, `python/conduit/bridge/checkpoint.py`, `python/conduit/wrp_kernel/engine.py`, `python/conduit/wrp_kernel/delta.py`, `python/conduit/wrp_kernel/identity.py`, `python/conduit/wrp_kernel/graph.py`, `python/conduit/wrp_kernel/lineage.py`.*
+
+> **Reconciliation Note:** `wrp-kernel` is an **in-process Python library** at `python/conduit/wrp_kernel/` — it is **not** an HTTP service, MCP server, or daemon on port `:3103`. The bridge daemon imports it and calls `KernelEngine.reduce(delta)` directly. Earlier revisions of this diagram framed the kernel as a standalone HTTP endpoint (`POST /delta/`) reachable via `KERNEL_API_URL`; that networking has been removed and the call is now in-process. Canonical note: `mcp_server_standalone_discrepancies` in `nexus/graph/nexus-knowledge-graph.json`.

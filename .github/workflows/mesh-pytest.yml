@@ -1,0 +1,42 @@
+name: Mesh Probe Tests
+
+# Runs the pytest suite that locks in mesh-register.py::probe_one behavior
+# (URL-suffix streaming guard, Content-Type streaming guard with canonical
+# media-type parsing, stdio-empty-heath_url branch, health_cmd branch). The
+# vendor-extension case pins the regression where a substring scan falsely
+# rejected media types containing 'text/event-stream' as a substring.
+
+on:
+  push:
+    branches: [ main, master, feature/* ]
+  pull_request:
+    branches: [ main, master, feature/* ]
+
+permissions:
+  contents: read
+
+jobs:
+  probe-tests:
+    name: "mesh-register probe tests (Python ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.13"]
+    defaults:
+      run:
+        working-directory: nexus
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      - name: Install pytest (pinned via requirements-dev.txt)
+        run: python3 -m pip install -r requirements-dev.txt
+      - name: Record resolved pytest version in the run log
+        run: python3 -m pytest --version
+      - name: Run mesh-register probe tests
+        run: make mesh-test

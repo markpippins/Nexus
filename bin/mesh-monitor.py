@@ -103,9 +103,14 @@ def invoke_register() -> int:
     own stderr stream. Exit codes 0/2/3/4 are mesh-register's documented
     values — pass through since the operator sees them via stderr.
     """
+    # Forward the parent's environment so PGPASSWORD and other DB driver
+    # vars carry through to mesh-register.py's pg_env() check. Without
+    # this, monitors launched outside an env-bearing shell exit 4 at the
+    # PGPASSWORD gate and silently fail to register.
     proc = subprocess.run(
         [sys.executable, REGISTER_PY],
         capture_output=True, text=True,
+        env=os.environ,
     )
     sys.stderr.write(proc.stderr)
     return proc.returncode

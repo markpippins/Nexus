@@ -1,5 +1,5 @@
-import crypto from "crypto";
-import http from "http";
+import crypto from "node:crypto";
+import http from "node:http";
 import { PipelineWatcher } from "./watcher";
 import { createError, createSuccess } from "./errors";
 import { validate } from "./validate";
@@ -38,8 +38,8 @@ import {
   WorkRequestStatus,
   CompilerOutput,
 } from "./runtime-kernel";
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 
 import {
   validateImplementationPlan,
@@ -165,7 +165,9 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "create_plan",
     description:
-      "Create a new pending implementation plan in the database",
+      "Create a new implementation_plan record (writes to nebula.implementation_plans). "
+      + "Issues a PLAN_CREATE receipt and bootstraps a builder ticket. "
+      + "Note: for the new pipeline flow, prefer runtime_submit_work_request instead.",
     inputSchema: {
       type: "object",
       properties: {
@@ -204,7 +206,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
   },
   {
     name: "update_plan",
-    description: "Update metadata for an existing plan",
+    description: "Update metadata for an existing implementation_plan (nebula.implementation_plans)",
     inputSchema: {
       type: "object",
       properties: {
@@ -279,7 +281,9 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "revise_plan",
     description:
-      "Create a revision copy of an existing plan in planning state. Copies title/goal/acceptance criteria but strips filesAffected (Planner will add those). Issues a PLANNING receipt on the new plan.",
+      "Create a revision copy of an existing implementation_plan in planning state. "
+      + "Copies title/goal/acceptance criteria but strips filesAffected (Planner will add those). "
+      + "Issues a PLANNING receipt on the new plan.",
     inputSchema: {
       type: "object",
       properties: {
@@ -309,7 +313,9 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "unblock_plan",
     description:
-      "Move a blocked plan back to pending: deletes all BLOCK/PLAN_BLOCK receipts, issues a PLAN_CREATE receipt, and spawns a builder ticket so the conduit can pick it up again.",
+      "Move a blocked plan back to pending: undeletes (status→pending) if archived, "
+      + "deletes all BLOCK/PLAN_BLOCK receipts, issues a PLAN_CREATE receipt, "
+      + "and spawns a builder ticket so the conduit can pick it up again.",
     inputSchema: {
       type: "object",
       properties: {
@@ -324,7 +330,8 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "delete_plan",
     description:
-      "Soft-delete a plan: marks it deleted in the database so it disappears from all views. Receipts and audit trail are preserved.",
+      "Archive an implementation_plan: sets status='archived' so it disappears from active views. "
+      + "Receipts and audit trail are preserved. Use unblock_plan to restore.",
     inputSchema: {
       type: "object",
       properties: {
@@ -339,7 +346,9 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "hard_delete_plan",
     description:
-      "Permanently delete a plan and ALL associated tickets and receipts from the database. Irreversible — use only for stuck plans that cannot be recovered via unblock_plan or delete_plan. Requires confirmPlanTitle to match the plan's actual title as a safety guard.",
+      "Permanently delete an implementation_plan and ALL associated tickets and receipts from the database. "
+      + "Irreversible — use only for stuck plans that cannot be recovered via unblock_plan or delete_plan. "
+      + "Requires confirmPlanTitle to match the plan's actual title as a safety guard.",
     inputSchema: {
       type: "object",
       properties: {
@@ -1938,6 +1947,7 @@ export function registerToolHandlers(
         dco_json: JSON.stringify(args),
         context: { intent: args.intent, constraints: args.constraints, opTrace: args.opTrace },
         status: "draft",
+        title: args.intent?.objective || "",
       });
       await appendEvent(event.wrId, event.type, event.payload as Record<string, unknown>);
       const rawEvents = await getEvents(event.wrId);

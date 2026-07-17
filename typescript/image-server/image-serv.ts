@@ -76,6 +76,21 @@ const MIME_TYPES: Record<string, string> = {
   '.webp': 'image/webp',
 };
 
+// --- Case-insensitive file lookup ---
+
+// Fallback: when exact fs.access() fails on case-sensitive filesystems,
+// read the directory and find a case-insensitive filename match.
+const findCaseInsensitiveFile = async (dir: string, baseName: string): Promise<string | null> => {
+  try {
+    const entries = await fs.readdir(dir);
+    const lowerTarget = baseName.toLowerCase();
+    const match = entries.find(entry => entry.toLowerCase() === lowerTarget);
+    return match ? path.join(dir, match) : null;
+  } catch {
+    return null;
+  }
+};
+
 // --- Server Logic ---
 
 // Helper to serve a static file if it exists
@@ -105,6 +120,23 @@ const serveStaticFile = async (baseName: string, res: http.ServerResponse, searc
         return true; // File found and served
       } catch (error) {
         logger.debug(`File not found or inaccessible: ${baseName}`, { baseName, filePath, location, error: (error as Error).message });
+
+        // Case-insensitive fallback for case-sensitive filesystems
+        const ciPath = await findCaseInsensitiveFile(location, baseName);
+        if (ciPath) {
+          const fileContent = await fs.readFile(ciPath);
+          const ext = path.extname(ciPath).toLowerCase();
+          const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+          res.writeHead(200, {
+            'Content-Type': contentType,
+            'Content-Length': fileContent.length,
+            'Cache-Control': 'public, max-age=3600'
+          });
+          res.end(fileContent);
+          logger.info(`File served successfully (case-insensitive): ${baseName} -> ${path.basename(ciPath)}`, { baseName, filePath: ciPath, location });
+          return true;
+        }
+
         // Continue to try next location
       }
     }
@@ -130,6 +162,22 @@ const serveStaticFile = async (baseName: string, res: http.ServerResponse, searc
           return true; // File found and served
         } catch (error) {
           logger.debug(`File not found or inaccessible: ${fileName}`, { fileName, filePath, location, ext, error: (error as Error).message });
+
+          // Case-insensitive fallback for case-sensitive filesystems
+          const ciPath = await findCaseInsensitiveFile(location, fileName);
+          if (ciPath) {
+            const fileContent = await fs.readFile(ciPath);
+            const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+            res.writeHead(200, {
+              'Content-Type': contentType,
+              'Content-Length': fileContent.length,
+              'Cache-Control': 'public, max-age=3600'
+            });
+            res.end(fileContent);
+            logger.info(`File served successfully (case-insensitive): ${fileName} -> ${path.basename(ciPath)}`, { fileName, filePath: ciPath, location, ext });
+            return true;
+          }
+
           // Continue to try next extension/location
         }
       }
@@ -232,7 +280,7 @@ const server = http.createServer(async (req, res) => {
         const name = decodeURIComponent(params[0] || '');
         logger.info('Searching name folder', { requestedName: name });
         const lowerCaseName = name.toLowerCase();
-        fileServed = await serveStaticFile(lowerCaseName, res);
+        fileServed = await serveStaticFile(lowerCaseName, res, FOLDER_LOCATIONS);
       } else if (endpoint === 'ext') {
         const ext = decodeURIComponent(params[0] || '');
         logger.info('Searching ext folder', { requestedExtension: ext });

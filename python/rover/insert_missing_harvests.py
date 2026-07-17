@@ -21,6 +21,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from event_emitter import emit_harvest_captured
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -120,6 +122,7 @@ def insert_harvest(
     source_text: str | None,
     tags: list[str],
     metadata: dict,
+    file_size: int | None = None,
 ) -> dict | None:
     """Insert a harvest record via docker exec psql (stdin pipe)."""
 
@@ -130,10 +133,13 @@ def insert_harvest(
     tag_literals = ", ".join(sql_escape(t) for t in tags)
     tags_array = f"ARRAY[{tag_literals}]" if tag_literals else "'{}'"
 
+    file_size_col = "file_size,"
+    file_size_val = f"{file_size}," if file_size is not None else "NULL,"
+
     sql = f"""
     INSERT INTO nebula.harvests
         (source_path, source_filename, model, total_candidates,
-         candidates, source_text, tags, metadata)
+         candidates, source_text, tags, metadata, {file_size_col.rstrip(',')})
     VALUES
         ({sql_escape(source_path)},
          {sql_escape(source_filename)},
@@ -142,7 +148,8 @@ def insert_harvest(
          $${candidates_json}$$::jsonb,
          {sql_escape(source_text_val)}::text,
          {tags_array}::text[],
-         $${metadata_json}$$::jsonb)
+         $${metadata_json}$$::jsonb,
+         {file_size_val.rstrip(',')})
     RETURNING id, source_filename, total_candidates, created_at;
     """
 
@@ -278,6 +285,15 @@ def process_one(slug: str) -> bool:
         "has_source_text": has_source_text,
     }
 
+    # Compute file_size from source file on disk
+    file_size = None
+    if source_path:
+        full_path = Path("/home/codex/dev") / source_path
+        try:
+            file_size = full_path.stat().st_size
+        except OSError:
+            pass
+
     result = insert_harvest(
         source_path=source_path,
         source_filename=source_filename,
@@ -287,6 +303,7 @@ def process_one(slug: str) -> bool:
         source_text=harvested_md if has_source_text else None,
         tags=tags,
         metadata=metadata,
+        file_size=file_size,
     )
 
     if result:
@@ -298,6 +315,18 @@ def process_one(slug: str) -> bool:
             model,
             "yes" if has_source_text else "no",
         )
+
+        # Cascade event: harvest.captured
+        try:
+            emit_harvest_captured(
+                harvest_id=result["id"],
+                source_file=result["filename"],
+                total_candidates=result["candidates"],
+                source="rover.insert_missing_harvests",
+            )
+        except Exception as e:
+            log.warning("  harvest.captured emission failed: %s", e)
+
         return True
     else:
         log.error("  ❌ INSERT failed")

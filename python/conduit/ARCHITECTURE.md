@@ -277,7 +277,7 @@ DB-only mode.
 
 ### 3.6 Shared Database
 
-A single PostgreSQL database at `localhost:5433/nexus` with schema `conduit`
+A single PostgreSQL database at `localhost:5432/nexus` with schema `conduit`
 shared by both `conduit` (Python via `psycopg2`) and `conduit-mcp`
 (TypeScript via `pg`).
 
@@ -545,7 +545,7 @@ cp .env.example .env          # in nexus/typescript/conduit-mcp/
 
 | Variable                        | Default                                                    | Purpose                                |
 |--------------------------------|------------------------------------------------------------|----------------------------------------|
-| `CONDUIT_PG_DSN`              | `host=localhost port=5433 user=pguser password=pgpass dbname=nexus`  | PostgreSQL connection string (required) |
+| `CONDUIT_PG_DSN`              | `host=localhost port=5432 user=pguser password=pgpass dbname=nexus`  | PostgreSQL connection string (required) |
 | `CONDUIT_PG_SCHEMA`           | `conduit`                                                             | PostgreSQL schema name                 |
 | `CONDUIT_DATA_DIR`            | `/home/codex/dev/nexus/.conduit-data`                                | Conduit data directory (logs, artifacts)|
 | `PIPELINE_LOCK_PATH`          | `/tmp/pipeline-manager.lock`                               | Lock file (prevents concurrent runs)   |

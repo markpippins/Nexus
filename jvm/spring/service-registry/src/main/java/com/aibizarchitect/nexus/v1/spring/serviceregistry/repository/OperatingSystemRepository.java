@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface OperatingSystemRepository extends JpaRepository<OperatingSystem, Long> {
     Optional<OperatingSystem> findByName(String name);
 
+    Optional<OperatingSystem> findByNameIgnoreCase(String name);
+
     List<OperatingSystem> findByNameContainingIgnoreCase(String name);
 
     org.springframework.data.domain.Page<OperatingSystem> findByNameContainingIgnoreCase(String name, org.springframework.data.domain.Pageable pageable);

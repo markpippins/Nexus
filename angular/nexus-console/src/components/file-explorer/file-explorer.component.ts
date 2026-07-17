@@ -89,6 +89,8 @@ export class FileExplorerComponent implements OnDestroy {
   addServiceRegistry = output<void>();
   addGateway = output<void>();
   editLocalConfig = output<void>();
+  /** Emits whether the directory currently displayed by this pane is magnetized. */
+  currentFolderMagnet = output<boolean>();
 
   state = signal<FileSystemState>({ status: 'loading', items: [] });
   status = signal<{
@@ -188,25 +190,24 @@ export class FileExplorerComponent implements OnDestroy {
 
     const rootName = p[0];
 
-    // For Gateways/ServerName/..., slice off both Gateways and ServerName
-    if (rootName === 'Gateways' && p.length > 1) {
-      return p.slice(2);
-    }
-
     // For File Systems/Local Session/..., slice off both File Systems and Local Session
     if (rootName === 'File Systems' && p.length > 1) {
       return p.slice(2);
     }
 
-    // For Service Registries/ProfileName/..., slice off both Service Registries and ProfileName
-    if (rootName === 'Service Registries' && p.length > 1) {
-      return p.slice(2);
+    // Gateways and Service Registries now live nested under Platform Management.
+    // For ['Platform Management', 'Gateways', <brokerName>, ...] (or 'Service Registries'),
+    // strip both container levels so the per-profile remoteProvider receives only the inner path.
+    if (rootName === 'Platform Management' && p.length > 2 && (p[1] === 'Gateways' || p[1] === 'Service Registries')) {
+      return p.slice(3);
     }
 
-    // Virtual organization folders that need their path passed to homeProvider
-    const virtualFolders = ['File Systems', 'Gateways', 'Service Registries', 'Platform Management', 'Users', 'Services'];
+    // Virtual organization folders that need their path passed to homeProvider.
+    // 'Gateways' and 'Service Registries' are no longer top-level — they're virtual
+    // children of Platform Management, captured by the branch above.
+    const virtualFolders = ['File Systems', 'Platform Management', 'Users', 'Services'];
     if (virtualFolders.includes(rootName)) {
-      return p; // homeProvider needs to see the full path like ['Platform Management'] or ['Gateways']
+      return p; // homeProvider needs to see the full path like ['Platform Management']
     }
 
     // For other nodes, slice off just the root name
@@ -216,13 +217,13 @@ export class FileExplorerComponent implements OnDestroy {
   // Check if we're currently viewing the Service Registries folder (for context menu)
   isInServiceRegistriesFolder = computed(() => {
     const p = this.path();
-    return p.length === 1 && p[0] === 'Service Registries';
+    return p.length === 2 && p[0] === 'Platform Management' && p[1] === 'Service Registries';
   });
 
   // Check if we're currently viewing the Gateways folder (for context menu)
   isInGatewaysFolder = computed(() => {
     const p = this.path();
-    return p.length === 1 && p[0] === 'Gateways';
+    return p.length === 2 && p[0] === 'Platform Management' && p[1] === 'Gateways';
   });
 
   // Check if we're at a system mount folder under File Systems (gateway profile level)
@@ -353,18 +354,36 @@ export class FileExplorerComponent implements OnDestroy {
   }
 
   private async _loadContents(): Promise<void> {
+    const requestedPath = this.providerPath();
     this.state.set({ status: 'loading', items: [] });
     this.readmeContent.set(null); // Clear readme on navigation
     this.isReadmeLoading.set(false);
     try {
-      const items = await this.fileSystemProvider().getContents(this.providerPath());
+      const items = await this.fileSystemProvider().getContents(requestedPath);
+
+      // Ignore the result if the user navigated away while we were loading.
+      if (JSON.stringify(this.providerPath()) !== JSON.stringify(requestedPath)) return;
+
       this.state.set({ status: 'success', items: items });
+
+      // Determine whether the directory we just entered is itself magnetized.
+      // RemoteFileSystemService.getContents only flags *child* folders via hasFile,
+      // so we must explicitly check the CURRENT folder here to surface its magnet
+      // status in the footer.
+      try {
+        const isMagnet = await this.fileSystemProvider().hasFile(requestedPath, '.magnet');
+        if (JSON.stringify(this.providerPath()) === JSON.stringify(requestedPath)) {
+          this.currentFolderMagnet.emit(isMagnet);
+        }
+      } catch {
+        this.currentFolderMagnet.emit(false);
+      }
 
       // Check for README.md
       const readmeFile = items.find(item => item.name.toLowerCase() === 'readme.md' && item.type === 'file');
       if (readmeFile) {
         this.isReadmeLoading.set(true);
-        this.fileSystemProvider().getFileContent(this.providerPath(), readmeFile.name)
+        this.fileSystemProvider().getFileContent(requestedPath, readmeFile.name)
           .then(content => {
             this.readmeContent.set(content);
           })

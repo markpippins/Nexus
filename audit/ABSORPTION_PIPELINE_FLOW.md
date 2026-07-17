@@ -1,5 +1,12 @@
 # Absorption & Ingestion Pipeline Flow
 
+> **DEPRECATED (2026-07-12):** This document describes `python/absorb/html/`,
+> which has been superseded by `python/rover/`. The active harvest pipeline
+> uses Dockling for HTML transcript ingestion, LLM-based candidate extraction,
+> and promotion to intent_records. See `python/rover/` for the current
+> implementation. The absorb directory is retained for reference but is not
+> called by any active service.
+
 > **Version:** 0.1 (2026-06-28)
 > **Scope:** `nexus/python/absorb/html/` — Document ingestion, chat transcript parsing, semantic graph construction, and deterministic kernel execution.
 > **Entrypoint:** `main.py` via `python3 main.py <path> [--mode messages|graph] [--json]`

@@ -1,15 +1,15 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { ServiceInstance, Framework, Deployment, Library, ServiceLibrary } from '../models/service-mesh.model.js';
+import { ServiceInstance, Framework, Deployment, Library } from '../models/service-mesh.model.js';
 import { ComponentConfig } from '../models/component-config.js';
 import { PagedResponse } from '../models/paged-response.model.js';
 
-export interface Host {
+export interface Server {
     id: number;
     hostname: string;
     ipAddress: string;
-    hostTypeId: number;
+    serverTypeId: number;
     environmentTypeId: number;
     operatingSystemId: number;
     cpuCores?: number;
@@ -34,6 +34,7 @@ export interface ServicePayload {
     status?: string;
     componentOverrideId?: number;
     parentServiceId?: number;
+    systemId?: string;
 }
 
 export interface FrameworkPayload {
@@ -50,7 +51,7 @@ export interface FrameworkPayload {
 export interface DeploymentPayload {
     serviceId: number;
     environmentId: number;
-    hostId: number;
+    serverId: number;
     version?: string;
     status?: string;
     port?: number;
@@ -71,15 +72,18 @@ export interface LibraryPayload {
     license?: string;
 }
 
-export interface ServiceLibraryPayload {
-    serviceId: number;
-    libraryId: number;
-    version: string;
-    versionConstraint?: string;
-    scope?: string;
-    isDirect?: boolean;
-    isDevDependency?: boolean;
-    notes?: string;
+export interface SystemItem {
+    id: number;
+    name: string;
+    description?: string;
+    type?: string;
+    serviceCount?: number;
+}
+
+export interface SystemPayload {
+    name: string;
+    description?: string;
+    type?: string;
 }
 
 @Injectable({
@@ -93,13 +97,12 @@ export class PlatformManagementService {
     error = signal<string | null>(null);
 
     // Services CRUD
-    async getServices(baseUrl: string): Promise<ServiceInstance[]> {
+    async getServices(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<ServiceInstance>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/services`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<ServiceInstance>>(url));
-            return response.data;
+            const url = `${baseUrl}/api/v1/services?page=${page}&size=${size}`;
+            return await firstValueFrom(this.http.get<PagedResponse<ServiceInstance>>(url));
         } catch (e) {
             this.error.set('Failed to fetch services');
             throw e;
@@ -151,13 +154,12 @@ export class PlatformManagementService {
     }
 
     // Frameworks CRUD
-    async getFrameworks(baseUrl: string): Promise<Framework[]> {
+    async getFrameworks(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<Framework>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/frameworks`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<Framework>>(url));
-            return response.data;
+            const url = `${baseUrl}/api/v1/frameworks?page=${page}&size=${size}`;
+            return await firstValueFrom(this.http.get<PagedResponse<Framework>>(url));
         } catch (e) {
             this.error.set('Failed to fetch frameworks');
             throw e;
@@ -209,13 +211,12 @@ export class PlatformManagementService {
     }
 
     // Deployments CRUD
-    async getDeployments(baseUrl: string): Promise<Deployment[]> {
+    async getDeployments(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<Deployment>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/deployments`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<Deployment>>(url));
-            return response.data;
+            const url = `${baseUrl}/api/v1/deployments?page=${page}&size=${size}`;
+            return await firstValueFrom(this.http.get<PagedResponse<Deployment>>(url));
         } catch (e) {
             this.error.set('Failed to fetch deployments');
             throw e;
@@ -266,58 +267,57 @@ export class PlatformManagementService {
         }
     }
 
-    // Servers/Hosts CRUD
-    async getHosts(baseUrl: string): Promise<Host[]> {
+    // Servers CRUD
+    async getServers(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<Server>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/hosts`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<Host>>(url));
-            return response.data;
+            const url = `${baseUrl}/api/v1/servers?page=${page}&size=${size}`;
+            return await firstValueFrom(this.http.get<PagedResponse<Server>>(url));
         } catch (e) {
-            this.error.set('Failed to fetch hosts');
+            this.error.set('Failed to fetch servers');
             throw e;
         } finally {
             this.loading.set(false);
         }
     }
 
-    async createHost(baseUrl: string, host: Partial<Host>): Promise<Host> {
+    async createServer(baseUrl: string, server: Partial<Server>): Promise<Server> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/hosts`;
-            return await firstValueFrom(this.http.post<Host>(url, host));
+            const url = `${baseUrl}/api/v1/servers`;
+            return await firstValueFrom(this.http.post<Server>(url, server));
         } catch (e) {
-            this.error.set('Failed to create host');
+            this.error.set('Failed to create server');
             throw e;
         } finally {
             this.loading.set(false);
         }
     }
 
-    async updateHost(baseUrl: string, id: number, host: Partial<Host>): Promise<Host> {
+    async updateServer(baseUrl: string, id: number, server: Partial<Server>): Promise<Server> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/hosts/${id}`;
-            return await firstValueFrom(this.http.put<Host>(url, host));
+            const url = `${baseUrl}/api/v1/servers/${id}`;
+            return await firstValueFrom(this.http.put<Server>(url, server));
         } catch (e) {
-            this.error.set('Failed to update host');
+            this.error.set('Failed to update server');
             throw e;
         } finally {
             this.loading.set(false);
         }
     }
 
-    async deleteHost(baseUrl: string, id: number): Promise<void> {
+    async deleteServer(baseUrl: string, id: number): Promise<void> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/hosts/${id}`;
+            const url = `${baseUrl}/api/v1/servers/${id}`;
             await firstValueFrom(this.http.delete<void>(url));
         } catch (e) {
-            this.error.set('Failed to delete host');
+            this.error.set('Failed to delete server');
             throw e;
         } finally {
             this.loading.set(false);
@@ -325,12 +325,11 @@ export class PlatformManagementService {
     }
 
     // Lookup
-    async getLookup(baseUrl: string, type: string): Promise<LookupItem[]> {
+    async getLookup(baseUrl: string, type: string, page: number = 0, size: number = 100): Promise<PagedResponse<LookupItem>> {
         const endpoint = this.getLookupEndpoint(type);
         try {
-            const url = `${baseUrl}/api/v1/${endpoint}`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<LookupItem>>(url));
-            return response.data;
+            const url = `${baseUrl}/api/v1/${endpoint}?page=${page}&size=${size}`;
+            return await firstValueFrom(this.http.get<PagedResponse<LookupItem>>(url));
         } catch (e) {
             console.error(`Failed to fetch lookup ${type}`, e);
             throw e;
@@ -386,10 +385,13 @@ export class PlatformManagementService {
     private getLookupEndpoint(type: string): string {
         switch (type) {
             case 'service-types': return 'service-types';
-            case 'server-types': return 'host-types';
+            case 'server-types': return 'server-types';
             case 'framework-categories': return 'framework-categories';
+            case 'framework-types': return 'framework-categories';
             case 'framework-languages': return 'framework-languages';
             case 'library-categories': return 'library-categories';
+            case 'library-types': return 'library-categories';
+            case 'system-types': return 'registry/systems/types';
             case 'operating-systems': return 'operating-systems';
             case 'environments': return 'environments';
             default: return type;
@@ -397,13 +399,12 @@ export class PlatformManagementService {
     }
 
     // Libraries CRUD
-    async getLibraries(baseUrl: string): Promise<Library[]> {
+    async getLibraries(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<Library>> {
         this.loading.set(true);
         this.error.set(null);
         try {
-            const url = `${baseUrl}/api/v1/libraries`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<Library>>(url));
-            return response.data;
+            const url = `${baseUrl}/api/v1/libraries?page=${page}&size=${size}`;
+            return await firstValueFrom(this.http.get<PagedResponse<Library>>(url));
         } catch (e) {
             this.error.set('Failed to fetch libraries');
             throw e;
@@ -464,68 +465,14 @@ export class PlatformManagementService {
         }
     }
 
-    // Service Libraries (Dependencies) CRUD
-    async getServiceLibraries(baseUrl: string, serviceId: number): Promise<ServiceLibrary[]> {
-        try {
-            const url = `${baseUrl}/api/v1/service-libraries/service/${serviceId}`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<ServiceLibrary>>(url));
-            return response.data;
-        } catch (e) {
-            this.error.set('Failed to fetch service libraries');
-            throw e;
-        }
-    }
-
-    async addServiceLibrary(baseUrl: string, payload: ServiceLibraryPayload): Promise<ServiceLibrary> {
-        this.loading.set(true);
-        this.error.set(null);
-        try {
-            const url = `${baseUrl}/api/v1/service-libraries`;
-            return await firstValueFrom(this.http.post<ServiceLibrary>(url, payload));
-        } catch (e) {
-            this.error.set('Failed to add library to service');
-            throw e;
-        } finally {
-            this.loading.set(false);
-        }
-    }
-
-    async updateServiceLibrary(baseUrl: string, id: number, payload: ServiceLibraryPayload): Promise<ServiceLibrary> {
-        this.loading.set(true);
-        this.error.set(null);
-        try {
-            const url = `${baseUrl}/api/v1/service-libraries/${id}`;
-            return await firstValueFrom(this.http.put<ServiceLibrary>(url, payload));
-        } catch (e) {
-            this.error.set('Failed to update service library');
-            throw e;
-        } finally {
-            this.loading.set(false);
-        }
-    }
-
-    async removeServiceLibrary(baseUrl: string, id: number): Promise<void> {
-        this.loading.set(true);
-        this.error.set(null);
-        try {
-            const url = `${baseUrl}/api/v1/service-libraries/${id}`;
-            await firstValueFrom(this.http.delete<void>(url));
-        } catch (e) {
-            this.error.set('Failed to remove library from service');
-            throw e;
-        } finally {
-            this.loading.set(false);
-        }
-    }
     // Visual Components CRUD
-    async getVisualComponents(baseUrl: string): Promise<ComponentConfig[]> {
+    async getVisualComponents(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<ComponentConfig>> {
         try {
-            const url = `${baseUrl}/api/v1/visual-components`;
-            const response = await firstValueFrom(this.http.get<PagedResponse<ComponentConfig>>(url));
-            return response.data;
+            const url = `${baseUrl}/api/v1/visual-components?page=${page}&size=${size}`;
+            return await firstValueFrom(this.http.get<PagedResponse<ComponentConfig>>(url));
         } catch (e) {
             console.error('Failed to fetch visual components', e);
-            return [];
+            return { data: [], meta: { page: 0, per_page: 100, total: 0, last_page: 0 } };
         }
     }
 
@@ -549,6 +496,59 @@ export class PlatformManagementService {
         }
     }
 
+    // Systems CRUD
+    async getSystems(baseUrl: string, page: number = 0, size: number = 100): Promise<PagedResponse<SystemItem>> {
+        this.loading.set(true);
+        this.error.set(null);
+        try {
+            const url = `${baseUrl}/api/v1/registry/systems?page=${page}&size=${size}`;
+            return await firstValueFrom(this.http.get<PagedResponse<SystemItem>>(url));
+        } catch (e) {
+            this.error.set('Failed to fetch systems');
+            throw e;
+        } finally {
+            this.loading.set(false);
+        }
+    }
+
+    async createSystem(baseUrl: string, system: SystemPayload): Promise<SystemItem> {
+        this.loading.set(true);
+        this.error.set(null);
+        try {
+            const url = `${baseUrl}/api/v1/registry/systems`;
+            return await firstValueFrom(this.http.post<SystemItem>(url, system));
+        } catch (e) {
+            this.error.set('Failed to create system');
+            throw e;
+        } finally {
+            this.loading.set(false);
+        }
+    }
+
+    async deleteSystem(baseUrl: string, id: number): Promise<void> {
+        this.loading.set(true);
+        this.error.set(null);
+        try {
+            const url = `${baseUrl}/api/v1/registry/systems/${id}`;
+            await firstValueFrom(this.http.delete<void>(url));
+        } catch (e) {
+            this.error.set('Failed to delete system');
+            throw e;
+        } finally {
+            this.loading.set(false);
+        }
+    }
+
+    async associateServiceWithSystem(baseUrl: string, systemName: string, serviceName: string): Promise<void> {
+        try {
+            const url = `${baseUrl}/api/v1/registry/systems/${encodeURIComponent(systemName)}/services/${encodeURIComponent(serviceName)}`;
+            await firstValueFrom(this.http.post(url, null));
+        } catch (e) {
+            console.warn('Failed to associate service with system', e);
+            throw e;
+        }
+    }
+
     async deleteVisualComponent(baseUrl: string, id: string): Promise<void> {
         this.loading.set(true);
         try {
@@ -560,6 +560,81 @@ export class PlatformManagementService {
     }
 }
 
+/** Canonical lookup endpoint string constants — single source of truth. */
+export const LOOKUP_SERVICE_TYPES = 'service-types';
+export const LOOKUP_SERVER_TYPES = 'server-types';
+export const LOOKUP_FRAMEWORK_CATEGORIES = 'framework-categories';
+export const LOOKUP_FRAMEWORK_LANGUAGES = 'framework-languages';
+export const LOOKUP_LIBRARY_CATEGORIES = 'library-categories';
+export const LOOKUP_ENVIRONMENTS = 'environments';
+export const LOOKUP_OPERATING_SYSTEMS = 'operating-systems';
+
+/**
+ * Map of DB discriminator values → endpoint type strings used for API routing.
+ */
+export const TYPE_ENDPOINT_MAP: Record<string, string> = {
+    framework_type: 'framework-categories',
+    server_type: 'server-types',
+    library_type: 'library-categories',
+    environment_type: 'environments',
+    service_type: 'service-types',
+    service_config_type: 'service-config-types',
+    system_type: 'system-types',
+    operating_systems: 'operating-systems',
+};
+
+/**
+ * Human-readable labels for each type discriminator.
+ */
+export const TYPE_LABELS: Record<string, string> = {
+    all: 'All',
+    framework_type: 'Framework',
+    server_type: 'Server',
+    library_type: 'Library',
+    environment_type: 'Environment',
+    service_type: 'Service',
+    service_config_type: 'Config',
+    system_type: 'System',
+    operating_systems: 'OS',
+};
+
+/**
+ * Display ordering for category types.
+ */
+export const TYPE_ORDER = ['framework_type', 'server_type', 'library_type', 'environment_type', 'service_type', 'service_config_type', 'system_type', 'operating_systems'];
+
+/** Ordered list of types for the filter toolbar (excludes service_config_type). */
+export const FILTER_TYPES = [
+    'all',
+    'framework_type',
+    'server_type',
+    'library_type',
+    'environment_type',
+    'service_type',
+    'system_type',
+    'operating_systems',
+];
+
+/**
+ * Map a category discriminator (e.g. 'framework_type') to its icon name for tree display.
+ */
+export const CATEGORY_ICONS: Record<string, string> = {
+    framework_type: 'category',
+    server_type: 'storage',
+    library_type: 'local_library',
+    environment_type: 'environment',
+    service_type: 'dns',
+    system_type: 'dns',
+    operating_systems: 'os',
+};
+
+/**
+ * Map a category discriminator (e.g. 'framework_type') to its API endpoint string.
+ */
+export function getCategoryEndpointType(dbType: string): string {
+    return TYPE_ENDPOINT_MAP[dbType] || dbType;
+}
+
 export interface LookupItem {
     id: number;
     name: string;
@@ -569,5 +644,10 @@ export interface LookupItem {
     activeFlag?: boolean;
     defaultComponentId?: number | null;
     defaultComponent?: ComponentConfig;
+    /** Discriminator from the registry.categories view (e.g. 'framework_type', 'server_type'). */
+    type?: string;
+    /** Architecture field (operating_systems). */
+    architecture?: string;
+    /** Family field (operating_systems). */
+    family?: string;
 }
-

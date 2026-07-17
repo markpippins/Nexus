@@ -18,6 +18,13 @@
 --    • backfill_docklang.py (UPDATE SET docklang → SCD4 insert)
 --    • POST /api/harvests (INSERT without docklang → no-op)
 --
+--  ⚠ DEPENDENCY: Migration 026 adds a trigger-level FK guard that
+--  checks conversation_id EXISTS in nebula.harvests (the VIEW).
+--  This auto-segment trigger's INSERT into conversation_blocks must
+--  succeed because the INSTEAD OF INSERT trigger on harvests sets
+--  as_of_dt = NOW(), and NOW() is consistent throughout the transaction.
+--  If as_of_dt is ever changed, this trigger's inserts will be rejected.
+--
 --  Usage:
 --    psql -h localhost -U pguser -d nexus -f 004-auto-segment-trigger.sql
 -- ═══════════════════════════════════════════════════════════════════════
@@ -32,20 +39,32 @@ CREATE OR REPLACE FUNCTION nebula.harvests_insert_trigger()
 RETURNS TRIGGER AS $$
 DECLARE
     new_id UUID;
+    next_ver INTEGER;
 BEGIN
     new_id := COALESCE(NEW.id, gen_random_uuid());
 
+    SELECT COALESCE(MAX(h.version), 0) + 1 INTO next_ver
+      FROM nebula.harvests_history h
+     WHERE h.source_path = NEW.source_path
+       AND h.model = NEW.model
+       AND h.recorded_until_dt = '9999-12-31 23:59:59+00';
+
     INSERT INTO nebula.harvests_history
         (id, source_path, source_filename, model, total_candidates,
-         candidates, source_text, tags, metadata, docklang, created_at,
-         level, visibility_scope,
+         candidates, source_text, tags, metadata, created_at,
+         level, visibility_scope, docklang,
+         source_hash, file_size, version, run_metadata,
          recorded_on_dt, recorded_until_dt, valid_from, valid_until)
     VALUES
         (new_id, NEW.source_path, NEW.source_filename, NEW.model,
          NEW.total_candidates, NEW.candidates, NEW.source_text,
-         NEW.tags, NEW.metadata, NEW.docklang,
-         COALESCE(NEW.created_at, NOW()),
+         NEW.tags, NEW.metadata, COALESCE(NEW.created_at, NOW()),
          COALESCE(NEW.level, 1), COALESCE(NEW.visibility_scope, 'all'),
+         NEW.docklang,
+         COALESCE(NEW.source_hash, MD5(COALESCE(NEW.source_path, '') || COALESCE(NEW.model, ''))),
+         NEW.file_size,
+         COALESCE(NEW.version, next_ver),
+         COALESCE(NEW.run_metadata, '{}'::JSONB),
          NOW(), '9999-12-31 23:59:59+00',
          COALESCE(NEW.valid_from, NOW()), COALESCE(NEW.valid_until, '9999-12-31 23:59:59+00'));
 
@@ -53,6 +72,9 @@ BEGIN
     NEW.created_at := COALESCE(NEW.created_at, NOW());
     NEW.level := COALESCE(NEW.level, 1);
     NEW.visibility_scope := COALESCE(NEW.visibility_scope, 'all');
+    NEW.source_hash := COALESCE(NEW.source_hash, MD5(COALESCE(NEW.source_path, '') || COALESCE(NEW.model, '')));
+    NEW.version := COALESCE(NEW.version, next_ver);
+    NEW.run_metadata := COALESCE(NEW.run_metadata, '{}'::JSONB);
     NEW.recorded_on_dt := NOW();
     NEW.recorded_until_dt := '9999-12-31 23:59:59+00';
     NEW.valid_from := COALESCE(NEW.valid_from, NOW());
@@ -77,19 +99,26 @@ BEGIN
 
     INSERT INTO nebula.harvests_history
         (id, source_path, source_filename, model, total_candidates,
-         candidates, source_text, tags, metadata, docklang, created_at,
-         level, visibility_scope,
+         candidates, source_text, tags, metadata, created_at,
+         level, visibility_scope, docklang,
+         source_hash, file_size, version, run_metadata,
          recorded_on_dt, recorded_until_dt, valid_from, valid_until)
     VALUES
         (OLD.id, NEW.source_path, NEW.source_filename, NEW.model,
          NEW.total_candidates, NEW.candidates, NEW.source_text,
-         NEW.tags, NEW.metadata, NEW.docklang, OLD.created_at,
+         NEW.tags, NEW.metadata, OLD.created_at,
          COALESCE(NEW.level, 1), COALESCE(NEW.visibility_scope, 'all'),
+         NEW.docklang,
+         COALESCE(NEW.source_hash, OLD.source_hash),
+         COALESCE(NEW.file_size, OLD.file_size),
+         COALESCE(NEW.version, OLD.version),
+         COALESCE(NEW.run_metadata, OLD.run_metadata),
          NOW(), '9999-12-31 23:59:59+00',
          OLD.valid_from, OLD.valid_until)
     RETURNING id, source_path, source_filename, model, total_candidates,
-              candidates, source_text, tags, metadata, docklang, created_at,
-              level, visibility_scope,
+              candidates, source_text, tags, metadata, created_at,
+              level, visibility_scope, docklang,
+              source_hash, file_size, version, run_metadata,
               recorded_on_dt, recorded_until_dt, valid_from, valid_until INTO r;
 
     RETURN r;
@@ -116,6 +145,8 @@ DECLARE
     block_index    INTEGER := 0;
     total_blocks   INTEGER;
     source_hash    TEXT;
+    block_content  TEXT;
+    block_hash     TEXT;
 BEGIN
     -- ── Idempotency: skip if snapshot already exists ──────────────
     IF EXISTS (SELECT 1 FROM nebula.conversation_snapshots
@@ -150,6 +181,23 @@ BEGIN
         FOR block_elem IN
             SELECT * FROM jsonb_array_elements(unit_elem -> 'blocks')
         LOOP
+            -- Resolve content: prefer explicit content, fall back to
+            -- formatting list items (dockling stores lists under 'items' key)
+            IF block_elem #>> '{content}' IS NOT NULL AND block_elem #>> '{content}' != '' THEN
+                block_content := block_elem #>> '{content}';
+            ELSIF block_elem ? 'items' AND jsonb_array_length(block_elem -> 'items') > 0 THEN
+                SELECT string_agg('- ' || item, CHR(10))
+                INTO   block_content
+                FROM   jsonb_array_elements_text(block_elem -> 'items') AS item;
+            ELSE
+                block_content := '';
+            END IF;
+
+            block_hash := substring(
+                encode(sha256(convert_to(COALESCE(block_content, ''), 'UTF8')), 'hex'),
+                1, 16
+            );
+
             INSERT INTO nebula.conversation_blocks
                 (conversation_id, snapshot_id, block_index, parent_turn_id,
                  block_type, content_md, content_hash)
@@ -159,13 +207,8 @@ BEGIN
                 block_index,
                 unit_elem #>> '{heading}',
                 COALESCE(block_elem #>> '{type}', 'paragraph'),
-                COALESCE(block_elem #>> '{content}', ''),
-                substring(
-                    encode(sha256(
-                        convert_to(COALESCE(block_elem #>> '{content}', ''), 'UTF8')
-                    ), 'hex'),
-                    1, 16
-                )
+                block_content,
+                block_hash
             );
             block_index := block_index + 1;
         END LOOP;

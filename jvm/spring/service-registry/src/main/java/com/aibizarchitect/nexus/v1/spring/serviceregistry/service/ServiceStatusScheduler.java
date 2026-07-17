@@ -9,7 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * Scheduled tasks for maintaining service status and Redis health.
+ * Scheduled tasks for maintaining service status, Redis health, and SSE keepalive.
  */
 @Service
 @EnableScheduling
@@ -18,9 +18,12 @@ public class ServiceStatusScheduler {
     private static final Logger log = LoggerFactory.getLogger(ServiceStatusScheduler.class);
 
     private final ServiceStatusCacheService cacheService;
+    private final SseEmitterRegistry emitterRegistry;
 
-    public ServiceStatusScheduler(ServiceStatusCacheService cacheService) {
+    public ServiceStatusScheduler(ServiceStatusCacheService cacheService,
+            SseEmitterRegistry emitterRegistry) {
         this.cacheService = cacheService;
+        this.emitterRegistry = emitterRegistry;
     }
 
     /**
@@ -52,5 +55,14 @@ public class ServiceStatusScheduler {
                 log.info("Redis connection restored");
             }
         }
+    }
+
+    /**
+     * Send SSE keepalive to all connected clients.
+     * Runs every 15 seconds to prevent proxy/load-balancer timeouts.
+     */
+    @Scheduled(fixedRate = 15000)
+    public void sseKeepalive() {
+        emitterRegistry.sendKeepalive();
     }
 }

@@ -31,6 +31,10 @@ export enum CrossReferenceType {
   KV_CROSS_SCHEMA         = "kv:cross_schema",
   KV_NAME_OVERLAP         = "kv:name_overlap",
   KV_DESCRIPTION_OVERLAP  = "kv:description_overlap",
+
+  /* Requirement domain */
+  REQ_BLOCKS     = "req:blocks",
+  REQ_DEPENDS_ON = "req:depends_on",
 }
 
 /* ── All valid string values ─────────────────────────────────────── */
@@ -75,6 +79,8 @@ const TYPE_CONSTRAINTS: Record<string, TypeConstraint> = {
   [CrossReferenceType.KV_CROSS_SCHEMA]:    { sourceType: "embedding",  targetType: "embedding" },
   [CrossReferenceType.KV_NAME_OVERLAP]:    { sourceType: "knowledge_entity", targetType: "knowledge_entity" },
   [CrossReferenceType.KV_DESCRIPTION_OVERLAP]: { sourceType: "knowledge_entity", targetType: "knowledge_entity" },
+  [CrossReferenceType.REQ_BLOCKS]:     { sourceType: "requirement", targetType: "requirement" },
+  [CrossReferenceType.REQ_DEPENDS_ON]: { sourceType: "requirement", targetType: "requirement" },
 };
 
 /**

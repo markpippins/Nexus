@@ -8,7 +8,7 @@
  * where ALTER TABLE entries referenced a table before its CREATE TABLE ran.
  *
  * Prerequisites:
- *   - PostgreSQL on localhost:5433 (or CONDUIT_PG_DSN env var)
+ *   - PostgreSQL on localhost:5432 (or CONDUIT_PG_DSN env var)
  *   - pguser/pgpass credentials
  */
 
@@ -16,7 +16,7 @@ import { describe, test, expect, beforeAll, afterAll } from "vitest";
 import { Pool } from "pg";
 import { initDb } from "./db";
 
-const DSN = process.env.CONDUIT_PG_DSN || "postgresql://pguser:pgpass@localhost:5433/nexus";
+const DSN = process.env.CONDUIT_PG_DSN || "postgresql://pguser:pgpass@localhost:5432/nexus";
 
 let adminPool: Pool;
 

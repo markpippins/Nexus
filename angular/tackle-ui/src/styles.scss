@@ -1,6 +1,7 @@
-/* Tackle UI — Global Styles */
+/* Tackle UI — Global Styles (v2 — 3-theme support) */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* ── Steel theme (default) ── */
 :root {
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
@@ -18,6 +19,52 @@
   --tag-red-bg: rgba(239, 68, 68, 0.15);
   --tag-red-text: #f87171;
   --tag-yellow-bg: rgba(234, 179, 8, 0.15);
+  --tag-yellow-text: #facc15;
+  --tag-orange-bg: rgba(249, 115, 22, 0.08);
+  --tag-orange-text: #fb923c;
+}
+
+/* ── Light theme ── */
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-muted: #64748b;
+  --text-subtle: #94a3b8;
+  --border-default: #cbd5e1;
+  --border-subtle: #e2e8f0;
+  --accent-blue-text: #2563eb;
+  --accent-blue-bg: #dbeafe;
+  --accent-ring: rgba(37, 99, 235, 0.5);
+  --tag-green-bg: #dcfce7;
+  --tag-green-text: #15803d;
+  --tag-red-bg: #fee2e2;
+  --tag-red-text: #b91c1c;
+  --tag-yellow-bg: rgba(202, 138, 4, 0.1);
+  --tag-yellow-text: #854d0e;
+  --tag-orange-bg: rgba(249, 115, 22, 0.06);
+  --tag-orange-text: #c2410c;
+}
+
+/* ── True-dark theme ── */
+[data-theme="dark"] {
+  --bg-primary: #09090b;
+  --bg-secondary: #18181b;
+  --bg-tertiary: #27272a;
+  --text-primary: #f4f4f5;
+  --text-muted: #a1a1aa;
+  --text-subtle: #71717a;
+  --border-default: #3f3f46;
+  --border-subtle: #27272a;
+  --accent-blue-text: #a5b4fc;
+  --accent-blue-bg: rgba(129, 140, 248, 0.15);
+  --accent-ring: rgba(129, 140, 248, 0.5);
+  --tag-green-bg: rgba(74, 222, 128, 0.15);
+  --tag-green-text: #4ade80;
+  --tag-red-bg: rgba(248, 113, 113, 0.15);
+  --tag-red-text: #f87171;
+  --tag-yellow-bg: rgba(250, 204, 21, 0.15);
   --tag-yellow-text: #facc15;
   --tag-orange-bg: rgba(249, 115, 22, 0.08);
   --tag-orange-text: #fb923c;

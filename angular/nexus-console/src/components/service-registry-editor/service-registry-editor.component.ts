@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RegistryServerProfile } from '../../models/registry-server-profile.model.js';
-import { RegistryServerProfileService } from '../../services/registry-server-profile.service.js';
+import { HostProfileService } from '../../services/host-profile.service.js';
 
 interface FormState {
     id: string;
@@ -47,7 +47,7 @@ const INITIAL_FORM_STATE: FormState = {
     changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ServiceRegistryEditorComponent {
-    profileService = inject(RegistryServerProfileService);
+    profileService = inject(HostProfileService);
 
     // Input: the profile ID to edit
     profileId = input.required<string>();

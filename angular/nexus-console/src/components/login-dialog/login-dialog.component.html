@@ -6,13 +6,14 @@
     <div class="p-6 space-y-4">
         <p class="text-sm text-[rgb(var(--color-text-subtle))]">Enter your credentials to mount this server profile.</p>
         <div>
-            <label for="loginUsername" class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Username</label>
+            <label for="loginEmail" class="block text-sm font-medium text-[rgb(var(--color-text-muted))]">Email</label>
             <input 
-                type="text" 
-                id="loginUsername" 
-                [value]="username()" 
-                (input)="onUsernameChange($event)" 
-                autocomplete="username"
+                type="email" 
+                id="loginEmail" 
+                [value]="email()" 
+                (input)="onEmailChange($event)" 
+                autocomplete="email"
+                placeholder="m@example.com"
                 class="mt-1 block w-full px-3 py-2 bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-muted))] rounded-md shadow-sm focus:outline-none focus:ring-[rgb(var(--color-accent-ring))] focus:border-[rgb(var(--color-accent-ring))] sm:text-sm">
         </div>
         <div>
@@ -31,7 +32,7 @@
       <button (click)="onCancel()" class="px-4 py-2 bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-base))] rounded-md hover:bg-[rgb(var(--color-border-base))] transition-colors font-semibold text-sm">
         Cancel
       </button>
-      <button (click)="onSubmit()" class="px-4 py-2 bg-[rgb(var(--color-accent-solid-bg))] text-[rgb(var(--color-text-inverted))] rounded-md hover:bg-[rgb(var(--color-accent-solid-bg-hover))] transition-colors font-semibold text-sm disabled:bg-[rgb(var(--color-disabled-bg))]" [disabled]="!username().trim() || !password().trim()">
+      <button (click)="onSubmit()" class="px-4 py-2 bg-[rgb(var(--color-accent-solid-bg))] text-[rgb(var(--color-text-inverted))] rounded-md hover:bg-[rgb(var(--color-accent-solid-bg-hover))] transition-colors font-semibold text-sm disabled:bg-[rgb(var(--color-disabled-bg))]" [disabled]="!email().trim() || !password().trim()">
         Log In
       </button>
     </div>

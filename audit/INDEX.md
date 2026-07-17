@@ -21,8 +21,8 @@
 | **UI/Frontend** | §III | 5 UIs | — |
 | **JVM Spring Boot** | §IV | 4 primary + 17 service-broker | **[JVM_PIPELINE_FLOW.md](./JVM_PIPELINE_FLOW.md)** |
 | **Python Cognitive** | §V | nbk, ir, cascade, meep | **[COGNITIVE_RUNTIME_FLOW.md](./COGNITIVE_RUNTIME_FLOW.md)** |
-| **Python WRP** | §V | conduit/bridge, wrp-kernel | **[WRP_PIPELINE_FLOW.md](./WRP_PIPELINE_FLOW.md)** |
-| **Python Harvest** | §V | rover, steward, absorb | — |
+| **Python WRP** | §V | conduit/bridge + wrp-kernel (in-process lib) | **[WRP_PIPELINE_FLOW.md](./WRP_PIPELINE_FLOW.md)** |
+| **Python Harvest** | §V | rover, steward | — |
 | **Python AI/Vision** | §V | vision, tackle | — |
 | **Python Utilities** | §V | voyager, fs, nats_envelope | — |
 | **Infrastructure** | §VI | PostgreSQL, MongoDB, NATS, Redis, Ollama, Temporal | `SERVICE_TOPOLOGY.md` |
@@ -40,11 +40,13 @@
 | Layer | Services | Ports | Transport |
 |-------|----------|-------|-----------|
 | **AI Agents** | Codebuff, Claude, OpenCode | — | MCP stdio |
-| **MCP Servers** | conduit-mcp, nebula-mcp, nebula-mcp-sse, terrain-mcp, knowledge-mcp, tackle-mcp, peb-mcp, vision-mcp, vision-mcp-py, wrp-kernel | 3100-3400 (+ stdio) | stdio / SSE (:3100, :3102) |
+| **MCP Servers** | conduit-mcp, nebula-mcp, nebula-mcp-sse, terrain-mcp, knowledge-mcp, tackle-mcp, peb-mcp, vision-mcp, vision-mcp-py | 3100-3400 (+ stdio) | stdio / SSE (:3100, :3102) |
+
+> **Note:** `wrp-kernel` is an in-process Python library at `python/conduit/wrp_kernel/`, **not** an MCP server on port 3103. Canonical: `mcp_server_standalone_discrepancies` in `nexus/graph/nexus-knowledge-graph.json`.
 | **REST APIs** | nebula-srv, vision-srv, role-memory-srv, tools-aggregator, file-system-server, image-server, broker-service-proxy, fs/media-metadata | 3101, 3104, 3200, 3334, 3500, 4040, 8004, 9081 | HTTP |
 | **Frontend UIs** | nebula-ui, plurality-ui, duality-ui, nexus-console, conduit-ui | 3000-3002, 4200-4201 | HTTP (Angular/React/Vite) |
 | **JVM Services** | peb-kernel, broker-gateway, terrain, service-registry | 8080-8081, 8084-8085 | HTTP (Spring Boot) |
-| **Python Services** | vision-srv-py, agent-chat, wrp-bridge-daemon, nbk, ir, cascade, meep, rover, steward, absorb, voyager | 8003, 3017, 3103 | HTTP / process / NATS |
+| **Python Services** | vision-srv-py, agent-chat, wrp-bridge-daemon, nbk, ir, cascade, meep, rover, steward, voyager | 8003, 3017 | HTTP / process / NATS |
 
 ---
 
@@ -123,7 +125,7 @@ ARCHITECTURE.md ──┬── references ── SERVICE_TOPOLOGY.md
 | §III TypeScript Layer | `SERVICE_TOPOLOGY.md` | MCP servers, REST APIs |
 | §IV JVM Layer | `JVM_PIPELINE_FLOW.md` | End of §IV — all 4 services |
 | §V Python — Cognitive | `COGNITIVE_RUNTIME_FLOW.md` | nbk/ir/cascade/meep |
-| §V Python — WRP | `WRP_PIPELINE_FLOW.md` | conduit bridge + wrp-kernel |
+| §V Python — WRP | `WRP_PIPELINE_FLOW.md` | conduit bridge + wrp-kernel (in-process lib) |
 | §VII Service Topology | `SERVICE_TOPOLOGY.md`, `WRP_PIPELINE_FLOW.md`, `JVM_PIPELINE_FLOW.md` | Architecture diagram, dependencies, ports |
 | §X WorkRequest Pipeline | `WRP_PIPELINE_FLOW.md`, `JVM_PIPELINE_FLOW.md` | Plan lifecycle with JVM coordination |
 
@@ -185,7 +187,7 @@ ARCHITECTURE.md ──┬── references ── SERVICE_TOPOLOGY.md
 | Spring Boot service | `jvm/spring/<name>/` | `JVM_PIPELINE_FLOW.md` + `ARCHITECTURE.md §IV` |
 | WRP pipeline | `python/conduit/bridge/` or `python/conduit/wrp_kernel/` | `WRP_PIPELINE_FLOW.md` |
 | Cognitive runtime | `python/nbk/`, `python/ir/`, `python/cascade/`, `python/meep/` | `COGNITIVE_RUNTIME_FLOW.md` |
-| Harvest pipeline | `python/rover/`, `python/steward/`, `python/absorb/` | `ARCHITECTURE.md §V` |
+| Harvest pipeline | `python/rover/`, `python/steward/` | `ARCHITECTURE.md §V` |
 | AI / Vision | `python/vision/`, `python/tackle/` | `ARCHITECTURE.md §V` |
 | Infrastructure | PostgreSQL, Redis, NATS, MongoDB | `SERVICE_TOPOLOGY.md` + `ARCHITECTURE.md §VI` |
 

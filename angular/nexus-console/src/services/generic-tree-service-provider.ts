@@ -134,7 +134,7 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
       childrenLoaded: false,
     }));
 
-    // Create virtual organization nodes
+    // Create virtual organization nodes — now nested under Platform Management.
     const gatewaysNode: GenericTreeNode = {
       id: 'gateways-container',
       name: 'Gateways',
@@ -153,14 +153,24 @@ export class GenericTreeServiceProvider extends GenericTreeProvider {
       isVirtualNode: true,
     };
 
-    // Build the root tree
+    // Find the Platform Management node and attach the virtual folder containers under it.
+    const platformNode = hostNodes.find(n => n.name === 'Platform Management');
+    if (platformNode) {
+      platformNode.children = [
+        ...(platformNode.children ?? []),
+        gatewaysNode,
+        serviceRegistriesNode,
+      ];
+      platformNode.childrenLoaded = true;
+    }
+
+    // Build the root tree.
     return {
       id: 'root',
       name: 'Nexus',
       type: 'folder',
       children: [
         ...hostNodes,
-        ...(brokerProfileNodes.length > 0 ? [gatewaysNode] : []),
       ],
       childrenLoaded: true,
     };

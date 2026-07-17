@@ -9,4 +9,6 @@ import java.util.Optional;
 @Repository
 public interface FrameworkVendorRepository extends JpaRepository<FrameworkVendor, Long> {
     Optional<FrameworkVendor> findByName(String name);
+
+    Optional<FrameworkVendor> findByNameIgnoreCase(String name);
 }

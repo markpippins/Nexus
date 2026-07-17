@@ -55,13 +55,13 @@ public class OperatingSystem {
     private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "operatingSystem", cascade = CascadeType.ALL)
-    private Set<Host> servers = new HashSet<>();
+    private Set<Server> servers = new HashSet<>();
 
     public OperatingSystem() {
     }
 
     public OperatingSystem(Long id, String name, Boolean activeFlag, String version, String architecture, Boolean ltsFlag,
-            String description, String family, LocalDateTime createdAt, LocalDateTime updatedAt, Set<Host> servers) {
+            String description, String family, LocalDateTime createdAt, LocalDateTime updatedAt, Set<Server> servers) {
         this.id = id;
         this.name = name;
         this.activeFlag = activeFlag;
@@ -155,11 +155,11 @@ public class OperatingSystem {
         this.updatedAt = updatedAt;
     }
 
-    public Set<Host> getServers() {
+    public Set<Server> getServers() {
         return servers;
     }
 
-    public void setServers(Set<Host> servers) {
+    public void setServers(Set<Server> servers) {
         this.servers = servers;
     }
 

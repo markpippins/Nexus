@@ -148,8 +148,12 @@ export class SessionService implements FileSystemProvider {
 
           // Cleanup: Remove legacy or virtual folders if they were persisted
           if (parsedTree.children) {
+            // Drop legacy top-level entries that this version of the tree no longer synthesizes.
+            // Kept (instead of removed) because this filter parses persisted tree snapshots from
+            // localStorage that may still contain pre-refactor top-level entries. Service Registries
+            // and Gateways now live nested inside Platform Management, not at root.
             parsedTree.children = parsedTree.children.filter(c =>
-              !['Search & Discovery', 'Home', 'Service Registries', 'Service Registries', 'Gateways', 'Platform Management'].includes(c.name)
+              !['Search & Discovery', 'Home', 'Service Registries', 'Gateways', 'Platform Management'].includes(c.name)
             );
           }
 

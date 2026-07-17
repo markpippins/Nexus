@@ -1,9 +1,12 @@
 package com.aibizarchitect.nexus.v1.spring.topology.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 
 @Entity
 @Table(name = "runnable_services")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class RunnableService {
 
     @Id
@@ -23,6 +26,7 @@ public class RunnableService {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_type_id", insertable = false, updatable = false)
+    @JsonIgnore
     private ServiceType serviceType;
 
     @Column(name = "health_check_url")

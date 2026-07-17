@@ -1,0 +1,39 @@
+[Unit]
+Description=Address TTS Daemon — speech projection layer (Piper + NATS subscriber)
+Documentation=https://github.com/nexus/python/address/tts
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/python/address/tts
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=DATABASE_URL=postgres://pguser:pgpass@localhost:5432/nexus
+Environment=NATS_URL=nats://localhost:4222
+Environment=TTS_PORT=8600
+Environment=TTS_HEALTH_INTERVAL=300
+Environment=PYTHONUNBUFFERED=1
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/usr/bin/python3 main.py
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=10
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus
+
+# Nice the daemon — it's a background speech service, not latency-sensitive
+Nice=10
+
+[Install]
+WantedBy=default.target

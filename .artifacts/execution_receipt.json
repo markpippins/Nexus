@@ -1,16 +1,16 @@
 {
-  "request_id": "wr-1052-1782886381-476e6803",
-  "ccnf_hash": "60e0f4f21b0baa7ac74069dce54c106ec2f75976f7ba333bc9e7dbeb5ecb9ca2",
-  "cer_root_hash": "2c059621fd9c8ecfafacd8e2bff09e8d4f5fe4982f1d7ae7410c7d0ffac81481",
-  "trace_root_hash": "2c059621fd9c8ecfafacd8e2bff09e8d4f5fe4982f1d7ae7410c7d0ffac81481",
+  "request_id": "wr-1057-1782954618-8f73a9ad",
+  "ccnf_hash": "b9571a545f3a91ab88f5c761c616b58b1b31d12aeccaca404e25af3b1b8487d0",
+  "cer_root_hash": "81622ca89e2ae9bd8d054370291d34739d0af62f72cd305dca7ea70f993675b2",
+  "trace_root_hash": "81622ca89e2ae9bd8d054370291d34739d0af62f72cd305dca7ea70f993675b2",
   "trace_event_count": 1,
-  "replay_binding_hash": "f7b11940d9d50a76398cd09342510e5cdbef64913dbcec76608f862a9c0a561d",
+  "replay_binding_hash": "cc857653df801db2aa3dbd1a6d35c918a63f59f7502fb3bf147018abc4cfd0b3",
   "status": "SUCCESS",
   "failure": null,
   "timing": {
-    "started_at": 1782871982,
-    "completed_at": 1782871986,
-    "duration_ms": 4000
+    "started_at": 1782940220,
+    "completed_at": 1782940225,
+    "duration_ms": 5000
   },
   "ccnf_version": 1
 }

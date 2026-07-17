@@ -1,108 +1,63 @@
 # User Access Service
 
-The user management service module for the Nexus system, responsible for handling all user-related operations including registration, authentication, and profile management.
-
-## Overview
-
-The user access service provides comprehensive user management capabilities within the Nexus system. It handles user registration, authentication, profile management, and all other user-related operations. The service integrates with the broker system to process user requests from various clients and uses MongoDB for data persistence.
-
-## Key Features
-
-- **User Registration**: Create new user accounts with validation
-- **Authentication**: Secure user login and credential verification
-- **Profile Management**: View and update user profile information
-- **User Search**: Find and retrieve user information by various criteria
-- **Password Management**: Secure password updates and recovery
-- **Account Security**: Multi-factor authentication support
-- **User Validation**: Verify user data integrity and compliance
-- **Session Management**: Handle user sessions and authentication tokens
+A core module of the Nexus platform providing user management capabilities. Handles registration, authentication, profile management, and related user operations using PostgreSQL for persistence through the `assembly` schema.
 
 ## Architecture
 
-The user access service includes:
+The service follows a standard layered Spring Boot architecture with JPA persistence:
 
-- **UserService**: Core business logic for user operations
-- **UserRepository**: Handles user data persistence in MongoDB
-- **ProfileService**: Manages user profile operations
-- **ProfileRepository**: Handles profile data persistence in MongoDB
+```
+Controller → Service → Repository → PostgreSQL (assembly.users)
+```
+
+- **UserRegistrationController**: Exposes a `/user/validate` REST endpoint
+- **UserAccessService**: Handles core business logic for credential validation
+- **UserRegistrationRepository**: Spring Data JPA repository for the `assembly.users` table
+- **UserRegistration**: JPA entity mapped to `assembly.users`
 
 ## Dual ID System
 
-The service implements a dual ID architecture to maintain compatibility with existing web clients:
+The service uses a single UUID primary key system. UUIDs are generated at the database level via PostgreSQL's `gen_random_uuid()`. This replaces the legacy dual-ID pattern (Long + MongoDB String ID).
 
-- **Long ID**: For client compatibility (maintains numeric ID expectation for web clients)
-- **String mongoId**: Internal MongoDB document ID for storage and retrieval
+## API Capabilities
 
-When creating users, the system generates sequential Long IDs that are compatible with existing client code, while using MongoDB's native String IDs internally.
-
-## API
-
-The service handles requests through the broker system with operations including:
-
-- `login`: Authenticate user with credentials
-- `createUser`: Create a new user account
-- `findById`: Retrieve user by ID
-- `findByAlias`: Retrieve user by alias/username
-- `findByEmail`: Retrieve user by email
-- `findAll`: Retrieve all users
-- `addUser`: Add a new user
-- `save`: Save/Update user information
-- `update`: Update existing user profile information
-- `delete`: Delete user by ID
-- `deleteUser`: Delete user by ID (alias for delete)
-
-## Security Features
-
-- **Password Security**: Secure password handling and verification
-- **Input Validation**: Comprehensive validation of all user inputs
-- **XSS Prevention**: Proper output encoding for user-generated content
-- **Rate Limiting**: Protection against brute force attacks
-
-## Configuration
-
-The user access service supports configuration for:
-- MongoDB connection settings
-- Password complexity requirements
-- User registration settings
-- Security logging levels
-
-## Running with MongoDB
-
-### Prerequisites
-- Docker installed
-
-### Running MongoDB with Docker
-
-The Nexus platform provides convenient scripts to start MongoDB:
-
-**On Windows:**
-```bash
-mongodb-docker-start.bat
-```
-
-**On Linux/Mac:**
-```bash
-./mongodb-docker-start.sh
-```
-
-## Data Management
-
-- **User Data Storage**: Secure MongoDB document storage
-- **Privacy Compliance**: Adherence to data privacy regulations
-- **Document-based Modeling**: Flexible user data structure in MongoDB
-- **Audit Logging**: Tracking of user account changes
+- **Authentication:** Login via alias/password validation (`POST /user/validate`)
+- **User Lifecycle:** Registration, update, and deletion (via broker operations)
+- **Lookup:** Find by ID, alias, or email
 
 ## Integration
 
-The user access service integrates with:
-- Login service for authentication operations
-- Security components for access control
-- The broker service for request routing
-- User API for DTOs and shared models
+- **Login Service:** Consumes user credentials for authentication
+- **Broker Service:** All operations are exposed through the broker-gateway
+- **User API:** Shared DTOs (e.g., `UserRegistrationDTO`) are defined in the `nexus-user-api` module
 
-## Best Practices
+## Security
 
-- All sensitive operations require proper authentication
-- Proper validation of all user inputs
-- Secure handling of password recovery processes
-- Regular updates to security measures
+- Password hashing via bcrypt (cost factor 12)
+- Rate limiting on login attempts
+- XSS prevention on input fields
+- Audit logging for all account changes
+
+## Environment
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://localhost:5432/nexus` | PostgreSQL JDBC URL |
+| `SPRING_DATASOURCE_USERNAME` | `pguser` | Database user |
+| `SPRING_DATASOURCE_PASSWORD` | `pgpass` | Database password |
+| `SPRING_PROFILES_ACTIVE` | `dev` | Active Spring profile |
+
+## Running with PostgreSQL
+
+The service uses PostgreSQL via the `assembly` schema. Ensure PostgreSQL is running and the assembly schema exists:
+
+```sql
+CREATE SCHEMA IF NOT EXISTS assembly;
+```
+
+The `users` table will be validated against the entity on startup (ddl-auto=validate).
+
+## Data Management
+
+- **User Data Storage:** Secure PostgreSQL document storage in the `assembly` schema
+- **UUID-based Identification:** All primary keys use PostgreSQL `gen_random_uuid()` for distributed-friendly ID generation

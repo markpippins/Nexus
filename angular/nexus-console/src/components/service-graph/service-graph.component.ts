@@ -2,6 +2,7 @@ import {
   Component,
   input,
   output,
+  model,
   effect,
   signal,
   AfterViewInit,
@@ -10,7 +11,8 @@ import {
   ElementRef,
   inject,
   computed,
-  ChangeDetectionStrategy
+  ChangeDetectionStrategy,
+  ChangeDetectorRef
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +25,9 @@ import {
 import { ArchitectureVizService, NodeData } from '../../services/architecture-viz.service.js';
 import { ComponentRegistryService } from '../../services/component-registry.service.js';
 import { NodeType } from '../../models/component-config.js';
+import { AtlasService } from '../../services/atlas.service.js';
+import type { ConnectionData } from '../../models/graph-view.model.js';
+import * as THREE from 'three';
 
 @Component({
   selector: 'app-service-graph',
@@ -37,14 +42,25 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   dependencies = input<ServiceDependency[]>([]);
   deployments = input<Deployment[]>([]);
   showInternalPanels = input(true); // When false, hide internal palette and inspector sidebars
+  graphSubView = input<'canvas' | 'creator'>('canvas');
+  paletteCollapsed = input(false);
+  showRunningOnly = model(false);
+
+  // Outputs
   selectedNode = output<ServiceInstance>();
+  graphSubViewChange = output<'canvas' | 'creator'>();
+  refreshServices = output<void>();
 
   @ViewChild('canvasContainer') canvasContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('labelInput') labelInput!: ElementRef<HTMLInputElement>;
-  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   private vizService = inject(ArchitectureVizService);
   private registry = inject(ComponentRegistryService);
+  private atlas = inject(AtlasService);
+  private cdr = inject(ChangeDetectorRef);
+
+  /** Exposed for template — number of multi-selected nodes. */
+  multiSelectedCount = this.vizService.multiSelectedCount;
 
   // UI Panels
   isPaletteOpen = signal(true);
@@ -64,6 +80,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // Scene Settings
   bgColor = '#000510';
+
+  // Active Camera — 1 or 2, toggled via the camera switch button
+  activeCamera = this.vizService.activeCamera;
 
   // Initialization flag
   private isInitialized = signal(false);
@@ -104,15 +123,44 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
     }).sort((a, b) => a.label.localeCompare(b.label));
   });
 
-  // Derived list of actual connection objects for display
-  currentConnections = computed(() => {
+  /** All connections involving the selected node (outbound, inbound, bidirectional). */
+  allConnections = computed(() => {
     const current = this.selectedNodeData();
     const all = this.allNodes();
     if (!current) return [];
-    return current.connectedTo.map(targetId => {
+
+    const result: { nodeId: string; label: string; direction: 'out' | 'in' | 'bidirectional' }[] = [];
+    const seen = new Set<string>();
+
+    // Outbound + bidirectional from current
+    for (const targetId of current.connectedTo) {
+      const key = [current.id, targetId].sort().join('::');
+      if (seen.has(key)) continue;
+      seen.add(key);
       const target = all.find(n => n.id === targetId);
-      return target ? { id: targetId, label: target.label } : { id: targetId, label: 'Unknown' };
-    });
+      const bidir = this.vizService.isBidirectional(current.id, targetId);
+      result.push({
+        nodeId: targetId,
+        label: target?.label ?? targetId,
+        direction: bidir ? 'bidirectional' : 'out'
+      });
+    }
+
+    // Incoming (other nodes point to current, not already covered)
+    for (const n of all) {
+      if (n.id === current.id) continue;
+      if (n.connectedTo.includes(current.id)) {
+        const key = [current.id, n.id].sort().join('::');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push({
+          nodeId: n.id,
+          label: n.label,
+          direction: 'in'
+        });
+      }
+    }
+    return result;
   });
 
   // Form Models (synced with effect)
@@ -126,7 +174,21 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Connection Form
   selectedTargetId = '';
 
+  // Load View Dialog
+  showLoadDialog = signal(false);
+
+  // Delete Confirmation Dialog
+  showDeleteConfirm = signal(false);
+
+  // Toast notification for save/load debugging
+  toastMessage = signal('');
+  toastVisible = signal(false);
+  toastIsError = signal(false);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+
   private sub = new Subscription();
+  private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingAutoSave = false;
 
   constructor() {
     // Sync Services Input to Graph
@@ -218,6 +280,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         this.vizService.connectNodes(String(dep.sourceServiceId), String(dep.targetServiceId));
       });
 
+      // Try to load the default graph view for camera + position overrides
+      this.loadDefaultView();
+
     }, { allowSignalWrites: true });
 
     // Sync Selected Node to Form (Inspector)
@@ -234,6 +299,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
         this.isInspectorOpen.set(true);
         this.selectedTargetId = '';
+        this.cdr.markForCheck();
 
         // Find corresponding service if any
         const match = this.services().find(s => String(s.id) === node.id);
@@ -249,6 +315,34 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         if (this.labelInput) this.labelInput.nativeElement.focus();
       }, 50);
     }));
+
+    // Watch for view load requests from toolbar
+    effect(() => {
+      const viewId = this.atlas.loadRequested();
+      if (viewId !== null) {
+        this.loadView(viewId);
+        this.atlas.loadRequested.set(null);
+      }
+    }, { allowSignalWrites: true });
+
+    // Watch for save requests from toolbar
+    effect(() => {
+      const name = this.atlas.saveRequested();
+      if (name !== null) {
+        this.saveCurrentView(name);
+        this.atlas.saveRequested.set(null);
+      }
+    }, { allowSignalWrites: true });
+
+    // Watch for palette collapse toggle from sidebar
+    effect(() => {
+      const collapsed = this.paletteCollapsed();
+      this.isPaletteOpen.set(!collapsed);
+    }, { allowSignalWrites: true });
+
+    // Auto-save after drag or camera changes (debounced 500ms)
+    this.sub.add(this.vizService.nodePositionChanged.subscribe(() => this.scheduleAutoSave()));
+    this.sub.add(this.vizService.cameraChanged.subscribe(() => this.scheduleAutoSave()));
   }
 
   ngAfterViewInit() {
@@ -259,6 +353,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
     this.vizService.dispose();
     this.sub.unsubscribe();
   }
@@ -316,8 +411,12 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // --- Actions ---
 
-  setMode(mode: 'camera' | 'auto' | 'edit') {
+  setMode(mode: 'camera' | 'edit') {
     this.vizService.setViewMode(mode);
+  }
+
+  switchCamera() {
+    this.vizService.switchActiveCamera();
   }
 
   toggleSimulation() {
@@ -333,6 +432,145 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
     // Auto switch to edit mode when adding so they can move it
     this.setMode('edit');
+  }
+
+  // --- Graph Views (Atlas) ---
+
+  async loadView(id: number): Promise<void> {
+    try {
+      this.vizService.clearUserDraggedNodes(); // fresh slate for each load
+      const view = await this.atlas.getById(id);
+      this.atlas.selectedViewId.set(id);
+
+      // Apply camera 1 state to the live camera (preset 1 is set inside setCameraState)
+      this.vizService.setCameraState(
+        new THREE.Vector3(view.cameraPositionX, view.cameraPositionY, view.cameraPositionZ),
+        new THREE.Vector3(view.cameraTargetX, view.cameraTargetY, view.cameraTargetZ)
+      );
+
+      // Load camera 2 preset from saved data
+      if (view.camera2PositionX !== undefined) {
+        this.vizService.setCameraPreset(2,
+          new THREE.Vector3(view.camera2PositionX, view.camera2PositionY, view.camera2PositionZ),
+          new THREE.Vector3(view.camera2TargetX, view.camera2TargetY, view.camera2TargetZ)
+        );
+      }
+
+      // Apply node positions + metadata (fromLoadView skips nodes user already dragged)
+      if (view.positions) {
+        for (const pos of view.positions) {
+          this.vizService.setNodePosition(pos.nodeId, pos.positionX, pos.positionY, pos.positionZ, true);
+          // Only apply metadata fields that are actually present (avoid undefined overwrites)
+          const updates: Partial<NodeData> = {};
+          if (pos.label !== undefined) updates.label = pos.label;
+          if (pos.description !== undefined) updates.description = pos.description;
+          if (pos.color !== undefined) updates.color = pos.color;
+          if (Object.keys(updates).length > 0) {
+            this.vizService.updateNode(pos.nodeId, updates);
+          }
+        }
+      }
+
+      // Restore connections (backend stores as JSON string in JSONB column)
+      const rawConns = view.connections;
+      if (rawConns) {
+        const conns: ConnectionData[] = typeof rawConns === 'string' ? JSON.parse(rawConns) : rawConns as any;
+        if (conns.length > 0) {
+          this.vizService.restoreConnections(conns);
+        }
+      }
+
+      // Always start on camera 1 after loading a view
+      if (this.vizService.activeCamera() === 2) {
+        this.vizService.switchActiveCamera();
+      }
+    } catch (e) {
+      console.error('Failed to load graph view', e);
+    }
+  }
+
+  /** Build a view payload from the current scene state. */
+  private buildViewPayload(name: string): any {
+    const activeCam = this.vizService.activeCamera();
+    const live = { pos: this.vizService.getCameraPosition(), target: this.vizService.getCameraTarget() };
+    const defaultPos = new THREE.Vector3(-20, 40, 120);
+    const defaultTarget = new THREE.Vector3(0, 15, 0);
+    const preset1 = this.vizService.getCameraPreset(1) ?? { pos: defaultPos, target: defaultTarget };
+    const preset2 = this.vizService.getCameraPreset(2) ?? { pos: defaultPos, target: defaultTarget };
+    const cam1 = activeCam === 1 ? live : preset1;
+    const cam2 = activeCam === 2 ? live : preset2;
+    const positions = this.vizService.getAllNodePositions();
+    const allNodes = this.vizService.allNodes();
+
+    return {
+      name,
+      cameraPositionX: cam1.pos.x, cameraPositionY: cam1.pos.y, cameraPositionZ: cam1.pos.z,
+      cameraTargetX: cam1.target.x, cameraTargetY: cam1.target.y, cameraTargetZ: cam1.target.z,
+      camera2PositionX: cam2.pos.x, camera2PositionY: cam2.pos.y, camera2PositionZ: cam2.pos.z,
+      camera2TargetX: cam2.target.x, camera2TargetY: cam2.target.y, camera2TargetZ: cam2.target.z,
+      connections: JSON.stringify(this.vizService.getAllConnections()),
+      positions: Array.from(positions.entries()).map(([nodeId, pos]) => {
+        const node = allNodes.find(n => n.id === nodeId);
+        return {
+          nodeId,
+          positionX: pos.x, positionY: pos.y, positionZ: pos.z,
+          label: node?.label,
+          description: node?.description,
+          color: node?.color
+        };
+      })
+    };
+  }
+
+  async saveCurrentView(name: string): Promise<void> {
+    try {
+      const view = this.buildViewPayload(name);
+      const currentId = this.atlas.selectedViewId();
+      if (currentId !== null) {
+        await this.atlas.update(currentId, view);
+        this.showToast(`Saved "${name}"`);
+      } else {
+        const created = await this.atlas.create(view);
+        this.showToast(`Created "${name}"`);
+      }
+    } catch (e) {
+      console.error('Failed to save graph view', e);
+      this.showToast('Save failed — check console', true);
+    }
+  }
+
+  async loadDefaultView(): Promise<void> {
+    try {
+      // Only run on initial load — don't switch views mid-session
+      if (this.atlas.selectedViewId() !== null) return;
+
+      await this.atlas.refresh();
+      const views = this.atlas.views();
+      if (views.length === 0) return;
+
+      // Load the most recently updated view, not just isDefault.
+      // This ensures auto-saved changes survive restarts even after a "Save As"
+      // switches selectedViewId to a new (non-default) view.
+      const latest = views
+        .filter(v => v.updatedAt)
+        .sort((a, b) => new Date(b.updatedAt!).getTime() - new Date(a.updatedAt!).getTime())[0]
+        ?? views[0];
+
+      if (latest.id) {
+        await this.loadView(latest.id);
+        this.showToast(`Loaded "${latest.name ?? 'view'}"`);
+        // User-dragged nodes during load take priority over DB — clear tracking now
+        this.vizService.clearUserDraggedNodes();
+      }
+
+      // If there are pending auto-saves queued before the view was loaded, flush now.
+      if (this.pendingAutoSave) {
+        this.pendingAutoSave = false;
+        this.flushAutoSave();
+      }
+    } catch (e) {
+      console.error('Failed to load default graph view', e);
+    }
   }
 
   clearCanvas() {
@@ -357,38 +595,37 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   rotateLeft() { this.vizService.rotateCamera(0.2); }
   rotateRight() { this.vizService.rotateCamera(-0.2); }
 
-  // --- Save / Load ---
+  // --- Save / Load (Atlas DB) ---
 
-  saveJson() {
-    const json = this.vizService.exportSceneToJson();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'architecture-diagram.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  async saveToAtlas() {
+    // Always "Save As" — prompt for a name and create a brand-new view copy
+    const name = window.prompt('Save view as:');
+    if (!name || !name.trim()) return;
 
-  triggerLoad() {
-    this.fileInput.nativeElement.click();
-  }
-
-  onFileSelected(event: Event) {
-    const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
-      const file = input.files[0];
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result;
-        if (typeof result === 'string') {
-          this.vizService.importSceneFromJson(result);
-          input.value = ''; // Reset
-        }
-      };
-      reader.readAsText(file);
+    try {
+      await this.atlas.create(this.buildViewPayload(name.trim()));
+      this.showToast(`Created "${name.trim()}"`);
+    } catch (e) {
+      console.error('Save As failed', e);
+      this.showToast('Save As failed — check console', true);
     }
   }
+
+  openLoadDialog() {
+    this.atlas.refresh();
+    this.showLoadDialog.set(true);
+  }
+
+  closeLoadDialog() {
+    this.showLoadDialog.set(false);
+  }
+
+  async onSelectLoadView(id: number) {
+    this.showLoadDialog.set(false);
+    await this.loadView(id);
+  }
+
+  // --- File methods removed, using Atlas DB ---
 
   // --- Form Handling ---
 
@@ -402,6 +639,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       color: this.formColor,
       position: { x: this.formX, y: this.formY, z: this.formZ }
     });
+
+    // Auto-save whenever inspector values change
+    this.scheduleAutoSave();
   }
 
   deleteSelected() {
@@ -413,21 +653,86 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   // --- Connections ---
 
-  addConnection() {
+  addConnection(direction: 'out' | 'in' | 'bidirectional' = 'out') {
     const current = this.selectedNodeData();
-    if (current && this.selectedTargetId) {
-      this.vizService.connectNodes(current.id, this.selectedTargetId);
-      this.selectedTargetId = ''; // Reset
+    if (!current || !this.selectedTargetId) return;
+
+    let fromId: string, toId: string;
+    if (direction === 'in') {
+      fromId = this.selectedTargetId;
+      toId = current.id;
+    } else {
+      fromId = current.id;
+      toId = this.selectedTargetId;
     }
+
+    this.vizService.connectNodes(fromId, toId);
+    if (direction === 'bidirectional') {
+      this.vizService.toggleConnectionDirection(fromId, toId);
+    }
+    this.selectedTargetId = '';
   }
 
   removeConnection(targetId: string) {
     const current = this.selectedNodeData();
-    if (current) {
+    if (!current) return;
+    // If this is an inbound connection (targetId has current in its connectedTo),
+    // disconnect from their side so the visual line is properly removed
+    const targetNode = this.vizService.getNode(targetId);
+    if (targetNode?.connectedTo.includes(current.id)) {
+      this.vizService.disconnectNodes(targetId, current.id);
+    } else {
       this.vizService.disconnectNodes(current.id, targetId);
+    }
+  }
+
+  toggleConnectionDirection(targetId: string) {
+    const current = this.selectedNodeData();
+    if (current) {
+      this.vizService.toggleConnectionDirection(current.id, targetId);
+      // Force inspector refresh
+      this.vizService.selectNode(current.id);
     }
   }
 
   togglePalette() { this.isPaletteOpen.update(v => !v); }
   toggleInspector() { this.isInspectorOpen.update(v => !v); }
+
+  confirmDelete() {
+    this.vizService.deleteSelectedNodes();
+    this.showDeleteConfirm.set(false);
+  }
+
+  /** Debounce auto-save so rapid inspector edits don't hammer the API. */
+  private scheduleAutoSave(): void {
+    if (this.atlas.selectedViewId() === null) {
+      this.pendingAutoSave = true;
+      console.warn('[auto-save] deferred — no view loaded yet (selectedViewId is null)');
+      return;
+    }
+    if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+    this.autoSaveTimer = setTimeout(() => this.flushAutoSave(), 500);
+  }
+
+  /** Execute auto-save immediately (called from debounced timer or pending flush). */
+  private flushAutoSave(): void {
+    const currentId = this.atlas.selectedViewId();
+    if (currentId === null) return;
+    const existingView = this.atlas.views().find(v => v.id === currentId);
+    if (!existingView?.name) return;
+    this.saveCurrentView(existingView.name);
+  }
+
+  /** Show a toast notification (auto-fades after 2.5s). */
+  private showToast(message: string, isError = false): void {
+    this.toastMessage.set(message);
+    this.toastIsError.set(isError);
+    this.toastVisible.set(true);
+    this.cdr.markForCheck();
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => {
+      this.toastVisible.set(false);
+      this.cdr.markForCheck();
+    }, 2500);
+  }
 }

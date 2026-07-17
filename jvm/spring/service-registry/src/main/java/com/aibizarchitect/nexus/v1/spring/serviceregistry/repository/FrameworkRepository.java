@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkCategory;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkLanguage;
 
 @Repository
@@ -16,7 +16,7 @@ public interface FrameworkRepository extends JpaRepository<Framework, Long> {
     Optional<Framework> findByName(String name);
 
     @Cacheable(value = "frameworksByCategory", key = "#category.id")
-    List<Framework> findByCategory(FrameworkCategory category);
+    List<Framework> findByCategory(FrameworkType category);
 
     List<Framework> findByCategory_Id(Long categoryId);
 
@@ -25,7 +25,7 @@ public interface FrameworkRepository extends JpaRepository<Framework, Long> {
 
     List<Framework> findByLanguage_Id(Long languageId);
 
-    org.springframework.data.domain.Page<Framework> findByCategory(FrameworkCategory category, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Framework> findByCategory(FrameworkType category, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Framework> findByCategory_Id(Long categoryId, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Framework> findByLanguage(FrameworkLanguage language, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Framework> findByLanguage_Id(Long languageId, org.springframework.data.domain.Pageable pageable);

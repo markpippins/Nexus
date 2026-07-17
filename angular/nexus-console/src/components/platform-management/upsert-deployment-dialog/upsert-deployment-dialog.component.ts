@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, inject, signal, input, output, effect, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
-import { PlatformManagementService, LookupItem, DeploymentPayload, Host } from '../../../services/platform-management.service.js';
+import { PlatformManagementService, LookupItem, DeploymentPayload, Server, LOOKUP_ENVIRONMENTS } from '../../../services/platform-management.service.js';
 import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.js';
 
 @Component({
@@ -37,7 +37,7 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
                      <!-- Server -->
                      <div class="flex flex-col gap-1">
                         <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Server *</label>
-                        <select formControlName="hostId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                        <select formControlName="serverId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
                             <option [value]="null">Select Server</option>
                             <option *ngFor="let s of servers()" [value]="s.id">{{ s.hostname }}</option>
                         </select>
@@ -120,14 +120,14 @@ export class UpsertDeploymentDialogComponent implements OnInit {
     form: FormGroup;
     services = signal<ServiceInstance[]>([]);
     standaloneServices = signal<ServiceInstance[]>([]);
-    servers = signal<Host[]>([]);
+    servers = signal<Server[]>([]);
     environments = signal<LookupItem[]>([]);
     isSaving = signal(false);
 
     constructor() {
         this.form = this.fb.group({
             serviceId: [null, Validators.required],
-            hostId: [null, Validators.required],
+            serverId: [null, Validators.required],
             environmentId: [null, Validators.required],
             version: [''],
             status: ['STOPPED'],
@@ -143,7 +143,7 @@ export class UpsertDeploymentDialogComponent implements OnInit {
                 if (d) {
                     this.form.patchValue({
                         serviceId: d.service?.id,
-                        hostId: d.host?.id, // Assumes d.host exists or verify
+                        serverId: d.server?.id,
                         environmentId: null, // Need environment ID, but d.environment is ENUM. d.environmentId missing in interface?
                         version: d.version,
                         status: d.status,
@@ -174,12 +174,12 @@ export class UpsertDeploymentDialogComponent implements OnInit {
 
         // Load each lookup independently — one failure shouldn't clear the others
         let srvs: ServiceInstance[] = [];
-        let hosts: Host[] = [];
+        let hosts: Server[] = [];
         let envs: LookupItem[] = [];
 
-        try { srvs = await this.platformService.getServices(url); } catch (e) { console.error('Failed to load services', e); }
-        try { hosts = await this.platformService.getHosts(url); } catch (e) { console.error('Failed to load servers', e); }
-        try { envs = await this.platformService.getLookup(url, 'environments'); } catch (e) { console.error('Failed to load environments', e); }
+        try { srvs = (await this.platformService.getServices(url)).data; } catch (e) { console.error('Failed to load services', e); }
+        try { hosts = (await this.platformService.getServers(url)).data; } catch (e) { console.error('Failed to load servers', e); }
+        try { envs = (await this.platformService.getLookup(url, LOOKUP_ENVIRONMENTS)).data; } catch (e) { console.error('Failed to load environments', e); }
 
         const standalone = srvs.filter(s => !s.parentServiceId);
         this.standaloneServices.set(standalone);
@@ -212,7 +212,7 @@ export class UpsertDeploymentDialogComponent implements OnInit {
 
         // Ensure numbers
         payload.serviceId = Number(payload.serviceId);
-        payload.hostId = Number(payload.hostId);
+        payload.serverId = Number(payload.serverId);
         payload.environmentId = Number(payload.environmentId);
         if (payload.port) payload.port = Number(payload.port);
 

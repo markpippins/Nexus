@@ -4,8 +4,8 @@
  * ``dotenv``).  Does **not** override variables already in process.env.
  */
 
-import fs from "fs";
-import path from "path";
+import fs from "node:fs";
+import path from "node:path";
 
 export function loadEnv(envPath?: string): Record<string, string> {
   const filePath = envPath || path.resolve(__dirname, "..", ".env");

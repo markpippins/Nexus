@@ -133,6 +133,21 @@ class GraphIndex:
         """Return the number of unique edges."""
         return len(self.all_edges())
 
+    def remove_node(self, node_id: str) -> None:
+        """Remove a node and all its edges from the graph.
+
+        Args:
+            node_id: The identity_id of the node to remove.
+        """
+        # Remove outgoing edges
+        self._adjacency.pop(node_id, None)
+        # Remove incoming edges (scan all adjacency lists)
+        for source in list(self._adjacency.keys()):
+            self._adjacency[source] = [
+                e for e in self._adjacency[source]
+                if e.target != node_id
+            ]
+
     def reset(self) -> None:
         """Clear all graph state. Used for test isolation."""
         self._adjacency.clear()

@@ -15,18 +15,18 @@ import org.springframework.stereotype.Service;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Deployment;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.EnvironmentType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Framework;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkCategory;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkLanguage;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.LibraryCategory;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.HostType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.LibraryType;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServerType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.ServiceType;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.EnvironmentTypeRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkCategoryRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkLanguageRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.FrameworkRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.LibraryCategoryRepository;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.HostTypeRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.LibraryTypeRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerTypeRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceTypeRepository;
 
@@ -43,12 +43,12 @@ public class CacheWarmingService {
 
     // Static lookup repositories
     private final FrameworkRepository frameworkRepository;
-    private final FrameworkCategoryRepository frameworkCategoryRepository;
+    private final FrameworkTypeRepository frameworkTypeRepository;
     private final FrameworkLanguageRepository frameworkLanguageRepository;
     private final ServiceTypeRepository serviceTypeRepository;
-    private final HostTypeRepository hostTypeRepository;
+    private final ServerTypeRepository serverTypeRepository;
     private final EnvironmentTypeRepository environmentTypeRepository;
-    private final LibraryCategoryRepository libraryCategoryRepository;
+    private final LibraryTypeRepository libraryTypeRepository;
 
     // Dynamic data repositories
     private final ServiceRepository serviceRepository;
@@ -57,22 +57,22 @@ public class CacheWarmingService {
     private final Optional<CacheManager> cacheManager;
 
     public CacheWarmingService(FrameworkRepository frameworkRepository,
-            FrameworkCategoryRepository frameworkCategoryRepository,
+            FrameworkTypeRepository frameworkTypeRepository,
             FrameworkLanguageRepository frameworkLanguageRepository,
             ServiceTypeRepository serviceTypeRepository,
-            HostTypeRepository hostTypeRepository,
+            ServerTypeRepository serverTypeRepository,
             EnvironmentTypeRepository environmentTypeRepository,
-            LibraryCategoryRepository libraryCategoryRepository,
+            LibraryTypeRepository libraryTypeRepository,
             ServiceRepository serviceRepository,
             DeploymentRepository deploymentRepository,
             Optional<CacheManager> cacheManager) {
         this.frameworkRepository = frameworkRepository;
-        this.frameworkCategoryRepository = frameworkCategoryRepository;
+        this.frameworkTypeRepository = frameworkTypeRepository;
         this.frameworkLanguageRepository = frameworkLanguageRepository;
         this.serviceTypeRepository = serviceTypeRepository;
-        this.hostTypeRepository = hostTypeRepository;
+        this.serverTypeRepository = serverTypeRepository;
         this.environmentTypeRepository = environmentTypeRepository;
-        this.libraryCategoryRepository = libraryCategoryRepository;
+        this.libraryTypeRepository = libraryTypeRepository;
         this.serviceRepository = serviceRepository;
         this.deploymentRepository = deploymentRepository;
         this.cacheManager = cacheManager;
@@ -104,9 +104,9 @@ public class CacheWarmingService {
         log.debug("Warming static lookup caches...");
 
         try {
-            // Framework Categories
-            List<FrameworkCategory> categories = frameworkCategoryRepository.findAll();
-            log.debug("Pre-loaded {} framework categories", categories.size());
+            // Framework Types
+            List<FrameworkType> frameworkTypes = frameworkTypeRepository.findAll();
+            log.debug("Pre-loaded {} framework types", frameworkTypes.size());
 
             // Framework Languages
             List<FrameworkLanguage> languages = frameworkLanguageRepository.findAll();
@@ -116,27 +116,27 @@ public class CacheWarmingService {
             List<ServiceType> serviceTypes = serviceTypeRepository.findAll();
             log.debug("Pre-loaded {} service types", serviceTypes.size());
 
-            // Host Types
-            List<HostType> hostTypes = hostTypeRepository.findAll();
-            log.debug("Pre-loaded {} host types", hostTypes.size());
+            // Server Types
+            List<ServerType> serverTypes = serverTypeRepository.findAll();
+            log.debug("Pre-loaded {} server types", serverTypes.size());
 
             // Environment Types
             List<EnvironmentType> environmentTypes = environmentTypeRepository.findAll();
             log.debug("Pre-loaded {} environment types", environmentTypes.size());
 
-            // Library Categories
-            List<LibraryCategory> libraryCategories = libraryCategoryRepository.findAll();
-            log.debug("Pre-loaded {} library categories", libraryCategories.size());
+            // Library Types
+            List<LibraryType> libraryTypes = libraryTypeRepository.findAll();
+            log.debug("Pre-loaded {} library types", libraryTypes.size());
 
-            // Frameworks (load after categories and languages)
+            // Frameworks (load after types and languages)
             List<Framework> frameworks = frameworkRepository.findAll();
             log.debug("Pre-loaded {} frameworks", frameworks.size());
 
             // Trigger caching by name for frequently accessed items
-            categories.forEach(c -> frameworkCategoryRepository.findByName(c.getName()));
+            frameworkTypes.forEach(ft -> frameworkTypeRepository.findByName(ft.getName()));
             languages.forEach(l -> frameworkLanguageRepository.findByName(l.getName()));
             serviceTypes.forEach(st -> serviceTypeRepository.findByName(st.getName()));
-            hostTypes.forEach(ht -> hostTypeRepository.findByName(ht.getName()));
+            serverTypes.forEach(st -> serverTypeRepository.findByName(st.getName()));
             environmentTypes.forEach(et -> environmentTypeRepository.findByName(et.getName()));
 
             log.info("Static lookup caches warmed successfully");
@@ -202,10 +202,6 @@ public class CacheWarmingService {
             if (cache == null) {
                 return false;
             }
-
-            // Check if cache has any entries
-            // Note: This is a basic check. For production, you might want more
-            // sophisticated logic
             return cache.get("*") != null;
         } catch (Exception e) {
             log.debug("Error checking cache population for {}: {}", cacheName, e.getMessage());

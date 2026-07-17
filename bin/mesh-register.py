@@ -108,6 +108,7 @@ class Candidate:
     description: str = ""
     startup: str = ""
     workspace_path: str = ""
+    health_cmd: str | None = None  # shell command for health check (Docker, CLI)
 
 
 # Every service we have either built in this session or know is live
@@ -123,7 +124,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "WorkRequest orchestrator (conduit-mcp). Plan lifecycle: proposed "
             "→ planning → pending → active → completed. Exposes /state."
         ),
-        startup="cd typescript/conduit-mcp && npm run dev",
+        startup="systemd: systemctl --user start conduit-mcp.service",
         workspace_path="nexus/typescript/conduit-mcp",
     ),
     Candidate(
@@ -137,7 +138,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "/api/agent-records, /api/requirements, /api/systems, "
             "/api/harvests (also projected via nebula-mcp SSE @ 3102)."
         ),
-        startup="cd typescript/nebula-srv && npm run dev",
+        startup="systemd: systemctl --user start nebula-srv.service",
         workspace_path="nexus/typescript/nebula-srv",
     ),
     Candidate(
@@ -145,12 +146,31 @@ CANDIDATES: tuple[Candidate, ...] = (
         port=3102,
         kind="mcp_server",
         transport_type="sse",
-        health_url="http://localhost:3102/sse",
+        # Probe uses the non-streaming /health endpoint rather than /sse:
+        # the SSE handler holds the connection open, which causes curl /
+        # urllib.request.urlopen to time out at PROBE_TIMEOUT_SECONDS and
+        # mark the server OFFLINE even when the socket is healthy. The
+        # /health endpoint returns a small JSON body and closes.
+        health_url="http://localhost:3102/health",
         description=(
             "SSE wrapper around nebula-srv so stdio-only MCP clients (e.g. "
             "Claude Desktop) can speak to the canonical DB API."
         ),
-        startup="cd typescript/nebula-mcp && npm run dev:sse",
+        startup="systemd: systemctl --user start nebula-mcp-sse.service",
+        workspace_path="nexus/typescript/nebula-mcp",
+    ),
+    Candidate(
+        name="nebula-mcp",
+        port=None,
+        kind="mcp_server",
+        transport_type="stdio",
+        health_url="",
+        description=(
+            "Stdio MCP server for Nebula RMS. Client-launched (not a daemon). "
+            "Referenced by dependency edges as the primary Nebula MCP "
+            "consumer of nebula-srv."
+        ),
+        startup="cd typescript/nebula-mcp && npm run dev",
         workspace_path="nexus/typescript/nebula-mcp",
     ),
     Candidate(
@@ -163,7 +183,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "Vision REST proxy on its DEFAULT port (3103). vision-mcp's "
             "VISION_SRV_URL defaults to this URL."
         ),
-        startup="cd typescript/vision-srv && PORT=3103 npm run dev",
+        startup="systemd: systemctl --user start vision-srv.service",
         workspace_path="nexus/typescript/vision-srv",
     ),
     Candidate(
@@ -177,7 +197,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "vision-mcp reads VISION_SRV_URL env to choose between this and "
             "vision-srv on 3103."
         ),
-        startup="cd typescript/vision-srv && PORT=3104 npm run dev",
+        startup="systemd: systemctl --user start vision-srv-3104.service",
         workspace_path="nexus/typescript/vision-srv",
     ),
     Candidate(
@@ -187,7 +207,7 @@ CANDIDATES: tuple[Candidate, ...] = (
         transport_type="streamable-http",
         health_url="http://localhost:3400/health",
         description="Tackle MCP server (already up before this session).",
-        startup="cd typescript/tackle-mcp && npm run dev",
+        startup="systemd: systemctl --user start tackle-mcp.service",
         workspace_path="nexus/typescript/tackle-mcp",
     ),
     Candidate(
@@ -200,7 +220,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "Spring Boot kernel for the plugin-execution bus (PEB). Started "
             "Jun22; PID held in main JVM module nexus/jvm/spring/."
         ),
-        startup="cd jvm/spring/peb-kernel && mvn -pl peb-bootstrap spring-boot:run",
+        startup="systemd: systemctl --user start peb-kernel.service",
         workspace_path="nexus/jvm/spring/peb-kernel",
     ),
     Candidate(
@@ -212,20 +232,21 @@ CANDIDATES: tuple[Candidate, ...] = (
         description=(
             "Spring broker gateway. Pre-existing JVM service, started Jun21."
         ),
-        startup="cd jvm/spring/broker-gateway && mvn spring-boot:run",
-        workspace_path="nexus/jvm/spring/broker-gateway",
+        startup="systemd: systemctl --user start broker-gateway.service",
+        workspace_path="nexus/jvm/spring/service-broker/broker-gateway",
     ),
     Candidate(
-        name="topology-server",
+        name="terrain",
         port=8084,
         kind="runnable_service",
         service_type="Spring Boot",
         health_url="http://localhost:8084/actuator/health",
         description=(
-            "JVM TopologyServerApplication — second consumer of the "
-            "terrain.* schema; runs Spring Boot 3.x. PID 93734."
+            "JVM TopologyServerApplication — Spring Boot 3.x consumer of "
+            "the terrain.* schema. Registered as 'terrain' for backward "
+            "compatibility with existing dependency edges. Systemd-managed."
         ),
-        startup="cd jvm/spring/terrain && mvn spring-boot:run",
+        startup="systemd: systemctl --user start terrain.service",
         workspace_path="nexus/jvm/spring/terrain",
     ),
     Candidate(
@@ -239,7 +260,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "locations (device/, logo/, ui/shared/, ui/3d-fluency/, "
             "ui/neon/, ui/plastina-3d)."
         ),
-        startup="cd typescript/image-server && npm run start",
+        startup="systemd: systemctl --user start image-server.service",
         workspace_path="nexus/typescript/image-server",
     ),
     Candidate(
@@ -261,13 +282,169 @@ CANDIDATES: tuple[Candidate, ...] = (
         port=None,
         kind="mcp_server",
         transport_type="stdio",
+        # Stdio-only candidate; no HTTP health endpoint. Use the systemd
+        # unit as the liveness proxy: terrain-mcp.service is a stdio
+        # launcher stub with RemainAfterExit=yes, so is-active returns 0
+        # once the unit has been started even with no client currently
+        # spawned. This measures "MCP launch stub loaded", not "actively
+        # serving requests". A return of "inactive" correctly reflects a
+        # not-yet-registered unit (a transient bootstrap condition).
+        # Replaces the prior behaviour of always writing OFFLINE because
+        # probe_one() short-circuited on empty health_url alone.
         health_url="",
+        health_cmd="systemctl --user is-active terrain-mcp.service",
         description=(
             "TS stdio MCP server. Read+write surface over terrain.* tables. "
             "Not currently running on a TCP port — stdio-only."
         ),
         startup="cd typescript/terrain-mcp && npm run dev",
         workspace_path="nexus/typescript/terrain-mcp",
+    ),
+    Candidate(
+        name="address-tts",
+        port=8600,
+        kind="runnable_service",
+        service_type="Python Service",
+        health_url="http://localhost:8600/health",
+        description=(
+            "TTS speech projection layer. NATS subscriber on "
+            "nexus.kernel.v1.transition.> — speaks work request events. "
+            "REST API: POST /synthesize, POST /speak, GET /health. "
+            "Engine: Piper TTS (en_US-lessac-medium)."
+        ),
+        startup="systemd: systemctl --user start address-tts.service",
+        workspace_path="nexus/python/address/tts",
+    ),
+    Candidate(
+        name="address-tts-mcp",
+        port=3105,
+        kind="mcp_server",
+        transport_type="streamable-http",
+        health_url="http://localhost:3105/health",
+        description=(
+            "MCP server for Address TTS. Agent-facing interface: "
+            "tts_synthesize, tts_speak, tts_health. Proxies to "
+            "address-tts REST API on port 8600."
+        ),
+        startup="systemd: systemctl --user start address-tts-mcp.service",
+        workspace_path="nexus/typescript/address-tts-mcp",
+    ),
+    Candidate(
+        name="vision-srv-py",
+        port=8003,
+        kind="runnable_service",
+        service_type="Python Service",
+        health_url="http://localhost:8003/health",
+        description=(
+            "Python FastAPI/uvicorn LOSM backend. Provides REST API for "
+            "vision services on port 8003. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start vision-srv-py.service",
+        workspace_path="nexus/python/vision/vision-srv",
+    ),
+    Candidate(
+        name="role-memory-srv",
+        port=3500,
+        kind="runnable_service",
+        service_type="Microservice",
+        health_url="http://localhost:3500/health",
+        description=(
+            "PG-to-Redis sync server for the Role Memory Procedure Registry. "
+            "Reads tackle.memory + tackle.role_memory from PostgreSQL and "
+            "populates Redis keys. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start role-memory-srv.service",
+        workspace_path="nexus/typescript/role-memory-srv",
+    ),
+    Candidate(
+        name="wrp-bridge-daemon",
+        port=None,
+        kind="runnable_service",
+        service_type="Python Service",
+        health_url="",
+        health_cmd="systemctl --user is-active wrp-bridge-daemon.service",
+        description=(
+            "Conduit -> Kernel bridge daemon. Syncs receipts from "
+            "vision.receipts to the WRP Kernel Runtime. Polls every 30s. "
+            "Systemd-managed; no HTTP port."
+        ),
+        startup="systemd: systemctl --user start wrp-bridge-daemon.service",
+        workspace_path="nexus/python/conduit",
+    ),
+    Candidate(
+        name="redis",
+        port=6379,
+        kind="runnable_service",
+        service_type="Database",
+        health_url="",
+        health_cmd="docker exec atomic-redis-dev redis-cli ping | grep -q PONG",
+        description=(
+            "Redis in-memory cache via Docker (atomic-redis-dev). "
+            "Used by role-memory-srv and tackle-mcp. Systemd-managed "
+            "(oneshot). Auto-prunes old Docker artifacts before start."
+        ),
+        startup="systemd: systemctl --user start redis.service",
+        workspace_path="nexus/bin/start-redis-docker.sh",
+    ),
+    Candidate(
+        name="mongodb",
+        port=27017,
+        kind="runnable_service",
+        service_type="Database",
+        health_url="",
+        health_cmd="docker exec atomic-mongodb mongo --eval 'db.runCommand({ping:1})' --quiet 2>/dev/null | grep -q ok",
+        description=(
+            "MongoDB document database via Docker (atomic-mongodb). "
+            "Systemd-managed (oneshot). Auto-prunes old Docker artifacts "
+            "before start."
+        ),
+        startup="systemd: systemctl --user start mongodb.service",
+        workspace_path="nexus/bin/start-mongodb-docker.sh",
+    ),
+    Candidate(
+        name="service-registry",
+        port=8085,
+        kind="runnable_service",
+        service_type="Spring Boot",
+        health_url="http://localhost:8085/actuator/health",
+        description=(
+            "Nexus service discovery and registration. Spring Boot app "
+            "with PostgreSQL + Redis caching. Exposes REST API for "
+            "service lookup and health aggregation. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start service-registry.service",
+        workspace_path="nexus/jvm/spring/service-registry",
+    ),
+    Candidate(
+        name="assembly-mcp",
+        port=3107,
+        kind="mcp_server",
+        transport_type="streamable-http",
+        health_url="http://localhost:3107/health",
+        description=(
+            "MCP server for the assembly (social/deliberation) schema - "
+            "agent short-route to forums, threads, posts, and bridge "
+            "tables to nebula artifacts. Express + JSON-RPC over POST / on "
+            "ASSEMBLY_MCP_PORT (default 3107). Talks to Postgres directly; "
+            "no dependency on nebula-srv at the network layer. "
+            "Note: 3107 chosen to avoid collision with nebula-mcp-sse@3102."
+        ),
+        startup="cd typescript/assembly-mcp && bash scripts/mcp-daemon.sh start",
+        workspace_path="nexus/typescript/assembly-mcp",
+    ),
+    Candidate(
+        name="timeclock-mcp",
+        port=3600,
+        kind="mcp_server",
+        transport_type="streamable-http",
+        health_url="http://localhost:3600/healthz",
+        description=(
+            "MCP server for agent timeclock. Tracks session clock-in/out "
+            "by role and model. Provides heartbeat, active session query, "
+            "session log, and timeout cleanup. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start timeclock.service",
+        workspace_path="nexus/python/timeclock",
     ),
 )
 
@@ -296,9 +473,14 @@ DEPENDENCIES: tuple[tuple[str, str, str, str], ...] = (
     ("mcp_server", "nebula-mcp", "runnable_service", "nebula-srv"),
     ("mcp_server", "conduit-mcp", "runnable_service", "nebula-srv"),
     ("mcp_server", "tackle-mcp", "runnable_service", "nebula-srv"),
+    ("mcp_server", "tackle-mcp", "runnable_service", "redis"),
     ("mcp_server", "terrain-mcp", "runnable_service", "terrain"),
     ("runnable_service", "broker-gateway", "runnable_service", "nebula-srv"),
     ("runnable_service", "vision-srv", "runnable_service", "nebula-srv"),
+    ("runnable_service", "vision-srv-py", "runnable_service", "nebula-srv"),
+    ("runnable_service", "role-memory-srv", "runnable_service", "redis"),
+    ("runnable_service", "wrp-bridge-daemon", "runnable_service", "nebula-srv"),
+    ("mcp_server", "timeclock-mcp", "runnable_service", "nebula-srv"),
 )
 
 
@@ -315,6 +497,50 @@ class ProbeResult:
 
 
 def probe_one(c: Candidate) -> ProbeResult:
+    # ── Docker / CLI health check ────────────────────────────────────
+    if c.health_cmd:
+        try:
+            proc = subprocess.run(
+                ["bash", "-c", c.health_cmd],
+                capture_output=True, text=True, timeout=PROBE_TIMEOUT_SECONDS,
+            )
+            if proc.returncode == 0:
+                return ProbeResult(
+                    candidate=c,
+                    reachable=True,
+                    http_status=200,
+                    body_excerpt=proc.stdout.strip()[:120],
+                )
+            return ProbeResult(
+                candidate=c,
+                reachable=False,
+                error=f"health_cmd exited {proc.returncode}: {proc.stderr.strip()[:120]}",
+            )
+        except (subprocess.TimeoutExpired, OSError) as e:
+            return ProbeResult(
+                candidate=c,
+                reachable=False,
+                error=f"health_cmd failed: {e}",
+            )
+
+    # Refuse streaming-shaped endpoints up-front. urlopen() against
+    # /sse, /events, /ws, or /stream holds the connection open and
+    # exhausts PROBE_TIMEOUT_SECONDS, silently reporting OFFLINE even
+    # when the socket is healthy. Surface this as an actionable error
+    # so candidate authors wire up /health or health_cmd instead.
+    if c.health_url and any(
+        c.health_url.endswith(sfx)
+        for sfx in ("/sse", "/events", "/ws", "/stream")
+    ):
+        return ProbeResult(
+            candidate=c,
+            reachable=False,
+            error=(
+                f"streaming endpoint; configure /health or health_cmd "
+                f"instead of {c.health_url}"
+            ),
+        )
+
     if not c.health_url:
         return ProbeResult(
             candidate=c,
@@ -324,6 +550,34 @@ def probe_one(c: Candidate) -> ProbeResult:
     req = urllib.request.Request(c.health_url, headers={"Accept": "*/*"})
     try:
         with urllib.request.urlopen(req, timeout=PROBE_TIMEOUT_SECONDS) as r:
+            # Inspect Content-Type BEFORE reading the body. urllib only
+            # reads response headers here; the body stream is still
+            # untouched, so closing via the `with` exit tears down the
+            # stream without consuming chunked frames. This catches
+            # streaming endpoints whose URL shape does not advertise
+            # SSE/WS, e.g. notify, /stream/agent-events, gRPC-web.
+            #
+            # Use the canonical media type (lowercased, parameter-
+            # stripped) and exact match against the marker set, rather
+            # than a substring scan, so vendor extensions whose media
+            # type contains "event-stream" as a substring do not falsely
+            # reject. RFC 9110 §8.3 lets servers vary case; lower-case
+            # before compare.
+            ctype = str(r.headers.get("Content-Type", "")).lower().split(";", 1)[0].strip()
+            if ctype in (
+                "text/event-stream",
+                "multipart/x-mixed-replace",
+                "application/grpc-web",
+            ):
+                return ProbeResult(
+                    candidate=c,
+                    reachable=False,
+                    error=(
+                        f"streaming endpoint detected via Content-Type "
+                        f"({ctype!r}); configure /health or health_cmd "
+                        f"instead of {c.health_url}"
+                    ),
+                )
             body = r.read(512).decode(errors="replace")
             return ProbeResult(
                 candidate=c,

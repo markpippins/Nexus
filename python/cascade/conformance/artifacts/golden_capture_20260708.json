@@ -1,0 +1,140 @@
+{
+  "capture_id": "fc782fa8-0a1d-4281-98d0-b2210e245ab2",
+  "started_at": "2026-07-08T01:22:16.465939+00:00",
+  "completed_at": "2026-07-08T01:22:40.790798+00:00",
+  "events": [
+    {
+      "subject": "nexus.kernel.v1.transition.observation.captured",
+      "received_at": "2026-07-08T01:22:24.054144+00:00",
+      "envelope": {
+        "event_id": "0dcd88f1-0267-4f78-b2b4-3cd2140030b6",
+        "event_type": "observation.captured",
+        "event_version": 1,
+        "occurred_at": "2026-07-08 01:22:18.918769+00",
+        "origin_system": "nexus",
+        "origin_component": "kernel",
+        "domain": "kernel",
+        "ccnf_version": null,
+        "epoch_id": null,
+        "actor": null,
+        "intent": null,
+        "correlation_id": "0dcd88f1-0267-4f78-b2b4-3cd2140030b6",
+        "causation_id": null,
+        "source_event_ids": [],
+        "execution_id": null,
+        "classification": "internal",
+        "policy_version": null,
+        "subject": "nexus.kernel.v1.transition.observation.captured",
+        "payload": {
+          "id": "0dcd88f1-0267-4f78-b2b4-3cd2140030b6",
+          "type": "observation.captured",
+          "timestamp": "2026-07-08 01:22:18.918769+00",
+          "source": "kernel",
+          "payload": {
+            "aggregate_type": "observation",
+            "aggregate_id": "b6259ba4-0d68-4429-98dd-54d504d734e3",
+            "actor": "rover",
+            "raw": {
+              "actor": "rover",
+              "event_id": "0dcd88f1-0267-4f78-b2b4-3cd2140030b6",
+              "timestamp": "2026-07-08 01:22:18.918769+00",
+              "event_type": "observation.captured",
+              "aggregate_id": "b6259ba4-0d68-4429-98dd-54d504d734e3",
+              "aggregate_type": "observation"
+            }
+          }
+        }
+      },
+      "raw_bytes_size": 1076
+    },
+    {
+      "subject": "nexus.kernel.v1.transition.assessment.completed",
+      "received_at": "2026-07-08T01:22:24.161918+00:00",
+      "envelope": {
+        "event_id": "d2e89404-08c3-456a-8543-7f88eb493620",
+        "event_type": "assessment.completed",
+        "event_version": 1,
+        "occurred_at": "2026-07-08 01:22:24.139269+00",
+        "origin_system": "nexus",
+        "origin_component": "kernel",
+        "domain": "kernel",
+        "ccnf_version": null,
+        "epoch_id": null,
+        "actor": null,
+        "intent": null,
+        "correlation_id": "d2e89404-08c3-456a-8543-7f88eb493620",
+        "causation_id": null,
+        "source_event_ids": [],
+        "execution_id": null,
+        "classification": "internal",
+        "policy_version": null,
+        "subject": "nexus.kernel.v1.transition.assessment.completed",
+        "payload": {
+          "id": "d2e89404-08c3-456a-8543-7f88eb493620",
+          "type": "assessment.completed",
+          "timestamp": "2026-07-08 01:22:24.139269+00",
+          "source": "kernel",
+          "payload": {
+            "aggregate_type": "assessment",
+            "aggregate_id": "dd515c99-6943-4f51-bc7f-6c65e0dcef9d",
+            "actor": "cascade",
+            "raw": {
+              "actor": "cascade",
+              "event_id": "d2e89404-08c3-456a-8543-7f88eb493620",
+              "timestamp": "2026-07-08 01:22:24.139269+00",
+              "event_type": "assessment.completed",
+              "aggregate_id": "dd515c99-6943-4f51-bc7f-6c65e0dcef9d",
+              "aggregate_type": "assessment"
+            }
+          }
+        }
+      },
+      "raw_bytes_size": 1078
+    },
+    {
+      "subject": "nexus.kernel.v1.transition.assessment.completed",
+      "received_at": "2026-07-08T01:22:29.172194+00:00",
+      "envelope": {
+        "event_id": "d2e89404-08c3-456a-8543-7f88eb493620",
+        "event_type": "assessment.completed",
+        "event_version": 1,
+        "occurred_at": "2026-07-08 01:22:24.139269+00",
+        "origin_system": "nexus",
+        "origin_component": "kernel",
+        "domain": "kernel",
+        "ccnf_version": null,
+        "epoch_id": null,
+        "actor": null,
+        "intent": null,
+        "correlation_id": "d2e89404-08c3-456a-8543-7f88eb493620",
+        "causation_id": null,
+        "source_event_ids": [],
+        "execution_id": null,
+        "classification": "internal",
+        "policy_version": null,
+        "subject": "nexus.kernel.v1.transition.assessment.completed",
+        "payload": {
+          "id": "d2e89404-08c3-456a-8543-7f88eb493620",
+          "type": "assessment.completed",
+          "timestamp": "2026-07-08 01:22:24.139269+00",
+          "source": "kernel",
+          "payload": {
+            "aggregate_type": "assessment",
+            "aggregate_id": "dd515c99-6943-4f51-bc7f-6c65e0dcef9d",
+            "actor": "cascade",
+            "raw": {
+              "actor": "cascade",
+              "event_id": "d2e89404-08c3-456a-8543-7f88eb493620",
+              "timestamp": "2026-07-08 01:22:24.139269+00",
+              "event_type": "assessment.completed",
+              "aggregate_id": "dd515c99-6943-4f51-bc7f-6c65e0dcef9d",
+              "aggregate_type": "assessment"
+            }
+          }
+        }
+      },
+      "raw_bytes_size": 1078
+    }
+  ],
+  "pg_receipts": []
+}

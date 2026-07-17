@@ -92,6 +92,23 @@ class IdentityEngine:
         """Return the number of unique identities tracked."""
         return len(self._identities)
 
+    def remove(self, identity_id: str) -> bool:
+        """Remove an identity and its node mappings.
+
+        Args:
+            identity_id: The identity ID to remove.
+
+        Returns:
+            True if the identity was found and removed, False otherwise.
+        """
+        identity = self._identities.pop(identity_id, None)
+        if identity is None:
+            return False
+        # Remove all node_id → identity_id mappings for this identity
+        for alias in list(identity.aliases):
+            self._node_map.pop(alias, None)
+        return True
+
     def reset(self) -> None:
         """Clear all identity state. Used for test isolation."""
         self._node_map.clear()

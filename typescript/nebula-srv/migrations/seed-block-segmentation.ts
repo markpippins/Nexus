@@ -121,7 +121,11 @@ async function seed(): Promise<void> {
 
           for (const block of blocks) {
             const blockType: string = block.type || 'paragraph';
-            const content: string = block.content || '';
+            // List blocks store items in `items` array; fall back to formatting them
+            let content: string = block.content || '';
+            if (!content && block.items && Array.isArray(block.items)) {
+              content = block.items.map((item: string) => `- ${item}`).join('\n');
+            }
             const contentHash = hashContent(content);
             const provenance = block.provenance || {};
 

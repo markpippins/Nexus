@@ -1,0 +1,35 @@
+[Unit]
+Description=Broker Gateway — Nexus service broker gateway (Spring Boot, port 8081)
+Documentation=https://github.com/nexus/jvm/spring/service-broker/broker-gateway
+After=network.target postgresql.service service-registry.service
+Wants=postgresql.service service-registry.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/jvm/spring/service-broker/broker-gateway
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=SERVER_PORT=8081
+Environment=JAVA_HOME=/usr
+Environment=MAVEN_OPTS=-Xmx512m
+Environment=PATH=/usr/bin:/bin:/usr/local/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/usr/bin/mvn spring-boot:run
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=10
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/jvm/spring/service-broker/broker-gateway /home/codex/.m2
+
+[Install]
+WantedBy=default.target

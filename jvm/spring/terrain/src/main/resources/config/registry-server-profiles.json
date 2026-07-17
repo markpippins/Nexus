@@ -1,9 +1,9 @@
 [
   {
-    "profileId": "strontium",
-    "name": "Strontium Registry",
-    "registryServerUrl": "http://strontium:8085",
-    "imageUrl": "http://strontium:9081",
+    "profileId": "titanium",
+    "name": "Titanium",
+    "registryServerUrl": "http://localhost:8085",
+    "imageUrl": "http://localhost:9081",
     "isActive": true,
     "description": "Default local service registry"
   }

@@ -11,5 +11,7 @@ import java.util.Optional;
 public interface EnvironmentTypeRepository extends JpaRepository<EnvironmentType, Long> {
     Optional<EnvironmentType> findByName(String name);
 
+    Optional<EnvironmentType> findByNameIgnoreCase(String name);
+
     List<EnvironmentType> findByNameContainingIgnoreCase(String name);
 }

@@ -1,0 +1,39 @@
+[Unit]
+Description=WRP Bridge Daemon — conduit → kernel receipt sync loop
+Documentation=https://github.com/nexus/python/conduit/bridge
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/python/conduit
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=PYTHONUNBUFFERED=1
+Environment=CONDUIT_PG_DSN=postgres://pguser:pgpass@localhost:5432/nexus
+Environment=POLL_INTERVAL=30
+Environment=LOG_LEVEL=INFO
+Environment=PATH=/home/codex/opt/anaconda3/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/opt/anaconda3/bin/python3 -m bridge.daemon
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=10
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/python/conduit
+
+# Nice the daemon — it's a background sync loop, not latency-sensitive
+Nice=10
+
+[Install]
+WantedBy=default.target

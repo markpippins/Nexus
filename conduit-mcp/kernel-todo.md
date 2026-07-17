@@ -2,14 +2,20 @@
 
 ## What was built
 
-### API Layer (FastAPI on port 3102)
-- **POST /delta/** — ingest a KernelDelta, runs the 5-step reduce pipeline,
+### Architecture Decision (2026-07-04): in-process, no HTTP layer
+
+The wrp-kernel was previously framed as a FastAPI service on port 3102 with HTTP delta ingestion. **It is now an in-process Python library** at `python/conduit/wrp_kernel/`. The bridge daemon (`python/conduit/bridge/daemon.py` → `bridge/sync/syncer.py`) imports `wrp_kernel.engine.KernelEngine` and calls `engine.reduce(delta)` directly — no HTTP boundary, no `POST /delta/`, no port binding. The endpoints listed below are therefore **aspirational, not running**. If/when wrp-kernel is re-introduced as a service, those endpoints describe the boundary.
+
+For the live status of the kernel as of 2026-07-04, see `python/conduit/wrp_kernel/engine.py` (5-step reduce), `python/conduit/bridge/daemon.py` (in-process caller), `nexus/audit/WRP_PIPELINE_FLOW.md` (reconciled diagram), and `mcp_server_standalone_discrepancies` in `nexus/graph/nexus-knowledge-graph.json` (canonical note).
+
+>Aspirational HTTP boundary (NOT in use):
+- ~~**POST /delta/**~~ — ingest a KernelDelta, runs the 5-step reduce pipeline,
   persists to PG, returns new kernel version
-- **GET /delta/state** — summary of current kernel state
-- **GET /state/** — full kernel state (summary or full view)
-- **GET /state/health** — health check
-- **GET /state/lineage** — lineage event history from PG
-- **GET /replay/** — KSRA reconstruction at any version
+- ~~**GET /delta/state**~~ — summary of current kernel state
+- ~~**GET /state/**~~ — full kernel state (summary or full view)
+- ~~**GET /state/health**~~ — health check
+- ~~**GET /state/lineage**~~ — lineage event history from PG
+- ~~**GET /replay/**~~ — KSRA reconstruction at any version
 - **GET /replay/compare** — compare live engine vs replay (integrity check)
 
 ### Storage Layer (PostgreSQL via SQLAlchemy)

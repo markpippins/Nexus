@@ -43,7 +43,8 @@ public class MountService {
         defaultMount.setName("My Files");
         defaultMount.setType("user-home");
         defaultMount.setDefaultMount(true);
-        defaultMount.setRootPath(List.of("users", alias, "default"));
+        // FsRequest prepends ["users", alias] — mount rootPath is relative to that
+        defaultMount.setRootPath(List.of("default"));
 
         return List.of(defaultMount);
     }

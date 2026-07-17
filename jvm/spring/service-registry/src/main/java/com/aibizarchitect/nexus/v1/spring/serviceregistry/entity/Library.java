@@ -1,9 +1,7 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.entity;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -18,7 +16,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "library")
+@Table(name = "libraries")
 public class Library {
 
     @Id
@@ -33,7 +31,7 @@ public class Library {
 
     @ManyToOne
     @JoinColumn(name = "category_id")
-    private LibraryCategory category;
+    private LibraryType category;
 
     @ManyToOne
     @JoinColumn(name = "language_id")
@@ -66,8 +64,7 @@ public class Library {
     @Column
     private LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "library")
-    private Set<ServiceLibrary> serviceLibraries = new HashSet<>();
+
 
     public Library() {
     }
@@ -96,11 +93,11 @@ public class Library {
         this.description = description;
     }
 
-    public LibraryCategory getCategory() {
+    public LibraryType getCategory() {
         return category;
     }
 
-    public void setCategory(LibraryCategory category) {
+    public void setCategory(LibraryType category) {
         this.category = category;
     }
 
@@ -184,13 +181,6 @@ public class Library {
         this.updatedAt = updatedAt;
     }
 
-    public Set<ServiceLibrary> getServiceLibraries() {
-        return serviceLibraries;
-    }
-
-    public void setServiceLibraries(Set<ServiceLibrary> serviceLibraries) {
-        this.serviceLibraries = serviceLibraries;
-    }
 
     @PrePersist
     protected void onCreate() {

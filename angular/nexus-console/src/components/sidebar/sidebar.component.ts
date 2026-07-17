@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, signal, inject, Renderer2, NgZone, OnDestroy, input, output, HostListener, ElementRef, computed, ViewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, inject, Renderer2, NgZone, OnDestroy, input, output, HostListener, ElementRef, computed, ViewChild, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FileSystemNode } from '../../models/file-system.model.js';
 import { TreeViewComponent } from '../tree-view/tree-view.component.js';
@@ -18,6 +18,7 @@ import { ServiceInstance } from '../../models/service-mesh.model.js';
 import { ArchitectureVizService } from '../../services/architecture-viz.service.js';
 import { NodeType } from '../../models/component-config.js';
 
+
 @Component({
   selector: 'app-sidebar',
   templateUrl: './sidebar.component.html',
@@ -31,14 +32,13 @@ export class SidebarComponent implements OnDestroy {
   private uiPreferencesService = inject(UiPreferencesService);
   private serviceMeshService = inject(ServiceMeshService);
   private vizService = inject(ArchitectureVizService);
-
   folderTree = input<FileSystemNode | null>(null);
   currentPath = input.required<string[]>();
   getImageService = input.required<(path: string[]) => ImageService>();
   getProvider = input.required<(path: string[]) => FileSystemProvider>();
   isTreeVisible = input(true);
   isNotesVisible = input(true);
-  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms'>('file-explorer');
+  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'tackle-ui' | 'kanban' | 'cascade-ui'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console'); // Sub-mode when in service-mesh
   graphSubView = input<'canvas' | 'creator'>('canvas'); // Sub-view when in graph mode
 
@@ -50,6 +50,7 @@ export class SidebarComponent implements OnDestroy {
 
   meshViewModeChange = output<'console' | 'graph'>(); // For toggling between console and graph
   refreshServices = output<void>(); // For refreshing service mesh data
+  collapsePalette = output<void>();
   serversMenuClick = output<void>();
   hostServersMenuClick = output<void>();
   localConfigMenuClick = output<void>();
@@ -70,13 +71,15 @@ export class SidebarComponent implements OnDestroy {
   dependencies = computed(() => this.serviceMeshService.dependencies());
   deployments = computed(() => this.serviceMeshService.deployments());
   selectedService = this.serviceMeshService.selectedService;
-  isIframeMode = computed(() => this.viewMode() === 'conduit-ui' || this.viewMode() === 'duality' || this.viewMode() === 'plurality' || this.viewMode() === 'nebula-rms');
+  isIframeMode = computed(() => this.viewMode() === 'conduit-ui' || this.viewMode() === 'duality' || this.viewMode() === 'plurality' || this.viewMode() === 'assembly' || this.viewMode() === 'nebula-rms' || this.viewMode() === 'tackle-ui' || this.viewMode() === 'cascade-ui');
+
 
   width = signal(this.uiPreferencesService.sidebarWidth() ?? 288);
   isResizing = signal(false);
   treeExpansionCommand = signal<{ command: 'expand' | 'collapse', id: number } | null>(null);
+  expandedPaths = signal(new Set<string>());
   isHamburgerMenuOpen = signal(false);
-  showRunningOnly = signal(false); // Filter to show only running services
+  showRunningOnly = input(false); // Filter to show only running services
 
   // --- Vertical Resizing State for internal panes ---
   // We keep treePaneHeight around only if we want to refer to it, but now Tree will be flex-1
@@ -109,6 +112,53 @@ export class SidebarComponent implements OnDestroy {
   confirmDialogConfig = signal<{ title: string; message: string; confirmText: string }>({ title: '', message: '', confirmText: 'OK' });
 
   currentProvider = computed(() => this.getProvider()(this.currentPath()));
+
+  constructor() {
+    // Prune stale expanded paths when the tree structure changes (e.g., a profile disconnects).
+    // Walks the full tree to validate each path, not just the root segment — this prevents
+    // intermediate nodes from being collapsed during tree rebuilds (e.g., when a gateway
+    // connects and the "File Systems" node gets populated with children).
+    effect(() => {
+      const tree = this.folderTree();
+      if (!tree?.children) return;
+
+      untracked(() => {
+        const current = this.expandedPaths();
+        let changed = false;
+        const next = new Set(current);
+
+        for (const key of next) {
+          if (!key) continue;
+          // Walk the tree to verify this full path exists in the current tree
+          const segments = key.split('/').filter(s => s.length > 0);
+          let found = true;
+          let currentNode: FileSystemNode | undefined | null = tree;
+
+          for (const segment of segments) {
+            if (!currentNode?.children) {
+              found = false;
+              break;
+            }
+            const child: FileSystemNode | undefined = currentNode.children.find(c => c.name === segment);
+            if (!child) {
+              found = false;
+              break;
+            }
+            currentNode = child;
+          }
+
+          if (!found) {
+            next.delete(key);
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          this.expandedPaths.set(next);
+        }
+      });
+    });
+  }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event) {
@@ -227,16 +277,43 @@ export class SidebarComponent implements OnDestroy {
     this.refreshServices.emit();
   }
 
-  onToggleShowRunningOnly(): void {
-    this.showRunningOnly.update(v => !v);
-  }
-
   onExpandAll(): void {
     this.treeExpansionCommand.set({ command: 'expand', id: Date.now() });
   }
 
   onCollapseAll(): void {
     this.treeExpansionCommand.set({ command: 'collapse', id: Date.now() });
+  }
+
+  onToggleExpand(event: { path: string[]; expanded: boolean }): void {
+    const key = event.path.join('/');
+    this.expandedPaths.update(set => {
+      const next = new Set(set);
+      if (event.expanded) {
+        next.add(key);
+      } else {
+        next.delete(key);
+      }
+      return next;
+    });
+  }
+
+  onExpandPath(path: string[]): void {
+    const key = path.join('/');
+    this.expandedPaths.update(set => {
+      const next = new Set(set);
+      next.add(key);
+      return next;
+    });
+  }
+
+  onCollapsePath(path: string[]): void {
+    const key = path.join('/');
+    this.expandedPaths.update(set => {
+      const next = new Set(set);
+      next.delete(key);
+      return next;
+    });
   }
 
   onLoadChildren(path: string[]): void {

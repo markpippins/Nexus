@@ -66,3 +66,12 @@ app-nav-toolbar {
   border-radius: 1px;
   opacity: 0.6;
 }
+
+.nav-toolbar-spacer {
+  flex: 1;
+  min-height: 0;
+}
+
+.nav-toolbar-theme-btn {
+  flex-shrink: 0;
+}

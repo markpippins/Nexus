@@ -6,7 +6,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -31,7 +31,7 @@ import com.aibizarchitect.nexus.v1.spring.serviceregistry.client.ServicesConsole
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.config.TestJpaConfig;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.controller.DeploymentController;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Deployment;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Host;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Server;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
@@ -54,7 +54,7 @@ class DeploymentControllerTest {
 
     private Deployment testDeployment;
     private Service testService;
-    private Host testServer;
+    private Server testServer;
 
     @BeforeEach
     void setUp() {
@@ -62,14 +62,14 @@ class DeploymentControllerTest {
         testService.setId(1L);
         testService.setName("Test Service");
 
-        testServer = new Host();
+        testServer = new Server();
         testServer.setId(1L);
         testServer.setHostname("test-server");
 
         testDeployment = new Deployment();
         testDeployment.setId(1L);
         testDeployment.setService(testService);
-        testDeployment.setHost(testServer);
+        testDeployment.setServer(testServer);
         testDeployment.setVersion("1.0.0");
         testDeployment.setStatus("RUNNING");
         testDeployment.setHealthStatus("HEALTHY");
@@ -139,40 +139,6 @@ class DeploymentControllerTest {
         mockMvc.perform(put("/api/v1/deployments/1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"version\":\"1.0.0\"}"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void updateDeploymentStatus_Success() throws Exception {
-        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
-        when(deploymentRepository.save(any(Deployment.class))).thenReturn(testDeployment);
-
-        mockMvc.perform(patch("/api/v1/deployments/1/status").param("status", "STOPPED"))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void updateDeploymentStatus_NotFound() throws Exception {
-        when(deploymentRepository.findById(1L)).thenReturn(Optional.empty());
-
-        mockMvc.perform(patch("/api/v1/deployments/1/status").param("status", "STOPPED"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void updateDeploymentHealth_Success() throws Exception {
-        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
-        when(deploymentRepository.save(any(Deployment.class))).thenReturn(testDeployment);
-
-        mockMvc.perform(patch("/api/v1/deployments/1/health").param("healthStatus", "UNHEALTHY"))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    void updateDeploymentHealth_NotFound() throws Exception {
-        when(deploymentRepository.findById(1L)).thenReturn(Optional.empty());
-
-        mockMvc.perform(patch("/api/v1/deployments/1/health").param("healthStatus", "UNHEALTHY"))
                 .andExpect(status().isNotFound());
     }
 

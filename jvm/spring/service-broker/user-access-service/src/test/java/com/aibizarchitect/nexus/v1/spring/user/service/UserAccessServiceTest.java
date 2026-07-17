@@ -7,6 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.UUID;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -38,7 +39,8 @@ class UserAccessServiceTest {
         testUser.setAlias("testuser");
         testUser.setEmail("test@example.com");
         testUser.setIdentifier("testpass");
-        testUser.setId(1L);
+        testUser.setPassword("testpass");
+        testUser.setId(UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
     }
 
     @Test
@@ -53,7 +55,7 @@ class UserAccessServiceTest {
         assertNotNull(result);
         assertEquals("testuser", result.getAlias());
         assertEquals("test@example.com", result.getEmail());
-        assertEquals("1", result.getId()); // ID is converted to String in DTO
+        assertEquals("123e4567-e89b-12d3-a456-426614174000", result.getId()); // UUID converted to String in DTO
         verify(userRepository, times(1)).findByAlias("testuser");
     }
 

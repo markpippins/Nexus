@@ -1,6 +1,10 @@
 """
 KernelSnapshot — versioned state checkpoints for the WRP kernel.
 
+This module re-exports KernelSnapshot from nexus_core.wrp.kernel (the canonical
+definition). The SnapshotStore (in-memory store with nearest-ancestor lookup)
+is conduit-specific and remains here.
+
 Snapshots are checkpoints of KernelState at a specific version. They
 accelerate reconstruction by allowing the system to start from the
 closest previous checkpoint and replay only intervening deltas.
@@ -15,28 +19,9 @@ Design:
 Design reference: kernel-projection-answers.md §7 (snapshot.py + KSRA)
 """
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
-
-@dataclass
-class KernelSnapshot:
-    """A versioned checkpoint of KernelState.
-
-    Fields:
-        version: KernelState version at the time of this snapshot.
-        state: Serialized KernelState dict (plans, receipts, graph, etc.).
-        identity_hash: Hash of the identity engine state for integrity checks.
-        graph_hash: Hash of the graph index state for integrity checks.
-        lineage_cursor: Version of the last lineage event included.
-        metadata: Optional metadata (timestamp, source, etc.).
-    """
-    version: int
-    state: dict
-    identity_hash: Optional[str] = None
-    graph_hash: Optional[str] = None
-    lineage_cursor: Optional[int] = None
-    metadata: Optional[dict] = None
+from nexus_core.wrp.kernel import KernelSnapshot
 
 
 class SnapshotStore:
@@ -95,3 +80,6 @@ class SnapshotStore:
     def reset(self) -> None:
         """Clear all snapshots. Used for test isolation."""
         self._snapshots.clear()
+
+
+__all__ = ["KernelSnapshot", "SnapshotStore"]

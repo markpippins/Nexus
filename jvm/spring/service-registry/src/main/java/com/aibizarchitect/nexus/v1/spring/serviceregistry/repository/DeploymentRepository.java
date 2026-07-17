@@ -7,15 +7,15 @@ import org.springframework.stereotype.Repository;
 
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Deployment;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.EnvironmentType;
-import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Host;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Server;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
 
 @Repository
 public interface DeploymentRepository extends JpaRepository<Deployment, Long> {
     List<Deployment> findByService(Service service);
     List<Deployment> findByService_Id(Long serviceId);
-    List<Deployment> findByHost(Host host);
-    List<Deployment> findByHost_Id(Long hostId);
+    List<Deployment> findByServer(Server server);
+    List<Deployment> findByServer_Id(Long serverId);
     List<Deployment> findByStatus(String status);
     List<Deployment> findByEnvironment(EnvironmentType environment);
     List<Deployment> findByEnvironment_Id(Long environmentId);
@@ -23,8 +23,8 @@ public interface DeploymentRepository extends JpaRepository<Deployment, Long> {
 
     org.springframework.data.domain.Page<Deployment> findByService(Service service, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Deployment> findByService_Id(Long serviceId, org.springframework.data.domain.Pageable pageable);
-    org.springframework.data.domain.Page<Deployment> findByHost(Host host, org.springframework.data.domain.Pageable pageable);
-    org.springframework.data.domain.Page<Deployment> findByHost_Id(Long hostId, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByServer(Server server, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Page<Deployment> findByServer_Id(Long serverId, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Deployment> findByStatus(String status, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Deployment> findByEnvironment(EnvironmentType environment, org.springframework.data.domain.Pageable pageable);
     org.springframework.data.domain.Page<Deployment> findByEnvironment_Id(Long environmentId, org.springframework.data.domain.Pageable pageable);
@@ -36,7 +36,7 @@ public interface DeploymentRepository extends JpaRepository<Deployment, Long> {
     }
 
     default List<Deployment> findByHostId(Long hostId) {
-        return findByHost_Id(hostId);
+        return findByServer_Id(hostId);
     }
 
     default List<Deployment> findByEnvironmentId(Long environmentId) {

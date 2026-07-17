@@ -1,15 +1,18 @@
 import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { PlatformManagementService, Host } from '../../services/platform-management.service.js';
+import { PlatformManagementService, Server, SystemItem, getCategoryEndpointType } from '../../services/platform-management.service.js';
+import { UpsertServerDialogComponent } from './upsert-server-dialog/upsert-server-dialog.component.js';
+import { ServiceMeshService } from '../../services/service-mesh.service.js';
+import { ComponentRegistryService } from '../../services/component-registry.service.js';
 import { ServiceInstance, Framework, Deployment, Library } from '../../models/service-mesh.model.js';
 import { UpsertServiceDialogComponent } from './upsert-service-dialog/upsert-service-dialog.component.js';
 import { UpsertFrameworkDialogComponent } from './upsert-framework-dialog/upsert-framework-dialog.component.js';
 import { UpsertDeploymentDialogComponent } from './upsert-deployment-dialog/upsert-deployment-dialog.component.js';
-import { UpsertHostDialogComponent } from './upsert-host-dialog/upsert-host-dialog.component.js';
 import { LookupListComponent } from './lookup-list/lookup-list.component.js';
 import { UpsertLookupDialogComponent } from './upsert-lookup-dialog/upsert-lookup-dialog.component.js';
 import { UpsertLibraryDialogComponent } from './upsert-library-dialog/upsert-library-dialog.component.js';
-import { ServiceLibrariesDialogComponent } from './service-libraries-dialog/service-libraries-dialog.component.js';
+import { UpsertSystemDialogComponent } from './upsert-system-dialog/upsert-system-dialog.component.js';
+import { CategoriesViewComponent } from './categories-view/categories-view.component.js';
 import { LookupItem } from '../../services/platform-management.service.js';
 
 @Component({
@@ -19,11 +22,12 @@ import { LookupItem } from '../../services/platform-management.service.js';
         UpsertServiceDialogComponent,
         UpsertFrameworkDialogComponent,
         UpsertDeploymentDialogComponent,
-        UpsertHostDialogComponent,
+        UpsertServerDialogComponent,
         LookupListComponent,
         UpsertLookupDialogComponent,
         UpsertLibraryDialogComponent,
-        ServiceLibrariesDialogComponent
+        UpsertSystemDialogComponent,
+        CategoriesViewComponent
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -41,7 +45,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                     {{ error() }}
                 </div>
             } @else {
-                @switch (managementType()) {
+                @switch (displayType()) {
                     @case ('services') {
                         <div class="flex flex-col h-full">
                             <!-- Services List -->
@@ -114,7 +118,6 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     </span>
                                                 </td>
                                                 <td class="p-2 py-1.5 text-right">
-                                                    <button (click)="onManageServiceLibraries(service)" class="text-purple-500 hover:underline mr-3 text-xs">Libraries</button>
                                                     <button (click)="onEdit(service)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
                                                     <button (click)="onDelete(service)" class="text-red-500 hover:underline text-xs">Delete</button>
                                                 </td>
@@ -123,11 +126,67 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             <tr>
                                                 <td colspan="5" class="p-8 text-center text-[rgb(var(--color-text-muted))]">No services found.</td>
                                             </tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
+                                        }                                </tbody>
+                            </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1 || totalItems() > 0) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
+                    </div>
                     }
                     @case ('libraries') {
                         <div class="overflow-x-auto flex-1">
@@ -197,15 +256,64 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                     }
                                 </tbody>
                             </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1 || totalItems() > 0) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
-                    }
-                    @case ('library-categories') {
-                         <app-lookup-list
-                            [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
                     }
                     @case ('frameworks') {
                          <div class="overflow-x-auto">
@@ -266,6 +374,63 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                     }
                                 </tbody>
                             </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1 || totalItems() > 0) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
                     @case ('deployments') {
@@ -331,7 +496,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </td>
                                             <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.environment }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.host?.hostname }}</td>
+                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.server?.hostname }}</td>
                                             <td class="p-2 py-1.5">
                                                  <span [class]="'px-2 py-0.5 rounded-full text-xs font-medium ' + getStatusClass(d.status)">
                                                     {{ d.status }}
@@ -350,11 +515,68 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                     }
                                 </tbody>
                             </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1 || totalItems() > 0) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
                     }
-                    @case ('hosts') {
+                    @case ('servers') {
                         <div class="flex flex-col h-full">
-                            <!-- Hosts List -->
+                            <!-- Hosts / Servers List -->
                             <div class="overflow-x-auto flex-1">
                                 <table class="w-full text-left border-collapse">
                                     <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
@@ -375,10 +597,10 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th (click)="onSort('hostTypeId')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('serverTypeId')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Type
-                                                    @if (sortState().column === 'hostTypeId') {
+                                                    @if (sortState().column === 'serverTypeId') {
                                                         <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
                                                     }
                                                 </div>
@@ -387,7 +609,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        @for (h of hosts(); track h.id) {
+                                        @for (h of servers(); track h.id) {
                                             <tr 
                                                 tabindex="0"
                                                 (dblclick)="onEdit(h)"
@@ -396,7 +618,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             >
                                                 <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))] font-medium">{{ h.hostname }}</td>
                                                 <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.ipAddress || '-' }}</td>
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.hostTypeId || '-' }}</td>
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.serverTypeId || '-' }}</td>
                                                 <td class="p-2 py-1.5 text-right whitespace-nowrap">
                                                     <button (click)="onEdit(h)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
                                                     <button (click)="onDelete(h)" class="text-red-500 hover:underline text-xs">Delete</button>
@@ -409,44 +631,77 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 </td>
                                             </tr>
                                         }
-                                    </tbody>
-                                </table>
-                            </div>
+                                </tbody>
+                            </table>
+                            <!-- Pagination -->
+                            @if (totalPages() > 1 || totalItems() > 0) {
+                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                        {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <!-- Rows per page selector -->
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <select
+                                                (change)="onPageSizeChange($event)"
+                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            >
+                                                @for (s of pageSizes; track s) {
+                                                    <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button
+                                                (click)="onPrevPage()"
+                                                [disabled]="currentPage() === 0"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() === 0
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                ← Previous
+                                            </button>
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
+                                            </span>
+                                            <button
+                                                (click)="onNextPage()"
+                                                [disabled]="currentPage() >= totalPages() - 1"
+                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                [class]="currentPage() >= totalPages() - 1
+                                                    ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                    : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                            >
+                                                Next →
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
                         </div>
-                    }
-                    @case ('host-types') {
-                         <app-lookup-list
+                    </div>
+                }
+                @case ('categories') {
+                        <app-categories-view
                             [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
-                    }
-                    @case ('service-types') {
-                        <app-lookup-list
-                            [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
+                            [filteredType]="filteredCategoryType()"
+                            (onEdit)="onCategoriesEdit($event)"
+                            (onDelete)="onCategoriesDelete($event)"
+                        ></app-categories-view>
                     }
                     @case ('framework-languages') {
-                         <app-lookup-list
-                            [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
-                    }
-                    @case ('framework-vendors') {
-                         <app-lookup-list
-                            [items]="lookupData()"
-                            [type]="managementType()"
-                            (onEdit)="onEdit($event)"
-                            (onDelete)="onDelete($event)"
-                        ></app-lookup-list>
-                    }
-                    @case ('framework-categories') {
                          <app-lookup-list
                             [items]="lookupData()"
                             [type]="managementType()"
@@ -469,6 +724,123 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             (onEdit)="onEdit($event)"
                             (onDelete)="onDelete($event)"
                         ></app-lookup-list>
+                    }
+                    @case ('systems') {
+                        <div class="flex flex-col h-full">
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+                                        <tr>
+                                            <th (click)="onSort('name')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Name
+                                                    @if (sortState().column === 'name') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('type')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Type
+                                                    @if (sortState().column === 'type') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th (click)="onSort('description')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                                <div class="flex items-center">
+                                                    Description
+                                                    @if (sortState().column === 'description') {
+                                                        <span class="ml-1">{{ sortState().direction === 'asc' ? '↑' : '↓' }}</span>
+                                                    }
+                                                </div>
+                                            </th>
+                                            <th class="p-2 font-semibold text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @for (s of rawSystems(); track s.id) {
+                                            <tr 
+                                                tabindex="0"
+                                                (dblclick)="onEdit(s)"
+                                                (keydown.enter)="onEdit(s)"
+                                                class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]"
+                                            >
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))] font-medium">{{ s.name }}</td>
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.type || '-' }}</td>
+                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))] text-sm max-w-md truncate">{{ s.description || '-' }}</td>
+                                                <td class="p-2 py-1.5 text-right whitespace-nowrap">
+                                                    <button (click)="onEdit(s)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
+                                                    <button (click)="onDelete(s)" class="text-red-500 hover:underline text-xs">Delete</button>
+                                                </td>
+                                            </tr>
+                                        } @empty {
+                                            <tr>
+                                                <td colspan="4" class="p-8 text-center text-[rgb(var(--color-text-muted))]">
+                                                    No systems found.
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                                <!-- Pagination -->
+                                @if (totalPages() > 1 || totalItems() > 0) {
+                                    <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                        <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                            {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex items-center gap-1.5">
+                                                <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                                <select
+                                                    (change)="onPageSizeChange($event)"
+                                                    class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                                >
+                                                    @for (s of pageSizes; track s) {
+                                                        <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <button
+                                                    (click)="onPrevPage()"
+                                                    [disabled]="currentPage() === 0"
+                                                    class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                    [class]="currentPage() === 0
+                                                        ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                        : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                                >
+                                                    ← Previous
+                                                </button>
+                                                <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                    <span>Page</span>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        [max]="totalPages()"
+                                                        [value]="currentPage() + 1"
+                                                        (keydown.enter)="goToPage($event)"
+                                                        (blur)="goToPage($event)"
+                                                        class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                    >
+                                                    <span>of {{ totalPages() }}</span>
+                                                </span>
+                                                <button
+                                                    (click)="onNextPage()"
+                                                    [disabled]="currentPage() >= totalPages() - 1"
+                                                    class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                    [class]="currentPage() >= totalPages() - 1
+                                                        ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
+                                                        : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
+                                                >
+                                                    Next →
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
                     }
                     @default {
                         <div class="p-8 text-center text-[rgb(var(--color-text-muted))]">
@@ -504,18 +876,18 @@ import { LookupItem } from '../../services/platform-management.service.js';
             (saved)="onDeploymentSaved()"
         ></app-upsert-deployment-dialog>
 
-        <app-upsert-host-dialog
-            [isOpen]="isHostDialogOpen()"
+        <app-upsert-server-dialog
+            [isOpen]="isServerDialogOpen()"
             [baseUrl]="baseUrl()"
-            [host]="selectedHostForEdit()"
-            (close)="onHostDialogClose()"
-            (saved)="onHostSaved()"
-        ></app-upsert-host-dialog>
+            [server]="selectedServerForEdit()"
+            (close)="onServerDialogClose()"
+            (saved)="onServerSaved()"
+        ></app-upsert-server-dialog>
 
         <app-upsert-lookup-dialog
             [isOpen]="isLookupDialogOpen()"
             [baseUrl]="baseUrl()"
-            [type]="managementType()"
+            [type]="editLookupType()"
             [item]="selectedLookupForEdit()"
             (close)="onLookupDialogClose()"
             (saved)="onLookupSaved()"
@@ -530,14 +902,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
             ></app-upsert-library-dialog>
         }
 
-        @if (isServiceLibrariesDialogOpen() && selectedServiceForLibraries()) {
-            <app-service-libraries-dialog
+        @if (isSystemDialogOpen()) {
+            <app-upsert-system-dialog
                 [baseUrl]="baseUrl()"
-                [service]="selectedServiceForLibraries()!"
-                (closed)="onServiceLibrariesDialogClose()"
-            ></app-service-libraries-dialog>
+                [system]="selectedSystemForEdit()"
+                (saved)="onSystemSaved()"
+                (cancelled)="onSystemDialogClose()"
+            ></app-upsert-system-dialog>
         }
-
 
     </div>
   `
@@ -553,20 +925,34 @@ export class PlatformManagementComponent {
     private lastProcessedActionId = 0;
 
     platformService = inject(PlatformManagementService);
+    private serviceMeshService = inject(ServiceMeshService);
+    private componentRegistry = inject(ComponentRegistryService);
 
     // Data Signals
     // Data Signals (Raw)
     private rawServices = signal<ServiceInstance[]>([]);
     private rawFrameworks = signal<Framework[]>([]);
     private rawDeployments = signal<Deployment[]>([]);
-    private rawHosts = signal<Host[]>([]);
+    private rawServers = signal<Server[]>([]);
     private rawLibraries = signal<Library[]>([]);
+    private rawSystems = signal<SystemItem[]>([]);
 
     loading = signal(false);
     error = signal<string | null>(null);
 
     // Sort State
     sortState = signal<{ column: string; direction: 'asc' | 'desc' }>({ column: 'name', direction: 'asc' });
+
+    // Pagination State
+    currentPage = signal(0);
+    totalPages = signal(0);
+    totalItems = signal(0);
+    perPage = signal(100);
+    readonly pageSizes = [25, 50, 100];
+
+    // Computed pagination display helpers
+    pageStartIndex = computed(() => this.currentPage() * this.perPage() + 1);
+    pageEndIndex = computed(() => Math.min((this.currentPage() + 1) * this.perPage(), this.totalItems()));
 
     // Computed Sorted Signals
     services = computed(() => {
@@ -631,7 +1017,7 @@ export class PlatformManagementComponent {
             switch (col) {
                 case 'service': return item.service?.name;
                 case 'environment': return item.environment;
-                case 'server': return item.host?.hostname;
+                case 'server': return item.server?.hostname;
                 case 'status': return item.status;
                 case 'version': return item.version;
                 default: return (item as any)[col];
@@ -639,12 +1025,12 @@ export class PlatformManagementComponent {
         });
     });
 
-    hosts = computed(() => {
-        return this.sortData(this.rawHosts(), this.sortState(), (item, col) => {
+    servers = computed(() => {
+        return this.sortData(this.rawServers(), this.sortState(), (item, col) => {
             switch (col) {
                 case 'hostname': return item.hostname;
                 case 'ipAddress': return item.ipAddress;
-                case 'type': return item.hostTypeId;
+                case 'type': return item.serverTypeId;
                 case 'os': return item.operatingSystemId;
                 case 'status': return item.status;
                 default: return (item as any)[col];
@@ -665,6 +1051,17 @@ export class PlatformManagementComponent {
         });
     });
 
+    systems = computed(() => {
+        return this.sortData(this.rawSystems(), this.sortState(), (item, col) => {
+            switch (col) {
+                case 'name': return item.name;
+                case 'type': return item.type;
+                case 'description': return item.description;
+                default: return (item as any)[col];
+            }
+        });
+    });
+
     // Dialog State
     isServiceDialogOpen = signal(false);
     selectedServiceForEdit = signal<ServiceInstance | null>(null);
@@ -675,21 +1072,55 @@ export class PlatformManagementComponent {
     isDeploymentDialogOpen = signal(false);
     selectedDeploymentForEdit = signal<Deployment | null>(null);
 
-    isHostDialogOpen = signal(false);
-    selectedHostForEdit = signal<Host | null>(null);
+    isServerDialogOpen = signal(false);
+    selectedServerForEdit = signal<Server | null>(null);
 
     // Lookup State
     lookupData = signal<LookupItem[]>([]);
     isLookupDialogOpen = signal(false);
     selectedLookupForEdit = signal<LookupItem | null>(null);
 
+    /** Override type for the upsert-lookup-dialog when editing from the unified categories view. */
+    private _categoriesEditType = signal<string | null>(null);
+
+    /**
+     * The effective lookup type to pass to the upsert-lookup-dialog.
+     * Normally {@link managementType}, but overridden to the specific
+     * endpoint type (e.g. 'framework-categories') when editing from
+     * the unified categories view.
+     */
+    editLookupType = computed(() => this._categoriesEditType() ?? this.managementType());
+
+    /**
+     * Display type for the template switch — normalizes {@code categories:*} to {@code categories}
+     * so child nodes under Categories render the same categories view.
+     */
+    displayType = computed(() => {
+        const t = this.managementType();
+        if (t.startsWith('categories:')) return 'categories';
+        return t;
+    });
+
+    /**
+     * When managementType is {@code categories:{discriminator}}, extracts the discriminator
+     * (e.g. {@code framework_type}). Returns null otherwise.
+     */
+    filteredCategoryType = computed<string | null>(() => {
+        const t = this.managementType();
+        if (t.startsWith('categories:')) {
+            return t.slice('categories:'.length);
+        }
+        return null;
+    });
+
     // Library Dialog State
     isLibraryDialogOpen = signal(false);
     selectedLibraryForEdit = signal<Library | null>(null);
 
-    // Service Libraries Dialog State
-    isServiceLibrariesDialogOpen = signal(false);
-    selectedServiceForLibraries = signal<ServiceInstance | null>(null);
+    isSystemDialogOpen = signal(false);
+    selectedSystemForEdit = signal<SystemItem | null>(null);
+
+    // Service Libraries Dialog State (removed - service_libraries table dropped)
 
     // Tab State for Generic Service View
     activeTab = signal<string>('services');
@@ -699,10 +1130,14 @@ export class PlatformManagementComponent {
     constructor() {
         effect(() => {
             // Reset active tab when management type changes
-            if (this.managementType()) {
-                this.activeTab.set(this.managementType() === 'services' ? 'services' : this.managementType());
-                // Reset sort on type change
+            // Normalize categories:* to just 'categories' for the tab check
+            const type = this.managementType();
+            const displayType = type.startsWith('categories:') ? 'categories' : type;
+            if (displayType) {
+                this.activeTab.set(displayType === 'services' ? 'services' : displayType);
+                // Reset sort + page on type change
                 this.sortState.set({ column: 'name', direction: 'asc' });
+                this.currentPage.set(0);
             }
         });
 
@@ -743,7 +1178,10 @@ export class PlatformManagementComponent {
             let count = 0;
             let displayType = type;
 
-            switch (type) {
+            // Normalize categories:* for display in status bar
+            const statusType = type.startsWith('categories:') ? 'categories' : type;
+
+            switch (statusType) {
                 case 'services':
                     count = this.services().length;
                     displayType = 'Services';
@@ -756,24 +1194,24 @@ export class PlatformManagementComponent {
                     count = this.deployments().length;
                     displayType = 'Deployments';
                     break;
-                case 'hosts':
-                    count = this.hosts().length;
+                case 'servers':
+                    count = this.servers().length;
                     displayType = 'Servers';
                     break;
                 case 'libraries':
                     count = this.libraries().length;
                     displayType = 'Libraries';
                     break;
-                case 'service-types':
-                case 'host-types':
+                case 'categories':
                 case 'framework-languages':
-                case 'framework-vendors':
-                case 'framework-categories':
-                case 'library-categories':
                 case 'operating-systems':
                 case 'environments':
                     count = this.lookupData().length;
                     displayType = type.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    break;
+                case 'systems':
+                    count = this.systems().length;
+                    displayType = 'Systems';
                     break;
             }
 
@@ -821,42 +1259,67 @@ export class PlatformManagementComponent {
 
         // Determine what to load based on type and active tab
         // If type is services, we might be looking at a lookup map
-        const actualType = (type === 'services' && activeTab !== 'services') ? activeTab : type;
+        // Normalize categories:* to categories for data loading
+        const normalizedType = type.startsWith('categories:') ? 'categories' : type;
+        const actualType = (normalizedType === 'services' && activeTab !== 'services') ? activeTab : normalizedType;
+        const page = this.currentPage();
+        const size = this.perPage();
 
         try {
             switch (actualType) {
                 case 'services':
-                    console.log('[PlatformManagement] Fetching services from', `${url}/api/v1/services`);
-                    const s = await this.platformService.getServices(url);
-                    console.log('[PlatformManagement] Services loaded', s.length);
-                    this.rawServices.set(s);
+                    console.log('[PlatformManagement] Fetching services from', `${url}/api/v1/services?page=${page}&size=${size}`);
+                    const sResp = await this.platformService.getServices(url, page, size);
+                    console.log('[PlatformManagement] Services loaded', sResp.data.length, 'of', sResp.meta.total);
+                    this.rawServices.set(sResp.data);
+                    this.totalPages.set(sResp.meta.last_page);
+                    this.totalItems.set(sResp.meta.total);
+                    this.perPage.set(sResp.meta.per_page);
                     break;
                 case 'frameworks':
-                    const f = await this.platformService.getFrameworks(url);
-                    this.rawFrameworks.set(f);
+                    const fResp = await this.platformService.getFrameworks(url, page, size);
+                    this.rawFrameworks.set(fResp.data);
+                    this.totalPages.set(fResp.meta.last_page);
+                    this.totalItems.set(fResp.meta.total);
+                    this.perPage.set(fResp.meta.per_page);
                     break;
                 case 'deployments':
-                    const d = await this.platformService.getDeployments(url);
-                    this.rawDeployments.set(d);
+                    const dResp = await this.platformService.getDeployments(url, page, size);
+                    this.rawDeployments.set(dResp.data);
+                    this.totalPages.set(dResp.meta.last_page);
+                    this.totalItems.set(dResp.meta.total);
+                    this.perPage.set(dResp.meta.per_page);
                     break;
-                case 'hosts':
-                    const h = await this.platformService.getHosts(url);
-                    this.rawHosts.set(h);
+                case 'servers':
+                    const hResp = await this.platformService.getServers(url, page, size);
+                    this.rawServers.set(hResp.data);
+                    this.totalPages.set(hResp.meta.last_page);
+                    this.totalItems.set(hResp.meta.total);
+                    this.perPage.set(hResp.meta.per_page);
                     break;
-                case 'service-types':
-                case 'host-types':
+                case 'categories':
                 case 'framework-languages':
-                case 'framework-vendors':
-                case 'framework-categories':
-                case 'library-categories':
                 case 'operating-systems':
                 case 'environments':
-                    const l = await this.platformService.getLookup(url, actualType);
-                    this.lookupData.set(l);
+                    const lResp = await this.platformService.getLookup(url, actualType, page, size);
+                    this.lookupData.set(lResp.data);
+                    this.totalPages.set(lResp.meta.last_page);
+                    this.totalItems.set(lResp.meta.total);
+                    this.perPage.set(lResp.meta.per_page);
                     break;
                 case 'libraries':
-                    const libs = await this.platformService.getLibraries(url);
-                    this.rawLibraries.set(libs);
+                    const libsResp = await this.platformService.getLibraries(url, page, size);
+                    this.rawLibraries.set(libsResp.data);
+                    this.totalPages.set(libsResp.meta.last_page);
+                    this.totalItems.set(libsResp.meta.total);
+                    this.perPage.set(libsResp.meta.per_page);
+                    break;
+                case 'systems':
+                    const sysResp = await this.platformService.getSystems(url, page, size);
+                    this.rawSystems.set(sysResp.data);
+                    this.totalPages.set(sysResp.meta.last_page);
+                    this.totalItems.set(sysResp.meta.total);
+                    this.perPage.set(sysResp.meta.per_page);
                     break;
             }
         } catch (e) {
@@ -867,10 +1330,48 @@ export class PlatformManagementComponent {
         }
     }
 
+    onPrevPage() {
+        if (this.currentPage() > 0) {
+            this.currentPage.update(p => p - 1);
+        }
+    }
+
+    onNextPage() {
+        if (this.currentPage() < this.totalPages() - 1) {
+            this.currentPage.update(p => p + 1);
+        }
+    }
+
+    onPageSizeChange(event: Event) {
+        const size = Number((event.target as HTMLSelectElement).value);
+        this.perPage.set(size);
+        this.currentPage.set(0);
+    }
+
+    goToPage(event: Event) {
+        const input = event.target as HTMLInputElement;
+        const page = parseInt(input.value, 10);
+        if (isNaN(page) || page < 1 || page > this.totalPages()) {
+            input.value = String(this.currentPage() + 1);
+            return;
+        }
+        this.currentPage.set(page - 1);
+    }
+
     onAdd() {
         const type = this.managementType();
         const currentTab = this.activeTab();
         const actualType = (type === 'services' && currentTab !== 'services') ? currentTab : type;
+
+        // Handle categories with filter — open lookup dialog with the specific endpoint type
+        if (actualType.startsWith('categories:')) {
+            const filterType = actualType.slice('categories:'.length);
+            const endpointType = getCategoryEndpointType(filterType);
+            this._categoriesEditType.set(endpointType);
+            this.selectedLookupForEdit.set(null);
+            this.isLookupDialogOpen.set(true);
+            return;
+        }
 
         switch (actualType) {
             case 'services':
@@ -885,26 +1386,24 @@ export class PlatformManagementComponent {
                 this.selectedDeploymentForEdit.set(null);
                 this.isDeploymentDialogOpen.set(true);
                 break;
-            case 'hosts':
-                this.selectedHostForEdit.set(null);
-                this.isHostDialogOpen.set(true);
+            case 'servers':
+                this.selectedServerForEdit.set(null);
+                this.isServerDialogOpen.set(true);
                 break;
-            case 'service-types':
-            case 'host-types':
             case 'framework-languages':
-            case 'framework-vendors':
-            case 'framework-categories':
-            case 'library-categories':
             case 'operating-systems':
             case 'environments':
                 this.selectedLookupForEdit.set(null);
                 this.isLookupDialogOpen.set(true);
-                break;
-            case 'libraries':
-                this.selectedLibraryForEdit.set(null);
-                this.isLibraryDialogOpen.set(true);
-                break;
-        }
+                break;                case 'libraries':
+                    this.selectedLibraryForEdit.set(null);
+                    this.isLibraryDialogOpen.set(true);
+                    break;
+                case 'systems':
+                    this.selectedSystemForEdit.set(null);
+                    this.isSystemDialogOpen.set(true);
+                    break;
+            }
     }
 
     onEdit(item: any) {
@@ -925,15 +1424,11 @@ export class PlatformManagementComponent {
                 this.selectedDeploymentForEdit.set(item);
                 this.isDeploymentDialogOpen.set(true);
                 break;
-            case 'hosts':
-                this.selectedHostForEdit.set(item);
-                this.isHostDialogOpen.set(true);
+            case 'servers':
+                this.selectedServerForEdit.set(item);
+                this.isServerDialogOpen.set(true);
                 break;
-            case 'service-types':
-            case 'host-types':
             case 'framework-languages':
-            case 'framework-categories':
-            case 'library-categories':
             case 'operating-systems':
             case 'environments':
                 this.selectedLookupForEdit.set(item);
@@ -942,6 +1437,10 @@ export class PlatformManagementComponent {
             case 'libraries':
                 this.selectedLibraryForEdit.set(item);
                 this.isLibraryDialogOpen.set(true);
+                break;
+            case 'systems':
+                this.selectedSystemForEdit.set(item);
+                this.isSystemDialogOpen.set(true);
                 break;
         }
     }
@@ -965,14 +1464,10 @@ export class PlatformManagementComponent {
                 case 'deployments':
                     await this.platformService.deleteDeployment(url, Number(item.id));
                     break;
-                case 'hosts':
-                    await this.platformService.deleteHost(url, Number(item.id));
+                case 'servers':
+                    await this.platformService.deleteServer(url, Number(item.id));
                     break;
-                case 'service-types':
-                case 'host-types':
                 case 'framework-languages':
-                case 'framework-categories':
-                case 'library-categories':
                 case 'operating-systems':
                 case 'environments':
                     await this.platformService.deleteLookup(url, actualType, Number(item.id));
@@ -980,8 +1475,15 @@ export class PlatformManagementComponent {
                 case 'libraries':
                     await this.platformService.deleteLibrary(url, Number(item.id));
                     break;
+                case 'systems':
+                    await this.platformService.deleteSystem(url, Number(item.id));
+                    break;
             }
             this.loadData(); // Refresh
+            this.serviceMeshService.fetchAllData();
+            if (actualType === 'service-types') {
+                this.componentRegistry.refresh();
+            }
         } catch (e) {
             console.error('Delete failed', e);
             alert('Failed to delete item');
@@ -996,6 +1498,7 @@ export class PlatformManagementComponent {
 
     onServiceSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
 
     // Framework Dialog Handlers
@@ -1006,6 +1509,7 @@ export class PlatformManagementComponent {
 
     onFrameworkSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
 
     // Deployment Dialog Handlers
@@ -1016,16 +1520,18 @@ export class PlatformManagementComponent {
 
     onDeploymentSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
 
     // Server Dialog Handlers
-    onHostDialogClose() {
-        this.isHostDialogOpen.set(false);
-        this.selectedHostForEdit.set(null);
+    onServerDialogClose() {
+        this.isServerDialogOpen.set(false);
+        this.selectedServerForEdit.set(null);
     }
 
-    onHostSaved() {
+    onServerSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
 
     getStatusClass(status: string | undefined): string {
@@ -1050,14 +1556,51 @@ export class PlatformManagementComponent {
         }
     }
 
+    // --- Categories View Handlers -----------------------------
+
+    /**
+     * Handle edit event from the unified categories view.
+     * Overrides the dialog type to the specific endpoint type
+     * (e.g. 'framework-categories', 'server-types') so that the
+     * upsert dialog sends updates to the correct backend endpoint.
+     */
+    onCategoriesEdit(event: { item: LookupItem; type: string }) {
+        this._categoriesEditType.set(event.type);
+        this.selectedLookupForEdit.set(event.item);
+        this.isLookupDialogOpen.set(true);
+    }
+
+    /** Handle delete event from the unified categories view. */
+    async onCategoriesDelete(event: { item: LookupItem; type: string }) {
+        if (!confirm('Are you sure you want to delete this item?')) return;
+        const url = this.baseUrl();
+        if (!url) return;
+        try {
+            await this.platformService.deleteLookup(url, event.type, Number(event.item.id));
+            this.loadData();
+            this.serviceMeshService.fetchAllData();
+        } catch (e) {
+            console.error('Delete failed', e);
+            alert('Failed to delete item');
+        }
+    }
+
+    // -----------------------------------------------------------
+
     // Lookup Dialog Handlers
     onLookupDialogClose() {
+        this._categoriesEditType.set(null);
         this.isLookupDialogOpen.set(false);
         this.selectedLookupForEdit.set(null);
     }
 
     onLookupSaved() {
         this.loadData();
+        this.serviceMeshService.fetchAllData();
+        // Visual components (Default Visual Style) may have changed for service-types
+        if (this.managementType() === 'service-types') {
+            this.componentRegistry.refresh();
+        }
     }
 
     // Library Dialog Handlers
@@ -1072,14 +1615,17 @@ export class PlatformManagementComponent {
         this.loadData();
     }
 
-    // Service Libraries Dialog Handlers
-    onManageServiceLibraries(service: ServiceInstance) {
-        this.selectedServiceForLibraries.set(service);
-        this.isServiceLibrariesDialogOpen.set(true);
+    // System Dialog Handlers
+
+    onSystemDialogClose() {
+        this.isSystemDialogOpen.set(false);
+        this.selectedSystemForEdit.set(null);
     }
 
-    onServiceLibrariesDialogClose() {
-        this.isServiceLibrariesDialogOpen.set(false);
-        this.selectedServiceForLibraries.set(null);
+    onSystemSaved() {
+        this.loadData();
+        this.serviceMeshService.fetchAllData();
     }
+
 }
+

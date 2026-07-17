@@ -1,13 +1,12 @@
 package com.aibizarchitect.nexus.v1.spring.user.model;
 
 import java.io.Serializable;
+import java.util.UUID;
 
 import com.aibizarchitect.nexus.v1.user.UserRegistrationDTO;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
@@ -18,18 +17,18 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 /**
- * User registration entity stored in MySQL.
- * Single identifier pattern (auto-increment Long ID).
+ * User registration entity stored in the assembly schema (PostgreSQL).
+ * Uses UUID primary keys generated at the database level via gen_random_uuid().
  */
 @Entity
-@Table(name = "users")
+@Table(name = "users", schema = "assembly")
 public class UserRegistration implements Serializable {
 
     private static final long serialVersionUID = 2747813660378401172L;
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(columnDefinition = "UUID DEFAULT gen_random_uuid()")
+    private UUID id;
 
     @Column(nullable = false, unique = true, length = 100)
     @NotBlank(message = "Alias is required")
@@ -46,7 +45,7 @@ public class UserRegistration implements Serializable {
     private boolean admin = false;
 
     @Column(nullable = false, length = 255)
-    private String identifier;   // password
+    private String password;
 
     @Column(name = "created_at")
     @Temporal(TemporalType.TIMESTAMP)
@@ -58,6 +57,9 @@ public class UserRegistration implements Serializable {
 
     @PrePersist
     protected void onCreate() {
+        if (id == null) {
+            id = UUID.randomUUID();
+        }
         createdAt = new java.util.Date();
         updatedAt = new java.util.Date();
     }
@@ -69,7 +71,7 @@ public class UserRegistration implements Serializable {
 
     public UserRegistrationDTO toDTO() {
         UserRegistrationDTO dto = new UserRegistrationDTO();
-        dto.setId(getId() != null ? String.valueOf(getId()) : null);
+        dto.setId(getId() != null ? getId().toString() : null);
         dto.setAlias(getAlias());
         dto.setEmail(getEmail());
         dto.setAdmin(isAdmin());
@@ -93,11 +95,11 @@ public class UserRegistration implements Serializable {
     }
 
     // Getters and Setters
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 
@@ -133,20 +135,21 @@ public class UserRegistration implements Serializable {
         this.identifier = identifier;
     }
 
-    public java.util.Date getCreatedAt() {
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public java.util.Date getCreatedAt()
+ {
         return createdAt;
     }
 
     public void setCreatedAt(java.util.Date createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public String getIdentifier() {
-        return identifier;
-    }
-
-    public void setIdentifier(String identifier) {
-        this.identifier = identifier;
     }
 
     public java.util.Date getUpdatedAt() {

@@ -51,7 +51,7 @@ def compute_checksum(data: dict) -> str:
 
 def extract_description(item: dict) -> str:
     """Best-effort extraction of descriptive text for embedding."""
-    for key in ("description", "statement", "rationale"):
+    for key in ("description", "statement", "rationale", "goal"):
         val = item.get(key)
         if val and isinstance(val, str) and len(val) > 10:
             return val
@@ -65,7 +65,7 @@ def extract_description(item: dict) -> str:
 
 def extract_entity_type(item: dict) -> str:
     """Map the section-specific category/type/severity to a generic type."""
-    for key in ("category", "severity", "type"):
+    for key in ("category", "severity", "type", "role"):
         val = item.get(key)
         if val and isinstance(val, str):
             return val
@@ -170,6 +170,7 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
     ENTITY_SECTIONS = [
         "types", "actors", "epistemic_types", "state_machines",
         "architectural_observations", "decisions", "gaps_and_blockers",
+        "work_requests", "plans",
     ]
 
     entities: list[dict] = []
@@ -179,9 +180,10 @@ def migrate(kg_path: str, dry_run: bool = False) -> int:
     for section in ENTITY_SECTIONS:
         items = kg.get(section, [])
         for item in items:
-            entity_id = item.get("id", "")
+            # Plans use plan_number as their ID
+            entity_id = item.get("id", "") or item.get("plan_number", "")
             if not entity_id:
-                log.warning("  %s entry missing 'id', skipped", section)
+                log.warning("  %s entry missing 'id' or 'plan_number', skipped", section)
                 continue
 
             desc = extract_description(item)

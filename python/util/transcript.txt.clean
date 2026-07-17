@@ -1,179 +1,74 @@
-I've been a huge fan and advocate of markdown for as long as I can remember,
-even to the point where it hurt my career. I literally didn't apply to jobs at companies where I couldn't submit my markdown resume as my official resume
-for the company. I had my entire resume on my GitHub and if I had to or I was really interested, I would just submit a PDF with a single link to the markdown
-file on my GitHub. That's how dedicated I was. I just didn't think all of these fancy ways of presenting information mattered when we had a good, simple,
-reliable language for it specifically. I will always be incredibly thankful to John Gruber and Aaron Schwarz for creating something as magical as
-Markdown. Having such a simple, reliable way to just write content and have it come out and render so well, it still
-has a bit of a magical feel to it. As someone who tried really hard to make latte work in college, markdown once it clicked for me just kind of became how I
-write everything to this day. Which is why this article immediately grabbed my attention. Why the heck are we still using Markdown? As great as Markdown is,
-I am more than happy to agree we have went too far with it. Once we got to the point where we were making new file extensions to embed other types of
-content into our markdown, we were probably over the line. And now that we're in a world where we're using LLMs and agents and all of these things and
-Markdown is the method we communicate between them, it's getting even more questionable. I have a lot of different things I want to talk about with Markdown in the near future. Things like
-how Markdown is not the right primitive for memory or how Markdown is actually pretty good as a programming scripting language in specific scenarios, which
-we'll definitely talk a lot about in the future. But today, I want to question the fundamentals. Why are we still using Markdown? What makes it so great? and
-what would a better solution for the stuff we do today look like? I've barely even started and I can already imagine all of the Obsidian comments in my head.
-And if I know y'all love anything more than Obsidian, it's probably today's sponsor. I have a question for you.
-What's the most times you've committed code that didn't work just trying to fix CI? I've probably stacked up to 15 commits before just watching CI break
-again and again, and all I wanted was the ability to run it locally without having to make more commits. Ideally, in a way that doesn't even force me to leave my editor or my agent. Today's
-sponsor is RWX. I can tell you about how fast they are or how great they are to work with agents or how they run things in parallel so you don't have to wait for a bunch of stuff that's blocking
-when it doesn't have to be. There's a lot of reasons to use RWX, but I don't want to talk about any of that because I'm in love with the CLI. Once you write the YAML file for your CI, all you have
-to do is run their CLI to trigger a run without having to commit the code. So instead of committing, pushing, and waiting for the whole thing to run, you can just run a CLI command locally. It
-will then spin up a cloud instance that can still take advantage of all of the caching infra, and all the other things they do, right? and immediately get your feedback as to whether or not it worked.
-This should be enough to sell you. But when you combine it with their agent skill, suddenly it's like, "Oh yeah,
-seriously though, run loops are such a great solution to so many different problems. If you're working on a hard feature that you can test, go write the test, commit it, and then tell the
-agent, make sure CI passes by running the RWX run command, and then when it passes, commit and push." This is such a good workflow, and I'm amazed nothing
-else has it. And this is just the tip of the iceberg. The more you dig in, the more you'll appreciate RWX's unique way of fixing CI so that you will move faster instead of slower. Check out the CI that makes your agents faster at soy.
-Rwx. So, why the heck are we still using Markdown? There are few things in life that bring me much joy and hate at the same time, like a chocolate that hurts when eaten or markdown. Seriously, why?
-Half of the time we aren't even using the full language. Speaking of which,
-this is a bold opening. HTML is the best programming language. I know you've heard people say that the only programming language they know is HTML.
-And I know we both rolled our eyes in discontent trying to get our programming language papers out of assembled decks on of papers on how HTML is only a
-markup language and not a programming language. I mean, yes, we're on the right, but that guy probably has something that we don't have a life.
-Okay, already owned and the articles barely started. I I will have you know that my girlfriend loves when I talk
-about HTML and Markdown, but to each their own. Note, when the author is talking about markdown, he is specifically talking about common mark unless stated otherwise because it is
-the unambiguous syntax specification. I love the project. I really appreciate their efforts on making this language a bit more grounded. It's not the specification that's broken. It's the
-language itself. Oh boy, the good markdown is a minimal language used for type setting trivial documents. It needed to do one simple job. Get a markdown file and output an HTML file.
-It index is as legible as it gets and it's easy to write even with no assists.
-Like the C language, you can see the output that will be created. Bold is always open, closed, B tags at the end,
-and the italics are the same. Learning curve is simply non-existent if you're just a casual user. Just one look at the cheat sheet and you're ready. But now
-the bad. We don't know what we want. Do we want UI? Do we want a programming language? We don't know. The only reason feature creep exists is because of
-unclear specifications. You want a minimal, easily legible markup language. You have markdown. Simple as that,
-right? Well, here are two different syntaxes to generate the exact same output. You have the single hash for
-title, hello, stars for doing an italics here for I am, and then unambiguous,
-which you want bold, and then grammar in a block quote. This is roughly how I would write this. I would have used double stars for unambiguous, but I am
-what I am. Actually, actually, I would have used double stars for unambiguous and underscores for that. So, I guess I'm closer to here, but I would never have done the header syntax like this.
-God. Yeah, there is almost no syntax overlap between these other than the block quote at the end. Oh boy, I to
-have fun. I hope you have the two eyeballs enough to see that markdown is not what you asked for. These produce two identical outputs and this is just the tip of the iceberg. It has so many
-poor decisions baked in that if you try to use it, it will actively fight against you the moment you think you know what you're doing. Let's start with bold itallic and bold itallic. In
-markdown, you can write a bold in different ways. You have the double star syntax, double underscores, or the B tag. And these are just some of the ways a valid bold can be written. And these
-are for common mark. If you're using something which isn't marketing itself as common mark compliant, you can very well encounter valid stuff that produces
-the same input like this or this or Yeah. God. Yeah, we've had to deal with so much [ __ ] like this for T3 chat. You
-guys have no idea. It is so absurdly difficult to handle all the different weird cases for markdown rendering. But
-I will also personally say the edge cases for latte are even worse. So yeah,
-[snorts] and don't even get him started on layered ones like this. Oh god, I don't even want to try to parse this.
-Okay, we got the two star here. Then this one is an italic. So this whole section is bold here. This one is italicized. This is italicized.
-A is bolded here. Not italicized. This is reitalicized. Of is italicized. This
-is italics. And this is doubled the italics for the lead here. I think that hurt.
-or this. Oh no, no, please no. I'm not even going to try on that one. This thing is actually
-so peak that we have a class of parser vulnerabilities called redos, regular expression denial of service that are affecting this. Like this 6.9 severity
-level CVE for markdown. It this is a legit DOS vulnerability.
-You just put a bunch of stars in a link and it can't process it. Beautiful. Beautiful.
-Yeah, this string here takes 65,553 steps. That will [ __ ] over anything.
-Great. Super cool. We love that.
-So, how much worse can it possibly get here? Exhibit B. Am was a good idea. But this in old languages where compilers
-were producing optimal code like a river in a desert, inline assembly helped them write performance critical code with ease in the cost of the compiler
-engineers blood, sweat, tears in the birth of their firstborn son. Yeah,
-writing your inline assembly to get perfect code is hellish. It's one of the reasons that a project like ffmpeg is so tough but also so important. Inline as
-allowed stuff like simd operations before the compiler support in for them.
-You want an overview of early SIMD generation failures, you can take a look at those here. Oh god, that's the last thing I want to look at. Now, let's take this wonderful idea and bolt it directly
-into the most bloated singlethreaded sandboxed environment, expecting a simple and easy way to write documents.
-And that's how inline HTML inside Markdown was born. Oh boy. Inline HTML allows you to do stuff like this. I've
-had so many problems with inline HTML in Markdown personally that I am even more on this author side now. Yeah, I am an
-insert simple programmer doing span class fancy text elegant close span programming div class animation. And
-here's my portfolio clos. Isn't this just simple? Isn't this just neat? The main reason why correct markdown parsing is exceptionally hard isn't because
-markdown syntax is so hard to comprehend. It's only onetenth of the issue. The real issue is that to ship a markdown parser, you also need to ship a
-friendly HTML parser. You're using HTML inside of Markdown. Why not use HTML from the start? Fair. I actually remember now friend of the channel who
-might even be here right now, Jacob Evans tried really hard a while back and it looks like he has given it up since,
-but he tried super hard to have a single markdown file for his GitHub profile and for his homepage by serving the markdown
-as HTML because there's enough overlap that hypothetically you could write a valid HTML homepage and have it render
-as your profile as well without code between the two. literally the same exact bites for both. And the results were hellish. He tried really hard to
-make it work. But man, it was very fun watching him try. Markdown in and of itself isn't powerful enough to satisfy the simple monkey brain developers like
-the author who's only satisfied when the site looks good enough. Good enough in this case means it needs to have at least basic latex support with tix support with the ability to install
-packages, plant UML, mermaid, custom styling, custom short codes, tagging and taxonomy, proper footnotes, bib tech
-support. I don't want a simple job from the simple tool too. To nail a painting to the wall, I need a hammer. In this case, the hammer is Markdown. But what
-if I wanted to paint too? I'll break the canvas the moment I try to paint it with a hammer. Breaking the canvas also means a whole lot of CVEes primarily around cross-ite scripting vulnerabilities.
-This has me thinking. It has me thinking. I want to take a look at my blog and see how [ __ ] my markdown is. I haven't thought about this in a while.
-So, we already have a helmet here. That's great.
-I have an iframe embedded because it's a YouTube video. So, in the first 13 lines in the second paragraph here, I'm
-already doing weird HTML [ __ ] Then the rest is fine. Oh, here's a great one. I needed to have an image tag that was
-also a link. So, I put an image HTML tag inside of brackets to attach the link.
-Isn't this wonderful? I had to check two posts to find some cursed [ __ ] More cursed HTML and lined. Man, I used to be
-so good at writing. It's a shame that the syntax is awful. Yeah, get the idea.
-It as soon as you want to use markdown for more interesting stuff, you end up writing some cursed stuff. Every time we
-allow inline HTML, plug-in hooks, or embedded execution engines, we expand the attack surface. The result is predictable recurring cross-sight scripting vulnerabilities across major
-Markdown implementations and much much more. And this will continue to rise with the vibe shaded parsers that are hitting the market. Yep, I've seen a lot
-of attempts to rethink how we parse markdown because all of the agents spit out Markdown. We want to make things that are better, faster, and more reliable, and all of them are just full of exploits, edge cases,
-vulnerabilities, and more. Apparently, Obsidian Markdown is even more cursed.
-I'm sure I will love that. Speaking of things I love, we're now in exhibit C. The old and obscure syntax. Markdown,
-like all the good tech we have around the worldwide web, was made in the good old 2000s. Markdown was inspired by pre-existing conventions for marking up plain text in email and Usenet posts.
-Mind you, before 2000, most serious mail looked like this. You see this quote syntax, putting the colon at the start of every line.
-Oh god, this ending in the signature. Do you see the beauty of it? The quote syntax, the vertical separation with pipes. This is what markdown was needed
-for which it would fail horribly at because in Markdown you can't divide the screen into n parts without inline HTML blackmagic. But because of this legacy you have two different ways of writing
-headings. The normal way and the ATX way. You have two different ways and more than two CVE of writing bold and itallic. You have two different ways of writing horizontal rules which collide
-with one of them colliding with the set text header syntax. You have two different ways of writing unordered lists. You have an ordered list which doesn't care about how you ordered them.
-And you have a footnote syntax which moves the entire grammar to context dependent grammar. And I remember the first time I saw that like the right way
-to do lists in markdown. The correct thing is to put zeros because then your markdown parser can number them correctly. And if you change the order of things, you don't have to go redo all the numbers.
-So much [ __ ] Oh. Oh, I didn't see this line. This language is literally the C++ of markup languages. Oh man, now that I've seen this, I can't unsee this.
-That is entirely correct. This might be my favorite programming video ever other than maybe the OOP is garbage video.
-It's two hours long and I had to stop and pause and go back to it later because unlike most 2-hour long videos,
-I couldn't watch that one in the background cuz it was too good. So, I actually sat and like walked in and just stared at my phone for 2 hours. My roommate at the time asked if I was okay. I was like, I'm more than okay.
-You're going to have to watch this after. This video is so good. highly recommend it. And knowing that, having that still in my head, C++ and markdown,
-yeah, there's a lot of overlap. Nearly everything can be done in two different ways, which some of them might allow for cross-ite scripting and somehow leak memory in HTML. It's used everywhere,
-but it also fails everywhere equally.
-And now we're at exhibit D. You can't simply just parse it. You also have to use it. Parsing is the easy thing. If you remember, I told you that the
-footnote syntax moves this grammar up to a contextsensitive one. Let me elucidate you. Okay. So if we have this syntax
-with the carrot for a citation, this becomes test bracket one there. But if we actually handle a citation at the
-bottom, now the markdown changes because this is now a link instead. Previously,
-it just put this in. Now this thing further on changes how this part here is parsed. Oh boy. Actually though,
-footnotes aren't supported in common mark. They have links. The only notable difference is that link syntax means you can put only one word after the
-definition as opposed to a shameful explanation of why bananas on pizza is a good idea. Reference style links and footnotes require global definition
-resolution. A token's meaning depends on declarations elsewhere in the document that breaks purely contextfree parsing assumptions. Erggo the updates to a CSG
-from a CFG. I had some intuition that markdown as as we use it was a context-sensitive grammar, but god damn,
-this is a really really damning example of that.
-All this is a lot of words for saying if you want a simple language, it should say simple. Rendering is the hard thing.
-I think this is the most controversial part about the author's rant because nobody wants to admit that what we use and need are two very different things.
-Vanilla markdown needs a transliterator which is literally a onetoone mapping function. You see bold and then HTML bold comes out. But modern markdown has
-to support stuff like footnotes which takes this simple transliterator into a full-blown compiler. And after you made this step, here's the ladder that you'll
-climb. I need a personal knowledge management system. Oh boy, the Obsidian people are going to love this requirement. I'll need footnotes. Cool.
-We're now in a CSG grammar. Now we've built a compiler. Oh, you want custom callouts, hooks that bind HTML with markdown? Now you have a dependency
-graph. I'll need math. Well, you need type setting library integrations, too.
-So, your dependency graph just got way more complex with execution engines as well. And if you want custom styling,
-custom CSS, you have to deal with CSS injections with file-based scoping rules. This one is really fun. Having CSS in one markdown file and making sure
-it doesn't break things in others. Good luck. Have fun. This is a great section y'all will love. I swear what I have to do in Obsidian work to make my needs
-using markdown make it seem like notion made a sane decision copying Word and Excel internally instead. Yeah, the
-author thinks that notion seems sane because of how bad Markdown is. Do you understand how absurd that is? Honestly,
-okay, here I'm going to drop my hot take here. I like notion's use of markdown as hotkeys effectively where you can export
-markdown from notion, but the formatting of it's broken and garbage. It's so bad.
-So, like don't do that. But when I'm typing in notion, the fact that I can just use markdown syntax to change the element without having to learn a whole bunch of new hotkeys, that's really
-nice. Like if I'm looking at the notion doc for this video, I say sup and I decide this should actually be a title hash space. Now it's a title. Oh, I want
-a smaller one. Two hash three hash space. That's really nice. But that's a different use case. That's not the
-syntax we're using. That is a syntax or grammar that we're familiar with being used effectively as a hotkey layer. Bun.
-Uh, Wabo just linked me async syntax in markdown. This is JS though. But still,
-this syntax for doing execution with awaits in blockers is so cursed. This is like view levels
-of curse but in a markup language. Async markdown, not even once.
-This This horrifies me. I feel sick. Oh god, there's more. Oh, this is data view.js JS as text in oh no I want
-nothing to do with any of this save me get me away no let's let's see how we solve this according to the author you ask the guy with a majestic beard with
-30 plus years of experience in 886 assembly the answer is plain text you ask the guy with MacBook and openclaw running three different Mac minis making
-a startup a day the answer is MDX no I okay I'm not an openclaw guy with three Mac minis I do have three Mac minis in
-this apartment but only one is on I even know MDX is not the right answer here you ask the guy who codes can see for a living. The answer is restructured text.
-If you ask the author, the answer's none. All of these solutions are broken in their own ways. Plain text is beautiful, but I can't show it to somebody that doesn't know what a null
-pointer dreference is. Restructured text is wonderful if you only read it and never write it. And MDX is so busy trying to be HTML, it forgets it needs
-to be legible. And the biggest problem in all of them is that they don't have a build system. We cut corners in the name of speed. If they had a build system, a
-sane, unambiguous, legible syntax purpose built for what it's needed to be. I think all of the problems will be fixed. Don't allow inline HTML. Allow
-for well-defined short codes and functions to manipulate the text. Allow for custom hooks to be executed before, during, and after the compilation. Oh,
-so you are in favor of async markdown. And most importantly, define everything.
-What we need is a customuilt tool, not a Frankenstein's monster that we dare to call a language. Not saying markdown or markup should be a programming language.
-I'm saying we are trying to use it like one. And because it lacks a formal foundation, it's failing at both. I genuinely think that a proper build system around a ser markup language with
-compile time hook support can fix a lot of the problems around this with the right constraints. At this point, we should just let go of markdown for good and look for our answers elsewhere,
-probably with a trivially parsible grammar. He has a whole formal language theory section here. Markup languages are a standard text encoding system
-consisting of a set of symbols inserted in a text document to control its structure, formatting, or the relationship between its parts. And programming languages are computer
-programming languages. Any of various languages for expressing a set of detailed instructions for a digital computer. So you can clearly see these official definitions are not the way to
-go. So he's going to use another separate one. A language is a programming language if it's tingcomplete. Oh god. So markdown is definitely a programming language. I
-write JavaScript for a living. So we're not going to get into eBnf and contextfree languages. Articles in the description if you're the type that
-cares about these depths to turn completeness things. God, none of these words are in the Bible. The thing separating a set of mathematical axioms
-from provability to non-provability is the want of recursion self-reference,
-which manifests itself as the common multiplication operation. A trivial observation can have non-trivial reactions. Yeah. Oh god, I missed this.
-Man, I forgot about this. This was in 2012. Jeff Atwood wrote an article begging Gruber to give up markdown or at
-least bless these attempts to make a better standard. Oh man, this is actually really good. I wish that this happened. RIP. John Gruber's original
-Markdown.Ppl is one of the worst small programs I've ever read. Completely riddled with outright bugs and missed features that continually bite its users in the ass. It's awful even by the
-already low standards of handwritten many past reax based spaghetti parsers.
-Nobody should be using this original script. And unfortunately, many of the other implementations out there are direct transliterations that replicate all of its absurd errors. Like where if
-you mention the MD5 hash of another token in the document, the hash will be replaced with the token because it uses that as inline escaping mechanisms. But I got hit with a cross-sight scripting
-virus that got through the filters because of this. Jesus Christ. And another markdown is a disaster from last year.
-Wild. I did not know there was this quiet cult of people fighting the chaos that is Markdown, but it's really cool to see and I have a lot of respect for
-the author for taking the time to write this. Thank you to Barack for writing this. This was a fantastic read. I did
-not realize how much I hated Markdown and I use it every day. This article very much pushed me over the edge to more deeply appreciate how bad it is.
-Sadly, this author does not have a Twitter or anything linked, so I can't throw you at anything other than his blog, but I would recommend checking it out if you're nerdy about these things.
-And the original article has even more fun details if you want to check it out yourself. I got nothing else, though. I can't help but notice the irony of me
-wearing this HTML shirt, and I'm going to resist the urge to go rewrite all of my stuff in HTML or maybe a new markup language I make up myself. Please don't
-make me do this, guys. T3 down is not the solution, but I am admitting [sighs]
-a little bit of temptation. Until next time, peace nerds.
+Welcome to this explainer. Today we're unpacking part five of the AI agent factory curriculum. And honestly, we're taking a really structured look at the
+massive economic and technological shift that's driving the open claw developer revolution. Whether you're an experienced developer or just someone trying to figure out where on earth the
+software industry is heading in 2026, you are absolutely in the right place.
+We're going to break down exactly how you transition from being a simple AI user to actually building, monetizing, and publishing your own AI applications
+on what's rapidly becoming the defining platform of our era. Let's kick things off with a quote from Nvidia's Jensen Hong at GTC 2026 because it completely
+nails the sheer magnitude of the shift we're dealing with. He said, "Every company in the world today needs to have an open clause strategy and a gentic
+system strategy. This is the new computer." And you know what? The data completely backs up that bold claim.
+Think about this for a second. Openclaw achieved in mere weeks what Linux took 30 years to do. It became the largest, most popular, and fastest growing open
+ource project in history. Nvidia even built Nemo Claw directly on top of it.
+It effectively turns any standard computer into an AI agent platform that you can just ping via WhatsApp, Telegram, or really any messaging
+channel. So why are we focusing so heavily on this right now? Well, because we are looking at the defining market opportunity of 2026. Right now, there is
+this massive gaping hole in the market between companies that desperately need digital employees, what the source calls digital FTEEs or full-time equivalents,
+and the developers who actually know how to build them. Every single industry is hunting for this. A law firm needs a contract reviewer that works flawlessly
+at 2 a.m. A medical clinic needs a triage agent that speaks three different languages on demand. A tutoring company needs an educator that literally never
+sleeps. The tools to build these agents, they exist. The platform exists. What doesn't exist yet is a critical mass of developers who can take the idea of an
+AI employee and turn it into a published money-making product. And the global explosion of demand for this is just
+unprecedented. Our source highlights how OpenClaw triggered what the BBC actually called a national frenzy in China. The
+scale of adoption is staggering. I mean, we're talking hundreds of thousands of GitHub stars and forks in just weeks.
+Chinese developers immediately jumped in to integrate it with DeepSeek and massive domestic super apps like WeChat.
+It got so intense that tech giants like Tensson and BU literally set up physical locations where people waited in line to get free customized versions. We even
+saw local government stepping up. Wooi City alone offered up to 5 million yuana in incentives just for manufacturing applications. Though actually, it's
+worth noting that this explosive growth also prompted government cyber security authorities to step in and flag risks about improper installation, which
+really just highlights the urgent need for developers who can build these tools safely and professionally. To ground all this hype and some practical reality,
+take a look at this number, 200. Our source shares this fascinating anecdote about an IT engineer who customized his
+own openclaw agent just to manage his online shop. He used the agent to automatically list 200 products complete with better descriptions and automatic
+competitor price comparisons in exactly 2 minutes before openclaw. That exact same workload consumed his entire day.
+That is the true economic impact of this technology at the individual level.
+Section one, the developer's journey from user to publisher. To help bridge the gap between being just an impressed
+observer and becoming a published application developer, the curriculum gives you this exact road map through chapters 56 to 60. Part 5 is designed
+with a really specific focus. In the earlier parts, you were learning how to think with AI, right? But here, you're building on a platform that already
+handles all the messy under the hood stuff, the messaging, security, scheduling, orchestration, so you can focus entirely on making your
+application valuable. It's a beautifully structured path. You start in chapter 56 in the experience phase, just installing
+OpenClaw and building a working AI employee. Then you move to extend in chapter 57, adding new capabilities. By
+chapter 58, you're in the build phase, creating a complex ninetool product called Tutorclaw with real Stripe integration. Chapter 59 tackles the
+understand phase where we dive into the wild economics of these apps. And finally, in chapter 60, you hit the publish phase. document your
+architecture and push your release to Claw Hub. You start out as a user and you finish as a published developer on the new computer. Now, you might be
+thinking, "Do I need a massive server farm to do this?" The crucial point is how incredibly accessible it is to start
+for chapter 56. Your prerequisites are basically nothing. You don't need a supercomput. You just need to install Node.js version 22 or higher, which is
+completely free. You need a standard WhatsApp account, though Telegram or Discord work too if you prefer. And you can deploy your very first AI employee
+in under an hour using Google Gemini's free tier as your default model. The whole platform is model agnostic, meaning any capable model works, which
+makes that initial deployment basically frictionless. Then, as you advance into chapter 57, the training wheels come off, but in a really clever way. You're
+going to use cloud code and a specific skill called the MCP builder to create model context protocol or MCP servers.
+What's revolutionary here is the workflow itself. You literally just describe what you need and Claude Code actually writes the code to extend your
+agents capabilities. It's this awesome describe, steer, verify workflow that lets you seamlessly connect new complex tools directly to your agent without
+drowning in boilerplate code. Section two, flipping traditional SAS economics.
+The financial incentives of building these AI agents completely rewrite the rules of traditional software. This is not just a tech shift. It is a
+fundamental change in how software businesses are built and monetized. Get a load of the staggering number, 89%.
+According to the curriculum, when you build on an agent OS that handles all the heavy lifting like orchestration and security, your cost structure changes
+dramatically. You're able to achieve gross margins that approach an astonishing 89%. You're going to learn exactly why agent applications
+completely flipped the traditional software as a service model. And we're doing it with real numbers, not just fluffy business theory. So in chapter 58, you actually put those economic
+theories into practice. You'll learn exactly how to realize those incredible margins by building a full product called Tutor Claw. And listen, this
+isn't some toy app. It's a robust nine tool product. You learn how to implement tiered access control, meaning different users get access to different capabilities. You'll integrate Stripe
+payments directly into the agents workflow. and you'll learn how to leverage the near zero marginal cost of operating this software to build a highly highly profitable business
+architecture. Section three, open versus managed platforms. Now, while Open Claw is phenomenal, the whole industry is
+moving at lightning speed. We are watching the opening salvos of an impending war over where exactly these AI agents will ultimately live, operate,
+and who controls them. This really highlights the fundamental tension dividing the market right now. On one side, you've got OpenClaw. It's open source, runs on your own hardware, you choose the model, and you own the data.
+It is all about multi- vendor freedom.
+But on the other side, our source notes that Anthropic is testing a platform called Conway. Conway is a managed, always on agent platform. It lives as a
+persistent sidebar on your system, has native Chrome integration, and uses web hook triggers that can actually wake the agent without a human ever prompting it.
+But it's not open source, and it's not model agnostic. It represents a massive bet that most users will happily trade Ultimate Control for seamless out-of-the-box convenience. If this
+sounds familiar, well, it absolutely should. We've seen this movie before in tech history. Think of Linux versus Mac OS, or self-hosted WordPress versus
+managed Shopify, or Android's open ecosystem versus iOS. Every major AI lab from Open AI to Google wants to be the runtime environment, not just the
+underlying model. The reality is the open and managed AI layers will coexist.
+The open layer will always win on flexibility and cost control, while the managed layer will win on onboarding speed and integrated tooling. Neither approach is going to kill the other one
+off. And that is exactly why this curriculum focuses relentlessly on principles over platform specific procedures. You aren't just learning to
+depend on one single runtime. The MCP server protocols you build, they speak a language that Conway, OpenClaw, and every serious platform already supports.
+You'll learn to use architecture decision records or ADRs, which teach you to professionally document why you made a choice, like understanding why six attempts failed before the seventh
+model finally clicked. and the tiered monetization models you build are enduring business patterns, not just fleeting platform features. These are the deep skills that will outlast any
+single platform war. So, we're going to wrap up with a rather stark question echoing a warning directly from a Chinese state newspaper about this exact
+technological wave. They warned that missing this shift was akin to raising lobsters, meaning you're stuck doing irrelevant, outdated work while the
+whole world just passes you by. The tools are here. The platform is ready.
+The defining opportunity of 2026 is sitting right in front of us. The only question left is, are you ready to learn the enduring principles and actually
+build on the new computer, or will you sit back and let this incredible opportunity pass you by?
+

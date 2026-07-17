@@ -6,4 +6,6 @@ import java.util.Optional;
 
 public interface FrameworkLanguageRepository extends JpaRepository<FrameworkLanguage, Long> {
     Optional<FrameworkLanguage> findByName(String name);
+
+    Optional<FrameworkLanguage> findByNameIgnoreCase(String name);
 }

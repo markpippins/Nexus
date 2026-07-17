@@ -26,7 +26,7 @@ public class DeploymentCacheService {
 
     private static final String DEPLOYMENT_KEY_PREFIX = "cache:deployment:";
     private static final String DEPLOYMENTS_BY_SERVICE_PREFIX = "cache:deployments:service:";
-    private static final String DEPLOYMENTS_BY_HOST_PREFIX = "cache:deployments:host:";
+    private static final String DEPLOYMENTS_BY_SERVER_PREFIX = "cache:deployments:server:";
     private static final String DEPLOYMENTS_BY_ENV_PREFIX = "cache:deployments:env:";
     private static final long TTL_MINUTES = 15;
 
@@ -107,7 +107,7 @@ public class DeploymentCacheService {
      * Get deployments by host ID.
      */
     public List<Deployment> getDeploymentsByHostId(Long hostId) {
-        String key = DEPLOYMENTS_BY_HOST_PREFIX + hostId;
+        String key = DEPLOYMENTS_BY_SERVER_PREFIX + hostId;
 
         try {
             @SuppressWarnings("unchecked")
@@ -232,7 +232,7 @@ public class DeploymentCacheService {
     private void invalidateListCachesForDeployment(Deployment deployment) {
         try {
             redisTemplate.delete(DEPLOYMENTS_BY_SERVICE_PREFIX + deployment.getServiceId());
-            redisTemplate.delete(DEPLOYMENTS_BY_HOST_PREFIX + deployment.getHostId());
+            redisTemplate.delete(DEPLOYMENTS_BY_SERVER_PREFIX + deployment.getHostId());
             redisTemplate.delete(DEPLOYMENTS_BY_ENV_PREFIX + deployment.getEnvironmentId());
             log.debug("Invalidated list caches for deployment ID: {}", deployment.getId());
         } catch (Exception e) {
@@ -247,7 +247,7 @@ public class DeploymentCacheService {
         try {
             redisTemplate.delete(redisTemplate.keys(DEPLOYMENT_KEY_PREFIX + "*"));
             redisTemplate.delete(redisTemplate.keys(DEPLOYMENTS_BY_SERVICE_PREFIX + "*"));
-            redisTemplate.delete(redisTemplate.keys(DEPLOYMENTS_BY_HOST_PREFIX + "*"));
+            redisTemplate.delete(redisTemplate.keys(DEPLOYMENTS_BY_SERVER_PREFIX + "*"));
             redisTemplate.delete(redisTemplate.keys(DEPLOYMENTS_BY_ENV_PREFIX + "*"));
             log.info("Cleared all deployment caches");
         } catch (Exception e) {

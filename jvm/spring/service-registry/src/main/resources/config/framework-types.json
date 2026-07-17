@@ -1,0 +1,202 @@
+[
+    {
+        "name": "Java Spring",
+        "description": "Java Spring Framework"
+    },
+    {
+        "name": "Java Quarkus",
+        "description": "Java Quarkus Framework"
+    },
+    {
+        "name": "Java Micronaut",
+        "description": "Java Micronaut Framework"
+    },
+    {
+        "name": "Java Helidon",
+        "description": "Java Helidon Framework"
+    },
+    {
+        "name": "Node NestJS",
+        "description": "Node.js NestJS Framework"
+    },
+    {
+        "name": "Node AdonisJS",
+        "description": "Node.js AdonisJS Framework"
+    },
+    {
+        "name": "Node Moleculer",
+        "description": "Node.js Moleculer Framework"
+    },
+    {
+        "name": "Node Express",
+        "description": "Node.js Express Framework"
+    },
+    {
+        "name": "Node Fastify",
+        "description": "Node.js Fastify Framework"
+    },
+    {
+        "name": "Node Hono",
+        "description": "Node.js Hono Framework"
+    },
+    {
+        "name": "Node Koa",
+        "description": "Node.js Koa Framework"
+    },
+    {
+        "name": "Node Hapi",
+        "description": "Node.js Hapi Framework"
+    },
+    {
+        "name": "Node Feathers",
+        "description": "Node.js Feathers Framework"
+    },
+    {
+        "name": "Node tRPC",
+        "description": "Node.js tRPC Framework"
+    },
+    {
+        "name": "Python FastAPI",
+        "description": "Python FastAPI Framework"
+    },
+    {
+        "name": "Python Django",
+        "description": "Python Django Framework"
+    },
+    {
+        "name": "Python Flask",
+        "description": "Python Flask Framework"
+    },
+    {
+        "name": "Go Goa",
+        "description": "Go Gin Framework"
+    },
+    {
+        "name": "Go Fiber",
+        "description": "Go Fiber Framework"
+    },
+    {
+        "name": "Frontend React",
+        "description": "React Frontend Framework"
+    },
+    {
+        "name": "Frontend Angular",
+        "description": "Angular Frontend Framework"
+    },
+    {
+        "name": "Frontend Vue",
+        "description": "Vue.js Frontend Framework"
+    },
+    {
+        "name": "Frontend Svelte",
+        "description": "Svelte Frontend Framework"
+    },
+    {
+        "name": "Frontend Solid",
+        "description": "SolidJS Frontend Framework"
+    },
+    {
+        "name": "Frontend NextJS",
+        "description": "Next.js Frontend Framework"
+    },
+    {
+        "name": "Frontend Nuxt",
+        "description": "Nuxt.js Frontend Framework"
+    },
+    {
+        "name": "Frontend Remix",
+        "description": "Remix Frontend Framework"
+    },
+    {
+        "name": "Frontend Astro",
+        "description": "Astro Frontend Framework"
+    },
+    {
+        "name": "Frontend Analog",
+        "description": "Analog Frontend Framework"
+    },
+    {
+        "name": "Frontend Ember",
+        "description": "Ember.js Frontend Framework"
+    },
+    {
+        "name": "Frontend Preact",
+        "description": "Preact Frontend Framework"
+    },
+    {
+        "name": "Desktop Electron",
+        "description": "Electron Desktop Framework"
+    },
+    {
+        "name": "Desktop Tauri",
+        "description": "Tauri Desktop Framework"
+    },
+    {
+        "name": "Mobile React Native",
+        "description": "React Native Mobile Framework"
+    },
+    {
+        "name": "Mobile Expo",
+        "description": "Expo Mobile Framework"
+    },
+    {
+        "name": "Mobile Ionic",
+        "description": "Ionic Mobile Framework"
+    },
+    {
+        "name": "Mobile Capacitor",
+        "description": "Capacitor Mobile Framework"
+    },
+    {
+        "name": "Mobile Nativescript",
+        "description": "NativeScript Mobile Framework"
+    },
+    {
+        "name": "Elixir Phoenix",
+        "description": "Elixir Phoenix Framework"
+    },
+    {
+        "name": "Ruby Rails",
+        "description": "Ruby on Rails Framework"
+    },
+    {
+        "name": "PHP Laravel",
+        "description": "PHP Laravel Framework"
+    },
+    {
+        "name": "Runtime Deno",
+        "description": "Deno Runtime"
+    },
+    {
+        "name": "Runtime Bun",
+        "description": "Bun Runtime"
+    },
+    {
+        "name": "Runtime Node",
+        "description": "Node.js Runtime"
+    },
+    {
+        "name": "Rust Actix",
+        "description": "Rust Actix Framework"
+    },
+    {
+        "name": "ASP.NET",
+        "description": ".NET ASP.NET Framework"
+    },
+    {
+        "name": "CMS Strapi",
+        "description": "Strapi CMS"
+    },
+    {
+        "name": "CMS Keystone",
+        "description": "Keystone CMS"
+    },
+    {
+        "name": "Other",
+        "description": "Other Framework"
+    },
+    {
+        "name": "None",
+        "description": "None / Unspecified"
+    }
+]

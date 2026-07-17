@@ -21,9 +21,9 @@ public class UserAccessController {
     }
 
     @PostMapping(value = "/validate", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public ResponseEntity<UserRegistrationDTO> validateUser(@RequestParam("alias") String alias,
+    public ResponseEntity<UserRegistrationDTO> validateUser(@RequestParam("email") String email,
             @RequestParam("identifier") String password) {
-        UserRegistrationDTO user = userAccessService.validateUser(alias, password);
+        UserRegistrationDTO user = userAccessService.validateUser(email, password);
         if (user != null) {
             return ResponseEntity.ok(user);
         } else {

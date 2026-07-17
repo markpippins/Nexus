@@ -4,12 +4,13 @@ Batch File Candidates — Stage 2 Inference
 
 Reads docklang from nebula.harvests, uses Gemini to identify candidate-worthy
 architectural concepts, maps them to the Nebula hierarchy (systems/subsystems/
-features), and creates harvest candidates via the nebula-srv REST API.
+features), creates harvest candidates via the nebula-srv REST API, and
+optionally publishes to the Assembly forum.
 
 Usage:
     cd /home/codex/dev/nexus/python/rover
     source .venv/bin/activate
-    python3 batch_file_candidates.py [--dry-run] [--limit N] [--batch N]
+    python3 batch_file_candidates.py [--dry-run] [--limit N] [--batch N] [--publish]
 """
 
 import argparse
@@ -20,13 +21,16 @@ import sys
 import time
 from pathlib import Path
 
+from tackle.inference import call_llm
+from event_emitter import emit_candidate_discovered
+
 log = logging.getLogger("batch_file_candidates")
 
 PROJECT_ROOT = Path("/home/codex/dev")
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 NEBULA_API = "http://localhost:3101/api"
-GEMINI_API_KEY = "AIzaSyD0sfwbXYGGyaa8gCkVziqYzoVbmxbuJqQ"
-GEMINI_MODEL = "gemini-2.5-flash"
+# Model config resolved via tackle-mcp (role: Rover)
+# See tackle/inference.py and config bundles at POST /config/ai/bundles/:role
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,39 +71,52 @@ def nebula_post(path: str, body: dict) -> dict:
         return {"error": True, "status": e.code, "body": body_text[:500]}
 
 
-def call_gemini(prompt: str) -> str | None:
-    import urllib.request, urllib.error
-    import time
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 8192}
-    }
-    data = json.dumps(payload).encode("utf-8")
-    
-    max_retries = 3
-    for attempt in range(1, max_retries + 1):
-        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-        try:
-            with urllib.request.urlopen(req, timeout=120) as r:
-                resp = json.loads(r.read().decode())
-            candidates = resp.get("candidates", [])
-            if not candidates:
-                return None
-            return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-        except urllib.error.HTTPError as e:
-            body = e.read().decode() if e.fp else "(no body)"
-            if e.code == 503 and attempt < max_retries:
-                wait = attempt * 15
-                log.warning("  503 error (attempt %d/%d), waiting %ds...", attempt, max_retries, wait)
-                time.sleep(wait)
-                continue
-            log.error("  Gemini API error %s: %s", e.code, body[:300])
-            return None
-        except Exception as e:
-            log.error("  Gemini call failed: %s", e)
-            return None
-    return None
+# Gemini call replaced by tackle.inference.call_llm — resolves model config
+# via tackle-mcp config bundles / config/ai/resolve/:role (port 3400).
+
+
+def check_filename_dedup(filenames: list[str]) -> dict[str, str]:
+    """Pre-inference dedup check: for each filename, check if existing
+    candidates from that filename (if any) are already duplicates of
+    intent_records or implementation_plans.
+
+    Returns a dict mapping filename -> skip_reason (or absent = don't skip).
+    A filename is skipped if its existing candidates already match
+    intent_records, meaning another LLM pass would just produce more
+    duplicates.
+    """
+    if not filenames:
+        return {}
+
+    # Format filenames for SQL IN clause
+    fn_list = ",".join(f"'{fn.replace(chr(39), chr(39)+chr(39))}'" for fn in filenames)
+
+    # For each filename, find existing candidate titles and check if
+    # they match intent_records (trigram > 0.6)
+    sql = f"""
+    WITH existing AS (
+        SELECT hc.title, h.source_filename
+        FROM nebula.harvest_candidates hc
+        JOIN nebula.harvests h ON hc.harvest_id = h.id
+        WHERE h.source_filename IN ({fn_list})
+    )
+    SELECT DISTINCT e.source_filename
+    FROM existing e
+    WHERE EXISTS (
+        SELECT 1 FROM nebula.intent_records ir
+        WHERE similarity(ir.title, e.title) > 0.6
+    )
+    """
+    rc, out = psql(sql)
+    if rc != 0 or not out:
+        return {}
+
+    skip_map = {}
+    for line in out.splitlines():
+        fn = line.strip()
+        if fn:
+            skip_map[fn] = "existing candidates already match intent_records"
+    return skip_map
 
 
 def fetch_hierarchy() -> list[dict]:
@@ -167,33 +184,123 @@ def summarize_docklang(docklang: dict) -> str:
     return "\n".join(parts)
 
 
-def get_unfiled_harvests(limit: int = None) -> list[dict]:
-    try:
-        candidates_data = nebula_get("/harvest-candidates?limit=500")
-        candidates = candidates_data.get("candidates", [])
-        filed_harvest_ids = set(c.get("harvest_id") for c in candidates if c.get("harvest_id"))
-        log.info("Existing: %d candidates across %d harvests", len(candidates), len(filed_harvest_ids))
-    except Exception as e:
-        log.warning("Could not fetch existing candidates: %s", e)
-        filed_harvest_ids = set()
+def get_unfiled_harvests(limit: int = None, skip_unchanged: bool = False) -> tuple[list[dict], list[str]]:
+    """Query harvests with docklang that have no existing candidates.
+    Uses direct SQL exclusion (NOT IN subquery) — immune to API limits.
     
-    rc, out = psql("SELECT id, source_filename FROM nebula.harvests WHERE docklang IS NOT NULL ORDER BY created_at DESC;")
-    if rc != 0 or not out:
+    If skip_unchanged=True, also excludes harvests whose same-filename
+    predecessor at the same file_size already has candidates (re-ingestion
+    of unchanged content). Returns (harvests, skipped_filenames).
+    """
+    sql = """
+    SELECT h.id, h.source_filename, h.file_size
+    FROM nebula.harvests h
+    WHERE h.docklang IS NOT NULL
+      AND h.id NOT IN (
+        SELECT DISTINCT harvest_id
+        FROM nebula.harvest_candidates
+        WHERE harvest_id IS NOT NULL
+      )
+    ORDER BY h.created_at DESC
+    """
+    rc, out = psql(sql)
+    if rc != 0:
         log.error("Failed to query harvests")
-        return []
-    
+        return [], []
+
     harvests = []
-    for line in out.splitlines():
-        parts = line.split("|", 1)
-        if len(parts) == 2:
-            hid, fname = parts
-            if hid not in filed_harvest_ids:
-                harvests.append({"id": hid, "filename": fname})
-    
-    log.info("Unfiled: %d / %d harvests", len(harvests), len(out.splitlines()))
+    if out:  # 0 results is valid, not an error
+        for line in out.splitlines():
+            parts = line.split("|")
+            if len(parts) >= 2:
+                h = {"id": parts[0], "filename": parts[1]}
+                if len(parts) >= 3 and parts[2]:
+                    try:
+                        h["file_size"] = int(parts[2])
+                    except ValueError:
+                        pass
+                harvests.append(h)
+
+    # Also query total for logging
+    rc2, out2 = psql("SELECT COUNT(*) FROM nebula.harvests WHERE docklang IS NOT NULL;")
+    total = int(out2) if rc2 == 0 and out2 else 0
+
+    # File-size-based skip/reharvest: for each unfiled harvest, compare
+    # against the largest predecessor that already has candidates.
+    #   - Same size → skip (unchanged content)
+    #   - Current larger → reharvest (new content added to transcript)
+    #   - Current smaller → skip (truncated or rolled back)
+    skipped = []
+    reharvested = []
+    if skip_unchanged:
+        remaining = []
+        for h in harvests:
+            fs = h.get("file_size")
+            if fs is None:
+                remaining.append(h)
+                continue
+            fn_escaped = h["filename"].replace(chr(39), chr(39)+chr(39))
+            # Find the largest file_size among predecessors with candidates
+            rc3, out3 = psql(f"""
+                SELECT MAX(file_size) FROM nebula.harvests
+                WHERE source_filename = '{fn_escaped}'
+                  AND id != '{h["id"]}'
+                  AND file_size IS NOT NULL
+                  AND id IN (SELECT DISTINCT harvest_id FROM nebula.harvest_candidates);
+            """)
+            if rc3 == 0 and out3 and out3.strip() and out3.strip() != "":
+                try:
+                    prev_max = int(out3.strip())
+                except ValueError:
+                    remaining.append(h)
+                    continue
+
+                if fs == prev_max:
+                    log.info("  Skip (unchanged): %s (%d bytes) — predecessor has candidates",
+                             h["filename"], fs)
+                    skipped.append(h["filename"])
+                elif fs > prev_max:
+                    log.info("  Reharvest: %s (%d → %d bytes) — larger version detected",
+                             h["filename"], prev_max, fs)
+                    reharvested.append(h["filename"])
+                    remaining.append(h)
+                else:
+                    log.info("  Skip (smaller): %s (%d < %d bytes) — truncated or rolled back",
+                             h["filename"], fs, prev_max)
+                    skipped.append(h["filename"])
+            else:
+                # No predecessor with candidates — first time processing
+                remaining.append(h)
+        harvests = remaining
+
+    # Pre-inference dedup: skip filenames whose existing candidates already
+    # match intent_records. Another LLM pass would just produce duplicates.
+    dedup_skipped = []
+    if harvests:
+        filenames = list(set(h["filename"] for h in harvests))
+        skip_map = check_filename_dedup(filenames)
+        if skip_map:
+            remaining = []
+            for h in harvests:
+                reason = skip_map.get(h["filename"])
+                if reason:
+                    dedup_skipped.append(h["filename"])
+                    log.info("  Skip (dedup): %s — %s", h["filename"], reason)
+                else:
+                    remaining.append(h)
+            harvests = remaining
+
+    log.info("Unfiled: %d / %d harvests (direct SQL exclusion)", len(harvests), total)
+    if skipped:
+        log.info("Skipped (unchanged/smaller): %d", len(skipped))
+    if reharvested:
+        log.info("Reharvest (larger version): %d", len(reharvested))
+    if dedup_skipped:
+        log.info("Skipped (pre-inference dedup): %d", len(dedup_skipped))
+    all_skipped = skipped + dedup_skipped
     if limit:
         harvests = harvests[:limit]
-    return harvests
+    return harvests, all_skipped
 
 
 def get_docklang(harvest_id: str) -> dict | None:
@@ -280,13 +387,62 @@ def resolve_hierarchy_ids(candidates: list[dict], systems: list[dict]) -> list[d
     return resolved
 
 
-def create_candidate(harvest_id: str, candidate: dict) -> bool:
+def create_candidate(harvest_id: str, candidate: dict) -> str | None:
+    """Create a candidate via the nebula-srv REST API.
+
+    Returns the candidate UUID on success, None on failure.
+    """
     body = {"harvestId": harvest_id, **candidate}
     for k in ["systemMatch", "subsystemMatch", "featureMatch"]:
         body.pop(k, None)
     result = nebula_post("/harvest-candidates", body)
     if isinstance(result, dict) and result.get("error"):
+        return None
+    # API returns the full row with 'id'
+    return result.get("id")
+
+
+ASSEMBLY_MCP_URL = "http://localhost:3107"
+
+
+def assembly_mcp_call(method: str, params: dict) -> dict:
+    """Call an MCP tool on the assembly-mcp server via JSON-RPC over HTTP."""
+    import urllib.request, urllib.error
+    payload = json.dumps({
+        "jsonrpc": "2.0",
+        "id": "1",
+        "method": method,
+        "params": params,
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        ASSEMBLY_MCP_URL,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode() if e.fp else "(no body)"
+        log.error("  Assembly MCP %s: %s", method, body_text[:500])
+        return {"error": True, "status": e.code, "body": body_text[:500]}
+    except Exception as e:
+        log.error("  Assembly MCP call failed: %s", e)
+        return {"error": True}
+
+
+def publish_harvest_to_forum(harvest_id: str) -> bool:
+    """Call assembly_publish_harvest MCP tool to create a forum post."""
+    result = assembly_mcp_call("tools/call", {
+        "name": "assembly_publish_harvest",
+        "arguments": {"harvest_id": harvest_id},
+    })
+    if isinstance(result, dict) and result.get("error"):
         return False
+    # Successful response looks like: {"jsonrpc":"2.0","id":"1","result":{"content":[{"text":"..."}]}}
+    content = result.get("result", {}).get("content", [])
+    if content:
+        log.info("  Forum post result: %s", content[0].get("text", "")[:200])
     return True
 
 
@@ -295,29 +451,44 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--batch", type=int, default=3)
-    parser.add_argument("--resume", type=str, default=None)
+    parser.add_argument("--resume", type=str, default=None,
+                        help="Resume from a specific harvest ID")
+    parser.add_argument("--resume-file", type=str, default=None,
+                        help="Resume from a specific source_filename (immune to UUID changes)")
+    parser.add_argument("--publish", action="store_true", default=False,
+                        help="Publish harvests to Assembly forum after creating candidates")
+    parser.add_argument("--skip-unchanged", action="store_true", default=False,
+                        help="Skip harvests whose same-filename predecessor at same file_size already has candidates")
     args = parser.parse_args()
     
     log.info("=" * 60)
     log.info("Batch File Candidates — Stage 2 Inference")
-    log.info("Model: %s | Batch: %d", GEMINI_MODEL, args.batch)
+    log.info("Model: resolved by tackle-mcp for role Rover | Batch: %d", args.batch)
     
     systems = fetch_hierarchy()
     if not systems:
         return 1
     hierarchy_text = build_hierarchy_text(systems)
     
-    harvests = get_unfiled_harvests(args.limit)
+    harvests, skipped = get_unfiled_harvests(args.limit, args.skip_unchanged)
     if not harvests:
         log.info("No unfiled harvests.")
         return 0
     
-    if args.resume:
+    if args.resume_file:
         try:
-            idx = next(i for i, h in enumerate(harvests) if h["id"] == args.resume)
+            idx = next(i for i, h in enumerate(harvests) if h["filename"] == args.resume_file)
+            log.info("Resuming from file: %s (position %d/%d)", args.resume_file, idx + 1, len(harvests))
             harvests = harvests[idx:]
         except StopIteration:
-            pass
+            log.warning("Resume file not found: %s", args.resume_file)
+    elif args.resume:
+        try:
+            idx = next(i for i, h in enumerate(harvests) if h["id"] == args.resume)
+            log.info("Resuming from ID: %s (position %d/%d)", args.resume[:8], idx + 1, len(harvests))
+            harvests = harvests[idx:]
+        except StopIteration:
+            log.warning("Resume ID not found: %s", args.resume[:8])
     
     if args.dry_run:
         for h in harvests:
@@ -348,7 +519,7 @@ def main():
         log.info("  Prompt: %d chars", len(prompt))
         
         start = time.time()
-        response = call_gemini(prompt)
+        response = call_llm(prompt, role="Rover", temperature=0.1, max_tokens=8192)
         elapsed = time.time() - start
         
         if not response:
@@ -384,7 +555,7 @@ def main():
                     results[h["id"]] = (0, elapsed)
                 continue
         
-        log.info("  Gemini: %d candidates in %.1fs", len(candidates), elapsed)
+        log.info("  LLM: %d candidates in %.1fs", len(candidates), elapsed)
         
         # Distribute candidates to harvests
         harvest_cands = {h["id"]: [] for h in batch}
@@ -411,10 +582,63 @@ def main():
             resolved = resolve_hierarchy_ids(cands, systems)
             created = 0
             for c in resolved:
-                if create_candidate(h["id"], c):
+                cand_id = create_candidate(h["id"], c)
+                if cand_id:
                     created += 1
                     total_candidates += 1
+
+                    # Cascade event: candidate.discovered
+                    emit_candidate_discovered(
+                        candidate_id=cand_id,
+                        harvest_id=h["id"],
+                        title=c.get("title", ""),
+                        cpf=c.get("compilationReadiness"),
+                        source="rover.batch_file_candidates",
+                    )
             results[h["id"]] = (created, elapsed)
+            
+            # ── Emit observation.captured kernel event ──
+            # This proves the nervous system: the organization notices
+            # that something happened. Cascade subscribers will assess
+            # and potentially surface via Assembly.
+            if created > 0:
+                try:
+                    import uuid as _uuid
+                    obs_id = str(_uuid.uuid4())
+                    filename_escaped = h["filename"].replace("'", "''")
+                    payload_json = json.dumps({
+                        "trigger_type": "candidate_extracted",
+                        "source_artifact_type": "harvest",
+                        "source_artifact_id": h["id"],
+                        "details": {
+                            "candidate_count": created,
+                            "filename": h["filename"],
+                        }
+                    }).replace("'", "''")
+                    rc_transition, _ = psql(
+                        f"SELECT kernel.sys_transition("
+                        f"  'observation.captured'::kernel.event_type,"
+                        f"  'observation',"
+                        f"  '{obs_id}',"
+                        f"  'rover',"
+                        f"  '{payload_json}'::jsonb,"
+                        f"  p_authority := 'rover'"
+                        f");"
+                    )
+                    if rc_transition == 0:
+                        log.info("  ✓ Emitted observation.captured (%s)", obs_id[:8])
+                    else:
+                        log.warning("  ⚠ Failed to emit observation.captured")
+                except Exception as e:
+                    log.warning("  ⚠ observation.captured emission failed: %s", e)
+
+            # Publish to Assembly forum if candidates were created (direct path)
+            if created > 0 and args.publish:
+                log.info("  Publishing harvest %s to Assembly forum...", h["id"][:8])
+                if publish_harvest_to_forum(h["id"]):
+                    log.info("  ✓ Published to Assembly forum")
+                else:
+                    log.warning("  ⚠ Failed to publish harvest %s to forum", h["id"][:8])
     
     log.info("=" * 60)
     log.info("COMPLETE: %d candidates created across %d harvests",

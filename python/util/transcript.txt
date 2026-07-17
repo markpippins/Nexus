@@ -1,369 +1,74 @@
-Welcome to Hypervelocity Engineering
-0:00
-The fire hose of vibe-coded  AI slop will not stop. But
-0:04
-our friends at Microsoft have the  answer: Hypervelocity Engineering.
-0:12
-So I've been going through Microsoft's  open-source stuff on this topic,
-0:16
-Hypervelocity Engineering, their  documentation, and some internal
-0:20
-stuff that I can't share. And even if you're  not a Microsoft shop, this is probably going
-0:24
-to impact you because this is basically the  Silicon Valley bros leaking into enterprise.
-0:29
-All right. So as a quick intro, Microsoft uses  this Hypervelocity Engineering methodology
-0:35
-internally, and they've been doing it across  their Industry Solutions Engineering team,
-0:42
-which is basically Microsoft Consulting. Okay.  So this is what they are trying to do on all of
-0:46
-their projects: use AI to hypervelocity-accelerate  the software engineering life cycle. Everybody in
-0:54
-the Microsoft ecosystem is going to be impacted by  this, from mom and pop .NET shops to big corporate
-0:59
-guys. This is going to leak everywhere. Okay? So,  we should pay some attention to this. Seriously.
-1:04
-So, what are people doing today with their AI  tools? Yeah. If you're at a quite low maturity
-1:08
-level, you will just be opening Copilot Chat.  You'll type a prompt, paste the result back in,
-Prompt Engineering vs Context Engineering
-1:15
-accept it, move on with our lives. But this  isn't engineering. This is vibe coding. All
-1:20
-right? And it's going to get everybody in a  lot of trouble. Okay? There's no structure.
-1:25
-There's no verification. There's no  persistence between sessions. I mean,
-1:29
-normally the system would have forgotten  what you did the day before. It can
-1:34
-be really useful. You can do some great  one-shot cracking demos. And when it works,
-1:39
-it's great. When it doesn't work, it sucks,  but you will normally end up with a giant
-1:44
-pull request that nobody understands or  a load of slop with security holes in it.
-1:49
-In Microsoft Docs, they put this pretty  bluntly, okay? They say AI code is still
-1:55
-your code, and if you can't explain it,  understand it, maintain it, or support it,
-1:59
-don't ship it. Which sounds fair enough to me.  But sadly for this boomer, this .NET boomer,
-2:05
-okay, who used to hand-crank his C# code—he  loved it, right—the question isn't "should we
-2:11
-use AI to write code anymore?" All right,  that ship has well and truly sailed away.
-2:17
-It's left the platform. Okay, we have to catch  up because the industry will demand it of us,
-2:22
-or we won't be competitive. We won't be  able to build anything ever. It'll just
-2:26
-be us doing some weird artisan thing that  nobody will pay for, and we will all starve.
-2:31
-All right, so the question is how can we  actually use this AI stuff without burying
-2:35
-ourselves in technical debt? And that  is the industry's number one challenge
-What exactly is Hypervelocity Engineering
-2:40
-at the moment. Hypervelocity Engineering is  Microsoft's proposed answer to this problem,
-2:46
-right? And they describe it as expert  multidisciplinary teams using AI tools,
-2:51
-proven starting points, and design thinking  across the entire life cycle. Design thinking is
-2:57
-basically consulting, genuine actual consulting,  the stuff that users on various parts of the
-3:05
-spectrum don't particularly want to do, but  we won't have a choice anymore. They claim,
-3:10
-and this sounds like, you know, your X/Twitter  tech bro yap, two to three times faster delivery,
-3:18
-half the team sizes from what they used  to use. They have three or four people
-3:22
-on a team instead of 10. I don't know what you  were doing with 10 people on the team anyway,
-3:26
-but I guess that was your average Agile Scrum dev  team, right? And 30% of the code in Microsoft is
-3:31
-now written by AI, they claim. So they use this  internally and externally with their customers.
-3:36
-Hypervelocity Engineering, according to the  documentation, has four key parts. All right,
-3:43
-multidisciplinary teams. These are those  full-stack engineers I keep banging on
-3:48
-about. We don't just have a little bit of  front end, a little bit of back end, a DBA,
-3:52
-an architect, a QA. Everybody ends up doing  everything. You are a software engineer. Okay,
-3:59
-design thinking, which is basically consulting all  over again. Proven starting points. So you have
-4:05
-to use accelerators. You don't rewrite or recreate  Hypervelocity Engineering on every single project,
-4:12
-and you use agents across the entire life cycle.  AI does everything from requirements checking to
-4:17
-validation at the end. That's what they want you  to do, and that is the future of this industry,
-4:23
-despite what us poor, whingeing  boomers have to say about it.
-4:30
-If you are a software engineer like me, okay,  you've been doing Agile Scrum for ages. So,
-4:35
-you're saying Agile is already fast. Well, yes,  it is. Agile is agile. Agile Scrum. We've been
-4:41
-doing this for decades now. Do you remember Scrum  Masters? Yeah. At least we're not going to have
-4:46
-Scrum Masters in all of this. All right. I see  that the principles of agile in Hypervelocity
-4:53
-Engineering are still there. All right. We ship  working software, we iterate, we keep talking
-4:57
-to the customer. Sometimes we've forgotten  how to do that in normal agile. But anyway,
-5:00
-we respond to change. Okay, that's what we  do. Most of the ceremony of agile, right,
-5:07
-accumulated to compensate for slow humans. All  right, you know those annoying standups and
-5:12
-those annoying retrospectives and all this slop  you have to deal with every week. Your week is
-5:18
-full of calendar meetings. It's because humans  have been really crap at this process. Right?
-Old Agile vs Super Agile
-5:24
-If you think of Hypervelocity Engineering as  super agile or agile squared, you're getting
-5:32
-the hang of it. Things that used to take two  weeks now need to be compressed again down
-5:37
-to two or three days with the same quality  rigor. That is the dream. Do you remember
-5:42
-those Agile Scrum loops on graphic PowerPoints  that all the consultants used to whip out? Do
-5:47
-you remember the SAFe Agile Release Train?  Choo choo. Let's all get on the train. Well,
-5:53
-Hypervelocity Engineering is being described as  multiple parallel development cycles in some sort
-6:00
-of messed up whirlwind vortex of productivity.  You should see some of the graphics that are
-6:05
-coming out on this. Story points and planning  poker, thank God, consigned to the dustbin of
-6:11
-history as it should have been, because the plan  itself is the contract with the AI agent. You
-6:17
-create the plan first. All right. No more backlog  refinement. Okay. The research agent reads your
-6:23
-codebase and writes the backlog for you. Or,  as one of the examples that Microsoft uses,
-6:28
-they just take a meeting transcript to use  the Azure DevOps MCP server to automatically
-6:33
-create the work items that the customer wants  based on those transcripts. Okay, it's wild.
-6:39
-So, it's still iterative and incremental. But I  think if you try to squint a bit, okay, you can
-6:48
-see that this is moving software engineering  again from what was a creative team sport,
-6:54
-almost like making a movie, into more of an  engineering discipline, like actual engineering
-7:03
-jobs. Okay. I mean, I think calling it agile  squared is a nice analogy, because in old agile,
-7:10
-one dev was one dev, right? But in Hypervelocity  Engineering, one dev is orchestrating a little
-7:16
-mini team of agents. And you might have seen  one of my old videos on the squad thing that
-7:20
-they were coming up with. But that is sadly  the direction that Microsoft and Enterprise
-7:27
-Software want you to go over the next few years.  And we're not going to have a choice. Okay.
-7:34
-So, how do you level up? How do you level up  to Hypervelocity Engineering? Well, step one,
-7:39
-okay, is moving from prompt engineering, which is  just spamming what you want built into Copilot or
-7:45
-Claude or whatever, and moving into context  engineering. And context engineering is a bit
-7:51
-like this, okay? The entire information pipeline  of your product and your work items and how to
-7:58
-verify the work is all available to the agent,  to the AI LLM that you're using. You tell it
-8:05
-what documentation it has access to, what coding  conventions you want to use, and it also has all
-8:10
-the context from all the work you did yesterday,  which if you just started a brand new chat session
-8:14
-in Copilot, you wouldn't have, right? Context  is so important because it actually lets you use
-8:20
-cheaper models, right? You don't have to bankrupt  yourself or your employer if there's actual work
-8:25
-on the context before using it in the model.  A small model with good context can outperform
-8:31
-something twice its size is what Microsoft claims,  and they have the data. So I kind of believe them.
-8:36
-Practically what this means you need to do  is, if you've never written or got the agent
-8:40
-to write a Copilot instructions file and stick  it in your repository, you haven't told your AI
-8:45
-what patterns and libraries it should be using  when writing code on this particular project,
-8:50
-and 80% of the value is left on the table.  Okay? It doesn't matter what model you use,
-8:56
-you need to level up from just spamming prompts  in and designing the context for your AI to use.
-9:05
-All right, I know this is painful for a boomer  like me, but this is just the way it's going.
-9:12
-So, how does Microsoft do it? This is it. The  money shot, boys. Okay, the actual workflow that
-RPI: Research, Plan, Implement, Review
-9:17
-Microsoft uses for their customer work and their  internal work, they call it RPI: Research, Plan,
-9:24
-Implement, and then Review. All right. Discover  is a fifth phase, but we'll ignore that. RPI is
-9:31
-a name that they stick with. Each is handled  by a different agent. They've created agents
-9:38
-for their AI LLM to use. And then by using  this process, the agents can hand off work.
-9:44
-First, there's a research agent. It goes off and  reads your codebase, your APIs, your conventions,
-9:49
-documentation, but it's not allowed to write  code. Okay? It can't write code. It just has
-9:53
-to plan and research, which is fine. Okay? I  mean, that's actually, if we were engineers,
-9:58
-the first thing we do shouldn't be to write code,  okay? It actually researches the task and creates
-10:04
-some evidence, right? It gets file references  and then comes up with a recommended approach,
-10:09
-because then it plans. It sends it over to  the planning agent for phase two. All right?
-10:14
-This takes the research and produces an explicit  plan with even some line numbers in some cases,
-10:20
-I'm told. Right, something then validates the  plan to make sure that it's okay against the
-10:26
-research and the context that you've given  your AI LLM, and it tries to catch design
-10:30
-issues before the code is written. So phase three  is implement. Now we can write some code. Okay,
-10:36
-you might still have some bit of fun with  this, maybe you can actually do some coding
-10:39
-for a change, but in reality, there's probably  a coding agent and you will need to handhold
-10:44
-and review the work because  phase four is review. All right?
-10:48
-And you're supposed to create automatic  checks and hooks and make sure that the
-10:52
-linting passes. And who uses StyleCop?  This is the equivalent, okay, of when
-10:58
-you had these weird people that insisted  on using StyleCop on every single project,
-11:02
-but basically, you have to check  the work. So you've got agents,
-11:05
-AI checking AI to keep it all on track. And  this is kind of checks and balances for the real
-11:12
-engineering work. It can be tough to swallow for  us creatives, but that's what they want us to do.
-11:20
-Here's a quote from the big boys, Microsoft  themselves. Okay. "When AI knows it cannot
-11:25
-implement during research, it stops optimizing  for plausible code and starts optimizing for
-11:31
-verified truth." Okay. The constraint changes the  optimization target. All right? Constraints make
-11:38
-AI better, not worse. So the more context you  have, the better the result you're going to get
-11:43
-when you finally get round to asking it to build  your app for you. They even have this thing called
-Tools Microsoft offer for Hypervelocity Engineering
-11:50
-phase bleed. Would you believe it? That sounds  pretty bleak to me. They leak phases together,
-11:55
-and this really does a bad job on their  AI-assisted efforts, is what Microsoft says.
-12:01
-The good news is this isn't  just an idea. All right,
-12:03
-Microsoft has published the same tools that they  use with their consulting customers. All right,
-12:09
-you don't have to build all this yourself.  They've open-sourced the whole toolkit.
-12:12
-It's called hve-core, right? It's  a VS Code extension. It's a GitHub
-12:17
-Copilot CLI plugin. And the source code is at  github.com/microsoft/hve-core. This is how you
-12:26
-install it in VS Code: install the extension  ise-hve-essentials.hve-core is what you want.
-12:34
-This gives you an entire dump of Microsoft's  entire AI development stack. All right,
-12:40
-you got agents for research, planning,  implementation, review, PR review,
-12:44
-doc ops, whatever the hell that is, conventional  commit messages, prompt evaluation, a coaching
-12:50
-agent that actually teaches you how to do design  thinking and be a proper user-centric consultant,
-12:57
-as well as memory agents. The whole works. All  right. They've even got some coding standards
-13:05
-for your favorite programming languages, such as  C#, my favorite obviously, and obviously Python,
-13:11
-Bash, TypeScript. It's all there. Okay. They've  really, really published the kitchen sink.
-13:20
-So, time for some advice. So, I'll close this rant  off with some advice for those boomers out there
-How to get started with HVE
-13:26
-like me that want to get started because they  want to pay the bills, and if they don't do this,
-13:31
-they will probably eventually at some point  get out-competed in the market. All right? So,
-13:38
-you need to stop one-shotting stuff. Okay? You  need to create a plan. Next time you have a task
-13:43
-that you want to use AI with, force yourself  to create two prompts. Okay? "Research this.
-13:49
-Do not write code." And then "propose a  plan." All right, you don't have to use
-13:53
-the actual hve-core stuff for this. You can  just practice when you're doing your yapping,
-13:58
-but plan first. All right, the next step is  to try the hve-core stuff. Okay, you can just
-14:06
-copy and paste some of the useful agent code,  the agents, into your skillset library in your
-14:12
-repository and share it amongst your team. So  this is like Copilot instructions, for example.
-14:17
-Step three is to write that file. All right, pick  something you care about like testing or secrets
-14:23
-management or UX design or whatever, or your  favorite libraries. Like my instructions file
-14:30
-would say "don't use AutoFixture," for example,  or AutoMapper. Okay, right, particularly don't use
-14:36
-AutoMapper, and put it in copilot-instructions.md.  Okay. And the AI LLM will never use it. And if it
-14:44
-does accidentally use it randomly, another agent  will check it against the instructions and make
-14:49
-sure that you didn't accidentally put AutoMapper  in your source code, for example. All right.
-14:56
-So, in closing, is this going  to change your life? Well,
-14:59
-I don't think it's going to change our lives,  our side projects. All right. Because actually,
-15:04
-prompt engineering is fun. It's like pulling a  slot machine. Will I get it right this time? Okay.
-15:10
-But when you're working with a team and  are using these very expensive tools,
-15:13
-all right, you kind of owe it to the poor gits  paying your token bills to do this properly,
-15:20
-right, and make sure that you're not wasting  everybody's time and money and GPU usage. Okay,
-15:27
-so Microsoft has done this for you. I mean, they  get the luxury obviously of unlimited GitHub
-15:33
-Copilot tokens, I'm assuming. So some of their  advice and shilling on X is a bit difficult for
-15:40
-us plebs to also replicate. But anyway, we still  should try and do some actual engineering here.
-15:48
-If you think of it as super agile or super  mega ultra agile, which I think we should
-15:54
-coin in this video, or agile squared  is a bit of a lazy way of doing it,
-16:00
-we need to be up to date on this because at some  point you'll be asked to do a project this way.
-16:05
-And if you haven't practiced with it, you'll be  stuck. You won't even be able to wipe your own
-16:11
-butt. Okay? And you'll look very stupid, right?  So this is at least... I actually think this is
-16:17
-better than Agile Scrum. Okay? It's better  than story points, planning poker, therapy,
-16:23
-retrospective sessions. All of that is meatware  for humans, and this is way smarter and more
-16:30
-concise. And if we can get used to it, okay, and  actually focus our human skills on the consulting
-16:38
-aspect of our projects, well, maybe we'll be  happier. Maybe software engineers will be happier.
-16:44
-Let me know what you think. Is Hypervelocity  Engineering going to be a total slop disaster
-16:49
-for the industry? Or will it be a saving grace  and turn us into proper real professionals?
-16:54
-Let me know in the comments. I reply  to every single one. Why not subscribe,
-16:59
-because I'm going to do a video where I  update one of my apps using this methodology,
-17:03
-and it's probably going to  be next. Thanks for watching.
+0:00Welcome to this explainer. Today we're unpacking part five of the AI agent factory curriculum. And honestly, we're taking a really structured look at the
+0:088 secondsmassive economic and technological shift that's driving the open claw developer revolution. Whether you're an experienced developer or just someone trying to figure out where on earth the
+0:1616 secondssoftware industry is heading in 2026, you are absolutely in the right place.
+0:2121 secondsWe're going to break down exactly how you transition from being a simple AI user to actually building, monetizing, and publishing your own AI applications
+0:2929 secondson what's rapidly becoming the defining platform of our era. Let's kick things off with a quote from Nvidia's Jensen Hong at GTC 2026 because it completely
+0:3838 secondsnails the sheer magnitude of the shift we're dealing with. He said, "Every company in the world today needs to have an open clause strategy and a gentic
+0:4646 secondssystem strategy. This is the new computer." And you know what? The data completely backs up that bold claim.
+0:5353 secondsThink about this for a second. Openclaw achieved in mere weeks what Linux took 30 years to do. It became the largest, most popular, and fastest growing open
+1:011 minute, 1 secondsource project in history. Nvidia even built Nemo Claw directly on top of it.
+1:061 minute, 6 secondsIt effectively turns any standard computer into an AI agent platform that you can just ping via WhatsApp, Telegram, or really any messaging
+1:121 minute, 12 secondschannel. So why are we focusing so heavily on this right now? Well, because we are looking at the defining market opportunity of 2026. Right now, there is
+1:211 minute, 21 secondsthis massive gaping hole in the market between companies that desperately need digital employees, what the source calls digital FTEEs or full-time equivalents,
+1:291 minute, 29 secondsand the developers who actually know how to build them. Every single industry is hunting for this. A law firm needs a contract reviewer that works flawlessly
+1:361 minute, 36 secondsat 2 a.m. A medical clinic needs a triage agent that speaks three different languages on demand. A tutoring company needs an educator that literally never
+1:431 minute, 43 secondssleeps. The tools to build these agents, they exist. The platform exists. What doesn't exist yet is a critical mass of developers who can take the idea of an
+1:511 minute, 51 secondsAI employee and turn it into a published money-making product. And the global explosion of demand for this is just
+1:581 minute, 58 secondsunprecedented. Our source highlights how OpenClaw triggered what the BBC actually called a national frenzy in China. The
+2:062 minutes, 6 secondsscale of adoption is staggering. I mean, we're talking hundreds of thousands of GitHub stars and forks in just weeks.
+2:122 minutes, 12 secondsChinese developers immediately jumped in to integrate it with DeepSeek and massive domestic super apps like WeChat.
+2:182 minutes, 18 secondsIt got so intense that tech giants like Tensson and BU literally set up physical locations where people waited in line to get free customized versions. We even
+2:262 minutes, 26 secondssaw local government stepping up. Wooi City alone offered up to 5 million yuana in incentives just for manufacturing applications. Though actually, it's
+2:352 minutes, 35 secondsworth noting that this explosive growth also prompted government cyber security authorities to step in and flag risks about improper installation, which
+2:432 minutes, 43 secondsreally just highlights the urgent need for developers who can build these tools safely and professionally. To ground all this hype and some practical reality,
+2:502 minutes, 50 secondstake a look at this number, 200. Our source shares this fascinating anecdote about an IT engineer who customized his
+2:582 minutes, 58 secondsown openclaw agent just to manage his online shop. He used the agent to automatically list 200 products complete with better descriptions and automatic
+3:063 minutes, 6 secondscompetitor price comparisons in exactly 2 minutes before openclaw. That exact same workload consumed his entire day.
+3:143 minutes, 14 secondsThat is the true economic impact of this technology at the individual level.
+3:183 minutes, 18 secondsSection one, the developer's journey from user to publisher. To help bridge the gap between being just an impressed
+3:253 minutes, 25 secondsobserver and becoming a published application developer, the curriculum gives you this exact road map through chapters 56 to 60. Part 5 is designed
+3:353 minutes, 35 secondswith a really specific focus. In the earlier parts, you were learning how to think with AI, right? But here, you're building on a platform that already
+3:423 minutes, 42 secondshandles all the messy under the hood stuff, the messaging, security, scheduling, orchestration, so you can focus entirely on making your
+3:503 minutes, 50 secondsapplication valuable. It's a beautifully structured path. You start in chapter 56 in the experience phase, just installing
+3:583 minutes, 58 secondsOpenClaw and building a working AI employee. Then you move to extend in chapter 57, adding new capabilities. By
+4:054 minutes, 5 secondschapter 58, you're in the build phase, creating a complex ninetool product called Tutorclaw with real Stripe integration. Chapter 59 tackles the
+4:144 minutes, 14 secondsunderstand phase where we dive into the wild economics of these apps. And finally, in chapter 60, you hit the publish phase. document your
+4:224 minutes, 22 secondsarchitecture and push your release to Claw Hub. You start out as a user and you finish as a published developer on the new computer. Now, you might be
+4:304 minutes, 30 secondsthinking, "Do I need a massive server farm to do this?" The crucial point is how incredibly accessible it is to start
+4:374 minutes, 37 secondsfor chapter 56. Your prerequisites are basically nothing. You don't need a supercomput. You just need to install Node.js version 22 or higher, which is
+4:454 minutes, 45 secondscompletely free. You need a standard WhatsApp account, though Telegram or Discord work too if you prefer. And you can deploy your very first AI employee
+4:544 minutes, 54 secondsin under an hour using Google Gemini's free tier as your default model. The whole platform is model agnostic, meaning any capable model works, which
+5:025 minutes, 2 secondsmakes that initial deployment basically frictionless. Then, as you advance into chapter 57, the training wheels come off, but in a really clever way. You're
+5:105 minutes, 10 secondsgoing to use cloud code and a specific skill called the MCP builder to create model context protocol or MCP servers.
+5:175 minutes, 17 secondsWhat's revolutionary here is the workflow itself. You literally just describe what you need and Claude Code actually writes the code to extend your
+5:245 minutes, 24 secondsagents capabilities. It's this awesome describe, steer, verify workflow that lets you seamlessly connect new complex tools directly to your agent without
+5:325 minutes, 32 secondsdrowning in boilerplate code. Section two, flipping traditional SAS economics.
+5:385 minutes, 38 secondsThe financial incentives of building these AI agents completely rewrite the rules of traditional software. This is not just a tech shift. It is a
+5:475 minutes, 47 secondsfundamental change in how software businesses are built and monetized. Get a load of the staggering number, 89%.
+5:545 minutes, 54 secondsAccording to the curriculum, when you build on an agent OS that handles all the heavy lifting like orchestration and security, your cost structure changes
+6:026 minutes, 2 secondsdramatically. You're able to achieve gross margins that approach an astonishing 89%. You're going to learn exactly why agent applications
+6:106 minutes, 10 secondscompletely flipped the traditional software as a service model. And we're doing it with real numbers, not just fluffy business theory. So in chapter 58, you actually put those economic
+6:196 minutes, 19 secondstheories into practice. You'll learn exactly how to realize those incredible margins by building a full product called Tutor Claw. And listen, this
+6:266 minutes, 26 secondsisn't some toy app. It's a robust nine tool product. You learn how to implement tiered access control, meaning different users get access to different capabilities. You'll integrate Stripe
+6:356 minutes, 35 secondspayments directly into the agents workflow. and you'll learn how to leverage the near zero marginal cost of operating this software to build a highly highly profitable business
+6:436 minutes, 43 secondsarchitecture. Section three, open versus managed platforms. Now, while Open Claw is phenomenal, the whole industry is
+6:516 minutes, 51 secondsmoving at lightning speed. We are watching the opening salvos of an impending war over where exactly these AI agents will ultimately live, operate,
+6:596 minutes, 59 secondsand who controls them. This really highlights the fundamental tension dividing the market right now. On one side, you've got OpenClaw. It's open source, runs on your own hardware, you choose the model, and you own the data.
+7:097 minutes, 9 secondsIt is all about multi- vendor freedom.
+7:117 minutes, 11 secondsBut on the other side, our source notes that Anthropic is testing a platform called Conway. Conway is a managed, always on agent platform. It lives as a
+7:197 minutes, 19 secondspersistent sidebar on your system, has native Chrome integration, and uses web hook triggers that can actually wake the agent without a human ever prompting it.
+7:267 minutes, 26 secondsBut it's not open source, and it's not model agnostic. It represents a massive bet that most users will happily trade Ultimate Control for seamless out-of-the-box convenience. If this
+7:347 minutes, 34 secondssounds familiar, well, it absolutely should. We've seen this movie before in tech history. Think of Linux versus Mac OS, or self-hosted WordPress versus
+7:427 minutes, 42 secondsmanaged Shopify, or Android's open ecosystem versus iOS. Every major AI lab from Open AI to Google wants to be the runtime environment, not just the
+7:507 minutes, 50 secondsunderlying model. The reality is the open and managed AI layers will coexist.
+7:557 minutes, 55 secondsThe open layer will always win on flexibility and cost control, while the managed layer will win on onboarding speed and integrated tooling. Neither approach is going to kill the other one
+8:038 minutes, 3 secondsoff. And that is exactly why this curriculum focuses relentlessly on principles over platform specific procedures. You aren't just learning to
+8:118 minutes, 11 secondsdepend on one single runtime. The MCP server protocols you build, they speak a language that Conway, OpenClaw, and every serious platform already supports.
+8:208 minutes, 20 secondsYou'll learn to use architecture decision records or ADRs, which teach you to professionally document why you made a choice, like understanding why six attempts failed before the seventh
+8:298 minutes, 29 secondsmodel finally clicked. and the tiered monetization models you build are enduring business patterns, not just fleeting platform features. These are the deep skills that will outlast any
+8:378 minutes, 37 secondssingle platform war. So, we're going to wrap up with a rather stark question echoing a warning directly from a Chinese state newspaper about this exact
+8:468 minutes, 46 secondstechnological wave. They warned that missing this shift was akin to raising lobsters, meaning you're stuck doing irrelevant, outdated work while the
+8:548 minutes, 54 secondswhole world just passes you by. The tools are here. The platform is ready.
+8:588 minutes, 58 secondsThe defining opportunity of 2026 is sitting right in front of us. The only question left is, are you ready to learn the enduring principles and actually
+9:079 minutes, 7 secondsbuild on the new computer, or will you sit back and let this incredible opportunity pass you by?
+

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Process a rover job with NLP extraction via Ollama on strontium.
+Process a rover job with NLP extraction via Ollama (local).
 
 Usage:
     python3 nlp_process_job.py <job_id> [--ollama-url URL] [--model MODEL]
@@ -18,7 +18,7 @@ from mcp import ClientSession
 from mcp.client.sse import sse_client
 
 ROVER_URL = "http://localhost:3102/sse"
-OLLAMA_URL = "http://strontium:11434"
+OLLAMA_URL = "http://localhost:11434"
 MODEL = "qwen3:4b"   # will fall back to gemma4 if not available
 
 async def get_chunk(session, job_id, ollama_url="", model=""):
@@ -43,12 +43,12 @@ async def main():
     ollama_url = OLLAMA_URL
     model = MODEL
 
-    # Check what models are available on strontium
+    # Check what models are available on the Ollama host
     import urllib.request
     try:
         tags = json.loads(urllib.request.urlopen(f"{OLLAMA_URL}/api/tags", timeout=5).read())
         available = [m["name"] for m in tags.get("models", [])]
-        print(f"Available on strontium: {available}")
+        print(f"Available on Ollama host: {available}")
         if "qwen3:4b" in available:
             model = "qwen3:4b"
         elif "gemma4:latest" in available:

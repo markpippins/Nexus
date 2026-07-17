@@ -246,7 +246,7 @@ export function registerTools(server: McpServer) {
     "Create a new requirement in the backlog.",
     {
       systemId: z.string().describe("System UUID"),
-      subsystemId: z.string().describe("Subsystem UUID"),
+      subsystemId: z.string().nullable().optional().describe("Optional subsystem UUID — requirement can live at system level"),
       featureId: z.string().nullable().optional().describe("Optional feature UUID"),
       title: z.string().describe("Requirement title"),
       description: z.string().optional().describe("Requirement description"),
@@ -254,6 +254,10 @@ export function registerTools(server: McpServer) {
       priority: z.string().optional().describe("Priority: Low, Medium, High"),
       startDate: z.string().nullable().optional().describe("Start date string"),
       completionDate: z.string().nullable().optional().describe("Completion date string"),
+      parentId: z.string().nullable().optional().describe("Parent requirement UUID (for hierarchy)"),
+      reqType: z.string().nullable().optional().describe("Requirement type: Epic, Story, Task, Bug"),
+      acceptanceCriteria: z.array(z.string()).nullable().optional().describe("Acceptance criteria list"),
+      candidateId: z.string().nullable().optional().describe("Originating harvest candidate UUID"),
     },
     async (args) => {
       const result = await NebulaClient.createRequirement({
@@ -266,6 +270,10 @@ export function registerTools(server: McpServer) {
         priority: args.priority,
         startDate: args.startDate,
         completionDate: args.completionDate,
+        parentId: args.parentId,
+        reqType: args.reqType,
+        acceptanceCriteria: args.acceptanceCriteria,
+        candidateId: args.candidateId,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -285,11 +293,15 @@ export function registerTools(server: McpServer) {
       systemId: z.string().optional().describe("Reassign to system"),
       subsystemId: z.string().optional().describe("Reassign to subsystem"),
       featureId: z.string().nullable().optional().describe("Reassign to feature"),
+      parentId: z.string().nullable().optional().describe("Parent requirement UUID"),
+      reqType: z.string().nullable().optional().describe("Requirement type: Epic, Story, Task, Bug"),
+      acceptanceCriteria: z.array(z.string()).nullable().optional().describe("Acceptance criteria list"),
+      candidateId: z.string().nullable().optional().describe("Originating harvest candidate UUID"),
     },
     async (args) => {
-      const { id, title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId } = args;
+      const { id, title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId, parentId, reqType, acceptanceCriteria, candidateId } = args;
       const result = await NebulaClient.updateRequirement(id, {
-        title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId,
+        title, description, status, priority, startDate, completionDate, systemId, subsystemId, featureId, parentId, reqType, acceptanceCriteria, candidateId,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
@@ -770,7 +782,7 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_update_harvest_candidate",
-    "Update a harvest candidate — primarily used to link it to a system, subsystem, or feature in the Nebula project hierarchy. Also supports updating title, status, intent description, and tags.",
+    "Update a harvest candidate — primarily used to link it to a system, subsystem, or feature in the Nebula project hierarchy. Also supports updating title, status, intent description, tags, work request linkage, and completion status.",
     {
       id: z.string().describe("Harvest candidate UUID"),
       title: z.string().optional().describe("New title"),
@@ -781,6 +793,8 @@ export function registerTools(server: McpServer) {
       featureId: z.string().nullable().optional().describe("Link to feature UUID (or null to unlink)"),
       tags: z.array(z.string()).optional().describe("New tags array"),
       planRef: z.string().optional().describe("Conduit plan reference (e.g. '0136') — creates a cross-reference linking this candidate to the plan with rel_type='spawns_plan'"),
+      workRequestId: z.string().uuid().nullable().optional().describe("Link to WRP runtime WorkRequest UUID — set when a WorkRequest is created for this candidate"),
+      completed: z.boolean().optional().describe("Mark candidate as completed (independent of work_request_id — useful for backfilling conduit-era work)"),
     },
     async (args) => {
       const { id, ...body } = args;
@@ -897,13 +911,16 @@ export function registerTools(server: McpServer) {
     {
       id: z.string().describe("Harvest candidate UUID"),
       systemId: z.string().describe("System UUID to link the candidate to (also used for the requirement and info tab)"),
-      subsystemId: z.string().describe("Subsystem UUID — required because the requirement must belong to a subsystem"),
+      subsystemId: z.string().nullable().optional().describe("Optional subsystem UUID — requirement can live at system level"),
       featureId: z.string().nullable().optional().describe("Optional feature UUID to link candidate and requirement to"),
       planRef: z.string().optional().describe("Optional conduit plan reference (e.g. '0136') — creates a cross-reference with rel_type='spawns_plan'"),
       priority: z.string().optional().describe("Requirement priority: Low, Medium, High (default Medium)"),
       status: z.string().optional().describe("Requirement status: Backlog, ToDo, InProgress, Active, Blocked, Done, Cancelled, Accepted (default Backlog)"),
       title: z.string().optional().describe("Requirement title (defaults to candidate title)"),
       description: z.string().optional().describe("Requirement description (defaults to candidate intent_description)"),
+      parentId: z.string().nullable().optional().describe("Parent requirement UUID (for hierarchy)"),
+      reqType: z.string().nullable().optional().describe("Requirement type: Epic, Story, Task, Bug"),
+      acceptanceCriteria: z.array(z.string()).nullable().optional().describe("Acceptance criteria list"),
     },
     async (args) => {
       const { id, ...body } = args;
@@ -918,13 +935,18 @@ export function registerTools(server: McpServer) {
 
   server.tool(
     "nebula_list_agent_records",
-    "List agent audit records, optionally filtered by type (report|analysis|assessment|inspection|prompt|response|engineering_log|architecture_note|decision), role, system, or plan.",
+    "List agent audit records, optionally filtered by type, role, system/subsystem/feature, plan, multi-tag (AND conjunction), text search, date range, level, or visibility scope.",
     {
       type: z.string().optional().describe("Filter by record type (report, analysis, assessment, inspection, prompt, response, engineering_log, architecture_note, decision)"),
       role: z.string().optional().describe("Filter by agent role (architect, planner, builder, reviewer, critic, analyst, inspector, engineer)"),
       systemId: z.string().optional().describe("Filter by associated system UUID"),
+      subsystemId: z.string().optional().describe("Filter by associated subsystem UUID"),
+      featureId: z.string().optional().describe("Filter by associated feature UUID"),
       planRef: z.string().optional().describe("Filter by conduit plan reference (e.g. '0136')"),
-      tag: z.string().optional().describe("Filter by tag"),
+      tag: z.union([z.string(), z.array(z.string())]).optional().describe("Filter by tag(s). Single string or array for AND conjunction (e.g. ['to:engineer', 'type:response'])"),
+      search: z.string().optional().describe("Free-text search across title and content (case-insensitive ILIKE)"),
+      createdAfter: z.string().optional().describe("Filter records created at or after this ISO 8601 timestamp"),
+      createdBefore: z.string().optional().describe("Filter records created at or before this ISO 8601 timestamp"),
       level: z.number().optional().describe("Filter by abstraction level (1-4)"),
       visibilityScope: z.string().optional().describe("Filter by visibility scope (builder, architect, planner, reviewer, all)"),
       limit: z.number().optional().describe("Max results (default 100, max 500)"),
@@ -1516,6 +1538,173 @@ export function registerTools(server: McpServer) {
     },
     async (args) => {
       const result = await NebulaClient.getOpRegistryLineage(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
+  //  EXECUTION AUTHORITY (ADR-006)
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "execution_create_request",
+    "Create a new WorkRequest in the execution domain. Returns the created request with UUID id.",
+    {
+      businessKey: z.string().describe("Unique business key (e.g. 'legacy-plan-0053' or 'wr-2026-07-12-001')"),
+      title: z.string().optional().describe("Human-readable title"),
+      intentType: z.string().optional().describe("Type of intent (default: 'task')"),
+      objective: z.string().optional().describe("What is desired"),
+      inputs: z.any().optional().describe("Intent inputs (any JSON)"),
+      deterministic: z.boolean().optional().describe("Whether this is deterministic (default: true)"),
+      maxRetries: z.number().optional().describe("Max retry hint"),
+      timeoutPolicy: z.string().optional().describe("Timeout policy hint"),
+      resourceHints: z.array(z.string()).optional().describe("Resource hints"),
+      opTrace: z.any().optional().describe("Op resolution trace"),
+      status: z.string().optional().describe("Initial status (default: DRAFT)"),
+      sourcePlanId: z.string().optional().describe("Source conduit plan ID"),
+      sourceWrId: z.string().optional().describe("Source vision.work_requests.wr_id"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createExecutionRequest(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_list_requests",
+    "List execution requests, optionally filtered by status.",
+    {
+      status: z.string().optional().describe("Filter by status (DRAFT, COMPILED, VALIDATED, ADMITTED, READY, COMPLETED, FAILED, CANCELLED)"),
+      limit: z.number().optional().describe("Max results (default 50, max 200)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listExecutionRequests(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_get_request",
+    "Get a single execution request with its full lifecycle (leases, attempts, receipts).",
+    {
+      id: z.string().describe("Request UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getExecutionRequest(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_transition_request",
+    "Transition a WorkRequest to a new status. Enforces valid state transitions per ADR-006.",
+    {
+      id: z.string().describe("Request UUID"),
+      targetStatus: z.enum(["COMPILED","VALIDATED","ADMITTED","READY","COMPLETED","FAILED","CANCELLED"])
+        .describe("Target status"),
+      reason: z.string().optional().describe("Reason for transition"),
+    },
+    async (args) => {
+      const result = await NebulaClient.transitionExecutionRequest(args.id, {
+        targetStatus: args.targetStatus,
+        reason: args.reason,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_acquire_lease",
+    "Acquire a temporal lease on an execution request. Only one active lease per request at a time.",
+    {
+      requestId: z.string().describe("Request UUID to lease"),
+      executorId: z.string().describe("Executor identity (e.g. 'conduit', 'cli', 'jenkins')"),
+      ttlSeconds: z.number().optional().describe("Time-to-live in seconds (default: 300)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.acquireLease(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_renew_lease",
+    "Renew an active lease (extend TTL). Fails if lease is expired or released.",
+    {
+      id: z.string().describe("Lease UUID"),
+      ttlSeconds: z.number().optional().describe("New TTL in seconds (default: 300)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.renewLease(args.id, { ttlSeconds: args.ttlSeconds });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_release_lease",
+    "Release an active lease. The executor voluntarily gives back execution permission.",
+    {
+      id: z.string().describe("Lease UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.releaseLease(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_submit_attempt",
+    "Submit an execution attempt result. Creates an attempt record linked to the lease.",
+    {
+      leaseId: z.string().describe("Lease UUID (must be ACTIVE)"),
+      status: z.enum(["SUCCEEDED","FAILED","TIMED_OUT"]).optional()
+        .describe("Attempt outcome (default: SUCCEEDED)"),
+      result: z.any().optional().describe("Result payload (any JSON)"),
+      error: z.string().optional().describe("Error message if failed"),
+      exitCode: z.number().optional().describe("Exit code"),
+    },
+    async (args) => {
+      const result = await NebulaClient.submitAttempt(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_issue_receipt",
+    "Issue an immutable receipt from a completed attempt. Consumed by the Kernel.",
+    {
+      attemptId: z.string().describe("Attempt UUID"),
+      type: z.string().optional().describe("Receipt type (default: EXECUTION_COMPLETE or EXECUTION_FAILED based on attempt status)"),
+      agentRole: z.string().optional().describe("Agent role (defaults to executor_id)"),
+      summary: z.string().optional().describe("Human-readable summary"),
+      metadata: z.any().optional().describe("Additional metadata"),
+    },
+    async (args) => {
+      const result = await NebulaClient.issueReceipt(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_list_receipts",
+    "List execution receipts, optionally filtered by request or type.",
+    {
+      requestId: z.string().optional().describe("Filter by request UUID"),
+      type: z.string().optional().describe("Filter by receipt type"),
+      limit: z.number().optional().describe("Max results"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listExecutionReceipts(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "execution_state",
+    "Get a summary of the execution domain state (request/lease attempt/receipt counts by status).",
+    {},
+    async () => {
+      const result = await NebulaClient.getExecutionState();
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );

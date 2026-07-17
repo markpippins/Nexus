@@ -1,0 +1,26 @@
+{
+  "name": "address-tts-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for the Address TTS service — agent-facing interface for text-to-speech synthesis and work request state narration",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "daemon": "bash scripts/mcp-daemon.sh start",
+    "daemon-stop": "bash scripts/mcp-daemon.sh stop",
+    "daemon-restart": "bash scripts/mcp-daemon.sh restart",
+    "daemon-status": "bash scripts/mcp-daemon.sh status"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

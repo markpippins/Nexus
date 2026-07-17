@@ -193,8 +193,8 @@ PY_ID=$(create_system "Python Services" '"Python backend services and pipelines"
   create_subsystem "$PY_ID" "Conduit (Legacy)" '"Legacy Python conduit service"' "legacy/python/conduit/README.md"
   create_workspace "$PY_ID" "" "legacy/python/conduit"
 
-  create_subsystem "$PY_ID" "HTML Importer" '"Chat transcript ingestion pipeline"' "python/absorb/html/README.md"
-  create_workspace "$PY_ID" "" "python/absorb/html"
+  create_subsystem "$PY_ID" "Harvest Pipeline" '"Chat transcript ingestion and candidate extraction pipeline"' "python/rover/README.md"
+  create_workspace "$PY_ID" "" "python/rover"
 
   create_subsystem "$PY_ID" "FS Crawler" '"Filesystem crawler and watcher"' "python/fs/fs-crawler/README.md"
   create_workspace "$PY_ID" "" "python/fs/fs-crawler"

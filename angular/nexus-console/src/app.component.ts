@@ -12,7 +12,7 @@ import { HostProfileService } from './services/host-profile.service.js';
 import { DetailPaneComponent } from './components/detail-pane/detail-pane.component.js';
 import { SessionService } from './services/in-memory-file-system.service.js';
 import { BrokerProfile } from './models/broker-profile.model.js';
-import { PlatformManagementService, ServicePayload, FrameworkPayload, Host } from './services/platform-management.service.js';
+import { PlatformManagementService, ServicePayload, FrameworkPayload, Server, LOOKUP_SERVER_TYPES, LOOKUP_ENVIRONMENTS, LOOKUP_OPERATING_SYSTEMS, LOOKUP_SERVICE_TYPES, LOOKUP_FRAMEWORK_CATEGORIES, LOOKUP_FRAMEWORK_LANGUAGES } from './services/platform-management.service.js';
 import { RemoteFileSystemService } from './services/remote-file-system.service.js';
 import { FsService } from './services/fs.service.js';
 import { ImageService } from './services/image.service.js';
@@ -63,13 +63,15 @@ import { ServiceRegistryEditorComponent } from './components/service-registry-ed
 import { GatewayEditorComponent } from './components/gateway-editor/gateway-editor.component.js';
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
 import { GatewayManagementComponent } from './components/gateway-management/gateway-management.component.js';
-import { HostServerManagementComponent } from './components/host-server-management/host-server-management.component.js';
+import { RegistryServerManagementComponent } from './components/registry-server-management/registry-server-management.component.js';
 import { IframeViewComponent } from './components/iframe-view/iframe-view.component.js';
 import { NavToolbarComponent } from './nav-toolbar/nav-toolbar.component.js';
 import { GenericTreeNode } from './models/generic-tree.model.js';
 import { MessageBoxContainerComponent } from './components/message-box-container/message-box-container.component.js';
+import { UiEventBusService } from './services/ui-event-bus.service.js';
 
 import { SystemHealthComponent } from './components/system-health/system-health.component.js';
+import { NebulaPanelComponent } from './components/nebula-panel/nebula-panel.component.js';
 
 interface PanePath {
   id: number;
@@ -118,7 +120,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, HostServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent, NebulaPanelComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -154,7 +156,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private registryServerProvider = inject(RegistryServerProvider);
   private serviceMeshService = inject(ServiceMeshService);
   public vizService = inject(ArchitectureVizService);
-
+  private eventBus = inject(UiEventBusService);
   private initialAutoConnectAttempted = false;
 
   // --- State Management ---
@@ -176,23 +178,37 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'nebula-rms'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'tackle-ui' | 'kanban' | 'cascade-ui'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
+  showRunningOnly = signal(false);  // Toggle to show only running services in mesh
+  paletteCollapsed = signal(false);  // Toggle to collapse component palette in service graph
 
   viewModeUrls: Record<string, string> = {
     'conduit-ui': 'http://localhost:4201',
     'duality': 'http://localhost:3002',
-    'plurality': 'http://localhost:3001',
+    'plurality': 'http://localhost:3004',
+    'assembly': 'http://localhost:9003',
     'nebula-rms': 'http://localhost:3000',
+    'tackle-ui': 'http://localhost:4202',
+    'cascade-ui': 'http://localhost:4203',
   };
 
   isIframeMode = computed(() =>
     this.currentViewMode() === 'conduit-ui' ||
     this.currentViewMode() === 'duality' ||
     this.currentViewMode() === 'plurality' ||
-    this.currentViewMode() === 'nebula-rms'
+    this.currentViewMode() === 'assembly' ||
+    this.currentViewMode() === 'nebula-rms' ||
+    this.currentViewMode() === 'tackle-ui' ||
+    this.currentViewMode() === 'cascade-ui'
+  );
+
+  isKanbanMode = computed(() => this.currentViewMode() === 'kanban');
+
+  isFullScreenMode = computed(() =>
+    this.isIframeMode() || this.currentViewMode() === 'kanban'
   );
 
   // --- Pane Visibility State (from service) ---
@@ -238,6 +254,8 @@ export class AppComponent implements OnInit, OnDestroy {
   // --- Status Bar State ---
   pane1Status = signal<PaneStatus>({ selectedItemsCount: 0, totalItemsCount: 0, filteredItemsCount: null });
   pane2Status = signal<PaneStatus>({ selectedItemsCount: 0, totalItemsCount: 0, filteredItemsCount: null });
+  pane1FolderIsMagnet = signal(false);
+  pane2FolderIsMagnet = signal(false);
 
   activePaneStatus = computed<PaneStatus>(() => {
     const activeId = this.activePaneId();
@@ -247,10 +265,18 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.pane2Status();
   });
 
+  /** Whether the directory currently shown in the active pane is magnetized. */
+  activePaneFolderIsMagnet = computed<boolean>(() => {
+    return this.activePaneId() === 1 ? this.pane1FolderIsMagnet() : this.pane2FolderIsMagnet();
+  });
+
   statusBarSelectionInfo = computed(() => {
     const item = this.selectedDetailItem();
+    const folderIsMagnet = this.activePaneFolderIsMagnet();
+
     if (!item) {
-      return 'Ready';
+      // Nothing selected: reflect the magnet status of the current directory.
+      return folderIsMagnet ? '🧲 Magnet Folder' : 'Ready';
     }
 
     if (item.isServerRoot) {
@@ -320,28 +346,40 @@ export class AppComponent implements OnInit, OnDestroy {
   pane2GatewayProfileId = computed(() => this.getGatewayProfileIdForPath(this.pane2Path()));
 
   private getHostServerProfileIdForPath(path: string[]): string | null {
-    // Path must be exactly ['Service Registries', 'Profile Name'] to show editor
-    if (path.length !== 2 || path[0] !== 'Service Registries') {
+    // Path must be ['Platform Management', 'Service Registries', 'Profile Name', ...] to show editor (any depth under the profile).
+    if (path.length < 3 || path[0] !== 'Platform Management' || path[1] !== 'Service Registries') {
       return null;
     }
-    const profileName = path[1];
+    const profileName = path[2];
     const profile = this.hostProfileService.profiles().find(p => p.name === profileName);
     return profile?.id ?? null;
   }
 
   private getGatewayProfileIdForPath(path: string[]): string | null {
-    // Path must be exactly ['Gateways', 'Profile Name'] to show editor
-    if (path.length !== 2 || path[0] !== 'Gateways') {
+    // Path must be ['Platform Management', 'Gateways', 'Profile Name', ...] to show editor (any depth under the profile).
+    if (path.length < 3 || path[0] !== 'Platform Management' || path[1] !== 'Gateways') {
       return null;
     }
-    const profileName = path[1];
+    const profileName = path[2];
     const profile = this.profileService.profiles().find(p => p.name === profileName);
     return profile?.id ?? null;
   }
 
+  /** Map of category type labels → DB discriminator values for child nodes under Categories. */
+  private readonly CATEGORY_LABEL_TO_TYPE: Record<string, string> = {
+    'framework': 'framework_type',
+    'server': 'server_type',
+    'library': 'library_type',
+    'environment': 'environment_type',
+    'service': 'service_type',
+    'config': 'service_config_type',
+    'system': 'system_type',
+    'os': 'operating_systems',
+  };
+
   private getPlatformNodeForPath(path: string[]) {
-    // Valid management types
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'hosts', 'service hosts', 'lookup tables', 'service types', 'server types', 'framework languages', 'framework categories', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'system health'];
+    // Valid management types (System Health is now a top-level sibling, not a Platform Management child).
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems'];
     const profiles = this.hostProfileService.profiles();
     const activeProfile = this.hostProfileService.activeProfile();
 
@@ -353,8 +391,9 @@ export class AppComponent implements OnInit, OnDestroy {
       if (n === 'service-definitions') return 'services';
       if (n === 'service-hosts' || n === 'hosts') return 'servers';
       if (n === 'languages') return 'framework-languages';
-      if (n === 'categories') return 'framework-categories';
-      if (n === 'system-health') return 'system-health';
+      if (n === 'categories') return 'categories';
+      if (n === 'framework-types') return 'framework-categories';
+      if (n === 'library-types') return 'library-categories';
       return n;
     };
 
@@ -365,7 +404,12 @@ export class AppComponent implements OnInit, OnDestroy {
     // Explicitly exclude "Search & Discovery" paths to prevent masking user folders
     if (path[0] === 'Search & Discovery') {
       return null;
-    }
+    }        // System Health is a top-level sibling of Platform Management (always connects to terrain server).
+        // Handle it here at root before the Platform Management branch — also covers any deeper path.
+        if (path[0] === 'System Health') {
+          const terrainUrl = this.localConfigService.terrainServerUrl();
+          return { type: 'system-health', baseUrl: terrainUrl };
+        }
 
     console.log('[AppComponent] getPlatformNodeForPath', { path, profilesCount: profiles.length, activeProfile: activeProfile?.name });
 
@@ -375,7 +419,7 @@ export class AppComponent implements OnInit, OnDestroy {
       if (validTypes.includes(type)) {
         const profile = activeProfile;
         if (profile) {
-          const baseUrl = profile.hostServerUrl.startsWith('http') ? profile.hostServerUrl.replace(/\/$/, '') : `http://${profile.hostServerUrl.replace(/\/$/, '')}`;
+          const baseUrl = profile.registryServerUrl.startsWith('http') ? profile.registryServerUrl.replace(/\/$/, '') : `http://${profile.registryServerUrl.replace(/\/$/, '')}`;
           console.log('[AppComponent] Matched single-element path', { type, baseUrl });
           return { type: normalizeType(type), baseUrl };
         }
@@ -406,6 +450,13 @@ export class AppComponent implements OnInit, OnDestroy {
           // Special case: if type is "data dictionary", check if there's a sub-type segment
           if (type === 'data dictionary' && remaining.length > typeIndex + 1) {
             const subType = remaining[remaining.length - 1].toLowerCase();
+            // Check if the subType is a category label (child under Categories)
+            const categoryType = this.CATEGORY_LABEL_TO_TYPE[subType];
+            if (categoryType) {
+              // Return categories:{discriminator} format so PlatformManagementComponent
+              // can show the categories view filtered to this type
+              return { type: `categories:${categoryType}`, baseUrl: this.resolveBaseUrl(remaining, profiles, activeProfile, pmIndex, path) };
+            }
             if (validTypes.includes(subType)) {
               type = subType;
             }
@@ -432,14 +483,11 @@ export class AppComponent implements OnInit, OnDestroy {
           return { type: normalizedType, baseUrl: terrainUrl };
         }
 
-        const profile = targetProfileName
-          ? profiles.find(p => p.name === targetProfileName)
-          : (path[0] === 'Service Registries' && path.length > 1 ? profiles.find(p => p.name === path[1]) : (path[0].toLowerCase() !== 'platform management' ? profiles.find(p => p.name === path[0]) : activeProfile));
-
-        const finalProfile = profile || activeProfile;
-        if (finalProfile) {
-          const baseUrl = finalProfile.hostServerUrl.startsWith('http') ? finalProfile.hostServerUrl.replace(/\/$/, '') : `http://${finalProfile.hostServerUrl.replace(/\/$/, '')}`;
-          console.log('[AppComponent] Matched Platform Management path', { type, baseUrl, targetProfileName });
+        // 'Service Registries' was previously a root sibling and had a special branch here;
+        // it now lives inside 'Platform Management', so the special case is unreachable.
+        const baseUrl = this.resolveBaseUrl(remaining, profiles, activeProfile, pmIndex, path);
+        if (baseUrl) {
+          console.log('[AppComponent] Matched Platform Management path', { type: normalizedType, baseUrl, targetProfileName });
           return { type: normalizedType, baseUrl };
         }
       }
@@ -462,7 +510,7 @@ export class AppComponent implements OnInit, OnDestroy {
         }
 
         if (profile) {
-          const baseUrl = profile.hostServerUrl.startsWith('http') ? profile.hostServerUrl.replace(/\/$/, '') : `http://${profile.hostServerUrl.replace(/\/$/, '')}`;
+          const baseUrl = profile.registryServerUrl.startsWith('http') ? profile.registryServerUrl.replace(/\/$/, '') : `http://${profile.registryServerUrl.replace(/\/$/, '')}`;
           console.log('[AppComponent] Matched direct management path', { type: lastElement, baseUrl, profileName: path[0] });
           return { type: normalizeType(lastElement), baseUrl };
         }
@@ -473,14 +521,48 @@ export class AppComponent implements OnInit, OnDestroy {
     return null;
   }
 
-  // --- Gateway Context Signals ---
-  isGatewayContext = computed(() => this.activePanePath()[0] === 'Gateways');
-  isGatewaysNodeSelected = computed(() => this.activePanePath().length === 1 && this.activePanePath()[0] === 'Gateways');
-  isGatewaySelected = computed(() => this.activePanePath().length === 2 && this.activePanePath()[0] === 'Gateways');
+  /** Resolve the baseUrl from a Platform Management path. */
+  private resolveBaseUrl(remaining: string[], profiles: any[], activeProfile: any, pmIndex: number, path: string[]): string | null {
+    // Find the first element in remaining that matches a valid type
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems'];
+    const typeIndex = remaining.findIndex(p => validTypes.includes(p.toLowerCase()));
 
-  isServiceRegistryContext = computed(() => this.activePanePath()[0] === 'Service Registries');
-  isServiceRegistriesNodeSelected = computed(() => this.activePanePath().length === 1 && this.activePanePath()[0] === 'Service Registries');
-  isServiceRegistrySelected = computed(() => this.activePanePath().length === 2 && this.activePanePath()[0] === 'Service Registries');
+    let targetProfileName: string | null = null;
+    if (typeIndex > 0) {
+      targetProfileName = remaining[0];
+    }
+
+    const profile = targetProfileName
+      ? profiles.find((p: any) => p.name === targetProfileName)
+      : (path[0].toLowerCase() !== 'platform management' ? profiles.find((p: any) => p.name === path[0]) : activeProfile);
+
+    const finalProfile = profile || activeProfile;
+    if (finalProfile) {
+      return finalProfile.registryServerUrl.startsWith('http') ? finalProfile.registryServerUrl.replace(/\/$/, '') : `http://${finalProfile.registryServerUrl.replace(/\/$/, '')}`;
+    }
+    return null;
+  }
+
+  /** True when the active platform node is exactly 'categories' (no type filter). */
+  isPlainCategoriesSelected = computed(() => {
+    const node = this.activePaneId() === 1 ? this.pane1PlatformNode() : this.pane2PlatformNode();
+    return node?.type === 'categories';
+  });
+
+  // --- Gateway Context Signals ---
+  // Gateways now lives at ['Platform Management', 'Gateways', ...] — context = at-or-below the container.
+  isGatewayContext = computed(() => this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Gateways');
+  isGatewaysNodeSelected = computed(() => this.activePanePath().length === 2 && this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Gateways');
+  isGatewaySelected = computed(() => this.activePanePath().length === 3 && this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Gateways');
+
+  // Service Registries analogously.
+  isServiceRegistryContext = computed(() => this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Service Registries');
+  isServiceRegistriesNodeSelected = computed(() => this.activePanePath().length === 2 && this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Service Registries');
+  isServiceRegistrySelected = computed(() => this.activePanePath().length === 3 && this.activePanePath()[0] === 'Platform Management' && this.activePanePath()[1] === 'Service Registries');
+
+  // Combined disjunction — use when callers only care about being anywhere under
+  // Gateways or Service Registries and don't need to distinguish between them.
+  isInGatewaysOrRegistries = computed(() => this.isGatewayContext() || this.isServiceRegistryContext());
 
   isPlatformManagementContext = computed(() => {
     // Check if current view is a platform management view
@@ -510,13 +592,12 @@ export class AppComponent implements OnInit, OnDestroy {
       this.isDeleteGatewayConfirmOpen.set(false);
       this.gatewayToDelete.set(null);
       await this.loadFolderTree();
-      // Navigate back to Gateways root if we were editing
+      // Navigate back to Gateways container under Platform Management if we were editing
       const activeId = this.activePaneId();
-      this.panePaths.update(paths => {
-        const pathObj = paths.find(p => p.id === activeId);
-        if (pathObj && pathObj.path.length > 1 && pathObj.path[0] === 'Gateways') {
+      this.panePaths.update(paths => {          const pathObj = paths.find(p => p.id === activeId);
+        if (pathObj && pathObj.path.length >= 2 && pathObj.path[0] === 'Platform Management' && pathObj.path[1] === 'Gateways') {
           const otherPanes = paths.filter(p => p.id !== activeId);
-          return [...otherPanes, { id: activeId, path: ['Gateways'] }];
+          return [...otherPanes, { id: activeId, path: ['Platform Management', 'Gateways'] }];
         }
         return paths;
       });
@@ -538,13 +619,12 @@ export class AppComponent implements OnInit, OnDestroy {
       this.isDeleteServiceRegistryConfirmOpen.set(false);
       this.serviceRegistryToDelete.set(null);
       await this.loadFolderTree();
-      // Navigate back to Service Registries root
+      // Navigate back to Service Registries container under Platform Management
       const activeId = this.activePaneId();
-      this.panePaths.update(paths => {
-        const pathObj = paths.find(p => p.id === activeId);
-        if (pathObj && pathObj.path.length > 1 && pathObj.path[0] === 'Service Registries') {
+      this.panePaths.update(paths => {          const pathObj = paths.find(p => p.id === activeId);
+        if (pathObj && pathObj.path.length >= 2 && pathObj.path[0] === 'Platform Management' && pathObj.path[1] === 'Service Registries') {
           const otherPanes = paths.filter(p => p.id !== activeId);
-          return [...otherPanes, { id: activeId, path: ['Service Registries'] }];
+          return [...otherPanes, { id: activeId, path: ['Platform Management', 'Service Registries'] }];
         }
         return paths;
       });
@@ -564,14 +644,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.hostProfileService.saveProfile({
       id: Date.now().toString(),
       name,
-      hostServerUrl: 'http://localhost:8000',
+      registryServerUrl: 'http://localhost:8000',
       imageUrl: '',
       status: 'ACTIVE'
-    }).then(() => {
+    }    ).then(() => {
       this.loadFolderTree();
       this.panePaths.update(paths => {
         const otherPanes = paths.filter(p => p.id !== activeId);
-        return [...otherPanes, { id: activeId, path: ['Service Registries', name] }];
+        return [...otherPanes, { id: activeId, path: ['Platform Management', 'Service Registries', name] }];
       });
     });
   }
@@ -597,7 +677,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const activeId = this.activePaneId();
     this.panePaths.update(paths => {
       const otherPanes = paths.filter(p => p.id !== activeId);
-      return [...otherPanes, { id: activeId, path: ['Gateways', newName] }];
+      return [...otherPanes, { id: activeId, path: ['Platform Management', 'Gateways', newName] }];
     });
   };
 
@@ -605,7 +685,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const activeId = this.activePaneId();
     this.panePaths.update(paths => {
       const otherPanes = paths.filter(p => p.id !== activeId);
-      return [...otherPanes, { id: activeId, path: ['Service Registries', name] }];
+      return [...otherPanes, { id: activeId, path: ['Platform Management', 'Service Registries', name] }];
     });
   }
 
@@ -613,7 +693,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const activeId = this.activePaneId();
     this.panePaths.update(paths => {
       const otherPanes = paths.filter(p => p.id !== activeId);
-      return [...otherPanes, { id: activeId, path: ['Gateways', name] }];
+      return [...otherPanes, { id: activeId, path: ['Platform Management', 'Gateways', name] }];
     });
   }
 
@@ -672,6 +752,9 @@ export class AppComponent implements OnInit, OnDestroy {
       // It's a server profile path, check if it's mounted
       return this.mountedProfileIds().includes(profile.id);
     }
+
+    // Plain Categories node (no child type selected) — disable add/action buttons
+    if (this.isPlainCategoriesSelected()) return false;
 
     // It's not a server profile path, so it must be the local session, which is always actionable.
     // Also include management nodes (e.g., Infrastructure, Services) which are handled by getPlatformNodeForPath
@@ -755,24 +838,24 @@ export class AppComponent implements OnInit, OnDestroy {
           try {
             if (node.type === 'servers') {
               const [st, et, os] = await Promise.all([
-                this.platformManagementService.getLookup(baseUrl, 'server-types'),
-                this.platformManagementService.getLookup(baseUrl, 'environments'),
-                this.platformManagementService.getLookup(baseUrl, 'operating-systems')
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_SERVER_TYPES).then(r => r.data),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_ENVIRONMENTS).then(r => r.data),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_OPERATING_SYSTEMS).then(r => r.data)
               ]);
               serverTypes = st;
               environmentTypes = et;
               operatingSystems = os;
             } else if (node.type === 'services') {
               const [fw, st] = await Promise.all([
-                this.platformManagementService.getFrameworks(baseUrl),
-                this.platformManagementService.getLookup(baseUrl, 'service-types')
+                this.platformManagementService.getFrameworks(baseUrl).then(r => r.data),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_SERVICE_TYPES).then(r => r.data)
               ]);
               frameworks = fw;
               serviceTypes = st;
             } else if (node.type === 'frameworks') {
               const [fc, fl] = await Promise.all([
-                this.platformManagementService.getLookup(baseUrl, 'framework-categories'),
-                this.platformManagementService.getLookup(baseUrl, 'framework-languages')
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_FRAMEWORK_CATEGORIES).then(r => r.data),
+                this.platformManagementService.getLookup(baseUrl, LOOKUP_FRAMEWORK_LANGUAGES).then(r => r.data)
               ]);
               frameworkCategories = fc;
               frameworkLanguages = fl;
@@ -830,19 +913,12 @@ export class AppComponent implements OnInit, OnDestroy {
                 const { type: _t, environment: _e, operatingSystem: _o, ...cleanedItem } = item;
 
                 // If mappings fail, fallback to existing IDs if present, or let it fail gracefully (or send what we have)
-                const payload: Partial<Host> = {
+                const payload: Partial<Server> = {
                   ...cleanedItem,
                   serverTypeId: st ? st.id : item.serverTypeId,
                   environmentTypeId: et ? et.id : item.environmentTypeId,
                   operatingSystemId: os ? os.id : item.operatingSystemId
                 };
-
-                // Cleanup string fields that shouldn't be sent if we have IDs? 
-                // The Host interface has 'status' as string, which is fine.
-                // But fields like 'type', 'environment', 'operatingSystem' (if they exist in item) are not part of Host interface for creation (Host entity has relationships).
-                // However, the Service/Controller might ignore unknown fields.
-                // IMPORTANT: 'type' in Host interface is 'serverTypeId' (number). 
-                // The interface I imported for Host has: serverTypeId: number
 
                 await this.platformManagementService.createServer(baseUrl, payload);
               }
@@ -948,16 +1024,16 @@ export class AppComponent implements OnInit, OnDestroy {
         console.log('[homeProvider.getContents] hostChildren:', hostChildren.map(c => c.name));
         const hostNodes: FileSystemNode[] = hostChildren.map(node => {
           // Convert NodeType to FileType
-          let fileType: 'folder' | 'file' | 'host-server' = 'folder';
+          let fileType: 'folder' | 'file' | 'registry-server' = 'folder';
           if (node.type === NodeType.FILE) {
             fileType = 'file';
-          } else if (node.type === NodeType.HOST_SERVER) {
-            fileType = 'host-server';
+          } else if (node.type === NodeType.REGISTRY_SERVER) {
+            fileType = 'registry-server';
           }
 
           return {
             name: node.name,
-            type: node.type === NodeType.HOST_SERVER ? 'host-server' :
+            type: node.type === NodeType.REGISTRY_SERVER ? 'registry-server' :
               node.type === NodeType.FILE ? 'file' : 'folder',
             id: node.id,
             metadata: node.metadata,
@@ -988,7 +1064,7 @@ export class AppComponent implements OnInit, OnDestroy {
           };
         });
 
-        // Build host server profile nodes for the Host Servers folder
+        // Build host server profile nodes for the Service Registries folder
         const allHostProfiles = this.hostProfileService.profiles();
         const hostProfileNodes: FileSystemNode[] = allHostProfiles.map(p => ({
           name: p.name,
@@ -998,7 +1074,7 @@ export class AppComponent implements OnInit, OnDestroy {
           connected: this.healthCheckService.getServiceStatus(p.imageUrl) !== 'DOWN', // Show X overlay when registry is DOWN
           healthStatus: this.healthCheckService.getServiceStatus(p.imageUrl),
           children: [],
-          childrenLoaded: false,
+          childrenLoaded: true, // Leaf nodes — editor opens on selection, no tree children to lazy-load
         }));
 
         // Handle subdirectory paths for virtual organization folders
@@ -1040,13 +1116,12 @@ export class AppComponent implements OnInit, OnDestroy {
             }));
           }
 
-          // Gateways folder - contains broker gateway nodes
-          if (rootName === 'Gateways') {
+          // Gateways / Service Registries virtual containers (now nested under Platform Management).
+          // Handles ['Platform Management', 'Gateways'] and ['Platform Management', 'Service Registries'].
+          if (rootName === 'Platform Management' && path.length === 2 && path[1] === 'Gateways') {
             return brokerProfileNodes;
           }
-
-          // Service Registries folder
-          if (rootName === 'Service Registries') {
+          if (rootName === 'Platform Management' && path.length === 2 && path[1] === 'Service Registries') {
             return hostProfileNodes;
           }
 
@@ -1071,11 +1146,11 @@ export class AppComponent implements OnInit, OnDestroy {
             const nodes = await this.registryServerProvider.getChildren(currentNodeId);
             return nodes.map(node => {
               // Determine the type based on NodeType enum, converting to FileType
-              let fileType: 'file' | 'folder' | 'host-server' = 'folder';
+              let fileType: 'file' | 'folder' | 'registry-server' = 'folder';
               if (node.type === NodeType.FILE) {
                 fileType = 'file';
-              } else if (node.type === NodeType.HOST_SERVER) {
-                fileType = 'host-server';
+              } else if (node.type === NodeType.REGISTRY_SERVER) {
+                fileType = 'registry-server';
               } else {
                 fileType = 'folder';
               }
@@ -1102,26 +1177,10 @@ export class AppComponent implements OnInit, OnDestroy {
           throw new Error(`Home provider does not support path: ${path.join('/')}`);
         }
 
-        // Root path [] - return all children
-        // Create "Gateways" virtual folder containing broker profiles
-        const gatewaysNode: FileSystemNode = {
-          name: 'Gateways',
-          type: 'folder' as FileType,
-          children: brokerProfileNodes,
-          childrenLoaded: true,
-          isVirtualFolder: true,
-        };
-
-        // Create "Service Registries" virtual folder containing host server profiles
-        const serviceRegistriesNode: FileSystemNode = {
-          name: 'Service Registries',
-          type: 'folder' as FileType,
-          children: hostProfileNodes,
-          childrenLoaded: true,
-          isVirtualFolder: true,
-        };
-
-
+        // Root path [] - return all children.
+        // Gateways and Service Registries are no longer synthesized as root siblings —
+        // they live inside Platform Management (added by registry-server-provider.service.ts).
+        // brokerProfileNodes / hostProfileNodes still feed those nested children when accessed.
 
         // Find the "File Systems" node and add Local Session as its child
         const fileSystemsNode = hostNodes.find(n => n.name === 'File Systems');
@@ -1135,12 +1194,14 @@ export class AppComponent implements OnInit, OnDestroy {
         // Find the "Users" node
         const usersNode = hostNodes.find(n => n.name === 'Users');
 
-        // Filter out nodes we want to order manually
+        // Filter out nodes we want to order manually.
+        // Service Registries / service-registries clauses were removed: registryServerProvider
+        // no longer emits them at root (they live under Platform Management), so the defensive
+        // clauses were dead code here. in-memory-file-system.service.ts retains its clause
+        // because it parses persisted tree snapshots that may still contain stale entries.
         const otherHostNodes = hostNodes.filter((n: FileSystemNode) =>
           n.name !== 'Users' &&
           n.name !== 'Search & Discovery' &&
-          n.name !== 'Service Registries' &&
-          n.id !== 'service-registries' &&
           n.name !== 'File Systems' &&
           n.name !== 'Platform Management'
         );
@@ -1150,9 +1211,7 @@ export class AppComponent implements OnInit, OnDestroy {
         const rootChildren = [
           ...otherHostNodes,
           ...(fileSystemsNode ? [fileSystemsNode] : []),
-          gatewaysNode,
           ...(platformNode ? [platformNode] : []),
-          serviceRegistriesNode,
           sessionNode,
           ...(usersNode ? [usersNode] : []),
           ...(searchDiscoveryNode ? [searchDiscoveryNode] : [])
@@ -1194,32 +1253,40 @@ export class AppComponent implements OnInit, OnDestroy {
       // Rebuilds the master folder tree whenever the list of server profiles changes,
       // or when the connection status (mounted profiles) of any profile changes. This ensures
       // the tree view is always in sync with the application's connection state.
+      // NOTE: healthCheckService.statusMap() is intentionally NOT included here because
+      //       health pings don't change the tree structure — only visual indicators.
+      //       Including it caused constant tree rebuilds that reset expansion state.
       this.profileService.profiles(); // Dependency
+      this.hostProfileService.profiles(); // Dependency — host profiles also drive tree nodes
       this.mountedProfiles(); // Dependency
-      this.healthCheckService.statusMap(); // Dependency
       this.loadFolderTree();
 
-      // Handles auto-connecting on startup, once profiles are loaded.
+      // Handles session restoration and auto-connect on startup, once profiles are loaded.
       if (!this.initialAutoConnectAttempted) {
         const profiles = this.profileService.profiles();
         if (profiles.length > 0) {
           this.initialAutoConnectAttempted = true;
-          for (const profile of profiles) {
-            if (profile.autoConnect) {
-              // Attempt to auto-connect without credentials. This is a placeholder for a
-              // more robust session/token management system. For now, we assume this is
-              // only for profiles that don't need interactive login.
-              this.onLoginAndMount({ profile, username: 'auto-user', password: 'auto-password' });
-            }
-          }
+          // First, try to restore sessions from persisted tokens (survives page refresh)
+          this.restoreSessions();
         }
       }
     }, { allowSignalWrites: true });
   }
 
   ngOnInit(): void {
-    // Initialization is now handled reactively by effects in the constructor.
-    // This method is kept to satisfy the OnInit interface, but can be left empty.
+    // Connect to the UI event bus as nexus-console
+    this.eventBus.connect('nexus-console');
+
+    // Log incoming events for debugging (nexus-console won't receive its own events)
+    this.eventBus.onAny((event) => {
+      console.log(`[EventBus] received: ${event.sender} → ${event.eventName}`, event.eventValue);
+    });
+
+    // Subscribe to location changes from child apps
+    this.eventBus.onLocationChange((location) => {
+      console.log(`[EventBus] location change from child app:`, location);
+      // TODO: update address bar display when child apps report their location
+    });
   }
 
   ngOnDestroy(): void {
@@ -1231,27 +1298,6 @@ export class AppComponent implements OnInit, OnDestroy {
   getProvider = (path: string[]): FileSystemProvider => {
     if (path.length === 0) return this.homeProvider;
     const rootName = path[0];
-
-    // Handle "Gateways" virtual folder - broker gateways are nested under it
-    if (rootName === 'Gateways') {
-      if (path.length === 1) {
-        // At the Gateways folder level itself - return home provider 
-        // (children are already loaded in the tree)
-        return this.homeProvider;
-      }
-      // Path is like ['Gateways', 'ServerName', ...]
-      const serverName = path[1];
-      const remoteProvider = this.remoteProviders().get(serverName);
-      if (remoteProvider) {
-        return remoteProvider;
-      }
-      // Server is known but not mounted
-      const isServerProfile = this.profileService.profiles().some(p => p.name === serverName);
-      if (isServerProfile) {
-        return disconnectedProvider;
-      }
-      return this.homeProvider;
-    }
 
     // Handle Local Session at root level
     const sessionName = this.localConfigService.sessionName();
@@ -1281,22 +1327,41 @@ export class AppComponent implements OnInit, OnDestroy {
       return this.homeProvider;
     }
 
-    // Handle "Service Registries" virtual folder - host server profiles are nested under it
-    if (rootName === 'Service Registries') {
-      if (path.length === 1) {
-        // At the Service Registries folder level itself - return home provider
-        // (children are already loaded in the tree)
+    // Handle "Gateways" virtual container nested under "Platform Management" — broker profiles at depth 3.
+    if (rootName === 'Platform Management' && path.length > 1 && path[1] === 'Gateways') {
+      if (path.length === 2) {
+        // At the Gateways container level itself - return home provider
+        // (children come from homeProvider.getContents(['Platform Management', 'Gateways']))
         return this.homeProvider;
       }
-      // Path is like ['Service Registries', 'ProfileName', ...]
-      // For now, host server profiles don't have navigable children in file explorer
-      // They are informational only
+      // Path is like ['Platform Management', 'Gateways', 'ServerName', ...]
+      const serverName = path[2];
+      const remoteProvider = this.remoteProviders().get(serverName);
+      if (remoteProvider) {
+        return remoteProvider;
+      }
+      const isServerProfile = this.profileService.profiles().some(p => p.name === serverName);
+      if (isServerProfile) {
+        return disconnectedProvider;
+      }
       return this.homeProvider;
     }
 
-    // Handle virtual organization folders (Platform Management, Users, Services)
+    // Handle "Service Registries" virtual container nested under "Platform Management" — host profiles at depth 3.
+    if (rootName === 'Platform Management' && path.length > 1 && path[1] === 'Service Registries') {
+      if (path.length === 2) {
+        // At the Service Registries container level itself - return home provider
+        // (children come from homeProvider.getContents(['Platform Management', 'Service Registries']))
+        return this.homeProvider;
+      }
+      // Path is like ['Platform Management', 'Service Registries', 'ProfileName', ...]
+      // For now, host server profiles don't have navigable children in the file explorer.
+      return this.homeProvider;
+    }
+
+    // Handle virtual organization folders (Platform Management, Users, Services, System Health)
     // These are top-level categories that don't have navigable children in the file explorer main area
-    const virtualOrgFolders = ['Platform Management', 'Users', 'Services'];
+    const virtualOrgFolders = ['Platform Management', 'Users', 'Services', 'System Health'];
     if (virtualOrgFolders.includes(rootName)) {
       // Return homeProvider which handles these paths with special logic
       return this.homeProvider;
@@ -1329,9 +1394,9 @@ export class AppComponent implements OnInit, OnDestroy {
   getImageService = (path: string[]): ImageService => {
     let effectiveRootName = path.length > 0 ? path[0] : this.localConfigService.sessionName();
 
-    // Handle "Gateways" virtual folder - server name is at path[1]
-    if (effectiveRootName === 'Gateways' && path.length > 1) {
-      effectiveRootName = path[1];
+    // Handle nested Gateways/Service Registries under Platform Management - profile name is at path[2].
+    if (effectiveRootName === 'Platform Management' && path.length > 2 && (path[1] === 'Gateways' || path[1] === 'Service Registries')) {
+      effectiveRootName = path[2];
     }
 
     // Handle "File Systems" folder - Local Session is at path[1]
@@ -1456,14 +1521,9 @@ export class AppComponent implements OnInit, OnDestroy {
       }
     }
 
-    // Create "Gateways" parent node for broker gateways
-    const gatewaysNode: FileSystemNode = {
-      name: 'Gateways',
-      type: 'folder' as FileType,
-      children: remoteRoots,
-      childrenLoaded: true,
-      isVirtualFolder: true, // Mark as a virtual organizational folder
-    };
+    // Gateways and Service Registries no longer synthesized as root siblings — they live
+    // inside Platform Management (added by registry-server-provider.service.ts).
+    // brokerProfileNodes / hostProfileNodes still feed those nested children when accessed.
 
     // Find the "File Systems" node
     const fileSystemsNode = hostNodes.find(n => n.name === 'File Systems');
@@ -1486,29 +1546,11 @@ export class AppComponent implements OnInit, OnDestroy {
       sessionTree.children = sessionTree.children.filter((c: FileSystemNode) => c.name !== 'Search & Discovery');
     }
 
-    // Build host server profile nodes for the Service Registries folder
-    const allHostProfiles = this.hostProfileService.profiles();
-    const hostProfileNodes: FileSystemNode[] = allHostProfiles.map(p => ({
-      name: p.name,
-      type: 'folder' as const,
-      isServerRoot: true,
-      profileId: p.id,
-      connected: this.healthCheckService.getServiceStatus(p.imageUrl) !== 'DOWN', // Show X overlay when registry is DOWN
-      healthStatus: this.healthCheckService.getServiceStatus(p.imageUrl),
-      children: [],
-      childrenLoaded: false,
-    }));
-
-    // Create "Service Registries" parent node
-    const serviceRegistriesNode: FileSystemNode = {
-      name: 'Service Registries',
-      type: 'folder' as FileType,
-      children: hostProfileNodes,
-      childrenLoaded: true,
-      isVirtualFolder: true,
-    };
-
-    // Filter out specific nodes for manual ordering
+    // Filter out specific nodes for manual ordering.
+    // Service Registries / service-registries clauses were removed: registryServerProvider
+    // no longer emits them at root (they live under Platform Management), so the defensive
+    // clauses were dead. in-memory-file-system.service.ts retains its equivalent clause
+    // because it parses persisted tree snapshots that may still contain stale entries.
     const otherHostNodes = hostNodes.filter((n: FileSystemNode) =>
       n.name !== 'File Systems' &&
       n.name !== 'Search & Discovery' &&
@@ -1517,13 +1559,13 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const platformNode = hostNodes.find(n => n.name === 'Platform Management');
 
-    // Build the final tree structure alphabetically
+    // Build the final tree structure alphabetically.
+    // Gateways / Service Registries are no longer root siblings — they live inside
+    // Platform Management (registry-server-provider.service.ts appends them there).
     const rootChildren = [
       ...otherHostNodes,
       ...(fileSystemsNode ? [fileSystemsNode] : []),
-      gatewaysNode,
       ...(platformNode ? [platformNode] : []),
-      ...(allHostProfiles.length > 0 ? [serviceRegistriesNode] : []),
       sessionTree,
     ];
 
@@ -1571,9 +1613,17 @@ export class AppComponent implements OnInit, OnDestroy {
       // Calculate the provider-relative path by removing the routing prefix
       let providerPath: string[];
 
-      if (rootName === 'Gateways' && path.length > 1) {
-        // Path is ['Gateways', 'ServerName', ...], provider expects path without 'Gateways' and 'ServerName'
-        providerPath = path.slice(2);
+      if (rootName === 'Platform Management' && path.length > 2 && path[1] === 'Service Registries') {
+        // Service Registry profile nodes are leaf nodes — they show an editor when selected,
+        // not file-system children in the tree. Return early to prevent falling through to
+        // homeProvider.getContents([]) which would incorrectly return the Home root children.
+        return;
+      }
+
+      if (rootName === 'Platform Management' && path.length > 2 && path[1] === 'Gateways') {
+        // Path is ['Platform Management', 'Gateways', 'ServerName', ...]; strip both container
+        // levels so the per-profile remoteProvider sees an inner path.
+        providerPath = path.slice(3);
       } else if (rootName === 'File Systems' && path.length > 1) {
         // Path is ['File Systems', 'Local Session', ...], provider expects path without both prefixes
         providerPath = path.slice(2);
@@ -1708,6 +1758,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.pane2Status.set(status);
   }
 
+  onPane1FolderMagnetChanged(isMagnet: boolean): void {
+    this.pane1FolderIsMagnet.set(isMagnet);
+  }
+
+  onPane2FolderMagnetChanged(isMagnet: boolean): void {
+    this.pane2FolderIsMagnet.set(isMagnet);
+  }
+
 
   // --- UI Toggles ---
   toggleDetailPane(): void {
@@ -1738,6 +1796,11 @@ export class AppComponent implements OnInit, OnDestroy {
     this.uiPreferencesService.toggleConsole();
   }
 
+  onDirectoryChanged(): void {
+    this.loadFolderTree();
+    this.triggerRefresh();
+  }
+
   triggerRefresh(): void {
     this.refreshPanes.update(v => v + 1);
   }
@@ -1758,6 +1821,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onRefreshServices(): void {
     this.serviceMeshService.fetchAllData();
+  }
+
+  onCollapsePalette(): void {
+    this.paletteCollapsed.update(v => !v);
   }
 
   // --- Graph Visualization Control Handlers ---
@@ -1850,9 +1917,8 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     if (name === 'rename') {
-      if ((this.isGatewayContext() && this.isGatewaysNodeSelected()) ||
-        (this.isServiceRegistryContext() && this.isServiceRegistriesNodeSelected())) {
-        // Handled by management component
+      if (this.isGatewaysNodeSelected() || this.isServiceRegistriesNodeSelected()) {
+        // Handled by management component — leaf signals already imply context.
         return;
       }
     }
@@ -1962,32 +2028,34 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   // --- Login and Connection Management ---
-  async onLoginAndMount({ profile, username, password }: { profile: BrokerProfile, username: string, password: string }): Promise<void> {
+
+  /**
+   * Shared connection logic: creates providers, pulse-checks, lists mounts,
+   * and populates all mounted-state signals. Used by both onLoginAndMount
+   * (after fresh login) and restoreSessions (after page refresh).
+   */
+  private async connectProfile(profile: BrokerProfile, token: string, user: User): Promise<{ fsHealthy: boolean }> {
+    const provider = new RemoteFileSystemService(profile, this.fsService, token);
+    const imageService = new ImageService(profile, this.imageClientService, this.preferencesService, this.healthCheckService, this.localConfigService);
+
+    // Pulse check the file-system server before listing mounts
+    let fsHealthy = false;
     try {
-      const { user, token } = await this.loginService.login(profile, username, password);
+      fsHealthy = await provider.pulseCheck();
+    } catch {
+      // File-system server unreachable
+    }
 
-      const provider = new RemoteFileSystemService(profile, this.fsService, token);
-      const imageService = new ImageService(profile, this.imageClientService, this.preferencesService, this.healthCheckService, this.localConfigService);
+    this.filesystemHealth.update(m => new Map(m).set(profile.name, fsHealthy));
 
-      // Pulse check the file-system server before listing mounts
-      let fsHealthy = false;
+    if (fsHealthy) {
       try {
-        fsHealthy = await provider.pulseCheck();
-      } catch (pulseErr) {
-        this.toastService.show(`File-system server is unreachable for ${profile.name}.`, 'warning');
+        await provider.ensureDefaultDirectory();
+      } catch {
+        console.warn(`Could not ensure default directory for ${profile.name}`);
       }
 
-      this.filesystemHealth.update(m => new Map(m).set(profile.name, fsHealthy));
-
-      if (fsHealthy) {
-        // Ensure the user's default directory exists
-        try {
-          await provider.ensureDefaultDirectory();
-        } catch (dirErr) {
-          console.warn(`Could not ensure default directory for ${profile.name}:`, dirErr);
-        }
-
-        // Load mounts BEFORE updating mountedProfiles so the tree rebuild sees mount data
+      try {
         const mounts = await provider.listMounts();
         provider.setMounts(mounts);
         this.mountedProfileMounts.update(map => {
@@ -1995,19 +2063,105 @@ export class AppComponent implements OnInit, OnDestroy {
           m.set(profile.name, mounts);
           return m;
         });
-      } else {
+      } catch {
+        console.warn(`Could not list mounts for ${profile.name}`);
+      }
+    }
+
+    // Populate mounted state
+    this.mountedProfiles.update(p => [...p, profile]);
+    this.mountedProfileUsers.update(m => new Map(m).set(profile.id, user));
+    this.mountedProfileTokens.update(m => new Map(m).set(profile.id, token));
+    this.remoteProviders.update(m => new Map(m).set(profile.name, provider));
+    this.remoteImageServices.update(m => new Map(m).set(profile.name, imageService));
+    this.notesService.setToken(profile.id, token);
+
+    // Sync mounts to all providers
+    this.syncProviderMounts();
+
+    return { fsHealthy };
+  }
+
+  /**
+   * Attempt to restore sessions from persisted localStorage tokens.
+   * Called once on startup after profiles are loaded.
+   * For each profile with a stored token, validates it against the backend
+   * and re-establishes the connection if still valid.
+   * Falls through to interactive auto-login for autoConnect profiles with no valid stored token.
+   */
+  private async restoreSessions(): Promise<void> {
+    const profiles = this.profileService.profiles();
+
+    for (const profile of profiles) {
+      try {
+        const storedToken = localStorage.getItem(`nexus-token-${profile.id}`);
+        if (!storedToken) {
+          // No stored token — try auto-connect if enabled
+          if (profile.autoConnect) {
+            this.onLoginAndMount({ profile, email: 'auto@auto.com', password: 'auto-password' });
+          }
+          continue;
+        }
+
+        // Validate the stored token against the backend
+        const isValid = await this.loginService.isLoggedIn(profile, storedToken);
+
+        if (!isValid) {
+          // Token expired or invalid — clean up and fall through to auto-connect
+          try {
+            localStorage.removeItem(`nexus-token-${profile.id}`);
+            localStorage.removeItem(`nexus-user-${profile.id}`);
+          } catch { /* ignore */ }
+
+          if (profile.autoConnect) {
+            this.onLoginAndMount({ profile, email: 'auto@auto.com', password: 'auto-password' });
+          }
+          continue;
+        }
+
+        // Token is valid — restore the user from localStorage or create a minimal one
+        let user: User;
+        try {
+          const storedUser = localStorage.getItem(`nexus-user-${profile.id}`);
+          user = storedUser ? JSON.parse(storedUser) : { id: '', profileId: profile.id, alias: profile.name, email: '' };
+        } catch {
+          user = { id: '', profileId: profile.id, alias: profile.name, email: '' };
+        }
+
+        // Re-establish the connection using the shared helper
+        await this.connectProfile(profile, storedToken, user);
+
+        console.log(`[AppComponent] Session restored for ${profile.name}`);
+        this.toastService.showInfo(`Session restored for ${profile.name}`);
+
+      } catch (e) {
+        console.warn(`[AppComponent] Session restore failed for ${profile.name}:`, e);
+        // If restore fails and autoConnect is set, fall through to interactive login
+        if (profile.autoConnect) {
+          try {
+            this.onLoginAndMount({ profile, email: 'auto@auto.com', password: 'auto-password' });
+          } catch { /* ignore fallback failure */ }
+        }
+      }
+    }
+  }
+
+  async onLoginAndMount({ profile, email, password }: { profile: BrokerProfile, email: string, password: string }): Promise<void> {
+    try {
+      const { user, token } = await this.loginService.login(profile, email, password);
+
+      // Use the shared connection helper
+      const { fsHealthy } = await this.connectProfile(profile, token, user);
+
+      if (!fsHealthy) {
         this.toastService.show(`File-system server is unreachable for ${profile.name}.`, 'warning');
       }
 
-      this.mountedProfiles.update(p => [...p, profile]);
-      this.mountedProfileUsers.update(m => new Map(m).set(profile.id, user));
-      this.mountedProfileTokens.update(m => new Map(m).set(profile.id, token));
-      this.remoteProviders.update(m => new Map(m).set(profile.name, provider));
-      this.remoteImageServices.update(m => new Map(m).set(profile.name, imageService));
-      this.notesService.setToken(profile.id, token);
-
-      // Sync mounts to remaining providers (provider already has them via setMounts above)
-      this.syncProviderMounts();
+      // Persist token and user to localStorage so session survives page refresh
+      try {
+        localStorage.setItem(`nexus-token-${profile.id}`, token);
+        localStorage.setItem(`nexus-user-${profile.id}`, JSON.stringify(user));
+      } catch { /* localStorage may be full or unavailable */ }
 
       this.toastService.show(`Successfully connected to ${profile.name}.`);
 
@@ -2068,6 +2222,12 @@ export class AppComponent implements OnInit, OnDestroy {
       });
     });
 
+    // Clean up persisted session data
+    try {
+      localStorage.removeItem(`nexus-token-${profile.id}`);
+      localStorage.removeItem(`nexus-user-${profile.id}`);
+    } catch { /* localStorage may be unavailable */ }
+
     this.loadFolderTree();
     this.toastService.show(`Disconnected from ${profile.name}.`);
   }
@@ -2089,6 +2249,26 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Called from the gateway editor's Disconnect button.
+   * Calls the backend logout to invalidate the session token,
+   * then cleans up local state.
+   */
+  async onDisconnectGateway(profileId: string): Promise<void> {
+    const profile = this.mountedProfiles().find(p => p.id === profileId);
+    if (!profile) return;
+
+    const token = this.mountedProfileTokens().get(profileId);
+    if (token) {
+      try {
+        await this.loginService.logout(profile, token);
+      } catch (e) {
+        console.warn(`Backend logout for ${profile.name} failed (proceeding with local cleanup):`, e);
+      }
+    }
+    this.onUnmountProfile(profile);
+  }
+
   onDisconnectFromServer(profileId: string): void {
     const profile = this.mountedProfiles().find(p => p.id === profileId);
     if (profile) {
@@ -2103,7 +2283,7 @@ export class AppComponent implements OnInit, OnDestroy {
       const activeId = this.activePaneId();
       this.panePaths.update(paths => {
         const otherPanes = paths.filter(p => p.id !== activeId);
-        return [...otherPanes, { id: activeId, path: ['Gateways', brokerProfile.name] }];
+        return [...otherPanes, { id: activeId, path: ['Platform Management', 'Gateways', brokerProfile.name] }];
       });
       return;
     }
@@ -2114,7 +2294,7 @@ export class AppComponent implements OnInit, OnDestroy {
       const activeId = this.activePaneId();
       this.panePaths.update(paths => {
         const otherPanes = paths.filter(p => p.id !== activeId);
-        return [...otherPanes, { id: activeId, path: ['Host Servers', hostProfile.name] }];
+        return [...otherPanes, { id: activeId, path: ['Platform Management', 'Service Registries', hostProfile.name] }];
       });
     }
   }
@@ -2155,10 +2335,10 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadFolderTree();
   }
 
-  onLoginSubmittedFromSidebar({ username, password }: { username: string, password: string }): void {
+  onLoginSubmittedFromSidebar({ email, password }: { email: string, password: string }): void {
     const profile = this.profileForLogin();
     if (profile) {
-      this.onLoginAndMount({ profile, username, password });
+      this.onLoginAndMount({ profile, email, password });
       this.profileForLogin.set(null);
     } else {
       console.error("Login submitted but no profile was selected for login.");
@@ -2283,6 +2463,7 @@ export class AppComponent implements OnInit, OnDestroy {
     provider.createDirectory(providerPath, event.name)
       .then(() => {
         this.loadFolderTree();
+        this.triggerRefresh();
         this.toastService.show('Folder created.');
       })
       .catch(e => this.toastService.show(`Failed to create folder: ${(e as Error).message}`, 'error'));
@@ -2294,6 +2475,7 @@ export class AppComponent implements OnInit, OnDestroy {
     provider.createFile(providerPath, event.name)
       .then(() => {
         this.loadFolderTree();
+        this.triggerRefresh();
         this.toastService.show('File created.');
       })
       .catch(e => this.toastService.show(`Failed to create file: ${(e as Error).message}`, 'error'));
@@ -2462,6 +2644,8 @@ export class AppComponent implements OnInit, OnDestroy {
   setTheme(theme: Theme): void {
     this.uiPreferencesService.setTheme(theme);
     this.isThemeDropdownOpen.set(false);
+    // Publish theme change to the event bus for other apps
+    this.eventBus.publishThemeChange(theme);
   }
 
   // --- Preferences Dialog ---

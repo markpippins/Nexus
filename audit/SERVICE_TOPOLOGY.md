@@ -73,10 +73,10 @@ graph TB
         HUS["helidon-user-access<br/><small>Helidon MP :9093 • User auth</small>"]
     end
 
-    %% ===== WRP PIPELINE LAYER (standalone process group, not nested in Python) =====
+    %% ===== WRP PIPELINE LAYER (Python layer: bridge daemon + in-process kernel library) =====
     subgraph WRPI["WRP Pipeline — Bridge Daemon + Kernel Runtime"]
-        WBD["🐉 wrp-bridge-daemon<br/><small>Polls vision.receipts (PG)<br/>Creates KernelDeltas → wrp-kernel</small>"]
-        WK_INT["⚙️ wrp-kernel (internal)<br/><small>:3103</small>"]
+        WBD["🐉 wrp-bridge-daemon<br/><small>Polls vision.receipts (PG)<br/>Calls KernelEngine.reduce(delta) in-process</small>"]
+        WK_INT["⚙️ wrp-kernel (in-process lib)<br/><small>python/conduit/wrp_kernel/</small>"]
         subgraph WK_STEPS["Kernel Reduce Pipeline (5-step)"]
             S1["1️⃣ Receipt Materialization<br/><small>Insert receipts, dedup check</small>"]
             S2["2️⃣ Identity Resolution<br/><small>node_id → identity_id mapping</small>"]
@@ -111,7 +111,6 @@ graph TB
         RVR["rover<br/><small>Harvest pipeline</small>"]
         SWD["steward<br/><small>Knowledge Graph Migration<br/>JSON → knowledge.graph_*</small>"]
         VYG["voyager<br/><small>Filesystem Acquisition Layer<br/>Scanner + TopologyEngine → NATS</small>"]
-        ABS["absorb<br/><small>Ingestion Pipeline<br/>DoclingAdapter + NexusVM</small>"]
     end
 
     %% ===== INFRASTRUCTURE LAYER =====
@@ -226,7 +225,7 @@ graph LR
     %% HIGH dependencies
     subgraph High["High Dependencies"]
         WBD1("wrp-bridge-daemon") --> PG1("PostgreSQL :5432")
-        WBD1 --> WK1("wrp-kernel :3103")
+        WBD1 --> WK1("wrp-kernel (in-process lib)")
         WK1 --> WK_STEPS("5-Step Reduce Pipeline<br/>Materialize→Identity→Graph→Lineage→Commit")
     end
 
@@ -240,7 +239,6 @@ graph LR
         VS2("vision-srv :3104") --> NS1
         TM1 --> TERR1("terrain :8084")
         SWD1("steward") --> PG1
-        ABS1("absorb") --> PG1
         FS1("fs / media-metadata :8004") --> MONGO1("MongoDB :27017")
         VYG1("voyager") --> NATS1("NATS :4222")
         PK1("peb-kernel :8080") -- "peb-mcp bridge" --> PM1("peb-mcp (stdio)")
@@ -420,11 +418,10 @@ NATS JetStream   ← cascade — event publication
 | **cascade** | Event pipeline | System of Record for Thought — converts activity to history |
 | **conduit** | app/, cli/, bridge/, wrp_kernel/ | WRP orchestrator, bridge daemon, kernel runtime |
 | **meep** | End-to-end pipeline | Minimal deterministic pipeline (text → CER log) |
-| **rover** | Harvest pipeline | Chat/NLP/LOSM → knowledge graph with Ollama embeddings |
+| **rover** | Harvest pipeline | Chat/NLP/LOSM → knowledge graph with Ollama embeddings; HTML transcript ingestion via Dockling (DockLang), candidate extraction via LLM, promotion to intent_records. Includes file_size tracking and reharvest-on-growth logic. |
 | **steward** | migrate_graph.py | Knowledge Graph Migration — reads `nexus/graph/nexus-knowledge-graph.json`, parses entity sections (types, actors, epistemic_types, architectural_observations, decisions, gaps_and_blockers, rules, topology, boundaries), and inserts into `knowledge.graph_entities`, `knowledge.graph_edges`, `knowledge.graph_cross_references`. Maintains migration history in `knowledge.graph_migrations`. Exclusive write path for the knowledge graph. |
 | **voyager** | Scanner, TopologyEngine, Publisher | Filesystem Acquisition Layer — CLI tool and daemon using **Scanner** with **DedupeCache** (Redis) for change detection, **Publisher** (NATS) for emitting observations, and **TopologyEngine** for structural pattern detection (vanishing directories, evolution, containment, adjacency signals). |
 | **fs** | fs-crawler (FastAPI :8004), fs-crawler-adapter (:8001) | Media Metadata Indexing Service — scan/status/search/metadata/duplicate-detection/file-rule operations. Uses Redis + MongoDB + MySQL backends. **Note:** fs-crawler-adapter (:8001) is listed in port allocation but its source code could not be verified — may be aspirational or located outside the main fs/ tree. The broker adapter wraps the REST API for service-registry integration, enabling discovery by broker-gateway. |
-| **absorb** | NexusVM, DoclingAdapter, FSM, multi-parsers (chatgpt, gemini, copilot, markdown, opencode) | Ingestion & Absorption Pipeline — converts chat transcripts, HTML, PDF, DOCX, PPTX, EPUB, and images into structured knowledge using **DoclingAdapter**. Multi-parser architecture (ChatGPT HTML, Gemini, Copilot, OpenCode, markdown). **NexusVM** — temporal DAG execution ledger with fork/merge timeline semantics. Cryptographically chained deterministic Kernel with FSM Controller (5-step trace: schema validation → FSM → causality check → graph mutation → hash chain). |
 
 ### WRP Pipeline — Internal Architecture
 
@@ -450,18 +447,18 @@ NATS JetStream   ← cascade — event publication
                  │     kernel receipt format                 │
                  │  5. Build KernelDelta payload (delta_id,   │
                  │     receipts, affected_plans)             │
-                 │  6. POST KernelDelta to :3103/delta/      │
+                 │  6. Call KernelEngine.reduce(delta) (in-process)│
                  │  7. On success: save checkpoint            │
                  │     On rejection: skip checkpoint (retry)  │
                  │  ─────────────────────────────────────    │
                  │  Env: CONDUIT_PG_DSN                      │
-                 │       KERNEL_API_URL (http://:3103)       │
+                 │       (no HTTP — direct in-process call)  │
                  │       POLL_INTERVAL (default 30s)         │
                  └──────────┬───────────────────────────────┘
                             │ KernelDelta (receipts + affected_plans)
                  ┌──────────▼───────────────────────────────┐
-                 │  wrp-kernel :3103                          │
-                 │  wrp_kernel/engine.py                      │
+                 │  wrp-kernel (in-process lib)               │
+                 │  python/conduit/wrp_kernel/engine.py       │
                  │                                            │
                  │  ┌────────────────────────────────────┐    │
                  │  │  5-Step Reduce Pipeline (pure fn)   │    │
@@ -495,10 +492,14 @@ NATS JetStream   ← cascade — event publication
                  │  GRAPH_CYCLE, VERSION_MISMATCH,            │
                  │  INVALID_TRANSITION, VALIDATION_ERROR      │
                  │                                            │
-                 │  Available as MCP server via stdio          │
+                 │  In-process Python library — imported by    │
+                 │  the bridge daemon; no HTTP/MCP endpoint  │
                  └────────────────────────────────────────────┘
+```
+
+> **Reconciliation Note:** `wrp-kernel` is an **in-process Python library** at `python/conduit/wrp_kernel/` (`engine.py`, `identity.py`, `graph.py`, `lineage.py`, `delta.py`, `snapshot.py`). It is **not** an MCP server, daemon, or HTTP service on port 3103 — the bridge daemon imports it and calls `KernelEngine.reduce(delta)` directly. This ASCII diagram previously framed the kernel as a standalone process on `:3103`; that framing was a documentation artifact. Canonical note: `mcp_server_standalone_discrepancies` in `nexus/graph/nexus-knowledge-graph.json`.
 ```
 
 ---
 
-*Last updated: 2026-06-29. Sources: `terrain.service_dependencies`, `terrain.runnable_services`, `terrain.mcp_servers`, `nexus/python/conduit/bridge/daemon.py`, `nexus/python/conduit/wrp_kernel/engine.py`, `nexus/python/steward/migrate_graph.py`, `nexus/python/voyager/src/`, `nexus/python/fs/`, `nexus/python/absorb/html/`, `nexus/audit/SERVICE_TOPOLOGY.md` (self-audit), ARCHITECTURE.md.*
+*Last updated: 2026-07-12. Sources: `terrain.service_dependencies`, `terrain.runnable_services`, `terrain.mcp_servers`, `nexus/python/conduit/bridge/daemon.py`, `nexus/python/conduit/wrp_kernel/engine.py`, `nexus/python/steward/migrate_graph.py`, `nexus/python/voyager/src/`, `nexus/python/fs/`, `nexus/python/rover/`, `nexus/audit/SERVICE_TOPOLOGY.md` (self-audit), ARCHITECTURE.md.*
