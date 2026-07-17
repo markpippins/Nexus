@@ -404,6 +404,136 @@ def emit_requirement_promoted_to_plan(
     )
 
 
+# ── Planner events ─────────────────────────────────────────────────
+
+def emit_candidate_assessed(
+    candidate_id: str,
+    cpf_score: float,
+    components: dict | None = None,
+    promotable: bool = False,
+    source: str = "rover.planner",
+    **kwargs,
+) -> str:
+    """Emit: candidate.assessed — CPF scoring completed for a candidate."""
+    return emit_event(
+        event_type="candidate.assessed",
+        source=source,
+        aggregate_type="harvest_candidate",
+        aggregate_id=candidate_id,
+        payload={
+            "cpf_score": cpf_score,
+            "components": components or {},
+            "promotable": promotable,
+        },
+        actor_type="agent",
+        **kwargs,
+    )
+
+
+def emit_question_created(
+    question_id: str,
+    candidate_id: str | None = None,
+    requirement_id: str | None = None,
+    category: str = "",
+    title: str = "",
+    source: str = "rover.planner",
+    causation_id: str | None = None,
+    **kwargs,
+) -> str:
+    """Emit: question.created — an open question was created from CPF gaps."""
+    return emit_event(
+        event_type="question.created",
+        source=source,
+        aggregate_type="open_question",
+        aggregate_id=question_id,
+        payload={
+            "candidate_id": candidate_id,
+            "requirement_id": requirement_id,
+            "category": category,
+            "title": title,
+        },
+        caused_by_event_type="candidate.assessed",
+        causation_id=causation_id,
+        actor_type="agent",
+        **kwargs,
+    )
+
+
+def emit_ripple_assessed(
+    requirement_id: str,
+    risk_level: str,
+    blast_radius: dict | None = None,
+    blocking_questions: int = 0,
+    source: str = "rover.planner",
+    **kwargs,
+) -> str:
+    """Emit: ripple.assessed — ripple assessment completed for a requirement."""
+    return emit_event(
+        event_type="ripple.assessed",
+        source=source,
+        aggregate_type="requirement",
+        aggregate_id=requirement_id,
+        payload={
+            "risk_level": risk_level,
+            "blast_radius": blast_radius or {},
+            "blocking_questions": blocking_questions,
+        },
+        actor_type="agent",
+        **kwargs,
+    )
+
+
+def emit_candidate_greenlit(
+    candidate_id: str,
+    cpf_score: float,
+    risk_level: str,
+    source: str = "rover.planner",
+    causation_id: str | None = None,
+    **kwargs,
+) -> str:
+    """Emit: candidate.greenlit — candidate is ready for promotion."""
+    return emit_event(
+        event_type="candidate.greenlit",
+        source=source,
+        aggregate_type="harvest_candidate",
+        aggregate_id=candidate_id,
+        payload={
+            "cpf_score": cpf_score,
+            "risk_level": risk_level,
+            "status": "ready_for_promotion",
+        },
+        caused_by_event_type="ripple.assessed",
+        causation_id=causation_id,
+        actor_type="agent",
+        **kwargs,
+    )
+
+
+def emit_candidate_escalated(
+    candidate_id: str,
+    cpf_score: float,
+    risk_level: str,
+    reason: str,
+    source: str = "rover.planner",
+    **kwargs,
+) -> str:
+    """Emit: candidate.escalated — candidate needs human review."""
+    return emit_event(
+        event_type="candidate.escalated",
+        source=source,
+        aggregate_type="harvest_candidate",
+        aggregate_id=candidate_id,
+        payload={
+            "cpf_score": cpf_score,
+            "risk_level": risk_level,
+            "reason": reason,
+            "status": "needs_human_review",
+        },
+        actor_type="agent",
+        **kwargs,
+    )
+
+
 # ── CLI test ─────────────────────────────────────────────────────────
 
 def _test_emit():
