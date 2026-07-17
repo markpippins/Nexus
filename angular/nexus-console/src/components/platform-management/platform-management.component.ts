@@ -156,8 +156,18 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
-                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
@@ -274,8 +284,18 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
-                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
@@ -382,8 +402,18 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
-                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
@@ -513,8 +543,18 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
-                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
@@ -621,8 +661,18 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium">
-                                                Page {{ currentPage() + 1 }} of {{ totalPages() }}
+                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                                <span>Page</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    [max]="totalPages()"
+                                                    [value]="currentPage() + 1"
+                                                    (keydown.enter)="goToPage($event)"
+                                                    (blur)="goToPage($event)"
+                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                >
+                                                <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
@@ -1142,6 +1192,16 @@ export class PlatformManagementComponent {
         const size = Number((event.target as HTMLSelectElement).value);
         this.perPage.set(size);
         this.currentPage.set(0);
+    }
+
+    goToPage(event: Event) {
+        const input = event.target as HTMLInputElement;
+        const page = parseInt(input.value, 10);
+        if (isNaN(page) || page < 1 || page > this.totalPages()) {
+            input.value = String(this.currentPage() + 1);
+            return;
+        }
+        this.currentPage.set(page - 1);
     }
 
     onAdd() {

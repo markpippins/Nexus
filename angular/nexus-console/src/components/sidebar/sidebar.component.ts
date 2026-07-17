@@ -115,26 +115,44 @@ export class SidebarComponent implements OnDestroy {
 
   constructor() {
     // Prune stale expanded paths when the tree structure changes (e.g., a profile disconnects).
-    // Only depends on folderTree() — expandedPaths reads/writes are untracked.
+    // Walks the full tree to validate each path, not just the root segment — this prevents
+    // intermediate nodes from being collapsed during tree rebuilds (e.g., when a gateway
+    // connects and the "File Systems" node gets populated with children).
     effect(() => {
       const tree = this.folderTree();
       if (!tree?.children) return;
-
-      // Collect valid root-level names from the current tree
-      const validRootNames = new Set(tree.children.map(c => c.name));
 
       untracked(() => {
         const current = this.expandedPaths();
         let changed = false;
         const next = new Set(current);
+
         for (const key of next) {
           if (!key) continue;
-          const firstSegment = key.split('/')[0];
-          if (!validRootNames.has(firstSegment)) {
+          // Walk the tree to verify this full path exists in the current tree
+          const segments = key.split('/').filter(s => s.length > 0);
+          let found = true;
+          let currentNode: FileSystemNode | undefined | null = tree;
+
+          for (const segment of segments) {
+            if (!currentNode?.children) {
+              found = false;
+              break;
+            }
+            const child: FileSystemNode | undefined = currentNode.children.find(c => c.name === segment);
+            if (!child) {
+              found = false;
+              break;
+            }
+            currentNode = child;
+          }
+
+          if (!found) {
             next.delete(key);
             changed = true;
           }
         }
+
         if (changed) {
           this.expandedPaths.set(next);
         }
