@@ -255,7 +255,7 @@ def emit_candidate_completed(
 def emit_candidate_promoted(
     candidate_id: str,
     intent_record_id: str | None = None,
-    from_state: str = "useful",
+    from_state: str = "staged",
     cpf: float | None = None,
     source: str = "rover.candidate_promote",
     **kwargs,
