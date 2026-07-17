@@ -23,7 +23,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "services")
-@JsonIgnoreProperties({ "deployments", "serviceConfigs", "serviceDependenciesAsConsumer",
+@JsonIgnoreProperties({ "hibernateLazyInitializer", "handler", "deployments", "serviceConfigs", "serviceDependenciesAsConsumer",
         "serviceDependenciesAsProvider", "subModules", "parentService" })
 public class Service {
 
