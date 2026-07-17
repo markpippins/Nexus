@@ -113,11 +113,11 @@ def _get_pg_conn():
 
 
 def _get_pending_plan_count(pg_conn) -> int:
-    """Count pending work requests from nebula.work_requests."""
+    """Count work requests not yet consumed by execution layer."""
     try:
         with pg_conn.cursor() as cur:
             cur.execute(
-                "SELECT COUNT(*) FROM nebula.work_requests WHERE status = 'pending'"
+                "SELECT COUNT(*) FROM nebula.work_requests WHERE consumed_at IS NULL"
             )
             row = cur.fetchone()
             return row[0] if row else 0
@@ -141,11 +141,11 @@ def _get_active_builder_count(pg_conn) -> int:
 
 
 def _get_blocked_plan_count(pg_conn) -> int:
-    """Count failed work requests (proxy for blocked)."""
+    """Count cancelled work requests (proxy for blocked)."""
     try:
         with pg_conn.cursor() as cur:
             cur.execute(
-                "SELECT COUNT(*) FROM nebula.work_requests WHERE status = 'failed'"
+                "SELECT COUNT(*) FROM nebula.work_requests WHERE business_status = 'CANCELLED'"
             )
             row = cur.fetchone()
             return row[0] if row else 0
@@ -336,7 +336,7 @@ def _build_work_request_summary(wr_id: str) -> str:
                 SELECT
                     COALESCE(wrs.current_state, ''),
                     COALESCE(wr.title, ''),
-                    COALESCE(wr.status, '')
+                    COALESCE(wr.business_status, '')
                 FROM conduit.work_request_state wrs
                 LEFT JOIN nebula.work_requests wr
                     ON wr.legacy_id = wrs.work_request_id::text

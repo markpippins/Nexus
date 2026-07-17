@@ -691,22 +691,46 @@ class DBAdapter:
         now = datetime.utcnow().isoformat() + "Z"
         with self._get_connection() as conn:
             conn.execute(
-                "INSERT INTO nebula.work_requests (id, legacy_id, plan_id, title, status, dco_json, created_at, updated_at) "
+                "INSERT INTO nebula.work_requests (id, legacy_id, plan_id, title, business_status, dco_json, created_at, updated_at) "
                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
                 "ON CONFLICT (legacy_id) DO NOTHING",
-                (str(uuid.uuid4()), wr_id, plan_id, title, 'pending', dco_json, now, now),
+                (str(uuid.uuid4()), wr_id, plan_id, title, 'DRAFT', dco_json, now, now),
             )
             conn.commit()
 
     def update_work_request_status(self, wr_id: str, status: str):
-        """Update work request status by legacy_id (TEXT ID)."""
-        _log.debug("update_work_request_status: wr=%s status=%s", wr_id, status)
+        """Update work request business_status by legacy_id (TEXT ID).
+        
+        Maps conduit statuses to business statuses:
+        - pending → DRAFT
+        - completed → DISPATCHED (and sets consumed_at)
+        - failed → CANCELLED
+        - rate_limited → DRAFT
+        """
+        # Map conduit status to business status
+        status_map = {
+            'pending': 'DRAFT',
+            'completed': 'DISPATCHED',
+            'failed': 'CANCELLED',
+            'rate_limited': 'DRAFT',
+        }
+        business_status = status_map.get(status, status)
+        
+        _log.debug("update_work_request_status: wr=%s conduit=%s business=%s", wr_id, status, business_status)
         now = datetime.utcnow().isoformat() + "Z"
+        
         with self._get_connection() as conn:
-            conn.execute(
-                "UPDATE nebula.work_requests SET status = %s, updated_at = %s WHERE legacy_id = %s",
-                (status, now, wr_id)
-            )
+            if business_status == 'DISPATCHED':
+                # Set consumed_at when work is dispatched to execution
+                conn.execute(
+                    "UPDATE nebula.work_requests SET business_status = %s, consumed_at = %s, updated_at = %s WHERE legacy_id = %s",
+                    (business_status, now, now, wr_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE nebula.work_requests SET business_status = %s, updated_at = %s WHERE legacy_id = %s",
+                    (business_status, now, wr_id)
+                )
             conn.commit()
 
     def get_active_session(self, agent_role: str) -> Optional[Dict[str, Any]]:
