@@ -66,6 +66,18 @@ def run_cpf(args: list[str]) -> dict:
         return {"error": str(e)}
 
 
+def _filter_hierarchy(data: list, system: str | None, subsystem: str | None) -> list:
+    """Filter data list by system_name and/or subsystem_name."""
+    if not system and not subsystem:
+        return data
+    result = data
+    if system:
+        result = [d for d in result if d.get("system_name", "").lower() == system.lower()]
+    if subsystem:
+        result = [d for d in result if d.get("subsystem_name", "").lower() == subsystem.lower()]
+    return result
+
+
 def promote_candidate(candidate_id: str) -> dict:
     """Promote a single candidate via promote-ready.sh."""
     if not os.path.exists(PROMOTE_SCRIPT):
@@ -113,9 +125,12 @@ class CpfHandler(BaseHTTPRequestHandler):
         params = parse_qs(parsed.query)
 
         if path == "/api/cpf/count":
+            system = params.get("system", [None])[0]
+            subsystem = params.get("subsystem", [None])[0]
+
             result = run_cpf(["--json", "--all"])
             if "data" in result:
-                data = result["data"]
+                data = _filter_hierarchy(result["data"], system, subsystem)
                 total = len(data)
                 ready = sum(1 for d in data if d.get("compilation_readiness", 0) >= 0.7)
                 promoted = sum(1 for d in data if d.get("status") == "promoted")
@@ -133,6 +148,18 @@ class CpfHandler(BaseHTTPRequestHandler):
             threshold = params.get("threshold", [None])[0]
             candidate_id = params.get("candidate", [None])[0]
             show_all = "all" in params
+            system = params.get("system", [None])[0]
+            subsystem = params.get("subsystem", [None])[0]
+
+            # Pagination params
+            try:
+                limit = int(params.get("limit", ["0"])[0])
+            except (ValueError, TypeError):
+                limit = 0
+            try:
+                offset = int(params.get("offset", ["0"])[0])
+            except (ValueError, TypeError):
+                offset = 0
 
             args = ["--json"]
             if candidate_id:
@@ -143,6 +170,21 @@ class CpfHandler(BaseHTTPRequestHandler):
                 args.extend(["--threshold", threshold])
 
             result = run_cpf(args)
+
+            # Apply hierarchy filter if specified
+            if "data" in result and isinstance(result["data"], list) and (system or subsystem):
+                result["data"] = _filter_hierarchy(result["data"], system, subsystem)
+                result["count"] = len(result["data"])
+
+            # Apply pagination slice if limit > 0
+            if "data" in result and isinstance(result["data"], list) and limit > 0:
+                total = len(result["data"])
+                page = result["data"][offset:offset + limit]
+                result["data"] = page
+                result["count"] = total  # total count before slicing
+                result["limit"] = limit
+                result["offset"] = offset
+
             self._send_json(result)
 
         elif path == "/api/cpf/ready":
