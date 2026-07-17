@@ -33,6 +33,7 @@ public class FrameworkTypeController {
     @GetMapping
     public ResponseEntity<?> getAll(
             @RequestParam(required = false) String name,
+            @RequestParam(required = false) Boolean active,
             org.springframework.data.domain.Pageable pageable) {
         log.info("Fetching all framework types");
         if (name != null && !name.isEmpty()) {
@@ -40,6 +41,12 @@ public class FrameworkTypeController {
             return repository.findByName(name)
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());
+        }
+        // Default to only active types, unless explicitly requested otherwise
+        if (active == null || active) {
+            log.debug("Filtering active framework types");
+            org.springframework.data.domain.Page<com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.FrameworkType> result = repository.findByActiveFlagTrue(pageable);
+            return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(result));
         }
         return ResponseEntity.ok(com.aibizarchitect.nexus.v1.spring.serviceregistry.dto.SpringPagedResponse.fromPage(
                 repository.findAll(pageable)));

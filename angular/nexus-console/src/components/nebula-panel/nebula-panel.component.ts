@@ -5,12 +5,13 @@ import {
   NebulaRequirement,
   RequirementStatus,
 } from '../../services/nebula.service.js';
+import { CpfFunnelComponent } from '../cpf-funnel/cpf-funnel.component.js';
 import { ToastService } from '../../services/toast.service.js';
 
 @Component({
   selector: 'app-nebula-panel',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, CpfFunnelComponent],
   templateUrl: './nebula-panel.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -18,6 +19,9 @@ import { ToastService } from '../../services/toast.service.js';
   }
 })
 export class NebulaPanelComponent implements OnInit, OnDestroy {
+  /** Active tab — 'requirements' shows the kanban, 'funnel' shows the CPF funnel */
+  activeTab = signal<'requirements' | 'funnel'>('requirements');
+
   nebula = inject(NebulaService);
   private toast = inject(ToastService);
 

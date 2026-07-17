@@ -4,14 +4,15 @@
 This script runs the Planner's backlog grooming cycle:
 1. Scan candidates for CPF assessment
 2. Compute CPF scores
-3. Generate open questions for gaps
-4. Emit cascade events at each decision point
+3. Check knowledge graph for completion evidence
+4. Generate open questions from CPF gaps AND evidence
+5. Emit cascade events at each decision point
 
 Events emitted:
   - candidate.assessed — CPF scoring completed
-  - question.created — open question generated from CPF gaps
-  - candidate.greenlit — ready for promotion (CPF >= 0.7, risk != CRITICAL)
-  - candidate.escalated — needs human review (risk == CRITICAL)
+  - question.created — open question generated from CPF gaps or evidence
+  - candidate.greenlit — ready for promotion (CPF >= 0.7, risk != CRITICAL, no evidence)
+  - candidate.escalated — needs human review (risk == CRITICAL OR evidence found)
 
 Usage:
     cd /home/codex/dev/nexus/python/rover
@@ -168,6 +169,209 @@ def create_questions(candidate_id: str, assessment: dict, dry_run: bool = False)
     return created
 
 
+def check_knowledge_graph_evidence(candidate_id: str, dry_run: bool = False) -> dict:
+    """Check knowledge graph for completion evidence.
+    
+    Queries:
+    - Completed WorkRequests with similar titles
+    - Completed execution requests
+    - Duplicate candidates already promoted
+    
+    Returns evidence dict with recommendation (clear/escalate/block).
+    """
+    log.info("  Checking knowledge graph for completion evidence...")
+    
+    # Query 1: Check completed WorkRequests
+    sql = f"""
+        SELECT json_agg(json_build_object(
+            'id', id,
+            'title', title,
+            'status', business_status,
+            'completed_at', consumed_at
+        ))
+        FROM nebula.work_requests
+        WHERE business_status IN ('COMPLETED', 'DISPATCHED')
+        AND (
+            similarity(lower(title), lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid))) > 0.3
+            OR lower(title) LIKE '%%' || lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid)) || '%%'
+        )
+        LIMIT 5;
+    """
+    rc, out = psql(sql)
+    work_requests = json.loads(out) if rc == 0 and out and out != "null" else []
+    
+    # Query 2: Check duplicate candidates
+    sql = f"""
+        SELECT json_agg(json_build_object(
+            'id', id,
+            'title', title,
+            'cpf_score', compilation_readiness,
+            'status', status
+        ))
+        FROM nebula.harvest_candidates
+        WHERE status IN ('promoted', 'linked')
+        AND id != '{candidate_id}'::uuid
+        AND (
+            similarity(lower(title), lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid))) > 0.4
+            OR lower(title) LIKE '%%' || lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid)) || '%%'
+        )
+        ORDER BY compilation_readiness DESC
+        LIMIT 5;
+    """
+    rc, out = psql(sql)
+    duplicates = json.loads(out) if rc == 0 and out and out != "null" else []
+    
+    # Query 3: Check execution requests
+    sql = f"""
+        SELECT json_agg(json_build_object(
+            'id', id,
+            'title', business_key,
+            'status', status,
+            'completed_at', completed_at
+        ))
+        FROM execution.requests
+        WHERE status = 'COMPLETED'
+        AND (
+            similarity(lower(business_key), lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid))) > 0.3
+            OR lower(business_key) LIKE '%%' || lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid)) || '%%'
+        )
+        LIMIT 5;
+    """
+    rc, out = psql(sql)
+    execution_requests = json.loads(out) if rc == 0 and out and out != "null" else []
+    
+    # Build evidence
+    evidence = {
+        "work_requests": work_requests or [],
+        "duplicates": duplicates or [],
+        "execution_requests": execution_requests or [],
+    }
+    
+    # Determine recommendation
+    has_completed_wr = len(evidence["work_requests"]) > 0
+    has_duplicates = len(evidence["duplicates"]) > 0
+    has_completed_er = len(evidence["execution_requests"]) > 0
+    
+    if has_completed_wr:
+        # Strong evidence of completed work
+        high_confidence = any(
+            wr.get("status") == "COMPLETED" 
+            for wr in evidence["work_requests"]
+        )
+        recommendation = "block" if high_confidence else "escalate"
+    elif has_duplicates and has_completed_er:
+        # Multiple signals — escalate
+        recommendation = "escalate"
+    elif has_duplicates or has_completed_er:
+        # Weak signals — escalate for review
+        recommendation = "escalate"
+    else:
+        # No evidence of overlap
+        recommendation = "clear"
+    
+    evidence["recommendation"] = recommendation
+    evidence["signals"] = {
+        "completed_work_requests": has_completed_wr,
+        "duplicate_candidates": has_duplicates,
+        "completed_execution": has_completed_er,
+    }
+    
+    log.info("  Evidence: %d work_requests, %d duplicates, %d execution_requests → %s",
+             len(evidence["work_requests"]),
+             len(evidence["duplicates"]),
+             len(evidence["execution_requests"]),
+             recommendation)
+    
+    return evidence
+
+
+def create_evidence_questions(candidate_id: str, evidence: dict, dry_run: bool = False) -> list[dict]:
+    """Create open questions from knowledge graph evidence.
+    
+    If evidence suggests work is completed, create an open question
+    that blocks promotion until resolved.
+    """
+    recommendation = evidence.get("recommendation", "clear")
+    
+    if recommendation == "clear":
+        return []
+    
+    questions = []
+    
+    # Create question for each evidence type
+    if evidence.get("work_requests"):
+        wr = evidence["work_requests"][0]  # Most relevant
+        questions.append({
+            "question": f"Similar WorkRequest '{wr.get('title', 'unknown')}' is {wr.get('status', 'unknown')} — is this a duplicate?",
+            "category": "DUPLICATE_DETECTED",
+            "component": "evidence",
+        })
+    
+    if evidence.get("duplicates"):
+        dup = evidence["duplicates"][0]
+        questions.append({
+            "question": f"Candidate '{dup.get('title', 'unknown')}' already promoted (CPF={dup.get('cpf_score', 0):.2f}) — is this a duplicate?",
+            "category": "DUPLICATE_CANDIDATE",
+            "component": "evidence",
+        })
+    
+    if evidence.get("execution_requests"):
+        er = evidence["execution_requests"][0]
+        questions.append({
+            "question": f"Execution request '{er.get('title', 'unknown')}' completed — is this work already done?",
+            "category": "WORK_COMPLETED",
+            "component": "evidence",
+        })
+    
+    if not questions:
+        return []
+    
+    log.info("  Creating %d evidence questions...", len(questions))
+    created = []
+    
+    for q in questions:
+        if dry_run:
+            log.info("    [DRY RUN] Would create: %s (%s)", q["question"][:60], q["category"])
+            created.append(q)
+            continue
+        
+        # Insert into database
+        sql = f"""
+            INSERT INTO nebula.open_questions (
+                requirement_id, title, description, category, status, blocking, created_by
+            ) VALUES (
+                NULL,
+                '{q["question"].replace("'", "''")}',
+                'Auto-generated from knowledge graph evidence. Component: {q["component"]}.',
+                '{q["category"]}',
+                'OPEN',
+                true,
+                'planner'
+            )
+            RETURNING id;
+        """
+        rc, out = psql(sql)
+        
+        if rc == 0 and out:
+            question_id = out.strip()
+            log.info("    Created question: %s", question_id[:8])
+            
+            # Emit question.created event
+            emit_question_created(
+                question_id=question_id,
+                candidate_id=candidate_id,
+                category=q["category"],
+                title=q["question"],
+                causation_id=None,
+            )
+            
+            created.append({"id": question_id, **q})
+        else:
+            log.error("    Failed to create question: %s", q["question"][:40])
+    
+    return created
+
+
 def check_ripple_assessment(requirement_id: str, dry_run: bool = False) -> dict | None:
     """Run ripple assessment if requirement exists."""
     sql = f"SELECT nebula.assess_ripple('{requirement_id}'::uuid);"
@@ -286,7 +490,14 @@ def run_grooming_cycle(args):
         log.info("Nothing to groom.")
         return
     
-    stats = {"assessed": 0, "questions_created": 0, "greenlit": 0, "escalated": 0}
+    stats = {
+        "assessed": 0, 
+        "questions_created": 0, 
+        "evidence_questions_created": 0,
+        "greenlit": 0, 
+        "escalated": 0,
+        "blocked_by_evidence": 0,
+    }
     
     for c in candidates:
         cid = c["id"]
@@ -302,16 +513,34 @@ def run_grooming_cycle(args):
         score = assessment.get("score", 0)
         promotable = assessment.get("promotable", False)
         
-        # 2. Generate questions for gaps
+        # 2. Check knowledge graph for completion evidence
+        evidence = check_knowledge_graph_evidence(cid, args.dry_run)
+        evidence_recommendation = evidence.get("recommendation", "clear")
+        
+        # 3. Generate questions from CPF gaps
         if not args.no_questions:
             questions = create_questions(cid, assessment, args.dry_run)
             stats["questions_created"] += len(questions)
         
+        # 4. Generate questions from evidence (blocks promotion)
+        if evidence_recommendation != "clear" and not args.no_questions:
+            evidence_questions = create_evidence_questions(cid, evidence, args.dry_run)
+            stats["evidence_questions_created"] += len(evidence_questions)
+        
         if args.questions_only:
             continue
         
-        # 3. Decision point
+        # 5. Decision point
         if promotable:
+            # Evidence blocks promotion
+            if evidence_recommendation == "block":
+                escalate_candidate(cid, assessment, "UNKNOWN", 
+                                 f"Evidence suggests work is completed: {len(evidence.get('work_requests', []))} work_requests, {len(evidence.get('duplicates', []))} duplicates",
+                                 args.dry_run)
+                stats["escalated"] += 1
+                stats["blocked_by_evidence"] += 1
+                continue
+            
             # Check ripple assessment if requirement exists
             ripple = check_ripple_assessment(cid, args.dry_run)
             
@@ -339,8 +568,10 @@ def run_grooming_cycle(args):
     log.info("Grooming Summary:")
     log.info("  Assessed: %d", stats["assessed"])
     log.info("  Questions created: %d", stats["questions_created"])
+    log.info("  Evidence questions created: %d", stats["evidence_questions_created"])
     log.info("  Greenlit: %d", stats["greenlit"])
     log.info("  Escalated: %d", stats["escalated"])
+    log.info("  Blocked by evidence: %d", stats["blocked_by_evidence"])
     log.info("=" * 60)
 
 

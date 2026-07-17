@@ -1,0 +1,6 @@
+*/5 * * * * pushd /home/codex/dev ; /home/codex/dev/.pipeline/SCRIPTS/plan-watcher.sh ; popd
+0 */2 * * * pushd /home/codex/dev ; /home/codex/dev/.pipeline/SCRIPTS/critic-watcher.sh ; popd
+*/15 * * * * pushd /home/codex/dev ; /home/codex/dev/.pipeline/SCRIPTS/inspector-watcher.sh ; popd
+*/30 * * * * pushd /home/codex/dev ; /home/codex/dev/.pipeline/SCRIPTS/analyst-watcher.sh ; popd
+0 */4 * * * pushd /home/codex/dev ; /home/codex/dev/.pipeline/SCRIPTS/build-log-backup.sh ; popd
+0 */12 * * * pushd /home/codex/dev ; /home/codex/dev/.pipeline/SCRIPTS/completed-plans-backup.sh ; popd

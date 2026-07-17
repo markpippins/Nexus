@@ -14,11 +14,11 @@ import org.hibernate.annotations.Immutable;
 /**
  * Read-only entity mapping to the {@code registry.categories} view.
  *
- * This view is a UNION ALL of all 7 type lookup tables (framework_type,
+ * This view is a UNION ALL of all 8 type lookup tables (framework_type,
  * server_type, library_type, environment_type, service_type,
- * service_config_type, operating_systems) with a {@code type} discriminator
- * column.  Because it is a view (not a table), the entity is marked
- * {@link Immutable} — Hibernate will never attempt INSERT/UPDATE/DELETE.
+ * service_config_type, operating_systems, system_type) with a {@code type}
+ * discriminator column.  Because it is a view (not a table), the entity is
+ * marked {@link Immutable} — Hibernate will never attempt INSERT/UPDATE/DELETE.
  *
  * {@link CategoriesViewId} forms the composite primary key because the same
  * numeric {@code id} can appear across different type discriminator groups.
@@ -48,7 +48,7 @@ public class CategoriesView {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    /** Discriminator — one of: framework_type, server_type, library_type, etc. Part of composite PK. */
+    /** Discriminator — one of: framework_type, server_type, library_type, system_type, etc. Part of composite PK. */
     @Id
     @Column(name = "type", nullable = false, insertable = false, updatable = false)
     private String type;

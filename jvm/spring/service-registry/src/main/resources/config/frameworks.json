@@ -2,7 +2,7 @@
   {
     "name": "Spring Boot",
     "description": "Java Spring Boot microservices framework",
-    "category": "Java Spring",
+    "category": "Back end",
     "language": "Java",
     "current_version": "3.2.0",
     "lts_version": "3.1.5",
@@ -11,7 +11,7 @@
   {
     "name": "Quarkus",
     "description": "Supersonic Subnexus Java framework",
-    "category": "Java Quarkus",
+    "category": "Back end",
     "language": "Java",
     "current_version": "3.6.0",
     "lts_version": "3.2.9",
@@ -20,7 +20,7 @@
   {
     "name": "Micronaut",
     "description": "Modern JVM-based framework for microservices",
-    "category": "Java Micronaut",
+    "category": "Back end",
     "language": "Java",
     "current_version": "4.2.0",
     "lts_version": "4.0.6",
@@ -29,7 +29,7 @@
   {
     "name": "Helidon",
     "description": "Oracle Helidon microservices framework",
-    "category": "Java Helidon",
+    "category": "Back end",
     "language": "Java",
     "current_version": "4.0.0",
     "lts_version": "3.2.0",
@@ -38,7 +38,7 @@
   {
     "name": "NestJS",
     "description": "Progressive Node.js framework",
-    "category": "Node NestJS",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "10.0.0",
     "lts_version": "9.5.0",
@@ -47,7 +47,7 @@
   {
     "name": "AdonisJS",
     "description": "Node.js MVC framework",
-    "category": "Node AdonisJS",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "6.0.0",
     "lts_version": "5.9.0",
@@ -56,7 +56,7 @@
   {
     "name": "Moleculer",
     "description": "Progressive microservices framework for Node.js",
-    "category": "Node Moleculer",
+    "category": "Back end",
     "language": "JavaScript",
     "current_version": "0.14.0",
     "lts_version": "0.14.0",
@@ -65,7 +65,7 @@
   {
     "name": "Express",
     "description": "Fast, unopinionated web framework for Node.js",
-    "category": "Node Express",
+    "category": "Back end",
     "language": "JavaScript",
     "current_version": "4.18.0",
     "lts_version": "4.18.0",
@@ -74,7 +74,7 @@
   {
     "name": "Fastify",
     "description": "Fast and low overhead web framework for Node.js",
-    "category": "Node Fastify",
+    "category": "Back end",
     "language": "JavaScript",
     "current_version": "4.26.0",
     "lts_version": "4.26.0",
@@ -83,7 +83,7 @@
   {
     "name": "Hono",
     "description": "Ultrafast web framework for the Edges",
-    "category": "Node Hono",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "4.0.0",
     "lts_version": "4.0.0",
@@ -92,7 +92,7 @@
   {
     "name": "Koa",
     "description": "Expressive HTTP middleware framework for Node.js",
-    "category": "Node Koa",
+    "category": "Back end",
     "language": "JavaScript",
     "current_version": "2.15.0",
     "lts_version": "2.15.0",
@@ -101,7 +101,7 @@
   {
     "name": "Hapi",
     "description": "Framework for building applications and services",
-    "category": "Node Hapi",
+    "category": "Back end",
     "language": "JavaScript",
     "current_version": "21.0.0",
     "lts_version": "21.0.0",
@@ -110,7 +110,7 @@
   {
     "name": "Feathers",
     "description": "Framework for real-time applications and REST APIs",
-    "category": "Node Feathers",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "5.0.0",
     "lts_version": "5.0.0",
@@ -119,7 +119,7 @@
   {
     "name": "tRPC",
     "description": "End-to-end typesafe APIs made easy",
-    "category": "Node tRPC",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "11.0.0",
     "lts_version": "10.45.0",
@@ -128,7 +128,7 @@
   {
     "name": "FastAPI",
     "description": "Modern Python web framework",
-    "category": "Python FastAPI",
+    "category": "Back end",
     "language": "Python",
     "current_version": "0.109.0",
     "lts_version": "0.109.0",
@@ -137,7 +137,7 @@
   {
     "name": "Django",
     "description": "High-level Python web framework",
-    "category": "Python Django",
+    "category": "Back end",
     "language": "Python",
     "current_version": "5.0.0",
     "lts_version": "4.2.0",
@@ -146,7 +146,7 @@
   {
     "name": "Flask",
     "description": "Lightweight Python web framework",
-    "category": "Python Flask",
+    "category": "Back end",
     "language": "Python",
     "current_version": "3.0.0",
     "lts_version": "2.3.0",
@@ -155,7 +155,7 @@
   {
     "name": "Go",
     "description": "High-performance HTTP web framework for Go",
-    "category": "Go Goa",
+    "category": "Back end",
     "language": "Go",
     "current_version": "1.9.0",
     "lts_version": "1.9.0",
@@ -164,7 +164,7 @@
   {
     "name": "Fiber",
     "description": "Express-inspired web framework for Go",
-    "category": "Go Fiber",
+    "category": "Back end",
     "language": "Go",
     "current_version": "2.52.0",
     "lts_version": "2.52.0",
@@ -173,7 +173,7 @@
   {
     "name": "React",
     "description": "JavaScript library for building user interfaces",
-    "category": "Frontend React",
+    "category": "Front end",
     "language": "JavaScript",
     "current_version": "18.2.0",
     "lts_version": "18.2.0",
@@ -182,7 +182,7 @@
   {
     "name": "Angular",
     "description": "Platform for building web applications",
-    "category": "Frontend Angular",
+    "category": "Front end",
     "language": "TypeScript",
     "current_version": "17.0.0",
     "lts_version": "16.2.0",
@@ -191,7 +191,7 @@
   {
     "name": "Vue.js",
     "description": "Progressive JavaScript framework",
-    "category": "Frontend Vue",
+    "category": "Front end",
     "language": "JavaScript",
     "current_version": "3.4.0",
     "lts_version": "3.4.0",
@@ -200,7 +200,7 @@
   {
     "name": "Svelte",
     "description": "Cybernetically enhanced web apps",
-    "category": "Frontend Svelte",
+    "category": "Front end",
     "language": "JavaScript",
     "current_version": "4.2.0",
     "lts_version": "4.2.0",
@@ -209,7 +209,7 @@
   {
     "name": "SvelteKit",
     "description": "Web development, streamlined with Svelte",
-    "category": "Frontend Svelte",
+    "category": "Front end",
     "language": "JavaScript",
     "current_version": "2.5.0",
     "lts_version": "2.5.0",
@@ -218,7 +218,7 @@
   {
     "name": "SolidJS",
     "description": "Simple and performant reactivity",
-    "category": "Frontend Solid",
+    "category": "Front end",
     "language": "TypeScript",
     "current_version": "1.8.0",
     "lts_version": "1.8.0",
@@ -227,7 +227,7 @@
   {
     "name": "SolidStart",
     "description": "SolidJS meta-framework",
-    "category": "Frontend Solid",
+    "category": "Front end",
     "language": "TypeScript",
     "current_version": "1.0.0",
     "lts_version": "1.0.0",
@@ -236,7 +236,7 @@
   {
     "name": "Next.js",
     "description": "React framework for production",
-    "category": "Frontend NextJS",
+    "category": "Front end",
     "language": "TypeScript",
     "current_version": "14.0.0",
     "lts_version": "13.5.0",
@@ -245,7 +245,7 @@
   {
     "name": "Nuxt",
     "description": "Vue.js meta-framework",
-    "category": "Frontend Nuxt",
+    "category": "Front end",
     "language": "TypeScript",
     "current_version": "3.10.0",
     "lts_version": "3.10.0",
@@ -254,7 +254,7 @@
   {
     "name": "Remix",
     "description": "Full stack web framework for React",
-    "category": "Frontend Remix",
+    "category": "Front end",
     "language": "TypeScript",
     "current_version": "2.6.0",
     "lts_version": "2.6.0",
@@ -263,7 +263,7 @@
   {
     "name": "Astro",
     "description": "The web framework for content-driven websites",
-    "category": "Frontend Astro",
+    "category": "Front end",
     "language": "TypeScript",
     "current_version": "4.3.0",
     "lts_version": "4.3.0",
@@ -272,7 +272,7 @@
   {
     "name": "Analog",
     "description": "Fullstack meta-framework for Angular",
-    "category": "Frontend Analog",
+    "category": "Front end",
     "language": "TypeScript",
     "current_version": "1.0.0",
     "lts_version": "0.2.0",
@@ -281,7 +281,7 @@
   {
     "name": "Ember.js",
     "description": "A framework for ambitious web developers",
-    "category": "Frontend Ember",
+    "category": "Front end",
     "language": "JavaScript",
     "current_version": "5.6.0",
     "lts_version": "5.4.0",
@@ -290,7 +290,7 @@
   {
     "name": "Preact",
     "description": "Fast 3kB alternative to React",
-    "category": "Frontend Preact",
+    "category": "Front end",
     "language": "JavaScript",
     "current_version": "10.19.0",
     "lts_version": "10.19.0",
@@ -299,7 +299,7 @@
   {
     "name": "Alpine.js",
     "description": "Lightweight JavaScript framework",
-    "category": "Other",
+    "category": "Front end",
     "language": "JavaScript",
     "current_version": "3.13.0",
     "lts_version": "3.13.0",
@@ -308,7 +308,7 @@
   {
     "name": "HTMX",
     "description": "High power tools for HTML",
-    "category": "Other",
+    "category": "Front end",
     "language": "JavaScript",
     "current_version": "1.9.0",
     "lts_version": "1.9.0",
@@ -317,7 +317,7 @@
   {
     "name": "Electron",
     "description": "Build cross-platform desktop apps",
-    "category": "Desktop Electron",
+    "category": "Full Stack",
     "language": "JavaScript",
     "current_version": "28.0.0",
     "lts_version": "28.0.0",
@@ -326,7 +326,7 @@
   {
     "name": "Tauri",
     "description": "Build smaller, faster, and more secure desktop apps",
-    "category": "Desktop Tauri",
+    "category": "Full Stack",
     "language": "Rust",
     "current_version": "2.0.0",
     "lts_version": "1.6.0",
@@ -335,7 +335,7 @@
   {
     "name": "React Native",
     "description": "Build native mobile apps using React",
-    "category": "Mobile React Native",
+    "category": "Full Stack",
     "language": "JavaScript",
     "current_version": "0.73.0",
     "lts_version": "0.73.0",
@@ -344,7 +344,7 @@
   {
     "name": "Expo",
     "description": "Platform for making universal native apps",
-    "category": "Mobile Expo",
+    "category": "Full Stack",
     "language": "JavaScript",
     "current_version": "50.0.0",
     "lts_version": "50.0.0",
@@ -353,7 +353,7 @@
   {
     "name": "Ionic",
     "description": "Cross-platform app development",
-    "category": "Mobile Ionic",
+    "category": "Full Stack",
     "language": "TypeScript",
     "current_version": "8.0.0",
     "lts_version": "7.7.0",
@@ -362,7 +362,7 @@
   {
     "name": "Capacitor",
     "description": "Cross-platform native runtime",
-    "category": "Mobile Capacitor",
+    "category": "Full Stack",
     "language": "TypeScript",
     "current_version": "5.7.0",
     "lts_version": "5.7.0",
@@ -371,7 +371,7 @@
   {
     "name": "NativeScript",
     "description": "Native mobile apps with Angular, Vue.js, TypeScript",
-    "category": "Mobile Nativescript",
+    "category": "Full Stack",
     "language": "TypeScript",
     "current_version": "8.6.0",
     "lts_version": "8.6.0",
@@ -380,7 +380,7 @@
   {
     "name": "Phoenix",
     "description": "Elixir web framework for productive developers",
-    "category": "Elixir Phoenix",
+    "category": "Back end",
     "language": "Elixir",
     "current_version": "1.7.0",
     "lts_version": "1.7.0",
@@ -389,7 +389,7 @@
   {
     "name": "Ruby on Rails",
     "description": "Full-stack web application framework",
-    "category": "Ruby Rails",
+    "category": "Back end",
     "language": "Ruby",
     "current_version": "7.1.0",
     "lts_version": "7.0.0",
@@ -398,7 +398,7 @@
   {
     "name": "Laravel",
     "description": "The PHP Framework for Web Artisans",
-    "category": "PHP Laravel",
+    "category": "Back end",
     "language": "PHP",
     "current_version": "11.0.0",
     "lts_version": "10.0.0",
@@ -407,7 +407,7 @@
   {
     "name": "Deno",
     "description": "Secure runtime for JavaScript and TypeScript",
-    "category": "Runtime Deno",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "1.40.0",
     "lts_version": "1.40.0",
@@ -416,7 +416,7 @@
   {
     "name": "Bun",
     "description": "Fast all-in-one JavaScript runtime",
-    "category": "Runtime Bun",
+    "category": "Back end",
     "language": "JavaScript",
     "current_version": "1.0.0",
     "lts_version": "1.0.0",
@@ -425,7 +425,7 @@
   {
     "name": "Node.js",
     "description": "JavaScript runtime built on Chrome V8",
-    "category": "Runtime Node",
+    "category": "Back end",
     "language": "JavaScript",
     "current_version": "21.0.0",
     "lts_version": "20.10.0",
@@ -434,7 +434,7 @@
   {
     "name": "Actix Web",
     "description": "Rust web framework",
-    "category": "Rust Actix",
+    "category": "Back end",
     "language": "Rust",
     "current_version": "4.4.0",
     "lts_version": "4.4.0",
@@ -443,7 +443,7 @@
   {
     "name": "ASP.NET Core",
     "description": "Cross-platform .NET framework",
-    "category": "ASP.NET",
+    "category": "Back end",
     "language": ".NET",
     "current_version": "8.0.0",
     "lts_version": "6.0.0",
@@ -452,7 +452,7 @@
   {
     "name": "Strapi",
     "description": "Open-source headless CMS",
-    "category": "CMS Strapi",
+    "category": "Back end",
     "language": "JavaScript",
     "current_version": "4.21.0",
     "lts_version": "4.21.0",
@@ -461,7 +461,7 @@
   {
     "name": "Keystone",
     "description": "Headless CMS and GraphQL API",
-    "category": "CMS Keystone",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "8.0.0",
     "lts_version": "8.0.0",
@@ -470,7 +470,7 @@
   {
     "name": "Meteor",
     "description": "Full-stack JavaScript platform",
-    "category": "Other",
+    "category": "Full Stack",
     "language": "JavaScript",
     "current_version": "3.0.0",
     "lts_version": "2.14.0",
@@ -479,7 +479,7 @@
   {
     "name": "RedwoodJS",
     "description": "Full-stack React framework with GraphQL",
-    "category": "Other",
+    "category": "Full Stack",
     "language": "TypeScript",
     "current_version": "7.0.0",
     "lts_version": "7.0.0",
@@ -488,7 +488,7 @@
   {
     "name": "Blitz.js",
     "description": "Fullstack React framework built on Next.js",
-    "category": "Frontend NextJS",
+    "category": "Full Stack",
     "language": "TypeScript",
     "current_version": "2.0.0",
     "lts_version": "2.0.0",
@@ -497,7 +497,7 @@
   {
     "name": "T3 Stack",
     "description": "Full-stack, typesafe Next.js app stack",
-    "category": "Frontend NextJS",
+    "category": "Full Stack",
     "language": "TypeScript",
     "current_version": "7.0.0",
     "lts_version": "7.0.0",
@@ -506,7 +506,7 @@
   {
     "name": "Better-T Stack",
     "description": "Modern TypeScript full-stack starter",
-    "category": "Other",
+    "category": "Full Stack",
     "language": "TypeScript",
     "current_version": "1.0.0",
     "lts_version": "1.0.0",
@@ -515,7 +515,7 @@
   {
     "name": "Tanstack",
     "description": "High-quality open-source software for web developers",
-    "category": "Other",
+    "category": "Full Stack",
     "language": "TypeScript",
     "current_version": "5.0.0",
     "lts_version": "5.0.0",
@@ -524,7 +524,7 @@
   {
     "name": "ElysiaJS",
     "description": "TypeScript framework for Bun",
-    "category": "Node Hono",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "1.0.0",
     "lts_version": "1.0.0",
@@ -533,7 +533,7 @@
   {
     "name": "ExpressoTS",
     "description": "TypeScript framework for Express",
-    "category": "Node Express",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "3.0.0",
     "lts_version": "3.0.0",
@@ -542,7 +542,7 @@
   {
     "name": "Deepkit",
     "description": "High-performance TypeScript framework",
-    "category": "Other",
+    "category": "Back end",
     "language": "TypeScript",
     "current_version": "1.0.0",
     "lts_version": "1.0.0",
@@ -551,7 +551,7 @@
   {
     "name": "Inertia.js",
     "description": "Modern monolith approach to building SPAs",
-    "category": "Other",
+    "category": "Front end",
     "language": "JavaScript",
     "current_version": "1.0.0",
     "lts_version": "1.0.0",
