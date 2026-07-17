@@ -325,10 +325,13 @@ export class PlatformManagementService {
     }
 
     // Lookup
-    async getLookup(baseUrl: string, type: string, page: number = 0, size: number = 100): Promise<PagedResponse<LookupItem>> {
+    async getLookup(baseUrl: string, type: string, page: number = 0, size: number = 100, typeFilter?: string): Promise<PagedResponse<LookupItem>> {
         const endpoint = this.getLookupEndpoint(type);
         try {
-            const url = `${baseUrl}/api/v1/${endpoint}?page=${page}&size=${size}`;
+            let url = `${baseUrl}/api/v1/${endpoint}?page=${page}&size=${size}`;
+            if (typeFilter) {
+                url += `&type=${encodeURIComponent(typeFilter)}`;
+            }
             return await firstValueFrom(this.http.get<PagedResponse<LookupItem>>(url));
         } catch (e) {
             console.error(`Failed to fetch lookup ${type}`, e);
@@ -502,7 +505,46 @@ export class PlatformManagementService {
         this.error.set(null);
         try {
             const url = `${baseUrl}/api/v1/registry/systems?page=${page}&size=${size}`;
-            return await firstValueFrom(this.http.get<PagedResponse<SystemItem>>(url));
+            const response: any = await firstValueFrom(this.http.get<any>(url));
+
+            // Backend returns a plain array (List<Systems>), not a PagedResponse.
+            // Normalize: if it's an array, wrap it into PagedResponse format.
+            if (Array.isArray(response)) {
+                // Map nested systemType object → flat type string
+                const items: SystemItem[] = response.map((s: any) => ({
+                    id: s.id,
+                    name: s.name,
+                    description: s.description,
+                    type: s.systemType?.name,
+                    serviceCount: 0,
+                }));
+                return {
+                    data: items,
+                    meta: {
+                        page: 0,
+                        per_page: size,
+                        total: items.length,
+                        last_page: 1,
+                    },
+                };
+            }
+
+            // Already a paged response — map systemType to type on each item
+            if (response.data && Array.isArray(response.data)) {
+                const items: SystemItem[] = response.data.map((s: any) => ({
+                    id: s.id,
+                    name: s.name,
+                    description: s.description,
+                    type: s.systemType?.name ?? s.type,
+                    serviceCount: s.serviceCount ?? 0,
+                }));
+                return {
+                    data: items,
+                    meta: response.meta,
+                };
+            }
+
+            throw new Error('Unexpected response format from systems endpoint');
         } catch (e) {
             this.error.set('Failed to fetch systems');
             throw e;

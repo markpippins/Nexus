@@ -53,6 +53,7 @@ import { HealthCheckService } from './services/health-check.service.js';
 import { GeminiSearchDialogComponent } from './components/gemini-search-dialog/gemini-search-dialog.component.js';
 import { TreeManagerService } from './services/tree-manager.service.js';
 import { RegistryServerProvider } from './services/registry-server-provider.service.js';
+import { RegistryServerProfileService } from './services/registry-server-profile.service.js';
 import { TreeProviderAdapter } from './services/tree-provider-adapter.js';
 import { ServiceMeshComponent } from './components/service-mesh/service-mesh.component.js';
 import { CreateUserDialogComponent } from './components/create-user/create-user-dialog.component.js';
@@ -71,6 +72,7 @@ import { MessageBoxContainerComponent } from './components/message-box-container
 import { UiEventBusService } from './services/ui-event-bus.service.js';
 
 import { SystemHealthComponent } from './components/system-health/system-health.component.js';
+import { TopologyComponent } from './components/topology/topology.component.js';
 import { NebulaPanelComponent } from './components/nebula-panel/nebula-panel.component.js';
 
 interface PanePath {
@@ -120,7 +122,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent, NebulaPanelComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent, TopologyComponent, NebulaPanelComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -154,6 +156,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private healthCheckService = inject(HealthCheckService);
   private treeManager = inject(TreeManagerService);
   private registryServerProvider = inject(RegistryServerProvider);
+  private registryServerProfileService = inject(RegistryServerProfileService);
   private serviceMeshService = inject(ServiceMeshService);
   public vizService = inject(ArchitectureVizService);
   private eventBus = inject(UiEventBusService);
@@ -379,7 +382,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private getPlatformNodeForPath(path: string[]) {
     // Valid management types (System Health is now a top-level sibling, not a Platform Management child).
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems'];
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems', 'topology'];
     const profiles = this.hostProfileService.profiles();
     const activeProfile = this.hostProfileService.activeProfile();
 
@@ -404,11 +407,14 @@ export class AppComponent implements OnInit, OnDestroy {
     // Explicitly exclude "Search & Discovery" paths to prevent masking user folders
     if (path[0] === 'Search & Discovery') {
       return null;
-    }        // System Health is a top-level sibling of Platform Management (always connects to terrain server).
+    }        // System Health is a top-level sibling of Platform Management (connects to service-registry real-time SSE stream).
         // Handle it here at root before the Platform Management branch — also covers any deeper path.
         if (path[0] === 'System Health') {
-          const terrainUrl = this.localConfigService.terrainServerUrl();
-          return { type: 'system-health', baseUrl: terrainUrl };
+          const registryUrl = this.registryServerProfileService.activeBaseUrl();
+          if (registryUrl) {
+            return { type: 'system-health', baseUrl: registryUrl };
+          }
+          return null;
         }
 
     console.log('[AppComponent] getPlatformNodeForPath', { path, profilesCount: profiles.length, activeProfile: activeProfile?.name });
@@ -476,10 +482,18 @@ export class AppComponent implements OnInit, OnDestroy {
           return null;
         }
 
-        // System Health always uses the terrain server URL, not a profile's hostServerUrl
+        // System Health uses the service-registry URL (SSE based), Topology uses terrain server
         if (normalizedType === 'system-health') {
+          const registryUrl = this.registryServerProfileService.activeBaseUrl();
+          if (registryUrl) {
+            console.log('[AppComponent] Matched Platform Management path - system-health', { registryUrl });
+            return { type: normalizedType, baseUrl: registryUrl };
+          }
+          return null;
+        }
+        if (normalizedType === 'topology') {
           const terrainUrl = this.localConfigService.terrainServerUrl();
-          console.log('[AppComponent] Matched Platform Management path - system-health', { terrainUrl });
+          console.log('[AppComponent] Matched Platform Management path - topology', { terrainUrl });
           return { type: normalizedType, baseUrl: terrainUrl };
         }
 
@@ -524,7 +538,7 @@ export class AppComponent implements OnInit, OnDestroy {
   /** Resolve the baseUrl from a Platform Management path. */
   private resolveBaseUrl(remaining: string[], profiles: any[], activeProfile: any, pmIndex: number, path: string[]): string | null {
     // Find the first element in remaining that matches a valid type
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems'];
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems', 'topology'];
     const typeIndex = remaining.findIndex(p => validTypes.includes(p.toLowerCase()));
 
     let targetProfileName: string | null = null;

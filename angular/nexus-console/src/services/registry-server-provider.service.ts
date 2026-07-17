@@ -213,6 +213,16 @@ export class RegistryServerProvider implements TreeProvider {
                         lastUpdated: new Date()
                     },
                     {
+                        id: `platform-systems-${profile.id}`,
+                        name: 'Systems',
+                        type: NodeType.FOLDER,
+                        icon: 'dns',
+                        hasChildren: false,
+                        operations: ['manage-systems'],
+                        metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/registry/systems`, managementType: 'systems' },
+                        lastUpdated: new Date()
+                    },
+                    {
                         id: `platform-dictionary-${profile.id}`,
                         name: 'Data Dictionary',
                         type: NodeType.FOLDER,
@@ -220,6 +230,16 @@ export class RegistryServerProvider implements TreeProvider {
                         hasChildren: true,
                         operations: [],
                         metadata: { hostProfileId: profile.id },
+                        lastUpdated: new Date()
+                    },
+                    {
+                        id: `platform-topology-${profile.id}`,
+                        name: 'Topology',
+                        type: NodeType.FOLDER,
+                        icon: 'account_tree',
+                        hasChildren: false,
+                        operations: ['view-topology'],
+                        metadata: { hostProfileId: profile.id, url: `${this.localConfigService.terrainServerUrl()}/api/v1/platform/health`, managementType: 'topology', baseUrl: this.localConfigService.terrainServerUrl() },
                         lastUpdated: new Date()
                     }
                 );
@@ -443,6 +463,16 @@ export class RegistryServerProvider implements TreeProvider {
                 lastUpdated: new Date()
             },
             {
+                id: `platform-systems-${profile.id}`,
+                name: 'Systems',
+                type: NodeType.FOLDER,
+                icon: 'dns',
+                hasChildren: false,
+                operations: ['manage-systems'],
+                metadata: { hostProfileId: profile.id, url: `${baseUrl}/api/v1/registry/systems`, managementType: 'systems' },
+                lastUpdated: new Date()
+            },
+            {
                 id: `platform-health-${profile.id}`,
                 name: 'System Health',
                 type: NodeType.HEALTH_CHECK,
@@ -460,6 +490,16 @@ export class RegistryServerProvider implements TreeProvider {
                 hasChildren: true,
                 operations: [],
                 metadata: { hostProfileId: profile.id },
+                lastUpdated: new Date()
+            },
+            {
+                id: `platform-topology-${profile.id}`,
+                name: 'Topology',
+                type: NodeType.FOLDER,
+                icon: 'account_tree',
+                hasChildren: false,
+                operations: ['view-topology'],
+                metadata: { hostProfileId: profile.id, url: `${this.localConfigService.terrainServerUrl()}/api/v1/platform/health`, managementType: 'topology', baseUrl: this.localConfigService.terrainServerUrl() },
                 lastUpdated: new Date()
             }
         ];

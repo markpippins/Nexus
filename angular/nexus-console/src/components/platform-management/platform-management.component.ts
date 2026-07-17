@@ -1301,7 +1301,11 @@ export class PlatformManagementComponent {
                 case 'framework-languages':
                 case 'operating-systems':
                 case 'environments':
-                    const lResp = await this.platformService.getLookup(url, actualType, page, size);
+                    // When viewing a filtered category child (e.g. Categories > System),
+                    // pass the type discriminator so the backend filters server-side.
+                    // Otherwise all items are fetched and filtered client-side.
+                    const catTypeFilter = actualType === 'categories' ? (this.filteredCategoryType() ?? undefined) : undefined;
+                    const lResp = await this.platformService.getLookup(url, actualType, page, size, catTypeFilter);
                     this.lookupData.set(lResp.data);
                     this.totalPages.set(lResp.meta.last_page);
                     this.totalItems.set(lResp.meta.total);

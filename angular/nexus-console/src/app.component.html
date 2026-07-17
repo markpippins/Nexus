@@ -364,6 +364,10 @@
                         <app-system-health
                           [baseUrl]="pane1PlatformNode()!.baseUrl"
                         ></app-system-health>
+                      } @else if (pane1PlatformNode()!.type === 'topology') {
+                        <app-topology
+                          [baseUrl]="pane1PlatformNode()!.baseUrl"
+                        ></app-topology>
                       } @else {
                         <app-platform-management
                           [managementType]="pane1PlatformNode()!.type"
@@ -473,6 +477,10 @@
                         <app-system-health
                           [baseUrl]="pane2PlatformNode()!.baseUrl"
                         ></app-system-health>
+                      } @else if (pane2PlatformNode()!.type === 'topology') {
+                        <app-topology
+                          [baseUrl]="pane2PlatformNode()!.baseUrl"
+                        ></app-topology>
                       } @else {
                         <app-platform-management
                           [managementType]="pane2PlatformNode()!.type"

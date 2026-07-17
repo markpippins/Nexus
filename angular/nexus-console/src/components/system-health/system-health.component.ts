@@ -1,12 +1,19 @@
-import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, input, signal, computed, OnDestroy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { TerrainService, TerrainHealthSummary, TerrainServiceStatus, McpServer, RunnableService } from '../../services/terrain.service.js';
-import { ServicePollMonitorComponent } from './service-poll-monitor.component.js';
+import {
+  RegistryStatusService,
+  RegistryServiceStatus,
+  RegistryStatusEvent,
+  HealthState,
+} from '../../services/registry-status.service.js';
+
+type SortField = 'name' | 'status' | 'heartbeat' | 'responseTime';
+type FilterType = 'all' | HealthState;
 
 @Component({
   selector: 'app-system-health',
   standalone: true,
-  imports: [CommonModule, ServicePollMonitorComponent],
+  imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="h-full flex flex-col bg-[rgb(var(--color-surface))] overflow-auto">
@@ -14,32 +21,64 @@ import { ServicePollMonitorComponent } from './service-poll-monitor.component.js
       <div class="flex-shrink-0 px-6 py-4 border-b border-[rgb(var(--color-border-base))]">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6"
-              [class.text-green-500]="summary()?.terrainUp"
-              [class.text-red-500]="!summary()?.terrainUp && !loading()"
-              [class.text-yellow-500]="loading()"
-              viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd" />
-            </svg>
-            <h2 class="text-xl font-semibold text-[rgb(var(--color-text-base))]">System Health</h2>
-          </div>
-          @if (summary()?.loadedAt) {
-            <span class="text-xs text-[rgb(var(--color-text-muted))]">
-              Last updated: {{ summary()!.loadedAt | date:'mediumTime' }}
+            <!-- Connection indicator -->
+            <span class="relative flex h-3 w-3">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                [class.bg-green-400]="connected()"
+                [class.bg-red-400]="!connected() && !loading()"
+                [class.bg-yellow-400]="loading()"
+              ></span>
+              <span class="relative inline-flex rounded-full h-3 w-3"
+                [class.bg-green-500]="connected()"
+                [class.bg-red-500]="!connected() && !loading()"
+                [class.bg-yellow-500]="loading()"
+              ></span>
             </span>
-          }
+            <div>
+              <h2 class="text-xl font-semibold text-[rgb(var(--color-text-base))]">System Health</h2>
+              <p class="text-xs text-[rgb(var(--color-text-muted))]">
+                @if (connected()) {
+                  <span class="text-green-500">●</span> Live
+                  @if (lastSnapshotAt(); as t) {
+                    · Updated {{ t | date:'mediumTime' }}
+                  }
+                  · {{ sseClients().length }} connected client{{ sseClients().length !== 1 ? 's' : '' }}
+                } @else if (loading()) {
+                  Connecting...
+                } @else {
+                  <span class="text-red-500">●</span> Disconnected
+                }
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              (click)="reconnect()"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-colors"
+              [class.text-green-500]="!connected()"
+              [class.bg-green-500/10]="!connected()"
+              [class.text-[rgb(var(--color-text-muted))]]="connected()"
+              [class.bg-[rgb(var(--color-surface-hover))]]="connected()"
+              title="Reconnect"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10.899 12.101A7.002 7.002 0 012.399 8.567a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101z" clip-rule="evenodd" />
+              </svg>
+              @if (!connected()) { Reconnect }
+            </button>
+          </div>
         </div>
       </div>
 
       <!-- Content -->
-      <div class="flex-1 p-6">
+      <div class="flex-1 p-6 overflow-auto">
         @if (loading()) {
           <!-- Loading state -->
           <div class="flex flex-col items-center justify-center h-64 gap-4">
             <div class="animate-spin rounded-full h-10 w-10 border-3 border-t-transparent border-[rgb(var(--color-accent-ring))]"></div>
-            <p class="text-[rgb(var(--color-text-muted))]">Checking terrain server status...</p>
+            <p class="text-[rgb(var(--color-text-muted))]">Connecting to real-time status stream...</p>
           </div>
-        } @else if (error()) {
+        } @else if (error(); as err) {
           <!-- Error state -->
           <div class="max-w-lg mx-auto mt-8">
             <div class="p-6 bg-red-500/10 border border-red-500/20 rounded-xl">
@@ -47,534 +86,440 @@ import { ServicePollMonitorComponent } from './service-poll-monitor.component.js
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-500" viewBox="0 0 20 20" fill="currentColor">
                   <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                 </svg>
-                <h3 class="text-lg font-semibold text-red-500">Terrain Server is Down</h3>
+                <h3 class="text-lg font-semibold text-red-500">Connection Failed</h3>
               </div>
-              <p class="text-[rgb(var(--color-text-muted))] text-sm">
-                Unable to reach the terrain server at <code class="px-1.5 py-0.5 bg-[rgb(var(--color-surface-muted))] rounded text-xs">{{ baseUrl() }}</code>.
-              </p>
-              @if (summary()?.terrainError) {
-                <p class="mt-2 text-xs text-red-400">{{ summary()?.terrainError }}</p>
-              }
+              <p class="text-[rgb(var(--color-text-muted))] text-sm">{{ err }}</p>
               <button
-                (click)="refresh()"
+                (click)="reconnect()"
                 class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[rgb(var(--color-accent-solid-bg))] text-white rounded-md hover:opacity-90 transition-opacity text-sm"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10.899 12.101A7.002 7.002 0 012.399 8.567a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101z" clip-rule="evenodd" />
-                </svg>
-                Retry
+                Retry Connection
               </button>
             </div>
           </div>
-        } @else if (summary(); as s) {
-          <!--
-            Service taxonomy for this view:
-              • Third-Party Dependencies  ← MCP Servers (typically external integrations we connect to)
-              • Internal Services         ← Runnable Services (services we deploy and operate)
-              • Host Servers              ← infrastructure / machines (shown separately, no taxonomy applied)
-            Override per-item by adding an &quot;isThirdParty&quot; boolean to McpServer, or by
-            deriving it from &quot;repositoryUrl&quot;; this is the current default.
-          -->
-          <!-- Summary Cards -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <!-- Third-Party Dependencies Card (MCP Servers are typically external integrations) -->
-            <div class="p-5 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))]">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Third-Party Dependencies</span>
-                <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ s.mcpServers.length }}</span>
-              </div>
-              <div class="flex gap-2 text-xs">
-                <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countEffective(s.mcpServers, 'ON') }} Online</span>
-                <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countEffective(s.mcpServers, 'OFFLINE') }} Offline</span>
-                @if (countEffective(s.mcpServers, 'DEGRADED') > 0) {
-                  <span class="px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600">{{ countEffective(s.mcpServers, 'DEGRADED') }} Degraded</span>
-                }
+        } @else {
+          <!-- Status Summary Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="p-4 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))] cursor-pointer" (click)="filterType.set('all')" [class.ring-2]="filterType() === 'all'" [class.ring-[rgb(var(--color-accent-ring))]]="filterType() === 'all'">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-medium text-[rgb(var(--color-text-muted))]">Total Services</span>
+                <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ totalCount() }}</span>
               </div>
             </div>
-
-            <!-- Internal Services Card (Runnable Services are services we deploy and operate) -->
-            <div class="p-5 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))]">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Internal Services</span>
-                <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ s.runnableServices.length }}</span>
-              </div>
-              <div class="flex gap-2 text-xs">
-                <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countEffective(s.runnableServices, 'ON') }} Online</span>
-                <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countEffective(s.runnableServices, 'OFFLINE') }} Offline</span>
-                @if (countEffective(s.runnableServices, 'DEGRADED') > 0) {
-                  <span class="px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600">{{ countEffective(s.runnableServices, 'DEGRADED') }} Degraded</span>
-                }
+            <div class="p-4 bg-green-500/5 rounded-xl border border-green-500/20 cursor-pointer" (click)="filterType.set('HEALTHY')" [class.ring-2]="filterType() === 'HEALTHY'" [class.ring-green-500]="filterType() === 'HEALTHY'">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-medium text-green-600">Healthy</span>
+                <span class="text-2xl font-bold text-green-500">{{ healthyCount() }}</span>
               </div>
             </div>
-
-            <!-- Servers Card -->
-            <div class="p-5 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))]">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Host Servers</span>
-                <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ s.servers.length }}</span>
+            <div class="p-4 bg-yellow-500/5 rounded-xl border border-yellow-500/20 cursor-pointer" (click)="filterType.set('DEGRADED')" [class.ring-2]="filterType() === 'DEGRADED'" [class.ring-yellow-500]="filterType() === 'DEGRADED'">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-medium text-yellow-600">Degraded</span>
+                <span class="text-2xl font-bold text-yellow-500">{{ degradedCount() }}</span>
               </div>
-              <div class="flex gap-2 text-xs">
-                <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countServerByStatus(s.servers, 'ONLINE') }} Online</span>
-                <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countServerByStatus(s.servers, 'OFFLINE') }} Offline</span>
+            </div>
+            <div class="p-4 bg-red-500/5 rounded-xl border border-red-500/20 cursor-pointer" (click)="filterType.set('UNHEALTHY')" [class.ring-2]="filterType() === 'UNHEALTHY'" [class.ring-red-500]="filterType() === 'UNHEALTHY'">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-medium text-red-500">Unhealthy</span>
+                <span class="text-2xl font-bold text-red-500">{{ unhealthyCount() }}</span>
               </div>
             </div>
           </div>
 
-          <!-- Terrain Status Banner -->
-          <div class="mb-6 p-4 rounded-lg border"
-            [class.bg-green-500/5]="s.terrainUp && !hasIssues()"
-            [class.border-green-500/20]="s.terrainUp && !hasIssues()"
-            [class.bg-yellow-500/5]="hasIssues()"
-            [class.border-yellow-500/20]="hasIssues()"
-            [class.bg-red-500/5]="!s.terrainUp"
-            [class.border-red-500/20]="!s.terrainUp"
-          >
-            <div class="flex items-center gap-2">
-              <span class="relative flex h-3 w-3">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                  [class.bg-green-400]="s.terrainUp && !hasIssues()"
-                  [class.bg-yellow-400]="hasIssues()"
-                  [class.bg-red-400]="!s.terrainUp"
-                ></span>
-                <span class="relative inline-flex rounded-full h-3 w-3"
-                  [class.bg-green-500]="s.terrainUp && !hasIssues()"
-                  [class.bg-yellow-500]="hasIssues()"
-                  [class.bg-red-500]="!s.terrainUp"
-                ></span>
-              </span>
-              <span class="text-sm font-medium text-[rgb(var(--color-text-base))]">
-                @if (hasIssues()) {
-                  Terrain Server: <span class="text-yellow-500">Degraded</span>
-                  <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">
-                    {{ countOffline() }} service(s) offline, {{ countDegraded() }} degraded
+          <!-- Filter & Sort Toolbar -->
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-[rgb(var(--color-border-base))]">
+            <div class="flex gap-1 flex-wrap">
+              <button (click)="filterType.set('all')"
+                class="px-2.5 py-1 text-xs rounded-md transition-colors"
+                [class.bg-[rgb(var(--color-surface-hover))]]="filterType() === 'all'"
+                [class.text-[rgb(var(--color-text-base))]]="filterType() === 'all'"
+                [class.text-[rgb(var(--color-text-muted))]]="filterType() !== 'all'"
+              >All</button>
+              <button (click)="filterType.set('OFFLINE')"
+                class="px-2.5 py-1 text-xs rounded-md transition-colors"
+                [class.bg-red-500/10]="filterType() === 'OFFLINE'"
+                [class.text-red-500]="filterType() === 'OFFLINE'"
+                [class.text-[rgb(var(--color-text-muted))]]="filterType() !== 'OFFLINE'"
+              >Offline</button>
+              <button (click)="filterType.set('UNKNOWN')"
+                class="px-2.5 py-1 text-xs rounded-md transition-colors"
+                [class.bg-gray-500/10]="filterType() === 'UNKNOWN'"
+                [class.text-gray-500]="filterType() === 'UNKNOWN'"
+                [class.text-[rgb(var(--color-text-muted))]]="filterType() !== 'UNKNOWN'"
+              >Unknown</button>
+            </div>
+            <span class="mx-2 text-[rgb(var(--color-text-subtle))]">|</span>
+            <label class="text-xs text-[rgb(var(--color-text-muted))]">Sort:</label>
+            <select (change)="onSortChange($event)"
+              class="text-xs bg-[rgb(var(--color-surface-muted))] border border-[rgb(var(--color-border-muted))] rounded px-2 py-1 text-[rgb(var(--color-text-base))]">
+              <option value="name">Name</option>
+              <option value="status">Status</option>
+              <option value="heartbeat">Last Heartbeat</option>
+              <option value="responseTime">Response Time</option>
+            </select>
+          </div>
+
+          <!-- Service Cards Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+            @for (svc of filteredServices(); track svc.serviceName) {
+              <div class="p-4 rounded-xl border transition-all duration-200 hover:shadow-md cursor-pointer group"
+                [class.border-green-500/30]="svc.healthState === 'HEALTHY'"
+                [class.bg-green-500/[0.03]]="svc.healthState === 'HEALTHY'"
+                [class.border-red-500/30]="svc.healthState === 'UNHEALTHY' || svc.healthState === 'OFFLINE'"
+                [class.bg-red-500/[0.03]]="svc.healthState === 'UNHEALTHY' || svc.healthState === 'OFFLINE'"
+                [class.border-yellow-500/30]="svc.healthState === 'DEGRADED'"
+                [class.bg-yellow-500/[0.03]]="svc.healthState === 'DEGRADED'"
+                [class.border-gray-500/30]="svc.healthState === 'UNKNOWN'"
+                [class.bg-gray-500/[0.03]]="svc.healthState === 'UNKNOWN'"
+                (click)="toggleExpanded(svc.serviceName)"
+              >
+                <div class="flex items-start justify-between">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <span class="w-2 h-2 rounded-full flex-shrink-0"
+                        [class.bg-green-500]="svc.healthState === 'HEALTHY'"
+                        [class.bg-red-500]="svc.healthState === 'UNHEALTHY' || svc.healthState === 'OFFLINE'"
+                        [class.bg-yellow-500]="svc.healthState === 'DEGRADED'"
+                        [class.bg-gray-400]="svc.healthState === 'UNKNOWN'"
+                        [class.animate-pulse]="svc.healthState === 'UNHEALTHY' || svc.healthState === 'OFFLINE'"
+                      ></span>
+                      <span class="font-medium text-sm text-[rgb(var(--color-text-base))] truncate">{{ svc.serviceName }}</span>
+                    </div>
+                    @if (svc.version) {
+                      <span class="ml-4 text-[10px] text-[rgb(var(--color-text-muted))] font-mono">v{{ svc.version }}</span>
+                    }
+                  </div>
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0"
+                    [class.bg-green-500/10]="svc.healthState === 'HEALTHY'"
+                    [class.text-green-600]="svc.healthState === 'HEALTHY'"
+                    [class.bg-red-500/10]="svc.healthState === 'UNHEALTHY' || svc.healthState === 'OFFLINE'"
+                    [class.text-red-500]="svc.healthState === 'UNHEALTHY' || svc.healthState === 'OFFLINE'"
+                    [class.bg-yellow-500/10]="svc.healthState === 'DEGRADED'"
+                    [class.text-yellow-600]="svc.healthState === 'DEGRADED'"
+                    [class.bg-gray-500/10]="svc.healthState === 'UNKNOWN'"
+                    [class.text-gray-500]="svc.healthState === 'UNKNOWN'"
+                  >
+                    {{ svc.healthState }}
                   </span>
-                } @else if (s.terrainUp) {
-                  Terrain Server: <span class="text-green-500">Online</span>
-                } @else {
-                  Terrain Server: <span class="text-red-500">Offline</span>
+                </div>
+                <div class="mt-2 flex items-center gap-3 text-[10px] text-[rgb(var(--color-text-muted))]">
+                  @if (svc.responseTimeMs != null) {
+                    <span>{{ svc.responseTimeMs }}ms</span>
+                  }
+                  @if (svc.lastHeartbeat) {
+                    <span>♥ {{ svc.lastHeartbeat | date:'HH:mm:ss' }}</span>
+                  }
+                  @if (svc.errorMessage) {
+                    <span class="text-red-400 truncate" title="{{ svc.errorMessage }}">{{ svc.errorMessage }}</span>
+                  }
+                </div>
+
+                <!-- Expanded details: history -->
+                @if (expandedService() === svc.serviceName) {
+                  <div class="mt-3 pt-3 border-t border-[rgb(var(--color-border-base))]">
+                    <h4 class="text-[10px] font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-2">Status History</h4>
+                    @if (serviceHistories().get(svc.serviceName); as history) {
+                      <div class="space-y-1">
+                        @for (evt of history; track $index) {
+                          <div class="flex items-center gap-2 text-[10px]">
+                            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                              [class.bg-green-500]="evt.newState === 'HEALTHY'"
+                              [class.bg-red-500]="evt.newState === 'UNHEALTHY' || evt.newState === 'OFFLINE'"
+                              [class.bg-yellow-500]="evt.newState === 'DEGRADED'"
+                              [class.bg-gray-400]="true"
+                            ></span>
+                            <span class="text-[rgb(var(--color-text-muted))]">
+                              {{ evt.oldState || '?' }} → <span class="font-medium text-[rgb(var(--color-text-base))]">{{ evt.newState }}</span>
+                            </span>
+                            <span class="text-[rgb(var(--color-text-subtle))]">{{ evt.changedAt | date:'HH:mm' }}</span>
+                            @if (evt.reason) {
+                              <span class="text-[rgb(var(--color-text-subtle))] truncate">· {{ evt.reason }}</span>
+                            }
+                          </div>
+                        }
+                      </div>
+                    } @else {
+                      <p class="text-[10px] text-[rgb(var(--color-text-subtle))]">Loading history...</p>
+                    }
+                  </div>
                 }
-              </span>
-              <span class="text-xs text-[rgb(var(--color-text-muted))] ml-auto">{{ baseUrl() }}</span>
-            </div>
+              </div>
+            } @empty {
+              <div class="col-span-full p-8 text-center text-[rgb(var(--color-text-muted))]">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+                <p class="text-sm">No services match the current filter</p>
+              </div>
+            }
           </div>
 
-          <!-- Third-Party Dependencies Table (MCP Servers we connect to) -->
-          @if (s.mcpServers.length > 0) {
-            <div class="mb-8">
-              <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Third-Party Dependencies</h3>
-              <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
-                <table class="w-full text-left border-collapse">
-                  <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase">
-                    <tr>
-                      <th class="p-3 font-semibold">Name</th>
-                      <th class="p-3 font-semibold">Port</th>
-                      <th class="p-3 font-semibold">Transport</th>
-                      <th class="p-3 font-semibold">Status</th>
-                      <th class="p-3 font-semibold">Health Check</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (mcp of s.mcpServers; track mcp.id) {
-                      @let eff = getEffectiveStatus(mcp);
-                      @let probed = isLiveProbed(mcp);
-                      <tr class="border-t border-[rgb(var(--color-border-muted))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
-                        [class.opacity-50]="!mcp.activeFlag">
-                        <td class="p-3 text-sm">
-                          <span class="font-medium text-[rgb(var(--color-text-base))]">{{ mcp.name }}</span>
-                          @if (mcp.version) {
-                            <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ mcp.version }}</span>
+          <!-- Two-column layout: Transitions + Heartbeats -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Status Transitions Timeline -->
+            <div>
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
+                </svg>
+                Recent Transitions
+                <span class="text-[10px] font-normal text-[rgb(var(--color-text-subtle))]">({{ transitions().length }})</span>
+              </h3>
+              @if (transitions().length > 0) {
+                <div class="space-y-1 max-h-80 overflow-y-auto pr-1">
+                  @for (evt of transitions(); track $index) {
+                    <div class="flex items-start gap-3 p-2 rounded-lg hover:bg-[rgb(var(--color-surface-hover))] transition-colors">
+                      <div class="flex flex-col items-center mt-0.5">
+                        <div class="w-2 h-2 rounded-full"
+                          [class.bg-green-500]="evt.newState === 'HEALTHY'"
+                          [class.bg-red-500]="evt.newState === 'UNHEALTHY' || evt.newState === 'OFFLINE'"
+                          [class.bg-yellow-500]="evt.newState === 'DEGRADED'"
+                          [class.bg-gray-400]="true"
+                        ></div>
+                        <div class="w-px h-full min-h-[1.5rem] bg-[rgb(var(--color-border-muted))]"></div>
+                      </div>
+                      <div class="flex-1 min-w-0 pb-2">
+                        <div class="flex items-center justify-between">
+                          <span class="font-medium text-xs text-[rgb(var(--color-text-base))]">{{ evt.serviceName }}</span>
+                          <span class="text-[10px] text-[rgb(var(--color-text-subtle))]">{{ evt.changedAt | date:'HH:mm:ss' }}</span>
+                        </div>
+                        <div class="text-[10px] text-[rgb(var(--color-text-muted))]">
+                          {{ evt.oldState || '?' }} → <span class="font-medium">{{ evt.newState }}</span>
+                          @if (evt.reason) {
+                            <span class="ml-1 text-[rgb(var(--color-text-subtle))]">· {{ evt.reason }}</span>
                           }
-                        </td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono">{{ mcp.port || '—' }}</td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))]">{{ mcp.transportType || '—' }}</td>
-                        <td class="p-3">
-                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
-                            [class.bg-green-500/10]="eff === 'ON'"
-                            [class.text-green-600]="eff === 'ON'"
-                            [class.bg-red-500/10]="eff === 'OFFLINE'"
-                            [class.text-red-500]="eff === 'OFFLINE'"
-                            [class.bg-yellow-500/10]="eff === 'DEGRADED'"
-                            [class.text-yellow-600]="eff === 'DEGRADED'"
-                            [class.bg-gray-500/10]="eff !== 'ON' && eff !== 'OFFLINE' && eff !== 'DEGRADED'"
-                            [class.text-gray-500]="eff !== 'ON' && eff !== 'OFFLINE' && eff !== 'DEGRADED'"
-                          >
-                            <span class="w-1.5 h-1.5 rounded-full"
-                              [class.bg-green-500]="eff === 'ON'"
-                              [class.bg-red-500]="eff === 'OFFLINE'"
-                              [class.bg-yellow-500]="eff === 'DEGRADED'"
-                              [class.bg-gray-400]="eff !== 'ON' && eff !== 'OFFLINE' && eff !== 'DEGRADED'"
-                              [class.animate-pulse]="probed"
-                            ></span>
-                            {{ eff }}
-                          </span>
-                          @if (probed && eff !== mcp.status) {
-                            <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ mcp.status }}</span>
+                          @if (evt.errorMessage) {
+                            <span class="ml-1 text-red-400">· {{ evt.errorMessage }}</span>
                           }
-                        </td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ mcp.healthCheckUrl || '—' }}</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
+                  <p class="text-xs">No status transitions recorded yet</p>
+                </div>
+              }
             </div>
-          } @else {
-            <div class="mb-8 p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
-              <p class="text-sm">No third-party dependencies registered in terrain (no MCP servers).</p>
-            </div>
-          }
 
-          <!-- Internal Services Table (services we deploy and run) -->
-          @if (s.runnableServices.length > 0) {
-            <div class="mb-8">
-              <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Internal Services</h3>
-              <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
-                <table class="w-full text-left border-collapse">
-                  <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase">
-                    <tr>
-                      <th class="p-3 font-semibold">Name</th>
-                      <th class="p-3 font-semibold">Port</th>
-                      <th class="p-3 font-semibold">Workspace</th>
-                      <th class="p-3 font-semibold">Status</th>
-                      <th class="p-3 font-semibold">Health Check</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (svc of s.runnableServices; track svc.id) {
-                      @let eff = getEffectiveStatus(svc);
-                      @let probed = isLiveProbed(svc);
-                      <tr class="border-t border-[rgb(var(--color-border-muted))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
-                        [class.opacity-50]="!svc.activeFlag">
-                        <td class="p-3 text-sm">
-                          <span class="font-medium text-[rgb(var(--color-text-base))]">{{ svc.name }}</span>
-                          @if (svc.version) {
-                            <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ svc.version }}</span>
-                          }
-                        </td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono">{{ svc.port || '—' }}</td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ svc.workspacePath || '—' }}</td>
-                        <td class="p-3">
-                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
-                            [class.bg-green-500/10]="eff === 'ON'"
-                            [class.text-green-600]="eff === 'ON'"
-                            [class.bg-red-500/10]="eff === 'OFFLINE'"
-                            [class.text-red-500]="eff === 'OFFLINE'"
-                            [class.bg-yellow-500/10]="eff === 'DEGRADED'"
-                            [class.text-yellow-600]="eff === 'DEGRADED'"
-                            [class.bg-gray-500/10]="eff !== 'ON' && eff !== 'OFFLINE' && eff !== 'DEGRADED'"
-                            [class.text-gray-500]="eff !== 'ON' && eff !== 'OFFLINE' && eff !== 'DEGRADED'"
-                          >
-                            <span class="w-1.5 h-1.5 rounded-full"
-                              [class.bg-green-500]="eff === 'ON'"
-                              [class.bg-red-500]="eff === 'OFFLINE'"
-                              [class.bg-yellow-500]="eff === 'DEGRADED'"
-                              [class.bg-gray-400]="eff !== 'ON' && eff !== 'OFFLINE' && eff !== 'DEGRADED'"
-                              [class.animate-pulse]="probed"
-                            ></span>
-                            {{ eff }}
-                          </span>
-                          @if (probed && eff !== svc.status) {
-                            <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ svc.status }}</span>
-                          }
-                        </td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ svc.healthCheckUrl || '—' }}</td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
+            <!-- Heartbeat Activity Feed -->
+            <div>
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />
+                </svg>
+                Heartbeat Activity
+                <span class="text-[10px] font-normal text-[rgb(var(--color-text-subtle))]">({{ recentHeartbeats().length }})</span>
+              </h3>
+              @if (recentHeartbeats().length > 0) {
+                <div class="space-y-1 max-h-80 overflow-y-auto pr-1">
+                  @for (hb of recentHeartbeats(); track $index) {
+                    <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-[rgb(var(--color-surface-hover))] transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />
+                      </svg>
+                      <span class="text-xs font-medium text-[rgb(var(--color-text-base))] flex-1">{{ hb.serviceName }}</span>
+                      @if (hb.version) {
+                        <span class="text-[10px] text-[rgb(var(--color-text-muted))] font-mono">v{{ hb.version }}</span>
+                      }
+                      <span class="text-[10px] text-[rgb(var(--color-text-subtle))]">{{ hb.timestamp | date:'HH:mm:ss' }}</span>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
+                  <p class="text-xs">No heartbeat activity yet</p>
+                </div>
+              }
             </div>
-          } @else {
-            <div class="mb-8 p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
-              <p class="text-sm">No internal services deployed yet (no runnable services).</p>
-            </div>
-          }
-
-          <!-- Servers Table -->
-          @if (s.servers.length > 0) {
-            <div class="mb-8">
-              <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Host Servers</h3>
-              <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
-                <table class="w-full text-left border-collapse">
-                  <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase">
-                    <tr>
-                      <th class="p-3 font-semibold">Hostname</th>
-                      <th class="p-3 font-semibold">IP Address</th>
-                      <th class="p-3 font-semibold">OS</th>
-                      <th class="p-3 font-semibold">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (server of s.servers; track server.id) {
-                      <tr class="border-t border-[rgb(var(--color-border-muted))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
-                        [class.opacity-50]="!server.activeFlag">
-                        <td class="p-3 text-sm font-medium text-[rgb(var(--color-text-base))]">{{ server.hostname }}</td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono">{{ server.ipAddress || '—' }}</td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))]">{{ server.os || '—' }}</td>
-                        <td class="p-3">
-                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
-                            [class.bg-green-500/10]="server.status === 'ONLINE'"
-                            [class.text-green-600]="server.status === 'ONLINE'"
-                            [class.bg-red-500/10]="server.status === 'OFFLINE'"
-                            [class.text-red-500]="server.status === 'OFFLINE'"
-                            [class.bg-yellow-500/10]="server.status === 'MAINTENANCE'"
-                            [class.text-yellow-600]="server.status === 'MAINTENANCE'"
-                            [class.bg-gray-500/10]="server.status !== 'ONLINE' && server.status !== 'OFFLINE' && server.status !== 'MAINTENANCE'"
-                            [class.text-gray-500]="server.status !== 'ONLINE' && server.status !== 'OFFLINE' && server.status !== 'MAINTENANCE'"
-                          >
-                            <span class="w-1.5 h-1.5 rounded-full"
-                              [class.bg-green-500]="server.status === 'ONLINE'"
-                              [class.bg-red-500]="server.status === 'OFFLINE'"
-                              [class.bg-yellow-500]="server.status === 'MAINTENANCE'"
-                              [class.bg-gray-400]="server.status !== 'ONLINE' && server.status !== 'OFFLINE' && server.status !== 'MAINTENANCE'"
-                            ></span>
-                            {{ server.status }}
-                          </span>
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          } @else {
-            <div class="p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
-              <p class="text-sm">No host servers registered in terrain.</p>
-            </div>
-          }
-
-          <!-- Empty state when no data at all -->
-          @if (s.mcpServers.length === 0 && s.runnableServices.length === 0 && s.servers.length === 0) {
-            <div class="flex flex-col items-center justify-center py-16 text-center">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-[rgb(var(--color-text-muted))] opacity-30 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75" />
-              </svg>
-              <h3 class="text-lg font-medium text-[rgb(var(--color-text-muted))] mb-1">No Services Registered</h3>
-              <p class="text-sm text-[rgb(var(--color-text-muted))] max-w-md">
-                The terrain server is online but has no internal services, third-party dependencies, or host servers registered yet.
-              </p>
-            </div>
-          }
-
-          <!-- ── HTTP Service Health Monitor (transplanted from nebula-ui) ── -->
-          <app-service-poll-monitor />
+          </div>
         }
       </div>
 
-      <!-- Footer with refresh button and auto-refresh controls -->
+      <!-- Footer -->
       @if (!loading() && !error()) {
         <div class="flex-shrink-0 flex items-center justify-between px-6 py-3 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
-          <!-- Auto-refresh toggle -->
+          <div class="flex items-center gap-3 text-[11px] text-[rgb(var(--color-text-muted))]">
+            <span>SSE: <span class="font-medium" [class.text-green-500]="connected()" [class.text-red-500]="!connected()">{{ connected() ? 'Connected' : 'Disconnected' }}</span></span>
+            <span>·</span>
+            <span>Services: <span class="font-medium">{{ totalCount() }}</span></span>
+            <span>·</span>
+            <span>Clients: <span class="font-medium">{{ sseClients().length }}</span></span>
+          </div>
           <div class="flex items-center gap-2">
             <button
-              (click)="toggleAutoRefresh()"
-              class="inline-flex items-center gap-1.5 text-[11px] rounded-md transition-colors px-2 py-1"
-              [class.text-green-500]="autoRefresh()"
-              [class.bg-green-500/10]="autoRefresh()"
-              [class.text-[rgb(var(--color-text-muted))]]="!autoRefresh()"
-              [class.bg-[rgb(var(--color-surface-hover))]]="!autoRefresh()"
-              title="Toggle auto-refresh"
+              (click)="reconnect()"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] rounded-md transition-colors"
             >
-              <span class="relative flex h-2 w-2" [class.animate-pulse]="autoRefresh()">
-                <span class="absolute inline-flex h-full w-full rounded-full opacity-75"
-                  [class.bg-green-500]="autoRefresh()"
-                  [class.bg-gray-400]="!autoRefresh()"
-                ></span>
-                <span class="relative inline-flex rounded-full h-2 w-2"
-                  [class.bg-green-500]="autoRefresh()"
-                  [class.bg-gray-400]="!autoRefresh()"
-                ></span>
-              </span>
-              @if (autoRefresh()) {
-                <span>Auto {{ nextRefreshIn() }}s</span>
-              } @else {
-                <span>Auto off</span>
-              }
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10.899 12.101A7.002 7.002 0 012.399 8.567a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101z" clip-rule="evenodd" />
+              </svg>
+              Reconnect
             </button>
           </div>
-          <button
-            (click)="refresh()"
-            class="inline-flex items-center gap-2 px-3 py-1.5 text-xs text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] rounded-md transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10.899 12.101A7.002 7.002 0 012.399 8.567a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101z" clip-rule="evenodd" />
-            </svg>
-            Refresh now
-          </button>
         </div>
       }
     </div>
   `,
 })
 export class SystemHealthComponent implements OnDestroy {
-  private terrainService = inject(TerrainService);
+  private statusService = inject(RegistryStatusService);
 
-  /** Base URL of the terrain server (e.g. http://localhost:8084) */
+  /** Base URL of the service-registry (e.g. http://localhost:8085) */
   baseUrl = input.required<string>();
 
+  /** SSE connection state from the service */
+  connected = this.statusService.connected;
+  /** Error from the service */
+  error = this.statusService.error;
+
+  /** All service statuses from the service */
+  private serviceStatuses = this.statusService.serviceStatuses;
+  /** Transition timeline */
+  transitions = this.statusService.transitions;
+  /** Heartbeat feed */
+  recentHeartbeats = this.statusService.recentHeartbeats;
+  /** Connected SSE clients */
+  sseClients = this.statusService.sseClients;
+  /** Last snapshot timestamp */
+  lastSnapshotAt = this.statusService.lastSnapshotAt;
+
+  /** Loading state */
   loading = signal(true);
-  error = signal(false);
-  summary = signal<TerrainHealthSummary | null>(null);
 
-  /** Number of probed services that are effectively OFFLINE */
-  countOffline = signal(0);
-  /** Number of probed services that are effectively DEGRADED */
-  countDegraded = signal(0);
-  /** True when the terrain endpoint is reachable but some services have issues */
-  hasIssues = computed(() => this.countOffline() > 0 || this.countDegraded() > 0);
+  /** Filter by health state */
+  filterType = signal<FilterType>('all');
+  /** Sort field */
+  sortField = signal<SortField>('name');
 
-  /** Auto-refresh enabled state (default: on at 12s interval) */
-  autoRefresh = signal(true);
-  private readonly AUTO_REFRESH_MS = 12_000;
-  private autoRefreshTimerId: ReturnType<typeof setInterval> | null = null;
-  /** Seconds remaining until the next auto-refresh */
-  nextRefreshIn = signal(0);
-  private countdownTimerId: ReturnType<typeof setInterval> | null = null;
+  /** Handle sort dropdown change */
+  onSortChange(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    this.sortField.set(select.value as SortField);
+  }
+
+  /** Currently expanded service (shows history) */
+  expandedService = signal<string | null>(null);
+
+  /** Service histories — loaded on expand */
+  serviceHistories = signal<Map<string, RegistryStatusEvent[]>>(new Map());
+
+  /** Computed counts */
+  totalCount = computed(() => this.serviceStatuses().size);
+  healthyCount = computed(() => this.countByState('HEALTHY'));
+  unhealthyCount = computed(() => {
+    const map = this.serviceStatuses();
+    let count = 0;
+    for (const svc of map.values()) {
+      if (svc.healthState === 'UNHEALTHY' || svc.healthState === 'OFFLINE') count++;
+    }
+    return count;
+  });
+  degradedCount = computed(() => this.countByState('DEGRADED'));
+
+  /** Filtered and sorted service list */
+  filteredServices = computed(() => {
+    const map = this.serviceStatuses();
+    const filter = this.filterType();
+    const sort = this.sortField();
+
+    let services = Array.from(map.values());
+
+    // Filter
+    if (filter !== 'all') {
+      if (filter === 'UNHEALTHY') {
+        services = services.filter(s => s.healthState === 'UNHEALTHY' || s.healthState === 'OFFLINE');
+      } else {
+        services = services.filter(s => s.healthState === filter);
+      }
+    }
+
+    // Sort
+    services.sort((a, b) => {
+      const dir = sort === 'name' ? 1 : -1; // All date-based sorts descending
+      switch (sort) {
+        case 'name':
+          return a.serviceName.localeCompare(b.serviceName) * dir;
+        case 'status': {
+          const order = ['HEALTHY', 'DEGRADED', 'UNHEALTHY', 'OFFLINE', 'UNKNOWN'];
+          const ai = order.indexOf(a.healthState);
+          const bi = order.indexOf(b.healthState);
+          return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        }
+        case 'heartbeat':
+          return ((a.lastHeartbeat || '') < (b.lastHeartbeat || '') ? 1 : -1) * dir;
+        case 'responseTime':
+          return ((a.responseTimeMs ?? Infinity) - (b.responseTimeMs ?? Infinity)) * dir;
+        default:
+          return 0;
+      }
+    });
+
+    return services;
+  });
 
   constructor() {
-    // Reactively fetch data when baseUrl changes (initial load only)
+    // Connect on init when baseUrl changes
     effect(() => {
       const url = this.baseUrl();
       if (url) {
-        this.loadData(url, true);
+        this.connect(url);
       }
     });
   }
 
-  private async loadData(baseUrl: string, showLoading = false): Promise<void> {
-    if (showLoading) {
-      this.loading.set(true);
-    }
-    this.error.set(false);
-
+  private async connect(baseUrl: string): Promise<void> {
+    this.loading.set(true);
     try {
-      const summary = await this.terrainService.getHealthSummary(baseUrl);
-      this.summary.set(summary);
-
-      // Count issues from probed services
-      let offline = 0;
-      let degraded = 0;
-      for (const mcp of summary.mcpServers) {
-        const eff = this.getEffectiveStatus(mcp);
-        if (eff === 'OFFLINE') offline++;
-        if (eff === 'DEGRADED') degraded++;
-      }
-      for (const svc of summary.runnableServices) {
-        const eff = this.getEffectiveStatus(svc);
-        if (eff === 'OFFLINE') offline++;
-        if (eff === 'DEGRADED') degraded++;
-      }
-      this.countOffline.set(offline);
-      this.countDegraded.set(degraded);
-
-      // terrainUp=false + no terrainError → terrain responded, downstream
-      // services are just offline. The banner handles this as "Degraded".
-      // terrainUp=false + terrainError → terrain is genuinely unreachable.
-      // Show the error screen so the user sees the connection problem.
-      if (!summary.terrainUp && summary.terrainError) {
-        this.error.set(true);
-      }
-    } catch (err: any) {
-      this.error.set(true);
-      this.summary.set({
-        terrainUp: false,
-        terrainError: err?.message || 'Unknown error',
-        mcpServers: [],
-        runnableServices: [],
-        servers: [],
-        loadedAt: new Date(),
-      });
-      this.countOffline.set(0);
-      this.countDegraded.set(0);
-    } finally {
+      await this.statusService.connect(baseUrl);
       this.loading.set(false);
-      // Always reschedule auto-refresh so it keeps retrying even when terrain is down
-      this.scheduleAutoRefresh();
+    } catch (e) {
+      this.loading.set(false);
     }
   }
 
-  refresh(): void {
-    this.loadData(this.baseUrl(), true);
-  }
-
-  /** Toggle auto-refresh on/off */
-  toggleAutoRefresh(): void {
-    this.autoRefresh.update(v => !v);
-    if (this.autoRefresh()) {
-      this.scheduleAutoRefresh();
-    } else {
-      this.clearAutoRefresh();
+  /** Reconnect to the SSE stream */
+  reconnect(): void {
+    const url = this.baseUrl();
+    if (url) {
+      this.connect(url);
     }
   }
 
-  /** Schedule the next auto-refresh cycle */
-  private scheduleAutoRefresh(): void {
-    this.clearAutoRefresh();
-    if (!this.autoRefresh()) return;
+  /** Toggle expanded service details (loads history) */
+  toggleExpanded(serviceName: string): void {
+    if (this.expandedService() === serviceName) {
+      this.expandedService.set(null);
+      return;
+    }
+    this.expandedService.set(serviceName);
 
-    // Reset countdown
-    this.nextRefreshIn.set(Math.round(this.AUTO_REFRESH_MS / 1000));
-
-    // Countdown every second
-    this.countdownTimerId = setInterval(() => {
-      this.nextRefreshIn.update(v => Math.max(0, v - 1));
-    }, 1000);
-
-    // Auto-refresh after interval — no loading spinner to avoid blink
-    this.autoRefreshTimerId = setTimeout(() => {
-      this.loadData(this.baseUrl(), false);
-    }, this.AUTO_REFRESH_MS);
+    // Load history if not already loaded
+    if (!this.serviceHistories().has(serviceName)) {
+      const baseUrl = this.baseUrl();
+      if (baseUrl) {
+        this.statusService.fetchServiceHistory(baseUrl, serviceName).then(events => {
+          this.serviceHistories.update(map => {
+            const updated = new Map(map);
+            updated.set(serviceName, events);
+            return updated;
+          });
+        });
+      }
+    }
   }
 
-  /** Clear all auto-refresh timers */
-  private clearAutoRefresh(): void {
-    if (this.autoRefreshTimerId !== null) {
-      clearTimeout(this.autoRefreshTimerId);
-      this.autoRefreshTimerId = null;
+  private countByState(state: HealthState): number {
+    const map = this.serviceStatuses();
+    let count = 0;
+    for (const svc of map.values()) {
+      if (svc.healthState === state) count++;
     }
-    if (this.countdownTimerId !== null) {
-      clearInterval(this.countdownTimerId);
-      this.countdownTimerId = null;
-    }
+    return count;
   }
 
   ngOnDestroy(): void {
-    this.clearAutoRefresh();
-  }
-
-  /**
-   * Get the effective status for a service item.
-   *
-   * Priority:
-   * 1. liveStatus from the live probe (ON, OFFLINE, DEGRADED) — the ground truth
-   * 2. Stored status, normalized to probe-style values (ONLINE→ON, OFFLINE→OFFLINE)
-   *
-   * This ensures probed-offline services properly show as OFFLINE (red)
-   * rather than falling through to a stale stored ONLINE status.
-   */
-  getEffectiveStatus(item: { status: string; liveStatus?: string }): string {
-    // If the probe returned a meaningful result, use it directly
-    if (item.liveStatus && item.liveStatus !== 'UNKNOWN') {
-      return item.liveStatus;
-    }
-    // Normalize stored status to probe-style values
-    if (item.status === 'ONLINE') return 'ON';
-    if (item.status === 'OFFLINE') return 'OFFLINE';
-    // Keep STARTING, ERROR, etc. as-is (they'll render gray in the template)
-    return item.status;
-  }
-
-  /** Whether the live probe ran (any meaningful result, not just ON). */
-  isLiveProbed(item: { liveStatus?: string }): boolean {
-    return !!item.liveStatus && item.liveStatus !== 'UNKNOWN';
-  }
-
-  /** Count items by effective status (liveStatus preferred). */
-  countEffective(items: { status: string; liveStatus?: string }[], status: string): number {
-    return items.filter(i => this.getEffectiveStatus(i) === status).length;
-  }
-
-  countServerByStatus(items: { status: string }[], status: string): number {
-    return items.filter(i => i.status === status).length;
+    this.statusService.disconnect();
   }
 }
