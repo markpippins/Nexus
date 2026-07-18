@@ -555,11 +555,27 @@ def process_requirement(req: dict, harness: ArchitectHarness, dry_run: bool = Fa
 
 
 def _process_simple(req: dict, ripple: dict, harness: ArchitectHarness, dry_run: bool) -> dict:
-    """Simple requirement: LLM writes plan + questions, move to InProgress."""
+    """Simple requirement: LLM writes plan + questions, move to InProgress.
+
+    Contract: only promote when the completion envelope proves inference succeeded.
+    A failed model call, rate limit, or reboot during inference creates no
+    completed evaluation — so the requirement stays ToDo and retries cleanly.
+    """
     req_id = req["id"]
     title = req.get("title", "?")
 
     result = {"requirement_id": req_id, "title": title, "action": None, "success": False}
+
+    # Emit: evaluation started
+    from event_emitter import emit_event
+    start_event_id = emit_event(
+        event_type="evaluation.started",
+        source="rover.architect_process_todo",
+        aggregate_type="requirement",
+        aggregate_id=req_id,
+        payload={"title": title, "risk_level": ripple.get("risk_level", "UNKNOWN")},
+        actor_type="agent",
+    )
 
     # Build context for the harness
     ctx = build_requirement_context(harness._conn, req)
@@ -577,6 +593,17 @@ def _process_simple(req: dict, ripple: dict, harness: ArchitectHarness, dry_run:
     response = harness.invoke_llm(prompt)
 
     if not response:
+        # Emit: evaluation failed
+        emit_event(
+            event_type="evaluation.failed",
+            source="rover.architect_process_todo",
+            aggregate_type="requirement",
+            aggregate_id=req_id,
+            payload={"reason": "LLM invocation returned None", "start_event_id": start_event_id},
+            actor_type="agent",
+            causation_id=start_event_id,
+            caused_by_event_type="evaluation.started",
+        )
         result["action"] = "LLM invocation failed"
         log.warning("  ⊘ %s", result["action"])
         return result
@@ -584,24 +611,79 @@ def _process_simple(req: dict, ripple: dict, harness: ArchitectHarness, dry_run:
     # Parse and persist plans + questions
     lr = harness.handle_response(response, full_context)
 
-    # Move to InProgress
+    # Gate: check completion envelope — only promote if inference succeeded
+    plans_written = lr.get("plans_written", 0)
+    envelope = lr.get("completion_envelope")
+
+    if plans_written == 0 or not envelope:
+        # Emit: evaluation failed (no completion evidence)
+        emit_event(
+            event_type="evaluation.failed",
+            source="rover.architect_process_todo",
+            aggregate_type="requirement",
+            aggregate_id=req_id,
+            payload={
+                "reason": "No completion envelope",
+                "plans_written": plans_written,
+                "error": lr.get("error"),
+                "start_event_id": start_event_id,
+            },
+            actor_type="agent",
+            causation_id=start_event_id,
+            caused_by_event_type="evaluation.started",
+        )
+        result["action"] = f"failed — no completion evidence (plans={plans_written})"
+        log.warning("  ⊘ %s", result["action"])
+        return result
+
+    # Emit: evaluation completed
+    emit_event(
+        event_type="evaluation.completed",
+        source="rover.architect_process_todo",
+        aggregate_type="requirement",
+        aggregate_id=req_id,
+        payload={
+            "plans_written": plans_written,
+            "questions_created": lr.get("questions_created", 0),
+            "envelope": envelope,
+        },
+        actor_type="agent",
+        causation_id=start_event_id,
+        caused_by_event_type="evaluation.started",
+    )
+
+    # Move to InProgress — we have completion evidence
     update_status(req_id, "InProgress", dry_run)
 
-    plans = lr.get("plans_written", 0)
     questions = lr.get("questions_created", 0)
-    result["action"] = f"simple → InProgress (plans={plans}, questions={questions})"
+    result["action"] = f"simple → InProgress (plans={plans_written}, questions={questions})"
     result["success"] = True
     log.info("  ✓ %s", result["action"])
     return result
 
 
 def _process_complex(req: dict, ripple: dict, harness: ArchitectHarness, dry_run: bool) -> dict:
-    """Complex requirement: LLM decomposes + writes plans, gate on questions."""
+    """Complex requirement: LLM decomposes + writes plans.
+
+    Parent-child rollup: parent only advances when ALL children have
+    completion envelopes (proof that inference succeeded for each child).
+    """
     req_id = req["id"]
     title = req.get("title", "?")
 
     result = {"requirement_id": req_id, "title": title, "action": None, "success": False,
               "children": []}
+
+    # Emit: decomposition started
+    from event_emitter import emit_event
+    start_event_id = emit_event(
+        event_type="decomposition.started",
+        source="rover.architect_process_todo",
+        aggregate_type="requirement",
+        aggregate_id=req_id,
+        payload={"title": title, "risk_level": ripple.get("risk_level", "UNKNOWN")},
+        actor_type="agent",
+    )
 
     # Build context for decomposition prompt
     ctx = build_requirement_context(harness._conn, req)
@@ -619,6 +701,16 @@ def _process_complex(req: dict, ripple: dict, harness: ArchitectHarness, dry_run
 
     decomp_response = harness.invoke_llm(decomp_prompt)
     if not decomp_response:
+        emit_event(
+            event_type="decomposition.failed",
+            source="rover.architect_process_todo",
+            aggregate_type="requirement",
+            aggregate_id=req_id,
+            payload={"reason": "LLM invocation returned None", "start_event_id": start_event_id},
+            actor_type="agent",
+            causation_id=start_event_id,
+            caused_by_event_type="decomposition.started",
+        )
         result["action"] = "decomposition LLM failed"
         log.warning("  ⊘ %s", result["action"])
         return result
@@ -626,6 +718,16 @@ def _process_complex(req: dict, ripple: dict, harness: ArchitectHarness, dry_run
     # Parse decomposition
     children = _parse_decomposition(decomp_response, req)
     if not children:
+        emit_event(
+            event_type="decomposition.failed",
+            source="rover.architect_process_todo",
+            aggregate_type="requirement",
+            aggregate_id=req_id,
+            payload={"reason": "No children parsed from LLM response", "start_event_id": start_event_id},
+            actor_type="agent",
+            causation_id=start_event_id,
+            caused_by_event_type="decomposition.started",
+        )
         result["action"] = "decomposition produced no children"
         log.warning("  ⊘ %s", result["action"])
         return result
@@ -639,19 +741,109 @@ def _process_complex(req: dict, ripple: dict, harness: ArchitectHarness, dry_run
 
     result["children"] = children
 
-    # Write plan for each child using the harness
+    emit_event(
+        event_type="decomposition.completed",
+        source="rover.architect_process_todo",
+        aggregate_type="requirement",
+        aggregate_id=req_id,
+        payload={"child_count": len(children), "child_ids": [c["id"] for c in children]},
+        actor_type="agent",
+        causation_id=start_event_id,
+        caused_by_event_type="decomposition.started",
+    )
+
+    # Write plan for each child using the harness — track completion envelopes
     all_plans = 0
     all_questions = 0
+    children_with_envelopes = 0
+    children_failed = 0
+
     for child in children:
+        child_id = child["id"]
+        child_title = child.get("title", "?")
+
+        # Emit: child evaluation started
+        child_start = emit_event(
+            event_type="evaluation.started",
+            source="rover.architect_process_todo",
+            aggregate_type="requirement",
+            aggregate_id=child_id,
+            payload={"title": child_title, "parent_id": req_id},
+            actor_type="agent",
+        )
+
         child_ctx = build_requirement_context(harness._conn, child)
         child_full = {"requirements": [child_ctx]}
 
         prompt = harness.build_prompt(child_full)
         response = harness.invoke_llm(prompt)
-        if response:
-            lr = harness.handle_response(response, child_full)
-            all_plans += lr.get("plans_written", 0)
-            all_questions += lr.get("questions_created", 0)
+
+        if not response:
+            emit_event(
+                event_type="evaluation.failed",
+                source="rover.architect_process_todo",
+                aggregate_type="requirement",
+                aggregate_id=child_id,
+                payload={"reason": "LLM invocation returned None", "parent_id": req_id, "start_event_id": child_start},
+                actor_type="agent",
+                causation_id=child_start,
+                caused_by_event_type="evaluation.started",
+            )
+            children_failed += 1
+            continue
+
+        lr = harness.handle_response(response, child_full)
+        plans = lr.get("plans_written", 0)
+        questions = lr.get("questions_created", 0)
+        envelope = lr.get("completion_envelope")
+
+        all_plans += plans
+        all_questions += questions
+
+        if plans > 0 and envelope:
+            children_with_envelopes += 1
+            emit_event(
+                event_type="evaluation.completed",
+                source="rover.architect_process_todo",
+                aggregate_type="requirement",
+                aggregate_id=child_id,
+                payload={
+                    "plans_written": plans,
+                    "questions_created": questions,
+                    "envelope": envelope,
+                    "parent_id": req_id,
+                },
+                actor_type="agent",
+                causation_id=child_start,
+                caused_by_event_type="evaluation.started",
+            )
+        else:
+            children_failed += 1
+            emit_event(
+                event_type="evaluation.failed",
+                source="rover.architect_process_todo",
+                aggregate_type="requirement",
+                aggregate_id=child_id,
+                payload={
+                    "reason": "No completion envelope",
+                    "plans_written": plans,
+                    "error": lr.get("error"),
+                    "parent_id": req_id,
+                    "start_event_id": child_start,
+                },
+                actor_type="agent",
+                causation_id=child_start,
+                caused_by_event_type="evaluation.started",
+            )
+
+    # Parent-child rollup: only advance when ALL children have completion envelopes
+    if children_failed > 0:
+        result["action"] = (
+            f"complex → decomposed ({len(children)} children) but "
+            f"{children_failed} child(ren) lack completion envelopes"
+        )
+        log.info("  ⊘ %s", result["action"])
+        return result
 
     # Gate: check if all children have no blocking questions
     blocking = count_blocking_questions(req_id)
@@ -663,14 +855,15 @@ def _process_complex(req: dict, ripple: dict, harness: ArchitectHarness, dry_run
         log.info("  ⊘ %s", result["action"])
         return result
 
-    # Move parent + children to InProgress
+    # All children have completion envelopes + no blocking questions — advance
     update_status(req_id, "InProgress", dry_run)
     for child in children:
         update_status(child["id"], "InProgress", dry_run)
 
     result["action"] = (
         f"complex → InProgress ({len(children)} children, "
-        f"{all_plans} plans, {all_questions} questions)"
+        f"{all_plans} plans, {all_questions} questions, "
+        f"{children_with_envelopes}/{len(children)} envelopes)"
     )
     result["success"] = True
     log.info("  ✓ %s", result["action"])

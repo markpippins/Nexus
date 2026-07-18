@@ -222,11 +222,20 @@ class ArchitectHarness(Harness):
         return "\n".join(parts)
 
     def handle_response(self, response: str, context: dict) -> dict:
-        """Parse LLM response and persist results to DB."""
+        """Parse LLM response and persist results to DB.
+
+        Returns a result dict with plans_written, questions_created, and
+        the completion envelope that proves inference succeeded.
+        """
         # Try to extract JSON from response
         parsed = self._extract_json(response)
         if not parsed:
-            return {"error": "Could not parse LLM response as JSON"}
+            return {
+                "plans_written": 0,
+                "questions_created": 0,
+                "completion_envelope": None,
+                "error": "Could not parse LLM response as JSON",
+            }
 
         plans = parsed.get("plans", [])
         questions = parsed.get("questions", [])
@@ -256,6 +265,15 @@ class ArchitectHarness(Harness):
                 result["questions_created"] += 1
             except Exception as e:
                 log.error("Failed to write question for %s: %s", req_id[:8], e)
+
+        # Build completion envelope — the proof that inference succeeded
+        result["completion_envelope"] = {
+            "evaluation_status": "COMPLETED",
+            "evaluated_by": f"architect-{self.preferred_model.model_name}" if self.preferred_model else "architect-unknown",
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "open_question_count": result["questions_created"],
+            "plans_written": result["plans_written"],
+        }
 
         return result
 
@@ -288,7 +306,11 @@ class ArchitectHarness(Harness):
         return None
 
     def _write_plan(self, req_id: str, plan: dict, context: dict):
-        """Write an implementation plan to the database."""
+        """Write an implementation plan to the database.
+
+        The plan metadata includes a completion envelope that proves
+        inference succeeded. Cron checks this before promoting.
+        """
         cur = self._conn.cursor()
 
         # Check if plan already exists
@@ -304,6 +326,20 @@ class ArchitectHarness(Harness):
 
         now = datetime.now(timezone.utc).isoformat()
         plan_id = f"plan-{req_id[:8]}"
+
+        # Completion envelope: proof that inference completed successfully
+        envelope = {
+            "evaluation_status": "COMPLETED",
+            "evaluated_by": f"architect-{self.preferred_model.model_name}" if self.preferred_model else "architect-unknown",
+            "completed_at": now,
+            "model": self.preferred_model.model_identifier if self.preferred_model else "unknown",
+        }
+
+        metadata = {
+            "source": "architect_harness",
+            "model": self.preferred_model.model_name if self.preferred_model else "unknown",
+            "completion_envelope": envelope,
+        }
 
         cur.execute("""
             INSERT INTO nebula.implementation_plans
@@ -323,13 +359,13 @@ class ArchitectHarness(Harness):
             plan.get("files_affected", []),
             json.dumps(plan.get("acceptance_criteria", [])),
             ["architect-generated"],
-            json.dumps({"source": "architect_harness", "model": self.preferred_model.model_name if self.preferred_model else "unknown"}),
+            json.dumps(metadata),
             now, now,
         ))
 
         self._conn.commit()
         cur.close()
-        log.info("Plan written for %s", req_id[:8])
+        log.info("Plan written for %s (envelope: COMPLETED)", req_id[:8])
 
     def _write_question(self, req_id: str, question: dict):
         """Write an open question to the database."""
