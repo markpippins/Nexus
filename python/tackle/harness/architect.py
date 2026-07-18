@@ -8,18 +8,16 @@ The architect harness:
 5. Persists results to the database
 
 Usage:
-    from harness import ArchitectHarness
+    from tackle.harness import ArchitectHarness
     import psycopg2
 
     conn = psycopg2.connect("postgresql://pguser:pgpass@localhost:5432/nexus")
-    harness = ArchitectHarness()
-    harness.connect(conn)
+    harness = ArchitectHarness(conn)
     result = harness.run_cycle(limit=10)
 """
 
 import json
 import logging
-import subprocess
 from datetime import datetime, timezone
 from typing import Any
 
@@ -169,8 +167,23 @@ class ArchitectHarness(Harness):
     4. Persists results to DB
     """
 
-    def __init__(self):
+    def __init__(self, conn: psycopg2.extensions.connection, dsn: str = "postgresql://pguser:pgpass@localhost:5432/nexus"):
         super().__init__(role="architect")
+        self._conn = conn
+        self._dsn = dsn
+
+    def _ensure_connection(self):
+        """Reconnect if the connection was closed during an LLM call."""
+        try:
+            if self._conn.closed:
+                raise psycopg2.OperationalError("connection closed")
+            # Quick ping
+            cur = self._conn.cursor()
+            cur.execute("SELECT 1")
+            cur.close()
+        except Exception:
+            log.info("Reconnecting to database...")
+            self._conn = psycopg2.connect(self._dsn)
 
     def build_prompt(self, context: dict) -> str:
         """Build the LLM prompt from requirement contexts."""
@@ -311,6 +324,7 @@ class ArchitectHarness(Harness):
         The plan metadata includes a completion envelope that proves
         inference succeeded. Cron checks this before promoting.
         """
+        self._ensure_connection()
         cur = self._conn.cursor()
 
         # Check if plan already exists
@@ -369,6 +383,7 @@ class ArchitectHarness(Harness):
 
     def _write_question(self, req_id: str, question: dict):
         """Write an open question to the database."""
+        self._ensure_connection()
         cur = self._conn.cursor()
 
         # Idempotent check
@@ -402,9 +417,7 @@ class ArchitectHarness(Harness):
 
     def check_for_work(self, limit: int = 50) -> list[dict]:
         """Deterministic check for ToDo requirements. No LLM needed."""
-        if not self._conn:
-            raise RuntimeError("Harness not connected")
-
+        self._ensure_connection()
         return fetch_todo_requirements(self._conn, limit)
 
     def run_cycle(self, limit: int = 50, dry_run: bool = False) -> dict:
@@ -444,11 +457,11 @@ class ArchitectHarness(Harness):
             log.info("[DRY RUN] Would invoke LLM")
             return {"processed": len(contexts), "dry_run": True}
 
-        if not self._models:
-            self.load_models()
+        if not self.preferred_model:
+            self.load_model_info()
 
-        if not self._models:
-            log.error("No models configured — cannot run LLM")
+        if not self.preferred_model:
+            log.error("No model configured — cannot run LLM")
             return {"processed": 0, "error": "no models"}
 
         # 4. Invoke LLM

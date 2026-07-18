@@ -27,13 +27,18 @@ import json
 import logging
 import subprocess
 import sys
+import os
+
+# Add parent directory to path so tackle.harness is importable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 import uuid as uuidlib
 from datetime import datetime, timezone
 
 import psycopg2
 
-from harness import ArchitectHarness
-from harness.architect import build_requirement_context
+from tackle.harness import ArchitectHarness
+from tackle.harness.architect import build_requirement_context
 
 log = logging.getLogger("architect")
 
@@ -46,9 +51,12 @@ logging.basicConfig(
 )
 
 
+PG_DSN = "postgresql://pguser:pgpass@localhost:5432/nexus"
+
+
 def get_pg_connection():
-    """Create a psycopg2 connection for the harness."""
-    return psycopg2.connect("postgresql://pguser:pgpass@localhost:5432/nexus")
+    """Create a psycopg2 connection for the harness with keepalive."""
+    return psycopg2.connect(PG_DSN)
 
 
 def psql(sql: str, timeout: int = 30) -> tuple[int, str, str]:
@@ -892,9 +900,8 @@ def main():
 
     # Connect harness for LLM calls
     pg_conn = get_pg_connection()
-    harness = ArchitectHarness()
-    harness.connect(pg_conn)
-    harness.load_models()
+    harness = ArchitectHarness(pg_conn, dsn=PG_DSN)
+    harness.load_model_info()
 
     if not harness.preferred_model:
         log.error("No model configured for architect — cannot run LLM")
