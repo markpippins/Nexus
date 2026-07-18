@@ -110,7 +110,8 @@ class Harness:
         """Process LLM response. Must be overridden."""
         raise NotImplementedError("Subclass must implement handle_response()")
 
-    def invoke_llm(self, prompt: str, system_prompt: str | None = None) -> str | None:
+    def invoke_llm(self, prompt: str, system_prompt: str | None = None,
+                   max_tokens: int = 8192) -> str | None:
         """Invoke the LLM via tackle.inference.
 
         Calls the provider API directly (OpenAI, Google, Anthropic, Ollama)
@@ -132,6 +133,7 @@ class Harness:
                 role=self.role,
                 system_prompt=system_prompt,
                 fallback=True,
+                max_tokens=max_tokens,
             )
             if response:
                 log.info("LLM response: %d chars", len(response))

@@ -8,5 +8,12 @@ The harness provides a reusable abstraction for:
 
 from .base import Harness, ModelConfig, resolve_role_model
 from .architect import ArchitectHarness
+from .extractor import ExtractorHarness
 
-__all__ = ["Harness", "ModelConfig", "resolve_role_model", "ArchitectHarness"]
+__all__ = [
+    "Harness",
+    "ModelConfig",
+    "resolve_role_model",
+    "ArchitectHarness",
+    "ExtracterHarness",
+]
