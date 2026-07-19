@@ -44,7 +44,8 @@ ALL_SERVICES=(
     "address-tts.service"      # port 8600 — speech synthesis
     "address-tts-mcp.service"  # port 3105 — TTS MCP
 
-    # MCP servers
+    # Operator + MCP servers
+    "operator-svc.service"     # port 3018 — Operator host personality
     "conduit-mcp.service"      # port 3100 — work request orchestration
     "nebula-mcp-sse.service"   # port 3102 — Nebula MCP SSE
     "nebula-mcp.service"       # stdio  — Nebula MCP (on-demand; clients spawn independently)
@@ -79,6 +80,7 @@ SERVICE_PORTS=(
     # nebula-mcp.service — stdio, on-demand (no port)
     # terrain-mcp.service — stdio, on-demand (no port)
     ["tackle-mcp.service"]="3400"
+    ["operator-svc.service"]="3018"
     ["cpf-api.service"]="3108"
 )
 

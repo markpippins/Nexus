@@ -74,5 +74,20 @@
     "startup": "npx tsx src/index.ts",
     "health": "/health",
     "isInternal": true
+  },
+  {
+    "name": "operator-svc",
+    "port": 3018,
+    "workspacePath": "nexus/python/operator_svc",
+    "serviceTypeId": 12,
+    "healthCheckUrl": "http://localhost:3018/chat/health",
+    "status": "ONLINE",
+    "version": "0.1.0",
+    "description": "Operator service — host personality for Nexus UIs. Direct provider API calls via tackle.inference, conversation history in PostgreSQL.",
+    "activeFlag": true,
+    "startup": "systemd: systemctl --user start operator-svc.service",
+    "health": "curl -sf http://localhost:3018/chat/health && echo ONLINE || echo OFFLINE",
+    "isInternal": true,
+    "notes": "Port 3018. POST /chat returns LLM response directly. GET /chat/stream/<id> for SSE streaming. POST /api/proxy/<service> for conduit/nebula/terrain proxy."
   }
 ]

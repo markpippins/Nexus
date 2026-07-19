@@ -50,23 +50,18 @@ export class MessageBoxService {
   private cachedChatUrl: string | null = null;
 
   constructor() {
-    this.open("Assistant");
+    this.open("Operator");
   }
 
   /** Fetch the chat server URL, caching the result for subsequent calls. */
   private async getChatUrl(): Promise<string> {
     if (this.cachedChatUrl) return this.cachedChatUrl;
-    let url = "http://localhost:3017";
-    try {
-      const configRes = await fetch("/chat/config");
-      const config = await configRes.json();
-      url = config.agentChatUrl || url;
-    } catch { /* fallback */ }
-    this.cachedChatUrl = url;
-    return url;
+    // Operator service handles chat directly — no more conduit-mcp proxy
+    this.cachedChatUrl = "http://localhost:3018";
+    return this.cachedChatUrl;
   }
 
-  open(title = "Assistant"): string {
+  open(title = "Operator"): string {
     const id = `mbox-${++this.idCounter}`;
     const width = DEFAULT_WIDTH;
     const instance: MessageBoxInstance = {
@@ -165,8 +160,8 @@ export class MessageBoxService {
     try {
       const chatUrl = await this.getChatUrl();
 
-      // Send the message via the MCP proxy.
-      const chatRes = await fetch("/chat/send", {
+      // Send the message directly to the operator service.
+      const chatRes = await fetch(`${chatUrl}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -179,60 +174,17 @@ export class MessageBoxService {
         throw new Error(`Chat server returned ${chatRes.status}`);
       }
       const chatData = await chatRes.json();
-      const sessionId: string = chatData.session_id;
-      if (!sessionId) {
-        throw new Error(chatData.error || "No session_id returned");
-      }
 
-      // Stream the agent's response via SSE.
-      const streamUrl = `${chatUrl}/chat/stream/${sessionId}`;
-      let streamBuffer = "";
-
-      const response = await fetch(streamUrl);
-      if (!response.ok) {
-        throw new Error(`Stream error: ${response.status}`);
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
-
-      const decoder = new TextDecoder("utf-8");
-      let done = false;
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        if (readerDone) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        streamBuffer += chunk;
-
-        const lines = streamBuffer.split("\n");
-        streamBuffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6).trim();
-          if (!payload) continue;
-
-          try {
-            const event = JSON.parse(payload);
-            if (event.type === "line" && event.text) {
-              let text = this.stripAnsi(event.text);
-              // Filter opencode log lines.
-              const isLogLine = /^[A-Z]+ +\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(text);
-              if (isLogLine) continue;
-              this.appendStreamContent(id, text + "\n");
-            } else if (event.type === "error") {
-              this.appendStreamContent(id, `\n[Error: ${event.text}]\n`);
-            } else if (event.type === "done") {
-              done = true;
-            } else if (event.type === "close") {
-              done = true;
-            }
-          } catch {
-            // malformed event — skip
-          }
+      // POST now waits for the LLM response and returns it directly.
+      const responseText: string = chatData.response || "";
+      if (responseText) {
+        let text = this.stripAnsi(responseText);
+        const isLogLine = /^[A-Z]+ +\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(text);
+        if (!isLogLine) {
+          this.appendStreamContent(id, text + "\n");
         }
+      } else if (chatData.error) {
+        this.appendStreamContent(id, `\n[Error: ${chatData.error}]\n`);
       }
     } catch (err: any) {
       this.appendStreamContent(id, `\n[Connection error: ${err.message}]\n`);

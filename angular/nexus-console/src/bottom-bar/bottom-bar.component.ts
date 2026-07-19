@@ -34,7 +34,7 @@ export class BottomBarComponent {
 
   /** Open a new chat messagebox instance */
   openNewChat(): void {
-    this.mbox.open('Assistant');
+    this.mbox.open('Operator');
   }
 
   /** Emit aiconfigClick event */
