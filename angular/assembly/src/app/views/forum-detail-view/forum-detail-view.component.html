@@ -1,0 +1,43 @@
+<div class="max-w-5xl mx-auto">
+  <app-table-skeleton *ngIf="loading()" [cols]="3" [rows]="6"></app-table-skeleton>
+
+  <app-error-state *ngIf="error() && !loading()" title="Failed to load forum" [description]="error()!" (retry)="retry()"></app-error-state>
+
+  <ng-container *ngIf="!loading() && !error() && forum()">
+    <app-page-header [title]="forum()!.name" [description]="forum()!.description" [count]="threads().length"></app-page-header>
+
+    <app-empty-state *ngIf="threads().length === 0" title="No threads" description="Threads will appear here once they are created."></app-empty-state>
+
+    <div *ngIf="threads().length > 0" class="app-panel overflow-hidden">
+      <div class="overflow-x-auto">
+      <table class="app-table">
+        <thead>
+          <tr>
+            <th>Topic</th>
+            <th class="w-24 text-center">Replies</th>
+            <th class="w-40 text-right">Last Activity</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let thread of threads()">
+            <td>
+              <div class="flex items-center gap-3">
+                <app-avatar [name]="thread.author.name" [size]="32"></app-avatar>
+                <div class="min-w-0">
+                  <a [routerLink]="['/forums', forum()!.slug, thread.id]" class="app-link font-medium">{{ thread.title }}</a>
+                  <div class="text-xs text-gray-400 mt-0.5">by {{ thread.author.name }} on {{ formatDate(thread.createdAt) }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="text-center text-sm text-gray-500 dark:text-gray-400">{{ thread.replyCount }}</td>
+            <td class="text-right text-xs text-gray-400">
+              <app-time-ago *ngIf="thread.lastReplyAt" [date]="thread.lastReplyAt"></app-time-ago>
+              <span *ngIf="!thread.lastReplyAt">—</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </ng-container>
+</div>

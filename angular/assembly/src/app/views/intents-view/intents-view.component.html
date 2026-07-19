@@ -1,0 +1,37 @@
+<div class="max-w-6xl mx-auto">
+  <app-page-header title="Intent Records" description="Pre-canonical intent captures promoted from harvest candidates." [count]="total()"></app-page-header>
+
+  <app-table-skeleton *ngIf="loading()" [cols]="4" [rows]="6"></app-table-skeleton>
+
+  <app-error-state *ngIf="error() && !loading()" title="Failed to load intents" [description]="error()!" (retry)="retry()"></app-error-state>
+
+  <ng-container *ngIf="!loading() && !error()">
+    <app-empty-state *ngIf="items().length === 0" title="No intent records" description="Intent records will appear here once they are promoted from candidates."></app-empty-state>
+
+    <div *ngIf="items().length > 0" class="app-panel">
+      <div class="overflow-x-auto">
+      <table class="app-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th class="w-28">Status</th>
+          <th class="w-32">Created</th>
+          <th class="w-28 text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of items()">
+          <td>
+            <a [routerLink]="['/intents', item.id]" class="app-link">{{ item.title || 'Untitled' }}</a>
+            <div class="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{{ item.description || 'No description' }}</div>
+          </td>
+          <td><app-status-badge [status]="item.status || 'unknown'"></app-status-badge></td>
+          <td class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(item.createdAt) }}</td>
+          <td class="text-right"><app-raise-question objectType="intent_record" [objectId]="item.id" [objectTitle]="item.title || 'Untitled'"></app-raise-question></td>
+        </tr>
+      </tbody>
+      </table>
+    </div>
+    </div>
+  </ng-container>
+</div>

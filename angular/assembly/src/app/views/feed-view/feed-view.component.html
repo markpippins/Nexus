@@ -1,0 +1,50 @@
+<div class="max-w-5xl mx-auto">
+  <app-page-header title="Feed" description="Latest posts across Assembly." [count]="posts().length"></app-page-header>
+
+  <app-create-post (posted)="retry()"></app-create-post>
+
+  <div *ngIf="loading()" class="space-y-3">
+    <div *ngFor="let _ of [1,2,3]" class="app-panel p-4">
+      <div class="flex items-start gap-3">
+        <app-skeleton width="2rem" height="2rem" [circle]="true"></app-skeleton>
+        <div class="flex-1 space-y-2">
+          <app-skeleton width="30%" height="0.75rem"></app-skeleton>
+          <app-skeleton width="80%" height="0.875rem"></app-skeleton>
+          <app-skeleton width="60%" height="0.875rem"></app-skeleton>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <app-error-state *ngIf="error() && !loading()" title="Failed to load feed" [description]="error()!" (retry)="retry()"></app-error-state>
+
+  <ng-container *ngIf="!loading() && !error()">
+    <app-empty-state *ngIf="posts().length === 0" title="No posts" description="Posts will appear here once they are created."></app-empty-state>
+
+    <div class="space-y-3" *ngIf="posts().length > 0">
+      <div *ngFor="let post of posts()" class="app-panel p-4 hover:shadow-soft transition-all duration-150">
+        <div class="flex items-start gap-3">
+          <app-avatar [name]="post.author.name" [size]="32"></app-avatar>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ post.author.name }}</span>
+              <app-time-ago [date]="post.createdAt" class="text-xs text-gray-400"></app-time-ago>
+              <a *ngIf="post.forum" [routerLink]="['/forums', post.forum.slug]" class="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full hover:bg-primary-50 hover:text-primary-700 transition-colors">{{ post.forum!.name }}</a>
+            </div>
+            <h3 *ngIf="post.title" class="text-sm font-medium text-gray-800 mt-1">{{ post.title }}</h3>
+            <div class="mt-1 line-clamp-3">
+              <app-markdown-renderer [content]="post.content"></app-markdown-renderer>
+            </div>
+            <div class="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+              <a [routerLink]="post.forum ? ['/forums', post.forum.slug, post.id] : ['/forums']" class="flex items-center gap-1 hover:text-primary-700 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8M8 14h8M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                {{ post.comments }} comments
+              </a>
+              <app-raise-question objectType="post" [objectId]="post.id" [objectTitle]="post.title || 'Feed post'"></app-raise-question>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>
