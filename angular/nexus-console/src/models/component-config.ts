@@ -41,11 +41,11 @@ export const INITIAL_REGISTRY: ComponentConfig[] = [
         id: 'sys-rest',
         type: 'rest-api',
         name: 'REST API Service',
-        geometry: 'tall-cylinder',
-        defaultColor: 0x0ea5e9, // Sky 500
+        geometry: 'dodecahedron',
+        defaultColor: 0x6366f1, // Indigo 500
         scale: 2,
-        iconClass: 'rounded-sm',
-        colorClass: 'bg-sky-500',
+        iconClass: 'rounded-md',
+        colorClass: 'bg-indigo-500',
         isSystem: true
     },
     {
@@ -68,6 +68,17 @@ export const INITIAL_REGISTRY: ComponentConfig[] = [
         scale: 1.5,
         iconClass: 'rounded-sm',
         colorClass: 'bg-teal-600',
+        isSystem: true
+    },
+    {
+        id: 'sys-mcp',
+        type: 'mcp-server',
+        name: 'MCP Server',
+        geometry: 'cone',
+        defaultColor: 0x00bc44, // Green 500
+        scale: 2,
+        iconClass: 'rounded-full',
+        colorClass: 'bg-green-500',
         isSystem: true
     },
     {

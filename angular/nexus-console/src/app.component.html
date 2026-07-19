@@ -747,6 +747,12 @@
     (close)="isCreateUserDialogOpen.set(false)"
   ></app-create-user-dialog>
 
+  <app-load-view-dialog
+    [isOpen]="isLoadViewDialogOpen()"
+    (close)="closeLoadViewDialog()"
+    (viewSelected)="onLoadViewSelected($event)"
+  ></app-load-view-dialog>
+
   @if (isDeleteGatewayConfirmOpen()) {
     <app-confirm-dialog
       title="Delete Gateway"

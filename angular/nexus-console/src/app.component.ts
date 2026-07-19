@@ -60,6 +60,7 @@ import { CreateUserDialogComponent } from './components/create-user/create-user-
 import { PlatformManagementComponent } from './components/platform-management/platform-management.component.js';
 import { ServiceMeshService } from './services/service-mesh.service.js';
 import { ArchitectureVizService } from './services/architecture-viz.service.js';
+import { AtlasService } from './services/atlas.service.js';
 import { ServiceRegistryEditorComponent } from './components/service-registry-editor/service-registry-editor.component.js';
 import { GatewayEditorComponent } from './components/gateway-editor/gateway-editor.component.js';
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
@@ -74,6 +75,7 @@ import { UiEventBusService } from './services/ui-event-bus.service.js';
 import { SystemHealthComponent } from './components/system-health/system-health.component.js';
 import { TopologyComponent } from './components/topology/topology.component.js';
 import { NebulaPanelComponent } from './components/nebula-panel/nebula-panel.component.js';
+import { LoadViewDialogComponent } from './components/load-view-dialog/load-view-dialog.component.js';
 
 interface PanePath {
   id: number;
@@ -122,7 +124,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent, TopologyComponent, NebulaPanelComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent, TopologyComponent, NebulaPanelComponent, LoadViewDialogComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -159,6 +161,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private registryServerProfileService = inject(RegistryServerProfileService);
   private serviceMeshService = inject(ServiceMeshService);
   public vizService = inject(ArchitectureVizService);
+  private atlasService = inject(AtlasService);
   private eventBus = inject(UiEventBusService);
   private initialAutoConnectAttempted = false;
 
@@ -175,6 +178,7 @@ export class AppComponent implements OnInit, OnDestroy {
   isComplexSearchDialogOpen = signal(false);
   isGeminiSearchDialogOpen = signal(false);
   isCreateUserDialogOpen = signal(false);
+  isLoadViewDialogOpen = signal(false);
   isImportDependencyWarningOpen = signal(false);
   importWarningDontShowAgain = signal(false);
   profileForCreateUser = signal<BrokerProfile | undefined>(undefined);
@@ -1851,39 +1855,89 @@ export class AppComponent implements OnInit, OnDestroy {
     this.vizService.toggleSimulation(!isActive);
   }
 
-  onSaveGraph(): void {
-    const data = this.vizService.exportScene();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = this.document.createElement('a');
-    a.href = url;
-    a.download = 'service-mesh-graph.json';
-    a.click();
-    URL.revokeObjectURL(url);
-    this.toastService.show('Graph saved successfully', 'success');
+  async onSaveGraph(): Promise<void> {
+    const inGraphMode = this.currentViewMode() === 'service-mesh' && this.meshViewMode() === 'graph';
+    if (!inGraphMode) {
+      // Fallback for non-graph views: export current scene to a JSON file
+      const data = this.vizService.exportScene();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = this.document.createElement('a');
+      a.href = url;
+      a.download = 'service-mesh-graph.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      this.toastService.show('Graph exported to file', 'success');
+      return;
+    }
+
+    const name = window.prompt('Save graph view as:');
+    if (!name || !name.trim()) return;
+
+    try {
+      const payload = this.vizService.buildAtlasViewPayload(name.trim());
+      const currentId = this.atlasService.selectedViewId();
+      if (currentId !== null) {
+        await this.atlasService.update(currentId, payload);
+        this.toastService.show(`Updated graph view "${name.trim()}"`, 'success');
+      } else {
+        await this.atlasService.create(payload);
+        this.toastService.show(`Saved graph view "${name.trim()}"`, 'success');
+      }
+    } catch (err) {
+      console.error('Failed to save graph view', err);
+      this.toastService.show('Failed to save graph view', 'error');
+    }
+  }
+
+  async openLoadViewDialog(): Promise<void> {
+    try {
+      await this.atlasService.refresh();
+    } catch (err) {
+      console.error('Failed to refresh graph views', err);
+      this.toastService.show('Failed to load saved views', 'error');
+      return;
+    }
+    this.isLoadViewDialogOpen.set(true);
+  }
+
+  closeLoadViewDialog(): void {
+    this.isLoadViewDialogOpen.set(false);
+  }
+
+  onLoadViewSelected(id: number): void {
+    this.closeLoadViewDialog();
+    this.atlasService.loadRequested.set(id);
   }
 
   onLoadGraph(): void {
-    const input = this.document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const data = JSON.parse(reader.result as string);
-            this.vizService.importScene(data);
-            this.toastService.show('Graph loaded successfully', 'success');
-          } catch (err) {
-            this.toastService.show('Failed to load graph file', 'error');
-          }
-        };
-        reader.readAsText(file);
-      }
-    };
-    input.click();
+    const inGraphMode = this.currentViewMode() === 'service-mesh' && this.meshViewMode() === 'graph';
+    if (!inGraphMode) {
+      // Fallback for non-graph views: import scene from a JSON file
+      const input = this.document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e: Event) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const data = JSON.parse(reader.result as string);
+              this.vizService.importScene(data);
+              this.toastService.show('Graph loaded from file', 'success');
+            } catch (err) {
+              this.toastService.show('Failed to load graph file', 'error');
+            }
+          };
+          reader.readAsText(file);
+        }
+      };
+      input.click();
+      return;
+    }
+
+    this.openLoadViewDialog();
   }
 
   onBackgroundColorChange(color: string): void {

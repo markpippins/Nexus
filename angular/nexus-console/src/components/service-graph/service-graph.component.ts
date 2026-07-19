@@ -27,11 +27,12 @@ import { ComponentRegistryService } from '../../services/component-registry.serv
 import { NodeType } from '../../models/component-config.js';
 import { AtlasService } from '../../services/atlas.service.js';
 import type { ConnectionData } from '../../models/graph-view.model.js';
+import { LoadViewDialogComponent } from '../load-view-dialog/load-view-dialog.component.js';
 import * as THREE from 'three';
 
 @Component({
   selector: 'app-service-graph',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LoadViewDialogComponent],
   templateUrl: './service-graph.component.html',
   styleUrls: ['./service-graph.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -45,6 +46,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   graphSubView = input<'canvas' | 'creator'>('canvas');
   paletteCollapsed = input(false);
   showRunningOnly = model(false);
+  bloomParams = input<{ strength?: number; radius?: number; threshold?: number }>();
 
   // Outputs
   selectedNode = output<ServiceInstance>();
@@ -54,7 +56,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   @ViewChild('canvasContainer') canvasContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('labelInput') labelInput!: ElementRef<HTMLInputElement>;
 
-  private vizService = inject(ArchitectureVizService);
+  public vizService = inject(ArchitectureVizService);
   private registry = inject(ComponentRegistryService);
   private atlas = inject(AtlasService);
   private cdr = inject(ChangeDetectorRef);
@@ -340,6 +342,17 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       this.isPaletteOpen.set(!collapsed);
     }, { allowSignalWrites: true });
 
+    // Apply configurable bloom parameters when provided
+    effect(() => {
+      const params = this.bloomParams();
+      if (!params) return;
+      this.vizService.setBloomParams(
+        params.strength ?? this.vizService.bloomStrength(),
+        params.radius ?? this.vizService.bloomRadius(),
+        params.threshold ?? this.vizService.bloomThreshold()
+      );
+    }, { allowSignalWrites: true });
+
     // Auto-save after drag or camera changes (debounced 500ms)
     this.sub.add(this.vizService.nodePositionChanged.subscribe(() => this.scheduleAutoSave()));
     this.sub.add(this.vizService.cameraChanged.subscribe(() => this.scheduleAutoSave()));
@@ -471,13 +484,10 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         }
       }
 
-      // Restore connections (backend stores as JSON string in JSONB column)
-      const rawConns = view.connections;
-      if (rawConns) {
-        const conns: ConnectionData[] = typeof rawConns === 'string' ? JSON.parse(rawConns) : rawConns as any;
-        if (conns.length > 0) {
-          this.vizService.restoreConnections(conns);
-        }
+      // Restore connections (backend returns as an array)
+      const conns = view.connections;
+      if (conns && conns.length > 0) {
+        this.vizService.restoreConnections(conns);
       }
 
       // Always start on camera 1 after loading a view
@@ -491,35 +501,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   /** Build a view payload from the current scene state. */
   private buildViewPayload(name: string): any {
-    const activeCam = this.vizService.activeCamera();
-    const live = { pos: this.vizService.getCameraPosition(), target: this.vizService.getCameraTarget() };
-    const defaultPos = new THREE.Vector3(-20, 40, 120);
-    const defaultTarget = new THREE.Vector3(0, 15, 0);
-    const preset1 = this.vizService.getCameraPreset(1) ?? { pos: defaultPos, target: defaultTarget };
-    const preset2 = this.vizService.getCameraPreset(2) ?? { pos: defaultPos, target: defaultTarget };
-    const cam1 = activeCam === 1 ? live : preset1;
-    const cam2 = activeCam === 2 ? live : preset2;
-    const positions = this.vizService.getAllNodePositions();
-    const allNodes = this.vizService.allNodes();
-
-    return {
-      name,
-      cameraPositionX: cam1.pos.x, cameraPositionY: cam1.pos.y, cameraPositionZ: cam1.pos.z,
-      cameraTargetX: cam1.target.x, cameraTargetY: cam1.target.y, cameraTargetZ: cam1.target.z,
-      camera2PositionX: cam2.pos.x, camera2PositionY: cam2.pos.y, camera2PositionZ: cam2.pos.z,
-      camera2TargetX: cam2.target.x, camera2TargetY: cam2.target.y, camera2TargetZ: cam2.target.z,
-      connections: JSON.stringify(this.vizService.getAllConnections()),
-      positions: Array.from(positions.entries()).map(([nodeId, pos]) => {
-        const node = allNodes.find(n => n.id === nodeId);
-        return {
-          nodeId,
-          positionX: pos.x, positionY: pos.y, positionZ: pos.z,
-          label: node?.label,
-          description: node?.description,
-          color: node?.color
-        };
-      })
-    };
+    return this.vizService.buildAtlasViewPayload(name);
   }
 
   async saveCurrentView(name: string): Promise<void> {
@@ -686,13 +668,18 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  toggleConnectionDirection(targetId: string) {
+  toggleConnectionDirection(targetId: string, direction: 'out' | 'in' | 'bidirectional') {
     const current = this.selectedNodeData();
-    if (current) {
-      this.vizService.toggleConnectionDirection(current.id, targetId);
-      // Force inspector refresh
-      this.vizService.selectNode(current.id);
-    }
+    if (!current) return;
+
+    // Determine the actual source/target pair for the underlying edge.
+    // For an inbound connection, the edge is stored as targetId -> current.id.
+    const fromId = direction === 'in' ? targetId : current.id;
+    const toId = direction === 'in' ? current.id : targetId;
+
+    this.vizService.toggleConnectionDirection(fromId, toId);
+    // Force inspector refresh
+    this.vizService.selectNode(current.id);
   }
 
   togglePalette() { this.isPaletteOpen.update(v => !v); }
