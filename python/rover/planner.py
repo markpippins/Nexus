@@ -4,7 +4,7 @@
 This script runs the Planner's backlog grooming cycle:
 1. Scan candidates for CPF assessment
 2. Compute CPF scores
-3. Check knowledge graph for completion evidence
+3. Check knowledge graph for completion evidence (via MCP server)
 4. Generate open questions from CPF gaps AND evidence
 5. Emit cascade events at each decision point
 
@@ -44,6 +44,12 @@ from event_emitter import (
     emit_candidate_greenlit,
     emit_question_created,
     emit_ripple_assessed,
+)
+from planner_mcp_server import (
+    assess_candidate_relevance,
+    write_duplicate_question,
+    write_evidence_question,
+    get_candidate_questions,
 )
 
 log = logging.getLogger("planner")
@@ -104,7 +110,6 @@ def assess_candidate(candidate_id: str, dry_run: bool = False) -> dict | None:
     )
     
     if not dry_run:
-        # Emit candidate.assessed event
         emit_candidate_assessed(
             candidate_id=candidate_id,
             cpf_score=score,
@@ -115,12 +120,58 @@ def assess_candidate(candidate_id: str, dry_run: bool = False) -> dict | None:
     return assessment
 
 
+def check_linked_evidence(candidate_id: str) -> dict:
+    """Check if there are agent_records linked to this candidate via cross_references.
+    
+    Returns dict with linked record count and titles, so the Planner can skip
+    questions when evidence already exists.
+    """
+    sql = f"""
+        SELECT count(*)::int as cnt,
+               array_agg(ar.title ORDER BY ar.created_at DESC) as titles
+        FROM nebula.cross_references cr
+        JOIN nebula.agent_records ar ON ar.id::text = cr.source_id
+        WHERE cr.target_id = '{candidate_id}'
+          AND cr.target_type = 'harvest_candidate'
+          AND cr.source_type = 'agent_record'
+          AND cr.rel_type = 'ag:evidences_candidate';
+    """
+    rc, out = psql(sql)
+    
+    if rc != 0 or not out:
+        return {"count": 0, "titles": []}
+    
+    try:
+        parts = out.split("|")
+        count = int(parts[0]) if parts[0] else 0
+        titles_str = parts[1] if len(parts) > 1 else ""
+        # Parse PostgreSQL array format {title1,title2,...}
+        titles = [t.strip() for t in titles_str.strip('{}').split(',') if t.strip()]
+        return {"count": count, "titles": titles}
+    except Exception:
+        return {"count": 0, "titles": []}
+
+
 def create_questions(candidate_id: str, assessment: dict, dry_run: bool = False) -> list[dict]:
-    """Generate open questions from CPF gaps."""
+    """Generate open questions from CPF gaps.
+    
+    Skips has_artifacts questions when linked agent_records exist
+    (evidence from history ingestion).
+    """
     questions = assessment.get("suggested_questions", [])
     
     if not questions:
         log.info("  No gaps — candidate is ready")
+        return []
+    
+    # Check for linked evidence — skip has_artifacts if records exist
+    linked = check_linked_evidence(candidate_id)
+    if linked["count"] > 0:
+        log.info("  Found %d linked agent_records — skipping has_artifacts questions", linked["count"])
+        questions = [q for q in questions if q.get("component") != "has_artifacts"]
+    
+    if not questions:
+        log.info("  All gaps answered by linked evidence")
         return []
     
     log.info("  Creating %d open questions...", len(questions))
@@ -132,164 +183,96 @@ def create_questions(candidate_id: str, assessment: dict, dry_run: bool = False)
             created.append(q)
             continue
         
-        # Insert into database
-        sql = f"""
-            INSERT INTO nebula.open_questions (
-                requirement_id, title, description, category, status, blocking, created_by
-            ) VALUES (
-                NULL,
-                '{q["question"].replace("'", "''")}',
-                'Auto-generated from CPF assessment. Component: {q["component"]}.',
-                '{q["category"]}',
-                'OPEN',
-                true,
-                'planner'
-            )
-            RETURNING id;
-        """
-        rc, out = psql(sql)
-        
-        if rc == 0 and out:
-            question_id = out.strip()
-            log.info("    Created question: %s", question_id[:8])
+        # Use MCP server's write functions for idempotent creation
+        try:
+            if q.get("category") == "DUPLICATE_DETECTED":
+                question_id = write_duplicate_question(
+                    candidate_id=candidate_id,
+                    duplicate_of_title=q.get("component", "unknown"),
+                    duplicate_of_id="",
+                    source="cpf_assessment",
+                )
+            elif q.get("category") in ("WORK_COMPLETED", "DUPLICATE_CANDIDATE"):
+                question_id = write_evidence_question(
+                    candidate_id=candidate_id,
+                    evidence_type=q.get("category", "unknown"),
+                    evidence_title=q.get("question", "")[:100],
+                    evidence_id="",
+                    confidence="medium",
+                )
+            else:
+                # Generic question — write directly
+                sql = f"""
+                    INSERT INTO nebula.open_questions (
+                        requirement_id, candidate_id, title, description,
+                        category, status, blocking, created_by
+                    ) VALUES (
+                        NULL, '{candidate_id}'::uuid,
+                        '{q["question"].replace("'", "''")}',
+                        'Auto-generated from CPF assessment. Component: {q.get("component", "unknown")}.',
+                        '{q.get("category", "GENERAL")}',
+                        'OPEN', true, 'planner'
+                    )
+                    RETURNING id;
+                """
+                rc, out = psql(sql)
+                question_id = out.strip() if rc == 0 and out else None
             
-            # Emit question.created event
-            emit_question_created(
-                question_id=question_id,
-                candidate_id=candidate_id,
-                category=q["category"],
-                title=q["question"],
-                causation_id=None,  # Would need to track from assess event
-            )
-            
-            created.append({"id": question_id, **q})
-        else:
-            log.error("    Failed to create question: %s", q["question"][:40])
+            if question_id:
+                log.info("    Created question: %s", question_id[:8])
+                emit_question_created(
+                    question_id=question_id,
+                    candidate_id=candidate_id,
+                    category=q.get("category", "GENERAL"),
+                    title=q["question"],
+                    causation_id=None,
+                )
+                created.append({"id": question_id, **q})
+            else:
+                log.error("    Failed to create question: %s", q["question"][:40])
+        except Exception as e:
+            log.error("    Error creating question: %s", e)
     
     return created
 
 
 def check_knowledge_graph_evidence(candidate_id: str, dry_run: bool = False) -> dict:
-    """Check knowledge graph for completion evidence.
-    
-    Queries:
-    - Completed WorkRequests with similar titles
-    - Completed execution requests
-    - Duplicate candidates already promoted
+    """Check knowledge graph for completion evidence via MCP server.
     
     Returns evidence dict with recommendation (clear/escalate/block).
     """
     log.info("  Checking knowledge graph for completion evidence...")
     
-    # Query 1: Check completed WorkRequests
-    sql = f"""
-        SELECT json_agg(json_build_object(
-            'id', id,
-            'title', title,
-            'status', business_status,
-            'completed_at', consumed_at
-        ))
-        FROM nebula.work_requests
-        WHERE business_status IN ('COMPLETED', 'DISPATCHED')
-        AND (
-            similarity(lower(title), lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid))) > 0.3
-            OR lower(title) LIKE '%%' || lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid)) || '%%'
-        )
-        LIMIT 5;
-    """
-    rc, out = psql(sql)
-    work_requests = json.loads(out) if rc == 0 and out and out != "null" else []
+    try:
+        result = assess_candidate_relevance(candidate_id, write_questions=False)
+        evidence = json.loads(result) if isinstance(result, str) else result
+    except Exception as e:
+        log.warning("  Evidence check failed: %s", e)
+        return {"recommendation": "clear", "signals": {}}
     
-    # Query 2: Check duplicate candidates
-    sql = f"""
-        SELECT json_agg(json_build_object(
-            'id', id,
-            'title', title,
-            'cpf_score', compilation_readiness,
-            'status', status
-        ))
-        FROM nebula.harvest_candidates
-        WHERE status IN ('promoted', 'linked')
-        AND id != '{candidate_id}'::uuid
-        AND (
-            similarity(lower(title), lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid))) > 0.4
-            OR lower(title) LIKE '%%' || lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid)) || '%%'
-        )
-        ORDER BY compilation_readiness DESC
-        LIMIT 5;
-    """
-    rc, out = psql(sql)
-    duplicates = json.loads(out) if rc == 0 and out and out != "null" else []
+    recommendation = evidence.get("recommendation", "clear")
+    has_completion = evidence.get("has_completion_evidence", False)
+    has_duplicates = evidence.get("has_duplicate_candidates", False)
+    has_overlaps = evidence.get("has_work_request_overlaps", False)
     
-    # Query 3: Check execution requests
-    sql = f"""
-        SELECT json_agg(json_build_object(
-            'id', id,
-            'title', business_key,
-            'status', status,
-            'completed_at', completed_at
-        ))
-        FROM execution.requests
-        WHERE status = 'COMPLETED'
-        AND (
-            similarity(lower(business_key), lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid))) > 0.3
-            OR lower(business_key) LIKE '%%' || lower((SELECT title FROM nebula.harvest_candidates WHERE id = '{candidate_id}'::uuid)) || '%%'
-        )
-        LIMIT 5;
-    """
-    rc, out = psql(sql)
-    execution_requests = json.loads(out) if rc == 0 and out and out != "null" else []
+    log.info("  Evidence: completion=%s, duplicates=%s, overlaps=%s → %s",
+             has_completion, has_duplicates, has_overlaps, recommendation)
     
-    # Build evidence
-    evidence = {
-        "work_requests": work_requests or [],
-        "duplicates": duplicates or [],
-        "execution_requests": execution_requests or [],
+    return {
+        "recommendation": recommendation,
+        "has_completion_evidence": has_completion,
+        "has_duplicate_candidates": has_duplicates,
+        "has_work_request_overlaps": has_overlaps,
+        "completion": evidence.get("completion", {}),
+        "duplicates": evidence.get("duplicates", {}),
+        "overlaps": evidence.get("overlaps", {}),
     }
-    
-    # Determine recommendation
-    has_completed_wr = len(evidence["work_requests"]) > 0
-    has_duplicates = len(evidence["duplicates"]) > 0
-    has_completed_er = len(evidence["execution_requests"]) > 0
-    
-    if has_completed_wr:
-        # Strong evidence of completed work
-        high_confidence = any(
-            wr.get("status") == "COMPLETED" 
-            for wr in evidence["work_requests"]
-        )
-        recommendation = "block" if high_confidence else "escalate"
-    elif has_duplicates and has_completed_er:
-        # Multiple signals — escalate
-        recommendation = "escalate"
-    elif has_duplicates or has_completed_er:
-        # Weak signals — escalate for review
-        recommendation = "escalate"
-    else:
-        # No evidence of overlap
-        recommendation = "clear"
-    
-    evidence["recommendation"] = recommendation
-    evidence["signals"] = {
-        "completed_work_requests": has_completed_wr,
-        "duplicate_candidates": has_duplicates,
-        "completed_execution": has_completed_er,
-    }
-    
-    log.info("  Evidence: %d work_requests, %d duplicates, %d execution_requests → %s",
-             len(evidence["work_requests"]),
-             len(evidence["duplicates"]),
-             len(evidence["execution_requests"]),
-             recommendation)
-    
-    return evidence
 
 
 def create_evidence_questions(candidate_id: str, evidence: dict, dry_run: bool = False) -> list[dict]:
-    """Create open questions from knowledge graph evidence.
+    """Create open questions from knowledge graph evidence via MCP server.
     
-    If evidence suggests work is completed, create an open question
-    that blocks promotion until resolved.
+    If evidence suggests work is completed, create blocking questions.
     """
     recommendation = evidence.get("recommendation", "clear")
     
@@ -299,28 +282,28 @@ def create_evidence_questions(candidate_id: str, evidence: dict, dry_run: bool =
     questions = []
     
     # Create question for each evidence type
-    if evidence.get("work_requests"):
-        wr = evidence["work_requests"][0]  # Most relevant
+    if evidence.get("completion", {}).get("evidence", 0) > 0:
+        ev = evidence["completion"]["evidence"][0] if evidence["completion"].get("evidence") else {}
         questions.append({
-            "question": f"Similar WorkRequest '{wr.get('title', 'unknown')}' is {wr.get('status', 'unknown')} — is this a duplicate?",
-            "category": "DUPLICATE_DETECTED",
-            "component": "evidence",
-        })
-    
-    if evidence.get("duplicates"):
-        dup = evidence["duplicates"][0]
-        questions.append({
-            "question": f"Candidate '{dup.get('title', 'unknown')}' already promoted (CPF={dup.get('cpf_score', 0):.2f}) — is this a duplicate?",
-            "category": "DUPLICATE_CANDIDATE",
-            "component": "evidence",
-        })
-    
-    if evidence.get("execution_requests"):
-        er = evidence["execution_requests"][0]
-        questions.append({
-            "question": f"Execution request '{er.get('title', 'unknown')}' completed — is this work already done?",
+            "question": f"Similar work found: {ev.get('title', 'unknown')} — is this a duplicate?",
             "category": "WORK_COMPLETED",
-            "component": "evidence",
+            "evidence_type": "work_request",
+        })
+    
+    if evidence.get("duplicates", {}).get("duplicates", 0) > 0:
+        dup = evidence["duplicates"]["duplicates"][0] if evidence["duplicates"].get("duplicates") else {}
+        questions.append({
+            "question": f"Candidate '{dup.get('title', 'unknown')}' already promoted — is this a duplicate?",
+            "category": "DUPLICATE_CANDIDATE",
+            "evidence_type": "candidate",
+        })
+    
+    if evidence.get("overlaps", {}).get("overlaps", 0) > 0:
+        overlap = evidence["overlaps"]["overlaps"][0] if evidence["overlaps"].get("overlaps") else {}
+        questions.append({
+            "question": f"WorkRequest '{overlap.get('title', 'unknown')}' completed — is this work already done?",
+            "category": "WORK_COMPLETED",
+            "evidence_type": "work_request",
         })
     
     if not questions:
@@ -335,39 +318,29 @@ def create_evidence_questions(candidate_id: str, evidence: dict, dry_run: bool =
             created.append(q)
             continue
         
-        # Insert into database
-        sql = f"""
-            INSERT INTO nebula.open_questions (
-                requirement_id, title, description, category, status, blocking, created_by
-            ) VALUES (
-                NULL,
-                '{q["question"].replace("'", "''")}',
-                'Auto-generated from knowledge graph evidence. Component: {q["component"]}.',
-                '{q["category"]}',
-                'OPEN',
-                true,
-                'planner'
-            )
-            RETURNING id;
-        """
-        rc, out = psql(sql)
-        
-        if rc == 0 and out:
-            question_id = out.strip()
-            log.info("    Created question: %s", question_id[:8])
-            
-            # Emit question.created event
-            emit_question_created(
-                question_id=question_id,
+        try:
+            question_id = write_evidence_question(
                 candidate_id=candidate_id,
-                category=q["category"],
-                title=q["question"],
-                causation_id=None,
+                evidence_type=q.get("evidence_type", "unknown"),
+                evidence_title=q["question"][:100],
+                evidence_id="",
+                confidence="medium",
             )
             
-            created.append({"id": question_id, **q})
-        else:
-            log.error("    Failed to create question: %s", q["question"][:40])
+            if question_id:
+                log.info("    Created question: %s", question_id[:8])
+                emit_question_created(
+                    question_id=question_id,
+                    candidate_id=candidate_id,
+                    category=q["category"],
+                    title=q["question"],
+                    causation_id=None,
+                )
+                created.append({"id": question_id, **q})
+            else:
+                log.error("    Failed to create question: %s", q["question"][:40])
+        except Exception as e:
+            log.error("    Error creating question: %s", e)
     
     return created
 
@@ -408,7 +381,6 @@ def promote_candidate(candidate_id: str, assessment: dict, risk_level: str, dry_
         log.info("  [DRY RUN] Would promote %s (CPF=%.3f, risk=%s)", candidate_id[:8], score, risk_level)
         return True
     
-    # Emit candidate.greenlit event
     event_id = emit_candidate_greenlit(
         candidate_id=candidate_id,
         cpf_score=score,
@@ -428,7 +400,6 @@ def escalate_candidate(candidate_id: str, assessment: dict, risk_level: str, rea
                  candidate_id[:8], score, risk_level, reason[:40])
         return True
     
-    # Emit candidate.escalated event
     emit_candidate_escalated(
         candidate_id=candidate_id,
         cpf_score=score,
@@ -479,10 +450,8 @@ def run_grooming_cycle(args):
     log.info("=" * 60)
     
     if args.candidate:
-        # Assess single candidate
         candidates = [{"id": args.candidate, "title": "manual"}]
     else:
-        # Get candidates for grooming
         candidates = get_candidates_for_grooming(args.limit)
         log.info("Candidates for grooming: %d", len(candidates))
     
@@ -513,7 +482,7 @@ def run_grooming_cycle(args):
         score = assessment.get("score", 0)
         promotable = assessment.get("promotable", False)
         
-        # 2. Check knowledge graph for completion evidence
+        # 2. Check knowledge graph for completion evidence (via MCP server)
         evidence = check_knowledge_graph_evidence(cid, args.dry_run)
         evidence_recommendation = evidence.get("recommendation", "clear")
         
@@ -535,7 +504,7 @@ def run_grooming_cycle(args):
             # Evidence blocks promotion
             if evidence_recommendation == "block":
                 escalate_candidate(cid, assessment, "UNKNOWN", 
-                                 f"Evidence suggests work is completed: {len(evidence.get('work_requests', []))} work_requests, {len(evidence.get('duplicates', []))} duplicates",
+                                 f"Evidence suggests work is completed: {evidence}",
                                  args.dry_run)
                 stats["escalated"] += 1
                 stats["blocked_by_evidence"] += 1
