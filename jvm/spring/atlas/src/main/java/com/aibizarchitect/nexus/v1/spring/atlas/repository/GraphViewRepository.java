@@ -14,7 +14,7 @@ public interface GraphViewRepository extends JpaRepository<GraphView, Long> {
 
     Optional<GraphView> findByIsDefaultTrue();
 
-    @EntityGraph(attributePaths = {"positions"})
+    @EntityGraph(attributePaths = {"positions", "connections"})
     Optional<GraphView> findWithPositionsById(Long id);
 
     @Modifying(clearAutomatically = true)

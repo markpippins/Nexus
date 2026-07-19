@@ -1,8 +1,6 @@
 package com.aibizarchitect.nexus.v1.spring.atlas.entity;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,10 +63,8 @@ public class GraphView {
     @OneToMany(mappedBy = "graphView", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<GraphViewPosition> positions = new ArrayList<>();
 
-    /** JSON array of connections: [{sourceNodeId, targetNodeId, direction}] */
-    @Column(name = "connections", columnDefinition = "JSONB")
-    @JdbcTypeCode(SqlTypes.JSON)
-    private String connections;
+    @OneToMany(mappedBy = "graphView", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<GraphViewConnection> connections = new ArrayList<>();
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -76,23 +72,6 @@ public class GraphView {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    /** Inner class for JSON serialization of connection data. */
-    public static class ConnectionData {
-        private String sourceNodeId;
-        private String targetNodeId;
-        private String direction; // OUTBOUND or BIDIRECTIONAL
-
-        public ConnectionData() {}
-        public ConnectionData(String sourceNodeId, String targetNodeId, String direction) {
-            this.sourceNodeId = sourceNodeId; this.targetNodeId = targetNodeId; this.direction = direction;
-        }
-        public String getSourceNodeId() { return sourceNodeId; }
-        public void setSourceNodeId(String s) { this.sourceNodeId = s; }
-        public String getTargetNodeId() { return targetNodeId; }
-        public void setTargetNodeId(String t) { this.targetNodeId = t; }
-        public String getDirection() { return direction; }
-        public void setDirection(String d) { this.direction = d; }
-    }
 
     public GraphView() {
     }
@@ -169,6 +148,6 @@ public class GraphView {
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 
-    public String getConnections() { return connections; }
-    public void setConnections(String connections) { this.connections = connections; }
+    public List<GraphViewConnection> getConnections() { return connections; }
+    public void setConnections(List<GraphViewConnection> connections) { this.connections = connections; }
 }
