@@ -606,4 +606,19 @@ export const NebulaClient = {
 
   /** GET /api/execution/state */
   getExecutionState: () => httpGet("/api/execution/state"),
+
+  // ── Open Questions ─────────────────────────────────────────
+  /** GET /api/open-questions */
+  listOpenQuestions: (query?: { requirementId?: string; candidateId?: string; status?: string }) => {
+    const params = new URLSearchParams();
+    if (query?.requirementId) params.set("requirementId", query.requirementId);
+    if (query?.candidateId) params.set("candidateId", query.candidateId);
+    if (query?.status) params.set("status", query.status);
+    const qs = params.toString();
+    return httpGet(`/api/open-questions${qs ? `?${qs}` : ""}`);
+  },
+
+  /** PUT /api/open-questions/:id/resolve */
+  resolveQuestion: (id: string, body: { resolution: string; resolvedBy: string }) =>
+    httpRequest("PUT", `/api/open-questions/${encodeURIComponent(id)}/resolve`, body),
 };

@@ -1710,6 +1710,41 @@ export function registerTools(server: McpServer) {
   );
 
   // ════════════════════════════════════════════════════════════════
+  //  OPEN QUESTIONS
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_list_open_questions",
+    "List open questions, optionally filtered by requirement, candidate, or status.",
+    {
+      requirementId: z.string().optional().describe("Filter by requirement UUID"),
+      candidateId: z.string().optional().describe("Filter by candidate UUID"),
+      status: z.string().optional().describe("Filter by status (default: OPEN)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listOpenQuestions(args);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_resolve_question",
+    "Resolve/close an open question with a resolution answer.",
+    {
+      questionId: z.string().describe("Question UUID to resolve"),
+      resolution: z.string().describe("The answer or resolution text"),
+      resolvedBy: z.string().describe("Who resolved it (role name, e.g. 'architect', 'planner')"),
+    },
+    async (args) => {
+      const result = await NebulaClient.resolveQuestion(args.questionId, {
+        resolution: args.resolution,
+        resolvedBy: args.resolvedBy,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
   //  HEALTH
   // ════════════════════════════════════════════════════════════════
 

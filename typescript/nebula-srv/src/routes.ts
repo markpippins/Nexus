@@ -5593,5 +5593,64 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // ════════════════════════════════════════════════════════════════
+  //  OPEN QUESTIONS
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/open-questions?requirementId=&candidateId=&status=
+  router.get('/open-questions', async (req: Request, res: Response) => {
+    try {
+      const { requirementId, candidateId, status } = req.query;
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (requirementId) { clauses.push(`requirement_id = $${i++}`); vals.push(requirementId); }
+      if (candidateId) { clauses.push(`candidate_id = $${i++}`); vals.push(candidateId); }
+      if (status) { clauses.push(`status = $${i++}`); vals.push(status); }
+      else { clauses.push(`status = 'OPEN'`); }
+      const where = 'WHERE ' + clauses.join(' AND ');
+      const { rows } = await pool.query(
+        `SELECT id, requirement_id, candidate_id, title, description, category,
+                status, blocking, resolution, resolved_by, resolved_at,
+                created_by, created_at
+         FROM nebula.open_questions ${where}
+         ORDER BY created_at DESC`, vals
+      );
+      res.json({ questions: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/open-questions/:id/resolve
+  router.put('/open-questions/:id/resolve', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { resolution, resolvedBy } = req.body;
+      if (!resolution || !resolvedBy) {
+        res.status(400).json({ error: 'resolution and resolvedBy are required' });
+        return;
+      }
+      const { rows } = await pool.query(
+        `UPDATE nebula.open_questions
+         SET status = 'RESOLVED',
+             resolution = $1,
+             resolved_by = $2,
+             resolved_at = now(),
+             updated_at = now()
+         WHERE id = $3 AND status = 'OPEN'
+         RETURNING id, title, status, resolution, resolved_by, resolved_at`,
+        [resolution, resolvedBy, id]
+      );
+      if (rows.length === 0) {
+        res.status(404).json({ error: 'Question not found or already closed' });
+        return;
+      }
+      res.json(rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   return router;
 }
