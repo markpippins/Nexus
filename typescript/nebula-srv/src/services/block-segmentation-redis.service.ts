@@ -66,7 +66,12 @@ export function initRedis(): Redis {
   redis = new Redis(url, {
     maxRetriesPerRequest: 3,
     retryStrategy(times: number) {
-      if (times > 5) return null;
+      // Always retry with capped exponential backoff. Returning null would
+      // permanently close the client (ioredis semantics) and prevent any
+      // recovery after a transient Redis outage — which left nebula-srv's
+      // block-segmentation cache silently broken (every cache op failed,
+      // routes fell back to PG on every request). Same fix as role-memory-srv
+      // (commit b099522) and tackle-mcp.
       return Math.min(times * 200, 2000);
     },
     lazyConnect: true,
