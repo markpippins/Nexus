@@ -192,6 +192,9 @@ export class AppComponent implements OnInit, OnDestroy {
   showRunningOnly = signal(false);  // Toggle to show only running services in mesh
   paletteCollapsed = signal(false);  // Toggle to collapse component palette in service graph
 
+  // Left nav collapsed state — persisted via UiPreferencesService
+  isNavCollapsed = this.uiPreferencesService.isNavCollapsed;
+
   viewModeUrls: Record<string, string> = {
     'conduit-ui': 'http://localhost:4201',
     'duality': 'http://localhost:3002',
@@ -220,6 +223,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // --- Pane Visibility State (from service) ---
   isSidebarVisible = this.uiPreferencesService.isSidebarVisible;
+  isSidebarCollapsed = this.uiPreferencesService.isSidebarCollapsed;
   isTreeVisible = this.uiPreferencesService.isTreeVisible;
   isNotesVisible = this.uiPreferencesService.isNotesVisible;
   isDetailPaneOpen = this.uiPreferencesService.isDetailPaneOpen;
@@ -1841,8 +1845,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.serviceMeshService.fetchAllData();
   }
 
-  onCollapsePalette(): void {
-    this.paletteCollapsed.update(v => !v);
+  onNavCollapseToggle(): void {
+    this.uiPreferencesService.toggleNavCollapse();
+  }
+
+  onSidebarCollapseToggle(): void {
+    this.uiPreferencesService.toggleSidebarCollapse();
   }
 
   // --- Graph Visualization Control Handlers ---

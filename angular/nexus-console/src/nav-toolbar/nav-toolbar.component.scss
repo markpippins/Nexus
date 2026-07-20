@@ -75,3 +75,47 @@ app-nav-toolbar {
 .nav-toolbar-theme-btn {
   flex-shrink: 0;
 }
+
+/* Collapse / Expand button — pinned to the bottom of the toolbar */
+.nav-toolbar-collapse-btn {
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+/* ── Collapsed state ────────────────────────────────── */
+.nav-toolbar.is-collapsed {
+  width: 24px;
+  padding: 8px 0;
+  overflow: hidden;
+}
+
+/* Fade out hidden elements using opacity + visibility (animatable, unlike display) */
+.nav-toolbar.is-collapsed .orb-wrapper,
+.nav-toolbar.is-collapsed .nav-toolbar-divider,
+.nav-toolbar.is-collapsed .nav-toolbar-spacer,
+.nav-toolbar.is-collapsed .nav-toolbar-btn:not(.nav-toolbar-collapse-btn) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.nav-toolbar.is-collapsed .nav-toolbar-collapse-btn {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  margin-top: 0;
+}
+
+/* Transition for smooth collapse/expand */
+.nav-toolbar {
+  transition: width 250ms ease-in-out, padding 250ms ease-in-out;
+}
+
+.nav-toolbar > * {
+  transition: opacity 200ms ease, visibility 200ms ease;
+}

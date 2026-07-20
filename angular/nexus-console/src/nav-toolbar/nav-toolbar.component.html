@@ -1,4 +1,4 @@
-<div class="nav-toolbar">
+<div class="nav-toolbar" [class.is-collapsed]="collapsed()">
   <!-- Nexus Orb at the top of the toolbar -->
   <app-orb class="orb-wrapper"></app-orb>
   <div class="nav-toolbar-divider"></div>
@@ -26,6 +26,7 @@
   <div class="nav-toolbar-spacer"></div>
 
   <!-- Theme Toggle (three-state: steel → light → dark) -->
+  @if (!collapsed()) {
   <button
     class="nav-toolbar-btn nav-toolbar-theme-btn"
     [title]="'Theme: ' + (theme() === 'theme-steel' ? 'Steel' : theme() === 'theme-light' ? 'Light' : 'Dark')"
@@ -50,6 +51,26 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
         </svg>
       }
+    }
+  </button>
+  }
+
+  <!-- Collapse / Expand Toggle (pinned to the bottom / right end) -->
+  <button
+    class="nav-toolbar-btn nav-toolbar-collapse-btn"
+    [title]="collapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+    (click)="onCollapseToggle()"
+  >
+    @if (collapsed()) {
+      <!-- Chevron-right: expand -->
+      <svg xmlns="http://www.w3.org/2000/svg" class="nav-toolbar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+      </svg>
+    } @else {
+      <!-- Chevron-left: collapse -->
+      <svg xmlns="http://www.w3.org/2000/svg" class="nav-toolbar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+      </svg>
     }
   </button>
 </div>

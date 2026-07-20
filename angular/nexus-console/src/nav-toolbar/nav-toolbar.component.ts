@@ -93,6 +93,11 @@ export class NavToolbarComponent {
   /** Emitted when the user clicks the theme toggle */
   themeChange = output<Theme>();
 
+  /** Whether the nav toolbar is collapsed */
+  collapsed = input(false);
+  /** Emitted when the collapse/expand toggle button is clicked */
+  collapseToggled = output<void>();
+
   readonly navItems = NAV_ITEMS;
   readonly THEME_CYCLE: Theme[] = ['theme-steel', 'theme-light', 'theme-dark'];
 
@@ -101,5 +106,9 @@ export class NavToolbarComponent {
     const idx = this.THEME_CYCLE.indexOf(current);
     const next = this.THEME_CYCLE[(idx + 1) % this.THEME_CYCLE.length];
     this.themeChange.emit(next);
+  }
+
+  onCollapseToggle(): void {
+    this.collapseToggled.emit();
   }
 }

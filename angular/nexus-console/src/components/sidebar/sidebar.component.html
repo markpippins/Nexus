@@ -2,10 +2,12 @@
   class="relative h-full flex flex-col bg-[rgb(var(--color-surface-sidebar))] border-r border-[rgb(var(--color-border-base))] ease-in-out"
   [class.transition-width]="!isResizing()"
   [class.duration-300]="!isResizing()"
-  [style.width.px]="width()"
+  [class.is-collapsed]="collapsed()"
+  [style.width.px]="collapsed() ? 28 : width()"
   (click)="contextMenu.set(null)"
 >
-  <!-- EXPANDED VIEW -->
+  <!-- EXPANDED VIEW -- only shown when not collapsed -->
+  @if (!collapsed()) {
   <div class="flex flex-col flex-1 overflow-hidden">
     <!-- Header -->
     <div
@@ -77,24 +79,24 @@
                 </button>
               </div>
               <div class="h-6 w-px bg-[rgb(var(--color-border-muted))] mx-2"></div>
-              <!-- Collapse Palette Button -->
+              <div class="flex-grow"></div>
+              <!-- Collapse Sidebar Toggle (pinned to right end of the toolbar) -->
               <button
-                (click)="collapsePalette.emit()"
-                title="Collapse Palette"
-                class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))]"
+                (click)="onSidebarCollapseToggle()"
+                title="Collapse sidebar"
+                class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5 text-[rgb(var(--color-text-muted))]"
+                  class="h-5 w-5"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
                   stroke-width="2"
                 >
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                 </svg>
               </button>
-              <div class="flex-grow"></div>
             </div>
           } @else {
             <!-- File Explorer Tree Toolbar -->
@@ -363,16 +365,34 @@
       }
     </div>
   </div>
+  }
 
+  <!-- COLLAPSED VIEW -- only the expand button when collapsed -->
+  @if (collapsed()) {
+  <div class="flex-shrink-0 flex items-center justify-center h-full">
+    <button
+      (click)="onSidebarCollapseToggle()"
+      title="Expand sidebar"
+      class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))]"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+      </svg>
+    </button>
+  </div>
+  }
+
+  @if (!collapsed()) {
   <!-- Resizer Handle -->
   <div
-    class="absolute top-0 right-0 h-full w-1.5 cursor-col-resize group z-10"
+    class="absolute top-12 right-0 bottom-0 w-1.5 cursor-col-resize group z-10"
     (mousedown)="startResize($event)"
   >
     <div
       class="w-0.5 h-full mx-auto bg-transparent group-hover:bg-[rgb(var(--color-accent-ring))]/50 transition-colors duration-200"
     ></div>
   </div>
+  }
 
   <!-- Context Menu -->
   @if (contextMenu(); as cm) {

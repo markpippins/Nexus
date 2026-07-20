@@ -16,6 +16,8 @@ export interface UiPreferences {
   isConsoleCollapsed: boolean;
   isStreamPaneCollapsed: boolean;
   isNotesPaneCollapsed: boolean;
+  isNavCollapsed: boolean;
+  isSidebarCollapsed: boolean;
   isStreamActiveSearchEnabled: boolean;
   sidebarWidth: number | null;
   sidebarTreeHeight: number | null;
@@ -40,6 +42,8 @@ const DEFAULT_PREFERENCES: UiPreferences = {
   isConsoleCollapsed: true,
   isStreamPaneCollapsed: false,
   isNotesPaneCollapsed: false,
+  isNavCollapsed: false,
+  isSidebarCollapsed: false,
   isStreamActiveSearchEnabled: true,
   sidebarWidth: null,
   sidebarTreeHeight: null,
@@ -70,6 +74,8 @@ export class UiPreferencesService {
   public readonly isConsoleCollapsed = computed(() => this.preferences().isConsoleCollapsed);
   public readonly isStreamPaneCollapsed = computed(() => this.preferences().isStreamPaneCollapsed);
   public readonly isNotesPaneCollapsed = computed(() => this.preferences().isNotesPaneCollapsed);
+  public readonly isNavCollapsed = computed(() => this.preferences().isNavCollapsed);
+  public readonly isSidebarCollapsed = computed(() => this.preferences().isSidebarCollapsed);
   public readonly isStreamActiveSearchEnabled = computed(() => this.preferences().isStreamActiveSearchEnabled);
   public readonly sidebarWidth = computed(() => this.preferences().sidebarWidth);
   public readonly sidebarTreeHeight = computed(() => this.preferences().sidebarTreeHeight);
@@ -158,6 +164,18 @@ export class UiPreferencesService {
 
   toggleNotesPaneCollapse(): void {
     this.preferences.update(p => ({ ...p, isNotesPaneCollapsed: !p.isNotesPaneCollapsed }));
+  }
+
+  toggleNavCollapse(): void {
+    this.preferences.update(p => ({ ...p, isNavCollapsed: !p.isNavCollapsed }));
+  }
+
+  setNavCollapsed(collapsed: boolean): void {
+    this.preferences.update(p => ({ ...p, isNavCollapsed: collapsed }));
+  }
+
+  toggleSidebarCollapse(): void {
+    this.preferences.update(p => ({ ...p, isSidebarCollapsed: !p.isSidebarCollapsed }));
   }
 
   toggleStreamActiveSearch(): void {
