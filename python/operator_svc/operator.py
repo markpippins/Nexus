@@ -56,10 +56,14 @@ TOOLS = [
     },
     {
         "name": "query_terrain",
-        "description": "Query the Terrain infrastructure service. Use for: service status, running services, infrastructure state.",
+        "description": "Query the Terrain infrastructure topology service. Use for: runnable services, service types, servers, service dependencies, platform health.",
         "endpoints": [
-            "GET  /api/services                — list all registered services",
-            "GET  /api/services/:id            — get service by ID",
+            "GET  /api/v1/runnable-services          — list all registered services",
+            "GET  /api/v1/runnable-services/:id       — get service by ID",
+            "GET  /api/v1/service-types                — list service types",
+            "GET  /api/v1/servers                     — list servers",
+            "GET  /api/v1/service-dependencies        — list service dependencies",
+            "GET  /api/v1/platform/health             — platform health check",
         ],
     },
 ]
@@ -97,7 +101,7 @@ Available tools:
 - query_conduit: plans, tickets, sessions, work requests, pipeline status
   Paths: /state, /wr, /wr/:id, /health
 - query_terrain: service status, infrastructure state
-  Paths: /api/services
+  Paths: /api/v1/runnable-services, /api/v1/service-types, /api/v1/servers, /api/v1/platform/health
 
 ## Behavior
 

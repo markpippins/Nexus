@@ -17,7 +17,7 @@ _log = logging.getLogger("operator.api_proxy")
 # Service URLs
 CONDUIT_URL = os.environ.get("CONDUIT_URL", "http://localhost:3100")
 NEBULA_URL = os.environ.get("NEBULA_URL", "http://localhost:3101")
-TERRAIN_URL = os.environ.get("TERRAIN_URL", "http://localhost:5000")
+TERRAIN_URL = os.environ.get("TERRAIN_URL", "http://localhost:8084")
 
 SERVICE_MAP = {
     "conduit": CONDUIT_URL,
