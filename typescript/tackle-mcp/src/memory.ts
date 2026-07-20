@@ -49,7 +49,10 @@ export function initRedis(): Redis {
   redis = new Redis(url, {
     maxRetriesPerRequest: 3,
     retryStrategy(times) {
-      if (times > 5) return null;
+      // Always retry with capped exponential backoff. Returning null would
+      // permanently close the client (ioredis semantics) and prevent any
+      // recovery after a transient Redis outage — same bug that left the
+      // Role Memory Procedure Registry reader stuck on "Connection is closed."
       return Math.min(times * 200, 2000);
     },
     lazyConnect: true, // don't fail startup if Redis is down

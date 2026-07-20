@@ -75,10 +75,20 @@ async function main() {
   initRedis();
 
   console.log("[role-memory-srv] Running initial sync...");
-  const result = await syncAll();
-  console.log(
-    `[role-memory-srv] Sync complete: ${result.procedures} procedures, ${result.roleIndices} role indices`
-  );
+  try {
+    const result = await syncAll();
+    console.log(
+      `[role-memory-srv] Sync complete: ${result.procedures} procedures, ${result.roleIndices} role indices`
+    );
+  } catch (err: any) {
+    // Don't crash if Redis is down at boot — the retryStrategy in redis.ts
+    // will keep trying to reconnect, and POST /refresh can repopulate once
+    // Redis is available. Booting the HTTP server in a degraded state is
+    // more resilient than crash-looping.
+    console.warn(
+      `[role-memory-srv] Initial sync failed (Redis may be down): ${err.message}. Booting anyway; use POST /refresh once Redis reconnects.`
+    );
+  }
 
   app.listen(PORT, () => {
     console.log(`[role-memory-srv] Listening on port ${PORT}`);

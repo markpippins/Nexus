@@ -12,7 +12,10 @@ export function initRedis(): Redis {
   redis = new Redis(url, {
     maxRetriesPerRequest: 3,
     retryStrategy(times) {
-      if (times > 5) return null;
+      // Always retry with capped exponential backoff. Returning null would
+      // permanently close the client (ioredis semantics) and prevent any
+      // recovery after a transient Redis outage — which is what caused the
+      // Role Memory Procedure Registry to silently stop syncing.
       return Math.min(times * 200, 2000);
     },
   });
