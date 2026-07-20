@@ -44,6 +44,8 @@ import {
   getAllEvents,
   selectNextRunnable,
   listWorkRequestStates,
+  checkProjectionDrift,
+  resolveWrUuid,
 } from "./db";
 import {
   validateCompilerOutput,
@@ -1316,6 +1318,26 @@ app.get("/wr/:id/events", async (req, res) => {
       return;
     }
     res.json({ ok: true, count: events.length, events });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /wr/:id/projection-drift — Check if the live work_request_state
+ * projection matches what a full event replay would produce.
+ * Non-destructive: computes expected state without writing.
+ */
+app.get("/wr/:id/projection-drift", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uuid = await resolveWrUuid(id);
+    const drift = await checkProjectionDrift(uuid);
+    if (!drift) {
+      res.status(404).json({ ok: false, error: `WorkRequest ${id} not found` });
+      return;
+    }
+    res.json({ ok: true, drift });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
   }
