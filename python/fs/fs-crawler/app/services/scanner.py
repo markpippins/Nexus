@@ -12,7 +12,7 @@ import structlog
 
 # Handle imports differently when run as a script vs module
 try:
-    from ..database import get_redis, get_mongodb, get_mysql_session
+    from ..database import get_redis, get_mongodb, get_mysql_session, safe_redis_op
     from ..models.mongodb_models import FileMetadata, DirectoryMetadata
     from ..models.mysql_models import LibraryPath, ScanOperation, OperationStatus
     from .metadata_processor import MetadataProcessor  # Same directory
@@ -22,7 +22,7 @@ except ImportError:
     import sys
     sys.path.append(str(Path(__file__).parents[2]))  # Go up two levels to app/
 
-    from database import get_redis, get_mongodb, get_mysql_session
+    from database import get_redis, get_mongodb, get_mysql_session, safe_redis_op
     from models.mongodb_models import FileMetadata, DirectoryMetadata
     from models.mysql_models import LibraryPath, ScanOperation, OperationStatus
     from services.metadata_processor import MetadataProcessor
@@ -54,6 +54,20 @@ class ScannerService:
             self.redis_client = get_redis()
         if not self.mongodb:
             self.mongodb = get_mongodb()
+
+    async def _redis(self, method: str, *args, default=None, **kwargs):
+        """Wrap Redis operations with ConnectionError handling.
+
+        Usage: await self._redis("hset", key, "field", "value")
+               await self._redis("hgetall", key)
+        """
+        client = self.redis_client
+        op = f"scanner.{method}"
+        return await safe_redis_op(
+            lambda: getattr(client, method)(*args, **kwargs),
+            default=default,
+            operation=op,
+        )
     
     async def scan_all_libraries(self):
         """Scan all configured library paths"""
@@ -116,10 +130,10 @@ class ScannerService:
 
                 # Update current directory being scanned
                 current_dir = os.path.dirname(file_path)
-                await self.redis_client.hset(scan_key, "current_directory", current_dir)
+                await self._redis("hset", scan_key, "current_directory", current_dir)
 
                 # Update current file being scanned
-                await self.redis_client.hset(scan_key, "current_file", file_path)
+                await self._redis("hset", scan_key, "current_file", file_path)
 
                 # Skip if already processed (unless deep scan)
                 if not deep_scan and await self._is_file_processed(file_path):
@@ -285,11 +299,11 @@ class ScannerService:
         await self._init_clients()
 
         # Get all scan states (both active and inactive)
-        scan_keys = await self.redis_client.keys(f"{self.scan_key_prefix}state:*")
+        scan_keys = await self._redis("keys", f"{self.scan_key_prefix}state:*", default=[])
         all_scans = []
 
         for key in scan_keys:
-            scan_data = await self.redis_client.hgetall(key)
+            scan_data = await self._redis("hgetall", key, default={})
             if scan_data:
                 # Convert string values to appropriate types where needed
                 if 'files_processed' in scan_data:
@@ -349,7 +363,7 @@ class ScannerService:
         scan_id = f"scan_{path_hash}"
         scan_key = f"{self.scan_key_prefix}state:{scan_id}"
         
-        existing_state = await self.redis_client.hgetall(scan_key)
+        existing_state = await self._redis("hgetall", scan_key, default={})
         
         if existing_state and existing_state.get("status") == "running":
             # Resume existing scan
@@ -371,7 +385,7 @@ class ScannerService:
                 "remaining_queue": "[]"   # JSON list of remaining files
             }
             
-            await self.redis_client.hset(scan_key, mapping=new_state)
+            await self._redis("hset", scan_key, mapping=new_state)
             return new_state
     
     async def _build_resumable_file_queue(self, root_path: str, scan_state: Dict[str, Any]) -> List[str]:
@@ -438,7 +452,7 @@ class ScannerService:
                     await self._mark_file_completed(scan_key, file_path)
 
                     # Update current file being processed in Redis
-                    await self.redis_client.hset(scan_key, "current_file", file_path)
+                    await self._redis("hset", scan_key, "current_file", file_path)
             except Exception as e:
                 logger.error("Failed to process file in batch", file=file_path, error=str(e))
 
@@ -457,7 +471,7 @@ class ScannerService:
         import json
         
         try:
-            completed_files_json = await self.redis_client.hget(scan_key, "completed_files") or "[]"
+            completed_files_json = await self._redis("hget", scan_key, "completed_files", default="[]") or "[]"
             completed_files = json.loads(completed_files_json)
             completed_files.append(file_path)
             
@@ -465,7 +479,7 @@ class ScannerService:
             if len(completed_files) > 1000:
                 completed_files = completed_files[-1000:]
             
-            await self.redis_client.hset(scan_key, "completed_files", json.dumps(completed_files))
+            await self._redis("hset", scan_key, "completed_files", json.dumps(completed_files))
         except Exception as e:
             logger.warning("Failed to update completed files", error=str(e))
     
@@ -480,7 +494,7 @@ class ScannerService:
                 "last_checkpoint": datetime.utcnow().isoformat()
             }
             
-            await self.redis_client.hset(scan_key, mapping=checkpoint_data)
+            await self._redis("hset", scan_key, mapping=checkpoint_data)
             logger.debug("Checkpoint updated", files_processed=files_processed, remaining=len(remaining_queue))
             
         except Exception as e:
@@ -495,10 +509,10 @@ class ScannerService:
             "remaining_queue": "[]"  # Clear queue
         }
         
-        await self.redis_client.hset(scan_key, mapping=completion_data)
+        await self._redis("hset", scan_key, mapping=completion_data)
         
         # Set expiration for completed scan state (keep for 24 hours)
-        await self.redis_client.expire(scan_key, 86400)
+        await self._redis("expire", scan_key, 86400)
     
     async def _mark_scan_failed(self, scan_key: str, error_message: str):
         """Mark scan as failed but keep state for potential resume"""
@@ -508,22 +522,22 @@ class ScannerService:
             "failed_at": datetime.utcnow().isoformat()
         }
         
-        await self.redis_client.hset(scan_key, mapping=failure_data)
+        await self._redis("hset", scan_key, mapping=failure_data)
         
         # Keep failed scan state for 7 days for debugging
-        await self.redis_client.expire(scan_key, 604800)
+        await self._redis("expire", scan_key, 604800)
     
     async def resume_failed_scans(self):
         """Resume any failed or interrupted scans on startup"""
         await self._init_clients()
         
         # Find all scan state keys
-        scan_keys = await self.redis_client.keys(f"{self.scan_key_prefix}state:*")
+        scan_keys = await self._redis("keys", f"{self.scan_key_prefix}state:*", default=[])
         
         resumed_count = 0
         
         for scan_key in scan_keys:
-            scan_state = await self.redis_client.hgetall(scan_key)
+            scan_state = await self._redis("hgetall", scan_key, default={})
             
             if scan_state.get("status") == "running":
                 root_path = scan_state.get("path")
@@ -549,22 +563,22 @@ class ScannerService:
         await self._init_clients()
         
         cutoff_time = datetime.utcnow().timestamp() - (max_age_days * 86400)
-        scan_keys = await self.redis_client.keys(f"{self.scan_key_prefix}state:*")
+        scan_keys = await self._redis("keys", f"{self.scan_key_prefix}state:*", default=[])
         
         cleaned_count = 0
         
         for scan_key in scan_keys:
-            scan_state = await self.redis_client.hgetall(scan_key)
+            scan_state = await self._redis("hgetall", scan_key, default={})
             
             if scan_state.get("started_at"):
                 try:
                     started_at = datetime.fromisoformat(scan_state["started_at"]).timestamp()
                     if started_at < cutoff_time:
-                        await self.redis_client.delete(scan_key)
+                        await self._redis("delete", scan_key)
                         cleaned_count += 1
                 except ValueError:
                     # Invalid timestamp, delete it
-                    await self.redis_client.delete(scan_key)
+                    await self._redis("delete", scan_key)
                     cleaned_count += 1
         
         if cleaned_count > 0:
@@ -577,12 +591,12 @@ class ScannerService:
         await self._init_clients()
 
         # Find all scan state keys
-        scan_keys = await self.redis_client.keys(f"{self.scan_key_prefix}state:*")
+        scan_keys = await self._redis("keys", f"{self.scan_key_prefix}state:*", default=[])
 
         stopped_count = 0
 
         for scan_key in scan_keys:
-            scan_state = await self.redis_client.hgetall(scan_key)
+            scan_state = await self._redis("hgetall", scan_key, default={})
 
             if scan_state.get("status") == "running":
                 # Mark scan as cancelled
@@ -591,10 +605,10 @@ class ScannerService:
                     "cancelled_at": datetime.utcnow().isoformat()
                 }
 
-                await self.redis_client.hset(scan_key, mapping=stop_data)
+                await self._redis("hset", scan_key, mapping=stop_data)
 
                 # Set expiration for cancelled scan state (cleanup later)
-                await self.redis_client.expire(scan_key, 86400)
+                await self._redis("expire", scan_key, 86400)
 
                 stopped_count += 1
 

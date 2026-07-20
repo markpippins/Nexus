@@ -3,7 +3,8 @@ Database connection management for Redis, MongoDB, and MySQL
 """
 
 import asyncio
-from typing import Optional
+from typing import Optional, Any, Callable
+from functools import wraps
 from motor.motor_asyncio import AsyncIOMotorClient
 import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -35,15 +36,46 @@ async_session_maker = None
 Base = declarative_base()
 
 
+async def safe_redis_op(coro_factory: Callable, default: Any = None,
+                         operation: str = "redis_op") -> Any:
+    """Execute a Redis operation with ConnectionError handling.
+
+    Args:
+        coro_factory: Callable that returns an awaitable (e.g. lambda: client.hget(k, f))
+        default: Value to return on ConnectionError (None = silent degradation)
+        operation: Label for logging on failure
+
+    Returns:
+        Result of the operation, or default on ConnectionError.
+    """
+    try:
+        return await coro_factory()
+    except redis.ConnectionError as e:
+        logger.warning("redis_connection_error", operation=operation, error=str(e))
+        return default
+    except redis.TimeoutError as e:
+        logger.warning("redis_timeout", operation=operation, error=str(e))
+        return default
+
+
 async def init_databases():
-    """Initialize all database connections"""
+    """Initialize all database connections.
+
+    Redis ping failure is non-fatal: the client is still created so
+    auto-reconnect can succeed on the next operation.  MongoDB and
+    MySQL failures remain fatal (service cannot run without them).
+    """
     global redis_client, mongodb_client, mongodb_db, mysql_engine, async_session_maker
     
     try:
-        # Initialize Redis
+        # Initialize Redis — ping is non-fatal
         redis_client = redis.from_url(settings.redis_url, decode_responses=True)
-        await redis_client.ping()
-        logger.info("Redis connection established")
+        try:
+            await redis_client.ping()
+            logger.info("Redis connection established")
+        except (redis.ConnectionError, redis.TimeoutError) as e:
+            logger.warning("Redis unavailable at startup, will reconnect on first operation",
+                           error=str(e))
         
         # Initialize MongoDB
         mongodb_client = AsyncIOMotorClient(settings.mongodb_url)

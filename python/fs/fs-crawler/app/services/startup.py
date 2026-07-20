@@ -9,7 +9,7 @@ import structlog
 
 # Handle imports differently when run as a script vs module
 try:
-    from ..database import get_redis, get_mongodb, get_mysql_session
+    from ..database import get_redis, get_mongodb, get_mysql_session, safe_redis_op
     from .scanner import ScannerService  # Same directory
     from ..config import settings
 except ImportError:
@@ -18,7 +18,7 @@ except ImportError:
     from pathlib import Path
     sys.path.append(str(Path(__file__).parents[2]))  # Go up two levels to app/
 
-    from database import get_redis, get_mongodb, get_mysql_session
+    from database import get_redis, get_mongodb, get_mysql_session, safe_redis_op
     from services.scanner import ScannerService
     from config import settings
 
@@ -140,18 +140,38 @@ class StartupService:
         redis_client = get_redis()
         
         # Cleanup old temporary keys
-        temp_keys = await redis_client.keys("temp:*")
+        temp_keys = await safe_redis_op(
+            lambda: redis_client.keys("temp:*"),
+            default=[],
+            operation="startup.cleanup.temp_keys",
+        )
         if temp_keys:
-            await redis_client.delete(*temp_keys)
+            await safe_redis_op(
+                lambda: redis_client.delete(*temp_keys),
+                default=0,
+                operation="startup.cleanup.temp_delete",
+            )
             logger.debug("Cleaned up temporary Redis keys", count=len(temp_keys))
         
         # Cleanup old lock keys (in case they weren't properly released)
-        lock_keys = await redis_client.keys("lock:*")
+        lock_keys = await safe_redis_op(
+            lambda: redis_client.keys("lock:*"),
+            default=[],
+            operation="startup.cleanup.lock_keys",
+        )
         for lock_key in lock_keys:
             # Check if lock is older than 1 hour
-            ttl = await redis_client.ttl(lock_key)
+            ttl = await safe_redis_op(
+                lambda lk=lock_key: redis_client.ttl(lk),
+                default=-2,
+                operation="startup.cleanup.lock_ttl",
+            )
             if ttl == -1:  # No expiration set
-                await redis_client.delete(lock_key)
+                await safe_redis_op(
+                    lambda lk=lock_key: redis_client.delete(lk),
+                    default=0,
+                    operation="startup.cleanup.lock_delete",
+                )
                 logger.debug("Cleaned up stale lock key", key=lock_key)
     
     async def _initialize_system_state(self):
@@ -162,7 +182,11 @@ class StartupService:
         
         # Set system startup timestamp
         startup_time = datetime.utcnow().isoformat()
-        await redis_client.set("system:startup_time", startup_time)
+        await safe_redis_op(
+            lambda: redis_client.set("system:startup_time", startup_time),
+            default=None,
+            operation="startup.init.startup_time",
+        )
         
         # Initialize system status
         system_status = {
@@ -173,7 +197,11 @@ class StartupService:
             "total_files_indexed": 0  # TODO: Get from MongoDB
         }
         
-        await redis_client.hset("system:status", mapping=system_status)
+        await safe_redis_op(
+            lambda: redis_client.hset("system:status", mapping=system_status),
+            default=None,
+            operation="startup.init.status",
+        )
         
         # Set system configuration from settings
         config_data = {
@@ -183,7 +211,11 @@ class StartupService:
             "supported_extensions": ",".join(settings.supported_extensions)
         }
         
-        await redis_client.hset("system:config", mapping=config_data)
+        await safe_redis_op(
+            lambda: redis_client.hset("system:config", mapping=config_data),
+            default=None,
+            operation="startup.init.config",
+        )
         
         logger.info("System state initialized")
     
@@ -192,14 +224,26 @@ class StartupService:
         redis_client = get_redis()
         
         # Get basic system status
-        status_data = await redis_client.hgetall("system:status")
+        status_data = await safe_redis_op(
+            lambda: redis_client.hgetall("system:status"),
+            default={},
+            operation="startup.status.system",
+        )
         
         # Get active scan count
-        active_scan_keys = await redis_client.keys("scan:state:*")
+        active_scan_keys = await safe_redis_op(
+            lambda: redis_client.keys("scan:state:*"),
+            default=[],
+            operation="startup.status.scan_keys",
+        )
         active_scans = 0
         
         for key in active_scan_keys:
-            scan_data = await redis_client.hgetall(key)
+            scan_data = await safe_redis_op(
+                lambda k=key: redis_client.hgetall(k),
+                default={},
+                operation="startup.status.scan_state",
+            )
             if scan_data.get("status") == "running":
                 active_scans += 1
         
@@ -238,7 +282,11 @@ class StartupService:
             redis_client = get_redis()
             
             # Mark system as shutting down
-            await redis_client.hset("system:status", "status", "shutting_down")
+            await safe_redis_op(
+                lambda: redis_client.hset("system:status", "status", "shutting_down"),
+                default=None,
+                operation="startup.shutdown.status",
+            )
             
             # TODO: Stop active scans gracefully
             # TODO: Save current state
