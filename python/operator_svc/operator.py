@@ -2,10 +2,11 @@
 """operator.operator — Core Operator logic.
 
 Builds the system prompt, manages conversation context via a 10-item
-FIFO continuity queue, and calls tackle.inference for LLM responses
-with tool-calling loop.
+FIFO continuity queue with session persistence, tool result caching,
+and a topic map for long-term memory.
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -25,18 +26,151 @@ from tackle.inference import call_llm
 from tackle.db import get_role_config
 
 from operator_svc.api_proxy import proxy_request
-from operator_svc.chat_store import log_prompt_response
+from operator_svc.chat_store import log_prompt_response, save_queue, load_queue
 
 _log = logging.getLogger("operator")
 
 MAX_TOOL_ROUNDS = 5
 CONTINUITY_QUEUE_MAX = 10
+TOPIC_MAP_MAX = 50  # max items across all topics
 
-# ── Continuity Queue ──────────────────────────────────────────────
-# In-memory FIFO of compacted conversation summaries.
-# Each item is a dict: {summary, user_message, timestamp}
+# ── Per-Session State ─────────────────────────────────────────────
+# Each session gets its own queue and topic map.
+# Keyed by session_id.
 
-_continuity_queue: deque = deque(maxlen=CONTINUITY_QUEUE_MAX)
+_session_queues: Dict[str, deque] = {}
+_session_topic_maps: Dict[str, Dict[str, List[Dict]]] = {}
+_session_locks: Dict[str, threading.Lock] = {}
+_global_lock = threading.Lock()
+
+
+def _get_session_lock(session_id: str) -> threading.Lock:
+    """Get or create a lock for a session."""
+    with _global_lock:
+        if session_id not in _session_locks:
+            _session_locks[session_id] = threading.Lock()
+        return _session_locks[session_id]
+
+
+def _get_session_queue(session_id: str) -> deque:
+    """Get or create a queue for a session, loading from DB if needed."""
+    with _get_session_lock(session_id):
+        if session_id not in _session_queues:
+            # Load from DB
+            db_items = load_queue(session_id)
+            q = deque(maxlen=CONTINUITY_QUEUE_MAX)
+            for item in db_items:
+                q.append(item)
+            _session_queues[session_id] = q
+            _log.info("Loaded %d items for session %s", len(q), session_id)
+        return _session_queues[session_id]
+
+
+def _get_topic_map(session_id: str) -> Dict[str, List[Dict]]:
+    """Get or create a topic map for a session."""
+    with _get_session_lock(session_id):
+        if session_id not in _session_topic_maps:
+            _session_topic_maps[session_id] = {}
+        return _session_topic_maps[session_id]
+
+
+# ── Tool Result Cache ─────────────────────────────────────────────
+# TTL-based cache for tool results to avoid redundant API calls.
+
+_tool_cache: Dict[str, Dict[str, Any]] = {}
+_tool_cache_lock = threading.Lock()
+
+# TTL per service (seconds)
+TOOL_CACHE_TTL = {
+    "terrain": 300,   # 5 min — services don't change often
+    "conduit": 120,   # 2 min — pipeline state changes moderately
+    "nebula": 60,     # 1 min — agent records change frequently
+}
+
+
+def _cache_key(service: str, method: str, path: str, body: Any = None) -> str:
+    """Generate a cache key from the request."""
+    raw = f"{service}:{method}:{path}:{json.dumps(body, sort_keys=True) if body else ''}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
+def _get_cached(service: str, method: str, path: str, body: Any = None) -> Optional[str]:
+    """Get a cached result if available and not expired."""
+    if method != "GET":
+        return None  # Only cache GET requests
+    key = _cache_key(service, method, path, body)
+    with _tool_cache_lock:
+        entry = _tool_cache.get(key)
+        if entry:
+            ttl = TOOL_CACHE_TTL.get(service, 60)
+            if time.time() - entry["timestamp"] < ttl:
+                _log.info("Cache hit: %s %s", service, path)
+                return entry["result"]
+            else:
+                del _tool_cache[key]
+    return None
+
+
+def _set_cached(service: str, method: str, path: str, body: Any, result: str) -> None:
+    """Store a result in the cache."""
+    if method != "GET":
+        return
+    key = _cache_key(service, method, path, body)
+    with _tool_cache_lock:
+        _tool_cache[key] = {
+            "result": result,
+            "timestamp": time.time(),
+        }
+
+
+# ── Topic Map ─────────────────────────────────────────────────────
+
+TOPIC_KEYWORDS = {
+    "infrastructure": ["service", "server", "health", "status", "running", "terrain", "deploy", "port"],
+    "pipeline": ["plan", "pipeline", "conduit", "work request", "ticket", "session", "circuit"],
+    "requirements": ["requirement", "need", "must", "should", "backlog", "rms", "priority"],
+    "architecture": ["design", "architecture", "decision", "trade", "pattern", "component"],
+    "agent": ["agent", "record", "harvest", "report", "analysis", "nebula"],
+}
+
+
+def _detect_topic(user_message: str) -> str:
+    """Detect the topic of a message based on keywords."""
+    msg_lower = user_message.lower()
+    scores = {}
+    for topic, keywords in TOPIC_KEYWORDS.items():
+        score = sum(1 for kw in keywords if kw in msg_lower)
+        if score > 0:
+            scores[topic] = score
+    if scores:
+        return max(scores, key=scores.get)
+    return "general"
+
+
+def _push_to_topic_map(session_id: str, item: Dict[str, Any]) -> None:
+    """Push an item to the topic map when it leaves the queue."""
+    topic = _detect_topic(item.get("user_message", ""))
+    topic_map = _get_topic_map(session_id)
+    if topic not in topic_map:
+        topic_map[topic] = []
+    topic_map[topic].append(item)
+    # Trim topic map if too large
+    total = sum(len(v) for v in topic_map.values())
+    if total > TOPIC_MAP_MAX:
+        # Remove oldest from smallest topic
+        smallest = min(topic_map, key=lambda k: len(topic_map[k]))
+        if topic_map[smallest]:
+            topic_map[smallest].pop(0)
+
+
+def _find_topic_context(session_id: str, user_message: str) -> List[Dict[str, Any]]:
+    """Find relevant items from the topic map based on the user's message."""
+    topic = _detect_topic(user_message)
+    topic_map = _get_topic_map(session_id)
+    items = topic_map.get(topic, [])
+    # Return last 3 items from the relevant topic
+    return items[-3:] if items else []
+
 
 # ── Tool Definitions ──────────────────────────────────────────────
 
@@ -134,11 +268,7 @@ Operator: {model_response}"""
 
 
 def _compact(user_message: str, model_response: str) -> str:
-    """Compact a prompt/response pair into a brief summary via LLM.
-
-    Uses the operator role with a short, focused prompt to produce
-    a 2-3 sentence summary suitable for the continuity queue.
-    """
+    """Compact a prompt/response pair into a brief summary via LLM."""
     prompt = COMPACTION_PROMPT_TEMPLATE.format(
         user_message=user_message[:2000],
         model_response=model_response[:2000],
@@ -153,42 +283,67 @@ def _compact(user_message: str, model_response: str) -> str:
         return (summary or "").strip()
     except Exception as e:
         _log.warning("Compaction failed: %s", e)
-        # Fallback: truncate the user message
         return user_message[:200]
 
 
-def _push_to_queue(user_message: str, model_response: str) -> None:
+def _push_to_queue(session_id: str, user_message: str, model_response: str) -> None:
     """Compact the exchange and push to the continuity queue."""
     summary = _compact(user_message, model_response)
-    if summary:
-        _continuity_queue.append({
-            "summary": summary,
-            "user_message": user_message[:500],
-            "timestamp": time.time(),
-        })
-        _log.info(
-            "Continuity queue: %d items, latest: %.80s...",
-            len(_continuity_queue), summary,
-        )
+    if not summary:
+        return
+
+    item = {
+        "summary": summary,
+        "user_message": user_message[:500],
+        "topic": _detect_topic(user_message),
+        "timestamp": time.time(),
+    }
+
+    q = _get_session_queue(session_id)
+    with _get_session_lock(session_id):
+        # If queue is full, the oldest item will be pushed out
+        if len(q) >= CONTINUITY_QUEUE_MAX:
+            oldest = q[0]
+            _push_to_topic_map(session_id, oldest)
+        q.append(item)
+
+    # Persist to DB in background
+    threading.Thread(
+        target=save_queue,
+        args=(session_id, list(q)),
+        daemon=True,
+    ).start()
+
+    _log.info(
+        "Session %s queue: %d items, topic: %s",
+        session_id, len(q), item["topic"],
+    )
 
 
 # ── Prompt Building ───────────────────────────────────────────────
 
-def build_prompt(user_message: str) -> str:
+def build_prompt(user_message: str, session_id: str) -> str:
     """Build the prompt string for the LLM call.
 
-    Uses the continuity queue for context. Each queue item is presented
-    as a compacted summary of a prior exchange.
-
-    call_llm() handles the system_prompt separately.
+    Uses the continuity queue for recent context and the topic map
+    for relevant long-term context.
     """
     parts = []
 
     # Add compacted history from continuity queue
-    if _continuity_queue:
+    q = _get_session_queue(session_id)
+    if q:
         parts.append("Previous conversation context:")
-        for i, item in enumerate(_continuity_queue):
+        for i, item in enumerate(q):
             parts.append(f"[{i+1}] {item['summary']}")
+        parts.append("")
+
+    # Add relevant topic map context
+    topic_items = _find_topic_context(session_id, user_message)
+    if topic_items:
+        parts.append("Earlier discussion on this topic:")
+        for item in topic_items:
+            parts.append(f"  - {item['summary']}")
         parts.append("")
 
     # Add the new user message
@@ -200,16 +355,9 @@ def build_prompt(user_message: str) -> str:
 # ── Tool Call Parsing & Execution ─────────────────────────────────
 
 def _parse_tool_call(text: str) -> Optional[Dict[str, str]]:
-    """Parse a <tool_call>...</tool_call> block from LLM output.
-
-    Handles both cases: with and without closing  tag.
-    Returns dict with keys: service, method, path, body (optional)
-    or None if no tool call found.
-    """
-    # Try with closing tag first
+    """Parse a <tool_call>...</tool_call> block from LLM output."""
     match = re.search(r"<tool_call>(.*?)</tool_call>", text, re.DOTALL)
     if not match:
-        # Try without closing tag — match from <tool_call> to end of text
         match = re.search(r"<tool_call>(.*)", text, re.DOTALL)
     if not match:
         return None
@@ -235,16 +383,12 @@ def _parse_tool_call(text: str) -> Optional[Dict[str, str]]:
 
 
 def _execute_tool_call(call: Dict[str, str]) -> str:
-    """Execute a tool call via the API proxy.
-
-    Returns a string summary of the result for the LLM to consume.
-    """
+    """Execute a tool call via the API proxy with caching."""
     service = call["service"]
     method = call["method"]
     path = call["path"]
     body = None
 
-    # Map tool names to actual service names
     SERVICE_ALIAS = {
         "query_nebula": "nebula",
         "query_conduit": "conduit",
@@ -258,16 +402,24 @@ def _execute_tool_call(call: Dict[str, str]) -> str:
         except json.JSONDecodeError:
             return f"Error: invalid JSON body: {call['body']}"
 
+    # Check cache first
+    cached = _get_cached(service, method, path, body)
+    if cached is not None:
+        return cached
+
+    # Execute the request
     result = proxy_request(service=service, path=path, method=method, body=body)
 
     if result["error"]:
         return f"Error ({result['status']}): {result['error']}"
 
     data = result["data"]
-    # Truncate very large responses to stay within context window
     text = json.dumps(data, indent=2, default=str)
     if len(text) > 8000:
         text = text[:8000] + "\n... (truncated)"
+
+    # Cache the result
+    _set_cached(service, method, path, body, text)
 
     return text
 
@@ -280,19 +432,11 @@ def respond(
     role: str = "operator",
     log_level: str = "ERROR",
 ) -> Dict[str, Any]:
-    """Process a user message and return the operator's response.
-
-    1. Build prompt from continuity queue + new message
-    2. Run tool-calling loop (up to MAX_TOOL_ROUNDS)
-    3. Compact the exchange and push to continuity queue
-    4. Log to database for audit trail
-
-    Returns dict with keys: response, model_identifier, latency_ms
-    """
+    """Process a user message and return the operator's response."""
     start = time.time()
 
-    # Build prompt from continuity queue
-    prompt = build_prompt(user_message)
+    # Build prompt from continuity queue + topic map
+    prompt = build_prompt(user_message, session_id)
 
     # Tool-calling loop
     response_text = ""
@@ -311,38 +455,36 @@ def respond(
 
         tool_call = _parse_tool_call(response_text)
         if tool_call is None:
-            # No tool call — this is the final answer
             break
 
-        # Execute the tool call and append result to prompt
         _log.info("Tool call: %s %s %s", tool_call["method"], tool_call["service"], tool_call["path"])
         tool_result = _execute_tool_call(tool_call)
 
-        # Append the tool call and result to the prompt for the next round
         prompt += (
             f"\n{response_text}"
             f"\n\nTool result:\n{tool_result}"
             f"\n\nNow answer the user's question using the tool result above."
         )
     else:
-        # Exhausted all rounds — return whatever we have
         pass
 
     latency_ms = int((time.time() - start) * 1000)
 
-    # Get model info for logging
     try:
         cfg = get_role_config(role)
         model_id = cfg.get("model_identifier", "unknown")
     except Exception:
         model_id = "unknown"
 
-    # Strip any remaining tool call blocks from the final response
     clean_response = re.sub(r"<tool_call>.*?</tool_call>", "", response_text, flags=re.DOTALL).strip()
     clean_response = re.sub(r"<tool_call>.*", "", clean_response, flags=re.DOTALL).strip()
 
-    # Compact and push to continuity queue (non-blocking)
-    threading.Thread(target=_push_to_queue, args=(user_message, clean_response), daemon=True).start()
+    # Push to continuity queue (non-blocking, includes DB persistence)
+    threading.Thread(
+        target=_push_to_queue,
+        args=(session_id, user_message, clean_response),
+        daemon=True,
+    ).start()
 
     # Log to database for audit trail
     log_prompt_response(

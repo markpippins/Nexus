@@ -100,6 +100,51 @@ def get_session_history(session_id: str, limit: int = 50) -> List[Dict[str, Any]
     return messages
 
 
+def save_queue(session_id: str, items: List[Dict[str, Any]]) -> bool:
+    """Persist the continuity queue to the database."""
+    # Clear existing queue for this session
+    sql = f"SELECT operator.clear_queue('{session_id}');"
+    rc, out = _psql(sql, timeout=10)
+    if rc != 0:
+        _log.error("Failed to clear queue: %s", out)
+        return False
+
+    # Insert each item
+    for i, item in enumerate(items):
+        summary = item.get("summary", "").replace("'", "''")
+        user_msg = item.get("user_message", "").replace("'", "''")
+        topic = item.get("topic", "").replace("'", "''")
+        sql = f"SELECT operator.save_queue_item('{session_id}', '{summary}', '{user_msg}', '{topic}', {i});"
+        rc, out = _psql(sql, timeout=10)
+        if rc != 0:
+            _log.error("Failed to save queue item %d: %s", i, out)
+            return False
+
+    return True
+
+
+def load_queue(session_id: str) -> List[Dict[str, Any]]:
+    """Load the continuity queue from the database."""
+    sql = f"SELECT * FROM operator.load_queue('{session_id}');"
+    rc, out = _psql(sql, timeout=10)
+    if rc != 0 or not out:
+        return []
+
+    items = []
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("|")
+        if len(parts) >= 3:
+            items.append({
+                "summary": parts[0],
+                "user_message": parts[1],
+                "topic": parts[2] if len(parts) > 2 else "",
+                "timestamp": 0,  # DB doesn't store timestamp, use 0
+            })
+    return items
+
+
 def get_recent_sessions(limit: int = 20) -> List[Dict[str, Any]]:
     """List recent sessions with message counts."""
     sql = f"""
