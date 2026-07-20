@@ -3,7 +3,7 @@
 
 Builds the system prompt, manages conversation context via a 10-item
 FIFO continuity queue with session persistence, tool result caching,
-and a topic map for long-term memory.
+and a hybrid topic+entity index for long-term memory.
 """
 
 import hashlib
@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 from collections import deque
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _TACKLE_PARENT = os.path.dirname(_SCRIPT_DIR)  # nexus/python/
@@ -32,20 +32,18 @@ _log = logging.getLogger("operator")
 
 MAX_TOOL_ROUNDS = 5
 CONTINUITY_QUEUE_MAX = 10
-TOPIC_MAP_MAX = 50  # max items across all topics
+ENTITY_INDEX_MAX = 100  # max items across all entities
 
 # ── Per-Session State ─────────────────────────────────────────────
-# Each session gets its own queue and topic map.
-# Keyed by session_id.
 
 _session_queues: Dict[str, deque] = {}
+_session_entity_indexes: Dict[str, Dict[str, List[Dict]]] = {}
 _session_topic_maps: Dict[str, Dict[str, List[Dict]]] = {}
 _session_locks: Dict[str, threading.Lock] = {}
 _global_lock = threading.Lock()
 
 
 def _get_session_lock(session_id: str) -> threading.Lock:
-    """Get or create a lock for a session."""
     with _global_lock:
         if session_id not in _session_locks:
             _session_locks[session_id] = threading.Lock()
@@ -53,10 +51,8 @@ def _get_session_lock(session_id: str) -> threading.Lock:
 
 
 def _get_session_queue(session_id: str) -> deque:
-    """Get or create a queue for a session, loading from DB if needed."""
     with _get_session_lock(session_id):
         if session_id not in _session_queues:
-            # Load from DB
             db_items = load_queue(session_id)
             q = deque(maxlen=CONTINUITY_QUEUE_MAX)
             for item in db_items:
@@ -66,8 +62,14 @@ def _get_session_queue(session_id: str) -> deque:
         return _session_queues[session_id]
 
 
+def _get_entity_index(session_id: str) -> Dict[str, List[Dict]]:
+    with _get_session_lock(session_id):
+        if session_id not in _session_entity_indexes:
+            _session_entity_indexes[session_id] = {}
+        return _session_entity_indexes[session_id]
+
+
 def _get_topic_map(session_id: str) -> Dict[str, List[Dict]]:
-    """Get or create a topic map for a session."""
     with _get_session_lock(session_id):
         if session_id not in _session_topic_maps:
             _session_topic_maps[session_id] = {}
@@ -75,29 +77,25 @@ def _get_topic_map(session_id: str) -> Dict[str, List[Dict]]:
 
 
 # ── Tool Result Cache ─────────────────────────────────────────────
-# TTL-based cache for tool results to avoid redundant API calls.
 
 _tool_cache: Dict[str, Dict[str, Any]] = {}
 _tool_cache_lock = threading.Lock()
 
-# TTL per service (seconds)
 TOOL_CACHE_TTL = {
-    "terrain": 300,   # 5 min — services don't change often
-    "conduit": 120,   # 2 min — pipeline state changes moderately
-    "nebula": 60,     # 1 min — agent records change frequently
+    "terrain": 300,
+    "conduit": 120,
+    "nebula": 60,
 }
 
 
 def _cache_key(service: str, method: str, path: str, body: Any = None) -> str:
-    """Generate a cache key from the request."""
     raw = f"{service}:{method}:{path}:{json.dumps(body, sort_keys=True) if body else ''}"
     return hashlib.md5(raw.encode()).hexdigest()
 
 
 def _get_cached(service: str, method: str, path: str, body: Any = None) -> Optional[str]:
-    """Get a cached result if available and not expired."""
     if method != "GET":
-        return None  # Only cache GET requests
+        return None
     key = _cache_key(service, method, path, body)
     with _tool_cache_lock:
         entry = _tool_cache.get(key)
@@ -112,18 +110,142 @@ def _get_cached(service: str, method: str, path: str, body: Any = None) -> Optio
 
 
 def _set_cached(service: str, method: str, path: str, body: Any, result: str) -> None:
-    """Store a result in the cache."""
     if method != "GET":
         return
     key = _cache_key(service, method, path, body)
     with _tool_cache_lock:
-        _tool_cache[key] = {
-            "result": result,
-            "timestamp": time.time(),
-        }
+        _tool_cache[key] = {"result": result, "timestamp": time.time()}
 
 
-# ── Topic Map ─────────────────────────────────────────────────────
+# ── Regex Entity Extraction ───────────────────────────────────────
+
+# Known service names from terrain
+KNOWN_SERVICES = {
+    "nats", "postgresql", "address-tts", "broker-gateway", "cascade",
+    "conduit-ui", "conduit-mcp", "duality-ui", "file-system-server",
+    "image-server", "mongodb", "nebula-srv", "nebula-mcp", "nebula-ui",
+    "nexus-console", "ollama", "operator-svc", "peb-kernel", "plurality-ui",
+    "redis", "role-memory-srv", "service-registry", "tackle-ui", "terrain",
+    "ui-event-bus", "vision-srv", "vision-srv-3104", "vision-srv-py",
+    "wrp-bridge-daemon",
+}
+
+# Patterns for structured IDs
+UUID_PATTERN = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b", re.IGNORECASE)
+PLAN_ID_PATTERN = re.compile(r"\bplan[\s-]*(\d+)\b", re.IGNORECASE)
+WR_ID_PATTERN = re.compile(r"\b(?:wr|work[\s-]*request)[\s-]*(\d+)\b", re.IGNORECASE)
+REQ_ID_PATTERN = re.compile(r"\b(?:req|requirement)[\s-]*(\d+)\b", re.IGNORECASE)
+PORT_PATTERN = re.compile(r"\bport[\s:]*(\d{4,5})\b", re.IGNORECASE)
+
+
+def _extract_regex_entities(text: str) -> Set[str]:
+    """Extract entities from text using regex patterns."""
+    entities = set()
+
+    # Known service names
+    text_lower = text.lower()
+    for svc in KNOWN_SERVICES:
+        if svc in text_lower:
+            entities.add(svc)
+
+    # Structured IDs
+    for match in UUID_PATTERN.finditer(text):
+        entities.add(match.group().lower())
+    for match in PLAN_ID_PATTERN.finditer(text):
+        entities.add(f"plan-{match.group(1)}")
+    for match in WR_ID_PATTERN.finditer(text):
+        entities.add(f"wr-{match.group(1)}")
+    for match in REQ_ID_PATTERN.finditer(text):
+        entities.add(f"req-{match.group(1)}")
+    for match in PORT_PATTERN.finditer(text):
+        entities.add(f"port-{match.group(1)}")
+
+    return entities
+
+
+# ── LLM Entity Extraction ─────────────────────────────────────────
+
+ENTITY_EXTRACTION_PROMPT = """Extract entities and topics from this conversation exchange.
+
+Output ONLY valid JSON with this structure:
+{{"topics": ["topic1"], "entities": ["entity1", "entity2"]}}
+
+Rules:
+- topics: 1-3 high-level topics (infrastructure, pipeline, requirements, architecture, agent, general)
+- entities: specific names mentioned (services, plans, work requests, requirements, ports, people)
+- Be specific: "NATS" not "messaging", "plan-12" not "plan"
+- Include port numbers as "port-XXXX"
+- Include UUIDs if present
+- Do NOT include generic words like "data", "system", "service" unless they are proper names
+
+User: {user_message}
+
+Response: {model_response}"""
+
+
+def _extract_entities_llm(user_message: str, model_response: str) -> Dict[str, Any]:
+    """Use LLM to extract structured entities and topics."""
+    prompt = ENTITY_EXTRACTION_PROMPT.format(
+        user_message=user_message[:1500],
+        model_response=model_response[:1500],
+    )
+    try:
+        result = call_llm(
+            prompt=prompt,
+            role="operator",
+            system_prompt="You are an entity extraction assistant. Output only valid JSON.",
+            fallback=True,
+        )
+        # Parse JSON from response
+        result = (result or "").strip()
+        # Handle markdown code blocks
+        if result.startswith("```"):
+            result = re.sub(r"^```(?:json)?\s*", "", result)
+            result = re.sub(r"\s*```$", "", result)
+        parsed = json.loads(result)
+        # Normalize keys (handle variations like "topic" vs "topics")
+        topics = parsed.get("topics") or parsed.get("topic") or []
+        entities = parsed.get("entities") or parsed.get("entity") or []
+        if isinstance(topics, str):
+            topics = [topics]
+        if isinstance(entities, str):
+            entities = [entities]
+        return {"topics": topics, "entities": entities}
+    except (json.JSONDecodeError, Exception) as e:
+        _log.warning("LLM entity extraction failed: %s", e)
+        return {"topics": [], "entities": []}
+
+
+# ── Hybrid Entity Extraction ──────────────────────────────────────
+
+def _extract_entities(user_message: str, model_response: str) -> Dict[str, Any]:
+    """Hybrid extraction: regex for known patterns + LLM for semantic entities."""
+    # Regex extraction (fast, deterministic)
+    regex_entities = _extract_regex_entities(user_message + " " + model_response)
+
+    # LLM extraction (slower, semantic)
+    llm_result = _extract_entities_llm(user_message, model_response)
+
+    # Merge: regex entities take precedence for known patterns
+    all_entities = list(llm_result.get("entities", []))
+    all_entities.extend(list(regex_entities))
+    # Deduplicate, normalize
+    seen = set()
+    deduped = []
+    for e in all_entities:
+        e_lower = e.lower().strip()
+        if e_lower and e_lower not in seen:
+            seen.add(e_lower)
+            deduped.append(e_lower)
+
+    topics = llm_result.get("topics", [])
+    if not topics:
+        topics = [_detect_topic(user_message)]
+
+    return {"topics": topics, "entities": deduped}
+
+
+# ── Topic Detection (keyword fallback) ────────────────────────────
 
 TOPIC_KEYWORDS = {
     "infrastructure": ["service", "server", "health", "status", "running", "terrain", "deploy", "port"],
@@ -135,7 +257,7 @@ TOPIC_KEYWORDS = {
 
 
 def _detect_topic(user_message: str) -> str:
-    """Detect the topic of a message based on keywords."""
+    """Detect topic via keyword matching (fallback for when LLM extraction fails)."""
     msg_lower = user_message.lower()
     scores = {}
     for topic, keywords in TOPIC_KEYWORDS.items():
@@ -147,29 +269,68 @@ def _detect_topic(user_message: str) -> str:
     return "general"
 
 
+# ── Index Operations ──────────────────────────────────────────────
+
+def _push_to_entity_index(session_id: str, item: Dict[str, Any]) -> None:
+    """Add item to entity index (entity → [items])."""
+    entity_index = _get_entity_index(session_id)
+    for entity in item.get("entities", []):
+        if entity not in entity_index:
+            entity_index[entity] = []
+        entity_index[entity].append(item)
+    # Trim if too large
+    total = sum(len(v) for v in entity_index.values())
+    if total > ENTITY_INDEX_MAX:
+        # Remove oldest entity with fewest items
+        smallest = min(entity_index, key=lambda k: len(entity_index[k]))
+        if entity_index[smallest]:
+            entity_index[smallest].pop(0)
+            if not entity_index[smallest]:
+                del entity_index[smallest]
+
+
 def _push_to_topic_map(session_id: str, item: Dict[str, Any]) -> None:
-    """Push an item to the topic map when it leaves the queue."""
-    topic = _detect_topic(item.get("user_message", ""))
+    """Add item to topic map (topic → [items])."""
     topic_map = _get_topic_map(session_id)
-    if topic not in topic_map:
-        topic_map[topic] = []
-    topic_map[topic].append(item)
-    # Trim topic map if too large
+    for topic in item.get("topics", ["general"]):
+        if topic not in topic_map:
+            topic_map[topic] = []
+        topic_map[topic].append(item)
+    # Trim
     total = sum(len(v) for v in topic_map.values())
-    if total > TOPIC_MAP_MAX:
-        # Remove oldest from smallest topic
+    if total > ENTITY_INDEX_MAX:
         smallest = min(topic_map, key=lambda k: len(topic_map[k]))
         if topic_map[smallest]:
             topic_map[smallest].pop(0)
 
 
-def _find_topic_context(session_id: str, user_message: str) -> List[Dict[str, Any]]:
-    """Find relevant items from the topic map based on the user's message."""
-    topic = _detect_topic(user_message)
+def _find_relevant_context(session_id: str, user_message: str) -> List[Dict[str, Any]]:
+    """Find relevant items using entity matching + topic matching."""
+    # Extract entities from the user's message
+    user_entities = _extract_regex_entities(user_message)
+    entity_index = _get_entity_index(session_id)
     topic_map = _get_topic_map(session_id)
-    items = topic_map.get(topic, [])
-    # Return last 3 items from the relevant topic
-    return items[-3:] if items else []
+
+    matched_items: Dict[str, Dict[str, Any]] = {}  # summary → item (dedup)
+
+    # Entity matching (highest relevance)
+    for entity in user_entities:
+        for item in entity_index.get(entity, []):
+            key = item.get("summary", "")
+            if key not in matched_items:
+                matched_items[key] = item
+
+    # Topic matching (secondary)
+    topic = _detect_topic(user_message)
+    for item in topic_map.get(topic, []):
+        key = item.get("summary", "")
+        if key not in matched_items:
+            matched_items[key] = item
+
+    # Return up to 5 most recent items
+    items = list(matched_items.values())
+    items.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+    return items[:5]
 
 
 # ── Tool Definitions ──────────────────────────────────────────────
@@ -287,23 +448,28 @@ def _compact(user_message: str, model_response: str) -> str:
 
 
 def _push_to_queue(session_id: str, user_message: str, model_response: str) -> None:
-    """Compact the exchange and push to the continuity queue."""
+    """Compact, extract entities, and push to the continuity queue."""
     summary = _compact(user_message, model_response)
     if not summary:
         return
 
+    # Extract entities and topics (hybrid regex + LLM)
+    extracted = _extract_entities(user_message, model_response)
+
     item = {
         "summary": summary,
         "user_message": user_message[:500],
-        "topic": _detect_topic(user_message),
+        "topics": extracted["topics"],
+        "entities": extracted["entities"],
         "timestamp": time.time(),
     }
 
     q = _get_session_queue(session_id)
     with _get_session_lock(session_id):
-        # If queue is full, the oldest item will be pushed out
+        # If queue is full, push oldest to indexes
         if len(q) >= CONTINUITY_QUEUE_MAX:
             oldest = q[0]
+            _push_to_entity_index(session_id, oldest)
             _push_to_topic_map(session_id, oldest)
         q.append(item)
 
@@ -315,8 +481,10 @@ def _push_to_queue(session_id: str, user_message: str, model_response: str) -> N
     ).start()
 
     _log.info(
-        "Session %s queue: %d items, topic: %s",
-        session_id, len(q), item["topic"],
+        "Session %s queue: %d items, topics: %s, entities: %s",
+        session_id, len(q),
+        extracted["topics"],
+        extracted["entities"][:5],
     )
 
 
@@ -325,8 +493,8 @@ def _push_to_queue(session_id: str, user_message: str, model_response: str) -> N
 def build_prompt(user_message: str, session_id: str) -> str:
     """Build the prompt string for the LLM call.
 
-    Uses the continuity queue for recent context and the topic map
-    for relevant long-term context.
+    Uses the continuity queue for recent context and the entity+topic
+    index for relevant long-term context.
     """
     parts = []
 
@@ -338,11 +506,11 @@ def build_prompt(user_message: str, session_id: str) -> str:
             parts.append(f"[{i+1}] {item['summary']}")
         parts.append("")
 
-    # Add relevant topic map context
-    topic_items = _find_topic_context(session_id, user_message)
-    if topic_items:
-        parts.append("Earlier discussion on this topic:")
-        for item in topic_items:
+    # Add relevant context from entity+topic index
+    relevant = _find_relevant_context(session_id, user_message)
+    if relevant:
+        parts.append("Earlier related discussion:")
+        for item in relevant:
             parts.append(f"  - {item['summary']}")
         parts.append("")
 
@@ -435,7 +603,7 @@ def respond(
     """Process a user message and return the operator's response."""
     start = time.time()
 
-    # Build prompt from continuity queue + topic map
+    # Build prompt from continuity queue + entity/topic index
     prompt = build_prompt(user_message, session_id)
 
     # Tool-calling loop
