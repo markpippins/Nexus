@@ -58,8 +58,6 @@ export class SidebarComponent implements OnDestroy {
   serversMenuClick = output<void>();
   hostServersMenuClick = output<void>();
   localConfigMenuClick = output<void>();
-  importClick = output<void>();
-  exportClick = output<void>();
   renameItemInTree = output<{ path: string[], newName: string }>();
   deleteItemInTree = output<string[]>();
   createFolderInTree = output<{ path: string[], name: string }>();
@@ -67,7 +65,6 @@ export class SidebarComponent implements OnDestroy {
   connectToServer = output<string>();
   disconnectFromServer = output<string>();
   editServerProfile = output<string>();
-  openCreateUser = output<void>();
   serviceSelected = output<ServiceInstance>();
 
   // Service Mesh data bindings (from ServiceMeshService)
@@ -341,25 +338,16 @@ export class SidebarComponent implements OnDestroy {
     this.isHamburgerMenuOpen.update(v => !v);
   }
 
-  onMenuItemClick(emitterName: 'localConfigMenuClick' | 'importClick' | 'exportClick' | 'serversMenuClick' | 'hostServersMenuClick' | 'createUserClick'): void {
+  onMenuItemClick(emitterName: 'localConfigMenuClick' | 'serversMenuClick' | 'hostServersMenuClick'): void {
     switch (emitterName) {
       case 'localConfigMenuClick':
         this.localConfigMenuClick.emit();
-        break;
-      case 'importClick':
-        this.importClick.emit();
-        break;
-      case 'exportClick':
-        this.exportClick.emit();
         break;
       case 'serversMenuClick':
         this.serversMenuClick.emit();
         break;
       case 'hostServersMenuClick':
         this.hostServersMenuClick.emit();
-        break;
-      case 'createUserClick':
-        this.openCreateUser.emit();
         break;
     }
     this.isHamburgerMenuOpen.set(false);
