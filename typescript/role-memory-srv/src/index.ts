@@ -72,7 +72,26 @@ async function main() {
   console.log("[role-memory-srv] PG connected.");
 
   console.log("[role-memory-srv] Connecting to Redis...");
-  initRedis();
+  const redis = initRedis();
+
+  // Auto-heal: ioredis emits "ready" on both initial connect AND every
+  // reconnect after an outage (the retryStrategy in redis.ts always retries).
+  // Re-syncing on ready means the Redis cache repopulates automatically once
+  // Redis is back, without anyone needing to call POST /refresh. Fire-and-forget
+  // so the handler never blocks the event loop; errors are logged, not thrown.
+  // At boot this may race with the explicit syncAll() below — both write the
+  // same keys from the same PG source, so the double write is harmless.
+  redis.on("ready", () => {
+    syncAll()
+      .then((r) =>
+        console.log(
+          `[role-memory-srv] Auto-sync on Redis ready: ${r.procedures} procedures, ${r.roleIndices} role indices`
+        )
+      )
+      .catch((err: any) =>
+        console.warn(`[role-memory-srv] Auto-sync on Redis ready failed: ${err.message}`)
+      );
+  });
 
   console.log("[role-memory-srv] Running initial sync...");
   try {
