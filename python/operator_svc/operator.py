@@ -163,73 +163,61 @@ def _extract_regex_entities(text: str) -> Set[str]:
     return entities
 
 
-# ── LLM Entity Extraction ─────────────────────────────────────────
+# ── Combined Compaction + Entity Extraction ───────────────────────
+# Single LLM call produces both summary and structured metadata.
 
-ENTITY_EXTRACTION_PROMPT = """Extract entities and topics from this conversation exchange.
+COMPACTION_NER_PROMPT = """Analyze this conversation exchange. Produce ONLY valid JSON with this structure:
+{{"summary": "2-3 sentence summary", "topics": ["topic1"], "entities": ["entity1", "entity2"]}}
 
-Output ONLY valid JSON with this structure:
-{{"topics": ["topic1"], "entities": ["entity1", "entity2"]}}
-
-Rules:
-- topics: 1-3 high-level topics (infrastructure, pipeline, requirements, architecture, agent, general)
-- entities: specific names mentioned (services, plans, work requests, requirements, ports, people)
+summary: Factual summary of what was asked, what data was retrieved, and what was answered.
+topics: 1-3 high-level topics (infrastructure, pipeline, requirements, architecture, agent, general).
+entities: Specific names mentioned — services, plans, work requests, requirements, ports, UUIDs.
 - Be specific: "NATS" not "messaging", "plan-12" not "plan"
 - Include port numbers as "port-XXXX"
-- Include UUIDs if present
-- Do NOT include generic words like "data", "system", "service" unless they are proper names
+- Do NOT include generic words unless they are proper names
 
 User: {user_message}
 
-Response: {model_response}"""
+Operator: {model_response}"""
 
 
-def _extract_entities_llm(user_message: str, model_response: str) -> Dict[str, Any]:
-    """Use LLM to extract structured entities and topics."""
-    prompt = ENTITY_EXTRACTION_PROMPT.format(
-        user_message=user_message[:1500],
-        model_response=model_response[:1500],
+def _compact_and_extract(user_message: str, model_response: str) -> Dict[str, Any]:
+    """Single LLM call: compact the exchange and extract entities/topics."""
+    # Regex extraction (fast, deterministic)
+    regex_entities = _extract_regex_entities(user_message + " " + model_response)
+
+    # LLM extraction (combined compaction + NER)
+    prompt = COMPACTION_NER_PROMPT.format(
+        user_message=user_message[:2000],
+        model_response=model_response[:2000],
     )
     try:
         result = call_llm(
             prompt=prompt,
             role="operator",
-            system_prompt="You are an entity extraction assistant. Output only valid JSON.",
+            system_prompt="You are a summarization and entity extraction assistant. Output only valid JSON.",
             fallback=True,
         )
-        # Parse JSON from response
         result = (result or "").strip()
-        # Handle markdown code blocks
         if result.startswith("```"):
             result = re.sub(r"^```(?:json)?\s*", "", result)
             result = re.sub(r"\s*```$", "", result)
         parsed = json.loads(result)
-        # Normalize keys (handle variations like "topic" vs "topics")
+        summary = (parsed.get("summary") or "").strip()
         topics = parsed.get("topics") or parsed.get("topic") or []
         entities = parsed.get("entities") or parsed.get("entity") or []
         if isinstance(topics, str):
             topics = [topics]
         if isinstance(entities, str):
             entities = [entities]
-        return {"topics": topics, "entities": entities}
     except (json.JSONDecodeError, Exception) as e:
-        _log.warning("LLM entity extraction failed: %s", e)
-        return {"topics": [], "entities": []}
+        _log.warning("Combined compaction+NER failed: %s", e)
+        summary = user_message[:200]
+        topics = []
+        entities = []
 
-
-# ── Hybrid Entity Extraction ──────────────────────────────────────
-
-def _extract_entities(user_message: str, model_response: str) -> Dict[str, Any]:
-    """Hybrid extraction: regex for known patterns + LLM for semantic entities."""
-    # Regex extraction (fast, deterministic)
-    regex_entities = _extract_regex_entities(user_message + " " + model_response)
-
-    # LLM extraction (slower, semantic)
-    llm_result = _extract_entities_llm(user_message, model_response)
-
-    # Merge: regex entities take precedence for known patterns
-    all_entities = list(llm_result.get("entities", []))
-    all_entities.extend(list(regex_entities))
-    # Deduplicate, normalize
+    # Merge regex entities
+    all_entities = list(entities) + list(regex_entities)
     seen = set()
     deduped = []
     for e in all_entities:
@@ -238,11 +226,14 @@ def _extract_entities(user_message: str, model_response: str) -> Dict[str, Any]:
             seen.add(e_lower)
             deduped.append(e_lower)
 
-    topics = llm_result.get("topics", [])
     if not topics:
         topics = [_detect_topic(user_message)]
 
-    return {"topics": topics, "entities": deduped}
+    return {
+        "summary": summary or user_message[:200],
+        "topics": topics,
+        "entities": deduped,
+    }
 
 
 # ── Topic Detection (keyword fallback) ────────────────────────────
@@ -417,44 +408,13 @@ Available tools:
 - Stay in character as the Nexus operator."""
 
 
-# ── Compaction ────────────────────────────────────────────────────
-
-COMPACTION_PROMPT_TEMPLATE = """Summarize this conversation exchange in 2-3 sentences. \
-Focus on: what the user asked, what data was retrieved (if any), and what the answer was. \
-Be factual and concise. Do not add opinions or interpretation.
-
-User: {user_message}
-
-Operator: {model_response}"""
-
-
-def _compact(user_message: str, model_response: str) -> str:
-    """Compact a prompt/response pair into a brief summary via LLM."""
-    prompt = COMPACTION_PROMPT_TEMPLATE.format(
-        user_message=user_message[:2000],
-        model_response=model_response[:2000],
-    )
-    try:
-        summary = call_llm(
-            prompt=prompt,
-            role="operator",
-            system_prompt="You are a summarization assistant. Produce only the summary, nothing else.",
-            fallback=True,
-        )
-        return (summary or "").strip()
-    except Exception as e:
-        _log.warning("Compaction failed: %s", e)
-        return user_message[:200]
-
-
 def _push_to_queue(session_id: str, user_message: str, model_response: str) -> None:
     """Compact, extract entities, and push to the continuity queue."""
-    summary = _compact(user_message, model_response)
+    # Single LLM call: compaction + entity extraction
+    extracted = _compact_and_extract(user_message, model_response)
+    summary = extracted["summary"]
     if not summary:
         return
-
-    # Extract entities and topics (hybrid regex + LLM)
-    extracted = _extract_entities(user_message, model_response)
 
     item = {
         "summary": summary,
