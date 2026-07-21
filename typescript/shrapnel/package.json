@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test \"test/**/*.test.js\"",
     "migrate": "node src/scripts/migrate.js",
-    "smoke": "node src/scripts/smoke.js"
+    "smoke": "node src/scripts/smoke.js",
+    "dbcheck": "psql \"${SHRAPNEL_PG_DSN:-postgresql://pguser:pgpass@localhost:5432/postgres}\" -v ON_ERROR_STOP=1 -f negative_path_check.sql"
   },
   "dependencies": {
     "cors": "^2.8.5",

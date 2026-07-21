@@ -72,8 +72,57 @@ The API encodes strictly in the order defined by the spec:
 All three sub-steps happen inside a single transaction so partial encodings
 roll back on failure.
 
+## Schema integrity guarantees
+
+Every table in the shrapnel schema has an explicit primary key (the original
+shrapnel review surfaced tables like `data_source.id` and `qbe_table.id` that
+were `bigint NOT NULL` but lacked `PRIMARY KEY` — the local shrapnel schema
+does not have this defect). All relationships are declared via `FOREIGN KEY`
+constraints (e.g. `object_attribute_value.value_id -> value.id`,
+`field.field_type_code -> field_type.code`,
+`object_attribute_value.{object_id, field_id} -> object_instance.id / field.id`).
+The junction table carries both a surrogate `id` PK and a `UNIQUE(object_id,
+field_id)` composite to prevent duplicate bindings. The `field.property_name`
+column has a unique constraint to support `ON CONFLICT (property_name)` upserts.
+
+The polymorphic value<->value_<type> pair deserves special attention.
+
+The 1:1 binding between `value.id` and exactly one `value_<type>.id` extension
+row is enforced at TWO layers:
+
+1. **DB layer** — migration `0002_value_extension_type_guard.sql` installs a
+   `BEFORE INSERT OR UPDATE` trigger on every `value_<type>` table that
+   raises an exception unless the parent `value.value_type_code` matches the
+   type the extension represents. This means:
+   - you cannot insert a `value_string` row for a parent `value` whose
+     `value_type_code = 1` (Long) — the trigger raises;
+   - you cannot insert the same `value.id` into TWO different extension
+     tables because the second extension's trigger would assert the wrong
+     type code;
+   - you cannot insert an extension row for an `id` that doesn't exist in
+     `value` at all (FK already catches this, the trigger re-states it).
+2. **API layer** — `lib/encode.js`'s `encodePayload()` inserts the `value`
+   base row AND the matching `value_<type>` row inside a single
+   `withTransaction()` call. Partial encodings cannot escape: any failure in
+   either row rolls the whole transaction back.
+
+The one gap that is NOT closed purely inside the database schema is **existence**:
+nothing structurally prevents a `value` row from having NO extension row at
+all (a deferred constraint cannot know which extension table to expect). The
+API invariant above makes this impossible in practice for writes going
+through the shrapnel-srv; any other writer that talks to the shrapnel schema
+directly MUST maintain the same invariant by inserting both rows in the same
+transaction.
+
 ## Migrations
 
 - `migrations/0001_init.sql` — full schema DDL (idempotent).
-- `migrations/0002_smoke_example.sql` — the canonical DO-block example from the
-  spec, plus a decode query to verify the round-trip.
+- `migrations/0002_value_extension_type_guard.sql` — DB-level guard trigger
+  that rejects any `value_<type>` extension row whose parent `value` row's
+  declared `value_type_code` does not match the type the extension represents.
+- `smoke_example.sql` — the canonical DO-block example from the spec, plus a
+  decode query to verify the round-trip. Not part of the migration flow; run
+  manually with `psql -f smoke_example.sql` against the same DB.
+- `negative_path_check.sql` — proves the type-guard trigger in `0002` fires
+  on each failure mode (wrong extension, second extension, no parent).
+  Run with `npm run dbcheck`.
