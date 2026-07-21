@@ -3,22 +3,23 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { DataService } from '../../services/data.service';
+import { entityRouteForType } from '../../utils/entity-route';
+import { DEFAULT_USER_ID } from '../../config/user.config';
+import { IconComponent } from '../icon/icon.component';
 
 const FORUM_SLUG = 'issues-and-open-questions';
 
 @Component({
   selector: 'app-raise-question',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, IconComponent],
   template: `
     <button
       (click)="open()"
       class="inline-flex items-center gap-1.5 px-2 h-6 text-[11px] font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded transition-all duration-150 hover:border-amber-300 focus-visible:ring-2 focus-visible:ring-amber-500"
     >
-      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.021-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-.98 2.5-2.5 2.95M12 17h.01"/>
-      </svg>
-      Question
+      <app-icon name="help-circle" class="w-3.5 h-3.5"></app-icon>
+      {{ buttonLabel }}
     </button>
 
     <div
@@ -26,12 +27,12 @@ const FORUM_SLUG = 'issues-and-open-questions';
       class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="raise-question-title"
+      [attr.aria-labelledby]="modalTitleId"
     >
       <div class="absolute inset-0 bg-gray-900/50 dark:bg-black/60 backdrop-blur-sm" (click)="close()"></div>
       <div class="relative w-full sm:w-auto sm:max-w-lg sm:rounded-lg app-panel p-4 shadow-xl max-h-[90vh] sm:max-h-none overflow-y-auto">
         <div class="flex items-center justify-between mb-3">
-          <h3 id="raise-question-title" class="text-sm font-semibold text-gray-900 dark:text-gray-100">Raise Open Question</h3>
+          <h3 [id]="modalTitleId" class="text-sm font-semibold text-gray-900 dark:text-gray-100">Raise Open Question</h3>
           <button (click)="close()" class="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" aria-label="Close">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -40,16 +41,16 @@ const FORUM_SLUG = 'issues-and-open-questions';
         </div>
 
         <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          Create a new post in <span class="font-medium text-gray-700 dark:text-gray-300">Issues and Open Questions</span> linked to
+          Create a new post in <span class="font-medium text-gray-700 dark:text-gray-300">Issues</span> linked to
           <span class="font-medium text-gray-700 dark:text-gray-300">{{ objectTitle || 'Untitled' }}</span>.
         </p>
 
         <form id="raise-question-form" (ngSubmit)="submit()" class="space-y-3">
           <div>
-            <label for="rq-title" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+            <label [attr.for]="titleId" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
             <input
               #titleInput
-              id="rq-title"
+              [id]="titleId"
               name="rq-title"
               type="text"
               [(ngModel)]="title"
@@ -59,9 +60,9 @@ const FORUM_SLUG = 'issues-and-open-questions';
             />
           </div>
           <div>
-            <label for="rq-body" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Body</label>
+            <label [attr.for]="bodyId" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Body</label>
             <textarea
-              id="rq-body"
+              [id]="bodyId"
               name="rq-body"
               [(ngModel)]="body"
               rows="4"
@@ -94,10 +95,12 @@ const FORUM_SLUG = 'issues-and-open-questions';
   `,
 })
 export class RaiseQuestionComponent implements AfterViewChecked, OnDestroy {
+  private static idCounter = 0;
   @Input() objectType = '';
   @Input() objectId = '';
   @Input() objectTitle = '';
   @Input() objectRoute = '';
+  @Input() buttonLabel = 'Question';
 
   @ViewChild('titleInput') titleInput!: ElementRef<HTMLInputElement>;
 
@@ -117,6 +120,9 @@ export class RaiseQuestionComponent implements AfterViewChecked, OnDestroy {
   body = signal('');
   submitting = signal(false);
   error = signal<string | null>(null);
+  titleId = `rq-title-${++RaiseQuestionComponent.idCounter}`;
+  bodyId = `rq-body-${RaiseQuestionComponent.idCounter}`;
+  modalTitleId = `raise-question-title-${RaiseQuestionComponent.idCounter}`;
   private shouldFocus = false;
 
   ngAfterViewChecked() {
@@ -159,15 +165,44 @@ export class RaiseQuestionComponent implements AfterViewChecked, OnDestroy {
     this.dataService.createForumThread(FORUM_SLUG, {
       title: titleValue,
       body: bodyValue,
+      postedById: DEFAULT_USER_ID,
     }).subscribe({
-      next: ({ id }) => {
-        this.submitting.set(false);
-        this.close();
-        this.router.navigate(['/forums', FORUM_SLUG, id]);
+      next: ({ id: threadId }) => {
+        this.saveOpenQuestionRecord(titleValue, bodyValue, threadId);
       },
       error: (err) => {
         this.submitting.set(false);
         this.error.set(err.message || 'Failed to create forum post');
+      }
+    });
+  }
+
+  private saveOpenQuestionRecord(titleValue: string, bodyValue: string, threadId: string) {
+    const entityType = this.objectType || null;
+    const entityId = this.objectId || null;
+    const description = `${bodyValue}\n\n[Discuss in forum](/forums/${FORUM_SLUG}/${threadId})`;
+
+    this.dataService.createOpenQuestion({
+      title: titleValue,
+      description,
+      category: 'MISSING_INFO',
+      blocking: false,
+      createdBy: DEFAULT_USER_ID,
+      entityType,
+      entityId,
+    }).subscribe({
+      next: () => {
+        this.submitting.set(false);
+        this.close();
+        this.router.navigate(['/forums', FORUM_SLUG, threadId]);
+      },
+      error: (err) => {
+        // The forum thread was already created, so navigate to it even if
+        // the open question record could not be created.
+        console.error('Failed to create open question record:', err);
+        this.submitting.set(false);
+        this.close();
+        this.router.navigate(['/forums', FORUM_SLUG, threadId]);
       }
     });
   }
@@ -183,24 +218,6 @@ export class RaiseQuestionComponent implements AfterViewChecked, OnDestroy {
   }
 
   private routeForType(type: string): string {
-    const map: Record<string, string> = {
-      work_request: 'work-requests',
-      requirement: 'requirements',
-      agenda: 'agendas',
-      candidate: 'candidates',
-      harvest: 'harvests',
-      conversation: 'conversations',
-      intent_record: 'intents',
-      assessment: 'assessments',
-      observation: 'observations',
-      report: 'reports',
-      agent_record: 'agent-records',
-      agent: 'agents',
-      specification: 'specifications',
-      open_question: 'open-questions',
-      open_questions: 'open-questions',
-      forum: 'forums',
-    };
-    return map[type] || type.replace(/_/g, '-');
+    return entityRouteForType(type) || type.replace(/_/g, '-');
   }
 }
