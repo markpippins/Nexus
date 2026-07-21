@@ -25,6 +25,29 @@ export class NebulaPanelComponent implements OnInit, OnDestroy {
   nebula = inject(NebulaService);
   private toast = inject(ToastService);
 
+  // ── Right-side Detail Drawer State ────────────────────────────
+  selectedReqId = signal<string | null>(null);
+
+  selectedRequirement = computed(() => {
+    const id = this.selectedReqId();
+    if (!id) return null;
+    return this.requirements().find(r => r.id === id) ?? null;
+  });
+
+  selectedReqContext = computed(() => {
+    const req = this.selectedRequirement();
+    if (!req) return '';
+    return this.nebula.getRequirementContext(req);
+  });
+
+  selectRequirement(reqId: string) {
+    this.selectedReqId.update(current => current === reqId ? null : reqId);
+  }
+
+  closeDetailPanel() {
+    this.selectedReqId.set(null);
+  }
+
   draggingReqId = signal<string | null>(null);
 
   readonly groupedByStatus = computed(() => {
