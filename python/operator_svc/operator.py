@@ -33,6 +33,7 @@ _log = logging.getLogger("operator")
 MAX_TOOL_ROUNDS = 5
 CONTINUITY_QUEUE_MAX = 10
 ENTITY_INDEX_MAX = 100  # max items across all entities
+SHORT_EXCHANGE_THRESHOLD = 200  # chars — skip LLM compaction below this
 
 # ── Per-Session State ─────────────────────────────────────────────
 
@@ -182,11 +183,25 @@ Operator: {model_response}"""
 
 
 def _compact_and_extract(user_message: str, model_response: str) -> Dict[str, Any]:
-    """Single LLM call: compact the exchange and extract entities/topics."""
-    # Regex extraction (fast, deterministic)
-    regex_entities = _extract_regex_entities(user_message + " " + model_response)
+    """Compact the exchange and extract entities/topics.
 
-    # LLM extraction (combined compaction + NER)
+    For short exchanges (< SHORT_EXCHANGE_THRESHOLD chars), uses regex-only
+    extraction to avoid the LLM call latency. For longer exchanges, uses a
+    single combined LLM call for both summary and entity extraction.
+    """
+    combined = user_message + " " + model_response
+
+    # Fast path: short exchanges — regex-only, no LLM call
+    if len(combined) < SHORT_EXCHANGE_THRESHOLD:
+        regex_entities = _extract_regex_entities(combined)
+        return {
+            "summary": user_message[:200],
+            "topics": [_detect_topic(user_message)],
+            "entities": list(regex_entities),
+        }
+
+    # Full path: longer exchanges — single combined LLM call
+    regex_entities = _extract_regex_entities(combined)
     prompt = COMPACTION_NER_PROMPT.format(
         user_message=user_message[:2000],
         model_response=model_response[:2000],

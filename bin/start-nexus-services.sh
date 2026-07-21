@@ -28,11 +28,14 @@ ALL_SERVICES=(
     "broker-gateway.service"    # port 8081 — service broker gateway
     "terrain.service"          # port 8084 — topology registry
     "file-system-server.service" # port 4040 — file system operations
+    "ui-event-bus.service"     # port 3200 — cross-app UI event bus (SSE)
     "peb-kernel.service"       # port 8080 — engineering brain
     "nebula-srv.service"       # Nebula RMS API
     "cascade-srv.service"      # port 3106 — Cascade Event API
     "role-memory-srv.service"  # port 3500 — PG→Redis sync
     "wrp-bridge-daemon.service" # conduit→kernel sync
+    "cascade-kernel-subscriber.service" # pg_notify → NATS (kernel transitions)
+    "cascade-obs-subscriber.service"   # pg_notify → NATS (PEB governance + Vision lifecycle)
 
     # API servers
     "vision-srv.service"       # port 3103 — Vision LOSM
@@ -64,6 +67,7 @@ SERVICE_PORTS=(
     ["broker-gateway.service"]="8081"
     ["terrain.service"]="8084"
     ["file-system-server.service"]="4040"
+    ["ui-event-bus.service"]="3200"
     ["peb-kernel.service"]="8080"
     ["nebula-srv.service"]="3101"
     ["cascade-srv.service"]="3106"
