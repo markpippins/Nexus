@@ -233,6 +233,13 @@ export class AppComponent implements OnInit, OnDestroy {
   isRssFeedVisible = this.uiPreferencesService.isRssFeedVisible;
   isStreamVisible = this.uiPreferencesService.isStreamVisible;
   isConsoleCollapsed = this.uiPreferencesService.isConsoleCollapsed;
+
+  /** When true, the terminal fills the entire viewport (fixed overlay). */
+  isTerminalMaximized = signal(false);
+
+  toggleMaximize(): void {
+    this.isTerminalMaximized.update(v => !v);
+  }
   isStreamPaneCollapsed = this.uiPreferencesService.isStreamPaneCollapsed;
 
   shouldShowStreamPane = computed(() => {

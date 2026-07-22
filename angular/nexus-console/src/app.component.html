@@ -589,7 +589,7 @@
                 (geminiSearchRequested)="onGeminiSearchRequested()"
               />
             }
-            @if (!isConsoleCollapsed()) {
+            @if (!isConsoleCollapsed() && !isTerminalMaximized()) {
               <!-- Resizer for Stream vs Console -->
               <div
                 data-console-resizer
@@ -606,6 +606,9 @@
             <div
               data-console-pane
               class="flex flex-col flex-shrink-0 bg-[rgb(var(--color-surface-muted))]"
+              [class.fixed]="isTerminalMaximized()"
+              [class.inset-0]="isTerminalMaximized()"
+              [class.z-50]="isTerminalMaximized()"
               [style.height.%]="!isConsoleCollapsed() ? consolePaneHeight() : undefined"
               [class.h-6]="isConsoleCollapsed()"
               [class.border-t]="isConsoleCollapsed()"
@@ -625,7 +628,12 @@
                   </button>
                 </div>
               } @else {
-                <app-terminal (collapse)="toggleConsole()" [remoteShellUrl]="'ws://localhost:3120'"></app-terminal>
+                <app-terminal
+                  (collapse)="toggleConsole()"
+                  (maximizeToggle)="toggleMaximize()"
+                  [isMaximized]="isTerminalMaximized()"
+                  [remoteShellUrl]="'ws://localhost:3120'"
+                ></app-terminal>
               }
             </div>
           }

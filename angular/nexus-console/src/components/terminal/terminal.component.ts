@@ -224,9 +224,24 @@ interface TerminalSession {
         padding: 0;
         flex-shrink: 0;
       }
-      .collapse-btn:hover {
+      .collapse-btn:hover,
+      .maximize-btn:hover {
         background: rgb(var(--color-surface-hover));
         color: rgb(var(--color-text-base));
+      }
+      .maximize-btn {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 3px;
+        border: none;
+        background: transparent;
+        color: rgb(var(--color-text-muted));
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
       }
     `,
   ],
@@ -234,6 +249,14 @@ interface TerminalSession {
 export class   TerminalComponent implements AfterViewInit, OnDestroy {
   @ViewChildren('terminalContainer') terminals!: QueryList<ElementRef<HTMLDivElement>>;
   collapse = output<void>();
+  maximizeToggle = output<void>();
+
+  /** Parent-driven: whether the terminal is currently maximized (controls the button icon). */
+  isMaximized = input(false);
+
+  toggleMaximize(): void {
+    this.maximizeToggle.emit();
+  }
 
   /**
    * When set to a WebSocket URL (e.g. 'ws://localhost:3120/pty'), the terminal
