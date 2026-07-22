@@ -1,0 +1,99 @@
+<div class="max-w-4xl mx-auto">
+  <div *ngIf="loading()" class="space-y-4">
+    <div class="app-panel p-4 space-y-2">
+      <app-skeleton width="40%" height="1rem"></app-skeleton>
+      <app-skeleton width="20%" height="0.75rem"></app-skeleton>
+    </div>
+    <div class="app-panel p-4 space-y-3">
+      <app-skeleton width="30%" height="0.75rem"></app-skeleton>
+      <app-skeleton width="100%" height="0.875rem"></app-skeleton>
+    </div>
+  </div>
+
+  <app-error-state *ngIf="error() && !loading()" title="Failed to load specification" [description]="error()!" (retry)="retry()"></app-error-state>
+
+  <ng-container *ngIf="!loading() && !error() && specification()">
+    <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-3">
+      <a [routerLink]="['/specifications']" class="hover:text-primary-700 transition-colors">Specifications</a>
+      <span>/</span>
+      <span class="text-gray-700 dark:text-gray-300 font-medium truncate">Revision #{{ specification()!.revisionNumber }}</span>
+    </div>
+
+    <div class="app-panel p-4 mb-4">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0 flex-1">
+          <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100">Revision #{{ specification()!.revisionNumber }}</h1>
+          <div class="flex items-center gap-2 mt-2 flex-wrap">
+            <span class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ specification()!.id.slice(0, 8) }}…</span>
+            <span class="text-xs px-1.5 py-0.5 rounded bg-steel-100 dark:bg-steel-700 text-steel-700 dark:text-steel-300 border border-steel-200 dark:border-steel-600">{{ specification()!.revisionType }}</span>
+          </div>
+        </div>
+        <app-raise-question objectType="specification" [objectId]="specification()!.id" [objectTitle]="'Revision #' + specification()!.revisionNumber"></app-raise-question>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="lg:col-span-2 space-y-4">
+        <div *ngIf="specification()!.changeSummary" class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Change Summary</h2>
+          <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ specification()!.changeSummary }}</p>
+        </div>
+
+        <div *ngIf="specification()!.itemSnapshot" class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Item Snapshot</h2>
+          <pre class="bg-gray-50 dark:bg-steel-800/80 dark:text-steel-200 p-3 rounded text-xs font-mono overflow-auto max-h-96 whitespace-pre-wrap">{{ formatJson(specification()!.itemSnapshot) }}</pre>
+        </div>
+
+        <div *ngIf="specification()!.derivedFrom?.length" class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Derived From</h2>
+          <ul class="space-y-1">
+            <li *ngFor="let source of specification()!.derivedFrom" class="text-sm font-mono text-gray-700 dark:text-gray-300">{{ source }}</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <div class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Details</h2>
+          <dl class="space-y-2 text-sm">
+            <div>
+              <dt class="text-xs text-gray-500 uppercase">Agenda</dt>
+              <dd>
+                <a [routerLink]="['/agendas', specification()!.agendaId]" class="app-link font-mono text-xs">{{ specification()!.agendaId.slice(0, 8) }}…</a>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 uppercase">Valid From</dt>
+              <dd class="text-gray-700 dark:text-gray-300">{{ formatDate(specification()!.validFrom) }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 uppercase">Valid Until</dt>
+              <dd class="text-gray-700 dark:text-gray-300">{{ formatDate(specification()!.validUntil) }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-gray-500 uppercase">Created</dt>
+              <dd class="text-gray-700 dark:text-gray-300">{{ formatDate(specification()!.createdAt) }}</dd>
+            </div>
+            <div *ngIf="specification()!.supersededBy">
+              <dt class="text-xs text-gray-500 uppercase">Superseded By</dt>
+              <dd>
+                <a [routerLink]="['/specifications', specification()!.supersededBy]" class="app-link font-mono text-xs">{{ specification()!.supersededBy!.slice(0, 8) }}…</a>
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Related Open Questions</h2>
+          <div *ngIf="openQuestions().length === 0" class="text-sm text-gray-500 dark:text-gray-400">No open questions linked.</div>
+          <div *ngIf="openQuestions().length > 0" class="divide-y divide-gray-100 dark:divide-gray-700/50">
+            <a *ngFor="let oq of openQuestions()" [routerLink]="['/open-questions', oq.id]" class="block py-2 hover:bg-steel-100 dark:hover:bg-steel-700/40 transition-colors">
+              <div class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ oq.title }}</div>
+              <app-status-badge [status]="oq.status"></app-status-badge>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>

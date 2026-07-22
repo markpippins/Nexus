@@ -7,7 +7,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Override Tailwind's default gray with a steel/blue-gray palette to match nebula-ui
+        // Override Tailwind's default gray with a steel/blue-gray palette
         gray: {
           50: '#f8fafc',
           100: '#f1f5f9',
@@ -21,21 +21,21 @@ module.exports = {
           900: '#0f172a',
         },
         primary: {
-          50: '#f4f6f9',
-          100: '#e9edf2',
-          200: '#cdd6e2',
-          300: '#9eacc2',
-          400: '#6b7b96',
-          500: '#4a5a75',
-          600: '#3d4d66',
-          700: '#2f3d54',
-          800: '#242f42',
-          900: '#18212f',
+          50: '#f5f3ff',
+          100: '#ede9fe',
+          200: '#ddd6fe',
+          300: '#c4b5fd',
+          400: '#a78bfa',
+          500: '#8b5cf6',
+          600: '#7c3aed',
+          700: '#6d28d9',
+          800: '#5b21b6',
+          900: '#4c1d95',
         },
         accent: {
-          400: '#34d399',
-          500: '#10b981',
-          600: '#059669',
+          400: '#a3e635',
+          500: '#84cc16',
+          600: '#65a30d',
         },
         steel: {
           50: '#f8fafc',
@@ -51,7 +51,8 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['PT Sans', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        headline: ['Poppins', 'sans-serif'],
       },
       boxShadow: {
         'soft': '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',

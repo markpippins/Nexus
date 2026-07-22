@@ -4,6 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { PageHeaderComponent } from '../../components/page-header/page-header.component';
 import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 import { ErrorStateComponent } from '../../components/error-state/error-state.component';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-settings-view',
@@ -52,6 +53,7 @@ import { ErrorStateComponent } from '../../components/error-state/error-state.co
 })
 export class SettingsViewComponent implements OnInit {
   private http = inject(HttpClient);
+  private toast = inject(ToastService);
 
   health = signal<any>(null);
   refreshing = signal(false);
@@ -82,11 +84,12 @@ export class SettingsViewComponent implements OnInit {
     this.http.post('/api/refresh-stats', {}).subscribe({
       next: () => {
         this.refreshing.set(false);
+        this.toast.show('Stats refreshed successfully', 'success');
         this.load();
       },
       error: () => {
         this.refreshing.set(false);
-        // TODO: surface a toast once a toast service is available.
+        this.toast.show('Failed to refresh stats', 'error');
       }
     });
   }

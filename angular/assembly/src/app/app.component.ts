@@ -5,11 +5,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DataService, Counts } from './services/data.service';
 import { SidebarComponent } from './components/sidebar/sidebar.component';
 import { HeaderComponent } from './components/header/header.component';
+import { ToastComponent } from './components/toast/toast.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, SidebarComponent, HeaderComponent],
+  imports: [CommonModule, RouterOutlet, SidebarComponent, HeaderComponent, ToastComponent],
   templateUrl: './app.component.html',
 })
 export class AppComponent implements OnInit, OnDestroy {

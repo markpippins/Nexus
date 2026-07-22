@@ -1,7 +1,9 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { DataService, AgentRecord } from '../../services/data.service';
+import { sortItems, SortDir, toggleSort } from '../../utils/sort';
+import { readSortFromSnapshot, writeSortToQueryParams } from '../../utils/query-sort';
 import { PageHeaderComponent } from '../../components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../components/status-badge/status-badge.component';
 import { TableSkeletonComponent } from '../../components/skeleton/table-skeleton.component';
@@ -25,17 +27,20 @@ import { RaiseQuestionComponent } from '../../components/raise-question/raise-qu
         <app-empty-state *ngIf="items().length === 0" title="No agents" description="Agent records will appear here once they are created."></app-empty-state>
 
         <div *ngIf="items().length > 0" class="app-panel">
+          <div *ngIf="sortField()" class="px-4 pt-2 pb-0">
+            <button (click)="toggleSort('')" class="text-[11px] text-steel-400 hover:text-steel-600 dark:hover:text-steel-300 transition-colors">Clear sort</button>
+          </div>
           <table class="app-table">
             <thead>
               <tr>
-                <th>Title</th>
-                <th class="w-28">Role</th>
-                <th class="w-32">Created</th>
+                <th (click)="toggleSort('title')" class="cursor-pointer hover:text-primary-600 select-none">Title <span *ngIf="sortField() === 'title'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+                <th (click)="toggleSort('role')" class="w-28 cursor-pointer hover:text-primary-600 select-none">Role <span *ngIf="sortField() === 'role'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+                <th (click)="toggleSort('createdAt')" class="w-32 cursor-pointer hover:text-primary-600 select-none">Created <span *ngIf="sortField() === 'createdAt'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
                 <th class="w-28 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let item of items()">
+              <tr *ngFor="let item of sortedItems()">
                 <td>
                   <a [routerLink]="['/agents', item.id]" class="app-link">{{ item.title || 'Untitled' }}</a>
                   <div class="text-xs text-gray-500 line-clamp-1 mt-0.5">{{ item.recordType || 'Record' }}</div>
@@ -53,12 +58,20 @@ import { RaiseQuestionComponent } from '../../components/raise-question/raise-qu
 })
 export class AgentsViewComponent implements OnInit {
   private dataService = inject(DataService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
   items = signal<AgentRecord[]>([]);
   total = signal(0);
   loading = signal(true);
+  sortField = signal<string>('createdAt');
+  sortDir = signal<SortDir>('desc');
+  sortedItems = computed(() => sortItems<AgentRecord>(this.items(), this.sortField(), this.sortDir()));
   error = signal<string | null>(null);
 
   ngOnInit() {
+    const saved = readSortFromSnapshot(this.route, 'createdAt', 'desc');
+    this.sortField.set(saved.field);
+    this.sortDir.set(saved.dir);
     this.load();
   }
 
@@ -80,6 +93,13 @@ export class AgentsViewComponent implements OnInit {
 
   retry() {
     this.load();
+  }
+
+  toggleSort(field: string) {
+    const next = toggleSort(this.sortField(), this.sortDir(), field);
+    this.sortField.set(next.field);
+    this.sortDir.set(next.dir);
+    writeSortToQueryParams(this.router, this.route, next.field, next.dir);
   }
 
   formatDate(date: string) {

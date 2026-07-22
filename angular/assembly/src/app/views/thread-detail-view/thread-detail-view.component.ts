@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DataService, Thread, Comment } from '../../services/data.service';
+import { DEFAULT_USER_ID } from '../../config/user.config';
 import { RaiseQuestionComponent } from '../../components/raise-question/raise-question.component';
 import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
@@ -23,6 +24,8 @@ export class ThreadDetailViewComponent implements OnInit {
   thread = signal<Thread | null>(null);
   comments = signal<Comment[]>([]);
   replyBody = '';
+  replyToCommentId = signal<string | null>(null);
+  replyToAuthor = signal<string | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
 
@@ -55,18 +58,41 @@ export class ThreadDetailViewComponent implements OnInit {
     return new Date(date).toLocaleString();
   }
 
+  replyTo(comment: Comment) {
+    this.replyToCommentId.set(comment.id);
+    this.replyToAuthor.set(comment.author.name);
+    this.replyBody = `@${comment.author.name} `;
+  }
+
+  cancelReply() {
+    this.replyToCommentId.set(null);
+    this.replyToAuthor.set(null);
+    this.replyBody = '';
+  }
+
   submitReply() {
     if (!this.replyBody.trim() || !this.thread()) return;
     const threadId = this.route.snapshot.paramMap.get('threadId') || '';
-    const postedById = '9abe1316-312e-4a2f-96ad-88c4b86c7b1e'; // TODO: replace with authenticated user
-    this.dataService.createComment(threadId, { body: this.replyBody.trim(), postedById }).subscribe({
+    const postedById = DEFAULT_USER_ID;
+    const parentId = this.replyToCommentId() || undefined;
+    this.dataService.createComment(threadId, { body: this.replyBody.trim(), postedById, parentId }).subscribe({
       next: () => {
         this.replyBody = '';
+        this.replyToCommentId.set(null);
+        this.replyToAuthor.set(null);
         this.load();
       },
       error: err => {
         this.error.set(err.message || 'Failed to post reply');
       }
     });
+  }
+
+  childComments(parentId: string): Comment[] {
+    return this.comments().filter(c => c.parentId === parentId);
+  }
+
+  rootComments(): Comment[] {
+    return this.comments().filter(c => !c.parentId);
   }
 }

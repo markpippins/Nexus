@@ -2,6 +2,9 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+/** Default page size used by all paginated list views and the DataService methods. */
+export const DEFAULT_PAGE_SIZE = 25;
+
 export interface Paged<T> {
   items: T[];
   total: number;
@@ -25,6 +28,7 @@ export interface Counts {
   observations: number;
   agentRecords: number;
   specifications: number;
+  plans: number;
 }
 
 export interface Forum {
@@ -188,6 +192,9 @@ export interface OpenQuestion {
   createdBy: string | null;
   createdAt: string;
   resolvedAt: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  entityTitle?: string | null;
 }
 
 export interface IntentRecord {
@@ -259,6 +266,22 @@ export interface Specification {
   validFrom: string;
   validUntil: string;
   createdAt: string;
+}
+
+export interface Plan {
+  id: string;
+  fileName: string;
+  title: string;
+  project: string;
+  goal: string;
+  content: string;
+  filesAffected: string;
+  acceptanceCriteria: string;
+  dependencies: string;
+  promptRef: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SpecItem {
@@ -344,6 +367,7 @@ export interface SearchResult {
 export interface SearchResponse {
   query: string;
   results: SearchResult[];
+  total: number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -376,7 +400,7 @@ export class DataService {
     return this.http.get<FeedPost[]>(`${this.base}/feed`);
   }
 
-  getWorkRequests(page = 1, pageSize = 100) {
+  getWorkRequests(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<WorkRequest>>(`${this.base}/work-requests?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -384,7 +408,7 @@ export class DataService {
     return this.http.get<WorkRequest>(`${this.base}/work-requests/${id}`);
   }
 
-  getRequirements(page = 1, pageSize = 100) {
+  getRequirements(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<Requirement>>(`${this.base}/requirements?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -392,7 +416,7 @@ export class DataService {
     return this.http.get<Requirement>(`${this.base}/requirements/${id}`);
   }
 
-  getAgendas(page = 1, pageSize = 100) {
+  getAgendas(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<Agenda>>(`${this.base}/agendas?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -400,7 +424,7 @@ export class DataService {
     return this.http.get<Agenda>(`${this.base}/agendas/${id}`);
   }
 
-  getCandidates(page = 1, pageSize = 100) {
+  getCandidates(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<Candidate>>(`${this.base}/candidates?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -408,7 +432,7 @@ export class DataService {
     return this.http.get<Candidate>(`${this.base}/candidates/${id}`);
   }
 
-  getHarvests(page = 1, pageSize = 100) {
+  getHarvests(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<Harvest>>(`${this.base}/harvests?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -416,7 +440,11 @@ export class DataService {
     return this.http.get<Harvest>(`${this.base}/harvests/${id}`);
   }
 
-  getConversations(page = 1, pageSize = 100) {
+  updateHarvest(id: string, sourceText: string) {
+    return this.http.patch<{ id: string }>(`${this.base}/harvests/${id}`, { sourceText });
+  }
+
+  getConversations(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<ConversationSnapshot>>(`${this.base}/conversations?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -424,7 +452,7 @@ export class DataService {
     return this.http.get<ConversationSnapshot>(`${this.base}/conversations/${id}`);
   }
 
-  getOpenQuestions(page = 1, pageSize = 100, requirementId?: string | null) {
+  getOpenQuestions(page = 1, pageSize = DEFAULT_PAGE_SIZE, requirementId?: string | null) {
     let url = `${this.base}/open-questions?page=${page}&pageSize=${pageSize}`;
     if (requirementId) {
       url += `&requirementId=${requirementId}`;
@@ -432,7 +460,11 @@ export class DataService {
     return this.http.get<Paged<OpenQuestion>>(url);
   }
 
-  getOpenQuestionsForEntity(entityType: string, entityId: string, page = 1, pageSize = 100) {
+  getResolvedQuestions(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+    return this.http.get<Paged<OpenQuestion>>(`${this.base}/open-questions?page=${page}&pageSize=${pageSize}&resolved=true`);
+  }
+
+  getOpenQuestionsForEntity(entityType: string, entityId: string, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<OpenQuestion>>(`${this.base}/open-questions?entityType=${entityType}&entityId=${entityId}&page=${page}&pageSize=${pageSize}`);
   }
 
@@ -444,7 +476,7 @@ export class DataService {
     return this.http.post<{ id: string }>(`${this.base}/open-questions`, payload);
   }
 
-  getIntents(page = 1, pageSize = 100) {
+  getIntents(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<IntentRecord>>(`${this.base}/intents?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -452,7 +484,7 @@ export class DataService {
     return this.http.get<IntentRecord>(`${this.base}/intents/${id}`);
   }
 
-  getAssessments(page = 1, pageSize = 100) {
+  getAssessments(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<Assessment>>(`${this.base}/assessments?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -460,7 +492,7 @@ export class DataService {
     return this.http.get<Assessment>(`${this.base}/assessments/${id}`);
   }
 
-  getObservations(page = 1, pageSize = 100) {
+  getObservations(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<Observation>>(`${this.base}/observations?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -468,7 +500,7 @@ export class DataService {
     return this.http.get<Observation>(`${this.base}/observations/${id}`);
   }
 
-  getReports(page = 1, pageSize = 100) {
+  getReports(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<AgentRecord>>(`${this.base}/reports?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -476,7 +508,7 @@ export class DataService {
     return this.http.get<AgentRecord>(`${this.base}/reports/${id}`);
   }
 
-  getAgentRecords(page = 1, pageSize = 100) {
+  getAgentRecords(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<AgentRecord>>(`${this.base}/agent-records?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -484,7 +516,7 @@ export class DataService {
     return this.http.get<AgentRecord>(`${this.base}/agent-records/${id}`);
   }
 
-  getSpecifications(page = 1, pageSize = 100) {
+  getSpecifications(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<Specification>>(`${this.base}/specifications?page=${page}&pageSize=${pageSize}`);
   }
 
@@ -492,8 +524,20 @@ export class DataService {
     return this.http.get<Specification>(`${this.base}/specifications/${id}`);
   }
 
-  getSpecs(page = 1, pageSize = 100) {
+  getPlans(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
+    return this.http.get<Paged<Plan>>(`${this.base}/plans?page=${page}&pageSize=${pageSize}`);
+  }
+
+  getPlan(id: string) {
+    return this.http.get<Plan>(`${this.base}/plans/${id}`);
+  }
+
+  getSpecs(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     return this.http.get<Paged<SpecItem>>(`${this.base}/specs?page=${page}&pageSize=${pageSize}`);
+  }
+
+  getSpecItem(id: string) {
+    return this.http.get<SpecItem>(`${this.base}/specs/${id}`);
   }
 
   getAgendaItems(agendaId: string) {
@@ -518,6 +562,10 @@ export class DataService {
 
   createFeedPost(payload: { text: string; postedById: string }) {
     return this.http.post<{ id: string }>(`${this.base}/feed`, payload);
+  }
+
+  deletePost(id: string) {
+    return this.http.delete<{ id: string }>(`${this.base}/feed/${id}`);
   }
 
   createComment(threadId: string, payload: { body: string; postedById: string; parentId?: string }) {

@@ -2,6 +2,7 @@ import { Component, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../services/data.service';
+import { DEFAULT_USER_ID } from '../../config/user.config';
 
 @Component({
   selector: 'app-create-post',
@@ -48,13 +49,18 @@ export class CreatePostComponent {
   currentUserInitial = 'Y';
 
   submit() {
-    if (!this.content.trim()) return;
+    const text = this.content.trim();
+    if (!text) return;
     this.submitting = true;
-    // TODO: wire to a real posts API once the backend exposes one.
-    setTimeout(() => {
-      this.content = '';
-      this.submitting = false;
-      this.posted.emit();
-    }, 300);
+    this.dataService.createFeedPost({ text, postedById: DEFAULT_USER_ID }).subscribe({
+      next: () => {
+        this.content = '';
+        this.submitting = false;
+        this.posted.emit();
+      },
+      error: () => {
+        this.submitting = false;
+      }
+    });
   }
 }

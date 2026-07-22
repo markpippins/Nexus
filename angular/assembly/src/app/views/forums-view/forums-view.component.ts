@@ -1,7 +1,9 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { RouterLink, ActivatedRoute, Router } from '@angular/router';
 import { DataService, Forum } from '../../services/data.service';
+import { sortItems, SortDir, toggleSort } from '../../utils/sort';
+import { readSortFromSnapshot, writeSortToQueryParams } from '../../utils/query-sort';
 import { PageHeaderComponent } from '../../components/page-header/page-header.component';
 import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
@@ -17,11 +19,19 @@ import { RaiseQuestionComponent } from '../../components/raise-question/raise-qu
 })
 export class ForumsViewComponent implements OnInit {
   private dataService = inject(DataService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
   forums = signal<Forum[]>([]);
+  sortField = signal<string>('name');
+  sortDir = signal<SortDir>('asc');
+  sortedForums = computed(() => sortItems<Forum>(this.forums(), this.sortField(), this.sortDir()));
   loading = signal(true);
   error = signal<string | null>(null);
 
   ngOnInit() {
+    const saved = readSortFromSnapshot(this.route, 'name', 'asc');
+    this.sortField.set(saved.field);
+    this.sortDir.set(saved.dir);
     this.load();
   }
 
@@ -38,6 +48,13 @@ export class ForumsViewComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  toggleSort(field: string) {
+    const next = toggleSort(this.sortField(), this.sortDir(), field);
+    this.sortField.set(next.field);
+    this.sortDir.set(next.dir);
+    writeSortToQueryParams(this.router, this.route, next.field, next.dir);
   }
 
   retry() {

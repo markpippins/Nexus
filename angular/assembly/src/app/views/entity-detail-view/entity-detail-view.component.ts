@@ -1,42 +1,46 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { switchMap, of, catchError } from 'rxjs';
-import { DataService, OpenQuestion, AgendaItem, ConversationBlock, TimelineEvent } from '../../services/data.service';
+import { switchMap, of, catchError, combineLatest } from 'rxjs';
+import { DataService, OpenQuestion, AgendaItem, ConversationBlock, TimelineEvent, DEFAULT_PAGE_SIZE } from '../../services/data.service';
 import { PageHeaderComponent } from '../../components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../components/status-badge/status-badge.component';
 import { RaiseQuestionComponent } from '../../components/raise-question/raise-question.component';
 import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 import { ErrorStateComponent } from '../../components/error-state/error-state.component';
 import { MarkdownRendererComponent } from '../../components/markdown-renderer/markdown-renderer.component';
+import { entityRouteForType, formatEntityType } from '../../utils/entity-route';
 
 export interface EntityTypeConfig {
   label: string;
   routePrefix: string;
   titleField: string;
+  backendType: string;
 }
 
 const ENTITY_CONFIG: Record<string, EntityTypeConfig> = {
-  'work-requests': { label: 'Work Request', routePrefix: 'work-requests', titleField: 'title' },
-  'requirements': { label: 'Requirement', routePrefix: 'requirements', titleField: 'title' },
-  'agendas': { label: 'Agenda', routePrefix: 'agendas', titleField: 'title' },
-  'candidates': { label: 'Candidate', routePrefix: 'candidates', titleField: 'title' },
-  'harvests': { label: 'Harvest', routePrefix: 'harvests', titleField: 'sourceFilename' },
-  'conversations': { label: 'Conversation', routePrefix: 'conversations', titleField: 'sourceFilename' },
-  'open-questions': { label: 'Open Question', routePrefix: 'open-questions', titleField: 'title' },
-  'intents': { label: 'Intent Record', routePrefix: 'intents', titleField: 'title' },
-  'assessments': { label: 'Assessment', routePrefix: 'assessments', titleField: 'outcome' },
-  'observations': { label: 'Observation', routePrefix: 'observations', titleField: 'triggerType' },
-  'reports': { label: 'Report', routePrefix: 'reports', titleField: 'title' },
-  'agent-records': { label: 'Agent Record', routePrefix: 'agent-records', titleField: 'title' },
-  'agents': { label: 'Agent', routePrefix: 'agents', titleField: 'title' },
-  'specifications': { label: 'Specification', routePrefix: 'specifications', titleField: 'revisionNumber' },
+  'work-requests': { label: 'Work Request', routePrefix: 'work-requests', titleField: 'title', backendType: 'work_request' },
+  'requirements': { label: 'Requirement', routePrefix: 'requirements', titleField: 'title', backendType: 'requirement' },
+  'agendas': { label: 'Agenda', routePrefix: 'agendas', titleField: 'title', backendType: 'agenda' },
+  'candidates': { label: 'Candidate', routePrefix: 'candidates', titleField: 'title', backendType: 'candidate' },
+  'harvests': { label: 'Harvest', routePrefix: 'harvests', titleField: 'sourceFilename', backendType: 'harvest' },
+  'conversations': { label: 'Conversation', routePrefix: 'conversations', titleField: 'sourceFilename', backendType: 'conversation' },
+  'open-questions': { label: 'Open Question', routePrefix: 'open-questions', titleField: 'title', backendType: 'open_question' },
+  'intents': { label: 'Intent Record', routePrefix: 'intents', titleField: 'title', backendType: 'intent_record' },
+  'assessments': { label: 'Assessment', routePrefix: 'assessments', titleField: 'outcome', backendType: 'assessment' },
+  'observations': { label: 'Observation', routePrefix: 'observations', titleField: 'triggerType', backendType: 'observation' },
+  'reports': { label: 'Report', routePrefix: 'reports', titleField: 'title', backendType: 'report' },
+  'agent-records': { label: 'Agent Record', routePrefix: 'agent-records', titleField: 'title', backendType: 'agent_record' },
+  'agents': { label: 'Agent', routePrefix: 'agents', titleField: 'title', backendType: 'agent' },
+  'specifications': { label: 'Specification', routePrefix: 'specifications', titleField: 'revisionNumber', backendType: 'specification' },
+  'specs': { label: 'Spec Item', routePrefix: 'specs', titleField: 'title', backendType: 'spec_item' },
 };
 
 @Component({
   selector: 'app-entity-detail-view',
   standalone: true,
-  imports: [CommonModule, RouterLink, PageHeaderComponent, StatusBadgeComponent, RaiseQuestionComponent, SkeletonComponent, ErrorStateComponent, MarkdownRendererComponent],
+  imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent, StatusBadgeComponent, RaiseQuestionComponent, SkeletonComponent, ErrorStateComponent, MarkdownRendererComponent],
   templateUrl: './entity-detail-view.component.html',
 })
 export class EntityDetailViewComponent implements OnInit {
@@ -51,11 +55,160 @@ export class EntityDetailViewComponent implements OnInit {
   conversationBlocks = signal<ConversationBlock[]>([]);
   timelineEvents = signal<TimelineEvent[]>([]);
   loading = signal(true);
+
+  /** Extracts sourceText from harvest entity */
+  harvestSourceText = computed<string>(() => {
+    const entity = this.entity();
+    if (!entity || this.entityType() !== 'harvests') return '';
+    const text = entity['sourceText'];
+    return typeof text === 'string' ? text : '';
+  });
+
+  /** Extracts docklang from harvest entity for DockLang toggle */
+  harvestDockLang = computed<string>(() => {
+    const entity = this.entity();
+    if (!entity || this.entityType() !== 'harvests') return '';
+    const docklang = entity['docklang'];
+    if (!docklang) return '';
+    try {
+      return typeof docklang === 'string' ? docklang : JSON.stringify(docklang, null, 2);
+    } catch {
+      return String(docklang);
+    }
+  });
+
+  /** Whether DockLang view is active instead of markdown */
+  showDockLang = signal(false);
+
+  toggleDockLang() {
+    this.showDockLang.update(v => !v);
+  }
+
+  /** Harvest edit state */
+  editingHarvest = signal(false);
+  harvestEditContent = '';
+  harvestSaving = signal(false);
+  harvestSaveError = signal<string | null>(null);
+
+  /** Open question resolution text */
+  openQuestionResolution = computed<string>(() => {
+    const entity = this.entity();
+    if (!entity || this.entityType() !== 'open-questions') return '';
+    const resolution = entity['resolution'];
+    return typeof resolution === 'string' && resolution.trim() ? resolution : '';
+  });
+
+  /** Whether the open question is resolved */
+  openQuestionIsResolved = computed<boolean>(() => {
+    const entity = this.entity();
+    if (!entity || this.entityType() !== 'open-questions') return false;
+    const status = entity['status'];
+    return status === 'RESOLVED' || status === 'WONT_FIX';
+  });
+
+  /** Extracts forum thread route from the description field for discussion links */
+  forumThreadRoute = computed<string[] | null>(() => {
+    const entity = this.entity();
+    if (!entity || this.entityType() !== 'open-questions') return null;
+    const desc = entity['description'];
+    if (typeof desc !== 'string') return null;
+    const match = desc.match(/\/forums\/([^\/\s]+)\/([^\/\s\)]+)/);
+    if (!match) return null;
+    return ['/forums', match[1], match[2]];
+  });
+
+  startHarvestEdit() {
+    this.harvestEditContent = this.harvestSourceText();
+    this.editingHarvest.set(true);
+    this.harvestSaveError.set(null);
+  }
+
+  cancelHarvestEdit() {
+    this.editingHarvest.set(false);
+    this.harvestEditContent = '';
+    this.harvestSaveError.set(null);
+  }
+
+  saveHarvestEdit() {
+    const id = this.entityId();
+    const content = this.harvestEditContent;
+    if (!id || !id.trim()) return;
+
+    this.harvestSaving.set(true);
+    this.harvestSaveError.set(null);
+
+    this.dataService.updateHarvest(id, content).subscribe({
+      next: () => {
+        // Update local entity state with the new sourceText
+        this.entity.update(e => {
+          if (e) {
+            return { ...e, sourceText: content };
+          }
+          return e;
+        });
+        this.editingHarvest.set(false);
+        this.harvestSaving.set(false);
+      },
+      error: err => {
+        this.harvestSaving.set(false);
+        this.harvestSaveError.set(err.message || 'Failed to save');
+      }
+    });
+  }
+
+  /** Merges consecutive blocks by the same role into single-turn markdown sections */
+  conversationMarkdown = computed<string>(() => {
+    const blocks = this.conversationBlocks();
+    if (!blocks.length) return '';
+
+    // Group consecutive blocks by role into turns
+    const turns: { role: string; content: string[] }[] = [];
+    for (const block of blocks) {
+      const roleLabel = block.role
+        ? block.role.charAt(0).toUpperCase() + block.role.slice(1)
+        : 'Unknown';
+      const content = block.contentMd || '';
+
+      const lastTurn = turns[turns.length - 1];
+      if (lastTurn && lastTurn.role === roleLabel) {
+        lastTurn.content.push(content);
+      } else {
+        turns.push({ role: roleLabel, content: [content] });
+      }
+    }
+
+    // Render each turn as a single section with one role header
+    return turns.map(turn => {
+      const header = `**${turn.role}:**`;
+      const body = turn.content.join('\n\n');
+      return `${header}\n\n${body}`;
+    }).join('\n\n---\n\n');
+  });
   error = signal<string | null>(null);
 
+  linkedEntityType = signal<string | null>(null);
+  linkedEntityId = signal<string | null>(null);
+
+  linkedEntityRoute = computed<string[] | null>(() => {
+    const type = this.linkedEntityType();
+    const id = this.linkedEntityId();
+    if (!type || !id) return null;
+    const route = entityRouteForType(type);
+    if (!route) return null;
+    return ['/', route, id];
+  });
+
+  linkedEntityLabel = computed<string>(() => formatEntityType(this.linkedEntityType()));
+
+  linkedEntityTitle = computed<string>(() => {
+    const title = this.entity()?.['entityTitle'];
+    if (typeof title === 'string' && title.trim()) return title;
+    return formatEntityType(this.linkedEntityType());
+  });
+
   ngOnInit() {
-    this.route.paramMap.subscribe(params => {
-      const type = this.route.snapshot.url[0]?.path || '';
+    combineLatest([this.route.url, this.route.paramMap]).subscribe(([segments, params]) => {
+      const type = segments[0]?.path || '';
       const id = params.get('id') || '';
       this.entityType.set(type);
       this.entityId.set(id);
@@ -93,6 +246,8 @@ export class EntityDetailViewComponent implements OnInit {
   loadEntity(type: string, id: string) {
     this.loading.set(true);
     this.error.set(null);
+    this.linkedEntityType.set(null);
+    this.linkedEntityId.set(null);
 
     const fetcher = this.getFetcher(type);
     if (!fetcher) {
@@ -105,12 +260,18 @@ export class EntityDetailViewComponent implements OnInit {
       switchMap(entity => {
         this.entity.set(entity as Record<string, unknown>);
         this.loadSubCollections(type, id);
-        return this.dataService.getOpenQuestionsForEntity(type.replace(/s$/, '').replace(/-/, '_'), id);
+        if (type === 'open-questions' && entity && typeof entity === 'object') {
+          const oq = entity as OpenQuestion;
+          this.linkedEntityType.set(oq.entityType || null);
+          this.linkedEntityId.set(oq.entityId || null);
+        }
+        const backendType = this.config?.backendType || 'unknown';
+        return this.dataService.getOpenQuestionsForEntity(backendType, id);
       }),
       catchError(err => {
         this.error.set(err.message || 'Failed to load entity');
         this.loading.set(false);
-        return of({ items: [], total: 0, page: 1, pageSize: 100 });
+        return of({ items: [], total: 0, page: 1, pageSize: DEFAULT_PAGE_SIZE });
       })
     ).subscribe(result => {
       this.openQuestions.set(result.items);
@@ -134,6 +295,7 @@ export class EntityDetailViewComponent implements OnInit {
       'agent-records': id => this.dataService.getAgentRecord(id),
       'agents': id => this.dataService.getAgentRecord(id),
       'specifications': id => this.dataService.getSpecification(id),
+      'specs': id => this.dataService.getSpecItem(id),
     };
     return map[type] || null;
   }
@@ -155,7 +317,7 @@ export class EntityDetailViewComponent implements OnInit {
     const entity = this.entity();
     if (!entity) return [];
     return Object.entries(entity)
-      .filter(([key]) => !['id'].includes(key))
+      .filter(([key]) => !['id', 'entityType', 'entityId'].includes(key))
       .map(([key, value]) => ({ key: this.formatKey(key), value }));
   }
 
@@ -177,4 +339,5 @@ export class EntityDetailViewComponent implements OnInit {
   formatDate(date: string) {
     return new Date(date).toLocaleString();
   }
+
 }

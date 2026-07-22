@@ -31,13 +31,13 @@ export class SidebarComponent {
     { route: '/intents', label: 'Intent Records', icon: 'scroll-text', countKey: 'intents' as keyof Counts },
     { route: '/agendas', label: 'Agendas', icon: 'list-checks', countKey: 'agendas' as keyof Counts },
     { route: '/specifications', label: 'Specifications', icon: 'file-text', countKey: 'specifications' as keyof Counts },
-    { route: '/specs', label: 'Specs', icon: 'file-text', countKey: 'specifications' as keyof Counts },
+    { route: '/specs', label: 'Spec Items', icon: 'file-text', countKey: 'specifications' as keyof Counts },
   ];
 
   executeItems = [
     { route: '/requirements', label: 'Requirements', icon: 'blocks', countKey: 'requirements' as keyof Counts },
     { route: '/work-requests', label: 'Work Requests', icon: 'git-branch', countKey: 'workRequests' as keyof Counts },
-    { route: '/plans', label: 'Plans', icon: 'list-checks', countKey: 'workRequests' as keyof Counts },
+    { route: '/plans', label: 'Plans', icon: 'map', countKey: 'plans' as keyof Counts },
   ];
 
   adminItems = [
@@ -45,12 +45,14 @@ export class SidebarComponent {
     { route: '/observations', label: 'Observations', icon: 'eye', countKey: 'observations' as keyof Counts },
     { route: '/reports', label: 'Reports', icon: 'bar-chart-3', countKey: 'reports' as keyof Counts },
     { route: '/agent-records', label: 'Agent Records', icon: 'bot', countKey: 'agentRecords' as keyof Counts },
-    { route: '/agents', label: 'Agents', icon: 'bot', countKey: 'agentRecords' as keyof Counts },
   ];
 
   settingsItem = { route: '/settings', label: 'Settings', icon: 'settings' };
 
-  openQuestionItem = { route: '/open-questions', label: 'Open Questions', icon: 'help-circle', countKey: 'openQuestions' as keyof Counts };
+  openQuestionsGroup = [
+    { route: '/open-questions', label: 'Open Questions', icon: 'help-circle', countKey: 'openQuestions' as keyof Counts },
+    { route: '/resolutions', label: 'Resolutions', icon: 'check-circle', countKey: undefined as keyof Counts | undefined },
+  ];
 
   getCount(key: keyof Counts): number | undefined {
     return this.counts ? this.counts[key] : undefined;

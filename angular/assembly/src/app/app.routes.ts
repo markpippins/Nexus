@@ -10,14 +10,17 @@ import { CandidatesViewComponent } from './views/candidates-view/candidates-view
 import { HarvestsViewComponent } from './views/harvests-view/harvests-view.component';
 import { ConversationsViewComponent } from './views/conversations-view/conversations-view.component';
 import { OpenQuestionsViewComponent } from './views/open-questions-view/open-questions-view.component';
+import { ResolutionsViewComponent } from './views/resolutions-view/resolutions-view.component';
 import { IntentsViewComponent } from './views/intents-view/intents-view.component';
 import { AssessmentsViewComponent } from './views/assessments-view/assessments-view.component';
 import { ObservationsViewComponent } from './views/observations-view/observations-view.component';
 import { ReportsViewComponent } from './views/reports-view/reports-view.component';
 import { AgentRecordsViewComponent } from './views/agent-records-view/agent-records-view.component';
 import { SpecificationsViewComponent } from './views/specifications-view/specifications-view.component';
+import { SpecificationDetailViewComponent } from './views/specification-detail-view/specification-detail-view.component';
 import { EntityDetailViewComponent } from './views/entity-detail-view/entity-detail-view.component';
 import { PlansViewComponent } from './views/plans-view/plans-view.component';
+import { PlanDetailViewComponent } from './views/plan-detail-view/plan-detail-view.component';
 import { AgentsViewComponent } from './views/agents-view/agents-view.component';
 import { ProfileViewComponent } from './views/profile-view/profile-view.component';
 import { SettingsViewComponent } from './views/settings-view/settings-view.component';
@@ -44,6 +47,7 @@ export const routes: Routes = [
   { path: 'conversations', component: ConversationsViewComponent },
   { path: 'conversations/:id', component: EntityDetailViewComponent },
   { path: 'open-questions', component: OpenQuestionsViewComponent },
+  { path: 'resolutions', component: ResolutionsViewComponent },
   { path: 'open-questions/:id', component: EntityDetailViewComponent },
   { path: 'intents', component: IntentsViewComponent },
   { path: 'intents/:id', component: EntityDetailViewComponent },
@@ -56,11 +60,13 @@ export const routes: Routes = [
   { path: 'agent-records', component: AgentRecordsViewComponent },
   { path: 'agent-records/:id', component: EntityDetailViewComponent },
   { path: 'specifications', component: SpecificationsViewComponent },
-  { path: 'specifications/:id', component: EntityDetailViewComponent },
+  { path: 'specifications/:id', component: SpecificationDetailViewComponent },
   { path: 'plans', component: PlansViewComponent },
+  { path: 'plans/:id', component: PlanDetailViewComponent },
   { path: 'agents', component: AgentsViewComponent },
-  { path: 'agents/:id', component: EntityDetailViewComponent },
+  { path: 'agents/:id', redirectTo: 'agent-records/:id', pathMatch: 'full' },
   { path: 'specs', component: SpecsViewComponent },
+  { path: 'specs/:id', component: EntityDetailViewComponent },
   { path: 'profile/:id', component: ProfileViewComponent },
   { path: 'settings', component: SettingsViewComponent },
   { path: 'search', component: SearchViewComponent },
