@@ -959,6 +959,8 @@ export function registerTools(server: McpServer) {
         systemId: args.systemId,
         planRef: args.planRef,
         tag: args.tag,
+        createdAfter: args.createdAfter,
+        createdBefore: args.createdBefore,
         level: args.level,
         visibilityScope: args.visibilityScope,
         limit: args.limit,
@@ -976,6 +978,31 @@ export function registerTools(server: McpServer) {
     },
     async (args) => {
       const result = await NebulaClient.getAgentRecord(args.id);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_get_inbox_pointer",
+    "Get the inbox pointer (watermark) for a role. Returns the ISO timestamp of the last-seen record, or null if no pointer exists.",
+    {
+      role: z.string().describe("Role name (e.g., architect, engineer, planner)"),
+    },
+    async (args) => {
+      const result = await NebulaClient.getInboxPointer(args.role);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_set_inbox_pointer",
+    "Set the inbox pointer (watermark) for a role. Call this after surfacing new messages to mark them as seen.",
+    {
+      role: z.string().describe("Role name (e.g., architect, engineer, planner)"),
+      timestamp: z.string().describe("ISO timestamp of the last-seen record"),
+    },
+    async (args) => {
+      const result = await NebulaClient.setInboxPointer(args.role, args.timestamp);
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );
@@ -1728,16 +1755,31 @@ export function registerTools(server: McpServer) {
   );
 
   server.tool(
+    "nebula_answer_question",
+    "Record an answer to an open question without resolving it. Status stays OPEN.",
+    {
+      questionId: z.string().describe("Question UUID to answer"),
+      answer: z.string().describe("The answer text"),
+      answeredBy: z.string().describe("Who answered (role name, e.g. 'analyst')"),
+    },
+    async (args) => {
+      const result = await NebulaClient.answerQuestion(args.questionId, {
+        answer: args.answer,
+        answeredBy: args.answeredBy,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
     "nebula_resolve_question",
-    "Resolve/close an open question with a resolution answer.",
+    "Resolve an open question that has been answered. Requires an existing answer.",
     {
       questionId: z.string().describe("Question UUID to resolve"),
-      resolution: z.string().describe("The answer or resolution text"),
-      resolvedBy: z.string().describe("Who resolved it (role name, e.g. 'architect', 'planner')"),
+      resolvedBy: z.string().describe("Who resolved it (role name, e.g. 'planner')"),
     },
     async (args) => {
       const result = await NebulaClient.resolveQuestion(args.questionId, {
-        resolution: args.resolution,
         resolvedBy: args.resolvedBy,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };

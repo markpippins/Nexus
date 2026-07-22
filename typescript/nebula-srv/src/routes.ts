@@ -3996,6 +3996,47 @@ export function createRoutes(pool: Pool): Router {
   });
 
   // ════════════════════════════════════════════════════════════════
+  //  INBOX POINTERS — per-role watermark for unread messages
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/inbox-pointer/:role — get the inbox pointer for a role
+  router.get('/inbox-pointer/:role', async (req: Request, res: Response) => {
+    try {
+      const role = req.params.role as string;
+      const { getInboxPointer } = await import('./services/block-segmentation-redis.service');
+      const pointer = await getInboxPointer(role);
+      res.json({ role, pointer });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/inbox-pointer/:role — set the inbox pointer for a role
+  router.put('/inbox-pointer/:role', async (req: Request, res: Response) => {
+    try {
+      const role = req.params.role as string;
+      const { timestamp } = req.body;
+      if (!timestamp) return res.status(400).json({ error: 'timestamp is required' });
+      const { setInboxPointer } = await import('./services/block-segmentation-redis.service');
+      await setInboxPointer(role, timestamp);
+      res.json({ ok: true, role, pointer: timestamp });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/inbox-pointers — list all inbox pointers (debugging)
+  router.get('/inbox-pointers', async (_req: Request, res: Response) => {
+    try {
+      const { getAllInboxPointers } = await import('./services/block-segmentation-redis.service');
+      const pointers = await getAllInboxPointers();
+      res.json({ pointers });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
   //  PROJECTIONS — on-demand markdown folder generation
   // ════════════════════════════════════════════════════════════════
 
@@ -5611,8 +5652,8 @@ export function createRoutes(pool: Pool): Router {
       const where = 'WHERE ' + clauses.join(' AND ');
       const { rows } = await pool.query(
         `SELECT id, requirement_id, candidate_id, title, description, category,
-                status, blocking, resolution, resolved_by, resolved_at,
-                created_by, created_at
+                status, blocking, resolution, answered_by, answered_at,
+                resolved_by, resolved_at, created_by, created_at
          FROM nebula.open_questions ${where}
          ORDER BY created_at DESC`, vals
       );
@@ -5622,28 +5663,56 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // PUT /api/open-questions/:id/answer
+  router.put('/open-questions/:id/answer', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { answer, answeredBy } = req.body;
+      if (!answer || !answeredBy) {
+        res.status(400).json({ error: 'answer and answeredBy are required' });
+        return;
+      }
+      const { rows } = await pool.query(
+        `UPDATE nebula.open_questions
+         SET resolution = $1,
+             answered_by = $2,
+             answered_at = now(),
+             updated_at = now()
+         WHERE id = $3 AND status = 'OPEN'
+         RETURNING id, title, status, resolution, answered_by, answered_at`,
+        [answer, answeredBy, id]
+      );
+      if (rows.length === 0) {
+        res.status(404).json({ error: 'Question not found or already closed' });
+        return;
+      }
+      res.json(rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // PUT /api/open-questions/:id/resolve
   router.put('/open-questions/:id/resolve', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { resolution, resolvedBy } = req.body;
-      if (!resolution || !resolvedBy) {
-        res.status(400).json({ error: 'resolution and resolvedBy are required' });
+      const { resolvedBy } = req.body;
+      if (!resolvedBy) {
+        res.status(400).json({ error: 'resolvedBy is required' });
         return;
       }
       const { rows } = await pool.query(
         `UPDATE nebula.open_questions
          SET status = 'RESOLVED',
-             resolution = $1,
-             resolved_by = $2,
+             resolved_by = $1,
              resolved_at = now(),
              updated_at = now()
-         WHERE id = $3 AND status = 'OPEN'
-         RETURNING id, title, status, resolution, resolved_by, resolved_at`,
-        [resolution, resolvedBy, id]
+         WHERE id = $2 AND status = 'OPEN' AND resolution IS NOT NULL
+         RETURNING id, title, status, resolution, answered_by, resolved_by, resolved_at`,
+        [resolvedBy, id]
       );
       if (rows.length === 0) {
-        res.status(404).json({ error: 'Question not found or already closed' });
+        res.status(404).json({ error: 'Question not found, already closed, or has no answer' });
         return;
       }
       res.json(rows[0]);

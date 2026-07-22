@@ -103,6 +103,52 @@ export async function closeRedis(): Promise<void> {
   }
 }
 
+// ── Inbox Pointer (per-role watermark for unread messages) ────────
+
+/**
+ * Key pattern for inbox pointers.
+ * Stores the ISO timestamp of the last-seen record per role.
+ * All state is RECOMPUTABLE — on Redis loss, agents re-read from the beginning.
+ */
+const KEY_INBOX_POINTER = (role: string) => `inbox:pointer:${role}`;
+
+/**
+ * Get the inbox pointer for a role.
+ * Returns the ISO timestamp of the last-seen record, or null if no pointer exists.
+ */
+export async function getInboxPointer(role: string): Promise<string | null> {
+  if (!redis) return null;
+  try {
+    return await redis.get(KEY_INBOX_POINTER(role));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Set the inbox pointer for a role.
+ * @param role - The role name (e.g., "architect", "engineer")
+ * @param timestamp - ISO timestamp of the last-seen record
+ */
+export async function setInboxPointer(role: string, timestamp: string): Promise<void> {
+  if (!redis) return;
+  await redis.set(KEY_INBOX_POINTER(role), timestamp);
+}
+
+/**
+ * Get all inbox pointers (for debugging/monitoring).
+ */
+export async function getAllInboxPointers(): Promise<Record<string, string | null>> {
+  if (!redis) return {};
+  const keys = await redis.keys('inbox:pointer:*');
+  const result: Record<string, string | null> = {};
+  for (const key of keys) {
+    const role = key.replace('inbox:pointer:', '');
+    result[role] = await redis.get(key);
+  }
+  return result;
+}
+
 // ── Session Cache (volatile per-conversation context) ────────────
 
 /** Fields stored in the session hash. */

@@ -328,6 +328,15 @@ export const NebulaClient = {
   /** DELETE /api/agent-records/:id */
   deleteAgentRecord: (id: string) => httpRequest("DELETE", `/api/agent-records/${encodeURIComponent(id)}`),
 
+  // ── Inbox Pointers ─────────────────────────────────────────
+  /** GET /api/inbox-pointer/:role */
+  getInboxPointer: (role: string) => httpGet(`/api/inbox-pointer/${encodeURIComponent(role)}`),
+  /** PUT /api/inbox-pointer/:role */
+  setInboxPointer: (role: string, timestamp: string) =>
+    httpRequest("PUT", `/api/inbox-pointer/${encodeURIComponent(role)}`, { timestamp }),
+  /** GET /api/inbox-pointers */
+  getAllInboxPointers: () => httpGet("/api/inbox-pointers"),
+
   // ── Projections ────────────────────────────────────────────
   /** GET /api/projections */
   listProjections: () => httpGet("/api/projections"),
@@ -618,7 +627,11 @@ export const NebulaClient = {
     return httpGet(`/api/open-questions${qs ? `?${qs}` : ""}`);
   },
 
+  /** PUT /api/open-questions/:id/answer */
+  answerQuestion: (id: string, body: { answer: string; answeredBy: string }) =>
+    httpRequest("PUT", `/api/open-questions/${encodeURIComponent(id)}/answer`, body),
+
   /** PUT /api/open-questions/:id/resolve */
-  resolveQuestion: (id: string, body: { resolution: string; resolvedBy: string }) =>
+  resolveQuestion: (id: string, body: { resolvedBy: string }) =>
     httpRequest("PUT", `/api/open-questions/${encodeURIComponent(id)}/resolve`, body),
 };
