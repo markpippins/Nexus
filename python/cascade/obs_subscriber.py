@@ -1,7 +1,8 @@
-"""obs_subscriber.py — PostgreSQL LISTEN subscriber for PEB/Vision observability.
+"""obs_subscriber.py — PostgreSQL LISTEN subscriber for PEB/Vision/Questions observability.
 
-Listens on ``peb_governance_event_created`` and
-``vision_lifecycle_event_created`` NOTIFY channels and publishes each
+Listens on ``peb_governance_event_created``,
+``vision_lifecycle_event_created``, ``open_question_answered``, and
+``open_question_resolved`` NOTIFY channels and publishes each
 event as a CanonicalEnvelope over NATS.
 
 Architecture::
@@ -13,6 +14,10 @@ Architecture::
         │                                       │
     vision.lifecycle_events (view)             │                          nexus.vision.v1.lifecycle.created
         │  INSTEAD OF INSERT trigger            │
+        │  ──→ pg_notify(...)                    │
+        │                                       │
+    nebula.open_questions                     │                          nexus.open_questions.v1.answered
+        │  AFTER UPDATE trigger                 │                          nexus.open_questions.v1.resolved
         │  ──→ pg_notify(...)                    │
         │                                       │
         └──────────────── NOTIFY ────────────────┘
@@ -52,6 +57,8 @@ NATS_URL = os.getenv("NATS_URL")
 CHANNELS = {
     "peb_governance_event_created": "nexus.peb.v1.governance.created",
     "vision_lifecycle_event_created": "nexus.vision.v1.lifecycle.created",
+    "open_question_answered": "nexus.open_questions.v1.answered",
+    "open_question_resolved": "nexus.open_questions.v1.resolved",
 }
 
 # ── Globals for graceful shutdown ──────────────────────────────────
@@ -168,7 +175,14 @@ def run_obs_subscriber() -> None:
                         )
 
                         # Derive source from channel
-                        source = "peb" if "peb" in channel else "vision"
+                        if "peb" in channel:
+                            source = "peb"
+                        elif "vision" in channel:
+                            source = "vision"
+                        elif "open_question" in channel:
+                            source = "open_questions"
+                        else:
+                            source = "unknown"
                         event_dict = _build_envelope(
                             payload, source, aggregate_type,
                         )
