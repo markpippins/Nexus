@@ -55,6 +55,7 @@ ALL_SERVICES=(
     "terrain-mcp.service"      # stdio  — Terrain topology MCP (on-demand; clients spawn independently)
     "tackle-mcp.service"       # port 3400 — AI config registry
     "cpf-api.service"          # port 3108 — CPF funnel data API
+    "execution-srv.service"    # port 3110 — execution observability REST API
 )
 
 # ── Service metadata for health checks ─────────────────────────────────
@@ -86,6 +87,7 @@ SERVICE_PORTS=(
     ["tackle-mcp.service"]="3400"
     ["operator-svc.service"]="3018"
     ["cpf-api.service"]="3108"
+    ["execution-srv.service"]="3110"
 )
 
 # Docker-based services (verified via docker ps instead of port check)
