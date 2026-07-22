@@ -5651,11 +5651,15 @@ export function createRoutes(pool: Pool): Router {
       else { clauses.push(`status = 'OPEN'`); }
       const where = 'WHERE ' + clauses.join(' AND ');
       const { rows } = await pool.query(
-        `SELECT id, requirement_id, candidate_id, title, description, category,
-                status, blocking, resolution, answered_by, answered_at,
-                resolved_by, resolved_at, created_by, created_at
-         FROM nebula.open_questions ${where}
-         ORDER BY created_at DESC`, vals
+        `SELECT oq.id, oq.requirement_id, oq.candidate_id, oq.title, oq.description, oq.category,
+                oq.status, oq.blocking, oq.resolution, oq.answered_by, oq.answered_at,
+                oq.resolved_by, oq.resolved_at, oq.created_by, oq.created_at,
+                COALESCE(ac.answer_count, 0) AS answer_count,
+                COALESCE(ac.role_count, 0) AS role_count
+         FROM nebula.open_questions oq
+         LEFT JOIN nebula.v_question_answer_counts ac ON ac.question_id = oq.id
+         ${where}
+         ORDER BY oq.created_at DESC`, vals
       );
       res.json({ questions: rows, count: rows.length });
     } catch (err: any) {
@@ -5663,7 +5667,64 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // PUT /api/open-questions/:id/answer
+  // GET /api/open-questions/:id/answers — list all answers for a question
+  router.get('/open-questions/:id/answers', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT id, question_id, role, answer, confidence, reasoning, answered_at
+         FROM nebula.open_question_answers
+         WHERE question_id = $1
+         ORDER BY answered_at ASC`, [id]
+      );
+      res.json({ answers: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/open-questions/:id/answers — add a new answer to a question
+  router.post('/open-questions/:id/answers', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { answer, role, confidence, reasoning } = req.body;
+      if (!answer || !role) {
+        res.status(400).json({ error: 'answer and role are required' });
+        return;
+      }
+      // Verify question exists and is open
+      const qCheck = await pool.query(
+        `SELECT id, status FROM nebula.open_questions WHERE id = $1`, [id]
+      );
+      if (qCheck.rows.length === 0) {
+        res.status(404).json({ error: 'Question not found' });
+        return;
+      }
+      // Insert answer
+      const { rows } = await pool.query(
+        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, question_id, role, answer, confidence, reasoning, answered_at`,
+        [id, role, answer, confidence || 'MEDIUM', reasoning || null]
+      );
+      // Also update the single-answer columns on open_questions for backwards compatibility
+      await pool.query(
+        `UPDATE nebula.open_questions
+         SET resolution = $1,
+             answered_by = $2,
+             answered_at = now(),
+             updated_at = now()
+         WHERE id = $3 AND status = 'OPEN'`,
+        [answer, role, id]
+      );
+      res.status(201).json(rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/open-questions/:id/answer — legacy single-answer endpoint (backwards compat)
+  // Now also inserts into open_question_answers table.
   router.put('/open-questions/:id/answer', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
@@ -5672,6 +5733,18 @@ export function createRoutes(pool: Pool): Router {
         res.status(400).json({ error: 'answer and answeredBy are required' });
         return;
       }
+      // Insert into answers table (upsert: one answer per role per question)
+      await pool.query(
+        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning)
+         VALUES ($1, $2, $3, 'MEDIUM', NULL)
+         ON CONFLICT (question_id, role) DO UPDATE
+         SET answer = EXCLUDED.answer,
+             confidence = EXCLUDED.confidence,
+             reasoning = EXCLUDED.reasoning,
+             answered_at = now()`,
+        [id, answeredBy, answer]
+      );
+      // Update single-answer columns on open_questions
       const { rows } = await pool.query(
         `UPDATE nebula.open_questions
          SET resolution = $1,

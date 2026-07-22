@@ -1786,6 +1786,39 @@ export function registerTools(server: McpServer) {
     }
   );
 
+  server.tool(
+    "nebula_list_question_answers",
+    "List all answers for an open question (multi-role deliberation).",
+    {
+      questionId: z.string().describe("Question UUID"),
+    },
+    async (args) => {
+      const result = await NebulaClient.listQuestionAnswers(args.questionId);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "nebula_add_question_answer",
+    "Add a new answer to an open question (multi-role deliberation). Multiple roles can answer the same question.",
+    {
+      questionId: z.string().describe("Question UUID to answer"),
+      answer: z.string().describe("The answer text"),
+      role: z.string().describe("Who answered (role name, e.g. 'analyst', 'architect')"),
+      confidence: z.string().optional().describe("Confidence level: HIGH, MEDIUM, LOW (default: MEDIUM)"),
+      reasoning: z.string().optional().describe("Step-by-step reasoning behind the answer"),
+    },
+    async (args) => {
+      const result = await NebulaClient.addQuestionAnswer(args.questionId, {
+        answer: args.answer,
+        role: args.role,
+        confidence: args.confidence,
+        reasoning: args.reasoning,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
   // ════════════════════════════════════════════════════════════════
   //  HEALTH
   // ════════════════════════════════════════════════════════════════

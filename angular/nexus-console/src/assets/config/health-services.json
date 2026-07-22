@@ -12,8 +12,6 @@
     { "key": "nebula-srv",        "name": "Nebula API",         "port": 3101, "healthPath": "/health", "category": "core" },
     { "key": "role-memory-srv",   "name": "Role Memory Sync",   "port": 3500, "healthPath": "/health", "category": "core" },
     { "key": "wrp-bridge-daemon", "name": "WRP Bridge Daemon",  "port": null, "category": "core", "note": "no HTTP health endpoint" },
-    { "key": "vision-srv",        "name": "Vision LOSM",        "port": 3103, "healthPath": "/health", "category": "api" },
-    { "key": "vision-srv-3104",   "name": "Vision LOSM (alt)",  "port": 3104, "healthPath": "/health", "category": "api" },
     { "key": "vision-srv-py",     "name": "Vision Python",      "port": 8003, "healthPath": "/health", "category": "api" },
     { "key": "image-server",      "name": "Image Server",       "port": null, "category": "api", "note": "no HTTP health endpoint" },
     { "key": "address-tts",       "name": "Address TTS",        "port": 8600, "healthPath": "/health", "category": "tts" },

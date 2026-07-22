@@ -234,6 +234,67 @@ class ArchitectHarness(Harness):
 
         return "\n".join(parts)
 
+    def build_need_spec_prompt(self, context: dict) -> str:
+        """Build the LLM prompt for NEEDS_SPEC escalations."""
+        requirement = context.get("requirement", {})
+        escalation = context.get("escalation", {})
+
+        parts = [
+            ARCHITECT_SYSTEM_PROMPT,
+            "",
+            "## NEEDS_SPEC Escalation",
+            "",
+            "The Planner has escalated a question that requires a spec and implementation plan.",
+            "",
+            f"### Original Question",
+            f"- **Title**: {escalation.get('question_title', 'Unknown')}",
+            f"- **Description**: {escalation.get('question_description', 'No description')}",
+            f"- **Created by**: {escalation.get('created_by', 'planner')}",
+            "",
+            f"### Linked Requirement",
+            f"- **ID**: {requirement.get('id', 'Unknown')}",
+            f"- **Title**: {requirement.get('title', 'Unknown')}",
+            f"- **Description**: {requirement.get('description', 'No description')}",
+            f"- **Status**: {requirement.get('status', 'unknown')}",
+            f"- **Priority**: {requirement.get('priority', 'Medium')}",
+            "",
+        ]
+
+        if requirement.get("acceptance_criteria"):
+            parts.append("**Acceptance Criteria:**")
+            criteria = requirement["acceptance_criteria"]
+            if isinstance(criteria, list):
+                for c in criteria:
+                    parts.append(f"- {c}")
+            elif isinstance(criteria, dict):
+                for k, v in criteria.items():
+                    parts.append(f"- {k}: {v}")
+            parts.append("")
+
+        parts.extend([
+            "## Your Task",
+            "",
+            "Write a spec and implementation plan for this requirement.",
+            "The spec should describe what to build and why.",
+            "The plan should describe how to build it, including files to create/modify.",
+            "",
+            "## Output Format",
+            "",
+            "Return a JSON object with this structure:",
+            "```json",
+            "{",
+            '  "spec_title": "Title for the spec",',
+            '  "spec_content": "Markdown content of the spec",',
+            '  "plan_title": "Title for the implementation plan",',
+            '  "plan_goal": "What this plan achieves",',
+            '  "acceptance_criteria": ["Criterion 1", "Criterion 2"],',
+            '  "files_affected": ["path/to/file1.py", "path/to/file2.py"]',
+            "}",
+            "```",
+        ])
+
+        return "\n".join(parts)
+
     def handle_response(self, response: str, context: dict) -> dict:
         """Parse LLM response and persist results to DB.
 

@@ -1,0 +1,17 @@
+[Unit]
+Description=MongoDB Health Monitor — restarts dependent services when MongoDB recovers
+Documentation=https://github.com/codex/nexus/wiki/mongodb-health-monitor
+After=network.target mongodb.service
+Wants=mongodb.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/codex/dev/nexus/bin/mongodb-health-monitor.sh
+User=codex
+Group=codex
+
+# Hardening (state file written to $XDG_RUNTIME_DIR, usually /run/user/1000/nexus-monitor)
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

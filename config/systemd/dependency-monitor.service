@@ -1,0 +1,17 @@
+[Unit]
+Description=Dependency Monitor — restarts dependent services when Redis, PostgreSQL, or MongoDB recovers
+Documentation=https://github.com/codex/nexus/wiki/dependency-monitor
+After=network.target redis.service postgresql.service mongodb.service
+Wants=redis.service postgresql.service mongodb.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/codex/dev/nexus/bin/dependency-monitor.sh
+User=codex
+Group=codex
+
+# Hardening (state file written to $XDG_RUNTIME_DIR, usually /run/user/1000/nexus-monitor)
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

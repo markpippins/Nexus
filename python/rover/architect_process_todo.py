@@ -878,24 +878,169 @@ def _process_complex(req: dict, ripple: dict, harness: ArchitectHarness, dry_run
     return result
 
 
+# ── NEEDS_SPEC Escalations ─────────────────────────────────────────────
+
+def fetch_needs_spec_questions(limit: int = 10) -> list[dict]:
+    """Fetch OPEN questions with category=NEEDS_SPEC (Planner escalations)."""
+    sql = f"""
+        SELECT row_to_json(r)::text FROM (
+            SELECT
+                oq.id, oq.title, oq.description, oq.category,
+                oq.requirement_id, oq.candidate_id, oq.created_by,
+                req.title as req_title, req.description as req_description,
+                req.status as req_status, req.priority as req_priority,
+                req.acceptance_criteria
+            FROM nebula.open_questions oq
+            LEFT JOIN nebula.requirements req ON req.id = oq.requirement_id
+            WHERE oq.status = 'OPEN'
+              AND oq.category = 'NEEDS_SPEC'
+            ORDER BY oq.blocking DESC, oq.created_at ASC
+            LIMIT {limit}
+        ) r;
+    """
+    return psql_json(sql)
+
+
+def resolve_needs_spec_question(question_id: str, answer: str, dry_run: bool = False) -> bool:
+    """Resolve a NEEDS_SPEC question after writing spec + plan."""
+    if dry_run:
+        log.info("  [DRY RUN] Would resolve NEEDS_SPEC question %s", question_id[:8])
+        return True
+
+    sql = f"""
+        UPDATE nebula.open_questions
+        SET status = 'RESOLVED',
+            resolution = '{answer.replace("'", "''")}',
+            resolved_by = 'architect',
+            resolved_at = now(),
+            updated_at = now()
+        WHERE id = '{question_id}'::uuid
+          AND status = 'OPEN'
+          AND category = 'NEEDS_SPEC'
+        RETURNING id;
+    """
+    rc, out, err = psql(sql)
+    if rc != 0 or not out:
+        log.warning("  Could not resolve NEEDS_SPEC question: %s", (err or out)[:100])
+        return False
+    return True
+
+
+def process_needs_spec(question: dict, harness: 'ArchitectHarness', dry_run: bool = False) -> dict:
+    """Process a NEEDS_SPEC escalation: write spec + implementation plan."""
+    q_id = question["id"]
+    req_id = question.get("requirement_id")
+    req_title = question.get("req_title", question.get("title", "Unknown"))
+    req_description = question.get("req_description", question.get("description", ""))
+    req_criteria = question.get("acceptance_criteria")
+
+    result = {"success": False, "action": None}
+
+    log.info("Processing NEEDS_SPEC: %s", question["title"][:60])
+
+    if not req_id:
+        result["action"] = "skipped — no linked requirement"
+        log.info("  ⊘ %s", result["action"])
+        return result
+
+    # Build context for LLM
+    context = {
+        "requirement": {
+            "id": req_id,
+            "title": req_title,
+            "description": req_description,
+            "status": question.get("req_status", "unknown"),
+            "priority": question.get("req_priority", "Medium"),
+            "acceptance_criteria": req_criteria,
+        },
+        "escalation": {
+            "question_id": q_id,
+            "question_title": question["title"],
+            "question_description": question.get("description", ""),
+            "created_by": question.get("created_by", "planner"),
+        },
+    }
+
+    # Build prompt
+    prompt = harness.build_need_spec_prompt(context)
+
+    # Invoke LLM
+    log.info("  Invoking LLM for spec + plan...")
+    response = harness.invoke(prompt)
+
+    if not response:
+        result["action"] = "failed — LLM returned no response"
+        log.error("  ✗ %s", result["action"])
+        return result
+
+    # Parse response
+    parsed = harness._extract_json(response)
+    if not parsed:
+        result["action"] = "failed — could not parse LLM response"
+        log.error("  ✗ %s", result["action"])
+        return result
+
+    # Write spec
+    spec_title = parsed.get("spec_title", f"Spec for {req_title[:50]}")
+    spec_content = parsed.get("spec_content", "")
+    spec_id = write_spec(req_id, spec_title, {"content": spec_content}, dry_run=dry_run)
+
+    if not spec_id and not dry_run:
+        result["action"] = "failed — could not write spec"
+        log.error("  ✗ %s", result["action"])
+        return result
+
+    # Write implementation plan
+    plan_title = parsed.get("plan_title", f"Plan for {req_title[:50]}")
+    plan_goal = parsed.get("plan_goal", "")
+    acceptance_criteria = parsed.get("acceptance_criteria", [])
+    files_affected = parsed.get("files_affected", [])
+
+    plan_id = write_implementation_plan(
+        req_id, spec_id or "dry-run",
+        plan_title, plan_goal, acceptance_criteria,
+        files_affected, dry_run=dry_run,
+    )
+
+    if not plan_id and not dry_run:
+        result["action"] = "failed — could not write plan"
+        log.error("  ✗ %s", result["action"])
+        return result
+
+    # Resolve the NEEDS_SPEC question
+    answer = f"Spec and plan written. Spec: {spec_id or 'dry-run'}, Plan: {plan_id or 'dry-run'}"
+    resolve_needs_spec_question(q_id, answer, dry_run=dry_run)
+
+    result["success"] = True
+    result["action"] = (
+        f"escalation resolved — spec: {spec_id[:8] if spec_id else 'dry-run'}, "
+        f"plan: {plan_id[:8] if plan_id else 'dry-run'}"
+    )
+    log.info("  ✓ %s", result["action"])
+    return result
+
+
 # ── Main ───────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Architect cron: ToDo → InProgress"
+        description="Architect cron: ToDo → InProgress + NEEDS_SPEC escalations"
     )
+    parser.add_argument("--mode", type=str, default="both",
+                        choices=["todo", "escalations", "both"],
+                        help="Run mode: todo, escalations, or both (default: both)")
     parser.add_argument("--requirement", type=str, default=None,
-                        help="Process a specific requirement UUID")
+                        help="Process a specific requirement UUID (todo mode only)")
     parser.add_argument("--limit", type=int, default=50,
-                        help="Max requirements to process")
+                        help="Max requirements/questions to process")
     parser.add_argument("--dry-run", action="store_true",
                         help="Preview without DB writes")
     args = parser.parse_args()
 
     log.info("=" * 60)
-    log.info("Architect Cron: ToDo → InProgress (LLM-powered)")
+    log.info("Architect Cron: ToDo + Escalations (LLM-powered)")
     log.info("Time: %s", datetime.now().isoformat())
-    log.info("Mode: %s", "DRY RUN" if args.dry_run else "LIVE")
+    log.info("Mode: %s (%s)", args.mode, "DRY RUN" if args.dry_run else "LIVE")
     log.info("=" * 60)
 
     # Connect harness for LLM calls
@@ -910,39 +1055,51 @@ def main():
     log.info("Model: %s (%s)", harness.preferred_model.model_name,
              harness.preferred_model.model_identifier)
 
-    if args.requirement:
-        req = fetch_requirement(args.requirement)
-        if not req:
-            log.error("Requirement not found: %s", args.requirement)
-            return 1
-        reqs = [req]
-    else:
-        reqs = fetch_todo_requirements(args.limit)
-        log.info("ToDo requirements: %d", len(reqs))
+    stats = {"simple": 0, "complex": 0, "skipped": 0, "failed": 0, "escalations": 0}
 
-    if not reqs:
-        log.info("Nothing to process.")
-        return 0
-
-    stats = {"simple": 0, "complex": 0, "skipped": 0, "failed": 0}
-
-    for req in reqs:
-        result = process_requirement(req, harness, args.dry_run)
-
-        if result["success"]:
-            if "complex" in (result.get("action") or ""):
-                stats["complex"] += 1
-            else:
-                stats["simple"] += 1
-        elif "skipped" in (result.get("action") or ""):
-            stats["skipped"] += 1
+    # Process ToDo requirements (if mode is todo or both)
+    if args.mode in ("todo", "both"):
+        if args.requirement:
+            req = fetch_requirement(args.requirement)
+            if not req:
+                log.error("Requirement not found: %s", args.requirement)
+                return 1
+            reqs = [req]
         else:
-            stats["failed"] += 1
+            reqs = fetch_todo_requirements(args.limit)
+            log.info("ToDo requirements: %d", len(reqs))
+
+        for req in reqs:
+            result = process_requirement(req, harness, args.dry_run)
+
+            if result["success"]:
+                if "complex" in (result.get("action") or ""):
+                    stats["complex"] += 1
+                else:
+                    stats["simple"] += 1
+            elif "skipped" in (result.get("action") or ""):
+                stats["skipped"] += 1
+            else:
+                stats["failed"] += 1
+
+    # Process NEEDS_SPEC escalations (if mode is escalations or both)
+    if args.mode in ("escalations", "both"):
+        escalation_limit = min(args.limit, 5)  # Cap escalations at 5
+        escalations = fetch_needs_spec_questions(escalation_limit)
+        log.info("NEEDS_SPEC escalations: %d", len(escalations))
+
+        for question in escalations:
+            result = process_needs_spec(question, harness, args.dry_run)
+            if result["success"]:
+                stats["escalations"] += 1
+            else:
+                stats["failed"] += 1
 
     log.info("=" * 60)
     log.info("Architect Summary:")
     log.info("  Simple → InProgress: %d", stats["simple"])
     log.info("  Complex → InProgress: %d", stats["complex"])
+    log.info("  Escalations resolved: %d", stats["escalations"])
     log.info("  Skipped:             %d", stats["skipped"])
     log.info("  Failed:              %d", stats["failed"])
     log.info("=" * 60)

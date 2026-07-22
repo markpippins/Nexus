@@ -107,8 +107,7 @@
                       [class]="selectedReqId() === req.id
                         ? 'border-[rgb(var(--color-accent-border))] ring-1 ring-[rgb(var(--color-accent-ring))] bg-[rgb(var(--color-surface-muted))]'
                         : 'border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-card))] hover:border-[rgb(var(--color-accent-border))] hover:shadow-sm'"
-                      [class.cursor-pointer]="draggingReqId() !== req.id"
-                      [class.cursor-grabbing]="draggingReqId() === req.id"
+                      [style.cursor]="draggingReqId() === req.id ? 'grabbing' : 'pointer'"
                       [class.opacity-40]="draggingReqId() === req.id"
                     >
                       <!-- Title -->

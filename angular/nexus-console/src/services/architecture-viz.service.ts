@@ -425,6 +425,42 @@ export class ArchitectureVizService {
         this.controls.update();
     }
 
+    /** Orbit the camera vertically around the target.
+     *  Positive angle moves the camera downward; negative moves it upward. */
+    public rotateCameraVertical(angle: number) {
+        if (!this.camera || !this.controls) return;
+
+        const offset = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
+        const radius = offset.length();
+        offset.normalize();
+
+        // Axis of rotation is perpendicular to both world UP and the camera offset
+        const right = new THREE.Vector3().crossVectors(this.camera.up, offset).normalize();
+        offset.applyAxisAngle(right, angle);
+
+        // Prevent flipping over the poles
+        if (Math.abs(offset.dot(this.camera.up)) > 0.98) return;
+
+        offset.multiplyScalar(radius);
+        this.camera.position.copy(this.controls.target).add(offset);
+        this.camera.lookAt(this.controls.target);
+        this.controls.update();
+    }
+
+    /** Pan the camera (and its target) horizontally by moving along the
+     *  camera's local right vector. Positive delta moves right; negative left. */
+    public panCamera(deltaX: number) {
+        if (!this.camera || !this.controls) return;
+
+        const right = new THREE.Vector3();
+        right.setFromMatrixColumn(this.camera.matrix, 0);
+        right.normalize().multiplyScalar(deltaX);
+
+        this.camera.position.add(right);
+        this.controls.target.add(right);
+        this.controls.update();
+    }
+
     // Convenience methods for toolbar
     public zoomIn() {
         this.zoomCamera(15);
@@ -1370,6 +1406,53 @@ export class ArchitectureVizService {
             event.preventDefault();
             event.stopPropagation();
             this.deselect();
+            return;
+        }
+
+        // Camera keyboard controls (only when graph has focus and not mid-animation)
+        if (event.key.startsWith('Arrow') && this.controls && !this.cameraAnimating) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const orbitAngle = 0.08;
+            const zoomAmount = 10;
+            const panAmount = 2;
+
+            if (event.altKey) {
+                // Alt + Arrow => translate camera position (dolly / pan)
+                switch (event.key) {
+                    case 'ArrowUp':
+                        this.zoomCamera(zoomAmount);
+                        break;
+                    case 'ArrowDown':
+                        this.zoomCamera(-zoomAmount);
+                        break;
+                    case 'ArrowLeft':
+                        this.panCamera(-panAmount);
+                        break;
+                    case 'ArrowRight':
+                        this.panCamera(panAmount);
+                        break;
+                }
+            } else {
+                // Plain Arrow => orbit around the target
+                switch (event.key) {
+                    case 'ArrowUp':
+                        this.rotateCameraVertical(-orbitAngle);
+                        break;
+                    case 'ArrowDown':
+                        this.rotateCameraVertical(orbitAngle);
+                        break;
+                    case 'ArrowLeft':
+                        this.rotateCamera(orbitAngle);
+                        break;
+                    case 'ArrowRight':
+                        this.rotateCamera(-orbitAngle);
+                        break;
+                }
+            }
+
+            this.cameraChanged.next();
             return;
         }
     }

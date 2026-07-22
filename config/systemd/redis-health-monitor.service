@@ -1,0 +1,17 @@
+[Unit]
+Description=Redis Health Monitor — restarts dependent services when Redis recovers
+Documentation=https://github.com/codex/nexus/wiki/redis-health-monitor
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/codex/dev/nexus/bin/redis-health-monitor.sh
+User=codex
+Group=codex
+
+# Hardening (state file written to $XDG_RUNTIME_DIR, usually /run/user/1000/nexus-monitor)
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

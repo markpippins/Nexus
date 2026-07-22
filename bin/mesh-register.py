@@ -174,31 +174,17 @@ CANDIDATES: tuple[Candidate, ...] = (
         workspace_path="nexus/typescript/nebula-mcp",
     ),
     Candidate(
-        name="vision-srv",
-        port=3103,
+        name="vision-srv-py",
+        port=8003,
         kind="runnable_service",
-        service_type="Express",
-        health_url="http://localhost:3103/health",
+        service_type="FastAPI",
+        health_url="http://localhost:8003/health",
         description=(
-            "Vision REST proxy on its DEFAULT port (3103). vision-mcp's "
-            "VISION_SRV_URL defaults to this URL."
+            "Vision Python service (8003) — full CRUD + DAG + edges + "
+            "validation. vision-mcp proxies to this service."
         ),
-        startup="systemd: systemctl --user start vision-srv.service",
-        workspace_path="nexus/typescript/vision-srv",
-    ),
-    Candidate(
-        name="vision-srv-3104",
-        port=3104,
-        kind="runnable_service",
-        service_type="Express",
-        health_url="http://localhost:3104/health",
-        description=(
-            "Vision REST on PORT=3104 to avoid collision with terrain-mcp. "
-            "vision-mcp reads VISION_SRV_URL env to choose between this and "
-            "vision-srv on 3103."
-        ),
-        startup="systemd: systemctl --user start vision-srv-3104.service",
-        workspace_path="nexus/typescript/vision-srv",
+        startup="systemd: systemctl --user start vision-srv-py.service",
+        workspace_path="nexus/python/vision/vision-srv",
     ),
     Candidate(
         name="tackle-mcp",

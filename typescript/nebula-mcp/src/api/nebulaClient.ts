@@ -634,4 +634,12 @@ export const NebulaClient = {
   /** PUT /api/open-questions/:id/resolve */
   resolveQuestion: (id: string, body: { resolvedBy: string }) =>
     httpRequest("PUT", `/api/open-questions/${encodeURIComponent(id)}/resolve`, body),
+
+  /** GET /api/open-questions/:id/answers */
+  listQuestionAnswers: (questionId: string) =>
+    httpGet(`/api/open-questions/${encodeURIComponent(questionId)}/answers`),
+
+  /** POST /api/open-questions/:id/answers */
+  addQuestionAnswer: (questionId: string, body: { answer: string; role: string; confidence?: string; reasoning?: string }) =>
+    httpRequest("POST", `/api/open-questions/${encodeURIComponent(questionId)}/answers`, body),
 };
