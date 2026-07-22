@@ -6,6 +6,7 @@ import com.aibizarchitect.nexus.v1.spring.atlas.entity.GraphViewPosition;
 import com.aibizarchitect.nexus.v1.spring.atlas.repository.GraphViewConnectionRepository;
 import com.aibizarchitect.nexus.v1.spring.atlas.repository.GraphViewPositionRepository;
 import com.aibizarchitect.nexus.v1.spring.atlas.repository.GraphViewRepository;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -40,11 +41,18 @@ public class GraphViewController {
         return ResponseEntity.ok(repository.findAll(pageable).getContent());
     }
 
-    /** Get a single view with its positions eager-loaded via EntityGraph. */
+    /** Get a single view with its positions and connections loaded. */
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<GraphView> getById(@PathVariable("id") Long id) {
-        return repository.findWithPositionsById(id)
-                .map(ResponseEntity::ok)
+        return repository.findById(id)
+                .map(view -> {
+                    // Avoid MultipleBagFetchException: load each collection separately
+                    // within the same read-only transaction.
+                    Hibernate.initialize(view.getPositions());
+                    Hibernate.initialize(view.getConnections());
+                    return ResponseEntity.ok(view);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 

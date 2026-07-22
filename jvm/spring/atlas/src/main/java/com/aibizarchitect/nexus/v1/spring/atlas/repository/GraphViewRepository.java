@@ -14,9 +14,6 @@ public interface GraphViewRepository extends JpaRepository<GraphView, Long> {
 
     Optional<GraphView> findByIsDefaultTrue();
 
-    @EntityGraph(attributePaths = {"positions", "connections"})
-    Optional<GraphView> findWithPositionsById(Long id);
-
     @Modifying(clearAutomatically = true)
     @Query("UPDATE GraphView g SET g.isDefault = false WHERE g.isDefault = true")
     void clearDefault();
