@@ -115,7 +115,7 @@ POSTGRESQL_DEPENDENT_SERVICES=(
     "cpf-api.service"
     "execution-srv.service"
     "cascade-srv.service"
-    "vision-srv.service"
+    "vision-srv-py.service"
 )
 
 _postgresql_healthy() {

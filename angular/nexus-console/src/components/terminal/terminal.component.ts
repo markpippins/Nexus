@@ -382,6 +382,11 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
       reconnectTimer: null,
     };
 
+    // Wire up input handling (both local and remote)
+    terminal.onData((data: string) => {
+      void this.handleSessionInput(session, data);
+    });
+
     if (isRemote) {
       this.saveSessionId(id);
       this.connectRemoteSession(session);

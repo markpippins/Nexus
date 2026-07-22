@@ -993,6 +993,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private unlistenStreamResizeUp: (() => void) | null = null;
 
   @ViewChild('mainContentWrapper') mainContentWrapperEl!: ElementRef<HTMLDivElement>;
+  @ViewChild('viewContainer') viewContainerEl!: ElementRef<HTMLDivElement>;
 
   // --- Console Pane Resizing ---
   consolePaneHeight = signal(this.uiPreferencesService.explorerConsoleHeight() ?? 20); // percentage
@@ -2674,7 +2675,7 @@ export class AppComponent implements OnInit, OnDestroy {
   startConsolePaneResize(event: MouseEvent): void {
     this.isResizingConsole = true;
     event.preventDefault();
-    const container = this.mainContentWrapperEl?.nativeElement;
+    const container = this.viewContainerEl?.nativeElement;
     if (!container) return;
     const startY = event.clientY;
     const containerRect = container.getBoundingClientRect();
@@ -2687,8 +2688,8 @@ export class AppComponent implements OnInit, OnDestroy {
         let newConsoleHeight = initialConsoleHeight + dy;
 
         const minHeight = 100;
-        const streamHeight = this.isStreamVisible() ? (this.isStreamPaneCollapsed() ? 28 : (this.streamPaneHeight() / 100 * containerRect.height)) : 0;
-        const maxHeight = containerRect.height - 100 - streamHeight;
+        // Console is now a sibling of <main> — leave at least 200px for the main content area
+        const maxHeight = containerRect.height - 200;
 
         if (newConsoleHeight < minHeight) newConsoleHeight = minHeight;
         if (newConsoleHeight > maxHeight) newConsoleHeight = maxHeight;

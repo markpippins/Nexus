@@ -179,6 +179,21 @@ export interface ConversationSnapshot {
   sourceFilename: string | null;
 }
 
+export interface OpenQuestionAnswer {
+  id: string;
+  questionId: string;
+  role: string;
+  answer: string;
+  confidence: string;
+  reasoning: string | null;
+  answeredAt: string;
+}
+
+export interface OpenQuestionAnswersResponse {
+  answers: OpenQuestionAnswer[];
+  count: number;
+}
+
 export interface OpenQuestion {
   id: string;
   requirementId: string | null;
@@ -195,6 +210,10 @@ export interface OpenQuestion {
   entityType?: string | null;
   entityId?: string | null;
   entityTitle?: string | null;
+  answerCount?: number;
+  roleCount?: number;
+  answeredBy?: string | null;
+  answeredAt?: string | null;
 }
 
 export interface IntentRecord {
@@ -546,6 +565,14 @@ export class DataService {
 
   getConversationBlocks(conversationId: string) {
     return this.http.get<ConversationBlock[]>(`${this.base}/conversations/${conversationId}/blocks`);
+  }
+
+  getOpenQuestionAnswers(id: string) {
+    return this.http.get<OpenQuestionAnswersResponse>(`${this.base}/open-questions/${id}/answers`);
+  }
+
+  addOpenQuestionAnswer(id: string, payload: { role: string; answer: string; confidence?: string; reasoning?: string }) {
+    return this.http.post<OpenQuestionAnswer>(`${this.base}/open-questions/${id}/answers`, payload);
   }
 
   getOpenQuestionTimeline(id: string) {

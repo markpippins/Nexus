@@ -18,6 +18,7 @@
         <tr>
           <th (click)="toggleSort('title')" class="cursor-pointer hover:text-primary-600 select-none">Title <span *ngIf="sortField() === 'title'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
           <th (click)="toggleSort('category')" class="w-28 cursor-pointer hover:text-primary-600 select-none">Category <span *ngIf="sortField() === 'category'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+          <th class="w-20 text-center">Answers</th>
           <th class="w-32">Linked To</th>
           <th (click)="toggleSort('status')" class="w-20 cursor-pointer hover:text-primary-600 select-none">Status <span *ngIf="sortField() === 'status'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
           <th class="w-28 text-right">Actions</th>
@@ -30,6 +31,22 @@
             <div class="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{{ item.description || 'No description' }}</div>
           </td>
           <td class="text-xs text-gray-600 dark:text-gray-400">{{ item.category }}</td>
+          <td class="text-center">
+            <ng-container *ngIf="item.answerCount && item.answerCount > 0; else noAnswers">
+              <span class="inline-flex items-center gap-1 text-xs font-medium" [ngClass]="{
+                'text-primary-700 dark:text-primary-400': item.status !== 'RESOLVED',
+                'text-green-700 dark:text-green-400': item.status === 'RESOLVED'
+              }">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                </svg>
+                {{ item.answerCount }}
+              </span>
+            </ng-container>
+            <ng-template #noAnswers>
+              <span class="text-xs text-gray-300 dark:text-gray-600">—</span>
+            </ng-template>
+          </td>
           <td>
             <ng-container *ngIf="entityRoute(item) as route; else noEntity">
               <a [routerLink]="route" class="inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 hover:underline">

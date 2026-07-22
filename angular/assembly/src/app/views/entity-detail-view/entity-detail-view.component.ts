@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { switchMap, of, catchError, combineLatest } from 'rxjs';
-import { DataService, OpenQuestion, AgendaItem, ConversationBlock, TimelineEvent, DEFAULT_PAGE_SIZE } from '../../services/data.service';
+import { DataService, OpenQuestion, OpenQuestionAnswer, AgendaItem, ConversationBlock, TimelineEvent, DEFAULT_PAGE_SIZE } from '../../services/data.service';
 import { PageHeaderComponent } from '../../components/page-header/page-header.component';
 import { StatusBadgeComponent } from '../../components/status-badge/status-badge.component';
 import { RaiseQuestionComponent } from '../../components/raise-question/raise-question.component';
@@ -54,6 +54,8 @@ export class EntityDetailViewComponent implements OnInit {
   agendaItems = signal<AgendaItem[]>([]);
   conversationBlocks = signal<ConversationBlock[]>([]);
   timelineEvents = signal<TimelineEvent[]>([]);
+  answers = signal<OpenQuestionAnswer[]>([]);
+  answersLoading = signal(false);
   loading = signal(true);
 
   /** Extracts sourceText from harvest entity */
@@ -224,6 +226,7 @@ export class EntityDetailViewComponent implements OnInit {
     this.agendaItems.set([]);
     this.conversationBlocks.set([]);
     this.timelineEvents.set([]);
+    this.answers.set([]);
 
     if (type === 'agendas') {
       this.dataService.getAgendaItems(id).subscribe({
@@ -239,6 +242,18 @@ export class EntityDetailViewComponent implements OnInit {
       this.dataService.getOpenQuestionTimeline(id).subscribe({
         next: events => this.timelineEvents.set(events),
         error: err => console.error('[entity-detail] failed to load timeline:', err.message),
+      });
+      this.answersLoading.set(true);
+      this.dataService.getOpenQuestionAnswers(id).subscribe({
+        next: res => {
+          this.answers.set(res.answers || []);
+          this.answersLoading.set(false);
+        },
+        error: err => {
+          console.error('[entity-detail] failed to load answers:', err.message);
+          this.answers.set([]);
+          this.answersLoading.set(false);
+        }
       });
     }
   }
@@ -338,6 +353,28 @@ export class EntityDetailViewComponent implements OnInit {
 
   formatDate(date: string) {
     return new Date(date).toLocaleString();
+  }
+
+  confidenceColor(confidence: string): string {
+    switch ((confidence || '').toUpperCase()) {
+      case 'HIGH': return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      case 'MEDIUM': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      case 'LOW': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400';
+    }
+  }
+
+  roleBadgeColor(role: string): string {
+    const colors: Record<string, string> = {
+      architect: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-700',
+      engineer: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-700',
+      analyst: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-700',
+      planner: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400 border-teal-200 dark:border-teal-700',
+      reviewer: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400 border-rose-200 dark:border-rose-700',
+      inspector: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-700',
+      critic: 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400 border-slate-200 dark:border-slate-700',
+    };
+    return colors[role?.toLowerCase()] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400 border-gray-200 dark:border-gray-700';
   }
 
 }
