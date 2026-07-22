@@ -1,0 +1,33 @@
+[Unit]
+Description=Semantic Kernel REST API Server — Express wrapper over kernel.sys_transition(), kernel.sys_issue_receipt(), and kernel.v_* views. Listens to kernel_transition_committed pg_notify and forwards over SSE.
+Documentation=https://github.com/nexus/typescript/kernel-srv
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/kernel-srv
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node dist/index.js
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart policy ────────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+StartLimitBurst=5
+StartLimitIntervalSec=30
+
+# ── Logging ────────────────────────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kernel-srv
+
+[Install]
+WantedBy=default.target

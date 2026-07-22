@@ -1,0 +1,25 @@
+{
+  "name": "kernel-srv",
+  "version": "1.0.0",
+  "description": "Express REST API for the PostgreSQL Semantic Kernel -- thin wrappers over kernel.sys_transition(), sys_issue_receipt(), and the kernel.* views. Listens for kernel_transition_committed pg_notify events and forwards them over SSE.",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
