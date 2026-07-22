@@ -9,7 +9,7 @@ export const users = [
 ];
 
 export const forums = [
-  { id: 'frm-1', slug: 'issues-and-open-questions', name: 'Issues and Open Questions', description: 'Blockers, questions, and unresolved concerns across the project.', expiration_dt: 'infinity' },
+  { id: 'frm-1', slug: 'issues-and-open-questions', name: 'Issues', description: 'Blockers, questions, and unresolved concerns across the project.', expiration_dt: 'infinity' },
   { id: 'frm-2', slug: 'change-log', name: 'Change Log', description: 'Summaries of substantive changes to the system.', expiration_dt: 'infinity' },
   { id: 'frm-3', slug: 'architecture', name: 'Architecture', description: 'Design decisions, ADRs, and architectural discussions.', expiration_dt: 'infinity' },
   { id: 'frm-4', slug: 'engineering-log', name: 'Engineering Log', description: 'Day-to-day engineering notes and progress.', expiration_dt: 'infinity' },

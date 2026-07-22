@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
+import { BadRequestError, NotFoundError } from '../errors.js';
 
 export const feedRouter = Router();
 
@@ -54,11 +55,30 @@ feedRouter.get('/', async (_req, res, next) => {
   }
 });
 
+feedRouter.delete('/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `DELETE FROM assembly.posts WHERE id = $1 RETURNING id`,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      throw new NotFoundError('Post not found');
+    }
+
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    next(err);
+  }
+});
+
 feedRouter.post('/', async (req, res, next) => {
   try {
     const { text, postedById } = req.body;
     if (!text || !postedById) {
-      return res.status(400).json({ error: 'Text and postedById are required' });
+      throw new BadRequestError('Text and postedById are required');
     }
 
     const result = await pool.query(

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
+import { BadRequestError, NotFoundError } from '../errors.js';
 
 export const forumsRouter = Router();
 
@@ -92,7 +93,7 @@ forumsRouter.post('/:slug/threads', async (req, res, next) => {
   try {
     const { title, body, postedById } = req.body;
     if (!title || !body) {
-      return res.status(400).json({ error: 'Title and body are required' });
+      throw new BadRequestError('Title and body are required');
     }
 
     const forumResult = await pool.query(
@@ -100,13 +101,13 @@ forumsRouter.post('/:slug/threads', async (req, res, next) => {
       [req.params.slug]
     );
     if (forumResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Forum not found' });
+      throw new NotFoundError('Forum not found');
     }
 
     const forumId = forumResult.rows[0].id;
     const userId = postedById;
     if (!userId) {
-      return res.status(400).json({ error: 'postedById is required' });
+      throw new BadRequestError('postedById is required');
     }
 
     const result = await pool.query(
@@ -144,7 +145,7 @@ forumsRouter.get('/threads/:threadId', async (req, res, next) => {
     `, [req.params.threadId]);
 
     if (threadResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Thread not found' });
+      throw new NotFoundError('Thread not found');
     }
 
     const row = threadResult.rows[0];
@@ -213,7 +214,7 @@ forumsRouter.post('/threads/:threadId/comments', async (req, res, next) => {
   try {
     const { body, postedById, parentId } = req.body;
     if (!body || !postedById) {
-      return res.status(400).json({ error: 'Body and postedById are required' });
+      throw new BadRequestError('Body and postedById are required');
     }
 
     const threadResult = await pool.query(
@@ -226,7 +227,7 @@ forumsRouter.post('/threads/:threadId/comments', async (req, res, next) => {
     );
 
     if (threadResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Thread not found' });
+      throw new NotFoundError('Thread not found');
     }
 
     let postId = threadResult.rows[0].post_id;
@@ -244,7 +245,7 @@ forumsRouter.post('/threads/:threadId/comments', async (req, res, next) => {
         [parentId]
       );
       if (parentResult.rows.length === 0 || parentResult.rows[0].post_id !== postId) {
-        return res.status(400).json({ error: 'Parent comment not found or does not belong to this thread' });
+        throw new BadRequestError('Parent comment not found or does not belong to this thread');
       }
       postId = null;
     }

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
+import { NotFoundError } from '../errors.js';
 
 export const workRequestsRouter = Router();
 
@@ -57,7 +58,7 @@ workRequestsRouter.get('/:id', async (req, res, next) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Not found' });
+      throw new NotFoundError('Not found');
     }
 
     const row = result.rows[0];

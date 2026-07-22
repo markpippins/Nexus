@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { forumsRouter } from './forums.js';
 import { feedRouter } from './feed.js';
+import { healthRouter } from './health.js';
+import { refreshStatsRouter } from './refresh-stats.js';
 import { workRequestsRouter } from './work-requests.js';
 import { requirementsRouter } from './requirements.js';
 import { agendasRouter } from './agendas.js';
@@ -17,10 +19,13 @@ import { specificationsRouter } from './specifications.js';
 import { usersRouter } from './users.js';
 import { specsRouter } from './specs.js';
 import { countsRouter } from './counts.js';
+import { plansRouter } from './plans.js';
 import { searchRouter } from './search.js';
 
 export const routes = Router();
 
+routes.use('/health', healthRouter);
+routes.use('/refresh-stats', refreshStatsRouter);
 routes.use('/counts', countsRouter);
 routes.use('/search', searchRouter);
 routes.use('/forums', forumsRouter);
@@ -40,3 +45,4 @@ routes.use('/agent-records', agentRecordsRouter);
 routes.use('/specifications', specificationsRouter);
 routes.use('/users', usersRouter);
 routes.use('/specs', specsRouter);
+routes.use('/plans', plansRouter);

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
+import { NotFoundError } from '../errors.js';
 
 export const conversationsRouter = Router();
 
@@ -61,7 +62,7 @@ conversationsRouter.get('/:id', async (req, res, next) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Not found' });
+      throw new NotFoundError('Not found');
     }
 
     const row = result.rows[0];
@@ -83,6 +84,16 @@ conversationsRouter.get('/:id', async (req, res, next) => {
 
 conversationsRouter.get('/:id/blocks', async (req, res, next) => {
   try {
+    // First resolve the snapshot to get the actual conversation_id
+    const snapResult = await pool.query(
+      'SELECT conversation_id FROM nebula.conversation_snapshots WHERE id = $1',
+      [req.params.id]
+    );
+    if (snapResult.rows.length === 0) {
+      throw new NotFoundError('Conversation snapshot not found');
+    }
+    const conversationId = snapResult.rows[0].conversation_id;
+
     const result = await pool.query(
       `SELECT id, conversation_id, snapshot_id, block_index,
               parent_turn_id, parent_block_id, block_type,
@@ -92,7 +103,7 @@ conversationsRouter.get('/:id/blocks', async (req, res, next) => {
        FROM nebula.conversation_blocks
        WHERE conversation_id = $1
        ORDER BY block_index ASC`,
-      [req.params.id]
+      [conversationId]
     );
 
     const blocks = result.rows.map(row => ({

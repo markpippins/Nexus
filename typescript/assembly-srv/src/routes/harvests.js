@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
+import { NotFoundError } from '../errors.js';
 
 export const harvestsRouter = Router();
 
@@ -55,6 +56,31 @@ harvestsRouter.get('/', async (req, res, next) => {
   }
 });
 
+harvestsRouter.patch('/:id', async (req, res, next) => {
+  try {
+    const { sourceText } = req.body;
+    if (sourceText === undefined) {
+      return res.status(400).json({ error: 'sourceText is required' });
+    }
+
+    const result = await pool.query(
+      `UPDATE nebula.harvests
+       SET source_text = $1
+       WHERE id = $2
+       RETURNING id`,
+      [String(sourceText), req.params.id]
+    );
+
+    if (result.rows.length === 0) {
+      throw new NotFoundError('Not found');
+    }
+
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    next(err);
+  }
+});
+
 harvestsRouter.get('/:id', async (req, res, next) => {
   try {
     const result = await pool.query(
@@ -69,7 +95,7 @@ harvestsRouter.get('/:id', async (req, res, next) => {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Not found' });
+      throw new NotFoundError('Not found');
     }
 
     const row = result.rows[0];

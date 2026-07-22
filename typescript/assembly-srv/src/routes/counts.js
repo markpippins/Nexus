@@ -20,6 +20,7 @@ countsRouter.get('/', async (_req, res, next) => {
       observationsResult,
       agentRecordsResult,
       specificationsResult,
+      plansResult,
     ] = await Promise.all([
       pool.query('SELECT COUNT(*)::int AS total FROM assembly.forums WHERE expiration_dt = \'infinity\'::timestamptz OR expiration_dt > now()'),
       pool.query('SELECT COUNT(*)::int AS total FROM assembly.posts'),
@@ -35,6 +36,7 @@ countsRouter.get('/', async (_req, res, next) => {
       pool.query('SELECT COUNT(*)::int AS total FROM nebula.observations'),
       pool.query('SELECT COUNT(*)::int AS total FROM nebula.agent_records'),
       pool.query('SELECT COUNT(*)::int AS total FROM nebula.specifications'),
+      pool.query('SELECT COUNT(*)::int AS total FROM conduit.plan_status'),
     ]);
 
     res.json({
@@ -53,6 +55,7 @@ countsRouter.get('/', async (_req, res, next) => {
       observations: observationsResult.rows[0].total,
       agentRecords: agentRecordsResult.rows[0].total,
       specifications: specificationsResult.rows[0].total,
+      plans: plansResult.rows[0].total,
     });
   } catch (err) {
     next(err);
