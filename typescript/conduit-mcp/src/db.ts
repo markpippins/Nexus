@@ -1202,14 +1202,16 @@ const migrations: Migration[] = [
         CREATE OR REPLACE FUNCTION ${PG_SCHEMA}.enforce_state_transition()
         RETURNS TRIGGER AS $TRIG$
         BEGIN
-          IF NEW.event_type != 'STATE.TRANSITION_COMMITTED' THEN
-            IF EXISTS (
-              SELECT 1 FROM ${PG_SCHEMA}.work_request_state
-              WHERE work_request_id = NEW.work_request_id
-              AND current_state != NEW.payload->>'new_state'
-            ) THEN
-              RAISE EXCEPTION 'STATE_MUTATION_FORBIDDEN: only STATE.TRANSITION_COMMITTED may mutate state';
-            END IF;
+          -- Only STATE.TRANSITION_COMMITTED may carry a new_state payload key.
+          -- Any other event type that includes new_state is a state-mutation
+          -- attempt disguised as a non-state event — reject unconditionally.
+          IF NEW.event_type != 'STATE.TRANSITION_COMMITTED'
+             AND NEW.payload ? 'new_state'
+          THEN
+            RAISE EXCEPTION
+              'STATE_MUTATION_FORBIDDEN: event type % must not carry payload.new_state; '
+              'only STATE.TRANSITION_COMMITTED may mutate state',
+              NEW.event_type;
           END IF;
           RETURN NEW;
         END;
@@ -1379,6 +1381,79 @@ const migrations: Migration[] = [
             v_count := v_count + 1;
           END LOOP;
           RETURN v_count;
+        END;
+        $FUNC$ LANGUAGE plpgsql;
+
+        CREATE OR REPLACE FUNCTION ${PG_SCHEMA}.check_projection_drift(p_wr_id UUID)
+        RETURNS TABLE (
+          expected_state TEXT,
+          expected_vision_stage TEXT,
+          expected_vision_ir_version INTEGER,
+          expected_last_event_id UUID,
+          live_state TEXT,
+          live_vision_stage TEXT,
+          live_vision_ir_version INTEGER,
+          live_last_event_id UUID,
+          has_drift BOOLEAN
+        ) AS $FUNC$
+        DECLARE
+          v_event RECORD;
+          v_state TEXT := 'PROPOSED';
+          v_stage TEXT := NULL;
+          v_ir_ver INTEGER := 0;
+          v_last_event UUID := NULL;
+          v_live RECORD;
+        BEGIN
+          FOR v_event IN
+            SELECT * FROM ${PG_SCHEMA}.work_request_events
+            WHERE work_request_id = p_wr_id
+            ORDER BY sequence_number ASC
+          LOOP
+            IF v_event.event_type = 'WORKREQUEST.CREATED' THEN
+              v_state := 'PROPOSED';
+            END IF;
+            IF v_event.event_type = 'STATE.TRANSITION_COMMITTED' THEN
+              v_state := COALESCE(v_event.payload->>'new_state', v_state);
+            END IF;
+            IF v_event.event_type = 'VISION.IR_PRODUCED' THEN
+              v_stage := v_event.payload->>'ir_stage';
+              v_ir_ver := COALESCE((v_event.payload->>'ir_version')::integer, v_ir_ver);
+            END IF;
+            v_last_event := v_event.event_id;
+          END LOOP;
+
+          SELECT * INTO v_live
+          FROM ${PG_SCHEMA}.work_request_state
+          WHERE work_request_id = p_wr_id;
+
+          IF v_live IS NULL THEN
+            expected_state := v_state;
+            expected_vision_stage := v_stage;
+            expected_vision_ir_version := v_ir_ver;
+            expected_last_event_id := v_last_event;
+            live_state := NULL;
+            live_vision_stage := NULL;
+            live_vision_ir_version := NULL;
+            live_last_event_id := NULL;
+            has_drift := TRUE;
+          ELSE
+            expected_state := v_state;
+            expected_vision_stage := v_stage;
+            expected_vision_ir_version := v_ir_ver;
+            expected_last_event_id := v_last_event;
+            live_state := v_live.current_state;
+            live_vision_stage := v_live.vision_stage;
+            live_vision_ir_version := v_live.vision_ir_version;
+            live_last_event_id := v_live.last_event_id;
+            has_drift := (
+              v_state != v_live.current_state
+              OR v_stage IS DISTINCT FROM v_live.vision_stage
+              OR v_ir_ver != v_live.vision_ir_version
+              OR v_last_event IS DISTINCT FROM v_live.last_event_id
+            );
+          END IF;
+
+          RETURN NEXT;
         END;
         $FUNC$ LANGUAGE plpgsql;
       `);
@@ -3826,6 +3901,27 @@ export async function getWorkRequestStateRow(
 ): Promise<any | undefined> {
   return qOne(
     `SELECT * FROM ${PG_SCHEMA}.work_request_state WHERE work_request_id = @workRequestId::uuid`,
+    { workRequestId },
+  );
+}
+
+export interface ProjectionDriftResult {
+  expected_state: string;
+  expected_vision_stage: string | null;
+  expected_vision_ir_version: number;
+  expected_last_event_id: string | null;
+  live_state: string | null;
+  live_vision_stage: string | null;
+  live_vision_ir_version: number | null;
+  live_last_event_id: string | null;
+  has_drift: boolean;
+}
+
+export async function checkProjectionDrift(
+  workRequestId: string,
+): Promise<ProjectionDriftResult | undefined> {
+  return qOne(
+    `SELECT * FROM ${PG_SCHEMA}.check_projection_drift(@workRequestId::uuid)`,
     { workRequestId },
   );
 }

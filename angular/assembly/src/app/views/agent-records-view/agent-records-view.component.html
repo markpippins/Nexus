@@ -1,0 +1,49 @@
+<div class="max-w-6xl mx-auto">
+  <app-page-header title="Agent Records" description="All agent records stored in the system." [count]="total()"></app-page-header>
+
+  <app-table-skeleton *ngIf="loading()" [cols]="5" [rows]="6"></app-table-skeleton>
+
+  <app-error-state *ngIf="error() && !loading()" title="Failed to load agent records" [description]="error()!" (retry)="retry()"></app-error-state>
+
+  <ng-container *ngIf="!loading() && !error()">
+    <app-empty-state *ngIf="items().length === 0" title="No agent records" description="Agent records will appear here once they are stored."></app-empty-state>
+
+    <div *ngIf="items().length > 0" class="app-panel">
+      <div *ngIf="sortField()" class="px-4 pt-2 pb-0">
+        <button (click)="toggleSort('')" class="text-[11px] text-steel-400 hover:text-steel-600 dark:hover:text-steel-300 transition-colors">Clear sort</button>
+      </div>
+      <div class="overflow-x-auto">
+      <table class="app-table">
+      <thead>
+        <tr>
+          <th (click)="toggleSort('title')" class="cursor-pointer hover:text-primary-600 select-none">Title <span *ngIf="sortField() === 'title'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+          <th (click)="toggleSort('recordType')" class="w-24 cursor-pointer hover:text-primary-600 select-none">Type <span *ngIf="sortField() === 'recordType'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+          <th (click)="toggleSort('role')" class="w-24 cursor-pointer hover:text-primary-600 select-none">Role <span *ngIf="sortField() === 'role'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+          <th (click)="toggleSort('createdAt')" class="w-32 cursor-pointer hover:text-primary-600 select-none">Created <span *ngIf="sortField() === 'createdAt'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+          <th class="w-28 text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of sortedItems()">
+          <td>
+            <a [routerLink]="['/agent-records', item.id]" class="app-link">{{ item.title || 'Untitled' }}</a>
+            <div class="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{{ item.content || 'No content' }}</div>
+          </td>
+          <td class="text-xs text-gray-600 dark:text-gray-400">{{ item.recordType || '—' }}</td>
+          <td class="text-xs text-gray-600 dark:text-gray-400">{{ item.role || '—' }}</td>
+          <td class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(item.createdAt) }}</td>
+          <td class="text-right"><app-raise-question objectType="agent_record" [objectId]="item.id" [objectTitle]="item.title || 'Untitled'"></app-raise-question></td>
+        </tr>
+      </tbody>
+      </table>
+    </div>
+      <app-pagination
+        *ngIf="total() > pageSize"
+        [currentPage]="currentPage()"
+        [totalItems]="total()"
+        [pageSize]="pageSize"
+        (pageChange)="onPageChange($event)"
+      ></app-pagination>
+    </div>
+  </ng-container>
+</div>

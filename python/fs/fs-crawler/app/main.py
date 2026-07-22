@@ -11,7 +11,13 @@ import structlog
 # Handle imports differently when run as a script vs module
 try:
     from .config import settings
-    from .database import init_databases, close_databases, get_redis, get_mongodb
+    from .database import (
+        init_databases,
+        close_databases,
+        get_redis,
+        get_mongodb,
+        ensure_redis_healthy,
+    )
     from .api.routes import router
 except ImportError:
     # When run as a script, use absolute imports
@@ -20,7 +26,13 @@ except ImportError:
     sys.path.append(str(Path(__file__).parent))
 
     from config import settings
-    from database import init_databases, close_databases, get_redis, get_mongodb
+    from database import (
+        init_databases,
+        close_databases,
+        get_redis,
+        get_mongodb,
+        ensure_redis_healthy,
+    )
     from api.routes import router
 
 
@@ -105,23 +117,21 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Detailed health check"""
+    """Detailed health check with Redis auto-reconnection"""
     try:
-        # Test database connections
-        redis_status = "connected"
-        try:
-            redis_client = get_redis()
-            await redis_client.ping()
-        except:
-            redis_status = "disconnected"
-        
+        # ── Redis: attempt reconnection if unhealthy ──────────────────
+        redis_ok = await ensure_redis_healthy()
+        redis_status = "connected" if redis_ok else "disconnected"
+
+        # MongoDB
         mongodb_status = "connected"
         try:
             mongodb = get_mongodb()
             await mongodb.command("ping")
         except:
             mongodb_status = "disconnected"
-        
+
+        # MySQL
         mysql_status = "connected"
         try:
             from database import async_session_maker
@@ -130,24 +140,24 @@ async def health_check():
                 await session.execute(text("SELECT 1"))
         except:
             mysql_status = "disconnected"
-        
+
         overall_status = "healthy" if all(
-            status == "connected" 
+            status == "connected"
             for status in [redis_status, mongodb_status, mysql_status]
         ) else "unhealthy"
-        
+
         return {
             "status": overall_status,
             "databases": {
                 "redis": redis_status,
-                "mongodb": mongodb_status, 
-                "mysql": mysql_status
-            }
+                "mongodb": mongodb_status,
+                "mysql": mysql_status,
+            },
         }
     except Exception as e:
         return {
             "status": "error",
-            "error": str(e)
+            "error": str(e),
         }
 
 

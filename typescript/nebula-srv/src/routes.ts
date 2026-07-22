@@ -3996,6 +3996,47 @@ export function createRoutes(pool: Pool): Router {
   });
 
   // ════════════════════════════════════════════════════════════════
+  //  INBOX POINTERS — per-role watermark for unread messages
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/inbox-pointer/:role — get the inbox pointer for a role
+  router.get('/inbox-pointer/:role', async (req: Request, res: Response) => {
+    try {
+      const role = req.params.role as string;
+      const { getInboxPointer } = await import('./services/block-segmentation-redis.service');
+      const pointer = await getInboxPointer(role);
+      res.json({ role, pointer });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/inbox-pointer/:role — set the inbox pointer for a role
+  router.put('/inbox-pointer/:role', async (req: Request, res: Response) => {
+    try {
+      const role = req.params.role as string;
+      const { timestamp } = req.body;
+      if (!timestamp) return res.status(400).json({ error: 'timestamp is required' });
+      const { setInboxPointer } = await import('./services/block-segmentation-redis.service');
+      await setInboxPointer(role, timestamp);
+      res.json({ ok: true, role, pointer: timestamp });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/inbox-pointers — list all inbox pointers (debugging)
+  router.get('/inbox-pointers', async (_req: Request, res: Response) => {
+    try {
+      const { getAllInboxPointers } = await import('./services/block-segmentation-redis.service');
+      const pointers = await getAllInboxPointers();
+      res.json({ pointers });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
   //  PROJECTIONS — on-demand markdown folder generation
   // ════════════════════════════════════════════════════════════════
 
@@ -5588,6 +5629,166 @@ export function createRoutes(pool: Pool): Router {
         attempts,
         receipts: { total: Number(receiptTotal.total), byType: receiptTypes },
       });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  OPEN QUESTIONS
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/open-questions?requirementId=&candidateId=&status=
+  router.get('/open-questions', async (req: Request, res: Response) => {
+    try {
+      const { requirementId, candidateId, status } = req.query;
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (requirementId) { clauses.push(`requirement_id = $${i++}`); vals.push(requirementId); }
+      if (candidateId) { clauses.push(`candidate_id = $${i++}`); vals.push(candidateId); }
+      if (status) { clauses.push(`status = $${i++}`); vals.push(status); }
+      else { clauses.push(`status = 'OPEN'`); }
+      const where = 'WHERE ' + clauses.join(' AND ');
+      const { rows } = await pool.query(
+        `SELECT oq.id, oq.requirement_id, oq.candidate_id, oq.title, oq.description, oq.category,
+                oq.status, oq.blocking, oq.resolution, oq.answered_by, oq.answered_at,
+                oq.resolved_by, oq.resolved_at, oq.created_by, oq.created_at,
+                COALESCE(ac.answer_count, 0) AS answer_count,
+                COALESCE(ac.role_count, 0) AS role_count
+         FROM nebula.open_questions oq
+         LEFT JOIN nebula.v_question_answer_counts ac ON ac.question_id = oq.id
+         ${where}
+         ORDER BY oq.created_at DESC`, vals
+      );
+      res.json({ questions: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/open-questions/:id/answers — list all answers for a question
+  router.get('/open-questions/:id/answers', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows } = await pool.query(
+        `SELECT id, question_id, role, answer, confidence, reasoning, answered_at
+         FROM nebula.open_question_answers
+         WHERE question_id = $1
+         ORDER BY answered_at ASC`, [id]
+      );
+      res.json({ answers: rows, count: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/open-questions/:id/answers — add a new answer to a question
+  router.post('/open-questions/:id/answers', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { answer, role, confidence, reasoning } = req.body;
+      if (!answer || !role) {
+        res.status(400).json({ error: 'answer and role are required' });
+        return;
+      }
+      // Verify question exists and is open
+      const qCheck = await pool.query(
+        `SELECT id, status FROM nebula.open_questions WHERE id = $1`, [id]
+      );
+      if (qCheck.rows.length === 0) {
+        res.status(404).json({ error: 'Question not found' });
+        return;
+      }
+      // Insert answer
+      const { rows } = await pool.query(
+        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, question_id, role, answer, confidence, reasoning, answered_at`,
+        [id, role, answer, confidence || 'MEDIUM', reasoning || null]
+      );
+      // Also update the single-answer columns on open_questions for backwards compatibility
+      await pool.query(
+        `UPDATE nebula.open_questions
+         SET resolution = $1,
+             answered_by = $2,
+             answered_at = now(),
+             updated_at = now()
+         WHERE id = $3 AND status = 'OPEN'`,
+        [answer, role, id]
+      );
+      res.status(201).json(rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/open-questions/:id/answer — legacy single-answer endpoint (backwards compat)
+  // Now also inserts into open_question_answers table.
+  router.put('/open-questions/:id/answer', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { answer, answeredBy } = req.body;
+      if (!answer || !answeredBy) {
+        res.status(400).json({ error: 'answer and answeredBy are required' });
+        return;
+      }
+      // Insert into answers table (upsert: one answer per role per question)
+      await pool.query(
+        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning)
+         VALUES ($1, $2, $3, 'MEDIUM', NULL)
+         ON CONFLICT (question_id, role) DO UPDATE
+         SET answer = EXCLUDED.answer,
+             confidence = EXCLUDED.confidence,
+             reasoning = EXCLUDED.reasoning,
+             answered_at = now()`,
+        [id, answeredBy, answer]
+      );
+      // Update single-answer columns on open_questions
+      const { rows } = await pool.query(
+        `UPDATE nebula.open_questions
+         SET resolution = $1,
+             answered_by = $2,
+             answered_at = now(),
+             updated_at = now()
+         WHERE id = $3 AND status = 'OPEN'
+         RETURNING id, title, status, resolution, answered_by, answered_at`,
+        [answer, answeredBy, id]
+      );
+      if (rows.length === 0) {
+        res.status(404).json({ error: 'Question not found or already closed' });
+        return;
+      }
+      res.json(rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/open-questions/:id/resolve
+  router.put('/open-questions/:id/resolve', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { resolvedBy } = req.body;
+      if (!resolvedBy) {
+        res.status(400).json({ error: 'resolvedBy is required' });
+        return;
+      }
+      const { rows } = await pool.query(
+        `UPDATE nebula.open_questions
+         SET status = 'RESOLVED',
+             resolved_by = $1,
+             resolved_at = now(),
+             updated_at = now()
+         WHERE id = $2 AND status = 'OPEN' AND resolution IS NOT NULL
+         RETURNING id, title, status, resolution, answered_by, resolved_by, resolved_at`,
+        [resolvedBy, id]
+      );
+      if (rows.length === 0) {
+        res.status(404).json({ error: 'Question not found, already closed, or has no answer' });
+        return;
+      }
+      res.json(rows[0]);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

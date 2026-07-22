@@ -5,12 +5,13 @@ import {
   NebulaRequirement,
   RequirementStatus,
 } from '../../services/nebula.service.js';
+import { CpfFunnelComponent } from '../cpf-funnel/cpf-funnel.component.js';
 import { ToastService } from '../../services/toast.service.js';
 
 @Component({
   selector: 'app-nebula-panel',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, CpfFunnelComponent],
   templateUrl: './nebula-panel.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -18,8 +19,34 @@ import { ToastService } from '../../services/toast.service.js';
   }
 })
 export class NebulaPanelComponent implements OnInit, OnDestroy {
+  /** Active tab — 'requirements' shows the kanban, 'funnel' shows the CPF funnel */
+  activeTab = signal<'requirements' | 'funnel'>('requirements');
+
   nebula = inject(NebulaService);
   private toast = inject(ToastService);
+
+  // ── Right-side Detail Drawer State ────────────────────────────
+  selectedReqId = signal<string | null>(null);
+
+  selectedRequirement = computed(() => {
+    const id = this.selectedReqId();
+    if (!id) return null;
+    return this.requirements().find(r => r.id === id) ?? null;
+  });
+
+  selectedReqContext = computed(() => {
+    const req = this.selectedRequirement();
+    if (!req) return '';
+    return this.nebula.getRequirementContext(req);
+  });
+
+  selectRequirement(reqId: string) {
+    this.selectedReqId.update(current => current === reqId ? null : reqId);
+  }
+
+  closeDetailPanel() {
+    this.selectedReqId.set(null);
+  }
 
   draggingReqId = signal<string | null>(null);
 

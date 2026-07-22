@@ -1,0 +1,623 @@
+// execution-srv routes — observability API over the PostgreSQL `execution` schema.
+//
+// Endpoints (see `REST API.md` at the project root):
+//
+//   1. Lifecycle state (per request — natural aggregate root)
+//        GET /api/execution/requests/{id}/state
+//
+//   2. Lease integrity
+//        GET /api/execution/leases/stale
+//        GET /api/execution/leases/{id}/lifecycle
+//
+//   3. Cross-table consistency scan (generalized check_receipt_integrity)
+//        GET /api/execution/health/integrity-scan
+//
+//   4. Attempt/lease/request tree
+//        GET /api/execution/requests/{id}/attempts
+//        GET /api/execution/requests/{id}/receipts/lineage
+//
+//   5. Fleet view
+//        GET /api/execution/health/by-executor?executor_id=
+//        GET /api/execution/health/status-distribution
+//
+//   Update: GET /api/execution/receipts/{id}/pipeline-origin
+//        follows lineage_original_id → vision.receipts.id and returns both
+//        records side by side, labeled by which audit trail each came from.
+//
+// All queries run as SELECTs only — there is no write path in this service.
+
+import { Request, Response, Router } from 'express';
+import { Pool, QueryResult } from 'pg';
+
+// ── Helpers ────────────────────────────────────────────────────────
+
+// Validate that a path param looks like a UUID. The pg UUID type will
+// reject bad input anyway, but this gives a clean 400 instead of a 500
+// and keeps logs free of stack traces for malformed requests.
+//
+// Express types req.params[...] as `string | undefined` and our TS strict
+// config widens that on certain code paths. We additionally tolerate the
+// `string[]` shape that some express routers forward (query-string-style)
+// by collapsing the first element. Restored to a plain string here.
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+function asString(v: string | string[] | undefined): string | undefined {
+  if (Array.isArray(v)) return v[0];
+  return v;
+}
+function isValidUuid(v: string | string[] | undefined): v is string {
+  const s = asString(v);
+  return typeof s === 'string' && UUID_RE.test(s);
+}
+function requireUuid(v: string | string[] | undefined, res: Response, label = 'id'): string | null {
+  if (!isValidUuid(v)) {
+    badRequest(res, `${label} must be a UUID`);
+    return null;
+  }
+  // safe assertion: isValidUuid v is string only confirmed single string
+  return asString(v) as string;
+}
+
+function badRequest(res: Response, msg: string): void {
+  res.status(400).json({ error: msg });
+}
+
+function notFound(res: Response, msg: string): void {
+  res.status(404).json({ error: msg });
+}
+
+// Generic error → 500 wrapper used by every handler. We deliberately keep
+// the message in the response because this is an internal observability
+// service, and operators debugging it benefit from the SQL message.
+function sendError(res: Response, err: unknown): void {
+  const message = err instanceof Error ? err.message : String(err);
+  res.status(500).json({ error: message });
+}
+
+export function createRoutes(pool: Pool): Router {
+  const router = Router();
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 1. LIFECYCLE STATE — the natural aggregate root
+  //
+  //    GET /api/execution/requests/{id}/state
+  //
+  //    Returns the request, its current lease (if any), its latest attempt,
+  //    and all of its receipts — the "where does this stand right now" view
+  //    that currently requires four joins nobody's written yet.
+  // ═══════════════════════════════════════════════════════════════════
+
+  router.get('/requests/:id/state', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const requestId = requireUuid(id, res);
+      if (!requestId) return;
+
+      // request row
+      const requestQ = await pool.query(
+        'SELECT * FROM requests WHERE id = $1',
+        [requestId]
+      );
+      if (requestQ.rowCount === 0) return notFound(res, 'request not found');
+      const request = requestQ.rows[0];
+
+      // current active lease (only one ACTIVE lease is allowed per request
+      // by idx_execution_leases_active_per_request — fall back to most
+      // recent lease otherwise, ordered by acquired_at DESC).
+      const leaseQ = await pool.query(
+        `SELECT * FROM leases
+         WHERE request_id = $1
+         ORDER BY (status = 'ACTIVE') DESC, acquired_at DESC
+         LIMIT 1`,
+        [requestId]
+      );
+      const currentLease = leaseQ.rows[0] ?? null;
+
+      // latest attempt
+      const attemptQ = await pool.query(
+        `SELECT * FROM attempts
+         WHERE request_id = $1
+         ORDER BY created_at DESC, started_at DESC NULLS LAST
+         LIMIT 1`,
+        [requestId]
+      );
+      const latestAttempt = attemptQ.rows[0] ?? null;
+
+      // all receipts, chronological
+      const receiptsQ = await pool.query(
+        `SELECT * FROM receipts WHERE request_id = $1 ORDER BY issued_at ASC`,
+        [requestId]
+      );
+
+      res.json({
+        request,
+        current_lease: currentLease,
+        latest_attempt: latestAttempt,
+        receipts: receiptsQ.rows,
+        receipt_count: receiptsQ.rowCount,
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 2. LEASE INTEGRITY — the expiry gap, made visible
+  // ═══════════════════════════════════════════════════════════════════
+
+  // GET /api/execution/leases/stale
+  // Active leases whose expires_at < now() — the enforcement gap made
+  // queryable. Returns each stale lease joined to its request so callers
+  // see the executor that is holding dead ground.
+  router.get('/leases/stale', async (_req: Request, res: Response) => {
+    try {
+      const { rows }: QueryResult = await pool.query(
+        `SELECT
+            l.id            AS lease_id,
+            l.request_id,
+            l.executor_id,
+            l.ttl_seconds,
+            l.acquired_at,
+            l.expires_at,
+            l.created_at,
+            r.business_key,
+            r.title,
+            r.status        AS request_status,
+            EXTRACT(EPOCH FROM (NOW() - l.expires_at))::int AS overdue_seconds
+         FROM leases l
+         JOIN requests r ON r.id = l.request_id
+         WHERE l.status = 'ACTIVE'
+           AND l.expires_at < NOW()
+         ORDER BY l.expires_at ASC`
+      );
+      res.json({
+        count: rows.length,
+        stale_leases: rows,
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // GET /api/execution/leases/{id}/lifecycle
+  // acquired_at → expires_at → released_at, actual vs promised.
+  // Computes how long the lease was actually held (or how long it's been
+  // held so far if still ACTIVE), and how that compares to the promised TTL.
+  router.get('/leases/:id/lifecycle', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const requestId = requireUuid(id, res);
+      if (!requestId) return;
+
+      const { rows }: QueryResult = await pool.query(
+        `SELECT
+            *,
+            EXTRACT(EPOCH FROM (expires_at - acquired_at))::int                AS promised_ttl_seconds,
+            EXTRACT(EPOCH FROM (COALESCE(released_at, NOW()) - acquired_at))::int AS actual_held_seconds,
+            CASE
+              WHEN status = 'RELEASED' AND released_at > expires_at
+                THEN EXTRACT(EPOCH FROM (released_at - expires_at))::int
+              WHEN status = 'ACTIVE' AND NOW() > expires_at
+                THEN EXTRACT(EPOCH FROM (NOW() - expires_at))::int
+              ELSE 0
+            END AS overdue_seconds,
+            CASE
+              WHEN status = 'RELEASED' THEN 'released'
+              WHEN status = 'EXPIRED'  THEN 'expired_unreleased'
+              WHEN status = 'ACTIVE' AND NOW() > expires_at THEN 'stale_active'
+              WHEN status = 'ACTIVE'  THEN 'live'
+              ELSE status
+            END AS lifecycle_state
+         FROM leases
+         WHERE id = $1`,
+        [requestId]
+      );
+      if (rows.length === 0) return notFound(res, 'lease not found');
+      res.json(rows[0]);
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 3. CROSS-TABLE CONSISTENCY SCAN
+  //
+  //    GET /api/execution/health/integrity-scan
+  //
+  //    Same shape as Vision's check_receipt_integrity() — a named, growing
+  //    list of specific pathologies, each one a query you write the day you
+  //    find the gap. Not a generic "health score."
+  // ═══════════════════════════════════════════════════════════════════
+
+  router.get('/health/integrity-scan', async (_req: Request, res: Response) => {
+    try {
+      // Each scan returns { kind, count, sample_ids[] } so callers get both
+      // scale and concrete examples to drill into. The kinds are intentionally
+      // explicit names — when we discover a new pathology in production, we
+      // add a kind here rather than abstracting into "anomaly_score".
+      const scans: { kind: string; sql: string }[] = [
+        {
+          kind: 'orphan_lease_request_mismatch',
+          sql: `SELECT l.id AS entity_id, l.request_id, NULL AS detail
+                  FROM leases l
+             LEFT JOIN requests r ON r.id = l.request_id
+                 WHERE r.id IS NULL`,
+        },
+        {
+          kind: 'stale_active_lease',
+          sql: `SELECT l.id AS entity_id, l.request_id,
+                       'overdue by ' || EXTRACT(EPOCH FROM (NOW() - l.expires_at))::int || 's' AS detail
+                  FROM leases l
+                 WHERE l.status = 'ACTIVE' AND l.expires_at < NOW()`,
+        },
+        {
+          kind: 'attempt_orphan_no_lease',
+          sql: `SELECT a.id AS entity_id, a.lease_id, NULL AS detail
+                  FROM attempts a
+             LEFT JOIN leases l ON l.id = a.lease_id
+                 WHERE l.id IS NULL`,
+        },
+        {
+          kind: 'attempt_status_diverges_from_request',
+          sql: `SELECT a.id AS entity_id, a.request_id,
+                       'attempt=' || a.status || ' request=' || r.status AS detail
+                  FROM attempts a
+                  JOIN requests r ON r.id = a.request_id
+                 WHERE (r.status = 'COMPLETED' AND a.status IN ('CREATED','RUNNING'))
+                    OR (r.status IN ('READY') AND a.status = 'SUCCEEDED'
+                        AND NOT EXISTS (
+                          SELECT 1 FROM receipts rc
+                           WHERE rc.attempt_id = a.id
+                             AND rc.type IN ('EXECUTION_COMPLETE','EXECUTION_FAILED')))`,
+        },
+        {
+          kind: 'receipt_request_mismatch',
+          sql: `SELECT rc.id AS entity_id, rc.request_id, NULL AS detail
+                  FROM receipts rc
+             LEFT JOIN requests r ON r.id = rc.request_id
+                 WHERE r.id IS NULL`,
+        },
+        {
+          kind: 'receipt_attempt_mismatch',
+          sql: `SELECT rc.id AS entity_id, rc.attempt_id, NULL AS detail
+                  FROM receipts rc
+             LEFT JOIN attempts a ON a.id = rc.attempt_id
+                 WHERE a.id IS NULL`,
+        },
+        {
+          kind: 'unreleased_lease_for_terminal_request',
+          sql: `SELECT l.id AS entity_id, l.request_id,
+                       'request=' || r.status || ' lease=' || l.status AS detail
+                  FROM leases l
+                  JOIN requests r ON r.id = l.request_id
+                 WHERE r.status IN ('COMPLETED','CANCELLED','FAILED')
+                   AND l.status = 'ACTIVE'`,
+        },
+        {
+          kind: 'attempted_no_completion',
+          sql: `SELECT a.id AS entity_id, a.request_id,
+                       'request=' || r.status || ' attempt=' || a.status AS detail
+                  FROM attempts a
+                  JOIN requests r ON r.id = a.request_id
+                 WHERE r.status NOT IN ('COMPLETED','CANCELLED','FAILED')
+                   AND a.status = 'CREATED'
+                   AND NOT EXISTS (
+                        SELECT 1 FROM attempts a2
+                         WHERE a2.request_id = a.request_id
+                           AND a2.status IN ('SUCCEEDED','FAILED','TIMED_OUT'))`,
+        },
+      ];
+
+      const results: any[] = [];
+      for (const scan of scans) {
+        const { rows }: QueryResult = await pool.query(scan.sql);
+        results.push({
+          kind: scan.kind,
+          count: rows.length,
+          samples: rows.slice(0, 50),
+        });
+      }
+
+      const totals = results.reduce(
+        (acc, r) => ({ anomalies: acc.anomalies + r.count, kinds_fired: acc.kinds_fired + (r.count > 0 ? 1 : 0) }),
+        { anomalies: 0, kinds_fired: 0 }
+      );
+
+      res.json({
+        scanned_at: new Date().toISOString(),
+        schema: 'execution',
+        totals,
+        scans: results,
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 4. ATTEMPT/LEASE/REQUEST TREE
+  // ═══════════════════════════════════════════════════════════════════
+
+  // GET /api/execution/requests/{id}/attempts
+  // Every attempt for this request, each attempt's lease, chronological.
+  router.get('/requests/:id/attempts', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const requestId = requireUuid(id, res);
+      if (!requestId) return;
+
+      const requestQ = await pool.query(
+        'SELECT id, business_key, title, status FROM requests WHERE id = $1',
+        [requestId]
+      );
+      if (requestQ.rowCount === 0) return notFound(res, 'request not found');
+
+      const { rows }: QueryResult = await pool.query(
+        `SELECT
+            a.*,
+            row_to_json(l) AS lease
+           FROM attempts a
+           JOIN leases l    ON l.id = a.lease_id
+          WHERE a.request_id = $1
+          ORDER BY a.created_at ASC, a.started_at ASC NULLS LAST`,
+        [requestId]
+      );
+      res.json({
+        request: requestQ.rows[0],
+        attempt_count: rows.length,
+        attempts: rows,
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // GET /api/execution/requests/{id}/receipts/lineage
+  // Split by lineage_source: native vs backfilled vs unknown.
+  router.get('/requests/:id/receipts/lineage', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const requestId = requireUuid(id, res);
+      if (!requestId) return;
+
+      const requestQ = await pool.query(
+        'SELECT id, business_key, title FROM requests WHERE id = $1',
+        [requestId]
+      );
+      if (requestQ.rowCount === 0) return notFound(res, 'request not found');
+
+      const { rows }: QueryResult = await pool.query(
+        `SELECT * FROM receipts WHERE request_id = $1 ORDER BY issued_at ASC`,
+        [requestId]
+      );
+
+      const buckets = {
+        native: [] as any[],     // NULL lineage_source — entry was born in execution.receipts
+        backfilled: [] as any[], // lineage_source references vision.receipts
+        unknown: [] as any[],    // any other non-null value (future migration sources)
+      };
+      for (const row of rows) {
+        if (row.lineage_source === null || row.lineage_source === '') {
+          buckets.native.push(row);
+        } else if (row.lineage_source === 'vision.receipts') {
+          buckets.backfilled.push(row);
+        } else {
+          buckets.unknown.push(row);
+        }
+      }
+
+      res.json({
+        request: requestQ.rows[0],
+        receipt_count: rows.length,
+        native_count: buckets.native.length,
+        backfilled_count: buckets.backfilled.length,
+        unknown_count: buckets.unknown.length,
+        lineage_buckets: buckets,
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 5. FLEET VIEW
+  // ═══════════════════════════════════════════════════════════════════
+
+  // GET /api/execution/health/by-executor?executor_id=
+  // What is this executor currently holding / running. Returns active
+  // leases + their in-progress attempts + a summary counter for the executor.
+  router.get('/health/by-executor', async (req: Request, res: Response) => {
+    try {
+      const executorId = (req.query.executor_id as string | undefined)?.trim();
+
+      if (!executorId) {
+        // No filter → group report across the whole fleet.
+        const { rows }: QueryResult = await pool.query(
+          `SELECT
+              executor_id,
+              COUNT(*) FILTER (WHERE status = 'ACTIVE')   AS active_leases,
+              COUNT(*) FILTER (WHERE status = 'RELEASED') AS released_leases,
+              COUNT(*) FILTER (WHERE status = 'EXPIRED')  AS expired_leases,
+              COUNT(*) AS total_leases
+             FROM leases
+             GROUP BY executor_id
+             ORDER BY active_leases DESC NULLS LAST, executor_id`
+        );
+        res.json({
+          scope: 'fleet',
+          executor_count: rows.length,
+          executors: rows,
+        });
+        return;
+      }
+
+      // scoped to one executor
+      const leasesQ = await pool.query(
+        `SELECT l.*,
+                r.business_key,
+                r.title,
+                r.status AS request_status
+           FROM leases l
+           JOIN requests r ON r.id = l.request_id
+          WHERE l.executor_id = $1
+            AND l.status = 'ACTIVE'
+          ORDER BY l.acquired_at DESC`,
+        [executorId]
+      );
+
+      const attemptsQ = await pool.query(
+        `SELECT a.*
+           FROM attempts a
+           JOIN leases l ON l.id = a.lease_id
+          WHERE l.executor_id = $1
+            AND a.status IN ('CREATED','RUNNING')
+          ORDER BY a.created_at DESC`,
+        [executorId]
+      );
+
+      const summaryQ = await pool.query(
+        `SELECT
+            COUNT(*) FILTER (WHERE l.status = 'ACTIVE')   AS active_leases,
+            COUNT(*) FILTER (WHERE l.status = 'RELEASED') AS released_leases,
+            COUNT(*) FILTER (WHERE l.status = 'EXPIRED')  AS expired_leases,
+            COUNT(DISTINCT l.request_id) FILTER (WHERE l.status = 'ACTIVE') AS requests_held,
+            COUNT(*) AS total_leases
+           FROM leases l
+          WHERE l.executor_id = $1`,
+        [executorId]
+      );
+
+      res.json({
+        scope: 'executor',
+        executor_id: executorId,
+        summary: summaryQ.rows[0] ?? {},
+        active_leases: leasesQ.rows,
+        in_progress_attempts: attemptsQ.rows,
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // GET /api/execution/health/status-distribution
+  // Count of requests per status, leases per status, attempts per status —
+  // the drift-over-time signal. One call returns everything for snapshotting.
+  router.get('/health/status-distribution', async (_req: Request, res: Response) => {
+    try {
+      const [requestsQ, leasesQ, attemptsQ, receiptsQ] = await Promise.all([
+        pool.query(`SELECT status, count(*) AS count FROM requests GROUP BY status ORDER BY count DESC`),
+        pool.query(`SELECT status, count(*) AS count FROM leases   GROUP BY status ORDER BY count DESC`),
+        pool.query(`SELECT status, count(*) AS count FROM attempts  GROUP BY status ORDER BY count DESC`),
+        pool.query(`SELECT type   AS status, count(*) AS count FROM receipts GROUP BY type    ORDER BY count DESC`),
+      ]);
+
+      // stale lease signal — the enforcement gap I want to see trending to zero
+      const staleQ = await pool.query(
+        `SELECT count(*) AS count FROM leases WHERE status = 'ACTIVE' AND expires_at < NOW()`
+      );
+
+      res.json({
+        scanned_at: new Date().toISOString(),
+        requests: requestsQ.rows,
+        leases: leasesQ.rows,
+        attempts: attemptsQ.rows,
+        receipts_by_type: receiptsQ.rows,
+        stale_active_leases: parseInt(staleQ.rows[0].count, 10) || 0,
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // UPDATE: pipeline-origin — the lineage-honest endpoint
+  //
+  //   GET /api/execution/receipts/{id}/pipeline-origin
+  //
+  //   Follows lineage_original_id → vision.receipts.id and returns both
+  //   records side by side, explicitly labeled by which audit trail each
+  //   came from. Doesn't pretend there's one canonical receipt — it shows
+  //   the seam.
+  // ═══════════════════════════════════════════════════════════════════
+
+  router.get('/receipts/:id/pipeline-origin', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const requestId = requireUuid(id, res);
+      if (!requestId) return;
+
+      // The execution.receipt row is the local record.
+      const localQ = await pool.query(
+        `SELECT * FROM receipts WHERE id = $1`,
+        [requestId]
+      );
+      if (localQ.rowCount === 0) return notFound(res, 'execution.receipt not found');
+      const local = localQ.rows[0];
+
+      // Resolve the lineage. Two cases:
+      //   1. lineage_source = 'vision.receipts' → cross-schema join
+      //   2. lineage_source IS NULL            → this receipt is the only
+      //      record (native execution audit trail, no upstream)
+      let vision: any = null;
+      const relationship: string =
+        local.lineage_source === 'vision.receipts' ? 'backfilled_from_vision' :
+        (local.lineage_source === null || local.lineage_source === '') ? 'native_execution_only' :
+        `unknown_source:${local.lineage_source}`;
+
+      if (local.lineage_source === 'vision.receipts' && local.lineage_original_id) {
+        // Cross-schema lookup. lineage_original_id is TEXT (the original
+        // vision.receipts.id is stored as text), so cast it for the JOIN.
+        const visionQ = await pool.query(
+          `SELECT *
+             FROM vision.receipts
+            WHERE id::text = $1
+            LIMIT 1`,
+          [local.lineage_original_id]
+        );
+        vision = visionQ.rows[0] ?? null;
+      }
+
+      res.json({
+        local_execution_record: {
+          audit_trail: 'execution.receipts',
+          record: local,
+        },
+        remote_vision_record: vision
+          ? { audit_trail: 'vision.receipts', record: vision }
+          : null,
+        relationship,
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Health inline — GET /api/execution/health
+  // Lightweight entry point distinct from /health (the root-level check).
+  // Returns just the live counts + the three key operational signals.
+  // ═══════════════════════════════════════════════════════════════════
+
+  router.get('/health', async (_req: Request, res: Response) => {
+    try {
+      const { rows }: QueryResult = await pool.query(
+        `SELECT
+            (SELECT count(*) FROM requests)                                                  AS requests,
+            (SELECT count(*) FROM requests WHERE status = 'READY')                            AS ready_requests,
+            (SELECT count(*) FROM requests WHERE status = 'COMPLETED')                         AS completed_requests,
+            (SELECT count(*) FROM leases)                                                     AS leases,
+            (SELECT count(*) FROM leases    WHERE status = 'ACTIVE' AND expires_at < NOW())   AS stale_active_leases,
+            (SELECT count(*) FROM attempts)                                                   AS attempts,
+            (SELECT count(*) FROM attempts  WHERE status = 'RUNNING')                          AS running_attempts,
+            (SELECT count(*) FROM receipts)                                                   AS receipts`
+      );
+      res.json({
+        scanned_at: new Date().toISOString(),
+        ...rows[0],
+      });
+    } catch (err) {
+      sendError(res, err);
+    }
+  });
+
+  return router;
+}

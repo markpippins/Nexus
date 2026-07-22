@@ -101,11 +101,11 @@ public class ExternalServiceRegistrationService {
                         });
                 newFramework.setVendor(vendor);
 
-                FrameworkType category = frameworkTypeRepository.findByName("Other")
+                FrameworkType category = frameworkTypeRepository.findByName("Back end")
                         .orElseGet(() -> {
                             FrameworkType c = new FrameworkType();
-                            c.setName("Other");
-                            c.setDescription("Other");
+                            c.setName("Back end");
+                            c.setDescription("Back end / server-side frameworks");
                             return frameworkTypeRepository.save(c);
                         });
                 newFramework.setCategory(category);

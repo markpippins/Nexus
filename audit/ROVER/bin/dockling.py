@@ -189,7 +189,10 @@ def extract_content_blocks(turn_element):
     seen_code = set()
 
     # User messages: simple pre-wrapped text
-    user_text_div = turn_element.find('div',
+    # Check if turn_element itself is whitespace-pre-wrap, or find a child
+    el_classes = turn_element.get('class', []) if hasattr(turn_element, 'get') else []
+    is_user_text = 'whitespace-pre-wrap' in str(el_classes)
+    user_text_div = turn_element if is_user_text else turn_element.find('div',
         class_=lambda c: c and 'whitespace-pre-wrap' in str(c))
     if user_text_div and not turn_element.find('p', attrs={'data-start': True}):
         text = clean_html_text(user_text_div.get_text('\n', strip=False))
@@ -273,6 +276,52 @@ def build_discourse_units(turns):
     return units
 
 
+def _detect_format(soup):
+    """Detect chat export format: 'chatgpt', 'claude', or 'unknown'."""
+    if soup.find_all(attrs={'data-message-author-role': True}):
+        return 'chatgpt'
+    if soup.find_all(attrs={'role': 'article'}):
+        return 'claude'
+    return 'unknown'
+
+
+def _parse_claude_ai(soup):
+    """Parse Claude.ai / Copilot SPA exports. Messages are in role='article' elements."""
+    articles = soup.find_all(attrs={'role': 'article'})
+    turns = []
+
+    for article in articles:
+        # Determine role from text prefix (Claude, Copilot, etc.)
+        # Some use colon ("You said:"), some use space ("You said ")
+        raw_text = article.get_text(' ', strip=True)
+        if raw_text.startswith('You said'):
+            role = 'user'
+        elif any(raw_text.startswith(p) for p in [
+            'Claude responded', 'Copilot said', 'ChatGPT said',
+            'Gemini said', 'Assistant:'
+        ]):
+            role = 'assistant'
+        else:
+            continue
+
+        # Find the content div — try multiple class patterns
+        content_div = article.find('div', class_=lambda c: c and any(
+            x in c for x in [
+                'font-claude-response', 'font-user-message',
+                'font-large', 'whitespace-pre-wrap'
+            ]
+        ))
+        if not content_div:
+            # Fallback: use the article itself
+            content_div = article
+
+        blocks = extract_content_blocks(content_div)
+        if blocks:
+            turns.append({'role': role, 'blocks': blocks})
+
+    return turns
+
+
 def parse_html(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         soup = BeautifulSoup(f, 'lxml')
@@ -280,17 +329,25 @@ def parse_html(filepath):
     title_tag = soup.find('title')
     title = title_tag.get_text(strip=True) if title_tag else ''
 
-    conv_match = re.search(r'chatgpt\.com/c/([^"\' ]+)', str(soup))
-    conv_id = conv_match.group(1) if conv_match else ''
+    fmt = _detect_format(soup)
 
-    turns = []
-    role_elements = soup.find_all(attrs={'data-message-author-role': True})
-
-    for el in role_elements:
-        role = el.get('data-message-author-role')
-        blocks = extract_content_blocks(el)
-        if blocks:
-            turns.append({'role': role, 'blocks': blocks})
+    if fmt == 'chatgpt':
+        conv_match = re.search(r'chatgpt\.com/c/([^"\' ]+)', str(soup))
+        conv_id = conv_match.group(1) if conv_match else ''
+        turns = []
+        for el in soup.find_all(attrs={'data-message-author-role': True}):
+            role = el.get('data-message-author-role')
+            blocks = extract_content_blocks(el)
+            if blocks:
+                turns.append({'role': role, 'blocks': blocks})
+    elif fmt == 'claude':
+        # Claude.ai conversation ID from URL or page content
+        conv_match = re.search(r'claude\.ai/chat/([^"\' ]+)', str(soup))
+        conv_id = conv_match.group(1) if conv_match else ''
+        turns = _parse_claude_ai(soup)
+    else:
+        conv_id = ''
+        turns = []
 
     units = build_discourse_units(turns)
 
@@ -316,8 +373,8 @@ def parse_html(filepath):
         for b in u['blocks']:
             t = b['type']
             if t == 'diagram':
-                fmt = b.get('format', 'unknown')
-                key = f'diagram:{fmt}'
+                fmt_key = b.get('format', 'unknown')
+                key = f'diagram:{fmt_key}'
             else:
                 key = t
             type_counts[key] = type_counts.get(key, 0) + 1

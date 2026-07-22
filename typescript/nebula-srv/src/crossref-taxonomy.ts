@@ -20,10 +20,11 @@ export enum CrossReferenceType {
   WRP_SUPERSEDES     = "wrp:supersedes",
 
   /* Agent domain */
-  AG_REFERENCES_PLAN = "ag:references_plan",
-  AG_SAME_THREAD_AS  = "ag:same_thread_as",
-  AG_PROMPTED_BY     = "ag:prompted_by",
-  AG_SPAWNS_PLAN     = "ag:spawns_plan",
+  AG_REFERENCES_PLAN      = "ag:references_plan",
+  AG_SAME_THREAD_AS       = "ag:same_thread_as",
+  AG_PROMPTED_BY          = "ag:prompted_by",
+  AG_SPAWNS_PLAN          = "ag:spawns_plan",
+  AG_EVIDENCES_CANDIDATE  = "ag:evidences_candidate",
 
   /* Knowledge domain */
   KV_SOURCED_FROM         = "kv:sourced_from",
@@ -73,7 +74,8 @@ const TYPE_CONSTRAINTS: Record<string, TypeConstraint> = {
   [CrossReferenceType.AG_REFERENCES_PLAN]: { sourceType: "agent_record", targetType: "plan" },
   [CrossReferenceType.AG_SAME_THREAD_AS]:  { sourceType: "agent_record", targetType: "agent_record" },
   [CrossReferenceType.AG_PROMPTED_BY]:     { sourceType: "agent_record", targetType: "prompt" },
-  [CrossReferenceType.AG_SPAWNS_PLAN]:     { sourceType: "harvest_candidate", targetType: "plan" },
+  [CrossReferenceType.AG_SPAWNS_PLAN]:          { sourceType: "harvest_candidate", targetType: "plan" },
+  [CrossReferenceType.AG_EVIDENCES_CANDIDATE]:  { sourceType: "agent_record", targetType: "harvest_candidate" },
   [CrossReferenceType.KV_SOURCED_FROM]:    { sourceType: "knowledge_entity", targetType: "harvest" },
   [CrossReferenceType.KV_INFORMS]:         { sourceType: "harvest", targetType: "knowledge_entity" },
   [CrossReferenceType.KV_CROSS_SCHEMA]:    { sourceType: "embedding",  targetType: "embedding" },

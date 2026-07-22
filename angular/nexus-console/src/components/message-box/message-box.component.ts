@@ -69,12 +69,12 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
             [class.user]="msg.role === 'user'"
             [class.assistant]="msg.role === 'assistant'"
           >
-            <span class="mbox-role">{{ msg.role === 'user' ? 'You' : (box.agentRole || 'Assistant') }}</span>
+            <span class="mbox-role">{{ msg.role === 'user' ? 'You' : (box.agentRole || 'Operator') }}</span>
             <div class="mbox-content">{{ msg.content }}</div>
           </div>
           @if (box.submitting) {
             <div class="mbox-msg assistant">
-              <span class="mbox-role">{{ box.agentRole || 'Assistant' }}</span>
+              <span class="mbox-role">{{ box.agentRole || 'Operator' }}</span>
               <div class="mbox-content mbox-thinking">Thinking…</div>
             </div>
           }

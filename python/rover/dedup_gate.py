@@ -202,7 +202,7 @@ def main():
     cur.execute("""
         SELECT id, title, status
         FROM nebula.harvest_candidates
-        WHERE status IN ('pending', 'linked', 'useful')
+        WHERE status IN ('pending', 'linked', 'staged')
         LIMIT 200
     """)
     candidates = [

@@ -1,0 +1,14 @@
+[Unit]
+Description=Redis Health Monitor timer — checks Redis every 30s
+Documentation=https://github.com/codex/nexus/wiki/redis-health-monitor
+After=network.target redis.service
+Wants=redis.service
+
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=30s
+Persistent=true
+RandomizedDelaySec=5s
+
+[Install]
+WantedBy=timers.target

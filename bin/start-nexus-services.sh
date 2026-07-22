@@ -28,28 +28,37 @@ ALL_SERVICES=(
     "broker-gateway.service"    # port 8081 — service broker gateway
     "terrain.service"          # port 8084 — topology registry
     "file-system-server.service" # port 4040 — file system operations
+    "ui-event-bus.service"     # port 3200 — cross-app UI event bus (SSE)
     "peb-kernel.service"       # port 8080 — engineering brain
+    "kernel-srv.service"       # port 8100 — Semantic Kernel REST API (wraps sys_transition, sys_issue_receipt, v_* views; SSE over pg_notify)
     "nebula-srv.service"       # Nebula RMS API
     "cascade-srv.service"      # port 3106 — Cascade Event API
     "role-memory-srv.service"  # port 3500 — PG→Redis sync
     "wrp-bridge-daemon.service" # conduit→kernel sync
+    "cascade-kernel-subscriber.service" # pg_notify → NATS (kernel transitions)
+    "cascade-obs-subscriber.service"   # pg_notify → NATS (PEB governance + Vision lifecycle)
 
     # API servers
-    "vision-srv.service"       # port 3103 — Vision LOSM
-    "vision-srv-3104.service"  # port 3104 — Vision LOSM (alt)
     "vision-srv-py.service"    # port 8003 — Vision Python
+    "losm-host.service"        # port 8006 — LOSM Host (FastAPI)
     "image-server.service"     # Image hosting
 
     # TTS stack
     "address-tts.service"      # port 8600 — speech synthesis
     "address-tts-mcp.service"  # port 3105 — TTS MCP
 
-    # MCP servers
+    # Operator + MCP servers
+    "operator-svc.service"     # port 3018 — Operator host personality
     "conduit-mcp.service"      # port 3100 — work request orchestration
+    "pty-srv.service"          # port 3120 — WebSocket PTY bridge for xterm.js
     "nebula-mcp-sse.service"   # port 3102 — Nebula MCP SSE
     "nebula-mcp.service"       # stdio  — Nebula MCP (on-demand; clients spawn independently)
     "terrain-mcp.service"      # stdio  — Terrain topology MCP (on-demand; clients spawn independently)
     "tackle-mcp.service"       # port 3400 — AI config registry
+    "cpf-api.service"          # port 3108 — CPF funnel data API
+    "atlas.service"            # port 8090 — graph views persistence
+    "execution-srv.service"    # port 3110 — execution observability REST API
+    "peb-srv.service"          # port 3111 — PEB observability REST API
 )
 
 # ── Service metadata for health checks ─────────────────────────────────
@@ -62,14 +71,15 @@ SERVICE_PORTS=(
     ["broker-gateway.service"]="8081"
     ["terrain.service"]="8084"
     ["file-system-server.service"]="4040"
+    ["ui-event-bus.service"]="3200"
     ["peb-kernel.service"]="8080"
+    ["kernel-srv.service"]="8100"
     ["nebula-srv.service"]="3101"
     ["cascade-srv.service"]="3106"
     ["role-memory-srv.service"]="3500"
     # wrp-bridge-daemon — no HTTP health endpoint
-    ["vision-srv.service"]="3103"
-    ["vision-srv-3104.service"]="3104"
     ["vision-srv-py.service"]="8003"
+    ["losm-host.service"]="8006"
     # image-server — no HTTP health endpoint
     ["address-tts.service"]="8600"
     ["address-tts-mcp.service"]="3105"
@@ -78,6 +88,12 @@ SERVICE_PORTS=(
     # nebula-mcp.service — stdio, on-demand (no port)
     # terrain-mcp.service — stdio, on-demand (no port)
     ["tackle-mcp.service"]="3400"
+    ["operator-svc.service"]="3018"
+    ["pty-srv.service"]="3121"
+    ["cpf-api.service"]="3108"
+    ["atlas.service"]="8090"
+    ["execution-srv.service"]="3110"
+    ["peb-srv.service"]="3111"
 )
 
 # Docker-based services (verified via docker ps instead of port check)
@@ -148,6 +164,7 @@ _is_active() {
 
 cmd_start_all() {
     echo "=== Starting Nexus Services ==="
+    systemctl --user daemon-reload
     for svc in "${ALL_SERVICES[@]}"; do
         echo -n "  $svc ... "
         if _is_active "$svc"; then

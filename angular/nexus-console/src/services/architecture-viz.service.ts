@@ -3,6 +3,10 @@ import { Injectable, NgZone, Signal, signal, WritableSignal, inject } from '@ang
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { Subject } from 'rxjs';
 import { NodeType } from '../models/component-config.js';
 import { ComponentRegistryService } from './component-registry.service.js';
@@ -35,6 +39,7 @@ interface FlowParticle {
     toId: string;
     progress: number; // 0 to 1
     speed: number;
+    color: number;
 }
 
 @Injectable({
@@ -47,6 +52,7 @@ export class ArchitectureVizService {
     private scene!: THREE.Scene;
     private camera!: THREE.PerspectiveCamera;
     private renderer!: THREE.WebGLRenderer;
+    private composer!: EffectComposer;
     private labelRenderer!: CSS2DRenderer;
     private controls!: OrbitControls;
     private animationId: number | null = null;
@@ -96,7 +102,8 @@ export class ArchitectureVizService {
     public isSimulationActive: WritableSignal<boolean> = signal(false);
     private flowParticles: FlowParticle[] = [];
     private packetGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-    private packetMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+    private packetMaterialForward = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+    private packetMaterialReverse = new THREE.MeshBasicMaterial({ color: 0x00ffff });
     private cameraOrbitAngle = 0;
 
     // Signals & Events
@@ -112,6 +119,23 @@ export class ArchitectureVizService {
     public readonly activeCamera: WritableSignal<1 | 2> = signal(1);
     private readonly cameraPresets = new Map<1 | 2, { pos: THREE.Vector3; target: THREE.Vector3 }>();
 
+    // Floor (grid + shadow plane) visibility
+    private readonly _floorVisible: WritableSignal<boolean> = signal(true);
+    public readonly floorVisible: Signal<boolean> = this._floorVisible.asReadonly();
+    private gridHelper!: THREE.GridHelper;
+    private shadowPlane!: THREE.Mesh;
+
+    // Bloom post-processing parameters
+    private bloomPass!: UnrealBloomPass;
+    private readonly _bloomEnabled: WritableSignal<boolean> = signal(true);
+    private readonly _bloomStrength: WritableSignal<number> = signal(0.6);
+    private readonly _bloomRadius: WritableSignal<number> = signal(0.3);
+    private readonly _bloomThreshold: WritableSignal<number> = signal(0.2);
+    public readonly bloomEnabled: Signal<boolean> = this._bloomEnabled.asReadonly();
+    public readonly bloomStrength: Signal<number> = this._bloomStrength.asReadonly();
+    public readonly bloomRadius: Signal<number> = this._bloomRadius.asReadonly();
+    public readonly bloomThreshold: Signal<number> = this._bloomThreshold.asReadonly();
+
     // Camera animation state (lerp transition between presets)
     private cameraAnimating = false;
     private cameraAnimStartPos = new THREE.Vector3();
@@ -125,6 +149,8 @@ export class ArchitectureVizService {
     private raycaster = new THREE.Raycaster();
     private mouse = new THREE.Vector2();
     private resizeObserver: ResizeObserver | null = null;
+    private keyDownHandler = this.onKeyDown.bind(this);
+    private canvasFocusHandler = this.onCanvasFocus.bind(this);
 
     initialize(container: HTMLElement) {
         this.container = container;
@@ -189,8 +215,25 @@ export class ArchitectureVizService {
 
         this.renderer.setSize(width, height);
         this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.domElement.style.outline = 'none';
         container.appendChild(this.renderer.domElement);
+
+        // 3b. Setup Post-Processing (Bloom)
+        const renderScene = new RenderPass(this.scene, this.camera);
+        this.bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(width, height),
+            this.bloomStrength(),
+            this.bloomRadius(),
+            this.bloomThreshold()
+        );
+        const outputPass = new OutputPass();
+        this.composer = new EffectComposer(this.renderer);
+        this.composer.setPixelRatio(window.devicePixelRatio);
+        this.composer.addPass(renderScene);
+        this.composer.addPass(this.bloomPass);
+        this.composer.addPass(outputPass);
 
         // 4. Setup Label Renderer
         this.labelRenderer = new CSS2DRenderer();
@@ -215,15 +258,57 @@ export class ArchitectureVizService {
         this.cameraPresets.set(1, { pos: pos1.clone(), target: target1.clone() });
         this.cameraPresets.set(2, { pos: pos2.clone(), target: target2.clone() });
 
-        // 6. Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        // 6. Lights — multi-source setup for strong contrast and readable shapes
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
         this.scene.add(ambientLight);
-        const pointLight = new THREE.PointLight(0xffffff, 1);
+
+        // Key light: warm directional light from upper-right front (casts shadows)
+        const keyLight = new THREE.DirectionalLight(0xfff4e6, 1.4);
+        keyLight.position.set(40, 60, 40);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.width = 2048;
+        keyLight.shadow.mapSize.height = 2048;
+        keyLight.shadow.camera.left = -60;
+        keyLight.shadow.camera.right = 60;
+        keyLight.shadow.camera.top = 60;
+        keyLight.shadow.camera.bottom = -60;
+        keyLight.shadow.camera.near = 0.5;
+        keyLight.shadow.camera.far = 150;
+        keyLight.shadow.bias = -0.001;
+        this.scene.add(keyLight);
+
+        // Fill light: cool directional light from lower-left back (reduces harsh shadows)
+        const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.7);
+        fillLight.position.set(-40, 20, -40);
+        this.scene.add(fillLight);
+
+        // Rim light: sharp backlight to separate nodes from the dark background
+        const rimLight = new THREE.DirectionalLight(0xc7d2fe, 1.0);
+        rimLight.position.set(0, 30, -60);
+        this.scene.add(rimLight);
+
+        // Point lights for local highlights
+        const pointLight = new THREE.PointLight(0xffffff, 0.9, 200);
         pointLight.position.set(20, 20, 20);
         this.scene.add(pointLight);
-        const pointLight2 = new THREE.PointLight(0x4444ff, 0.8);
+        const pointLight2 = new THREE.PointLight(0x4444ff, 0.6, 200);
         pointLight2.position.set(-20, -10, 10);
         this.scene.add(pointLight2);
+
+        // Subtle ground grid for spatial reference and contrast
+        this.gridHelper = new THREE.GridHelper(200, 40, 0x334155, 0x1e293b);
+        this.gridHelper.position.y = -20;
+        this.scene.add(this.gridHelper);
+
+        // Invisible shadow-receiving plane so nodes cast shadows on the ground
+        this.shadowPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(200, 200),
+            new THREE.ShadowMaterial({ opacity: 0.4 })
+        );
+        this.shadowPlane.rotation.x = -Math.PI / 2;
+        this.shadowPlane.position.y = -20;
+        this.shadowPlane.receiveShadow = true;
+        this.scene.add(this.shadowPlane);
 
         // 7. Helpers
         this.selectionBox = new THREE.BoxHelper(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)), 0xffff00);
@@ -240,14 +325,19 @@ export class ArchitectureVizService {
         this.renderer.domElement.addEventListener('pointerup', (e) => this.onPointerUp(e));
         this.renderer.domElement.addEventListener('dblclick', (e) => this.onDoubleClick(e));
 
-        // Middle-click (mousewheel click) toggles between Camera and Edit modes
+        // Middle-click (mousewheel click) toggles between camera presets 1 and 2
         this.renderer.domElement.addEventListener('auxclick', (e) => {
             if (e.button === 1) {
                 e.preventDefault();
-                const newMode: ViewMode = this.viewMode() === 'camera' ? 'edit' : 'camera';
-                this.setViewMode(newMode);
+                this.switchActiveCamera();
             }
         });
+
+        // Keyboard shortcuts for selection and deselection
+        document.addEventListener('keydown', this.keyDownHandler);
+
+        // Focus the canvas container on pointer down so keyboard shortcuts work
+        this.renderer.domElement.addEventListener('pointerdown', this.canvasFocusHandler);
 
         // 9. Start Loop
         // this.loadDefaultScene(); // Disabled automatic demo loading. Driven by ServiceGraphComponent inputs.
@@ -263,6 +353,45 @@ export class ArchitectureVizService {
             this.scene.background = threeColor;
             this.scene.fog = new THREE.FogExp2(threeColor.getHex(), 0.008);
         }
+    }
+
+    public toggleFloor(): void {
+        const isVisible = !this._floorVisible();
+        this._floorVisible.set(isVisible);
+        if (this.gridHelper) this.gridHelper.visible = isVisible;
+        if (this.shadowPlane) this.shadowPlane.visible = isVisible;
+    }
+
+    public setBloomEnabled(value: boolean): void {
+        this._bloomEnabled.set(value);
+        if (this.bloomPass) {
+            this.bloomPass.strength = value ? this._bloomStrength() : 0;
+        }
+    }
+
+    public toggleBloom(): void {
+        this.setBloomEnabled(!this._bloomEnabled());
+    }
+
+    public setBloomStrength(value: number): void {
+        this._bloomStrength.set(value);
+        if (this.bloomPass && this._bloomEnabled()) this.bloomPass.strength = value;
+    }
+
+    public setBloomRadius(value: number): void {
+        this._bloomRadius.set(value);
+        if (this.bloomPass && this._bloomEnabled()) this.bloomPass.radius = value;
+    }
+
+    public setBloomThreshold(value: number): void {
+        this._bloomThreshold.set(value);
+        if (this.bloomPass && this._bloomEnabled()) this.bloomPass.threshold = value;
+    }
+
+    public setBloomParams(strength: number, radius: number, threshold: number): void {
+        this.setBloomStrength(strength);
+        this.setBloomRadius(radius);
+        this.setBloomThreshold(threshold);
     }
 
     public zoomCamera(amount: number) {
@@ -293,6 +422,42 @@ export class ArchitectureVizService {
 
         this.camera.position.copy(this.controls.target).add(offset);
         this.camera.lookAt(this.controls.target);
+        this.controls.update();
+    }
+
+    /** Orbit the camera vertically around the target.
+     *  Positive angle moves the camera downward; negative moves it upward. */
+    public rotateCameraVertical(angle: number) {
+        if (!this.camera || !this.controls) return;
+
+        const offset = new THREE.Vector3().subVectors(this.camera.position, this.controls.target);
+        const radius = offset.length();
+        offset.normalize();
+
+        // Axis of rotation is perpendicular to both world UP and the camera offset
+        const right = new THREE.Vector3().crossVectors(this.camera.up, offset).normalize();
+        offset.applyAxisAngle(right, angle);
+
+        // Prevent flipping over the poles
+        if (Math.abs(offset.dot(this.camera.up)) > 0.98) return;
+
+        offset.multiplyScalar(radius);
+        this.camera.position.copy(this.controls.target).add(offset);
+        this.camera.lookAt(this.controls.target);
+        this.controls.update();
+    }
+
+    /** Pan the camera (and its target) horizontally by moving along the
+     *  camera's local right vector. Positive delta moves right; negative left. */
+    public panCamera(deltaX: number) {
+        if (!this.camera || !this.controls) return;
+
+        const right = new THREE.Vector3();
+        right.setFromMatrixColumn(this.camera.matrix, 0);
+        right.normalize().multiplyScalar(deltaX);
+
+        this.camera.position.add(right);
+        this.controls.target.add(right);
         this.controls.update();
     }
 
@@ -432,6 +597,47 @@ export class ArchitectureVizService {
             return;
         }
         this.importSceneFromJson(JSON.stringify(data));
+    }
+
+    /** Build an Atlas graph-view payload from the current scene state. */
+    public buildAtlasViewPayload(name: string): {
+        name: string;
+        cameraPositionX: number; cameraPositionY: number; cameraPositionZ: number;
+        cameraTargetX: number; cameraTargetY: number; cameraTargetZ: number;
+        camera2PositionX: number; camera2PositionY: number; camera2PositionZ: number;
+        camera2TargetX: number; camera2TargetY: number; camera2TargetZ: number;
+        connections: ConnectionData[];
+        positions: { nodeId: string; positionX: number; positionY: number; positionZ: number; label?: string; description?: string; color?: string }[];
+    } {
+        const activeCam = this.activeCamera();
+        const live = { pos: this.getCameraPosition(), target: this.getCameraTarget() };
+        const defaultPos = new THREE.Vector3(-20, 40, 120);
+        const defaultTarget = new THREE.Vector3(0, 15, 0);
+        const preset1 = this.getCameraPreset(1) ?? { pos: defaultPos, target: defaultTarget };
+        const preset2 = this.getCameraPreset(2) ?? { pos: defaultPos, target: defaultTarget };
+        const cam1 = activeCam === 1 ? live : preset1;
+        const cam2 = activeCam === 2 ? live : preset2;
+        const positions = this.getAllNodePositions();
+        const allNodes = Array.from(this.nodes.values()).map(n => n.data);
+
+        return {
+            name,
+            cameraPositionX: cam1.pos.x, cameraPositionY: cam1.pos.y, cameraPositionZ: cam1.pos.z,
+            cameraTargetX: cam1.target.x, cameraTargetY: cam1.target.y, cameraTargetZ: cam1.target.z,
+            camera2PositionX: cam2.pos.x, camera2PositionY: cam2.pos.y, camera2PositionZ: cam2.pos.z,
+            camera2TargetX: cam2.target.x, camera2TargetY: cam2.target.y, camera2TargetZ: cam2.target.z,
+            connections: this.getAllConnections(),
+            positions: Array.from(positions.entries()).map(([nodeId, pos]) => {
+                const node = allNodes.find(n => n.id === nodeId);
+                return {
+                    nodeId,
+                    positionX: pos.x, positionY: pos.y, positionZ: pos.z,
+                    label: node?.label,
+                    description: node?.description,
+                    color: node?.color
+                };
+            })
+        };
     }
 
     // --- Raycasting Helpers for Context Menu ---
@@ -616,12 +822,14 @@ export class ArchitectureVizService {
             default: geometry = new THREE.BoxGeometry(1, 1, 1);
         }
         const material = new THREE.MeshPhongMaterial({
-            color: colorHex, emissive: colorHex, emissiveIntensity: 0.2, shininess: 100, flatShading: true
+            color: colorHex, emissive: colorHex, emissiveIntensity: 0.8, shininess: 100, flatShading: true
         });
 
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.set(finalPos.x, finalPos.y, finalPos.z);
         mesh.scale.setScalar(config.scale);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
         mesh.userData = { id, type };
 
         const wireGeo = new THREE.WireframeGeometry(geometry);
@@ -1107,6 +1315,10 @@ export class ArchitectureVizService {
                 this.setPrimarySelection(id);
             }
             this.nodeDoubleClicked.next(id);
+        } else {
+            // Double-click on empty space toggles between camera and edit modes
+            const newMode: ViewMode = this.viewMode() === 'camera' ? 'edit' : 'camera';
+            this.setViewMode(newMode);
         }
     }
 
@@ -1147,6 +1359,102 @@ export class ArchitectureVizService {
         }
         this.selectedNodeData.set(null);
         this.clearMultiSelection();
+    }
+
+    /** Select every node in the scene. */
+    public selectAll(): void {
+        if (this.nodes.size === 0) return;
+        this.clearMultiSelection();
+        for (const id of this.nodes.keys()) {
+            this.multiSelectedNodeIds.add(id);
+        }
+        // Set the first node as primary selection
+        const firstId = this.nodes.keys().next().value as string | undefined;
+        if (firstId) {
+            this.setPrimarySelection(firstId);
+        }
+        this.refreshMultiSelectionBoxes();
+        this.multiSelectedCount.set(this.multiSelectedNodeIds.size);
+    }
+
+    private onCanvasFocus() {
+        this.container?.focus();
+    }
+
+    private onKeyDown(event: KeyboardEvent) {
+        // Ignore shortcuts when the user is typing in a form element
+        const target = event.target as HTMLElement | null;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+            return;
+        }
+
+        // Only act when the graph canvas has focus (or contains the focused element)
+        const active = document.activeElement;
+        const graphHasFocus = this.container && (this.container === active || this.container.contains(active));
+        if (!graphHasFocus) {
+            return;
+        }
+
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+            event.preventDefault();
+            event.stopPropagation();
+            this.selectAll();
+            return;
+        }
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            this.deselect();
+            return;
+        }
+
+        // Camera keyboard controls (only when graph has focus and not mid-animation)
+        if (event.key.startsWith('Arrow') && this.controls && !this.cameraAnimating) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const orbitAngle = 0.08;
+            const zoomAmount = 10;
+            const panAmount = 2;
+
+            if (event.altKey) {
+                // Alt + Arrow => translate camera position (dolly / pan)
+                switch (event.key) {
+                    case 'ArrowUp':
+                        this.zoomCamera(zoomAmount);
+                        break;
+                    case 'ArrowDown':
+                        this.zoomCamera(-zoomAmount);
+                        break;
+                    case 'ArrowLeft':
+                        this.panCamera(-panAmount);
+                        break;
+                    case 'ArrowRight':
+                        this.panCamera(panAmount);
+                        break;
+                }
+            } else {
+                // Plain Arrow => orbit around the target
+                switch (event.key) {
+                    case 'ArrowUp':
+                        this.rotateCameraVertical(-orbitAngle);
+                        break;
+                    case 'ArrowDown':
+                        this.rotateCameraVertical(orbitAngle);
+                        break;
+                    case 'ArrowLeft':
+                        this.rotateCamera(orbitAngle);
+                        break;
+                    case 'ArrowRight':
+                        this.rotateCamera(-orbitAngle);
+                        break;
+                }
+            }
+
+            this.cameraChanged.next();
+            return;
+        }
     }
 
     // --- Multi-Selection Helpers ---
@@ -1373,7 +1681,7 @@ export class ArchitectureVizService {
         // Keep connections in sync with floating nodes
         this.updateAllConnections();
 
-        this.renderer.render(this.scene, this.camera);
+        this.composer.render();
         this.labelRenderer.render(this.scene, this.camera);
     }
 
@@ -1385,16 +1693,32 @@ export class ArchitectureVizService {
 
         if (line) {
             const { fromId, toId } = line.userData;
-            const mesh = new THREE.Mesh(this.packetGeometry, this.packetMaterial);
-            this.scene.add(mesh);
 
+            // Forward pulse (source -> target)
+            const forwardMesh = new THREE.Mesh(this.packetGeometry, this.packetMaterialForward);
+            this.scene.add(forwardMesh);
             this.flowParticles.push({
-                mesh,
+                mesh: forwardMesh,
                 fromId,
                 toId,
                 progress: 0,
-                speed: 0.01 + Math.random() * 0.01 // Random speed variation
+                speed: 0.01 + Math.random() * 0.01,
+                color: 0xffff00
             });
+
+            // Reverse pulse (target -> source) for bidirectional edges
+            if (this.isBidirectional(fromId, toId)) {
+                const reverseMesh = new THREE.Mesh(this.packetGeometry, this.packetMaterialReverse);
+                this.scene.add(reverseMesh);
+                this.flowParticles.push({
+                    mesh: reverseMesh,
+                    fromId: toId,
+                    toId: fromId,
+                    progress: 0,
+                    speed: 0.01 + Math.random() * 0.01,
+                    color: 0x00ffff
+                });
+            }
         }
     }
 
@@ -1430,14 +1754,21 @@ export class ArchitectureVizService {
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(width, height);
+        this.composer.setSize(width, height);
+        this.composer.setPixelRatio(window.devicePixelRatio);
         this.labelRenderer.setSize(width, height);
     }
 
     public dispose() {
         if (this.animationId) cancelAnimationFrame(this.animationId);
         if (this.resizeObserver) this.resizeObserver.disconnect();
+        if (this.composer) this.composer.dispose();
         if (this.renderer) this.renderer.dispose();
         if (this.lassoDiv) { this.lassoDiv.remove(); this.lassoDiv = null; }
+        document.removeEventListener('keydown', this.keyDownHandler);
+        if (this.renderer) {
+            this.renderer.domElement.removeEventListener('pointerdown', this.canvasFocusHandler);
+        }
     }
 
     // --- Import / Export ---

@@ -69,7 +69,19 @@ export async function syncAll(): Promise<{
   // Write last-updated timestamp
   pipeline.set(META_UPDATED_KEY, now);
 
-  await pipeline.exec();
+  const results = await pipeline.exec();
+  // ioredis pipeline.exec() resolves with [error, reply][] and does NOT
+  // throw on per-command failure. Surface write failures so /refresh
+  // returns HTTP 500 instead of fake success with PG-read counts.
+  if (results) {
+    const failures = results.filter(([err]) => err !== null);
+    if (failures.length > 0) {
+      const first = failures[0][0] as Error;
+      throw new Error(
+        `Redis pipeline write failed: ${failures.length}/${results.length} commands failed. First error: ${first.message}`
+      );
+    }
+  }
 
   return {
     procedures: memMap.size,

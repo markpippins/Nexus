@@ -42,6 +42,11 @@ export class SidebarComponent implements OnDestroy {
   meshViewMode = input<'console' | 'graph'>('console'); // Sub-mode when in service-mesh
   graphSubView = input<'canvas' | 'creator'>('canvas'); // Sub-view when in graph mode
 
+  /** Whether the sidebar is collapsed to a thin strip */
+  collapsed = input(false);
+  /** Emitted when the collapse/expand toggle button is clicked */
+  collapseToggled = output<void>();
+
   pathChange = output<string[]>();
   refreshTree = output<void>();
   loadChildren = output<string[]>();
@@ -50,12 +55,9 @@ export class SidebarComponent implements OnDestroy {
 
   meshViewModeChange = output<'console' | 'graph'>(); // For toggling between console and graph
   refreshServices = output<void>(); // For refreshing service mesh data
-  collapsePalette = output<void>();
   serversMenuClick = output<void>();
   hostServersMenuClick = output<void>();
   localConfigMenuClick = output<void>();
-  importClick = output<void>();
-  exportClick = output<void>();
   renameItemInTree = output<{ path: string[], newName: string }>();
   deleteItemInTree = output<string[]>();
   createFolderInTree = output<{ path: string[], name: string }>();
@@ -63,7 +65,6 @@ export class SidebarComponent implements OnDestroy {
   connectToServer = output<string>();
   disconnectFromServer = output<string>();
   editServerProfile = output<string>();
-  openCreateUser = output<void>();
   serviceSelected = output<ServiceInstance>();
 
   // Service Mesh data bindings (from ServiceMeshService)
@@ -247,6 +248,10 @@ export class SidebarComponent implements OnDestroy {
     this.uiPreferencesService.toggleNotesPaneCollapse();
   }
 
+  onSidebarCollapseToggle(): void {
+    this.collapseToggled.emit();
+  }
+
   onServiceSelected(service: ServiceInstance): void {
     this.serviceMeshService.selectService(service);
     this.serviceSelected.emit(service);
@@ -333,25 +338,16 @@ export class SidebarComponent implements OnDestroy {
     this.isHamburgerMenuOpen.update(v => !v);
   }
 
-  onMenuItemClick(emitterName: 'localConfigMenuClick' | 'importClick' | 'exportClick' | 'serversMenuClick' | 'hostServersMenuClick' | 'createUserClick'): void {
+  onMenuItemClick(emitterName: 'localConfigMenuClick' | 'serversMenuClick' | 'hostServersMenuClick'): void {
     switch (emitterName) {
       case 'localConfigMenuClick':
         this.localConfigMenuClick.emit();
-        break;
-      case 'importClick':
-        this.importClick.emit();
-        break;
-      case 'exportClick':
-        this.exportClick.emit();
         break;
       case 'serversMenuClick':
         this.serversMenuClick.emit();
         break;
       case 'hostServersMenuClick':
         this.hostServersMenuClick.emit();
-        break;
-      case 'createUserClick':
-        this.openCreateUser.emit();
         break;
     }
     this.isHamburgerMenuOpen.set(false);

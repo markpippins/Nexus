@@ -44,6 +44,8 @@ import {
   getAllEvents,
   selectNextRunnable,
   listWorkRequestStates,
+  checkProjectionDrift,
+  resolveWrUuid,
 } from "./db";
 import {
   validateCompilerOutput,
@@ -993,171 +995,9 @@ app.post("/config/failure-recovery", async (req, res) => {
 
 // (All /config/ai/* endpoints deleted. Use tackle-mcp for AI config.)
 
-// ── v081: Agent chat (message box) ──────────────────────────────────
-
-const AGENT_CHAT_URL = process.env.AGENT_CHAT_URL || "http://localhost:3102";
-
-// Proxy: send message to agent via the chat server
-app.post("/chat/send", async (req, res) => {
-  const { role, message, log_level } = req.body || {};
-  if (!role || !message) {
-    res.status(400).json({ error: "role and message are required" });
-    return;
-  }
-  try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    const agentToken = process.env.AGENT_CHAT_TOKEN;
-    if (agentToken) {
-      headers["Authorization"] = `Bearer ${agentToken}`;
-    }
-
-    const body = JSON.stringify({
-      role,
-      message,
-      ...(log_level ? { log_level } : {}),
-    });
-    headers["Content-Length"] = Buffer.byteLength(body).toString();
-
-    const proxyReq = http.request(
-      `${AGENT_CHAT_URL}/chat`,
-      { method: "POST", headers, timeout: 30000 },
-      (proxyRes: any) => {
-        let body = "";
-        proxyRes.on("data", (chunk: string) => (body += chunk));
-        proxyRes.on("end", () => {
-          if (
-            proxyRes.statusCode &&
-            proxyRes.statusCode >= 200 &&
-            proxyRes.statusCode < 300
-          ) {
-            try {
-              res.status(proxyRes.statusCode).json(JSON.parse(body));
-            } catch {
-              res
-                .status(502)
-                .json({ error: "Invalid response from agent chat server" });
-            }
-          } else {
-            let detail = body;
-            try {
-              const parsed = JSON.parse(body);
-              detail = parsed.error || parsed.detail || body;
-            } catch {
-              /* use raw body */
-            }
-            res.status(proxyRes.statusCode || 502).json({
-              error: "Agent chat server error",
-              detail,
-            });
-          }
-        });
-      },
-    );
-    proxyReq.on("error", (err: Error) => {
-      if ((err as any).code === "ECONNREFUSED") {
-        res
-          .status(502)
-          .json({
-            error: "Agent chat server unreachable",
-            detail: "Connection refused — is the agent chat service running?",
-          });
-      } else if (
-        (err as any).code === "ETIMEDOUT" ||
-        err.message === "socket hang up"
-      ) {
-        res.status(502).json({ error: "Agent chat server timed out" });
-      } else {
-        res
-          .status(502)
-          .json({
-            error: "Agent chat server unreachable",
-            detail: err.message,
-          });
-      }
-    });
-    proxyReq.end(body);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Config: tell the UI where the agent chat SSE server lives
-app.get("/chat/config", async (_req, res) => {
-  res.json({
-    agentChatUrl: AGENT_CHAT_URL,
-    agents: [
-      {
-        role: "planner",
-        label: "Planner",
-        description: "Creates and refines implementation plans",
-      },
-      {
-        role: "builder",
-        label: "Builder",
-        description: "Implements plans, modifies code",
-      },
-      {
-        role: "reviewer",
-        label: "Reviewer",
-        description: "Reviews implementations against plans",
-      },
-      {
-        role: "critic",
-        label: "Critic",
-        description: "Critiques plans for gaps and improvements",
-      },
-      {
-        role: "analyst",
-        label: "Analyst",
-        description: "Analyzes inspection reports and triages issues",
-      },
-      {
-        role: "architect",
-        label: "Architect",
-        description: "Designs architecture and writes specifications",
-      },
-      {
-        role: "inspector",
-        label: "Inspector",
-        description: "Inspects codebase for errors and issues",
-      },
-      {
-        role: "engineer",
-        label: "Engineer",
-        description: "Reports on backlog and identifies priority work",
-      },
-      {
-        role: "rover",
-        label: "Rover",
-        description: "Processes chat transcripts through harvesting pipeline",
-      },
-    ],
-  });
-});
-
-// Proxy: list active agent chat sessions
-app.get("/chat/sessions", async (_req, res) => {
-  try {
-    const http = require("http") as typeof import("http");
-    http
-      .get(`${AGENT_CHAT_URL}/chat/sessions`, (proxyRes: any) => {
-        let body = "";
-        proxyRes.on("data", (chunk: string) => (body += chunk));
-        proxyRes.on("end", () => {
-          try {
-            res.json(JSON.parse(body));
-          } catch {
-            res.json({ sessions: [] });
-          }
-        });
-      })
-      .on("error", () => res.json({ sessions: [] }));
-  } catch {
-    res.json({ sessions: [] });
-  }
-});
+// ── Agent chat removed — now handled by operator_svc (port 3018) ──
+// Chat endpoints (POST /chat/send, GET /chat/config, GET /chat/sessions)
+// were removed from conduit-mcp. The UI connects directly to operator_svc.
 
 // Session log SSE endpoint (v071 — streaming live builder output)
 app.get("/log/:sessionId", async (req, res) => {
@@ -1478,6 +1318,26 @@ app.get("/wr/:id/events", async (req, res) => {
       return;
     }
     res.json({ ok: true, count: events.length, events });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
+ * GET /wr/:id/projection-drift — Check if the live work_request_state
+ * projection matches what a full event replay would produce.
+ * Non-destructive: computes expected state without writing.
+ */
+app.get("/wr/:id/projection-drift", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const uuid = await resolveWrUuid(id);
+    const drift = await checkProjectionDrift(uuid);
+    if (!drift) {
+      res.status(404).json({ ok: false, error: `WorkRequest ${id} not found` });
+      return;
+    }
+    res.json({ ok: true, drift });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err.message });
   }

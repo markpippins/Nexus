@@ -59,10 +59,9 @@ class Runner:
             WHERE enabled = 1
               AND (
                 last_run_at IS NULL
-                OR last_run_at = ''
                 OR (
                   schedule_type = 'interval'
-                  AND EXTRACT(EPOCH FROM NOW() - regexp_replace(last_run_at, '[Z+].*$', '')::timestamp)
+                  AND EXTRACT(EPOCH FROM NOW() - last_run_at)
                      >= schedule_value
                 )
               )

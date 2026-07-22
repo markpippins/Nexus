@@ -23,27 +23,43 @@
       </div>
     </div>
   }
-  <!-- Connected: Kanban Board -->
+  <!-- Connected: Tab Bar + Content -->
   @else if (connected()) {
-    <!-- ═══════ Branding Row: Operations Brand + Address Bar ═══════ -->
+    <!-- ═══════ Tab Bar ═══════ -->
     <div class="flex-shrink-0 flex items-center border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]" style="height:48px;min-height:48px">
-      <!-- Branding Box (width matches kanban grid column: 1/8 = 12.5%) -->
-      <div class="flex items-center h-full px-4 flex-shrink-0" style="width:12.5%">
-        <span class="text-sm font-semibold text-[rgb(var(--color-text-base))]">Operations</span>
+      <div class="flex items-center h-full px-4 gap-1">
+        <button
+          (click)="activeTab.set('requirements')"
+          class="h-full px-4 text-xs font-medium transition-colors border-b-2 flex items-center gap-1.5"
+          [class.border-[rgb(var(--color-accent-ring))]]="activeTab() === 'requirements'"
+          [class.text-[rgb(var(--color-text-base))]]="activeTab() === 'requirements'"
+          [class.border-transparent]="activeTab() !== 'requirements'"
+          [class.text-[rgb(var(--color-text-muted))]]="activeTab() !== 'requirements'"
+          [class.hover:text-[rgb(var(--color-text-base))]]="activeTab() !== 'requirements'"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          Requirements
+          <span class="text-[10px] text-[rgb(var(--color-text-subtle))]">({{ totalCount() }})</span>
+        </button>
+        <button
+          (click)="activeTab.set('funnel')"
+          class="h-full px-4 text-xs font-medium transition-colors border-b-2 flex items-center gap-1.5"
+          [class.border-[rgb(var(--color-accent-ring))]]="activeTab() === 'funnel'"
+          [class.text-[rgb(var(--color-text-base))]]="activeTab() === 'funnel'"
+          [class.border-transparent]="activeTab() !== 'funnel'"
+          [class.text-[rgb(var(--color-text-muted))]]="activeTab() !== 'funnel'"
+          [class.hover:text-[rgb(var(--color-text-base))]]="activeTab() !== 'funnel'"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+          </svg>
+          CPF Funnel
+        </button>
       </div>
 
-      <!-- Address Bar -->
-      <div class="flex-1 h-full flex items-center px-4 gap-2">
-        <svg class="w-4 h-4 text-[rgb(var(--color-text-dim))] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
-        </svg>
-        <div class="flex-1 flex items-center h-7 bg-[rgb(var(--color-background))] border border-[rgb(var(--color-border-muted))] rounded-md px-2.5 text-sm min-w-0">
-          <span class="text-xs font-medium text-[rgb(var(--color-text-muted))] truncate">
-            Nebula Requirements
-            <span class="text-[rgb(var(--color-text-subtle))] ml-1">({{ totalCount() }})</span>
-          </span>
-        </div>
-      </div>
+      <div class="flex-1"></div>
 
       <!-- Refresh -->
       <button
@@ -57,72 +73,219 @@
       </button>
     </div>
 
-    <!-- Kanban Columns (scrollable horizontally) -->
-    <div class="flex-1 overflow-x-auto overflow-y-auto">
-      <div class="grid grid-cols-8 gap-0 h-full min-w-[1600px]">
-        @for (col of columns; track col) {
-          <div
-            class="flex flex-col border-r border-[rgb(var(--color-border-base))] last:border-r-0 h-full"
-            (dragover)="onDragOver($event)"
-            (drop)="onDrop(col, $event)"
-          >
-            <!-- Column Header -->
-            <div class="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
-              <span class="text-xs font-semibold uppercase tracking-wider" [style.color]="columnColor(col)">
-                {{ columnLabel(col) }}
-              </span>
-              <span class="text-xs text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-background))] px-1.5 py-0.5 rounded-full">
-                {{ getRequirementsForColumn(col).length }}
-              </span>
-            </div>
-
-            <!-- Column Cards (scrollable vertically) -->
-            <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
-              @for (req of getRequirementsForColumn(col); track req.id) {
-                <div
-                  draggable="true"
-                  (dragstart)="onDragStart(req.id, $event)"
-                  (dragend)="onDragEnd()"
-                  class="group rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-card))] hover:border-[rgb(var(--color-accent-border))] hover:shadow-sm transition-all cursor-grab active:cursor-grabbing p-2.5"
-                  [class.opacity-40]="draggingReqId() === req.id"
-                >
-                  <!-- Title -->
-                  <div class="text-xs font-medium text-[rgb(var(--color-text-base))] leading-snug mb-1.5 line-clamp-2">
-                    {{ req.title }}
-                  </div>
-
-                  <!-- Badges -->
-                  <div class="flex items-center gap-1 flex-wrap mb-1.5">
-                    @if (req.reqType) {
-                      <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" [class]="typeBadge(req.reqType)">
-                        {{ req.reqType }}
-                      </span>
-                    }
-                    @if (req.priority && req.priority !== 'Medium') {
-                      <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" [class]="priorityBadge(req.priority)">
-                        {{ req.priority }}
-                      </span>
-                    }
-                  </div>
-
-                  <!-- Context path -->
-                  <div class="text-[10px] text-[rgb(var(--color-text-subtle))] truncate" [title]="nebula.getRequirementContext(req)">
-                    {{ nebula.getRequirementContext(req) }}
-                  </div>
+    <!-- Requirements Tab: Kanban Board + Right Detail Drawer -->
+    @if (activeTab() === 'requirements') {
+      <div class="flex-1 flex min-h-0 overflow-hidden">
+        <!-- Kanban Board -->
+        <div class="flex-1 overflow-x-auto overflow-y-auto">
+          <div class="grid grid-cols-8 gap-0 h-full min-w-[1600px]">
+            @for (col of columns; track col) {
+              <div
+                class="flex flex-col border-r border-[rgb(var(--color-border-base))] last:border-r-0 h-full"
+                (dragover)="onDragOver($event)"
+                (drop)="onDrop(col, $event)"
+              >
+                <!-- Column Header -->
+                <div class="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                  <span class="text-xs font-semibold uppercase tracking-wider" [style.color]="columnColor(col)">
+                    {{ columnLabel(col) }}
+                  </span>
+                  <span class="text-xs text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-background))] px-1.5 py-0.5 rounded-full">
+                    {{ getRequirementsForColumn(col).length }}
+                  </span>
                 </div>
-              }
 
-              <!-- Empty column placeholder -->
-              @if (getRequirementsForColumn(col).length === 0) {
-                <div class="flex items-center justify-center h-20 text-[10px] text-[rgb(var(--color-text-subtle))] italic">
-                  No items
+                <!-- Column Cards (scrollable vertically) -->
+                <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+                  @for (req of getRequirementsForColumn(col); track req.id) {
+                    <div
+                      draggable="true"
+                      (dragstart)="onDragStart(req.id, $event)"
+                      (dragend)="onDragEnd()"
+                      (click)="selectRequirement(req.id)"
+                      class="group rounded-md border transition-all p-2.5"
+                      [class]="selectedReqId() === req.id
+                        ? 'border-[rgb(var(--color-accent-border))] ring-1 ring-[rgb(var(--color-accent-ring))] bg-[rgb(var(--color-surface-muted))]'
+                        : 'border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-card))] hover:border-[rgb(var(--color-accent-border))] hover:shadow-sm'"
+                      [style.cursor]="draggingReqId() === req.id ? 'grabbing' : 'pointer'"
+                      [class.opacity-40]="draggingReqId() === req.id"
+                    >
+                      <!-- Title -->
+                      <div class="text-xs font-medium text-[rgb(var(--color-text-base))] leading-snug mb-1.5 line-clamp-2">
+                        {{ req.title }}
+                      </div>
+
+                      <!-- Badges -->
+                      <div class="flex items-center gap-1 flex-wrap mb-1.5">
+                        @if (req.reqType) {
+                          <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" [class]="typeBadge(req.reqType)">
+                            {{ req.reqType }}
+                          </span>
+                        }
+                        @if (req.priority && req.priority !== 'Medium') {
+                          <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" [class]="priorityBadge(req.priority)">
+                            {{ req.priority }}
+                          </span>
+                        }
+                      </div>
+
+                      <!-- Context path -->
+                      <div class="text-[10px] text-[rgb(var(--color-text-subtle))] truncate" [title]="nebula.getRequirementContext(req)">
+                        {{ nebula.getRequirementContext(req) }}
+                      </div>
+                    </div>
+                  }
+
+                  <!-- Empty column placeholder -->
+                  @if (getRequirementsForColumn(col).length === 0) {
+                    <div class="flex items-center justify-center h-20 text-[10px] text-[rgb(var(--color-text-subtle))] italic">
+                      No items
+                    </div>
+                  }
                 </div>
-              }
-            </div>
+              </div>
+            }
           </div>
-        }
+        </div>
+
+        <!-- Right Detail Drawer (always rendered; width animates via CSS transitions) -->
+        <div
+          class="flex-shrink-0 flex flex-col overflow-hidden border-l transition-all duration-200 ease-out"
+          [class.w-96]="selectedReqId() !== null"
+          [class.w-0]="selectedReqId() === null"
+          [class.opacity-100]="selectedReqId() !== null"
+          [class.opacity-0]="selectedReqId() === null"
+          [class.pointer-events-none]="selectedReqId() === null"
+          [style.border-color]="selectedReqId() !== null ? 'rgb(var(--color-border-base))' : 'transparent'"
+          [style.background-color]="selectedReqId() !== null ? 'rgb(var(--color-surface-card))' : 'transparent'"
+        >
+          @if (selectedRequirement(); as req) {
+            <!-- Drawer Header -->
+            <div class="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+              <span class="text-xs font-semibold text-[rgb(var(--color-text-base))] truncate pr-2">Requirement Details</span>
+              <button
+                (click)="closeDetailPanel()"
+                class="flex-shrink-0 p-1 rounded hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                title="Close panel"
+              >
+                <svg class="w-4 h-4 text-[rgb(var(--color-text-muted))]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Drawer Body (scrollable) -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-4">
+              <!-- Title -->
+              <div>
+                <h3 class="text-sm font-semibold text-[rgb(var(--color-text-base))] leading-snug">{{ req.title }}</h3>
+              </div>
+
+              <!-- Badges Row -->
+              <div class="flex items-center gap-2 flex-wrap">
+                @if (req.reqType) {
+                  <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" [class]="typeBadge(req.reqType)">
+                    {{ req.reqType }}
+                  </span>
+                }
+                @if (req.priority) {
+                  <span class="text-[10px] px-1.5 py-0.5 rounded font-medium" [class]="priorityBadge(req.priority)">
+                    {{ req.priority }}
+                  </span>
+                }
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-medium bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-muted))]">
+                  {{ req.status }}
+                </span>
+              </div>
+
+              <!-- Context Path -->
+              @if (selectedReqContext()) {
+                <div>
+                  <label class="text-[10px] uppercase tracking-wider font-semibold text-[rgb(var(--color-text-muted))] mb-1 block">Context</label>
+                  <div class="text-xs text-[rgb(var(--color-text-subtle))]">{{ selectedReqContext() }}</div>
+                </div>
+              }
+
+              <!-- Description -->
+              @if (req.description) {
+                <div>
+                  <label class="text-[10px] uppercase tracking-wider font-semibold text-[rgb(var(--color-text-muted))] mb-1 block">Description</label>
+                  <p class="text-xs text-[rgb(var(--color-text-base))] leading-relaxed whitespace-pre-wrap">{{ req.description }}</p>
+                </div>
+              }
+
+              <!-- Acceptance Criteria -->
+              @if (req.acceptanceCriteria && req.acceptanceCriteria.length > 0) {
+                <div>
+                  <label class="text-[10px] uppercase tracking-wider font-semibold text-[rgb(var(--color-text-muted))] mb-1 block">
+                    Acceptance Criteria ({{ req.acceptanceCriteria.length }})
+                  </label>
+                  <ul class="space-y-1">
+                    @for (criterion of req.acceptanceCriteria; track $index) {
+                      <li class="flex items-start gap-2 text-xs text-[rgb(var(--color-text-base))]">
+                        <span class="mt-0.5 text-[rgb(var(--color-text-subtle))]">•</span>
+                        <span>{{ criterion }}</span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+
+              <!-- Metadata -->
+              @if (req.createdAt || req.startDate || req.completionDate) {
+                <div class="pt-2 border-t border-[rgb(var(--color-border-base))]">
+                  <label class="text-[10px] uppercase tracking-wider font-semibold text-[rgb(var(--color-text-muted))] mb-2 block">Timeline</label>
+                  <div class="space-y-1.5">
+                    @if (req.createdAt) {
+                      <div class="flex items-center justify-between">
+                        <span class="text-[10px] text-[rgb(var(--color-text-muted))]">Created</span>
+                        <span class="text-[10px] text-[rgb(var(--color-text-subtle))]">{{ req.createdAt | date:'mediumDate' }}</span>
+                      </div>
+                    }
+                    @if (req.startDate) {
+                      <div class="flex items-center justify-between">
+                        <span class="text-[10px] text-[rgb(var(--color-text-muted))]">Started</span>
+                        <span class="text-[10px] text-[rgb(var(--color-text-subtle))]">{{ req.startDate | date:'mediumDate' }}</span>
+                      </div>
+                    }
+                    @if (req.completionDate) {
+                      <div class="flex items-center justify-between">
+                        <span class="text-[10px] text-[rgb(var(--color-text-muted))]">Completed</span>
+                        <span class="text-[10px] text-[rgb(var(--color-text-subtle))]">{{ req.completionDate | date:'mediumDate' }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+
+              <!-- IDs -->
+              <div class="pt-2 border-t border-[rgb(var(--color-border-base))]">
+                <label class="text-[10px] uppercase tracking-wider font-semibold text-[rgb(var(--color-text-muted))] mb-2 block">IDs</label>
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[10px] text-[rgb(var(--color-text-muted))]">Requirement ID</span>
+                    <span class="text-[10px] text-[rgb(var(--color-text-subtle))] font-mono">{{ req.id | slice:0:8 }}…</span>
+                  </div>
+                  @if (req.candidateId) {
+                    <div class="flex items-center justify-between">
+                      <span class="text-[10px] text-[rgb(var(--color-text-muted))]">Candidate ID</span>
+                      <span class="text-[10px] text-[rgb(var(--color-text-subtle))] font-mono">{{ req.candidateId | slice:0:8 }}…</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
       </div>
-    </div>
+    }
+
+    <!-- Funnel Tab: CPF Funnel View -->
+    @if (activeTab() === 'funnel') {
+      <div class="flex-1 overflow-auto">
+        <app-cpf-funnel></app-cpf-funnel>
+      </div>
+    }
   }
   <!-- Not connected (initial state) -->
   @else {

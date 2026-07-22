@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS knowledge.graph_entities (
     status          TEXT,                    -- 'status' for actors and decisions
     description     TEXT,                    -- extracted description text for embedding
     properties      JSONB NOT NULL DEFAULT '{}',  -- the full original JSON payload
-    embedding       VECTOR(1536),            -- pgvector: OpenAI ada-002 / nomic-embed-text compatible
     source_file     TEXT,                    -- which graph file this came from (for multi-source tracking)
     checksum        TEXT,                    -- SHA256 of properties JSON for integrity
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -39,7 +38,10 @@ CREATE TABLE IF NOT EXISTS knowledge.graph_edges (
 
     -- Quick lookup: all edges from/to an entity
     FOREIGN KEY (source_section, source_id) REFERENCES knowledge.graph_entities(section, entity_id) ON DELETE CASCADE,
-    FOREIGN KEY (target_section, target_id) REFERENCES knowledge.graph_entities(section, entity_id) ON DELETE CASCADE
+    FOREIGN KEY (target_section, target_id) REFERENCES knowledge.graph_entities(section, entity_id) ON DELETE CASCADE,
+
+    -- Prevent duplicate edges
+    UNIQUE (source_section, source_id, relation_type, target_section, target_id)
 );
 
 -- ── Cross-reference table: section-to-section link maps ──────────────
@@ -81,12 +83,6 @@ CREATE INDEX IF NOT EXISTS idx_graph_edges_source_relation ON knowledge.graph_ed
 
 CREATE INDEX IF NOT EXISTS idx_graph_cross_refs_map ON knowledge.graph_cross_references(map_name);
 
--- pgvector index for semantic search
--- Use cosine distance by default; switch to L2 or IP depending on embedding model
-CREATE INDEX IF NOT EXISTS idx_graph_entities_embedding ON knowledge.graph_entities
-    USING ivfflat (embedding vector_cosine_ops)
-    WITH (lists = 100);
-
 -- ── Views for common query patterns ────────────────────────────────
 
 -- All edges for a given entity (by section:id)
@@ -111,23 +107,24 @@ LEFT JOIN knowledge.graph_edges g ON g.source_section = e.section AND g.source_i
 LEFT JOIN knowledge.graph_edges g2 ON g2.target_section = e.section AND g2.target_id = e.entity_id
 GROUP BY e.id, e.section, e.entity_id, e.name;
 
--- Full graph summary
+-- Full graph summary (counts entities with embeddings in graph_entity_embeddings)
 CREATE OR REPLACE VIEW knowledge.v_graph_summary AS
 SELECT
-    section,
-    count(*) AS entity_count,
-    count(*) FILTER (WHERE embedding IS NOT NULL) AS embedded_count
-FROM knowledge.graph_entities
-GROUP BY section
-ORDER BY section;
+    e.section,
+    count(DISTINCT e.entity_id) AS entity_count,
+    count(DISTINCT em.kg_entity_id) AS embedded_count
+FROM knowledge.graph_entities e
+LEFT JOIN knowledge.graph_entity_embeddings em
+    ON e.entity_id = em.kg_entity_id AND e.section = em.section
+GROUP BY e.section
+ORDER BY e.section;
 
--- ── Helper: semantic search ───────────────────────────────────────
--- Usage: SELECT * FROM knowledge.semantic_search('governance kernel', 10);
--- Note: this function is a STUB. Application-layer code must provide
--- the query embedding and replace the zero-vector parameter.
--- Until then, run:   SELECT * FROM semantic_search() WHERE false;
+-- ── Semantic search ───────────────────────────────────────────────
+-- Usage: SELECT * FROM knowledge.semantic_search($1::vector, 10);
+-- Note: query_embedding must be a 768-dim vector (nomic-embed-text).
+-- Embedding is done at the application layer via Ollama.
 CREATE OR REPLACE FUNCTION knowledge.semantic_search(
-    query_text TEXT DEFAULT NULL,
+    query_embedding VECTOR(768),
     result_limit INTEGER DEFAULT 10,
     target_section TEXT DEFAULT NULL
 )
@@ -140,29 +137,19 @@ RETURNS TABLE(
 )
 LANGUAGE plpgsql
 AS $$
-DECLARE
-    zero_vec VECTOR(1536);
 BEGIN
-    -- Build a zero vector of the correct dimension for placeholder
-    SELECT array_fill(0::real, ARRAY[1536])::vector(1536) INTO zero_vec;
-
-    -- Embedding generation happens outside SQL (application layer).
-    -- This function expects the caller to provide the query embedding
-    -- via the zero_vec placeholder (or a proper parameter in production).
     RETURN QUERY
     SELECT
         ge.section,
-        ge.entity_id,
+        ge.kg_entity_id,
         ge.name,
-        ge.description,
-        (1 - (ge.embedding <=> zero_vec))::real AS similarity
-    FROM knowledge.graph_entities ge
+        ge.embed_text,
+        (1 - (ge.embedding <=> query_embedding))::real AS similarity
+    FROM knowledge.graph_entity_embeddings ge
     WHERE
         (target_section IS NULL OR ge.section = target_section)
-        AND ge.embedding IS NOT NULL
-        AND query_text IS NOT NULL  -- return empty until caller provides real embedding
     ORDER BY
-        ge.embedding <=> zero_vec
+        ge.embedding <=> query_embedding
     LIMIT result_limit;
 END;
 $$;

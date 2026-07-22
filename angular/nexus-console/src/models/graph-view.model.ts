@@ -18,6 +18,7 @@ export interface GraphView {
     camera2TargetY: number;
     camera2TargetZ: number;
     isDefault?: boolean;
+    /** Connections persisted as a relational array. */
     connections?: ConnectionData[];
     positions?: GraphViewPosition[];
     createdAt?: string;

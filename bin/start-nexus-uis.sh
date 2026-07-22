@@ -29,8 +29,9 @@ UI_NAMES=(
     "nebula-ui"
     "duality-ui"
     "plurality-ui"
-    "nexus-assembly"
+    "angular-assembly"
     "cascade-ui"
+    "execution-ui"
     "view-architect"
 )
 
@@ -54,9 +55,9 @@ UI_PATHS[duality-ui]="nexus/angular/duality-ui"
 UI_COMMANDS[duality-ui]="npm run dev"
 UI_PORTS[duality-ui]=3002
 
-UI_PATHS[nexus-assembly]="nexus-assembly"
-UI_COMMANDS[nexus-assembly]="npm run dev"
-UI_PORTS[nexus-assembly]=9003
+UI_PATHS[angular-assembly]="nexus/angular/assembly"
+UI_COMMANDS[angular-assembly]="npm run dev"
+UI_PORTS[angular-assembly]=4204
 
 UI_PATHS[cascade-ui]="nexus/angular/cascade-ui"
 UI_COMMANDS[cascade-ui]="npm start"
@@ -65,6 +66,10 @@ UI_PORTS[cascade-ui]=4203
 UI_PATHS[plurality-ui]="nexus/angular/plurality-ui"
 UI_COMMANDS[plurality-ui]="npm run dev"
 UI_PORTS[plurality-ui]=3004
+
+UI_PATHS[execution-ui]="nexus/angular/execution-ui"
+UI_COMMANDS[execution-ui]="npm run dev"
+UI_PORTS[execution-ui]=4205
 
 UI_PATHS[view-architect]="nexus/angular/view-architect"
 UI_COMMANDS[view-architect]="npm run dev"

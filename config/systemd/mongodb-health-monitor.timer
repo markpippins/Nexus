@@ -1,0 +1,14 @@
+[Unit]
+Description=MongoDB Health Monitor timer — checks MongoDB every 30s
+Documentation=https://github.com/codex/nexus/wiki/mongodb-health-monitor
+After=network.target mongodb.service
+Wants=mongodb.service
+
+[Timer]
+OnBootSec=10s
+OnUnitActiveSec=30s
+Persistent=true
+RandomizedDelaySec=5s
+
+[Install]
+WantedBy=timers.target

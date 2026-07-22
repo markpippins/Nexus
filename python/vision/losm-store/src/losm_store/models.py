@@ -32,7 +32,7 @@ class ArtifactType(str, Enum):
 # ── PlanningTask (view: work_requests) ──────────────────────────────────────
 
 class PlanningTask(Base):
-    __tablename__ = "work_requests"
+    __tablename__ = "work_requests_losm"
     __table_args__ = _table_args()
 
     id = Column(Integer, primary_key=True, autoincrement=True)

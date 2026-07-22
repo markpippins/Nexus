@@ -49,7 +49,7 @@ import uuid as uuidlib
 from datetime import datetime
 from typing import Any
 
-from event_emitter import emit_requirement_promoted
+from event_emitter import emit_requirement_promoted_to_plan
 
 log = logging.getLogger("req_compiler")
 
@@ -750,10 +750,9 @@ def compile_requirement(
 
         # Cascade event: requirement.promoted_to_plan
         try:
-            emit_requirement_promoted(
+            emit_requirement_promoted_to_plan(
                 requirement_id=req_id,
                 plan_id=impl_plan_id,
-                title=normalized.get("title", ""),
                 source="rover.req_compiler",
             )
         except Exception as e:
@@ -797,7 +796,7 @@ def main():
     log.info("=" * 60)
     log.info("Requirement → WorkRequest Compilation Pipeline")
     log.info("Time: %s", datetime.now().isoformat())
-    log.info("Mode: %s", "DRY RUN" if args.dry_run else ("STAGE 1 ONLY" if args.stage1_only else "FULL"))
+    log.info("Mode: %s", "DRY RUN" if args.dry_run else ("STAGE 1 ONLY" if args.stage_1_only else "FULL"))
     log.info("=" * 60)
 
     result = compile_requirement(

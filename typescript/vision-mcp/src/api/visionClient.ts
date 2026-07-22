@@ -3,8 +3,8 @@
  * All vision-mcp tools proxy through this client to vision-srv.
  *
  * Configuration (all optional, environment-driven):
- *   - VISION_SRV_URL                     — full base URL of vision-srv.
- *                                          Default: http://localhost:3104.
+ *   - VISION_SRV_URL                     — full base URL of vision-srv-py.
+ *                                          Default: http://localhost:8003.
  *                                          Both http:// and https:// are
  *                                          supported; the client dispatches
  *                                          to the matching Node transport.
@@ -13,7 +13,7 @@
  *                                          self-signed certificates.
  *
  * Override examples:
- *   VISION_SRV_URL=http://localhost:3104 \
+ *   VISION_SRV_URL=http://localhost:8003 \
  *     npx tsx src/index.ts
  *   VISION_SRV_URL=https://vision.internal:8443 \
  *     VISION_SRV_TLS_REJECT_UNAUTHORIZED=false \
@@ -40,7 +40,7 @@ function parseBaseUrl(raw: string): URL {
 }
 
 const BASE_URL = parseBaseUrl(
-  process.env.VISION_SRV_URL ?? "http://localhost:3104",
+  process.env.VISION_SRV_URL ?? "http://localhost:8003",
 );
 const USE_HTTPS = BASE_URL.protocol === "https:";
 const REJECT_UNAUTHORIZED =

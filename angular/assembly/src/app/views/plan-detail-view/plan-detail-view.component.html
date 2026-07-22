@@ -1,0 +1,99 @@
+<div class="max-w-4xl mx-auto">
+  <div *ngIf="loading()" class="space-y-4">
+    <div class="app-panel p-4 space-y-2">
+      <app-skeleton width="40%" height="1rem"></app-skeleton>
+      <app-skeleton width="20%" height="0.75rem"></app-skeleton>
+    </div>
+    <div class="app-panel p-4 space-y-3">
+      <app-skeleton width="30%" height="0.75rem"></app-skeleton>
+      <app-skeleton width="100%" height="0.875rem"></app-skeleton>
+    </div>
+  </div>
+
+  <app-error-state *ngIf="error() && !loading()" title="Failed to load plan" [description]="error()!" (retry)="retry()"></app-error-state>
+
+  <ng-container *ngIf="!loading() && !error() && plan()">
+    <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-3">
+      <a [routerLink]="['/plans']" class="hover:text-primary-700 transition-colors">Plans</a>
+      <span>/</span>
+      <span class="text-gray-700 dark:text-gray-300 font-medium truncate">{{ plan()!.title || 'Untitled' }}</span>
+    </div>
+
+    <div class="app-panel p-4 mb-4">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0 flex-1">
+          <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100">{{ plan()!.title || 'Untitled' }}</h1>
+          <div class="flex items-center gap-2 mt-2 flex-wrap">
+            <span class="font-mono text-xs text-gray-500 dark:text-gray-400">{{ plan()!.id.slice(0, 8) }}…</span>
+            <app-status-badge [status]="plan()!.status"></app-status-badge>
+          </div>
+        </div>
+        <app-raise-question objectType="plan" [objectId]="plan()!.id" [objectTitle]="plan()!.title || 'Untitled'"></app-raise-question>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="lg:col-span-2 space-y-4">
+        <div class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Goal</h2>
+          <div *ngIf="plan()!.goal; else noGoal" class="prose prose-sm max-w-none">
+            <app-markdown-renderer [content]="plan()!.goal || ''"></app-markdown-renderer>
+          </div>
+          <ng-template #noGoal>
+            <p class="text-sm text-gray-500 dark:text-gray-400">No goal recorded.</p>
+          </ng-template>
+        </div>
+
+        <div *ngIf="plan()!.content" class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Content</h2>
+          <div class="prose prose-sm max-w-none">
+            <app-markdown-renderer [content]="plan()!.content || ''"></app-markdown-renderer>
+          </div>
+        </div>
+
+        <div *ngIf="plan()!.acceptanceCriteria && plan()!.acceptanceCriteria !== '[]'" class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Acceptance Criteria</h2>
+          <pre class="bg-gray-50 dark:bg-steel-800/80 dark:text-steel-200 p-3 rounded text-xs font-mono overflow-auto max-h-64 whitespace-pre-wrap">{{ formatJson(parseJson(plan()!.acceptanceCriteria)) }}</pre>
+        </div>
+
+        <div *ngIf="plan()!.dependencies && plan()!.dependencies !== '[]'" class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Dependencies</h2>
+          <pre class="bg-gray-50 dark:bg-steel-800/80 dark:text-steel-200 p-3 rounded text-xs font-mono overflow-auto max-h-64 whitespace-pre-wrap">{{ formatJson(parseJson(plan()!.dependencies)) }}</pre>
+        </div>
+
+        <div *ngIf="plan()!.filesAffected && plan()!.filesAffected !== '[]'" class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Files Affected</h2>
+          <pre class="bg-gray-50 dark:bg-steel-800/80 dark:text-steel-200 p-3 rounded text-xs font-mono overflow-auto max-h-64 whitespace-pre-wrap">{{ formatJson(parseJson(plan()!.filesAffected)) }}</pre>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <div class="app-panel p-4">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Plan Metadata</h2>
+          <div class="space-y-2 text-sm">
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Project:</span>
+              <span class="ml-1 text-gray-900 dark:text-gray-100">{{ plan()!.project || '—' }}</span>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">File:</span>
+              <span class="ml-1 font-mono text-xs text-gray-700 dark:text-gray-300">{{ plan()!.fileName || '—' }}</span>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Prompt Ref:</span>
+              <span class="ml-1 text-gray-900 dark:text-gray-100">{{ plan()!.promptRef || '—' }}</span>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Created:</span>
+              <span class="ml-1 text-gray-900 dark:text-gray-100">{{ plan()!.createdAt | date:'medium' }}</span>
+            </div>
+            <div>
+              <span class="text-gray-500 dark:text-gray-400">Updated:</span>
+              <span class="ml-1 text-gray-900 dark:text-gray-100">{{ plan()!.updatedAt | date:'medium' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>

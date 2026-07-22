@@ -4,14 +4,15 @@
 This script runs the Planner's backlog grooming cycle:
 1. Scan candidates for CPF assessment
 2. Compute CPF scores
-3. Generate open questions for gaps
-4. Emit cascade events at each decision point
+3. Check knowledge graph for completion evidence (via MCP server)
+4. Generate open questions from CPF gaps AND evidence
+5. Emit cascade events at each decision point
 
 Events emitted:
   - candidate.assessed — CPF scoring completed
-  - question.created — open question generated from CPF gaps
-  - candidate.greenlit — ready for promotion (CPF >= 0.7, risk != CRITICAL)
-  - candidate.escalated — needs human review (risk == CRITICAL)
+  - question.created — open question generated from CPF gaps or evidence
+  - candidate.greenlit — ready for promotion (CPF >= 0.7, risk != CRITICAL, no evidence)
+  - candidate.escalated — needs human review (risk == CRITICAL OR evidence found)
 
 Usage:
     cd /home/codex/dev/nexus/python/rover
@@ -43,6 +44,12 @@ from event_emitter import (
     emit_candidate_greenlit,
     emit_question_created,
     emit_ripple_assessed,
+)
+from planner_mcp_server import (
+    assess_candidate_relevance,
+    write_duplicate_question,
+    write_evidence_question,
+    get_candidate_questions,
 )
 
 log = logging.getLogger("planner")
@@ -103,7 +110,6 @@ def assess_candidate(candidate_id: str, dry_run: bool = False) -> dict | None:
     )
     
     if not dry_run:
-        # Emit candidate.assessed event
         emit_candidate_assessed(
             candidate_id=candidate_id,
             cpf_score=score,
@@ -114,12 +120,58 @@ def assess_candidate(candidate_id: str, dry_run: bool = False) -> dict | None:
     return assessment
 
 
+def check_linked_evidence(candidate_id: str) -> dict:
+    """Check if there are agent_records linked to this candidate via cross_references.
+    
+    Returns dict with linked record count and titles, so the Planner can skip
+    questions when evidence already exists.
+    """
+    sql = f"""
+        SELECT count(*)::int as cnt,
+               array_agg(ar.title ORDER BY ar.created_at DESC) as titles
+        FROM nebula.cross_references cr
+        JOIN nebula.agent_records ar ON ar.id::text = cr.source_id
+        WHERE cr.target_id = '{candidate_id}'
+          AND cr.target_type = 'harvest_candidate'
+          AND cr.source_type = 'agent_record'
+          AND cr.rel_type = 'ag:evidences_candidate';
+    """
+    rc, out = psql(sql)
+    
+    if rc != 0 or not out:
+        return {"count": 0, "titles": []}
+    
+    try:
+        parts = out.split("|")
+        count = int(parts[0]) if parts[0] else 0
+        titles_str = parts[1] if len(parts) > 1 else ""
+        # Parse PostgreSQL array format {title1,title2,...}
+        titles = [t.strip() for t in titles_str.strip('{}').split(',') if t.strip()]
+        return {"count": count, "titles": titles}
+    except Exception:
+        return {"count": 0, "titles": []}
+
+
 def create_questions(candidate_id: str, assessment: dict, dry_run: bool = False) -> list[dict]:
-    """Generate open questions from CPF gaps."""
+    """Generate open questions from CPF gaps.
+    
+    Skips has_artifacts questions when linked agent_records exist
+    (evidence from history ingestion).
+    """
     questions = assessment.get("suggested_questions", [])
     
     if not questions:
         log.info("  No gaps — candidate is ready")
+        return []
+    
+    # Check for linked evidence — skip has_artifacts if records exist
+    linked = check_linked_evidence(candidate_id)
+    if linked["count"] > 0:
+        log.info("  Found %d linked agent_records — skipping has_artifacts questions", linked["count"])
+        questions = [q for q in questions if q.get("component") != "has_artifacts"]
+    
+    if not questions:
+        log.info("  All gaps answered by linked evidence")
         return []
     
     log.info("  Creating %d open questions...", len(questions))
@@ -131,39 +183,164 @@ def create_questions(candidate_id: str, assessment: dict, dry_run: bool = False)
             created.append(q)
             continue
         
-        # Insert into database
-        sql = f"""
-            INSERT INTO nebula.open_questions (
-                requirement_id, title, description, category, status, blocking, created_by
-            ) VALUES (
-                NULL,
-                '{q["question"].replace("'", "''")}',
-                'Auto-generated from CPF assessment. Component: {q["component"]}.',
-                '{q["category"]}',
-                'OPEN',
-                true,
-                'planner'
-            )
-            RETURNING id;
-        """
-        rc, out = psql(sql)
+        # Use MCP server's write functions for idempotent creation
+        try:
+            if q.get("category") == "DUPLICATE_DETECTED":
+                question_id = write_duplicate_question(
+                    candidate_id=candidate_id,
+                    duplicate_of_title=q.get("component", "unknown"),
+                    duplicate_of_id="",
+                    source="cpf_assessment",
+                )
+            elif q.get("category") in ("WORK_COMPLETED", "DUPLICATE_CANDIDATE"):
+                question_id = write_evidence_question(
+                    candidate_id=candidate_id,
+                    evidence_type=q.get("category", "unknown"),
+                    evidence_title=q.get("question", "")[:100],
+                    evidence_id="",
+                    confidence="medium",
+                )
+            else:
+                # Generic question — write directly
+                sql = f"""
+                    INSERT INTO nebula.open_questions (
+                        requirement_id, candidate_id, title, description,
+                        category, status, blocking, created_by
+                    ) VALUES (
+                        NULL, '{candidate_id}'::uuid,
+                        '{q["question"].replace("'", "''")}',
+                        'Auto-generated from CPF assessment. Component: {q.get("component", "unknown")}.',
+                        '{q.get("category", "GENERAL")}',
+                        'OPEN', true, 'planner'
+                    )
+                    RETURNING id;
+                """
+                rc, out = psql(sql)
+                question_id = out.strip() if rc == 0 and out else None
+            
+            if question_id:
+                log.info("    Created question: %s", question_id[:8])
+                emit_question_created(
+                    question_id=question_id,
+                    candidate_id=candidate_id,
+                    category=q.get("category", "GENERAL"),
+                    title=q["question"],
+                    causation_id=None,
+                )
+                created.append({"id": question_id, **q})
+            else:
+                log.error("    Failed to create question: %s", q["question"][:40])
+        except Exception as e:
+            log.error("    Error creating question: %s", e)
+    
+    return created
+
+
+def check_knowledge_graph_evidence(candidate_id: str, dry_run: bool = False) -> dict:
+    """Check knowledge graph for completion evidence via MCP server.
+    
+    Returns evidence dict with recommendation (clear/escalate/block).
+    """
+    log.info("  Checking knowledge graph for completion evidence...")
+    
+    try:
+        result = assess_candidate_relevance(candidate_id, write_questions=False)
+        evidence = json.loads(result) if isinstance(result, str) else result
+    except Exception as e:
+        log.warning("  Evidence check failed: %s", e)
+        return {"recommendation": "clear", "signals": {}}
+    
+    recommendation = evidence.get("recommendation", "clear")
+    has_completion = evidence.get("has_completion_evidence", False)
+    has_duplicates = evidence.get("has_duplicate_candidates", False)
+    has_overlaps = evidence.get("has_work_request_overlaps", False)
+    
+    log.info("  Evidence: completion=%s, duplicates=%s, overlaps=%s → %s",
+             has_completion, has_duplicates, has_overlaps, recommendation)
+    
+    return {
+        "recommendation": recommendation,
+        "has_completion_evidence": has_completion,
+        "has_duplicate_candidates": has_duplicates,
+        "has_work_request_overlaps": has_overlaps,
+        "completion": evidence.get("completion", {}),
+        "duplicates": evidence.get("duplicates", {}),
+        "overlaps": evidence.get("overlaps", {}),
+    }
+
+
+def create_evidence_questions(candidate_id: str, evidence: dict, dry_run: bool = False) -> list[dict]:
+    """Create open questions from knowledge graph evidence via MCP server.
+    
+    If evidence suggests work is completed, create blocking questions.
+    """
+    recommendation = evidence.get("recommendation", "clear")
+    
+    if recommendation == "clear":
+        return []
+    
+    questions = []
+    
+    # Create question for each evidence type
+    if evidence.get("completion", {}).get("evidence", 0) > 0:
+        ev = evidence["completion"]["evidence"][0] if evidence["completion"].get("evidence") else {}
+        questions.append({
+            "question": f"Similar work found: {ev.get('title', 'unknown')} — is this a duplicate?",
+            "category": "WORK_COMPLETED",
+            "evidence_type": "work_request",
+        })
+    
+    if evidence.get("duplicates", {}).get("duplicates", 0) > 0:
+        dup = evidence["duplicates"]["duplicates"][0] if evidence["duplicates"].get("duplicates") else {}
+        questions.append({
+            "question": f"Candidate '{dup.get('title', 'unknown')}' already promoted — is this a duplicate?",
+            "category": "DUPLICATE_CANDIDATE",
+            "evidence_type": "candidate",
+        })
+    
+    if evidence.get("overlaps", {}).get("overlaps", 0) > 0:
+        overlap = evidence["overlaps"]["overlaps"][0] if evidence["overlaps"].get("overlaps") else {}
+        questions.append({
+            "question": f"WorkRequest '{overlap.get('title', 'unknown')}' completed — is this work already done?",
+            "category": "WORK_COMPLETED",
+            "evidence_type": "work_request",
+        })
+    
+    if not questions:
+        return []
+    
+    log.info("  Creating %d evidence questions...", len(questions))
+    created = []
+    
+    for q in questions:
+        if dry_run:
+            log.info("    [DRY RUN] Would create: %s (%s)", q["question"][:60], q["category"])
+            created.append(q)
+            continue
         
-        if rc == 0 and out:
-            question_id = out.strip()
-            log.info("    Created question: %s", question_id[:8])
-            
-            # Emit question.created event
-            emit_question_created(
-                question_id=question_id,
+        try:
+            question_id = write_evidence_question(
                 candidate_id=candidate_id,
-                category=q["category"],
-                title=q["question"],
-                causation_id=None,  # Would need to track from assess event
+                evidence_type=q.get("evidence_type", "unknown"),
+                evidence_title=q["question"][:100],
+                evidence_id="",
+                confidence="medium",
             )
             
-            created.append({"id": question_id, **q})
-        else:
-            log.error("    Failed to create question: %s", q["question"][:40])
+            if question_id:
+                log.info("    Created question: %s", question_id[:8])
+                emit_question_created(
+                    question_id=question_id,
+                    candidate_id=candidate_id,
+                    category=q["category"],
+                    title=q["question"],
+                    causation_id=None,
+                )
+                created.append({"id": question_id, **q})
+            else:
+                log.error("    Failed to create question: %s", q["question"][:40])
+        except Exception as e:
+            log.error("    Error creating question: %s", e)
     
     return created
 
@@ -204,7 +381,6 @@ def promote_candidate(candidate_id: str, assessment: dict, risk_level: str, dry_
         log.info("  [DRY RUN] Would promote %s (CPF=%.3f, risk=%s)", candidate_id[:8], score, risk_level)
         return True
     
-    # Emit candidate.greenlit event
     event_id = emit_candidate_greenlit(
         candidate_id=candidate_id,
         cpf_score=score,
@@ -224,7 +400,6 @@ def escalate_candidate(candidate_id: str, assessment: dict, risk_level: str, rea
                  candidate_id[:8], score, risk_level, reason[:40])
         return True
     
-    # Emit candidate.escalated event
     emit_candidate_escalated(
         candidate_id=candidate_id,
         cpf_score=score,
@@ -275,10 +450,8 @@ def run_grooming_cycle(args):
     log.info("=" * 60)
     
     if args.candidate:
-        # Assess single candidate
         candidates = [{"id": args.candidate, "title": "manual"}]
     else:
-        # Get candidates for grooming
         candidates = get_candidates_for_grooming(args.limit)
         log.info("Candidates for grooming: %d", len(candidates))
     
@@ -286,7 +459,14 @@ def run_grooming_cycle(args):
         log.info("Nothing to groom.")
         return
     
-    stats = {"assessed": 0, "questions_created": 0, "greenlit": 0, "escalated": 0}
+    stats = {
+        "assessed": 0, 
+        "questions_created": 0, 
+        "evidence_questions_created": 0,
+        "greenlit": 0, 
+        "escalated": 0,
+        "blocked_by_evidence": 0,
+    }
     
     for c in candidates:
         cid = c["id"]
@@ -302,16 +482,34 @@ def run_grooming_cycle(args):
         score = assessment.get("score", 0)
         promotable = assessment.get("promotable", False)
         
-        # 2. Generate questions for gaps
+        # 2. Check knowledge graph for completion evidence (via MCP server)
+        evidence = check_knowledge_graph_evidence(cid, args.dry_run)
+        evidence_recommendation = evidence.get("recommendation", "clear")
+        
+        # 3. Generate questions from CPF gaps
         if not args.no_questions:
             questions = create_questions(cid, assessment, args.dry_run)
             stats["questions_created"] += len(questions)
         
+        # 4. Generate questions from evidence (blocks promotion)
+        if evidence_recommendation != "clear" and not args.no_questions:
+            evidence_questions = create_evidence_questions(cid, evidence, args.dry_run)
+            stats["evidence_questions_created"] += len(evidence_questions)
+        
         if args.questions_only:
             continue
         
-        # 3. Decision point
+        # 5. Decision point
         if promotable:
+            # Evidence blocks promotion
+            if evidence_recommendation == "block":
+                escalate_candidate(cid, assessment, "UNKNOWN", 
+                                 f"Evidence suggests work is completed: {evidence}",
+                                 args.dry_run)
+                stats["escalated"] += 1
+                stats["blocked_by_evidence"] += 1
+                continue
+            
             # Check ripple assessment if requirement exists
             ripple = check_ripple_assessment(cid, args.dry_run)
             
@@ -339,8 +537,10 @@ def run_grooming_cycle(args):
     log.info("Grooming Summary:")
     log.info("  Assessed: %d", stats["assessed"])
     log.info("  Questions created: %d", stats["questions_created"])
+    log.info("  Evidence questions created: %d", stats["evidence_questions_created"])
     log.info("  Greenlit: %d", stats["greenlit"])
     log.info("  Escalated: %d", stats["escalated"])
+    log.info("  Blocked by evidence: %d", stats["blocked_by_evidence"])
     log.info("=" * 60)
 
 

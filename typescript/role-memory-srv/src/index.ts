@@ -72,13 +72,42 @@ async function main() {
   console.log("[role-memory-srv] PG connected.");
 
   console.log("[role-memory-srv] Connecting to Redis...");
-  initRedis();
+  const redis = initRedis();
+
+  // Auto-heal: ioredis emits "ready" on both initial connect AND every
+  // reconnect after an outage (the retryStrategy in redis.ts always retries).
+  // Re-syncing on ready means the Redis cache repopulates automatically once
+  // Redis is back, without anyone needing to call POST /refresh. Fire-and-forget
+  // so the handler never blocks the event loop; errors are logged, not thrown.
+  // At boot this may race with the explicit syncAll() below — both write the
+  // same keys from the same PG source, so the double write is harmless.
+  redis.on("ready", () => {
+    syncAll()
+      .then((r) =>
+        console.log(
+          `[role-memory-srv] Auto-sync on Redis ready: ${r.procedures} procedures, ${r.roleIndices} role indices`
+        )
+      )
+      .catch((err: any) =>
+        console.warn(`[role-memory-srv] Auto-sync on Redis ready failed: ${err.message}`)
+      );
+  });
 
   console.log("[role-memory-srv] Running initial sync...");
-  const result = await syncAll();
-  console.log(
-    `[role-memory-srv] Sync complete: ${result.procedures} procedures, ${result.roleIndices} role indices`
-  );
+  try {
+    const result = await syncAll();
+    console.log(
+      `[role-memory-srv] Sync complete: ${result.procedures} procedures, ${result.roleIndices} role indices`
+    );
+  } catch (err: any) {
+    // Don't crash if Redis is down at boot — the retryStrategy in redis.ts
+    // will keep trying to reconnect, and POST /refresh can repopulate once
+    // Redis is available. Booting the HTTP server in a degraded state is
+    // more resilient than crash-looping.
+    console.warn(
+      `[role-memory-srv] Initial sync failed (Redis may be down): ${err.message}. Booting anyway; use POST /refresh once Redis reconnects.`
+    );
+  }
 
   app.listen(PORT, () => {
     console.log(`[role-memory-srv] Listening on port ${PORT}`);

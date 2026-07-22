@@ -1,9 +1,12 @@
 package com.aibizarchitect.nexus.v1.spring.atlas.controller;
 
 import com.aibizarchitect.nexus.v1.spring.atlas.entity.GraphView;
+import com.aibizarchitect.nexus.v1.spring.atlas.entity.GraphViewConnection;
 import com.aibizarchitect.nexus.v1.spring.atlas.entity.GraphViewPosition;
+import com.aibizarchitect.nexus.v1.spring.atlas.repository.GraphViewConnectionRepository;
 import com.aibizarchitect.nexus.v1.spring.atlas.repository.GraphViewPositionRepository;
 import com.aibizarchitect.nexus.v1.spring.atlas.repository.GraphViewRepository;
+import org.hibernate.Hibernate;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -21,10 +24,14 @@ public class GraphViewController {
 
     private final GraphViewRepository repository;
     private final GraphViewPositionRepository positionRepository;
+    private final GraphViewConnectionRepository connectionRepository;
 
-    public GraphViewController(GraphViewRepository repository, GraphViewPositionRepository positionRepository) {
+    public GraphViewController(GraphViewRepository repository,
+                               GraphViewPositionRepository positionRepository,
+                               GraphViewConnectionRepository connectionRepository) {
         this.repository = repository;
         this.positionRepository = positionRepository;
+        this.connectionRepository = connectionRepository;
     }
 
     /** List all views (positions are lazy — loaded on demand). */
@@ -34,15 +41,22 @@ public class GraphViewController {
         return ResponseEntity.ok(repository.findAll(pageable).getContent());
     }
 
-    /** Get a single view with its positions eager-loaded via EntityGraph. */
+    /** Get a single view with its positions and connections loaded. */
     @GetMapping("/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<GraphView> getById(@PathVariable("id") Long id) {
-        return repository.findWithPositionsById(id)
-                .map(ResponseEntity::ok)
+        return repository.findById(id)
+                .map(view -> {
+                    // Avoid MultipleBagFetchException: load each collection separately
+                    // within the same read-only transaction.
+                    Hibernate.initialize(view.getPositions());
+                    Hibernate.initialize(view.getConnections());
+                    return ResponseEntity.ok(view);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** Create a new view with optional positions. */
+    /** Create a new view with optional positions and connections. */
     @PostMapping
     @Transactional
     public GraphView create(@RequestBody GraphView view) {
@@ -50,6 +64,12 @@ public class GraphViewController {
         if (view.getPositions() != null) {
             for (GraphViewPosition pos : view.getPositions()) {
                 pos.setGraphView(view);
+            }
+        }
+        if (view.getConnections() != null) {
+            for (GraphViewConnection conn : view.getConnections()) {
+                conn.setId(null); // ensure treated as new, not detached
+                conn.setGraphView(view);
             }
         }
         // If this is the first view, make it default
@@ -84,8 +104,16 @@ public class GraphViewController {
                     existing.setCamera2TargetY(details.getCamera2TargetY());
                     existing.setCamera2TargetZ(details.getCamera2TargetZ());
 
-                    // Connections (JSON string stored in JSONB column)
-                    existing.setConnections(details.getConnections());
+                    // Replace connections (only if explicitly provided)
+                    if (details.getConnections() != null) {
+                        connectionRepository.deleteByGraphViewId(existing.getId());
+                        existing.getConnections().clear();
+                        for (GraphViewConnection conn : details.getConnections()) {
+                            conn.setId(null); // ensure treated as new, not detached
+                            conn.setGraphView(existing);
+                            existing.getConnections().add(conn);
+                        }
+                    }
 
                     // Replace positions (only if explicitly provided)
                     if (details.getPositions() != null) {

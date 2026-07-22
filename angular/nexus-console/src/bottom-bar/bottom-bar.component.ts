@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { EXTERNAL_SITES } from '../components/external-site-selector/external-site-selector.component.js';
 import { MessageBoxService } from '../services/message-box.service.js';
 
-export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'tackle-ui' | 'kanban' | 'cascade-ui';
+export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui';
 
 @Component({
   selector: 'app-bottom-bar',
@@ -34,7 +34,7 @@ export class BottomBarComponent {
 
   /** Open a new chat messagebox instance */
   openNewChat(): void {
-    this.mbox.open('Assistant');
+    this.mbox.open('Operator');
   }
 
   /** Emit aiconfigClick event */

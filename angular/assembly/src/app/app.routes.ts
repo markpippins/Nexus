@@ -1,0 +1,74 @@
+import { Routes } from '@angular/router';
+import { FeedViewComponent } from './views/feed-view/feed-view.component';
+import { ForumsViewComponent } from './views/forums-view/forums-view.component';
+import { ForumDetailViewComponent } from './views/forum-detail-view/forum-detail-view.component';
+import { ThreadDetailViewComponent } from './views/thread-detail-view/thread-detail-view.component';
+import { WorkRequestsViewComponent } from './views/work-requests-view/work-requests-view.component';
+import { RequirementsViewComponent } from './views/requirements-view/requirements-view.component';
+import { AgendasViewComponent } from './views/agendas-view/agendas-view.component';
+import { CandidatesViewComponent } from './views/candidates-view/candidates-view.component';
+import { HarvestsViewComponent } from './views/harvests-view/harvests-view.component';
+import { ConversationsViewComponent } from './views/conversations-view/conversations-view.component';
+import { OpenQuestionsViewComponent } from './views/open-questions-view/open-questions-view.component';
+import { ResolutionsViewComponent } from './views/resolutions-view/resolutions-view.component';
+import { IntentsViewComponent } from './views/intents-view/intents-view.component';
+import { AssessmentsViewComponent } from './views/assessments-view/assessments-view.component';
+import { ObservationsViewComponent } from './views/observations-view/observations-view.component';
+import { ReportsViewComponent } from './views/reports-view/reports-view.component';
+import { AgentRecordsViewComponent } from './views/agent-records-view/agent-records-view.component';
+import { SpecificationsViewComponent } from './views/specifications-view/specifications-view.component';
+import { SpecificationDetailViewComponent } from './views/specification-detail-view/specification-detail-view.component';
+import { EntityDetailViewComponent } from './views/entity-detail-view/entity-detail-view.component';
+import { PlansViewComponent } from './views/plans-view/plans-view.component';
+import { PlanDetailViewComponent } from './views/plan-detail-view/plan-detail-view.component';
+import { AgentsViewComponent } from './views/agents-view/agents-view.component';
+import { ProfileViewComponent } from './views/profile-view/profile-view.component';
+import { SettingsViewComponent } from './views/settings-view/settings-view.component';
+import { SpecsViewComponent } from './views/specs-view/specs-view.component';
+import { WorkRequestDetailViewComponent } from './views/work-request-detail-view/work-request-detail-view.component';
+import { SearchViewComponent } from './views/search-view/search-view.component';
+
+export const routes: Routes = [
+  { path: '', redirectTo: 'feed', pathMatch: 'full' },
+  { path: 'feed', component: FeedViewComponent },
+  { path: 'forums', component: ForumsViewComponent },
+  { path: 'forums/:slug', component: ForumDetailViewComponent },
+  { path: 'forums/:slug/:threadId', component: ThreadDetailViewComponent },
+  { path: 'work-requests', component: WorkRequestsViewComponent },
+  { path: 'work-requests/:id', component: WorkRequestDetailViewComponent },
+  { path: 'requirements', component: RequirementsViewComponent },
+  { path: 'requirements/:id', component: EntityDetailViewComponent },
+  { path: 'agendas', component: AgendasViewComponent },
+  { path: 'agendas/:id', component: EntityDetailViewComponent },
+  { path: 'candidates', component: CandidatesViewComponent },
+  { path: 'candidates/:id', component: EntityDetailViewComponent },
+  { path: 'harvests', component: HarvestsViewComponent },
+  { path: 'harvests/:id', component: EntityDetailViewComponent },
+  { path: 'conversations', component: ConversationsViewComponent },
+  { path: 'conversations/:id', component: EntityDetailViewComponent },
+  { path: 'open-questions', component: OpenQuestionsViewComponent },
+  { path: 'resolutions', component: ResolutionsViewComponent },
+  { path: 'open-questions/:id', component: EntityDetailViewComponent },
+  { path: 'intents', component: IntentsViewComponent },
+  { path: 'intents/:id', component: EntityDetailViewComponent },
+  { path: 'assessments', component: AssessmentsViewComponent },
+  { path: 'assessments/:id', component: EntityDetailViewComponent },
+  { path: 'observations', component: ObservationsViewComponent },
+  { path: 'observations/:id', component: EntityDetailViewComponent },
+  { path: 'reports', component: ReportsViewComponent },
+  { path: 'reports/:id', component: EntityDetailViewComponent },
+  { path: 'agent-records', component: AgentRecordsViewComponent },
+  { path: 'agent-records/:id', component: EntityDetailViewComponent },
+  { path: 'specifications', component: SpecificationsViewComponent },
+  { path: 'specifications/:id', component: SpecificationDetailViewComponent },
+  { path: 'plans', component: PlansViewComponent },
+  { path: 'plans/:id', component: PlanDetailViewComponent },
+  { path: 'agents', component: AgentsViewComponent },
+  { path: 'agents/:id', redirectTo: 'agent-records/:id', pathMatch: 'full' },
+  { path: 'specs', component: SpecsViewComponent },
+  { path: 'specs/:id', component: EntityDetailViewComponent },
+  { path: 'profile/:id', component: ProfileViewComponent },
+  { path: 'settings', component: SettingsViewComponent },
+  { path: 'search', component: SearchViewComponent },
+  { path: '**', redirectTo: 'feed' },
+];

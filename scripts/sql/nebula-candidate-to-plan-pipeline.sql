@@ -20,13 +20,13 @@ ALTER TABLE nebula.harvest_candidates
 
 ALTER TABLE nebula.harvest_candidates
   ADD CONSTRAINT harvest_candidates_status_check
-  CHECK (status IS NULL OR status IN ('pending', 'linked', 'useful', 'rejected', 'promoted'));
+  CHECK (status IS NULL OR status IN ('pending', 'linked', 'staged', 'rejected', 'promoted'));
 
 -- Backfill NULL statuses to 'pending'
 UPDATE nebula.harvest_candidates SET status = 'pending' WHERE status IS NULL;
 
 COMMENT ON COLUMN nebula.harvest_candidates.status IS
-    'Candidate lifecycle: pending → linked (to system) → useful (reviewed) → promoted (→ plan) | rejected (discarded)';
+    'Candidate lifecycle: pending → linked (to system) → staged (reviewed) → promoted (→ plan) | rejected (discarded)';
 
 -- Set candidate status with validation
 CREATE OR REPLACE FUNCTION nebula.set_candidate_status(
@@ -50,14 +50,14 @@ BEGIN
     END IF;
 
     -- Validate transitions
-    IF v_current_status = 'pending' AND p_new_status NOT IN ('linked', 'useful', 'rejected') THEN
-        RAISE EXCEPTION 'Invalid transition: pending → % (expected linked, useful, or rejected)', p_new_status;
+    IF v_current_status = 'pending' AND p_new_status NOT IN ('linked', 'staged', 'rejected') THEN
+        RAISE EXCEPTION 'Invalid transition: pending → % (expected linked, staged, or rejected)', p_new_status;
     END IF;
-    IF v_current_status = 'linked' AND p_new_status NOT IN ('useful', 'rejected') THEN
-        RAISE EXCEPTION 'Invalid transition: linked → % (expected useful or rejected)', p_new_status;
+    IF v_current_status = 'linked' AND p_new_status NOT IN ('staged', 'rejected') THEN
+        RAISE EXCEPTION 'Invalid transition: linked → % (expected staged or rejected)', p_new_status;
     END IF;
-    IF v_current_status = 'useful' AND p_new_status NOT IN ('promoted', 'rejected') THEN
-        RAISE EXCEPTION 'Invalid transition: useful → % (expected promoted or rejected)', p_new_status;
+    IF v_current_status = 'staged' AND p_new_status NOT IN ('promoted', 'rejected') THEN
+        RAISE EXCEPTION 'Invalid transition: staged → % (expected promoted or rejected)', p_new_status;
     END IF;
     IF v_current_status IN ('promoted', 'rejected') THEN
         RAISE EXCEPTION 'Candidate already in terminal state: %', v_current_status;
@@ -74,8 +74,8 @@ $$;
 
 COMMENT ON FUNCTION nebula.set_candidate_status(uuid, text) IS
     'Set candidate status with transition validation.
-     Valid: pending → linked|useful|rejected, linked → useful|rejected,
-            useful → promoted|rejected. promoted and rejected are terminal.';
+     Valid: pending → linked|staged|rejected, linked → staged|rejected,
+            staged → promoted|rejected. promoted and rejected are terminal.';
 
 -- Batch set status
 CREATE OR REPLACE FUNCTION nebula.set_candidate_status_batch(

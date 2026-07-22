@@ -1,0 +1,69 @@
+<div class="max-w-6xl mx-auto">
+  <app-page-header title="Requirements" description="Requirements tracked across systems." [count]="total()"></app-page-header>
+
+  <app-table-skeleton *ngIf="loading()" [cols]="5" [rows]="6"></app-table-skeleton>
+
+  <app-error-state *ngIf="error() && !loading()" title="Failed to load requirements" [description]="error()!" (retry)="retry()"></app-error-state>
+
+  <ng-container *ngIf="!loading() && !error()">
+    <app-empty-state *ngIf="items().length === 0" title="No requirements" description="Requirements will appear here once they are created."></app-empty-state>
+
+    <div *ngIf="items().length > 0" class="app-panel">
+      <div *ngIf="sortField()" class="px-4 pt-2 pb-0">
+        <button (click)="toggleSort('')" class="text-[11px] text-steel-400 hover:text-steel-600 dark:hover:text-steel-300 transition-colors">Clear sort</button>
+      </div>
+      <div class="overflow-x-auto">
+      <table class="app-table">
+      <thead>
+        <tr>
+          <th (click)="toggleSort('title')" class="cursor-pointer hover:text-primary-600 select-none">Title <span *ngIf="sortField() === 'title'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+          <th (click)="toggleSort('status')" class="w-24 cursor-pointer hover:text-primary-600 select-none">Status <span *ngIf="sortField() === 'status'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+          <th (click)="toggleSort('priority')" class="w-24 cursor-pointer hover:text-primary-600 select-none">Priority <span *ngIf="sortField() === 'priority'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+          <th class="w-24">Questions</th>
+          <th (click)="toggleSort('createdAt')" class="w-32 cursor-pointer hover:text-primary-600 select-none">Created <span *ngIf="sortField() === 'createdAt'" class="text-[10px]">{{ sortDir() === 'asc' ? '▲' : '▼' }}</span></th>
+          <th class="w-28 text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of sortedItems()">
+          <td>
+            <a [routerLink]="['/requirements', item.id]" class="app-link">{{ item.title || 'Untitled' }}</a>
+            <div class="text-xs text-gray-500 dark:text-gray-400 line-clamp-1 mt-0.5">{{ item.description || 'No description' }}</div>
+          </td>
+          <td><app-status-badge [status]="item.status || 'unknown'"></app-status-badge></td>
+          <td><app-status-badge [status]="item.priority || 'unknown'"></app-status-badge></td>
+          <td>
+            <ng-container *ngIf="item.questionCounts.total; else noQuestions">
+              <a [routerLink]="['/open-questions']" [queryParams]="{ requirementId: item.id }" class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span class="tabular-nums">{{ item.questionCounts.total }}</span>
+              </a>
+              <span *ngIf="item.questionCounts.blockingCount > 0" class="ml-1 inline-flex items-center gap-0.5 rounded bg-red-500/10 px-1 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400" title="{{ item.questionCounts.blockingCount }} blocking question(s)">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span class="tabular-nums">{{ item.questionCounts.blockingCount }}</span>
+              </span>
+              <span *ngIf="item.questionCounts.openCount > 0 && item.questionCounts.blockingCount === 0" class="ml-1 inline-flex items-center gap-0.5 rounded bg-amber-500/10 px-1 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                <span class="tabular-nums">{{ item.questionCounts.openCount }}</span>
+                <span class="sr-only">open</span>
+              </span>
+            </ng-container>
+            <ng-template #noQuestions>
+              <span class="text-xs text-gray-400 dark:text-gray-500">—</span>
+            </ng-template>
+          </td>
+          <td class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(item.createdAt) }}</td>
+          <td class="text-right"><app-raise-question objectType="requirement" [objectId]="item.id" [objectTitle]="item.title || 'Untitled'"></app-raise-question></td>
+        </tr>
+      </tbody>
+      </table>
+    </div>
+      <app-pagination
+        *ngIf="total() > pageSize"
+        [currentPage]="currentPage()"
+        [totalItems]="total()"
+        [pageSize]="pageSize"
+        (pageChange)="onPageChange($event)"
+      ></app-pagination>
+    </div>
+  </ng-container>
+</div>

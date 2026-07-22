@@ -18,11 +18,12 @@ public class VisualComponentSeeder {
             if (repository.count() == 0) {
                 List<VisualComponent> defaults = Arrays.asList(
                         // --- API Services ---
-                        create("rest-api", "REST API Service", "tall-cylinder", 0x0ea5e9L, 2.0, "rounded-sm",
-                                "bg-sky-500"),
+                        create("rest-api", "REST API Service", "dodecahedron", 0x6366f1L, 2.0, "rounded-md",
+                                "bg-indigo-500"),
                         create("graphql-api", "GraphQL API", "icosahedron", 0xe11d48L, 2.0, "rounded-full",
                                 "bg-rose-600"),
                         create("grpc-service", "gRPC Service", "box", 0x0d9488L, 1.5, "rounded-sm", "bg-teal-600"),
+                        create("mcp-server", "MCP Server", "cone", 0x00bc44L, 2.0, "rounded-full", "bg-green-500"),
                         create("background-job", "Background Job", "octahedron", 0xeab308L, 1.3, "rotate-45",
                                 "bg-yellow-500"),
 

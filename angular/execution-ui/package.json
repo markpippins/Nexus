@@ -1,0 +1,29 @@
+{
+  "type": "module",
+  "name": "execution-ui",
+  "version": "1.0.0",
+  "description": "Observability UI for the execution-srv API — requests, leases, attempts, receipts",
+  "private": true,
+  "scripts": {
+    "dev": "ng serve",
+    "build": "ng build",
+    "preview": "ng serve --configuration=production"
+  },
+  "dependencies": {
+    "@angular/common": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/platform-browser": "^21.0.0",
+    "@angular/router": "^21.0.0",
+    "@tailwindcss/postcss": "^4.0.0",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.0.0",
+    "@angular/cli": "^21.0.0",
+    "@angular/compiler-cli": "^21.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "~5.9.0"
+  }
+}

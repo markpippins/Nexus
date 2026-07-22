@@ -53,12 +53,14 @@ import { HealthCheckService } from './services/health-check.service.js';
 import { GeminiSearchDialogComponent } from './components/gemini-search-dialog/gemini-search-dialog.component.js';
 import { TreeManagerService } from './services/tree-manager.service.js';
 import { RegistryServerProvider } from './services/registry-server-provider.service.js';
+import { RegistryServerProfileService } from './services/registry-server-profile.service.js';
 import { TreeProviderAdapter } from './services/tree-provider-adapter.js';
 import { ServiceMeshComponent } from './components/service-mesh/service-mesh.component.js';
 import { CreateUserDialogComponent } from './components/create-user/create-user-dialog.component.js';
 import { PlatformManagementComponent } from './components/platform-management/platform-management.component.js';
 import { ServiceMeshService } from './services/service-mesh.service.js';
 import { ArchitectureVizService } from './services/architecture-viz.service.js';
+import { AtlasService } from './services/atlas.service.js';
 import { ServiceRegistryEditorComponent } from './components/service-registry-editor/service-registry-editor.component.js';
 import { GatewayEditorComponent } from './components/gateway-editor/gateway-editor.component.js';
 import { ConfirmDialogComponent } from './components/confirm-dialog/confirm-dialog.component.js';
@@ -71,7 +73,9 @@ import { MessageBoxContainerComponent } from './components/message-box-container
 import { UiEventBusService } from './services/ui-event-bus.service.js';
 
 import { SystemHealthComponent } from './components/system-health/system-health.component.js';
+import { TopologyComponent } from './components/topology/topology.component.js';
 import { NebulaPanelComponent } from './components/nebula-panel/nebula-panel.component.js';
+import { LoadViewDialogComponent } from './components/load-view-dialog/load-view-dialog.component.js';
 
 interface PanePath {
   id: number;
@@ -120,7 +124,7 @@ const disconnectedProvider: FileSystemProvider = {
   standalone: true,
   templateUrl: './app.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent, NebulaPanelComponent],
+  imports: [CommonModule, FileExplorerComponent, SidebarComponent, DetailPaneComponent, ToolbarComponent, ToastsComponent, WebviewDialogComponent, LocalConfigDialogComponent, LoginDialogComponent, RssFeedsDialogComponent, ImportDialogComponent, ExportDialogComponent, TextEditorDialogComponent, IdeaStreamComponent, PreferencesDialogComponent, TerminalComponent, ComplexSearchDialogComponent, GeminiSearchDialogComponent, ServiceMeshComponent, CreateUserDialogComponent, PlatformManagementComponent, ServiceRegistryEditorComponent, GatewayEditorComponent, GatewayManagementComponent, RegistryServerManagementComponent, ConfirmDialogComponent, IframeViewComponent, BottomBarComponent, NavToolbarComponent, MessageBoxContainerComponent, SystemHealthComponent, TopologyComponent, NebulaPanelComponent, LoadViewDialogComponent],
   host: {
     '(document:keydown)': 'onKeyDown($event)',
     '(document:click)': 'onDocumentClick($event)',
@@ -154,8 +158,10 @@ export class AppComponent implements OnInit, OnDestroy {
   private healthCheckService = inject(HealthCheckService);
   private treeManager = inject(TreeManagerService);
   private registryServerProvider = inject(RegistryServerProvider);
+  private registryServerProfileService = inject(RegistryServerProfileService);
   private serviceMeshService = inject(ServiceMeshService);
   public vizService = inject(ArchitectureVizService);
+  private atlasService = inject(AtlasService);
   private eventBus = inject(UiEventBusService);
   private initialAutoConnectAttempted = false;
 
@@ -172,27 +178,32 @@ export class AppComponent implements OnInit, OnDestroy {
   isComplexSearchDialogOpen = signal(false);
   isGeminiSearchDialogOpen = signal(false);
   isCreateUserDialogOpen = signal(false);
+  isLoadViewDialogOpen = signal(false);
   isImportDependencyWarningOpen = signal(false);
   importWarningDontShowAgain = signal(false);
   profileForCreateUser = signal<BrokerProfile | undefined>(undefined);
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'tackle-ui' | 'kanban' | 'cascade-ui'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
   showRunningOnly = signal(false);  // Toggle to show only running services in mesh
   paletteCollapsed = signal(false);  // Toggle to collapse component palette in service graph
 
+  // Left nav collapsed state — persisted via UiPreferencesService
+  isNavCollapsed = this.uiPreferencesService.isNavCollapsed;
+
   viewModeUrls: Record<string, string> = {
     'conduit-ui': 'http://localhost:4201',
     'duality': 'http://localhost:3002',
     'plurality': 'http://localhost:3004',
-    'assembly': 'http://localhost:9003',
+    'assembly': 'http://localhost:4204',
     'nebula-rms': 'http://localhost:3000',
     'tackle-ui': 'http://localhost:4202',
     'cascade-ui': 'http://localhost:4203',
+    'execution-ui': 'http://localhost:4205',
   };
 
   isIframeMode = computed(() =>
@@ -202,7 +213,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.currentViewMode() === 'assembly' ||
     this.currentViewMode() === 'nebula-rms' ||
     this.currentViewMode() === 'tackle-ui' ||
-    this.currentViewMode() === 'cascade-ui'
+    this.currentViewMode() === 'cascade-ui' ||
+    this.currentViewMode() === 'execution-ui'
   );
 
   isKanbanMode = computed(() => this.currentViewMode() === 'kanban');
@@ -213,6 +225,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // --- Pane Visibility State (from service) ---
   isSidebarVisible = this.uiPreferencesService.isSidebarVisible;
+  isSidebarCollapsed = this.uiPreferencesService.isSidebarCollapsed;
   isTreeVisible = this.uiPreferencesService.isTreeVisible;
   isNotesVisible = this.uiPreferencesService.isNotesVisible;
   isDetailPaneOpen = this.uiPreferencesService.isDetailPaneOpen;
@@ -220,6 +233,13 @@ export class AppComponent implements OnInit, OnDestroy {
   isRssFeedVisible = this.uiPreferencesService.isRssFeedVisible;
   isStreamVisible = this.uiPreferencesService.isStreamVisible;
   isConsoleCollapsed = this.uiPreferencesService.isConsoleCollapsed;
+
+  /** When true, the terminal fills the entire viewport (fixed overlay). */
+  isTerminalMaximized = signal(false);
+
+  toggleMaximize(): void {
+    this.isTerminalMaximized.update(v => !v);
+  }
   isStreamPaneCollapsed = this.uiPreferencesService.isStreamPaneCollapsed;
 
   shouldShowStreamPane = computed(() => {
@@ -379,7 +399,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private getPlatformNodeForPath(path: string[]) {
     // Valid management types (System Health is now a top-level sibling, not a Platform Management child).
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems'];
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems', 'topology'];
     const profiles = this.hostProfileService.profiles();
     const activeProfile = this.hostProfileService.activeProfile();
 
@@ -404,11 +424,14 @@ export class AppComponent implements OnInit, OnDestroy {
     // Explicitly exclude "Search & Discovery" paths to prevent masking user folders
     if (path[0] === 'Search & Discovery') {
       return null;
-    }        // System Health is a top-level sibling of Platform Management (always connects to terrain server).
+    }        // System Health is a top-level sibling of Platform Management (connects to service-registry real-time SSE stream).
         // Handle it here at root before the Platform Management branch — also covers any deeper path.
         if (path[0] === 'System Health') {
-          const terrainUrl = this.localConfigService.terrainServerUrl();
-          return { type: 'system-health', baseUrl: terrainUrl };
+          const registryUrl = this.registryServerProfileService.activeBaseUrl();
+          if (registryUrl) {
+            return { type: 'system-health', baseUrl: registryUrl };
+          }
+          return null;
         }
 
     console.log('[AppComponent] getPlatformNodeForPath', { path, profilesCount: profiles.length, activeProfile: activeProfile?.name });
@@ -476,10 +499,18 @@ export class AppComponent implements OnInit, OnDestroy {
           return null;
         }
 
-        // System Health always uses the terrain server URL, not a profile's hostServerUrl
+        // System Health uses the service-registry URL (SSE based), Topology uses terrain server
         if (normalizedType === 'system-health') {
+          const registryUrl = this.registryServerProfileService.activeBaseUrl();
+          if (registryUrl) {
+            console.log('[AppComponent] Matched Platform Management path - system-health', { registryUrl });
+            return { type: normalizedType, baseUrl: registryUrl };
+          }
+          return null;
+        }
+        if (normalizedType === 'topology') {
           const terrainUrl = this.localConfigService.terrainServerUrl();
-          console.log('[AppComponent] Matched Platform Management path - system-health', { terrainUrl });
+          console.log('[AppComponent] Matched Platform Management path - topology', { terrainUrl });
           return { type: normalizedType, baseUrl: terrainUrl };
         }
 
@@ -524,7 +555,7 @@ export class AppComponent implements OnInit, OnDestroy {
   /** Resolve the baseUrl from a Platform Management path. */
   private resolveBaseUrl(remaining: string[], profiles: any[], activeProfile: any, pmIndex: number, path: string[]): string | null {
     // Find the first element in remaining that matches a valid type
-    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems'];
+    const validTypes = ['data dictionary', 'services', 'frameworks', 'libraries', 'deployments', 'servers', 'lookup tables', 'service types', 'server types', 'framework types', 'framework languages', 'framework categories', 'library types', 'library categories', 'service definitions', 'languages', 'categories', 'operating systems', 'environments', 'systems', 'topology'];
     const typeIndex = remaining.findIndex(p => validTypes.includes(p.toLowerCase()));
 
     let targetProfileName: string | null = null;
@@ -962,6 +993,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private unlistenStreamResizeUp: (() => void) | null = null;
 
   @ViewChild('mainContentWrapper') mainContentWrapperEl!: ElementRef<HTMLDivElement>;
+  @ViewChild('viewContainer') viewContainerEl!: ElementRef<HTMLDivElement>;
 
   // --- Console Pane Resizing ---
   consolePaneHeight = signal(this.uiPreferencesService.explorerConsoleHeight() ?? 20); // percentage
@@ -1823,8 +1855,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.serviceMeshService.fetchAllData();
   }
 
-  onCollapsePalette(): void {
-    this.paletteCollapsed.update(v => !v);
+  onNavCollapseToggle(): void {
+    this.uiPreferencesService.toggleNavCollapse();
+  }
+
+  onSidebarCollapseToggle(): void {
+    this.uiPreferencesService.toggleSidebarCollapse();
   }
 
   // --- Graph Visualization Control Handlers ---
@@ -1837,39 +1873,89 @@ export class AppComponent implements OnInit, OnDestroy {
     this.vizService.toggleSimulation(!isActive);
   }
 
-  onSaveGraph(): void {
-    const data = this.vizService.exportScene();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = this.document.createElement('a');
-    a.href = url;
-    a.download = 'service-mesh-graph.json';
-    a.click();
-    URL.revokeObjectURL(url);
-    this.toastService.show('Graph saved successfully', 'success');
+  async onSaveGraph(): Promise<void> {
+    const inGraphMode = this.currentViewMode() === 'service-mesh' && this.meshViewMode() === 'graph';
+    if (!inGraphMode) {
+      // Fallback for non-graph views: export current scene to a JSON file
+      const data = this.vizService.exportScene();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = this.document.createElement('a');
+      a.href = url;
+      a.download = 'service-mesh-graph.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      this.toastService.show('Graph exported to file', 'success');
+      return;
+    }
+
+    const name = window.prompt('Save graph view as:');
+    if (!name || !name.trim()) return;
+
+    try {
+      const payload = this.vizService.buildAtlasViewPayload(name.trim());
+      const currentId = this.atlasService.selectedViewId();
+      if (currentId !== null) {
+        await this.atlasService.update(currentId, payload);
+        this.toastService.show(`Updated graph view "${name.trim()}"`, 'success');
+      } else {
+        await this.atlasService.create(payload);
+        this.toastService.show(`Saved graph view "${name.trim()}"`, 'success');
+      }
+    } catch (err) {
+      console.error('Failed to save graph view', err);
+      this.toastService.show('Failed to save graph view', 'error');
+    }
+  }
+
+  async openLoadViewDialog(): Promise<void> {
+    try {
+      await this.atlasService.refresh();
+    } catch (err) {
+      console.error('Failed to refresh graph views', err);
+      this.toastService.show('Failed to load saved views', 'error');
+      return;
+    }
+    this.isLoadViewDialogOpen.set(true);
+  }
+
+  closeLoadViewDialog(): void {
+    this.isLoadViewDialogOpen.set(false);
+  }
+
+  onLoadViewSelected(id: number): void {
+    this.closeLoadViewDialog();
+    this.atlasService.loadRequested.set(id);
   }
 
   onLoadGraph(): void {
-    const input = this.document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          try {
-            const data = JSON.parse(reader.result as string);
-            this.vizService.importScene(data);
-            this.toastService.show('Graph loaded successfully', 'success');
-          } catch (err) {
-            this.toastService.show('Failed to load graph file', 'error');
-          }
-        };
-        reader.readAsText(file);
-      }
-    };
-    input.click();
+    const inGraphMode = this.currentViewMode() === 'service-mesh' && this.meshViewMode() === 'graph';
+    if (!inGraphMode) {
+      // Fallback for non-graph views: import scene from a JSON file
+      const input = this.document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = (e: Event) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            try {
+              const data = JSON.parse(reader.result as string);
+              this.vizService.importScene(data);
+              this.toastService.show('Graph loaded from file', 'success');
+            } catch (err) {
+              this.toastService.show('Failed to load graph file', 'error');
+            }
+          };
+          reader.readAsText(file);
+        }
+      };
+      input.click();
+      return;
+    }
+
+    this.openLoadViewDialog();
   }
 
   onBackgroundColorChange(color: string): void {
@@ -2589,7 +2675,7 @@ export class AppComponent implements OnInit, OnDestroy {
   startConsolePaneResize(event: MouseEvent): void {
     this.isResizingConsole = true;
     event.preventDefault();
-    const container = this.mainContentWrapperEl?.nativeElement;
+    const container = this.viewContainerEl?.nativeElement;
     if (!container) return;
     const startY = event.clientY;
     const containerRect = container.getBoundingClientRect();
@@ -2602,8 +2688,8 @@ export class AppComponent implements OnInit, OnDestroy {
         let newConsoleHeight = initialConsoleHeight + dy;
 
         const minHeight = 100;
-        const streamHeight = this.isStreamVisible() ? (this.isStreamPaneCollapsed() ? 28 : (this.streamPaneHeight() / 100 * containerRect.height)) : 0;
-        const maxHeight = containerRect.height - 100 - streamHeight;
+        // Console is now a sibling of <main> — leave at least 200px for the main content area
+        const maxHeight = containerRect.height - 200;
 
         if (newConsoleHeight < minHeight) newConsoleHeight = minHeight;
         if (newConsoleHeight > maxHeight) newConsoleHeight = maxHeight;
