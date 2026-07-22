@@ -24,6 +24,14 @@
           </span>
         }
         <button
+          class="mode-toggle"
+          [class.remote]="session.isRemote"
+          (click)="toggleMode(i); $event.stopPropagation()"
+          [title]="session.isRemote ? 'Remote (pty-srv) — click for local' : 'Local (just-bash) — click for remote'"
+        >
+          {{ session.isRemote ? '🌐' : '💻' }}
+        </button>
+        <button
           class="tab-close"
           (click)="removeTab(i); $event.stopPropagation()"
           title="Close tab"

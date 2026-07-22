@@ -1,0 +1,35 @@
+[Unit]
+Description=PTY Server — WebSocket PTY bridge for xterm.js browser terminals
+Documentation=https://github.com/nexus/typescript/pty-srv
+After=network.target
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/pty-srv
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=PTY_SRV_PORT=3120
+Environment=NODE_ENV=production
+Environment=SHELL=/bin/bash
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/npx tsx src/index.ts
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+# NOTE: Relaxed vs other nexus services — this is a real shell, so users
+# need write access to their home directory and the ability to read most
+# of the filesystem.
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

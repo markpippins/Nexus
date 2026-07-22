@@ -4,6 +4,7 @@ import {
   ChangeDetectorRef,
   Component,
   ElementRef,
+  input,
   OnDestroy,
   QueryList,
   ViewChildren,
@@ -54,7 +55,7 @@ const helpCommand = defineCommand('help', async (_args, _ctx) => {
 interface TerminalSession {
   id: string;
   label: string;
-  bash: Bash;
+  bash: Bash | null;
   terminal: Terminal;
   fitAddon: FitAddon;
   currentCwd: string;
@@ -63,6 +64,12 @@ interface TerminalSession {
   inputBuffer: string;
   historyIndex: number;
   isExecuting: boolean;
+  // Remote shell mode
+  ws: WebSocket | null;
+  isRemote: boolean;
+  // Reconnection state
+  reconnectAttempts: number;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
 }
 
 @Component({
@@ -128,6 +135,31 @@ interface TerminalSession {
       .tab .tab-close:hover {
         background: rgb(var(--color-surface-hover));
         color: rgb(var(--color-text-base));
+      }
+      .tab .mode-toggle {
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 3px;
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font-size: 11px;
+        line-height: 1;
+        padding: 0;
+        opacity: 0.5;
+        transition: opacity 0.15s;
+      }
+      .tab .mode-toggle:hover {
+        opacity: 1;
+        background: rgb(var(--color-surface-hover));
+      }
+      .tab .mode-toggle.remote {
+        color: rgb(var(--color-accent-text));
+        opacity: 0.8;
       }
       .tab .tab-label {
         max-width: 120px;
@@ -203,12 +235,22 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
   @ViewChildren('terminalContainer') terminals!: QueryList<ElementRef<HTMLDivElement>>;
   collapse = output<void>();
 
+  /**
+   * When set to a WebSocket URL (e.g. 'ws://localhost:3120/pty'), the terminal
+   * connects to a real shell process on the host via the pty-srv backend.
+   * When empty/undefined, the terminal uses the local just-bash emulator.
+   */
+  remoteShellUrl = input<string | undefined>(undefined);
+
+  private static readonly LOCAL_STORAGE_KEY = 'nexus-console-remote-sessions';
   private readonly initialCwd = '/home/user';
   private resizeObserver: ResizeObserver | null = null;
   private hostEl = inject(ElementRef);
   private uiPreferencesService = inject(UiPreferencesService);
   private cdr = inject(ChangeDetectorRef);
   private logEventSource: EventSource | null = null;
+  private readonly MAX_RECONNECT_ATTEMPTS = 5;
+  private readonly RECONNECT_DELAY_MS = 2000;
 
   sessions = signal<TerminalSession[]>([]);
   activeIndex = signal(0);
@@ -226,17 +268,41 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    const initialSession = this.createSession('Terminal 1');
-    this.sessions.set([initialSession]);
+    // Restore persisted remote sessions from localStorage
+    const savedIds = TerminalComponent.loadSessionIds();
+    if (savedIds.length > 0 && !!this.remoteShellUrl()) {
+      // Create remote session tabs for each saved ID — use the saved ID directly
+      const sessions = savedIds.map((savedId, i) =>
+        this.createSession(`Terminal ${i + 1}`, savedId),
+      );
+      this.sessions.set(sessions);
+      this.activeIndex.set(0);
 
-    setTimeout(() => {
-      const divs = this.terminals.toArray();
-      if (divs.length > 0) {
-        initialSession.terminal.open(divs[0].nativeElement);
-        initialSession.fitAddon.fit();
-        this.writeWelcomeAndPrompt(initialSession);
-      }
-    }, 0);
+      setTimeout(() => {
+        const divs = this.terminals.toArray();
+        sessions.forEach((s, i) => {
+          if (divs.length > i) {
+            s.terminal.open(divs[i].nativeElement);
+            s.fitAddon.fit();
+            if (i === 0) {
+              this.writeWelcomeAndPrompt(s);
+            }
+          }
+        });
+      });
+    } else {
+      const initialSession = this.createSession('Terminal 1');
+      this.sessions.set([initialSession]);
+
+      setTimeout(() => {
+        const divs = this.terminals.toArray();
+        if (divs.length > 0) {
+          initialSession.terminal.open(divs[0].nativeElement);
+          initialSession.fitAddon.fit();
+          this.writeWelcomeAndPrompt(initialSession);
+        }
+      }, 0);
+    }
 
     this.resizeObserver = new ResizeObserver(() => {
       try {
@@ -252,12 +318,18 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
     this.resizeObserver.observe(this.hostEl.nativeElement);
   }
 
-  private createSession(label: string): TerminalSession {
-    const bash = new Bash({
-      cwd: this.initialCwd,
-      env: { TERM: 'xterm-256color' },
-      customCommands: [helpCommand],
-    });
+  private createSession(label: string, restoredId?: string): TerminalSession {
+    const isRemote = !!this.remoteShellUrl();
+    const sessionId = restoredId || `term-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    const bash: Bash | null = isRemote
+      ? null
+      : new Bash({
+          cwd: this.initialCwd,
+          env: { TERM: 'xterm-256color' },
+          customCommands: [helpCommand],
+        });
+
     const terminal = new Terminal({
       cursorBlink: true,
       convertEol: true,
@@ -268,7 +340,7 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
 
-    const id = `term-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const id = sessionId;
     const session: TerminalSession = {
       id,
       label,
@@ -281,13 +353,76 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
       inputBuffer: '',
       historyIndex: -1,
       isExecuting: false,
+      ws: null,
+      isRemote,
+      reconnectAttempts: 0,
+      reconnectTimer: null,
     };
 
-    terminal.onData((data: string) => {
-      void this.handleSessionInput(session, data);
-    });
+    if (isRemote) {
+      this.saveSessionId(id);
+      this.connectRemoteSession(session);
+
+      // Resize forwarding for remote sessions
+      terminal.onResize(({ cols, rows }) => {
+        if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+          session.ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        }
+      });
+    }
 
     return session;
+  }
+
+  private connectRemoteSession(session: TerminalSession): void {
+    const baseUrl = this.remoteShellUrl();
+    if (!baseUrl) return;
+
+    // Include session ID for tmux reconnection
+    const url = `${baseUrl}?session=${encodeURIComponent(session.id)}`;
+    session.reconnectAttempts = 0;
+
+    this.doConnect(session, url);
+  }
+
+  private doConnect(session: TerminalSession, url: string): void {
+    const ws = new WebSocket(url);
+    session.ws = ws;
+
+    ws.onopen = () => {
+      session.reconnectAttempts = 0;
+      const dims = session.fitAddon.proposeDimensions();
+      if (dims) {
+        ws.send(JSON.stringify({ type: 'resize', cols: dims.cols, rows: dims.rows }));
+      }
+    };
+
+    ws.onmessage = (ev: MessageEvent) => {
+      session.terminal.write(ev.data);
+      const osc7Match = ev.data.match(/\x1b]7;file:\/\/[^\/]+(.+)\x07/);
+      if (osc7Match) {
+        session.currentCwd = osc7Match[1] || session.currentCwd;
+      }
+    };
+
+    ws.onclose = () => {
+      session.ws = null;
+      if (session.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS) {
+        session.reconnectAttempts++;
+        session.terminal.writeln(
+          `\r\n\x1b[33m[disconnected — reconnecting in ${this.RECONNECT_DELAY_MS / 1000}s (attempt ${session.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS})]\x1b[0m`,
+        );
+        session.reconnectTimer = setTimeout(() => {
+          this.doConnect(session, url);
+        }, this.RECONNECT_DELAY_MS);
+      } else {
+        session.terminal.writeln('\r\n\x1b[31m[connection lost — max reconnect attempts reached]\x1b[0m');
+      }
+    };
+
+    ws.onerror = () => {
+      // onclose will fire after onerror, so reconnect logic is there
+    };
   }
 
   addTab(): void {
@@ -311,6 +446,19 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
   removeTab(index: number): void {
     const currentSessions = this.sessions();
     const session = currentSessions[index];
+
+    // Close WebSocket for remote sessions
+    if (session.ws) {
+      try { session.ws.close(); } catch { /* ignore */ }
+      session.ws = null;
+    }
+    // Cancel any reconnect timer
+    if (session.reconnectTimer) {
+      clearTimeout(session.reconnectTimer);
+      session.reconnectTimer = null;
+    }
+    // Remove from persisted sessions
+    this.removeSessionId(session.id);
 
     session.terminal.dispose();
 
@@ -372,7 +520,125 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
     this.editingIndex.set(null);
   }
 
-  // ─── Active session helpers ───
+  // ─── Per-tab mode toggle ───
+
+  /**
+   * Toggles a tab between local (just-bash) and remote (pty-srv WebSocket) mode.
+   * Disposes the current terminal and creates a fresh one with the new backend.
+   */
+  toggleMode(index: number): void {
+    const sessions = this.sessions();
+    const session = sessions[index];
+    if (!session) return;
+
+    // Clean up current backend
+    if (session.ws) {
+      try { session.ws.close(); } catch { /* ignore */ }
+      session.ws = null;
+    }
+    session.terminal.dispose();
+
+    // Toggle
+    const newIsRemote = !session.isRemote;
+    const isActive = index === this.activeIndex();
+
+    // Create new session with opposite mode
+    const newBash: Bash | null = newIsRemote
+      ? null
+      : new Bash({
+          cwd: this.initialCwd,
+          env: { TERM: 'xterm-256color' },
+          customCommands: [helpCommand],
+        });
+
+    const newTerminal = new Terminal({
+      cursorBlink: true,
+      convertEol: true,
+      fontFamily: `ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`,
+      fontSize: 13,
+    });
+    this.applyThemeToTerminal(newTerminal);
+    const newFitAddon = new FitAddon();
+    newTerminal.loadAddon(newFitAddon);
+
+    const updatedSession: TerminalSession = {
+      ...session,
+      bash: newBash,
+      terminal: newTerminal,
+      fitAddon: newFitAddon,
+      isRemote: newIsRemote,
+      ws: null,
+      currentCwd: this.initialCwd,
+      currentEnv: { TERM: 'xterm-256color' },
+      commandHistory: [],
+      inputBuffer: '',
+      historyIndex: -1,
+      isExecuting: false,
+    };
+
+    // Replace in sessions array
+    this.sessions.update(s => s.map((s, i) => (i === index ? updatedSession : s)));
+
+    // Wire up input
+    newTerminal.onData((data: string) => {
+      void this.handleSessionInput(updatedSession, data);
+    });
+
+    if (newIsRemote) {
+      this.saveSessionId(updatedSession.id);
+      this.connectRemoteSession(updatedSession);
+      newTerminal.onResize(({ cols, rows }) => {
+        if (updatedSession.ws && updatedSession.ws.readyState === WebSocket.OPEN) {
+          updatedSession.ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        }
+      });
+    } else {
+      this.removeSessionId(session.id);
+    }
+
+    // Always open in the DOM (the div always exists, just hidden by CSS)
+    this.cdr.detectChanges();
+    setTimeout(() => {
+      const divs = this.terminals.toArray();
+      if (divs.length > index) {
+        newTerminal.open(divs[index].nativeElement);
+        newFitAddon.fit();
+        if (isActive) {
+          this.writeWelcomeAndPrompt(updatedSession);
+        }
+      }
+    });
+  }
+
+  // ─── LocalStorage persistence for remote session IDs ───
+
+  private saveSessionId(id: string): void {
+    const ids = TerminalComponent.loadSessionIds();
+    if (!ids.includes(id)) {
+      ids.push(id);
+      localStorage.setItem(TerminalComponent.LOCAL_STORAGE_KEY, JSON.stringify(ids));
+    }
+  }
+
+  private removeSessionId(id: string): void {
+    const ids = TerminalComponent.loadSessionIds().filter(i => i !== id);
+    if (ids.length > 0) {
+      localStorage.setItem(TerminalComponent.LOCAL_STORAGE_KEY, JSON.stringify(ids));
+    } else {
+      localStorage.removeItem(TerminalComponent.LOCAL_STORAGE_KEY);
+    }
+  }
+
+  private static loadSessionIds(): string[] {
+    try {
+      const raw = localStorage.getItem(TerminalComponent.LOCAL_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
 
   private activeSession(): TerminalSession | undefined {
     const idx = this.activeIndex();
@@ -383,6 +649,14 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
   // ─── Input handling ───
 
   private async handleSessionInput(session: TerminalSession, data: string): Promise<void> {
+    // Remote sessions: forward all input directly to the PTY
+    if (session.isRemote) {
+      if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+        session.ws.send(JSON.stringify({ type: 'input', data }));
+      }
+      return;
+    }
+
     if (session.isExecuting) {
       if (data === '\u0003') {
         session.terminal.write('^C');
@@ -423,6 +697,11 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
   }
 
   private async executeSessionCommand(session: TerminalSession): Promise<void> {
+    // Remote sessions: execution is handled by the PTY — nothing to do here
+    if (session.isRemote) return;
+
+    if (!session.bash) return;
+
     const command = session.inputBuffer;
     session.terminal.write('\r\n');
 
@@ -558,6 +837,12 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
   }
 
   private writeWelcomeAndPrompt(session: TerminalSession): void {
+    if (session.isRemote) {
+      session.terminal.writeln('\x1B[1;3;34mNexus Console — Remote Shell\x1B[0m');
+      session.terminal.writeln('Connected to pty-srv');
+      session.terminal.writeln('');
+      return;
+    }
     session.terminal.writeln('\x1B[1;3;34mWelcome to the Nexus Console!\x1B[0m');
     session.terminal.writeln('Powered by xterm.js + just-bash');
     session.terminal.writeln('----------------------------------');
@@ -599,6 +884,16 @@ export class   TerminalComponent implements AfterViewInit, OnDestroy {
     }
     for (const session of this.sessions()) {
       session.terminal.dispose();
+      // Close WebSocket for remote sessions
+      if (session.ws) {
+        try { session.ws.close(); } catch { /* ignore */ }
+        session.ws = null;
+      }
+      // Cancel reconnect timer
+      if (session.reconnectTimer) {
+        clearTimeout(session.reconnectTimer);
+        session.reconnectTimer = null;
+      }
     }
     if (this.logEventSource) {
       try {

@@ -50,6 +50,7 @@ ALL_SERVICES=(
     # Operator + MCP servers
     "operator-svc.service"     # port 3018 — Operator host personality
     "conduit-mcp.service"      # port 3100 — work request orchestration
+    "pty-srv.service"          # port 3120 — WebSocket PTY bridge for xterm.js
     "nebula-mcp-sse.service"   # port 3102 — Nebula MCP SSE
     "nebula-mcp.service"       # stdio  — Nebula MCP (on-demand; clients spawn independently)
     "terrain-mcp.service"      # stdio  — Terrain topology MCP (on-demand; clients spawn independently)
@@ -88,6 +89,7 @@ SERVICE_PORTS=(
     # terrain-mcp.service — stdio, on-demand (no port)
     ["tackle-mcp.service"]="3400"
     ["operator-svc.service"]="3018"
+    ["pty-srv.service"]="3121"
     ["cpf-api.service"]="3108"
     ["atlas.service"]="8090"
     ["execution-srv.service"]="3110"

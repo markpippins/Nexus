@@ -625,7 +625,7 @@
                   </button>
                 </div>
               } @else {
-                <app-terminal (collapse)="toggleConsole()"></app-terminal>
+                <app-terminal (collapse)="toggleConsole()" [remoteShellUrl]="'ws://localhost:3120'"></app-terminal>
               }
             </div>
           }
