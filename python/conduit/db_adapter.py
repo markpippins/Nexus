@@ -202,11 +202,11 @@ class DBAdapter:
             _log.debug("_init_db: manager-owned tables ensured")
 
             # ── Fail fast if MCP-owned tables are missing ─────
-            # Tables are spread across conduit and vision schemas:
-            #   conduit: plans, sessions, circuit_breaker
+            # Tables are spread across conduit, nebula, and vision schemas:
+            #   conduit: sessions, circuit_breaker
+            #   nebula: plans (via implementation_plans view)
             #   vision: receipts, tickets
             table_schemas = {
-                "plans": s,
                 "sessions": s,
                 "circuit_breaker": s,
                 "receipts": "vision",

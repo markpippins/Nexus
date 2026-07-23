@@ -20,7 +20,7 @@ Caveat (BP):
 
 Table locations (discovered empirically):
     vision.receipts      — receipt events (source of truth)
-    conduit.plans        — plan metadata (enrichment: deps, files_affected)
+    nebula.plans         — plan metadata (enrichment: deps, files_affected)
 
 Cursor column:
     recorded_on_dt (TIMESTAMPTZ) — primary ordering key
@@ -282,7 +282,7 @@ class Syncer:
     Orchestrates one poll cycle:
         1. Load checkpoint from disk
         2. Query new receipts from vision.receipts
-        3. Enrich with plan data from conduit.plans
+        3. Enrich with plan data from nebula.plans
         4. Map each receipt to kernel format
         5. Build KernelDelta payload
         6. POST to kernel API
