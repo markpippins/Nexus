@@ -172,4 +172,23 @@ def run():
     except FileNotFoundError:
         check("plan_status view", False, "db.ts not found")
 
+    print("\n--- C-4: Critic receipt type correctness ---")
+    try:
+        src = read_file("python/conduit/main.py")
+        m = re.search(r"_SUCCESS_RECEIPTS\s*=\s*\{([^}]+)\}", src, re.DOTALL)
+        if m:
+            body = m.group(1)
+            critic_match = re.search(r'"critic"\s*:\s*"(\w+)"', body)
+            if critic_match:
+                critic_type = critic_match.group(1)
+                check("_SUCCESS_RECEIPTS['critic'] == 'CRITIQUE_PASS'",
+                      critic_type == "CRITIQUE_PASS",
+                      f"critic emits '{critic_type}' — should be CRITIQUE_PASS")
+            else:
+                check("_SUCCESS_RECEIPTS['critic'] exists", False, "critic key not found in SUCCESS_RECEIPTS")
+        else:
+            check("_SUCCESS_RECEIPTS extraction", False, "could not parse SUCCESS_RECEIPTS from main.py")
+    except FileNotFoundError:
+        check("C-4 critic receipt", False, "main.py not found")
+
     return passed, failed, skipped

@@ -162,7 +162,7 @@ def receipt_to_wrp_state(receipt_type: str) -> str:
 # ── 4. WRP adjacency matrix ──────────────────────────────────────────────
 
 _WRP_ADJACENCY_MATRIX: dict = {
-    "CREATED":       {"INTAKE": True},
+    "CREATED":       {"INTAKE": True, "FAILED": True},
     "INTAKE":        {"PLANNING": True, "FAILED": True},
     "PLANNING":      {"CRITIQUE": True, "FAILED": True},
     "CRITIQUE":      {"PLANNING": True, "SPECIFICATION": True, "FAILED": True},
