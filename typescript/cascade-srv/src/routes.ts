@@ -367,7 +367,7 @@ router.get('/assessments', async (req: Request, res: Response) => {
              ar.rationale, ar.dimensions_used, ar.dimensions_total,
              ar.resolved_at,
              e.event_type, e.source, e.payload
-      FROM cascade.assessment_resolutions ar
+      FROM nebula.assessment_resolutions ar
       LEFT JOIN cascade.events e ON e.event_id = ar.event_id
       ${where}
       ORDER BY ar.resolved_at DESC
@@ -375,7 +375,7 @@ router.get('/assessments', async (req: Request, res: Response) => {
     `, [...params, lim, off]);
 
     const countResult = await query<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM cascade.assessment_resolutions ar ${where}`,
+      `SELECT COUNT(*)::text AS count FROM nebula.assessment_resolutions ar ${where}`,
       params
     );
 
