@@ -462,7 +462,6 @@ DEPENDENCIES: tuple[tuple[str, str, str, str], ...] = (
     ("mcp_server", "tackle-mcp", "runnable_service", "redis"),
     ("mcp_server", "terrain-mcp", "runnable_service", "terrain"),
     ("runnable_service", "broker-gateway", "runnable_service", "nebula-srv"),
-    ("runnable_service", "vision-srv", "runnable_service", "nebula-srv"),
     ("runnable_service", "vision-srv-py", "runnable_service", "nebula-srv"),
     ("runnable_service", "role-memory-srv", "runnable_service", "redis"),
     ("runnable_service", "wrp-bridge-daemon", "runnable_service", "nebula-srv"),

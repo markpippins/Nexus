@@ -26,7 +26,7 @@ import urllib.error
 
 log = logging.getLogger("batch_publish")
 
-ASSEMBLY_MCP_URL = "http://localhost:3104"
+ASSEMBLY_MCP_URL = "http://localhost:3107"
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 
 logging.basicConfig(

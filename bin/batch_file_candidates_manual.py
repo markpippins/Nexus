@@ -10,7 +10,7 @@ import urllib.request, urllib.error
 log = logging.getLogger("manual_file")
 
 NEBULA_API = "http://localhost:3101/api"
-ASSEMBLY_MCP_URL = "http://localhost:3104"
+ASSEMBLY_MCP_URL = "http://localhost:3107"
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", stream=sys.stderr)
