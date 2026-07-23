@@ -323,7 +323,7 @@ export function registerTools(server: McpServer) {
       limit: z.number().min(1).max(50).optional().default(15).describe("Max results (1-50)"),
     },
     async (args) => {
-      const scriptPath = "/home/codex/dev/nexus/python/rover/unified_semantic_search.py";
+      const scriptPath = "/home/codex/dev/nexus/bin/unified_semantic_search.py";
       const pythonBin = "/home/codex/dev/nexus/python/rover/.venv/bin/python3";
 
       try {

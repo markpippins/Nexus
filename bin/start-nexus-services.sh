@@ -55,10 +55,12 @@ ALL_SERVICES=(
     "nebula-mcp.service"       # stdio  — Nebula MCP (on-demand; clients spawn independently)
     "terrain-mcp.service"      # stdio  — Terrain topology MCP (on-demand; clients spawn independently)
     "tackle-mcp.service"       # port 3400 — AI config registry
-    "cpf-api.service"          # port 3108 — CPF funnel data API
+"cpf-api.service"          # port 3108 — CPF funnel data API
     "atlas.service"            # port 8090 — graph views persistence
     "execution-srv.service"    # port 3110 — execution observability REST API
-    "peb-srv.service"          # port 3111 — PEB observability REST API
+    "mcp-bridge.service"       # ports 3131-3134 — generic stdio-to-SSE bridge (knowledge/vision/peb/terrain MCPs)
+    "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator
+    "service-broker-mcp.service" # port 3112 — service-broker MCP over SSE (auth/token tools)
 )
 
 # ── Service metadata for health checks ─────────────────────────────────
@@ -90,10 +92,12 @@ SERVICE_PORTS=(
     ["tackle-mcp.service"]="3400"
     ["operator-svc.service"]="3018"
     ["pty-srv.service"]="3121"
-    ["cpf-api.service"]="3108"
+["cpf-api.service"]="3108"
     ["atlas.service"]="8090"
     ["execution-srv.service"]="3110"
-    ["peb-srv.service"]="3111"
+    ["mcp-bridge.service"]="3131"     # one of ports 3131-3134 — any bridge target's /health works
+    ["tools-aggregator.service"]="3210"
+    ["service-broker-mcp.service"]="3112"
 )
 
 # Docker-based services (verified via docker ps instead of port check)

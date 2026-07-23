@@ -282,6 +282,45 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // GET /api/systems/:id — single system with full nested hierarchy
+  router.get('/systems/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [sys] } = await pool.query('SELECT * FROM systems WHERE id = $1', [id]);
+      if (!sys) return res.status(404).json({ error: 'System not found' });
+
+      // Folders
+      const { rows: folders } = await pool.query(
+        'SELECT * FROM system_folders WHERE system_id = $1 ORDER BY name',
+        [sys.id]
+      );
+      // Subsystems → Features
+      const { rows: subs } = await pool.query(
+        'SELECT * FROM subsystems WHERE system_id = $1 ORDER BY name',
+        [sys.id]
+      );
+      const subsystems = [];
+      for (const sub of subs) {
+        const { rows: feats } = await pool.query(
+          'SELECT * FROM features WHERE subsystem_id = $1 ORDER BY name',
+          [sub.id]
+        );
+        subsystems.push({
+          ...toEpochMs(sub, 'created_at'),
+          systemId: sub.system_id,
+          features: feats.map((f: any) => ({ ...toEpochMs(f, 'created_at'), subsystemId: f.subsystem_id })),
+        });
+      }
+      res.json({
+        ...toEpochMs(sys, 'created_at'),
+        folders: folders.map((f: any) => ({ ...f, id: f.id, name: f.name, category: f.category, note: f.note })),
+        subsystems,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════════════════════
   //  SUBSYSTEMS
   // ════════════════════════════════════════════════════════════════
@@ -345,6 +384,29 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // GET /api/subsystems/:id — single subsystem with features
+  router.get('/subsystems/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [sub] } = await pool.query(
+        'SELECT * FROM subsystems WHERE id = $1',
+        [id]
+      );
+      if (!sub) return res.status(404).json({ error: 'Subsystem not found' });
+      const { rows: feats } = await pool.query(
+        'SELECT * FROM features WHERE subsystem_id = $1 ORDER BY name',
+        [sub.id]
+      );
+      res.json({
+        ...toEpochMs(sub, 'created_at'),
+        systemId: sub.system_id,
+        features: feats.map((f: any) => ({ ...toEpochMs(f, 'created_at'), subsystemId: f.subsystem_id })),
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════════════════════
   //  FEATURES
   // ════════════════════════════════════════════════════════════════
@@ -401,14 +463,33 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // GET /api/features/:id — single feature
+  router.get('/features/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [feat] } = await pool.query(
+        'SELECT * FROM features WHERE id = $1',
+        [id]
+      );
+      if (!feat) return res.status(404).json({ error: 'Feature not found' });
+      res.json({ ...toEpochMs(feat, 'created_at'), subsystemId: feat.subsystem_id });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════════════════════
   //  REQUIREMENTS
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/requirements — filterable
+  // GET /api/requirements — filterable with pagination
   router.get('/requirements', async (req: Request, res: Response) => {
     try {
       const { systemId, subsystemId, featureId } = req.query;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
       const clauses: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -416,11 +497,19 @@ export function createRoutes(pool: Pool): Router {
       if (subsystemId) { clauses.push(`subsystem_id = $${i++}`); vals.push(subsystemId); }
       if (featureId) { clauses.push(`feature_id = $${i++}`); vals.push(featureId); }
       const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-      const { rows } = await pool.query(
-        `SELECT * FROM requirements ${where} ORDER BY created_at DESC`,
-        vals
-      );
-      res.json(rows.map((r: any) => ({
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT * FROM requirements ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i+1}`,
+          [...vals, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total FROM requirements ${where}`,
+          vals
+        ),
+      ]);
+
+      const items = dataResult.rows.map((r: any) => ({
         ...toEpochMs(r, 'created_at'),
         systemId: r.system_id,
         subsystemId: r.subsystem_id,
@@ -432,33 +521,56 @@ export function createRoutes(pool: Pool): Router {
         acceptanceCriteria: r.acceptance_criteria,
         candidateId: r.candidate_id,
         conduitPlanId: r.conduit_plan_id,
-      })));
+      }));
+
+      res.json({
+        items,
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  // GET /api/requirements/:id/children — fetch direct child requirements
+  // GET /api/requirements/:id/children — fetch direct child requirements with pagination
   router.get('/requirements/:id/children', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rows } = await pool.query(
-        `SELECT * FROM requirements WHERE parent_id = $1 ORDER BY created_at ASC`,
-        [id]
-      );
-      res.json(rows.map((r: any) => ({
-        ...toEpochMs(r, 'created_at'),
-        systemId: r.system_id,
-        subsystemId: r.subsystem_id,
-        featureId: r.feature_id,
-        startDate: r.start_date,
-        completionDate: r.completion_date,
-        parentId: r.parent_id,
-        reqType: r.req_type,
-        acceptanceCriteria: r.acceptance_criteria,
-        candidateId: r.candidate_id,
-        conduitPlanId: r.conduit_plan_id,
-      })));
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT * FROM requirements WHERE parent_id = $1 ORDER BY created_at ASC LIMIT $2 OFFSET $3`,
+          [id, pageSize, offset]
+        ),
+        pool.query(
+          'SELECT COUNT(*)::int AS total FROM requirements WHERE parent_id = $1',
+          [id]
+        ),
+      ]);
+
+      res.json({
+        items: dataResult.rows.map((r: any) => ({
+          ...toEpochMs(r, 'created_at'),
+          systemId: r.system_id,
+          subsystemId: r.subsystem_id,
+          featureId: r.feature_id,
+          startDate: r.start_date,
+          completionDate: r.completion_date,
+          parentId: r.parent_id,
+          reqType: r.req_type,
+          acceptanceCriteria: r.acceptance_criteria,
+          candidateId: r.candidate_id,
+          conduitPlanId: r.conduit_plan_id,
+        })),
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1035,16 +1147,29 @@ export function createRoutes(pool: Pool): Router {
   //  WORK SESSIONS
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/sessions
-  router.get('/sessions', async (_req: Request, res: Response) => {
+  // GET /api/sessions — list with pagination
+  router.get('/sessions', async (req: Request, res: Response) => {
     try {
-      const { rows } = await pool.query('SELECT * FROM work_sessions ORDER BY created_at DESC');
-      res.json(rows.map((r: any) => ({
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          'SELECT * FROM work_sessions ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+          [pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM work_sessions'),
+      ]);
+
+      const items = dataResult.rows.map((r: any) => ({
         ...toEpochMs(r, 'created_at'),
         parentId: r.parent_id,
         parentType: r.parent_type,
         parentName: r.parent_name,
-      })));
+      }));
+
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1227,25 +1352,37 @@ export function createRoutes(pool: Pool): Router {
   //  WORKSPACES
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/workspaces — list all workspace paths
-  router.get('/workspaces', async (_req: Request, res: Response) => {
+  // GET /api/workspaces — list all workspace paths with pagination
+  router.get('/workspaces', async (req: Request, res: Response) => {
     try {
-      const { rows } = await pool.query(
-        `SELECT w.id, w.system_id, w.subsystem_id, w.workspace_path, w.created_at,
-                s.name AS system_name, sub.name AS subsystem_name
-         FROM nebula.system_workspaces w
-         LEFT JOIN nebula.systems s ON s.id = w.system_id
-         LEFT JOIN nebula.subsystems sub ON sub.id = w.subsystem_id
-         ORDER BY s.name, sub.name`
-      );
-      res.json(rows.map((r: any) => ({
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT w.id, w.system_id, w.subsystem_id, w.workspace_path, w.created_at,
+                  s.name AS system_name, sub.name AS subsystem_name
+           FROM nebula.system_workspaces w
+           LEFT JOIN nebula.systems s ON s.id = w.system_id
+           LEFT JOIN nebula.subsystems sub ON sub.id = w.subsystem_id
+           ORDER BY s.name, sub.name
+           LIMIT $1 OFFSET $2`,
+          [pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.system_workspaces'),
+      ]);
+
+      const items = dataResult.rows.map((r: any) => ({
         ...toEpochMs(r, 'created_at'),
         systemId: r.system_id,
         subsystemId: r.subsystem_id,
         workspacePath: r.workspace_path,
         systemName: r.system_name,
         subsystemName: r.subsystem_name,
-      })));
+      }));
+
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1394,12 +1531,15 @@ export function createRoutes(pool: Pool): Router {
   //  PLANS DISPLAY (Plan 0134)
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/plans — list implementation plans from nebula.implementation_plans
-  // ?status=archived|pending|... & ?limit=N
+  // GET /api/plans — list implementation plans with pagination
+  // ?status=archived|pending|... & ?page=N & ?pageSize=N
   router.get('/plans', async (req: Request, res: Response) => {
     try {
-      const { status, limit: qLimit } = req.query;
-      const limit = Math.min(parseInt(qLimit as string) || 500, 1000);
+      const { status } = req.query;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
       const clauses: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -1408,20 +1548,32 @@ export function createRoutes(pool: Pool): Router {
         vals.push(status);
       }
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
-      vals.push(limit);
-      const { rows } = await pool.query(
-        `SELECT p.plan_number AS id, p.title, p.goal, p.content,
-                p.files_affected, p.acceptance_criteria, p.dependencies,
-                p.status, p.metadata, p.created_at, p.updated_at,
-                char_length(p.content)::int AS "sizeBytes",
-                p.updated_at AS "modifiedAt"
-         FROM nebula.implementation_plans p
-         ${where}
-         ORDER BY p.updated_at DESC
-         LIMIT $${i}`,
-        vals
-      );
-      res.json({ plans: rows, count: rows.length });
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT p.plan_number AS id, p.title, p.goal, p.content,
+                  p.files_affected, p.acceptance_criteria, p.dependencies,
+                  p.status, p.metadata, p.created_at, p.updated_at,
+                  char_length(p.content)::int AS "sizeBytes",
+                  p.updated_at AS "modifiedAt"
+           FROM nebula.implementation_plans p
+           ${where}
+           ORDER BY p.updated_at DESC
+           LIMIT $${i} OFFSET $${i+1}`,
+          [...vals, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total FROM nebula.implementation_plans p ${where}`,
+          vals
+        ),
+      ]);
+
+      res.json({
+        items: dataResult.rows,
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1464,23 +1616,48 @@ export function createRoutes(pool: Pool): Router {
   router.get('/systems/:id/implementation-plans', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rows } = await pool.query(
-        `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
-                p.files_affected, p.acceptance_criteria, p.dependencies,
-                p.status, p.metadata, p.created_at, p.updated_at,
-                char_length(p.content)::int AS "sizeBytes",
-                p.updated_at AS "modifiedAt"
-         FROM nebula.implementation_plans p
-         JOIN nebula.cross_references cr ON cr.target_type = 'plan'
-             AND cr.target_id = p.plan_number
-             AND cr.rel_type = 'spawns_plan'
-         JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
-             AND cr.source_type = 'harvest_candidate'
-         WHERE hc.system_id = $1
-         ORDER BY p.updated_at DESC`,
-        [id]
-      );
-      res.json({ systemId: id, plans: rows, count: rows.length });
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
+                  p.files_affected, p.acceptance_criteria, p.dependencies,
+                  p.status, p.metadata, p.created_at, p.updated_at,
+                  char_length(p.content)::int AS "sizeBytes",
+                  p.updated_at AS "modifiedAt"
+           FROM nebula.implementation_plans p
+           JOIN nebula.cross_references cr ON cr.target_type = 'plan'
+               AND cr.target_id = p.plan_number
+               AND cr.rel_type = 'spawns_plan'
+           JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
+               AND cr.source_type = 'harvest_candidate'
+           WHERE hc.system_id = $1
+           ORDER BY p.updated_at DESC
+           LIMIT $2 OFFSET $3`,
+          [id, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(DISTINCT p.plan_number)::int AS total
+           FROM nebula.implementation_plans p
+           JOIN nebula.cross_references cr ON cr.target_type = 'plan'
+               AND cr.target_id = p.plan_number
+               AND cr.rel_type = 'spawns_plan'
+           JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
+               AND cr.source_type = 'harvest_candidate'
+           WHERE hc.system_id = $1`,
+          [id]
+        ),
+      ]);
+
+      res.json({
+        systemId: id,
+        items: dataResult.rows,
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1490,23 +1667,48 @@ export function createRoutes(pool: Pool): Router {
   router.get('/subsystems/:id/implementation-plans', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rows } = await pool.query(
-        `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
-                p.files_affected, p.acceptance_criteria, p.dependencies,
-                p.status, p.metadata, p.created_at, p.updated_at,
-                char_length(p.content)::int AS "sizeBytes",
-                p.updated_at AS "modifiedAt"
-         FROM nebula.implementation_plans p
-         JOIN nebula.cross_references cr ON cr.target_type = 'plan'
-             AND cr.target_id = p.plan_number
-             AND cr.rel_type = 'spawns_plan'
-         JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
-             AND cr.source_type = 'harvest_candidate'
-         WHERE hc.subsystem_id = $1
-         ORDER BY p.updated_at DESC`,
-        [id]
-      );
-      res.json({ subsystemId: id, plans: rows, count: rows.length });
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
+                  p.files_affected, p.acceptance_criteria, p.dependencies,
+                  p.status, p.metadata, p.created_at, p.updated_at,
+                  char_length(p.content)::int AS "sizeBytes",
+                  p.updated_at AS "modifiedAt"
+           FROM nebula.implementation_plans p
+           JOIN nebula.cross_references cr ON cr.target_type = 'plan'
+               AND cr.target_id = p.plan_number
+               AND cr.rel_type = 'spawns_plan'
+           JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
+               AND cr.source_type = 'harvest_candidate'
+           WHERE hc.subsystem_id = $1
+           ORDER BY p.updated_at DESC
+           LIMIT $2 OFFSET $3`,
+          [id, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(DISTINCT p.plan_number)::int AS total
+           FROM nebula.implementation_plans p
+           JOIN nebula.cross_references cr ON cr.target_type = 'plan'
+               AND cr.target_id = p.plan_number
+               AND cr.rel_type = 'spawns_plan'
+           JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
+               AND cr.source_type = 'harvest_candidate'
+           WHERE hc.subsystem_id = $1`,
+          [id]
+        ),
+      ]);
+
+      res.json({
+        subsystemId: id,
+        items: dataResult.rows,
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1516,23 +1718,48 @@ export function createRoutes(pool: Pool): Router {
   router.get('/features/:id/implementation-plans', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rows } = await pool.query(
-        `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
-                p.files_affected, p.acceptance_criteria, p.dependencies,
-                p.status, p.metadata, p.created_at, p.updated_at,
-                char_length(p.content)::int AS "sizeBytes",
-                p.updated_at AS "modifiedAt"
-         FROM nebula.implementation_plans p
-         JOIN nebula.cross_references cr ON cr.target_type = 'plan'
-             AND cr.target_id = p.plan_number
-             AND cr.rel_type = 'spawns_plan'
-         JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
-             AND cr.source_type = 'harvest_candidate'
-         WHERE hc.feature_id = $1
-         ORDER BY p.updated_at DESC`,
-        [id]
-      );
-      res.json({ featureId: id, plans: rows, count: rows.length });
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT DISTINCT p.plan_number AS id, p.title, p.goal, p.content,
+                  p.files_affected, p.acceptance_criteria, p.dependencies,
+                  p.status, p.metadata, p.created_at, p.updated_at,
+                  char_length(p.content)::int AS "sizeBytes",
+                  p.updated_at AS "modifiedAt"
+           FROM nebula.implementation_plans p
+           JOIN nebula.cross_references cr ON cr.target_type = 'plan'
+               AND cr.target_id = p.plan_number
+               AND cr.rel_type = 'spawns_plan'
+           JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
+               AND cr.source_type = 'harvest_candidate'
+           WHERE hc.feature_id = $1
+           ORDER BY p.updated_at DESC
+           LIMIT $2 OFFSET $3`,
+          [id, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(DISTINCT p.plan_number)::int AS total
+           FROM nebula.implementation_plans p
+           JOIN nebula.cross_references cr ON cr.target_type = 'plan'
+               AND cr.target_id = p.plan_number
+               AND cr.rel_type = 'spawns_plan'
+           JOIN nebula.harvest_candidates hc ON hc.id = cr.source_id
+               AND cr.source_type = 'harvest_candidate'
+           WHERE hc.feature_id = $1`,
+          [id]
+        ),
+      ]);
+
+      res.json({
+        featureId: id,
+        items: dataResult.rows,
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1615,21 +1842,32 @@ export function createRoutes(pool: Pool): Router {
     }
   }
 
-  // GET /api/audit — list all audit files (metadata only, no content)
-  router.get('/audit', async (_req: Request, res: Response) => {
+  // GET /api/audit — list all audit files with pagination
+  router.get('/audit', async (req: Request, res: Response) => {
     try {
-      const { rows } = await pool.query(
-        'SELECT id, file_path, size_bytes, recorded_on_dt FROM audit_files ORDER BY file_path'
-      );
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          'SELECT id, file_path, size_bytes, recorded_on_dt FROM audit_files ORDER BY file_path LIMIT $1 OFFSET $2',
+          [pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM audit_files'),
+      ]);
+
       res.json({
-        files: rows.map((r: any) => ({
+        items: dataResult.rows.map((r: any) => ({
           id: r.id,
           filePath: r.file_path,
           content: '',
           sizeBytes: r.size_bytes,
           updatedAt: new Date(r.recorded_on_dt).getTime(),
         })),
-        count: rows.length,
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -2068,7 +2306,7 @@ export function createRoutes(pool: Pool): Router {
   //  HARVESTS — database-first harvest pipeline output
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/harvests — list all harvests with sort/filter support
+  // GET /api/harvests — list all harvests with sort/filter support + pagination
   // sort options: candidate_count, code_blocks, turns, block_density, collaboration, created_at
   router.get('/harvests', async (req: Request, res: Response) => {
     try {
@@ -2079,8 +2317,8 @@ export function createRoutes(pool: Pool): Router {
       const visibilityScope = req.query.visibilityScope as string | undefined;
       const tag = req.query.tag as string | undefined;
       const sort = (req.query.sort as string) || 'created_at';
-      const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
-      const offset = parseInt(req.query.offset as string) || 0;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
 
       const validSorts = ['candidate_count', 'code_blocks', 'turns', 'block_density', 'collaboration', 'created_at', 'tag_frequency', 'keyword_hits'];
       if (!validSorts.includes(sort)) {
@@ -2122,7 +2360,7 @@ export function createRoutes(pool: Pool): Router {
       if (tag) { clauses.push(`$${pi++} = ANY(h.tags)`); params.push(tag); }
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
-      const query = `
+      const dataQuery = `
         SELECT h.id, h.source_path, h.source_filename, h.model,
                h.total_candidates, h.tags, h.metadata, h.created_at,
                h.level, h.visibility_scope,
@@ -2140,10 +2378,20 @@ export function createRoutes(pool: Pool): Router {
         ${where}
         ORDER BY ${sortExpr[sort]} DESC NULLS LAST
         LIMIT $${pi} OFFSET $${pi + 1}`;
-      params.push(limit, offset);
 
-      const { rows } = await pool.query(query, params);
-      res.json({ harvests: rows, count: rows.length, sort });
+      // Parallel count query with same filters (no sort expression needed)
+      const countParams = params.slice(0, pi - 1); // exclude pagination params since they're not yet pushed
+      const countQuery = `SELECT COUNT(*)::int AS total FROM nebula.harvests h ${where}`;
+
+      params.push(pageSize, (page - 1) * pageSize);
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(dataQuery, params),
+        pool.query(countQuery, countParams),
+      ]);
+
+      const items = dataResult.rows;
+      const total = parseInt(countResult.rows[0].total, 10);
+      res.json({ items, total, page, pageSize, sort });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3035,19 +3283,25 @@ export function createRoutes(pool: Pool): Router {
   // ════════════════════════════════════════════════════════════════
 
 
-  // GET /api/work-requests — list ALL work requests (unscoped, when no hierarchy selected)
+  // GET /api/work-requests — list ALL work requests with pagination
   router.get('/work-requests', async (req: Request, res: Response) => {
     try {
-      const { limit: qLimit } = req.query;
-      const limit = Math.min(parseInt(qLimit as string) || 500, 1000);
-      const { rows } = await pool.query(
-        `SELECT wr.*
-         FROM nebula.work_requests wr
-         ORDER BY wr.created_at DESC
-         LIMIT $1`,
-        [limit]
-      );
-      res.json({ workRequests: rows, count: rows.length });
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT wr.*
+           FROM nebula.work_requests wr
+           ORDER BY wr.created_at DESC
+           LIMIT $1 OFFSET $2`,
+          [pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.work_requests'),
+      ]);
+
+      res.json({ items: dataResult.rows, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3073,19 +3327,38 @@ export function createRoutes(pool: Pool): Router {
   router.get('/systems/:id/work-requests', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rows } = await pool.query(
-        `SELECT DISTINCT ON (wr.id) wr.*
-         FROM nebula.work_requests wr
-         LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
-         LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
-         LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-         LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-         WHERE req.system_id = $1 OR hc.system_id = $1
-         ORDER BY wr.id, wr.created_at DESC`,
-        [id]
-      );
-      res.json({ systemId: id, workRequests: rows, count: rows.length });
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT DISTINCT ON (wr.id) wr.*
+           FROM nebula.work_requests wr
+           LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
+           LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
+           LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
+           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           WHERE req.system_id = $1 OR hc.system_id = $1
+           ORDER BY wr.id, wr.created_at DESC
+           LIMIT $2 OFFSET $3`,
+          [id, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total
+           FROM nebula.work_requests wr
+           LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
+           LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
+           LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
+           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           WHERE req.system_id = $1 OR hc.system_id = $1`,
+          [id]
+        ),
+      ]);
+
+      res.json({ items: dataResult.rows, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3095,19 +3368,38 @@ export function createRoutes(pool: Pool): Router {
   router.get('/subsystems/:id/work-requests', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rows } = await pool.query(
-        `SELECT DISTINCT ON (wr.id) wr.*
-         FROM nebula.work_requests wr
-         LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
-         LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
-         LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-         LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-         WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1
-         ORDER BY wr.id, wr.created_at DESC`,
-        [id]
-      );
-      res.json({ subsystemId: id, workRequests: rows, count: rows.length });
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT DISTINCT ON (wr.id) wr.*
+           FROM nebula.work_requests wr
+           LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
+           LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
+           LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
+           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1
+           ORDER BY wr.id, wr.created_at DESC
+           LIMIT $2 OFFSET $3`,
+          [id, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total
+           FROM nebula.work_requests wr
+           LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
+           LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
+           LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
+           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           WHERE req.subsystem_id = $1 OR hc.subsystem_id = $1`,
+          [id]
+        ),
+      ]);
+
+      res.json({ items: dataResult.rows, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3117,19 +3409,38 @@ export function createRoutes(pool: Pool): Router {
   router.get('/features/:id/work-requests', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rows } = await pool.query(
-        `SELECT DISTINCT ON (wr.id) wr.*
-         FROM nebula.work_requests wr
-         LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
-         LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
-         LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
-         LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
-         LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
-         WHERE req.feature_id = $1 OR hc.feature_id = $1
-         ORDER BY wr.id, wr.created_at DESC`,
-        [id]
-      );
-      res.json({ featureId: id, workRequests: rows, count: rows.length });
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT DISTINCT ON (wr.id) wr.*
+           FROM nebula.work_requests wr
+           LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
+           LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
+           LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
+           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           WHERE req.feature_id = $1 OR hc.feature_id = $1
+           ORDER BY wr.id, wr.created_at DESC
+           LIMIT $2 OFFSET $3`,
+          [id, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total
+           FROM nebula.work_requests wr
+           LEFT JOIN nebula.requirements req ON req.id = wr.source_requirement_id
+           LEFT JOIN nebula.specifications spec ON spec.id = wr.source_specification_id
+           LEFT JOIN nebula.agenda_items ai ON ai.agenda_id = spec.agenda_id AND ai.included = true
+           LEFT JOIN nebula.intent_records ir ON ir.id = ai.source_id AND ai.source_type = 'intent_record'
+           LEFT JOIN nebula.harvest_candidates hc ON hc.id = ir.candidate_id
+           WHERE req.feature_id = $1 OR hc.feature_id = $1`,
+          [id]
+        ),
+      ]);
+
+      res.json({ items: dataResult.rows, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3137,9 +3448,10 @@ export function createRoutes(pool: Pool): Router {
   // GET /api/harvest-candidates — list candidates, filterable by harvest or hierarchy
   router.get('/harvest-candidates', async (req: Request, res: Response) => {
     try {
-      const { harvestId, systemId, subsystemId, featureId, limit: qLimit, offset: qOffset } = req.query;
-      const limit = Math.min(parseInt(qLimit as string) || 100, 500);
-      const offset = parseInt(qOffset as string) || 0;
+      const { harvestId, systemId, subsystemId, featureId } = req.query;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -3150,21 +3462,35 @@ export function createRoutes(pool: Pool): Router {
       if (featureId) { clauses.push(`hc.feature_id = $${i++}`); vals.push(featureId); }
 
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
-      vals.push(limit, offset);
 
-      const { rows } = await pool.query(
-        `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description, hc.status, hc.tags,
-                hc.system_id, hc.subsystem_id, hc.feature_id,
-                hc.work_request_id, hc.completed,
-                hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
-                h.source_filename AS harvest_source
-         FROM nebula.harvest_candidates hc
-         LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
-         ${where}
-         ORDER BY hc.created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-        vals
-      );
-      res.json({ candidates: rows, count: rows.length });
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description, hc.status, hc.tags,
+                  hc.system_id, hc.subsystem_id, hc.feature_id,
+                  hc.work_request_id, hc.completed,
+                  hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
+                  h.source_filename AS harvest_source
+           FROM nebula.harvest_candidates hc
+           LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+           ${where}
+           ORDER BY hc.created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+          [...vals, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total
+           FROM nebula.harvest_candidates hc
+           LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+           ${where}`,
+          vals
+        ),
+      ]);
+
+      res.json({
+        items: dataResult.rows,
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3595,7 +3921,7 @@ export function createRoutes(pool: Pool): Router {
       const allFeatures = featuresRes.rows;
 
       // 3. For each candidate, run semantic search (parallelized) and evaluate confidence
-      const scriptPath = '/home/codex/dev/nexus/python/rover/unified_semantic_search.py';
+      const scriptPath = '/home/codex/dev/nexus/bin/unified_semantic_search.py';
       const pythonBin = '/home/codex/dev/nexus/python/rover/.venv/bin/python3';
 
       interface MatchResult {
@@ -3771,12 +4097,13 @@ export function createRoutes(pool: Pool): Router {
   //  AGENT RECORDS — database-first audit trail
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/agent-records — list records with optional filters
+  // GET /api/agent-records — list records with optional filters and pagination
   router.get('/agent-records', async (req: Request, res: Response) => {
     try {
-      const { type, role, systemId, subsystemId, featureId, planRef, tag, search, createdAfter, createdBefore, level, visibilityScope, limit: qLimit, offset: qOffset } = req.query;
-      const limit = Math.min(parseInt(qLimit as string) || 100, 500);
-      const offset = parseInt(qOffset as string) || 0;
+      const { type, role, systemId, subsystemId, featureId, planRef, tag, search, createdAfter, createdBefore, level, visibilityScope } = req.query;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -3826,13 +4153,26 @@ export function createRoutes(pool: Pool): Router {
       if (visibilityScope) { clauses.push(`visibility_scope = $${i++}`); vals.push(visibilityScope); }
 
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
-      const { rows } = await pool.query(
-        `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
-         FROM nebula.agent_records ${where}
-         ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-        [...vals, limit, offset]
-      );
-      res.json({ records: rows, count: rows.length });
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT id, record_type, role, title, source_path, tags, system_id, subsystem_id, feature_id, plan_ref, created_at, recorded_on_dt, level, visibility_scope
+           FROM nebula.agent_records ${where}
+           ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+          [...vals, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total FROM nebula.agent_records ${where}`,
+          vals
+        ),
+      ]);
+
+      res.json({
+        items: dataResult.rows,
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -4166,6 +4506,10 @@ export function createRoutes(pool: Pool): Router {
   router.get('/cross-references', async (req: Request, res: Response) => {
     try {
       const { sourceType, sourceId, targetType, targetId, relType } = req.query;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
       const clauses: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -4175,11 +4519,24 @@ export function createRoutes(pool: Pool): Router {
       if (targetId) { clauses.push(`target_id = $${i++}`); vals.push(targetId); }
       if (relType) { clauses.push(`rel_type = $${i++}`); vals.push(relType); }
       const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-      const { rows } = await pool.query(
-        `SELECT * FROM nebula.cross_references ${where} ORDER BY created_at DESC`,
-        vals
-      );
-      res.json(rows.map((r: any) => toEpochMs(r, 'created_at')));
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT * FROM nebula.cross_references ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+          [...vals, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total FROM nebula.cross_references ${where}`,
+          vals
+        ),
+      ]);
+
+      res.json({
+        items: dataResult.rows.map((r: any) => toEpochMs(r, 'created_at')),
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -4289,8 +4646,10 @@ export function createRoutes(pool: Pool): Router {
       const {
         knowledgeEntityId, nebulaHarvestId, nebulaCandidateId,
         linkType, provenance, minConfidence, maxConfidence,
-        limit, offset,
       } = req.query;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
 
       const clauses: string[] = [];
       const vals: any[] = [];
@@ -4305,14 +4664,24 @@ export function createRoutes(pool: Pool): Router {
       if (maxConfidence) { clauses.push(`confidence <= $${i++}`); vals.push(parseFloat(maxConfidence as string)); }
 
       const where = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-      const l = limit ? parseInt(limit as string, 10) : 100;
-      const o = offset ? parseInt(offset as string, 10) : 0;
 
-      const { rows } = await pool.query(
-        `SELECT * FROM knowledge.evidence_links ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
-        [...vals, l, o]
-      );
-      res.json(rows.map((r: any) => toEpochMs(r, 'created_at')));
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT * FROM knowledge.evidence_links ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+          [...vals, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total FROM knowledge.evidence_links ${where}`,
+          vals
+        ),
+      ]);
+
+      res.json({
+        items: dataResult.rows.map((r: any) => toEpochMs(r, 'created_at')),
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -4744,39 +5113,50 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // GET /api/op-registry — list registry entries with optional filters
+  // GET /api/op-registry — list registry entries with optional filters and pagination
   router.get('/op-registry', async (req: Request, res: Response) => {
     try {
       const {
         intent_id, status, search,
-        limit: qLimit, offset: qOffset,
       } = req.query;
-      const limit = Math.min(parseInt(qLimit as string) || 100, 500);
-      const offset = parseInt(qOffset as string) || 0;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
 
       const conditions: string[] = ['deleted_at IS NULL'];
-      const params: any[] = [];
+      const filterParams: any[] = [];
       let i = 1;
 
-      if (intent_id) { conditions.push(`intent_id = $${i++}`); params.push(intent_id); }
-      if (status) { conditions.push(`status = $${i++}`); params.push(status); }
+      if (intent_id) { conditions.push(`intent_id = $${i++}`); filterParams.push(intent_id); }
+      if (status) { conditions.push(`status = $${i++}`); filterParams.push(status); }
       if (search) {
         conditions.push(`(label ILIKE $${i} OR intent_id ILIKE $${i} OR notes ILIKE $${i})`);
-        params.push(`%${search}%`);
+        filterParams.push(`%${search}%`);
         i++;
       }
 
       const where = conditions.join(' AND ');
-      params.push(limit, offset);
 
-      const { rows } = await pool.query(
-        `SELECT * FROM nebula.op_registry
-         WHERE ${where}
-         ORDER BY intent_id, version DESC
-         LIMIT $${i++} OFFSET $${i}`,
-        params
-      );
-      res.json({ entries: rows, count: rows.length });
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT * FROM nebula.op_registry
+           WHERE ${where}
+           ORDER BY intent_id, version DESC
+           LIMIT $${i++} OFFSET $${i}`,
+          [...filterParams, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total FROM nebula.op_registry WHERE ${where}`,
+          filterParams
+        ),
+      ]);
+
+      res.json({
+        items: dataResult.rows,
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5652,7 +6032,7 @@ export function createRoutes(pool: Pool): Router {
       const where = 'WHERE ' + clauses.join(' AND ');
       const { rows } = await pool.query(
         `SELECT oq.id, oq.requirement_id, oq.candidate_id, oq.title, oq.description, oq.category,
-                oq.status, oq.blocking, oq.resolution, oq.answered_by, oq.answered_at,
+                oq.status, oq.blocking,
                 oq.resolved_by, oq.resolved_at, oq.created_by, oq.created_at,
                 COALESCE(ac.answer_count, 0) AS answer_count,
                 COALESCE(ac.role_count, 0) AS role_count
@@ -5707,16 +6087,8 @@ export function createRoutes(pool: Pool): Router {
          RETURNING id, question_id, role, answer, confidence, reasoning, answered_at`,
         [id, role, answer, confidence || 'MEDIUM', reasoning || null]
       );
-      // Also update the single-answer columns on open_questions for backwards compatibility
-      await pool.query(
-        `UPDATE nebula.open_questions
-         SET resolution = $1,
-             answered_by = $2,
-             answered_at = now(),
-             updated_at = now()
-         WHERE id = $3 AND status = 'OPEN'`,
-        [answer, role, id]
-      );
+      // Note: legacy single-answer columns (resolution, answered_by, answered_at)
+      // have been removed from the schema. Answers live in open_question_answers only.
       res.status(201).json(rows[0]);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -5744,16 +6116,14 @@ export function createRoutes(pool: Pool): Router {
              answered_at = now()`,
         [id, answeredBy, answer]
       );
-      // Update single-answer columns on open_questions
+      // Open questions no longer store single-answer columns (resolution, answered_by, answered_at).
+      // The update now only sets updated_at. Answers are tracked in open_question_answers.
       const { rows } = await pool.query(
         `UPDATE nebula.open_questions
-         SET resolution = $1,
-             answered_by = $2,
-             answered_at = now(),
-             updated_at = now()
-         WHERE id = $3 AND status = 'OPEN'
-         RETURNING id, title, status, resolution, answered_by, answered_at`,
-        [answer, answeredBy, id]
+         SET updated_at = now()
+         WHERE id = $1 AND status = 'OPEN'
+         RETURNING id, title, status`,
+        [id]
       );
       if (rows.length === 0) {
         res.status(404).json({ error: 'Question not found or already closed' });
@@ -5780,8 +6150,9 @@ export function createRoutes(pool: Pool): Router {
              resolved_by = $1,
              resolved_at = now(),
              updated_at = now()
-         WHERE id = $2 AND status = 'OPEN' AND resolution IS NOT NULL
-         RETURNING id, title, status, resolution, answered_by, resolved_by, resolved_at`,
+         WHERE id = $2 AND status = 'OPEN'
+           AND EXISTS (SELECT 1 FROM nebula.open_question_answers WHERE question_id = $2)
+         RETURNING id, title, status, resolved_by, resolved_at`,
         [resolvedBy, id]
       );
       if (rows.length === 0) {
@@ -5789,6 +6160,628 @@ export function createRoutes(pool: Pool): Router {
         return;
       }
       res.json(rows[0]);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  ROLES
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/roles — list all roles (governance roles with capabilities)
+  router.get('/roles', async (_req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        'SELECT * FROM nebula.roles ORDER BY name ASC'
+      );
+      res.json(rows.map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        displayName: r.display_name,
+        description: r.description,
+        ownsDomains: r.owns_domains,
+        canGreenlight: r.can_greenlight,
+        canCreateQuestions: r.can_create_questions,
+        canCreateAgendas: r.can_create_agendas,
+        canResolveQuestions: r.can_resolve_questions,
+        canVerifyWorkRequests: r.can_verify_work_requests,
+        maxOpenQuestions: r.max_open_questions,
+        requiresApprovalFrom: r.requires_approval_from,
+        cronEnabled: r.cron_enabled,
+        cronExpression: r.cron_expression,
+        cronDescription: r.cron_description,
+        escalatesTo: r.escalates_to,
+        escalationTriggers: r.escalation_triggers,
+        levelFilterPrimary: r.level_filter_primary,
+        levelFilterAllowed: r.level_filter_allowed,
+        visibilityScope: r.visibility_scope,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+      })));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/roles/:id — single role
+  router.get('/roles/:id', async (req: Request, res: Response) => {
+    try {
+      const { rows: [role] } = await pool.query(
+        'SELECT * FROM nebula.roles WHERE id = $1',
+        [req.params.id]
+      );
+      if (!role) {
+        res.status(404).json({ error: 'Role not found' });
+        return;
+      }
+      res.json({
+        id: role.id,
+        name: role.name,
+        displayName: role.display_name,
+        description: role.description,
+        ownsDomains: role.owns_domains,
+        canGreenlight: role.can_greenlight,
+        canCreateQuestions: role.can_create_questions,
+        canCreateAgendas: role.can_create_agendas,
+        canResolveQuestions: role.can_resolve_questions,
+        canVerifyWorkRequests: role.can_verify_work_requests,
+        maxOpenQuestions: role.max_open_questions,
+        requiresApprovalFrom: role.requires_approval_from,
+        cronEnabled: role.cron_enabled,
+        cronExpression: role.cron_expression,
+        cronDescription: role.cron_description,
+        escalatesTo: role.escalates_to,
+        escalationTriggers: role.escalation_triggers,
+        levelFilterPrimary: role.level_filter_primary,
+        levelFilterAllowed: role.level_filter_allowed,
+        visibilityScope: role.visibility_scope,
+        createdAt: role.created_at ? new Date(role.created_at).toISOString() : null,
+        updatedAt: role.updated_at ? new Date(role.updated_at).toISOString() : null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  INTENT RECORDS
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/intents — list with pagination
+  router.get('/intents', async (req: Request, res: Response) => {
+    try {
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT id, candidate_id, parent_id, title, description,
+                  source_type, source_ref, tags, status, metadata,
+                  created_at, updated_at
+           FROM nebula.intent_records
+           ORDER BY created_at DESC
+           LIMIT $1 OFFSET $2`,
+          [pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.intent_records'),
+      ]);
+
+      const items = dataResult.rows.map((r: any) => ({
+        id: r.id,
+        candidateId: r.candidate_id,
+        parentId: r.parent_id,
+        title: r.title,
+        description: r.description,
+        sourceType: r.source_type,
+        sourceRef: r.source_ref,
+        tags: r.tags,
+        status: r.status,
+        metadata: r.metadata,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+      }));
+
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/intents/:id — single intent record
+  router.get('/intents/:id', async (req: Request, res: Response) => {
+    try {
+      const { rows: [r] } = await pool.query(
+        `SELECT id, candidate_id, parent_id, title, description,
+                source_type, source_ref, tags, status, metadata,
+                created_at, updated_at
+         FROM nebula.intent_records WHERE id = $1`,
+        [req.params.id]
+      );
+      if (!r) { res.status(404).json({ error: 'Intent not found' }); return; }
+      res.json({
+        id: r.id,
+        candidateId: r.candidate_id,
+        parentId: r.parent_id,
+        title: r.title,
+        description: r.description,
+        sourceType: r.source_type,
+        sourceRef: r.source_ref,
+        tags: r.tags,
+        status: r.status,
+        metadata: r.metadata,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  ASSESSMENTS
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/assessments — list with pagination
+  router.get('/assessments', async (req: Request, res: Response) => {
+    try {
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT id, observation_id, outcome, confidence, impact_scope,
+                  open_questions, agenda_id, auto_resolve_plan_id,
+                  forum_post_id, analysis_detail, created_at
+           FROM nebula.assessments
+           ORDER BY created_at DESC
+           LIMIT $1 OFFSET $2`,
+          [pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.assessments'),
+      ]);
+
+      const items = dataResult.rows.map((r: any) => ({
+        id: r.id,
+        observationId: r.observation_id,
+        outcome: r.outcome,
+        confidence: r.confidence != null ? parseFloat(r.confidence) : null,
+        impactScope: r.impact_scope,
+        openQuestions: r.open_questions,
+        agendaId: r.agenda_id,
+        autoResolvePlanId: r.auto_resolve_plan_id,
+        forumPostId: r.forum_post_id,
+        analysisDetail: r.analysis_detail,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+      }));
+
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/assessments/:id — single assessment
+  router.get('/assessments/:id', async (req: Request, res: Response) => {
+    try {
+      const { rows: [r] } = await pool.query(
+        `SELECT id, observation_id, outcome, confidence, impact_scope,
+                open_questions, agenda_id, auto_resolve_plan_id,
+                forum_post_id, analysis_detail, created_at
+         FROM nebula.assessments WHERE id = $1`,
+        [req.params.id]
+      );
+      if (!r) { res.status(404).json({ error: 'Assessment not found' }); return; }
+      res.json({
+        id: r.id,
+        observationId: r.observation_id,
+        outcome: r.outcome,
+        confidence: r.confidence != null ? parseFloat(r.confidence) : null,
+        impactScope: r.impact_scope,
+        openQuestions: r.open_questions,
+        agendaId: r.agenda_id,
+        autoResolvePlanId: r.auto_resolve_plan_id,
+        forumPostId: r.forum_post_id,
+        analysisDetail: r.analysis_detail,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  OBSERVATIONS
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/observations — list with pagination
+  router.get('/observations', async (req: Request, res: Response) => {
+    try {
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT id, trigger_type, source_artifact_type, source_artifact_id,
+                  payload, assessed, created_at
+           FROM nebula.observations
+           ORDER BY created_at DESC
+           LIMIT $1 OFFSET $2`,
+          [pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.observations'),
+      ]);
+
+      const items = dataResult.rows.map((r: any) => ({
+        id: r.id,
+        triggerType: r.trigger_type,
+        sourceArtifactType: r.source_artifact_type,
+        sourceArtifactId: r.source_artifact_id,
+        payload: r.payload,
+        assessed: r.assessed,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+      }));
+
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/observations/:id — single observation
+  router.get('/observations/:id', async (req: Request, res: Response) => {
+    try {
+      const { rows: [r] } = await pool.query(
+        `SELECT id, trigger_type, source_artifact_type, source_artifact_id,
+                payload, assessed, created_at
+         FROM nebula.observations WHERE id = $1`,
+        [req.params.id]
+      );
+      if (!r) { res.status(404).json({ error: 'Observation not found' }); return; }
+      res.json({
+        id: r.id,
+        triggerType: r.trigger_type,
+        sourceArtifactType: r.source_artifact_type,
+        sourceArtifactId: r.source_artifact_id,
+        payload: r.payload,
+        assessed: r.assessed,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  OPEN QUESTIONS — detail (list already exists above)
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/open-questions/:id — single open question
+  router.get('/open-questions/:id', async (req: Request, res: Response) => {
+    try {
+      const { rows: [r] } = await pool.query(
+        `SELECT oq.id, oq.requirement_id, oq.candidate_id, oq.title, oq.description,
+                oq.category, oq.status, oq.blocking,
+                oq.created_by, oq.created_at, oq.updated_at,
+                oq.resolved_by, oq.resolved_at,
+                link.entity_type, link.entity_id, link.entity_title
+         FROM nebula.open_questions oq
+         LEFT JOIN LATERAL (
+           SELECT
+             qe.entity_type, qe.entity_id,
+             CASE
+               WHEN qe.entity_type = 'requirement' THEN (SELECT title FROM nebula.requirements WHERE id = qe.entity_id)
+               WHEN qe.entity_type = 'candidate' THEN (SELECT title FROM nebula.harvest_candidates WHERE id = qe.entity_id)
+               WHEN qe.entity_type = 'harvest' THEN (SELECT source_filename FROM nebula.harvests WHERE id = qe.entity_id)
+               WHEN qe.entity_type IN ('report', 'agent_record') THEN (SELECT title FROM nebula.agent_records WHERE id = qe.entity_id)
+               WHEN qe.entity_type = 'specification' THEN ('Rev #' || (SELECT revision_number::text FROM nebula.specifications WHERE id = qe.entity_id))
+               WHEN qe.entity_type = 'agenda' THEN (SELECT title FROM nebula.agendas WHERE id = qe.entity_id)
+               WHEN qe.entity_type = 'work_request' THEN (SELECT title FROM nebula.work_requests WHERE id = qe.entity_id)
+               ELSE qe.entity_id::text
+             END AS entity_title
+           FROM nebula.open_question_entities qe
+           WHERE qe.open_question_id = oq.id
+           ORDER BY qe.entity_type
+           LIMIT 1
+         ) link ON true
+         WHERE oq.id = $1`,
+        [req.params.id]
+      );
+      if (!r) { res.status(404).json({ error: 'Open question not found' }); return; }
+      res.json({
+        id: r.id,
+        requirementId: r.requirement_id,
+        candidateId: r.candidate_id,
+        title: r.title,
+        description: r.description,
+        category: r.category,
+        status: r.status,
+        blocking: r.blocking,
+        createdBy: r.created_by,
+        createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+        updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : null,
+        resolvedBy: r.resolved_by,
+        resolvedAt: r.resolved_at ? new Date(r.resolved_at).toISOString() : null,
+        entityType: r.entity_type,
+        entityId: r.entity_id,
+        entityTitle: r.entity_title,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  OPEN QUESTIONS — participants sub-resource
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/open-questions/:id/participants
+  router.get('/open-questions/:id/participants', async (req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, open_question_id, role, participated_at, contribution
+         FROM nebula.deliberation_participants
+         WHERE open_question_id = $1
+         ORDER BY participated_at ASC`,
+        [req.params.id]
+      );
+      res.json({
+        openQuestionId: req.params.id,
+        participants: rows.map((r: any) => ({
+          id: r.id,
+          openQuestionId: r.open_question_id,
+          role: r.role,
+          participatedAt: r.participated_at ? new Date(r.participated_at).toISOString() : null,
+          contribution: r.contribution,
+        })),
+        count: rows.length,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/open-questions/:id/participants
+  router.post('/open-questions/:id/participants', async (req: Request, res: Response) => {
+    try {
+      const { role, contribution } = req.body;
+      if (!role) { res.status(400).json({ error: 'role is required' }); return; }
+      const { rows: [p] } = await pool.query(
+        `INSERT INTO nebula.deliberation_participants
+         (open_question_id, role, contribution, participated_at)
+         VALUES ($1, $2, $3, now())
+         RETURNING id, open_question_id, role, contribution, participated_at`,
+        [req.params.id, role, contribution || null]
+      );
+      res.status(201).json({
+        id: p.id,
+        openQuestionId: p.open_question_id,
+        role: p.role,
+        contribution: p.contribution,
+        participatedAt: p.participated_at ? new Date(p.participated_at).toISOString() : null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  CANDIDATE DEPENDENCIES sub-resource
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/harvest-candidates/:id/dependencies
+  router.get('/harvest-candidates/:id/dependencies', async (req: Request, res: Response) => {
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, candidate_id, depends_on_id, created_at
+         FROM nebula.candidate_dependencies
+         WHERE candidate_id = $1
+         ORDER BY created_at ASC`,
+        [req.params.id]
+      );
+      res.json({
+        candidateId: req.params.id,
+        dependencies: rows.map((r: any) => ({
+          id: r.id,
+          candidateId: r.candidate_id,
+          dependsOnId: r.depends_on_id,
+          createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+        })),
+        count: rows.length,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  SEARCH (cross-entity full-text)
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/search?q=...
+  router.get('/search', async (req: Request, res: Response) => {
+    try {
+      const q = String(req.query.q || '').trim();
+      if (!q || q.length < 2) {
+        res.json({ query: q, results: [] });
+        return;
+      }
+
+      const escapeLike = (value: string) => value.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
+      const pattern = `%${escapeLike(q)}%`;
+      const limit = 20;
+
+      const [
+        threadResult, requirementResult, agendaResult, candidateResult,
+        harvestResult, oqResult, intentResult, assessmentResult,
+        observationResult, agentRecordResult, specificationResult, planResult,
+        userResult,
+      ] = await Promise.all([
+        // Threads
+        pool.query(
+          `SELECT id, title, text AS body, 'thread' AS result_type FROM assembly.posts
+           WHERE title ILIKE $1 ESCAPE '\\' OR text ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Requirements
+        pool.query(
+          `SELECT id, title, description, status, 'requirement' AS result_type FROM nebula.requirements
+           WHERE title ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Agendas
+        pool.query(
+          `SELECT id, title, planner_analysis AS description, status, 'agenda' AS result_type FROM nebula.agendas
+           WHERE title ILIKE $1 ESCAPE '\\' OR planner_analysis ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Harvest candidates
+        pool.query(
+          `SELECT id, title, intent_description AS description, status, 'candidate' AS result_type FROM nebula.harvest_candidates
+           WHERE title ILIKE $1 ESCAPE '\\' OR intent_description ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Harvests
+        pool.query(
+          `SELECT id, source_filename AS title, source_text AS description, model AS status, 'harvest' AS result_type FROM nebula.harvests
+           WHERE source_filename ILIKE $1 ESCAPE '\\' OR source_text ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Open questions
+        pool.query(
+          `SELECT id, title, description, status, 'open_question' AS result_type FROM nebula.open_questions
+           WHERE title ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Intent records
+        pool.query(
+          `SELECT id, title, description, status, 'intent' AS result_type FROM nebula.intent_records
+           WHERE title ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Assessments
+        pool.query(
+          `SELECT id, outcome AS title, analysis_detail AS description, outcome AS status, 'assessment' AS result_type FROM nebula.assessments
+           WHERE outcome ILIKE $1 ESCAPE '\\' OR analysis_detail ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Observations
+        pool.query(
+          `SELECT id, trigger_type AS title, payload::text AS description, 'observed' AS status, 'observation' AS result_type FROM nebula.observations
+           WHERE trigger_type ILIKE $1 ESCAPE '\\' OR payload::text ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Agent records
+        pool.query(
+          `SELECT id, title, content AS description, role AS status, 'agent_record' AS result_type FROM nebula.agent_records
+           WHERE title ILIKE $1 ESCAPE '\\' OR content ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Specifications
+        pool.query(
+          `SELECT id, change_summary AS title, revision_type AS description, 'spec' AS status, 'specification' AS result_type FROM nebula.specifications
+           WHERE change_summary ILIKE $1 ESCAPE '\\' OR revision_type ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Plans (conduit)
+        pool.query(
+          `SELECT id, title, goal AS description, COALESCE(derived_status, 'PLAN_CREATE') AS status, 'plan' AS result_type FROM conduit.plan_status
+           WHERE id IS NOT NULL AND id != ''
+             AND (title ILIKE $1 ESCAPE '\\' OR goal ILIKE $1 ESCAPE '\\' OR content ILIKE $1 ESCAPE '\\')
+           LIMIT $2`,
+          [pattern, limit]
+        ),
+        // Assembly users
+        pool.query(
+          `SELECT id, alias AS title, email AS description, 'user' AS status, 'user' AS result_type FROM assembly.users
+           WHERE alias ILIKE $1 ESCAPE '\\' OR email ILIKE $1 ESCAPE '\\' LIMIT $2`,
+          [pattern, limit]
+        ),
+      ]);
+
+      const results = [
+        ...threadResult.rows,
+        ...requirementResult.rows,
+        ...agendaResult.rows,
+        ...candidateResult.rows,
+        ...harvestResult.rows,
+        ...oqResult.rows,
+        ...intentResult.rows,
+        ...assessmentResult.rows,
+        ...observationResult.rows,
+        ...agentRecordResult.rows,
+        ...specificationResult.rows,
+        ...planResult.rows,
+        ...userResult.rows,
+      ]        .slice(0, 100).map((r: any) => {
+        // Route path mapping: DB-friendly result_type → hyphenated URL path
+        const routePaths: Record<string, string> = {
+          open_question: 'open-questions',
+          agent_record: 'agent-records',
+        };
+        const routePath = routePaths[r.result_type] || `${r.result_type}s`;
+        return {
+          type: r.result_type,
+          id: r.id,
+          title: r.title || '',
+          description: r.description ? r.description.slice(0, 200) : '',
+          status: r.status || null,
+          href: `/${routePath}/${r.id}`,
+        };
+      });
+
+      res.json({ query: q, results, total: results.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  COUNTS (aggregate row counts)
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/counts
+  router.get('/counts', async (_req: Request, res: Response) => {
+    try {
+      const [
+        postsResult, requirementsResult, agendasResult, candidatesResult,
+        harvestsResult, oqResult, intentsResult, assessmentsResult,
+        observationsResult, agentRecordsResult, specificationsResult, plansResult,
+        usersResult,
+      ] = await Promise.all([
+        pool.query('SELECT COUNT(*)::int AS total FROM assembly.posts'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.requirements'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.agendas'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.harvest_candidates'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.harvests'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.open_questions'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.intent_records'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.assessments'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.observations'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.agent_records'),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.specifications'),
+        pool.query('SELECT COUNT(*)::int AS total FROM conduit.plan_status WHERE id IS NOT NULL AND id != \'\''),
+        pool.query('SELECT COUNT(*)::int AS total FROM assembly.users'),
+      ]);
+
+      res.json({
+        threads: postsResult.rows[0].total,
+        requirements: requirementsResult.rows[0].total,
+        agendas: agendasResult.rows[0].total,
+        candidates: candidatesResult.rows[0].total,
+        harvests: harvestsResult.rows[0].total,
+        openQuestions: oqResult.rows[0].total,
+        intents: intentsResult.rows[0].total,
+        assessments: assessmentsResult.rows[0].total,
+        observations: observationsResult.rows[0].total,
+        agentRecords: agentRecordsResult.rows[0].total,
+        specifications: specificationsResult.rows[0].total,
+        plans: plansResult.rows[0].total,
+        users: usersResult.rows[0].total,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

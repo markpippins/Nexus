@@ -51,9 +51,10 @@ SPECIFIC_FILES=()           # optional: specific filenames for Stage 1
 # ── Paths ───────────────────────────────────────────────────────────────
 
 ROVER_DIR="/home/codex/dev/nexus/python/rover"
+BIN_DIR="/home/codex/dev/nexus/bin"
 VENV_ACTIVATE="${ROVER_DIR}/.venv/bin/activate"
-STAGE1="${ROVER_DIR}/batch_harvest_to_db.py"
-STAGE2="${ROVER_DIR}/batch_file_candidates.py"
+STAGE1="${BIN_DIR}/batch_harvest_to_db.py"
+STAGE2="${BIN_DIR}/batch_file_candidates.py"
 
 # ── Parse CLI flags ─────────────────────────────────────────────────────
 

@@ -40,6 +40,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -49,7 +50,10 @@ import uuid as uuidlib
 from datetime import datetime
 from typing import Any
 
-from event_emitter import emit_requirement_promoted_to_plan
+# Ensure parent dir (python/) is on path so rover.* is importable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from rover.event_emitter import emit_requirement_promoted_to_plan
 
 log = logging.getLogger("req_compiler")
 

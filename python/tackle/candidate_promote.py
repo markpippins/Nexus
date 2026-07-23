@@ -36,13 +36,17 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import subprocess
 import sys
 import uuid as uuidlib
 from datetime import datetime, timezone
 
-import agenda_matcher
-from event_emitter import (
+# Ensure parent dir (python/) is on path so rover.* and tackle.* are importable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from rover import agenda_matcher
+from rover.event_emitter import (
     emit_candidate_promoted,
     emit_intent_record_created,
     emit_agenda_item_added,

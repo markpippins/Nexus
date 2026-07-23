@@ -34,11 +34,15 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import subprocess
 import sys
 from datetime import datetime
 
-from event_emitter import (
+# Ensure parent dir (python/) is on path so rover.* and tackle.* are importable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from rover.event_emitter import (
     emit_candidate_assessed,
     emit_candidate_escalated,
     emit_candidate_greenlit,
@@ -186,37 +190,56 @@ def create_questions(candidate_id: str, assessment: dict, dry_run: bool = False)
         # Use MCP server's write functions for idempotent creation
         try:
             if q.get("category") == "DUPLICATE_DETECTED":
-                question_id = write_duplicate_question(
+                raw = write_duplicate_question(
                     candidate_id=candidate_id,
                     duplicate_of_title=q.get("component", "unknown"),
                     duplicate_of_id="",
                     source="cpf_assessment",
                 )
+                result = json.loads(raw) if isinstance(raw, str) else raw
+                question_id = result.get("question_id") if isinstance(result, dict) else None
             elif q.get("category") in ("WORK_COMPLETED", "DUPLICATE_CANDIDATE"):
-                question_id = write_evidence_question(
+                raw = write_evidence_question(
                     candidate_id=candidate_id,
                     evidence_type=q.get("category", "unknown"),
                     evidence_title=q.get("question", "")[:100],
                     evidence_id="",
                     confidence="medium",
                 )
+                result = json.loads(raw) if isinstance(raw, str) else raw
+                question_id = result.get("question_id") if isinstance(result, dict) else None
             else:
-                # Generic question — write directly
-                sql = f"""
-                    INSERT INTO nebula.open_questions (
-                        requirement_id, candidate_id, title, description,
-                        category, status, blocking, created_by
-                    ) VALUES (
-                        NULL, '{candidate_id}'::uuid,
-                        '{q["question"].replace("'", "''")}',
-                        'Auto-generated from CPF assessment. Component: {q.get("component", "unknown")}.',
-                        '{q.get("category", "GENERAL")}',
-                        'OPEN', true, 'planner'
-                    )
-                    RETURNING id;
+                # Generic question — dedup then write
+                title_clean = q["question"].replace("'", "''")
+                category = q.get("category", "GENERAL")
+                dedup_sql = f"""
+                    SELECT id FROM nebula.open_questions
+                    WHERE candidate_id = '{candidate_id}'::uuid
+                      AND category = '{category}'
+                      AND title = '{title_clean}'
+                      AND status = 'OPEN'
+                    LIMIT 1;
                 """
-                rc, out = psql(sql)
-                question_id = out.strip() if rc == 0 and out else None
+                rc, out = psql(dedup_sql)
+                if rc == 0 and out and out.strip():
+                    question_id = out.strip()
+                    log.info("    Already exists: %s", question_id[:8])
+                else:
+                    sql = f"""
+                        INSERT INTO nebula.open_questions (
+                            requirement_id, candidate_id, title, description,
+                            category, status, blocking, created_by
+                        ) VALUES (
+                            NULL, '{candidate_id}'::uuid,
+                            '{title_clean}',
+                            'Auto-generated from CPF assessment. Component: {q.get("component", "unknown")}.',
+                            '{category}',
+                            'OPEN', true, 'planner'
+                        )
+                        RETURNING id;
+                    """
+                    rc, out = psql(sql)
+                    question_id = out.strip() if rc == 0 and out else None
             
             if question_id:
                 log.info("    Created question: %s", question_id[:8])
@@ -381,6 +404,13 @@ def promote_candidate(candidate_id: str, assessment: dict, risk_level: str, dry_
         log.info("  [DRY RUN] Would promote %s (CPF=%.3f, risk=%s)", candidate_id[:8], score, risk_level)
         return True
     
+    # Advance status so candidate is not re-groomed
+    psql(f"""
+        UPDATE nebula.harvest_candidates
+        SET status = 'promoted', updated_at = NOW()
+        WHERE id = '{candidate_id}'::uuid
+    """)
+    
     event_id = emit_candidate_greenlit(
         candidate_id=candidate_id,
         cpf_score=score,
@@ -399,6 +429,13 @@ def escalate_candidate(candidate_id: str, assessment: dict, risk_level: str, rea
         log.info("  [DRY RUN] Would escalate %s (CPF=%.3f, risk=%s, reason=%s)", 
                  candidate_id[:8], score, risk_level, reason[:40])
         return True
+    
+    # Advance status so candidate is not re-groomed
+    psql(f"""
+        UPDATE nebula.harvest_candidates
+        SET status = 'useful', updated_at = NOW()
+        WHERE id = '{candidate_id}'::uuid
+    """)
     
     emit_candidate_escalated(
         candidate_id=candidate_id,
