@@ -594,7 +594,10 @@ class DBAdapter:
         try:
             with self._get_connection() as conn:
                 row = conn.execute(query).fetchone()
-                tripped = bool(row[0]) if row else False
+                if row is not None and row[0] is not None:
+                    tripped = bool(row[0])
+                else:
+                    tripped = False
                 _log.debug("is_circuit_breaker_tripped: %s", tripped)
                 return tripped
         except Exception as exc:
@@ -606,7 +609,10 @@ class DBAdapter:
         try:
             with self._get_connection() as conn:
                 row = conn.execute(query).fetchone()
-                paused = bool(row[0]) if row else False
+                if row is not None and row[0] is not None:
+                    paused = bool(row[0])
+                else:
+                    paused = False
                 _log.debug("is_conduit_paused: %s", paused)
                 return paused
         except Exception as exc:
@@ -667,6 +673,7 @@ class DBAdapter:
             INSERT INTO receipts (id, plan_id, type, agent_role, session_id,
                 ticket_id, summary, artifact_path, metadata_json, tokens_used, created_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT DO NOTHING
         """
         with self._get_connection() as conn:
             conn.execute(query, (

@@ -37,6 +37,8 @@ const ALLOWED: Record<string, string[]> = {
   // Cancelled / abandoned plans can be resurrected:
   CANCELLED: ["PLAN_CREATE"],
   ABANDONED: ["PLAN_CREATE"],
+  // API_LIMIT is always valid (like BLOCK) — handled as special case in validateReceipt
+  API_LIMIT: [],
 };
 
 export async function validateReceipt(

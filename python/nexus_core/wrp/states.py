@@ -54,7 +54,6 @@ def is_valid_transition(from_state: str, to_state: str) -> bool:
 # Maps each Conduit receipt type to the WRP state it represents.
 
 RECEIPT_TO_WRP_STATE: Dict[str, str] = {
-    "PROPOSED":       "CREATED",
     "PLANNING":       "INTAKE",
     "PLAN_CREATE":    "PLANNING",
     "CRITIQUE":       "CRITIQUE",
