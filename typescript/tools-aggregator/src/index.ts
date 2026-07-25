@@ -2,10 +2,10 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { v4 as uuidv4 } from "uuid";
 import { ToolDiscovery } from "./discovery";
-import { ToolCallRequest, ToolCallResponse } from "./types";
+import { ToolCallRequest, ToolCallResponse, AggregatedTool, JsonRpcRequest, JsonRpcResponse, McpToolCallResult, MCPProtocol } from "./types";
 
-const PORT = process.env.TOOLS_AGGREGATOR_PORT || 3200;
-const HOST = process.env.TOOLS_AGGREGATOR_HOST || "0.0.0.0";
+const PORT = process.env.TOOLS_AGGREGATOR_PORT || 3210;
+const HOST = process.env.TOOLS_AGGREGATOR_HOST || "127.0.0.1";
 
 const app = express();
 app.use(cors());
@@ -123,6 +123,7 @@ app.get("/tools", (_req: Request, res: Response) => {
       description: t.description,
       service: t.service,
       inputSchema: t.inputSchema,
+      protocol: t.protocol,
     })),
     total: tools.length,
   });
@@ -148,6 +149,7 @@ app.get("/tools/:name", (req: Request, res: Response) => {
     service: tool.service,
     serviceUrl: tool.serviceUrl,
     inputSchema: tool.inputSchema,
+    protocol: (tool as any).protocol,
   });
 });
 
@@ -204,7 +206,7 @@ app.post("/tools/call", async (req: Request, res: Response) => {
   }
 
   try {
-    const response = await callRemoteTool(tool.serviceUrl, name, toolArgs || {});
+    const response = await callRemoteTool(tool, name, toolArgs || {});
 
     res.json({
       success: true,
@@ -254,9 +256,47 @@ app.get("/registry", (_req: Request, res: Response) => {
 // ── Remote Tool Call Helper ─────────────────────────────────────────
 
 /**
- * Call a tool on a remote MCP service
+ * Call a tool on a remote MCP service. Dispatches by the protocol the
+ * tool was discovered with — REST (`/tools/call`) vs JSON-RPC (`POST /`,
+ * `tools/call` method). The protocol is stored per-tool in the registry,
+ * so the caller doesn't have to know.
+ *
+ * Both protocols surface a normalized `result` payload so callers above
+ * (the aggregator's REST API for downstream clients, the python
+ * tools_aggregator_client, the operator-svc dispatcher) don't need to
+ * care which underlying transport was used.
  */
 async function callRemoteTool(
+  tool: AggregatedTool,
+  toolName: string,
+  toolArgs: Record<string, any>
+): Promise<any> {
+  const protocol: Extract<MCPProtocol, "rest" | "jsonrpc" | "sse"> = tool.protocol;
+
+  if (protocol === "rest") {
+    return callRemoteToolRest(tool.serviceUrl, toolName, toolArgs);
+  }
+  if (protocol === "sse") {
+    // SSE is stateful — delegate to the discovery class which owns the
+    // persistent session pool keyed by service name. We reconstruct a
+    // minimal service config from the tool record so lookup-by-name works
+    // even when DEFAULT_SERVICES has been overridden at construction time.
+    return discovery.sseCallTool(
+      { name: tool.service, baseUrl: tool.serviceUrl, protocol: "sse" },
+      toolName,
+      toolArgs
+    );
+  }
+  return callRemoteToolJsonRpc(tool.serviceUrl, toolName, toolArgs);
+}
+
+/**
+ * REST-shaped MCP call. conduit-mcp exposes this surface.
+ *
+ *   POST <baseUrl>/tools/call with body { name, arguments }
+ *   → 200 with { success, result, ... } OR { error, ... }
+ */
+async function callRemoteToolRest(
   serviceUrl: string,
   toolName: string,
   toolArgs: Record<string, any>
@@ -279,12 +319,87 @@ async function callRemoteTool(
 
   const data: any = await response.json();
 
-  // Handle both error and success responses
+  // Handle both error-shaped and success-shaped responses.
   if (data.error) {
-    throw new Error(data.error);
+    throw new Error(typeof data.error === "string" ? data.error : (data.error.message ?? JSON.stringify(data.error)));
   }
 
+  // Some MCP-REST adapters wrap results in { result, success }; others
+  // return the raw envelope. Surface the meaningful payload either way.
+  if (data.result !== undefined) return data.result;
   return data;
+}
+
+/**
+ * JSON-RPC MCP call. tackle-mcp (and knowledge-mcp / vision-mcp when
+ * brought up) expose this surface.
+ *
+ *   POST <baseUrl>/ with body
+ *     { "jsonrpc":"2.0","id":<n>,"method":"tools/call","params":{ "name", "arguments" } }
+ *   → 200 with JsonRpcResponse<McpToolCallResult>
+ *
+ * The MCP tool-call result is `{ content: [{ type:"text", text: <string> }] }`.
+ * We unwrap that: if there's one text block (the common case), return the
+ * text. If there are multiple blocks or non-text content, return the raw
+ * content array so callers can format downstream.
+ */
+let _rpcCallIdCounter = 1;
+
+async function callRemoteToolJsonRpc(
+  serviceUrl: string,
+  toolName: string,
+  toolArgs: Record<string, any>
+): Promise<any> {
+  const url = `${serviceUrl}/`;
+  const id = _rpcCallIdCounter++;
+  const envelope: JsonRpcRequest = {
+    jsonrpc: "2.0",
+    id,
+    method: "tools/call",
+    params: { name: toolName, arguments: toolArgs },
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(envelope),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Remote service ${response.status}: ${text}`);
+  }
+
+  const data = (await response.json()) as JsonRpcResponse<McpToolCallResult>;
+
+  if (data.error) {
+    throw new Error(`JSON-RPC error ${data.error.code}: ${data.error.message}`);
+  }
+
+  const result = data.result;
+  if (!result) return null;
+
+  // isError:true is the MCP signal for "tool returned an error result"
+  // (server-level success but the tool itself errored — e.g. bad args).
+  if (result.isError) {
+    const text = result.content?.find((c) => c.type === "text")?.text ?? "Tool call returned an error";
+    throw new Error(text);
+  }
+
+  const blocks = result.content || [];
+  if (blocks.length === 1 && blocks[0].type === "text") {
+    const text = blocks[0].text ?? "";
+    // Try to pass parsed JSON through if the tool returned JSON-as-text
+    // (the common MCP convention) — fall back to the raw string.
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  }
+  // Mixed content (image + text, multiple blocks, etc.) — return as-is so
+  // the caller can format it for its consumer.
+  return blocks;
 }
 
 // ── Startup ─────────────────────────────────────────────────────────

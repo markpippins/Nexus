@@ -4,6 +4,8 @@ import { BadRequestError, NotFoundError } from '../errors.js';
 
 export const forumsRouter = Router();
 
+// ── Forum CRUD ──────────────────────────────────────────────────────
+
 forumsRouter.get('/', async (_req, res, next) => {
   try {
     const result = await pool.query(`
@@ -91,7 +93,7 @@ forumsRouter.get('/:slug/threads', async (req, res, next) => {
 
 forumsRouter.post('/:slug/threads', async (req, res, next) => {
   try {
-    const { title, body, postedById } = req.body;
+    const { title, body, postedById, source_url } = req.body;
     if (!title || !body) {
       throw new BadRequestError('Title and body are required');
     }
@@ -111,16 +113,57 @@ forumsRouter.post('/:slug/threads', async (req, res, next) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO assembly.posts (id, forum_uuid, posted_by_id, title, text, created)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())
+      `INSERT INTO assembly.posts (id, forum_uuid, posted_by_id, title, text, source_url, created)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())
        RETURNING id, title`,
-      [forumId, userId, String(title).slice(0, 500), String(body)]
+      [forumId, userId, String(title).slice(0, 500), String(body), source_url || null]
     );
 
     res.status(201).json({ id: result.rows[0].id, title: result.rows[0].title });
   } catch (err) {
     next(err);
   }
+});
+
+// ── UUID-based thread endpoints (avoids slug resolution round-trip) ──
+
+forumsRouter.post('/by-id/:forumId/threads', async (req, res, next) => {
+  try {
+    const { title, body, postedById, source_url } = req.body;
+    if (!title || !body) throw new BadRequestError('Title and body are required');
+    if (!postedById) throw new BadRequestError('postedById is required');
+
+    const forumCheck = await pool.query(
+      'SELECT id FROM assembly.forums WHERE id = $1 AND (expiration_dt = \'infinity\'::timestamptz OR expiration_dt > now()) LIMIT 1',
+      [req.params.forumId]
+    );
+    if (forumCheck.rows.length === 0) throw new NotFoundError('Forum not found');
+
+    const result = await pool.query(
+      `INSERT INTO assembly.posts (id, forum_uuid, posted_by_id, title, text, source_url, created)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())
+       RETURNING id, title`,
+      [req.params.forumId, postedById, String(title).slice(0, 500), String(body), source_url || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+forumsRouter.get('/by-id/:forumId/threads', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT p.id, p.title, p.created, p.text, p.source_url,
+              u.id AS user_id, u.alias, u.avatar_url,
+              f.id AS forum_id, f.slug AS forum_slug, f.name AS forum_name
+       FROM assembly.posts p
+       JOIN assembly.forums f ON f.id = p.forum_uuid
+       JOIN assembly.users u ON u.id = p.posted_by_id
+       WHERE p.forum_uuid = $1
+       ORDER BY p.created DESC`,
+      [req.params.forumId]
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
 });
 
 forumsRouter.get('/threads/:threadId', async (req, res, next) => {
@@ -261,4 +304,148 @@ forumsRouter.post('/threads/:threadId/comments', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ── Forum management (missing from original — migrated from assembly-mcp db.ts) ──
+
+forumsRouter.get('/by-slug/:slug', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, slug, description FROM assembly.forums WHERE slug = $1 AND (expiration_dt = \'infinity\'::timestamptz OR expiration_dt > now()) LIMIT 1',
+      [req.params.slug]
+    );
+    if (result.rows.length === 0) throw new NotFoundError('Forum not found');
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+forumsRouter.get('/by-id/:id', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, slug, description FROM assembly.forums WHERE id = $1',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) throw new NotFoundError('Forum not found');
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+forumsRouter.post('/', async (req, res, next) => {
+  try {
+    const { name, slug, description } = req.body;
+    if (!name) throw new BadRequestError('name is required');
+    const genSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const result = await pool.query(
+      'INSERT INTO assembly.forums (id, name, slug, description) VALUES (gen_random_uuid(), $1, $2, $3) RETURNING id, name, slug, description',
+      [name, genSlug, description || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+forumsRouter.put('/:id', async (req, res, next) => {
+  try {
+    const { name, slug, description } = req.body;
+    const sets = [];
+    const params = [];
+    let idx = 1;
+    if (name !== undefined) { sets.push(`name = $${idx++}`); params.push(name); }
+    if (slug !== undefined) { sets.push(`slug = $${idx++}`); params.push(slug); }
+    if (description !== undefined) { sets.push(`description = $${idx++}`); params.push(description); }
+    if (sets.length === 0) {
+      const r = await pool.query('SELECT id, name, slug, description FROM assembly.forums WHERE id = $1', [req.params.id]);
+      if (r.rows.length === 0) throw new NotFoundError('Forum not found');
+      return res.json(r.rows[0]);
+    }
+    params.push(req.params.id);
+    const result = await pool.query(
+      `UPDATE assembly.forums SET ${sets.join(', ')} WHERE id = $${idx} RETURNING id, name, slug, description`,
+      params
+    );
+    if (result.rows.length === 0) throw new NotFoundError('Forum not found');
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+forumsRouter.delete('/:id', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'UPDATE assembly.forums SET expiration_dt = now() WHERE id = $1 RETURNING id, name',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) throw new NotFoundError('Forum not found');
+    res.json({ expired: true, forum_id: req.params.id, name: result.rows[0].name });
+  } catch (err) { next(err); }
+});
+
+// ── Thread management ───────────────────────────────────────────────
+
+forumsRouter.post('/move-thread', async (req, res, next) => {
+  try {
+    const { post_id, forum_id } = req.body;
+    if (!post_id || !forum_id) throw new BadRequestError('post_id and forum_id are required');
+    const forumCheck = await pool.query('SELECT id FROM assembly.forums WHERE id = $1 AND (expiration_dt = \'infinity\'::timestamptz OR expiration_dt > now())', [forum_id]);
+    if (forumCheck.rows.length === 0) throw new NotFoundError('Destination forum not found');
+    const result = await pool.query(
+      'UPDATE assembly.posts SET forum_uuid = $1, updated = now() WHERE id = $2 RETURNING id, title, forum_uuid, created, updated, text, url, rating, posted_by_id, source_url',
+      [forum_id, post_id]
+    );
+    if (result.rows.length === 0) throw new NotFoundError('Post not found');
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+forumsRouter.delete('/threads/:threadId', async (req, res, next) => {
+  try {
+    const result = await pool.query('DELETE FROM assembly.posts WHERE id = $1', [req.params.threadId]);
+    if (result.rowCount === 0) throw new NotFoundError('Thread not found');
+    res.json({ deleted: true });
+  } catch (err) { next(err); }
+});
+
+// ── Search ──────────────────────────────────────────────────────────
+
+forumsRouter.get('/search/by-name', async (req, res, next) => {
+  try {
+    const { name } = req.query;
+    if (!name) throw new BadRequestError('name query parameter is required');
+    const result = await pool.query(
+      'SELECT id, name, slug, description FROM assembly.forums WHERE name ILIKE $1 OR slug ILIKE $1 ORDER BY name ASC LIMIT 20',
+      [`%${name}%`]
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
+forumsRouter.get('/search/by-thread-title', async (req, res, next) => {
+  try {
+    const { title } = req.query;
+    if (!title) throw new BadRequestError('title query parameter is required');
+    const result = await pool.query(
+      'SELECT id, created, updated, text, url, rating, posted_by_id, forum_uuid, source_url, title FROM assembly.posts WHERE title ILIKE $1 ORDER BY created DESC LIMIT 20',
+      [`%${title}%`]
+    );
+    res.json(result.rows);
+  } catch (err) { next(err); }
+});
+
+// ── Comment management ──────────────────────────────────────────────
+
+forumsRouter.get('/comments/:id', async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, created, updated, text, url, rating, posted_by_id, post_id, parent_id FROM assembly.comments WHERE id = $1',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) throw new NotFoundError('Comment not found');
+    res.json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+forumsRouter.delete('/comments/:id', async (req, res, next) => {
+  try {
+    const result = await pool.query('DELETE FROM assembly.comments WHERE id = $1', [req.params.id]);
+    if (result.rowCount === 0) throw new NotFoundError('Comment not found');
+    res.json({ deleted: true });
+  } catch (err) { next(err); }
 });

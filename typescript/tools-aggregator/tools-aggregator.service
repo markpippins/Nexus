@@ -1,0 +1,46 @@
+[Unit]
+Description=Tools Aggregator — Unified MCP tool discovery + invocation service (port 3210)
+Documentation=https://github.com/nexus/typescript/tools-aggregator
+After=network.target postgresql.service redis.service conduit-mcp.service tackle-mcp.service nebula-mcp-sse.service
+Wants=postgresql.service redis.service conduit-mcp.service tackle-mcp.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/tools-aggregator
+
+# ── Environment ────────────────────────────────────────────────────────
+# Aggregator port default is 3210 in src/index.ts — overridden here explicitly.
+# Bind to localhost only; downstream consumers (operator-svc, harnesses) are local.
+Environment=TOOLS_AGGREGATOR_PORT=3210
+Environment=TOOLS_AGGREGATOR_HOST=127.0.0.1
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# Allow per-MCP URL overrides from the unit file — so the discovery service
+# doesn't fall back to its in-source stale defaults if an MCP ever moves.
+# These are commented-out today because the in-source defaults (3100/3400)
+# are correct for the current layout. Activate one when you need to redirect
+# discovery to a non-default port without editing src/ files.
+# Environment=CONDUIT_MCP_URL=http://localhost:3100
+# Environment=TACKLE_MCP_URL=http://localhost:3400
+# Environment=NEBULA_MCP_URL=http://localhost:3102
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/npx tsx src/index.ts
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/typescript/tools-aggregator
+
+[Install]
+WantedBy=default.target

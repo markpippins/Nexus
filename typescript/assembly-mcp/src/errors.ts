@@ -39,9 +39,12 @@ export function createError(
 export function createSuccess(
   result: any,
   requestId?: string,
-): { result: any; requestId: string } {
+): { result: { isError: false; content: Array<{ type: "text"; text: string }> }; requestId: string } {
   return {
-    result,
+    result: {
+      isError: false,
+      content: [{ type: "text", text: typeof result === "string" ? result : JSON.stringify(result) }],
+    },
     requestId: requestId || crypto.randomUUID(),
   };
 }
