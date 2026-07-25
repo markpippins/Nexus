@@ -42,6 +42,18 @@ All keys live under the `mem:` prefix and are shared with `role-memory-srv`. Tac
 | `mem:proc:{slug}` | String (JSON) | `src/memory.ts` — `PROC_KEY(slug)` | Full procedure card for a given slug |
 | `mem:idx:{role}` | String (JSON) | `src/memory.ts` — `IDX_KEY(role)` | Procedure index (list of summaries) for a given role |
 | `mem:meta:last_updated` | String (ISO timestamp) | `src/memory.ts` — `META_UPDATED_KEY` | Global timestamp of last PG → Redis sync |
+| `mem:idx:{role}:updated_at` | String (ISO timestamp) | `src/memory.ts` | Last update timestamp for a role's index |
+
+### Weak Reference Logic
+
+When Redis cache keys are missing or stale, tackle-mcp automatically falls back to querying PostgreSQL directly. This ensures that even if the Redis cache hasn't been refreshed, agents can still retrieve procedure data. The fallback path queries `tackle.role_memory` directly and is indexed on `role, as_of_dt DESC` for performance.
+
+The dual-path strategy works as follows:
+1. Attempt to read from Redis cache first (fast path)
+2. If Redis returns no data or errors, fall back to PostgreSQL (slow path)
+3. Return results from whichever source had data
+
+This pattern is implemented in `memory_get_procedures()`, `memory_get_procedure()`, and `memory_check_since()`.
 
 ### Key Helpers (from `src/memory.ts`)
 
@@ -167,6 +179,28 @@ Proxies a `POST /refresh` call to `role-memory-srv` (port 3500), which triggers 
 
 ---
 
+## REST API Endpoints (Memory Procedure Registry)
+
+### `GET /api/mcp/memory/role-updates`
+
+Returns checkpoint information for all roles, showing the last known active timestamp for each role based on Redis cache state.
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-07-25T10:30:00Z",
+  "checkpoints": {
+    "engineer": { "last_active": "2026-07-25T10:25:00Z" },
+    "architect": { "last_active": "2026-07-25T10:20:00Z" }
+  }
+}
+```
+
+**Use case:** Agents can call this endpoint at turn start to see which roles have recent activity without polling individual indices.
+
+---
+
 ## PG Change-Check Flow
 
 Since Redis has no built-in temporal query capability, tackle-mcp implements a **dual-path strategy**:
@@ -205,19 +239,34 @@ From `src/memory.ts`:
 ```typescript
 const url = process.env.MEMORY_REDIS_URL || "redis://localhost:6379";
 const redis = new Redis(url, {
+  connectTimeout: 10000,  // Connection timeout guard (10s)
   maxRetriesPerRequest: 3,
   retryStrategy(times) {
     if (times > 5) return null;             // Give up after 5 retries
     return Math.min(times * 200, 2000);      // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 2000ms
   },
   lazyConnect: true,                          // Don't fail startup if Redis is down
+  keepAlive: 30000,                           // TCP keepalive
+});
+
+// Connection event handlers for observability
+redis.on("connect", () => {
+  console.log("[memory-mcp] Redis connected");
+});
+redis.on("error", (err) => {
+  console.error("[memory-mcp] Redis error:", err);
+});
+redis.on("reconnecting", () => {
+  console.log("[memory-mcp] Redis reconnecting...");
 });
 ```
 
 Key properties:
 - **Lazy connect** — tackle-mcp starts even if Redis is unavailable. Redis calls will fail at runtime with clear errors.
+- **Connection timeout guard** — 10s timeout prevents hanging on unresponsive Redis instances.
 - **Exponential backoff** — up to 2s between connection retries, max 5 attempts.
-- **Error logging** — Redis errors are logged to console but don't crash the server.
+- **Keepalive** — TCP keepalive helps maintain connections through transient network issues.
+- **Event logging** — All connection lifecycle events are logged for debugging.
 
 ---
 
@@ -256,7 +305,7 @@ Proxies to `http://localhost:3500/refresh` (configurable via `MEMORY_SRV_URL` en
 | File | Purpose |
 |------|---------|
 | `src/index.ts` | Express server, MCP JSON-RPC endpoint, REST routes |
-| `src/memory.ts` | **Redis client** — key helpers, reader functions, PG change-check, refresh proxy |
+| `src/memory.ts` | **Redis client** — key helpers, reader functions, PG change-check, refresh proxy, connection timeout guard |
 | `src/tools.ts` | MCP tool definitions and handler registration |
 | `src/db.ts` | PostgreSQL connection, schema init, AI config CRUD, session management |
 | `src/types.ts` | TypeScript interfaces for AI config rows |
