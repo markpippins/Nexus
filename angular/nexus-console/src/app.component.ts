@@ -1,7 +1,7 @@
 
 
 
-import { Component, ChangeDetectionStrategy, signal, computed, inject, effect, untracked, Renderer2, ElementRef, NgZone, OnDestroy, Injector, OnInit, ViewChild } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, effect, untracked, Renderer2, ElementRef, NgZone, OnDestroy, AfterViewInit, Injector, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FileExplorerComponent } from './components/file-explorer/file-explorer.component.js';
 import { SidebarComponent } from './components/sidebar/sidebar.component.js';
@@ -130,7 +130,7 @@ const disconnectedProvider: FileSystemProvider = {
     '(document:click)': 'onDocumentClick($event)',
   }
 })
-export class AppComponent implements OnInit, OnDestroy {
+export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   private sessionFs = inject(SessionService);
   private profileService = inject(BrokerProfileService);
   private hostProfileService = inject(HostProfileService);
@@ -185,7 +185,7 @@ export class AppComponent implements OnInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -201,9 +201,14 @@ export class AppComponent implements OnInit, OnDestroy {
     'plurality': 'http://localhost:3004',
     'assembly': 'http://localhost:4204',
     'nebula-rms': 'http://localhost:3000',
+    'peb-ui': 'http://localhost:4206',
+    'kernel-ui': 'http://localhost:4207',
     'tackle-ui': 'http://localhost:4202',
     'cascade-ui': 'http://localhost:4203',
-    'execution-ui': 'http://localhost:4205',
+    'execution-ui': 'http://localhost:4212',
+    'vision-ui': 'http://localhost:4208',
+    'edit-ui': 'http://localhost:4223',
+    'wind-ui': 'http://localhost:4209',
   };
 
   isIframeMode = computed(() =>
@@ -212,9 +217,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.currentViewMode() === 'plurality' ||
     this.currentViewMode() === 'assembly' ||
     this.currentViewMode() === 'nebula-rms' ||
+    this.currentViewMode() === 'peb-ui' ||
+    this.currentViewMode() === 'kernel-ui' ||
     this.currentViewMode() === 'tackle-ui' ||
     this.currentViewMode() === 'cascade-ui' ||
-    this.currentViewMode() === 'execution-ui'
+    this.currentViewMode() === 'execution-ui' ||
+    this.currentViewMode() === 'vision-ui' ||
+    this.currentViewMode() === 'edit-ui' ||
+    this.currentViewMode() === 'wind-ui'
   );
 
   isKanbanMode = computed(() => this.currentViewMode() === 'kanban');
@@ -996,7 +1006,7 @@ export class AppComponent implements OnInit, OnDestroy {
   @ViewChild('viewContainer') viewContainerEl!: ElementRef<HTMLDivElement>;
 
   // --- Console Pane Resizing ---
-  consolePaneHeight = signal(this.uiPreferencesService.explorerConsoleHeight() ?? 20); // percentage
+  consolePaneHeight = signal(200); // pixels — synced from persisted % in ngAfterViewInit
   private isResizingConsole = false;
   private unlistenConsoleResizeMove: (() => void) | null = null;
   private unlistenConsoleResizeUp: (() => void) | null = null;
@@ -1321,10 +1331,27 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
+  ngAfterViewInit(): void {
+    // Convert persisted percentage to pixel height once the container is available.
+    // Skip if console starts collapsed — conversion will happen on first expand.
+    if (this.isConsoleCollapsed()) return;
+    this.syncConsolePixelHeight();
+  }
+
   ngOnDestroy(): void {
     this.stopPaneResize();
     this.stopStreamResize();
     this.stopConsoleResize();
+  }
+
+  /** Convert the persisted percentage to a pixel height based on current container size. */
+  private syncConsolePixelHeight(): void {
+    const container = this.viewContainerEl?.nativeElement;
+    if (!container) return;
+    const pct = this.uiPreferencesService.explorerConsoleHeight();
+    if (pct == null) return;
+    const height = container.getBoundingClientRect().height;
+    this.consolePaneHeight.set(Math.round((pct / 100) * height));
   }
 
   getProvider = (path: string[]): FileSystemProvider => {
@@ -1825,6 +1852,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   toggleConsole(): void {
+    // Sync pixel height BEFORE toggling so the expanded view renders at the correct size.
+    // The collapsed view uses h-6, so updating early has no visible effect on it.
+    if (this.isConsoleCollapsed()) {
+      this.syncConsolePixelHeight();
+    }
     this.uiPreferencesService.toggleConsole();
   }
 
@@ -2677,15 +2709,14 @@ export class AppComponent implements OnInit, OnDestroy {
     event.preventDefault();
     const container = this.viewContainerEl?.nativeElement;
     if (!container) return;
-    const startY = event.clientY;
     const containerRect = container.getBoundingClientRect();
-    const consolePane = container.querySelector('[data-console-pane]');
-    const initialConsoleHeight = consolePane ? consolePane.getBoundingClientRect().height : 0;
 
     this.ngZone.runOutsideAngular(() => {
       const onMove = (e: MouseEvent) => {
-        const dy = startY - e.clientY;
-        let newConsoleHeight = initialConsoleHeight + dy;
+        // Track mouse directly — console fills from resizer to bottom bar.
+        // 48px = <app-bottom-bar> (h-12) | 6px = resizer itself (h-1.5)
+        const chromeOffset = 54;
+        let newConsoleHeight = containerRect.bottom - e.clientY - chromeOffset;
 
         const minHeight = 100;
         // Console is now a sibling of <main> — leave at least 200px for the main content area
@@ -2694,7 +2725,7 @@ export class AppComponent implements OnInit, OnDestroy {
         if (newConsoleHeight < minHeight) newConsoleHeight = minHeight;
         if (newConsoleHeight > maxHeight) newConsoleHeight = maxHeight;
 
-        this.consolePaneHeight.set((newConsoleHeight / containerRect.height) * 100);
+        this.consolePaneHeight.set(newConsoleHeight);
       };
 
       const onUp = () => {
@@ -2713,7 +2744,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.isResizingConsole = false;
     this.unlistenConsoleResizeMove?.();
     this.unlistenConsoleResizeUp?.();
-    this.uiPreferencesService.setExplorerConsoleHeight(this.consolePaneHeight());
+    // Persist as percentage of container height so it scales across viewport sizes
+    const container = this.viewContainerEl?.nativeElement;
+    if (container) {
+      const pct = (this.consolePaneHeight() / container.getBoundingClientRect().height) * 100;
+      this.uiPreferencesService.setExplorerConsoleHeight(pct);
+    }
   }
 
   // --- Theme Menu ---
