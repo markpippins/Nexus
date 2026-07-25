@@ -28,32 +28,63 @@ public class RegistryService {
     
     @BrokerOperation("register")
     public Map<String, String> register(@BrokerParam("registration") ServiceRegistration registration) {
-        log.info("Registering service: {}", registration.getServiceName());
+        // Null guard on registration object
+        if (registration == null) {
+            log.warn("Register called with null registration");
+            return Map.of("error", "Registration cannot be null");
+        }
+
+        String serviceName = registration.getServiceName();
+        // Null/blank guard on service name (ConcurrentHashMap rejects null keys)
+        if (serviceName == null || serviceName.isBlank()) {
+            log.warn("Register called with null or blank service name");
+            return Map.of("error", "Service name is required");
+        }
+
+        log.info("Registering service: {}", serviceName);
         log.debug("Registration details - Service: {}, Operations: {}, Endpoint: {}",
-                 registration.getServiceName(), registration.getOperations(), registration.getEndpoint());
+                 serviceName, registration.getOperations(), registration.getEndpoint());
+
+        // Clean stale operations from index before overwriting
+        ServiceRegistration old = registry.get(serviceName);
+        if (old != null && old.getOperations() != null) {
+            for (String op : old.getOperations()) {
+                operationIndex.remove(op);
+            }
+            log.debug("Cleaned {} stale operations from index for service: {}",
+                    old.getOperations().size(), serviceName);
+        }
 
         registration.setLastHeartbeat(Instant.now());
         registration.setStatus(ServiceStatus.HEALTHY);
 
         // Store in registry
-        registry.put(registration.getServiceName(), registration);
+        registry.put(serviceName, registration);
 
-        // Index operations
-        for (String operation : registration.getOperations()) {
-            operationIndex.put(operation, registration.getServiceName());
+        // Index operations (guard against null list)
+        List<String> operations = registration.getOperations();
+        if (operations != null) {
+            for (String operation : operations) {
+                operationIndex.put(operation, serviceName);
+            }
         }
 
         log.info("Successfully registered service: {} with {} operations",
-                registration.getServiceName(), registration.getOperations().size());
+                serviceName, operations != null ? operations.size() : 0);
 
         return Map.of(
             "message", "Service registered successfully",
-            "serviceName", registration.getServiceName()
+            "serviceName", serviceName
         );
     }
     
     @BrokerOperation("findByServiceName")
     public ServiceRegistration findByServiceName(@BrokerParam("serviceName") String serviceName) {
+        // Null/blank guard — ConcurrentHashMap.get(null) throws NPE
+        if (serviceName == null || serviceName.isBlank()) {
+            log.warn("findByServiceName called with null or blank service name");
+            return null;
+        }
         log.debug("Finding service by name: {}", serviceName);
         ServiceRegistration registration = registry.get(serviceName);
         if (registration != null) {
@@ -66,6 +97,11 @@ public class RegistryService {
     
     @BrokerOperation("findByOperation")
     public ServiceRegistration findByOperation(@BrokerParam("operation") String operation) {
+        // Null/blank guard — operationIndex.get(null) throws NPE
+        if (operation == null || operation.isBlank()) {
+            log.warn("findByOperation called with null or blank operation");
+            return null;
+        }
         log.debug("Finding service by operation: {}", operation);
         String serviceName = operationIndex.get(operation);
         if (serviceName != null) {
@@ -94,6 +130,11 @@ public class RegistryService {
     
     @BrokerOperation("deregister")
     public Map<String, String> deregister(@BrokerParam("serviceName") String serviceName) {
+        // Null/blank guard — ConcurrentHashMap.remove(null) throws NPE
+        if (serviceName == null || serviceName.isBlank()) {
+            log.warn("Deregister called with null or blank service name");
+            return Map.of("message", "Service not found");
+        }
         log.info("Deregistering service: {}", serviceName);
         ServiceRegistration registration = registry.remove(serviceName);
         if (registration != null) {
@@ -112,6 +153,11 @@ public class RegistryService {
     
     @BrokerOperation("heartbeat")
     public Map<String, String> heartbeat(@BrokerParam("serviceName") String serviceName) {
+        // Null/blank guard — ConcurrentHashMap.get(null) throws NPE
+        if (serviceName == null || serviceName.isBlank()) {
+            log.warn("Heartbeat called with null or blank service name");
+            return Map.of("message", "Service not found");
+        }
         log.debug("Processing heartbeat for service: {}", serviceName);
         ServiceRegistration registration = registry.get(serviceName);
         if (registration != null) {
@@ -127,6 +173,11 @@ public class RegistryService {
     
     // Internal method for broker-gateway to query registry
     public Optional<ServiceRegistration> lookupByOperation(String operation) {
+        // Null/blank guard — operationIndex.get(null) throws NPE
+        if (operation == null || operation.isBlank()) {
+            log.warn("lookupByOperation called with null or blank operation");
+            return Optional.empty();
+        }
         log.debug("Looking up service by operation: {}", operation);
         String serviceName = operationIndex.get(operation);
         if (serviceName != null) {
@@ -145,6 +196,11 @@ public class RegistryService {
     }
     
     public void markUnhealthy(String serviceName) {
+        // Null/blank guard — ConcurrentHashMap.get(null) throws NPE
+        if (serviceName == null || serviceName.isBlank()) {
+            log.warn("markUnhealthy called with null or blank service name");
+            return;
+        }
         log.info("Marking service as unhealthy: {}", serviceName);
         ServiceRegistration registration = registry.get(serviceName);
         if (registration != null) {

@@ -1,5 +1,7 @@
 package com.aibizarchitect.nexus.v1.spring.broker.gateway.service;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -30,7 +32,8 @@ public class ServiceDiscoveryClientImpl implements ServiceDiscoveryClient {
         log.debug("Looking for service to handle operation: {}", operation);
 
         try {
-            String url = serviceRegistryUrl + "/api/v1/registry/services/by-operation/" + operation;
+            String encodedOperation = URLEncoder.encode(operation, StandardCharsets.UTF_8);
+            String url = serviceRegistryUrl + "/api/v1/registry/services/by-operation/" + encodedOperation;
             log.debug("Querying service registry at: {}", url);
 
             ServiceInfoImpl serviceInfo = restTemplate.getForObject(url, ServiceInfoImpl.class);
@@ -51,7 +54,8 @@ public class ServiceDiscoveryClientImpl implements ServiceDiscoveryClient {
         log.debug("Getting details for service: {}", serviceName);
 
         try {
-            String url = serviceRegistryUrl + "/api/v1/registry/services/" + serviceName + "/details";
+            String encodedServiceName = URLEncoder.encode(serviceName, StandardCharsets.UTF_8);
+            String url = serviceRegistryUrl + "/api/v1/registry/services/" + encodedServiceName + "/details";
             log.debug("Querying service details at: {}", url);
 
             ServiceDetailsImpl details = restTemplate.getForObject(url, ServiceDetailsImpl.class);

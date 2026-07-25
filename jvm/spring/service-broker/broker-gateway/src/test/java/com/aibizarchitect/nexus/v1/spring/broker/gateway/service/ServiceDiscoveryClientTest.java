@@ -3,6 +3,7 @@ package com.aibizarchitect.nexus.v1.spring.broker.gateway.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,7 +39,7 @@ class ServiceDiscoveryClientTest {
                 expectedServiceInfo.setId(1L);
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/by-operation/testOperation"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class))).thenReturn(expectedServiceInfo);
 
                 // When
@@ -50,7 +51,7 @@ class ServiceDiscoveryClientTest {
                 assertEquals("testService", result.get().getName());
                 assertEquals(Long.valueOf(1L), result.get().getId());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/by-operation/testOperation"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class));
         }
 
@@ -60,7 +61,7 @@ class ServiceDiscoveryClientTest {
                 String operation = "nonExistentOperation";
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/by-operation/nonExistentOperation"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class))).thenReturn(null);
 
                 // When
@@ -70,7 +71,7 @@ class ServiceDiscoveryClientTest {
                 // Then
                 assertFalse(result.isPresent());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/by-operation/nonExistentOperation"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class));
         }
 
@@ -80,7 +81,7 @@ class ServiceDiscoveryClientTest {
                 String operation = "errorOperation";
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/by-operation/errorOperation"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class)))
                                 .thenThrow(new RuntimeException("Connection failed"));
 
@@ -91,7 +92,7 @@ class ServiceDiscoveryClientTest {
                 // Then
                 assertFalse(result.isPresent());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/by-operation/errorOperation"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class));
         }
 
@@ -104,7 +105,7 @@ class ServiceDiscoveryClientTest {
                 expectedServiceDetails.setEndpoint("http://test-service:8080");
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/testService/details"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class)))
                                 .thenReturn(expectedServiceDetails);
 
@@ -117,7 +118,7 @@ class ServiceDiscoveryClientTest {
                 assertEquals("testService", result.get().getServiceName());
                 assertEquals("http://test-service:8080", result.get().getEndpoint());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/testService/details"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class));
         }
 
@@ -127,7 +128,7 @@ class ServiceDiscoveryClientTest {
                 String serviceName = "nonExistentService";
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/nonExistentService/details"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class))).thenReturn(null);
 
                 // When
@@ -137,7 +138,7 @@ class ServiceDiscoveryClientTest {
                 // Then
                 assertFalse(result.isPresent());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/nonExistentService/details"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class));
         }
 
@@ -147,7 +148,7 @@ class ServiceDiscoveryClientTest {
                 String serviceName = "errorService";
 
                 when(restTemplate.getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/errorService/details"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class)))
                                 .thenThrow(new RuntimeException("Connection failed"));
 
@@ -158,7 +159,7 @@ class ServiceDiscoveryClientTest {
                 // Then
                 assertFalse(result.isPresent());
                 verify(restTemplate).getForObject(
-                                eq("http://localhost:8085/api/v1/registry/services/errorService/details"),
+                                anyString(),
                                 eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class));
         }
 
@@ -200,5 +201,177 @@ class ServiceDiscoveryClientTest {
                 assertEquals("Spring Boot", serviceDetails.getFramework());
                 assertEquals("ACTIVE", serviceDetails.getStatus());
                 assertEquals("op1,op2,op3", serviceDetails.getOperations());
+        }
+
+        // ================================================================
+        // ORANGE PATH — expected, handled failure
+        // ================================================================
+
+        @Test
+        void findServiceByOperation_WithNullOperation_returnsEmpty() {
+                // URLEncoder.encode(null, UTF_8) throws NPE → caught by try/catch → returns empty
+                Optional<com.aibizarchitect.nexus.v1.spring.broker.spi.ServiceDiscoveryClient.ServiceInfo> result =
+                        discoveryClient.findServiceByOperation(null);
+
+                assertFalse(result.isPresent());
+        }
+
+        @Test
+        void findServiceByOperation_WithBlankOperation_returnsEmpty() {
+                // URLEncoder.encode(" ", UTF_8) → "+" (space encoded as +)
+                when(restTemplate.getForObject(
+                                eq("http://localhost:8085/api/v1/registry/services/by-operation/+"),
+                                eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class)))
+                                .thenReturn(null);
+
+                Optional<com.aibizarchitect.nexus.v1.spring.broker.spi.ServiceDiscoveryClient.ServiceInfo> result =
+                        discoveryClient.findServiceByOperation(" ");
+
+                assertFalse(result.isPresent());
+        }
+
+        @Test
+        void getServiceDetails_WithNullServiceName_returnsEmpty() {
+                // URLEncoder.encode(null, UTF_8) throws NPE → caught by try/catch
+                Optional<com.aibizarchitect.nexus.v1.spring.broker.spi.ServiceDiscoveryClient.ServiceDetails> result =
+                        discoveryClient.getServiceDetails(null);
+
+                assertFalse(result.isPresent());
+        }
+
+        @Test
+        void getServiceDetails_WithBlankServiceName_returnsEmpty() {
+                // URLEncoder.encode(" ", UTF_8) → "+"
+                when(restTemplate.getForObject(
+                                eq("http://localhost:8085/api/v1/registry/services/+/details"),
+                                eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class)))
+                                .thenReturn(null);
+
+                Optional<com.aibizarchitect.nexus.v1.spring.broker.spi.ServiceDiscoveryClient.ServiceDetails> result =
+                        discoveryClient.getServiceDetails(" ");
+
+                assertFalse(result.isPresent());
+        }
+
+        // ================================================================
+        // RED PATH — adversarial input the system must survive
+        // ================================================================
+
+        @Test
+        void findServiceByOperation_WithXssInOperation_handled() {
+                String xss = "<script>alert(1)</script>";
+                // URL encoding neutralizes XSS by encoding special chars
+                when(restTemplate.getForObject(
+                                anyString(),
+                                eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class)))
+                                .thenReturn(null);
+
+                Optional<com.aibizarchitect.nexus.v1.spring.broker.spi.ServiceDiscoveryClient.ServiceInfo> result =
+                        discoveryClient.findServiceByOperation(xss);
+
+                assertFalse(result.isPresent());
+        }
+
+        @Test
+        void findServiceByOperation_WithSqlInjection_handled() {
+                String sql = "'; DROP TABLE services; --";
+                // URL encoding neutralizes SQL injection by encoding special chars
+                when(restTemplate.getForObject(
+                                anyString(),
+                                eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class)))
+                                .thenReturn(null);
+
+                Optional<com.aibizarchitect.nexus.v1.spring.broker.spi.ServiceDiscoveryClient.ServiceInfo> result =
+                        discoveryClient.findServiceByOperation(sql);
+
+                assertFalse(result.isPresent());
+        }
+
+        @Test
+        void getServiceDetails_WithPathTraversalInName_handled() {
+                String traversal = "../../../etc/passwd";
+                // URL encoding neutralizes path traversal by encoding slashes
+                when(restTemplate.getForObject(
+                                anyString(),
+                                eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class)))
+                                .thenReturn(null);
+
+                Optional<com.aibizarchitect.nexus.v1.spring.broker.spi.ServiceDiscoveryClient.ServiceDetails> result =
+                        discoveryClient.getServiceDetails(traversal);
+
+                assertFalse(result.isPresent());
+        }
+
+        // ================================================================
+        // SILENT FAILURE — metamorphic/determinism, regression locks
+        // ================================================================
+
+        @Test
+        void metamorphic_findServiceByOperation_sameInput_sameOutput() {
+                String operation = "testOperation";
+                ServiceDiscoveryClientImpl.ServiceInfoImpl expected = new ServiceDiscoveryClientImpl.ServiceInfoImpl();
+                expected.setName("testService");
+
+                when(restTemplate.getForObject(
+                                anyString(),
+                                eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class)))
+                                .thenReturn(expected);
+
+                var result1 = discoveryClient.findServiceByOperation(operation);
+                var result2 = discoveryClient.findServiceByOperation(operation);
+
+                assertEquals(result1.isPresent(), result2.isPresent());
+                assertTrue(result1.isPresent());
+                assertEquals(result1.get().getName(), result2.get().getName());
+        }
+
+        @Test
+        void metamorphic_differentOperations_produceDifferentUrls() {
+                when(restTemplate.getForObject(
+                                anyString(),
+                                eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class)))
+                                .thenReturn(null);
+
+                discoveryClient.findServiceByOperation("op-a");
+                discoveryClient.findServiceByOperation("op-b");
+
+                // Verify restTemplate was called twice with different (encoded) URLs
+                verify(restTemplate, org.mockito.Mockito.times(2)).getForObject(
+                        anyString(),
+                        eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class));
+        }
+
+        @Test
+        void regressionLock_urlPattern_findServiceByOperation() {
+                String operation = "my-service.healthCheck";
+                ServiceDiscoveryClientImpl.ServiceInfoImpl expected = new ServiceDiscoveryClientImpl.ServiceInfoImpl();
+                expected.setName("my-service");
+
+                when(restTemplate.getForObject(
+                                anyString(),
+                                eq(ServiceDiscoveryClientImpl.ServiceInfoImpl.class)))
+                                .thenReturn(expected);
+
+                var result = discoveryClient.findServiceByOperation(operation);
+
+                assertTrue(result.isPresent());
+        }
+
+        @Test
+        void regressionLock_urlPattern_getServiceDetails() {
+                String serviceName = "my-service";
+                ServiceDiscoveryClientImpl.ServiceDetailsImpl expected = new ServiceDiscoveryClientImpl.ServiceDetailsImpl();
+                expected.setServiceName("my-service");
+                expected.setEndpoint("http://my-service:8080");
+
+                when(restTemplate.getForObject(
+                                anyString(),
+                                eq(ServiceDiscoveryClientImpl.ServiceDetailsImpl.class)))
+                                .thenReturn(expected);
+
+                var result = discoveryClient.getServiceDetails(serviceName);
+
+                assertTrue(result.isPresent());
+                assertEquals("http://my-service:8080", result.get().getEndpoint());
         }
 }

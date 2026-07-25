@@ -221,7 +221,7 @@ class RegistryServiceTest {
         }
 
         @Test
-        @DisplayName("register with same name does NOT clean old operations from index (GAP)")
+        @DisplayName("register with same name cleans old operations from index")
         void register_overwrite() {
             ServiceRegistration first = buildRegistration("svc-a", List.of("op1"));
             first.setEndpoint("http://old:8080");
@@ -236,13 +236,13 @@ class RegistryServiceTest {
             assertEquals(2, found.getOperations().size(),
                 "Operations should be from second registration");
 
-            // GAP: old operation 'op1' is NOT removed from operationIndex
-            // The register() method only puts new operations; it never cleans old ones.
-            // 'op1' still points to svc-a which no longer supports it.
-            assertNotNull(registry.findByOperation("op1"),
-                "GAP: stale operation 'op1' not cleaned from index");
+            // Old operation 'op1' should be cleaned from index
+            assertNull(registry.findByOperation("op1"),
+                "Old operation 'op1' should be removed from index on overwrite");
             assertNotNull(registry.findByOperation("op2"),
                 "New operation 'op2' should be in index");
+            assertNotNull(registry.findByOperation("op3"),
+                "New operation 'op3' should be in index");
         }
 
         @Test
@@ -266,6 +266,20 @@ class RegistryServiceTest {
             assertNull(registry.findByOperation(""));
             assertNull(registry.findByOperation("  "));
         }
+
+        @Test
+        @DisplayName("deregister with blank name returns 'Service not found'")
+        void deregister_blankName_returnsNotFound() {
+            assertEquals("Service not found", registry.deregister("").get("message"));
+            assertEquals("Service not found", registry.deregister("  ").get("message"));
+        }
+
+        @Test
+        @DisplayName("heartbeat with blank name returns 'Service not found'")
+        void heartbeat_blankName_returnsNotFound() {
+            assertEquals("Service not found", registry.heartbeat("").get("message"));
+            assertEquals("Service not found", registry.heartbeat("  ").get("message"));
+        }
     }
 
     // ================================================================
@@ -277,41 +291,49 @@ class RegistryServiceTest {
     class RedPath {
 
         @Test
-        @DisplayName("register with null registration throws NPE (GAP: no null guard)")
-        void register_nullRegistration_throwsNpe() {
-            // GAP: register() doesn't guard against null — serviceName access throws NPE
-            assertThrows(NullPointerException.class,
-                () -> registry.register(null));
+        @DisplayName("register with null registration returns error map")
+        void register_nullRegistration_returnsError() {
+            Map<String, String> result = registry.register(null);
+
+            assertEquals("Registration cannot be null", result.get("error"));
         }
 
         @Test
-        @DisplayName("register with null service name throws NPE (GAP: ConcurrentHashMap rejects null)")
-        void register_nullServiceName_throwsNpe() {
+        @DisplayName("register with null service name returns error map")
+        void register_nullServiceName_returnsError() {
             ServiceRegistration reg = new ServiceRegistration();
             reg.setServiceName(null);
             reg.setOperations(List.of("op1"));
             reg.setEndpoint("http://test:8080");
 
-            // GAP: ConcurrentHashMap.put(null, v) throws NPE — no null guard on serviceName
-            assertThrows(NullPointerException.class,
-                () -> registry.register(reg));
+            Map<String, String> result = registry.register(reg);
+
+            assertEquals("Service name is required", result.get("error"));
+            assertTrue(registry.getAllServices().isEmpty(), "Nothing should be stored");
         }
 
         @Test
-        @DisplayName("register with null operations list throws NPE")
-        void register_nullOperations_throwsNpe() {
+        @DisplayName("register with blank service name returns error map")
+        void register_blankServiceName_returnsError() {
+            ServiceRegistration reg = buildRegistration("  ", List.of("op1"));
+
+            Map<String, String> result = registry.register(reg);
+
+            assertEquals("Service name is required", result.get("error"));
+        }
+
+        @Test
+        @DisplayName("register with null operations list succeeds with zero indexed ops")
+        void register_nullOperations_succeedsWithZeroOps() {
             ServiceRegistration reg = new ServiceRegistration();
             reg.setServiceName("svc-a");
             reg.setOperations(null);
             reg.setEndpoint("http://test:8080");
 
-            // GAP: operations.forEach() on null → NPE, service IS stored before crash
-            assertThrows(NullPointerException.class,
-                () -> registry.register(reg));
+            Map<String, String> result = registry.register(reg);
 
-            // Partial state: service IS in registry but operations were never indexed
-            assertNotNull(registry.findByServiceName("svc-a"),
-                "GAP: partial registration — service stored before NPE on operations");
+            assertEquals("Service registered successfully", result.get("message"));
+            assertNotNull(registry.findByServiceName("svc-a"), "Service should be stored");
         }
 
         @Test
@@ -326,35 +348,33 @@ class RegistryServiceTest {
         }
 
         @Test
-        @DisplayName("deregister with null name throws NPE (GAP: ConcurrentHashMap rejects null)")
-        void deregister_nullName_throwsNpe() {
-            // GAP: ConcurrentHashMap.remove(null) throws NPE — no null guard
-            assertThrows(NullPointerException.class,
-                () -> registry.deregister(null));
+        @DisplayName("deregister with null name returns 'Service not found'")
+        void deregister_nullName_returnsNotFound() {
+            Map<String, String> result = registry.deregister(null);
+
+            assertEquals("Service not found", result.get("message"));
         }
 
         @Test
-        @DisplayName("heartbeat with null name throws NPE (GAP: ConcurrentHashMap rejects null)")
-        void heartbeat_nullName_throwsNpe() {
-            // GAP: ConcurrentHashMap.get(null) throws NPE — no null guard
-            assertThrows(NullPointerException.class,
-                () -> registry.heartbeat(null));
+        @DisplayName("heartbeat with null name returns 'Service not found'")
+        void heartbeat_nullName_returnsNotFound() {
+            Map<String, String> result = registry.heartbeat(null);
+
+            assertEquals("Service not found", result.get("message"));
         }
 
         @Test
-        @DisplayName("markUnhealthy with null name throws NPE (GAP: ConcurrentHashMap rejects null)")
-        void markUnhealthy_nullName_throwsNpe() {
-            // GAP: ConcurrentHashMap.get(null) throws NPE — no null guard
-            assertThrows(NullPointerException.class,
-                () -> registry.markUnhealthy(null));
+        @DisplayName("markUnhealthy with null name is no-op")
+        void markUnhealthy_nullName_noOp() {
+            assertDoesNotThrow(() -> registry.markUnhealthy(null));
         }
 
         @Test
-        @DisplayName("lookupByOperation with null operation throws NPE (GAP: ConcurrentHashMap rejects null)")
-        void lookupByOperation_null_throwsNpe() {
-            // GAP: operationIndex.get(null) throws NPE — no null guard
-            assertThrows(NullPointerException.class,
-                () -> registry.lookupByOperation(null));
+        @DisplayName("lookupByOperation with null operation returns empty")
+        void lookupByOperation_null_returnsEmpty() {
+            Optional<ServiceRegistration> result = registry.lookupByOperation(null);
+
+            assertFalse(result.isPresent());
         }
 
         @Test
