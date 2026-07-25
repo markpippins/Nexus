@@ -69,5 +69,24 @@ public class PebDecision {
     @Column(nullable = false, columnDefinition = "timestamp with time zone")
     private Instant createdAt;
 
-    // Getters and Setters omitted for brevity
+    // Getters and Setters — only the fields the kernel dispatch and hash
+    // layers need are wired in; the rest stay absent to keep the entity narrow.
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public String getAfterHash() { return afterHash; }
+    public void setAfterHash(String afterHash) { this.afterHash = afterHash; }
+
+    public String getBeforeHash() { return beforeHash; }
+    public void setBeforeHash(String beforeHash) { this.beforeHash = beforeHash; }
+
+    public UUID getParentDecisionId() { return parentDecisionId; }
+    public void setParentDecisionId(UUID parentDecisionId) { this.parentDecisionId = parentDecisionId; }
+
+    public DecisionStatus getStatus() { return status; }
+    public void setStatus(DecisionStatus status) { this.status = status; }
+
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }
