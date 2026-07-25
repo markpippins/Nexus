@@ -2,8 +2,14 @@ package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -194,5 +200,116 @@ class ServiceStatusControllerTest {
                 controller.streamStatusUpdates(null, null, mockRequest);
 
         assertNotNull(emitter);
+    }
+
+    // ================================================================
+    // ORANGE PATH — expected, handled failure
+    // ================================================================
+
+    @Test
+    void getServiceStatus_NullName_returnsNotFound() {
+        // GAP: controller doesn't null-check serviceName — relies on cache returning empty
+        when(cacheService.getServiceStatus(null)).thenReturn(Optional.empty());
+
+        ResponseEntity<ServiceStatus> response = controller.getServiceStatus(null);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void getLastHeartbeat_BlankName_returnsNotFound() {
+        when(cacheService.getLastHeartbeat("")).thenReturn(Optional.empty());
+
+        ResponseEntity<Map<String, Object>> response = controller.getLastHeartbeat("");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void postServiceMetrics_NullBody_handled() {
+        doNothing().when(cacheService).storeMetrics(eq("test-service"), eq(null));
+
+        ResponseEntity<Map<String, String>> response = controller.postServiceMetrics("test-service", null);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        // GAP: should this really accept null metrics? Documented for awareness
+    }
+
+    @Test
+    void getServiceMetrics_EmptyName_returnsNotFound() {
+        when(cacheService.getMetrics("")).thenReturn(Optional.empty());
+
+        ResponseEntity<Map<String, Object>> response = controller.getServiceMetrics("");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    // ================================================================
+    // RED PATH — adversarial input the system must survive
+    // ================================================================
+
+    @Test
+    void postServiceMetrics_SpecialCharServiceName_handled() {
+        String maliciousName = "test<script>alert(1)</script>";
+        doNothing().when(cacheService).storeMetrics(eq(maliciousName), anyMap());
+
+        ResponseEntity<Map<String, String>> response = controller.postServiceMetrics(
+                maliciousName, Map.of("cpu", "10%"));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(cacheService).storeMetrics(eq(maliciousName), anyMap());
+    }
+
+    @Test
+    void postServiceMetrics_ExtremelyLargeBody_handled() {
+        java.util.Map<String, Object> largeMetrics = new java.util.HashMap<>();
+        for (int i = 0; i < 1000; i++) {
+            largeMetrics.put("key" + i, "value".repeat(100));
+        }
+        doNothing().when(cacheService).storeMetrics(eq("test-service"), eq(largeMetrics));
+
+        ResponseEntity<Map<String, String>> response = controller.postServiceMetrics("test-service", largeMetrics);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+    }
+
+    // ================================================================
+    // SILENT FAILURE — metamorphic/determinism coverage
+    // ================================================================
+
+    @Test
+    void metamorphic_redisHealth_sameStateConsistentOutput() {
+        when(cacheService.isRedisHealthy()).thenReturn(true);
+
+        ResponseEntity<Map<String, Object>> response1 = controller.getRedisHealth();
+        ResponseEntity<Map<String, Object>> response2 = controller.getRedisHealth();
+
+        assertEquals(response1.getBody().get("redisAvailable"), response2.getBody().get("redisAvailable"));
+    }
+
+    @Test
+    void metamorphic_healthyVsUnhealthy_producesDifferentOutput() {
+        when(cacheService.isRedisHealthy()).thenReturn(true);
+        ResponseEntity<Map<String, Object>> healthy = controller.getRedisHealth();
+
+        when(cacheService.isRedisHealthy()).thenReturn(false);
+        ResponseEntity<Map<String, Object>> unhealthy = controller.getRedisHealth();
+
+        assertNotEquals(healthy.getBody().get("redisAvailable"), unhealthy.getBody().get("redisAvailable"),
+                "Healthy and unhealthy Redis states MUST differ");
+    }
+
+    @Test
+    void regressionLock_heartbeatResponse_hasRequiredFields() {
+        Instant now = Instant.now();
+        when(cacheService.getLastHeartbeat("test-service")).thenReturn(Optional.of(now));
+        when(cacheService.isServiceStale("test-service")).thenReturn(false);
+
+        ResponseEntity<Map<String, Object>> response = controller.getLastHeartbeat("test-service");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().containsKey("serviceName"), "lastHeartbeat MUST include serviceName");
+        assertTrue(response.getBody().containsKey("isStale"), "lastHeartbeat MUST include isStale");
     }
 }

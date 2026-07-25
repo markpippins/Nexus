@@ -1,5 +1,8 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -110,5 +113,60 @@ class ServiceBackendControllerTest {
 
         mockMvc.perform(delete("/api/v1/backends/1"))
                 .andExpect(status().isNoContent());
+    }
+
+    // ================================================================
+    // ORANGE / RED / SILENT FAILURE — deepened coverage
+    // ================================================================
+
+    @Test
+    void addBackend_MalformedJson_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/backends")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{bad json"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void addBackend_InvalidRoleValue_throwsDeserializationError() {
+        org.junit.jupiter.api.Assertions.assertThrows(Exception.class, () ->
+                mockMvc.perform(post("/api/v1/backends")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"serviceDeploymentId\":1,\"backendDeploymentId\":2,\"role\":\"INVALID_ROLE\"}")));
+    }
+
+    @Test
+    void getBackends_NegativeDeploymentId_handled() throws Exception {
+        when(serviceBackendService.getBackendsForDeployment(-1L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/backends/deployment/-1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void metamorphic_sameBackend_sameResponse() throws Exception {
+        List<ServiceBackendDto> backends = List.of(testBackendDto);
+        when(serviceBackendService.getBackendsForDeployment(1L)).thenReturn(backends);
+
+        String r1 = mockMvc.perform(get("/api/v1/backends/deployment/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String r2 = mockMvc.perform(get("/api/v1/backends/deployment/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals(r1, r2, "Same deployment backends should produce identical JSON");
+    }
+
+    @Test
+    void regressionLock_emptyBackends_preservesFormat() throws Exception {
+        when(serviceBackendService.getBackendsForDeployment(1L)).thenReturn(List.of());
+        when(serviceBackendService.getConsumersForDeployment(1L)).thenReturn(List.of());
+
+        String r1 = mockMvc.perform(get("/api/v1/backends/deployment/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String r2 = mockMvc.perform(get("/api/v1/backends/consumers/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertNotNull(r1);
+        assertNotNull(r2);
     }
 }

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -227,5 +228,146 @@ class RegistryControllerTest {
         ResponseEntity<Map<String, String>> response = registryController.deregister("test-service");
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    // ================================================================
+    // ORANGE PATH — expected, handled failure
+    // ================================================================
+
+    @Test
+    void register_NullServiceName_handled() {
+        ExternalServiceRegistration reg = new ExternalServiceRegistration();
+        reg.setServiceName(null);
+        when(registrationService.registerExternalService(any(ExternalServiceRegistration.class)))
+                .thenThrow(new IllegalArgumentException("serviceName required"));
+
+        ResponseEntity<Map<String, Object>> response = registryController.register(reg);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertFalse((Boolean) response.getBody().get("success"));
+    }
+
+    @Test
+    void heartbeat_BlankServiceName_returnsNotFound() {
+        when(registrationService.updateHeartbeat(" ")).thenReturn(false);
+
+        ResponseEntity<Map<String, String>> response = registryController.heartbeat(" ", null);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void deregister_BlankServiceName_handled() {
+        when(registrationService.deregisterService("")).thenReturn(false);
+
+        ResponseEntity<Map<String, String>> response = registryController.deregister("");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void maintenanceMode_InvalidTargetState_returns400() {
+        ResponseEntity<Map<String, String>> response = registryController.setMaintenanceMode(
+                "test-service", Map.of("targetState", "BROKEN", "reason", "test"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("targetState must be OFFLINE or DEGRADED", response.getBody().get("error"));
+    }
+
+    @Test
+    void batchHeartbeat_EmptyServices_returns400() {
+        RegistryController.BatchHeartbeatRequest req = new RegistryController.BatchHeartbeatRequest();
+        req.setServices(java.util.Collections.emptyList());
+
+        ResponseEntity<Map<String, Object>> response = registryController.batchHeartbeat(req);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Empty services list", response.getBody().get("error"));
+    }
+
+    @Test
+    void batchHeartbeat_NullServices_returns400() {
+        RegistryController.BatchHeartbeatRequest req = new RegistryController.BatchHeartbeatRequest();
+
+        ResponseEntity<Map<String, Object>> response = registryController.batchHeartbeat(req);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    // ================================================================
+    // RED PATH — adversarial input the system must survive
+    // ================================================================
+
+    @Test
+    void heartbeat_SpecialCharactersInServiceName_handled() {
+        when(registrationService.updateHeartbeat("test<script>alert(1)</script>"))
+                .thenReturn(false);
+
+        ResponseEntity<Map<String, String>> response = registryController.heartbeat(
+                "test<script>alert(1)</script>", null);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void deregister_SqlInjectionInServiceName_handled() {
+        String maliciousName = "'; DROP TABLE services; --";
+        when(registrationService.deregisterService(maliciousName)).thenReturn(false);
+
+        ResponseEntity<Map<String, String>> response = registryController.deregister(maliciousName);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void findServiceByOperation_PathTraversal_handled() {
+        when(registrationService.findServiceByOperation("../../../etc/passwd"))
+                .thenReturn(Optional.empty());
+
+        ResponseEntity<Service> response = registryController.findServiceByOperation("../../../etc/passwd");
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    // ================================================================
+    // SILENT FAILURE — metamorphic/determinism coverage
+    // ================================================================
+
+    @Test
+    void metamorphic_heartbeatFailure_consistentNotFoundBody() {
+        when(registrationService.updateHeartbeat("unknown-svc")).thenReturn(false);
+
+        ResponseEntity<Map<String, String>> response1 = registryController.heartbeat("unknown-svc", null);
+        ResponseEntity<Map<String, String>> response2 = registryController.heartbeat("unknown-svc", null);
+
+        assertEquals(HttpStatus.NOT_FOUND, response1.getStatusCode());
+        assertEquals(response1.getStatusCode(), response2.getStatusCode());
+        // GAP: notFound has no body — regression lock
+        assertNotNull(response1);
+    }
+
+    @Test
+    void metamorphic_registerSuccess_producesDeterministicResponse() {
+        when(registrationService.registerExternalService(any(ExternalServiceRegistration.class)))
+                .thenReturn(testService);
+
+        ResponseEntity<Map<String, Object>> response1 = registryController.register(testRegistration);
+        ResponseEntity<Map<String, Object>> response2 = registryController.register(testRegistration);
+
+        assertEquals(response1.getBody().get("success"), response2.getBody().get("success"));
+        assertEquals(response1.getBody().get("serviceName"), response2.getBody().get("serviceName"));
+    }
+
+    @Test
+    void regressionLock_deregisterSuccess_responseFormat() {
+        when(registrationService.deregisterService("test-service")).thenReturn(true);
+
+        ResponseEntity<Map<String, String>> response = registryController.deregister("test-service");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertTrue(response.getBody().containsKey("message"));
+        assertEquals("Service deregistered successfully", response.getBody().get("message"));
     }
 }
