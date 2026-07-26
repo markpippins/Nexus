@@ -93,15 +93,18 @@ def run():
 
     print("\n--- Entrypoint Validation ---")
     scripts = [
-        ("python/rover/planner.py", "Planner"),
-        ("python/rover/analyst_answer_questions.py", "Analyst"),
-        ("python/rover/architect_process_todo.py", "Architect"),
+        ("python/tackle/planner.py", "Planner"),
+        ("bin/analyst_answer_questions.py", "Analyst"),
+        ("bin/architect_process_todo.py", "Architect"),
     ]
     nexus_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     venv_python = os.path.join(nexus_root, "python/rover/.venv/bin/python3")
     if not os.path.exists(venv_python):
         venv_python = sys.executable  # fallback
-    pythonpath = os.path.join(nexus_root, "python")
+    pythonpath = os.pathsep.join([
+        os.path.join(nexus_root, "python"),
+        os.path.join(nexus_root, "python/tackle"),
+    ])
     env = dict(os.environ, PYTHONPATH=pythonpath)
     for script_rel, name in scripts:
         script_path = os.path.join(nexus_root, script_rel)
@@ -134,3 +137,10 @@ def run():
               f"not found in systemctl --user list-timers")
 
     return passed, failed, skipped
+
+
+if __name__ == "__main__":
+    p, f, s = run()
+    print(f"\n{'='*40}")
+    print(f"Results: {p} passed, {f} failed, {s} skipped")
+    sys.exit(0 if f == 0 else 1)
