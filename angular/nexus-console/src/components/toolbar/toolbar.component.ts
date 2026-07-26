@@ -28,7 +28,7 @@ export class ToolbarComponent {    private elementRef = inject(ElementRef);
   isColorPickerOpen = signal(false);
 
   // View mode inputs
-  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms'>('file-explorer');
+  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console');
 
   // Inputs for button states (file explorer)

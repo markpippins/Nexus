@@ -8,17 +8,19 @@ module.exports = {
     extend: {
       colors: {
         // Override Tailwind's default gray with a steel/blue-gray palette
+        // Colors use CSS variables so they can be re-themed per mode (light / steel / dark).
+        // Fallbacks match the original light-mode values.
         gray: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
+          50: 'rgb(var(--steel-50, 248 250 252) / <alpha-value>)',
+          100: 'rgb(var(--steel-100, 241 245 249) / <alpha-value>)',
+          200: 'rgb(var(--steel-200, 226 232 240) / <alpha-value>)',
+          300: 'rgb(var(--steel-300, 203 213 225) / <alpha-value>)',
+          400: 'rgb(var(--steel-400, 148 163 184) / <alpha-value>)',
+          500: 'rgb(var(--steel-500, 100 116 139) / <alpha-value>)',
+          600: 'rgb(var(--steel-600, 71 85 105) / <alpha-value>)',
+          700: 'rgb(var(--steel-700, 51 65 85) / <alpha-value>)',
+          800: 'rgb(var(--steel-800, 30 41 59) / <alpha-value>)',
+          900: 'rgb(var(--steel-900, 15 23 42) / <alpha-value>)',
         },
         primary: {
           50: '#f5f3ff',
@@ -38,16 +40,16 @@ module.exports = {
           600: '#65a30d',
         },
         steel: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
+          50: 'rgb(var(--steel-50, 248 250 252) / <alpha-value>)',
+          100: 'rgb(var(--steel-100, 241 245 249) / <alpha-value>)',
+          200: 'rgb(var(--steel-200, 226 232 240) / <alpha-value>)',
+          300: 'rgb(var(--steel-300, 203 213 225) / <alpha-value>)',
+          400: 'rgb(var(--steel-400, 148 163 184) / <alpha-value>)',
+          500: 'rgb(var(--steel-500, 100 116 139) / <alpha-value>)',
+          600: 'rgb(var(--steel-600, 71 85 105) / <alpha-value>)',
+          700: 'rgb(var(--steel-700, 51 65 85) / <alpha-value>)',
+          800: 'rgb(var(--steel-800, 30 41 59) / <alpha-value>)',
+          900: 'rgb(var(--steel-900, 15 23 42) / <alpha-value>)',
         },
       },
       fontFamily: {

@@ -58,6 +58,40 @@ export class EntityDetailViewComponent implements OnInit {
   answersLoading = signal(false);
   loading = signal(true);
 
+  /** Reply form state */
+  replyBody = '';
+  replyRole = 'user';
+  replyConfidence = 'MEDIUM';
+  replySaving = signal(false);
+  replyError = signal<string | null>(null);
+
+  submitAnswer() {
+    const body = this.replyBody.trim();
+    if (!body) return;
+    const id = this.entityId();
+    if (!id) return;
+
+    this.replySaving.set(true);
+    this.replyError.set(null);
+
+    this.dataService.addOpenQuestionAnswer(id, {
+      role: this.replyRole,
+      answer: body,
+      confidence: this.replyConfidence,
+    }).subscribe({
+      next: (newAnswer) => {
+        this.answers.update(a => [...a, newAnswer]);
+        this.replyBody = '';
+        this.replyRole = 'user';
+        this.replySaving.set(false);
+      },
+      error: (err) => {
+        this.replyError.set(err.message || 'Failed to submit answer');
+        this.replySaving.set(false);
+      }
+    });
+  }
+
   /** Extracts sourceText from harvest entity */
   harvestSourceText = computed<string>(() => {
     const entity = this.entity();
@@ -92,20 +126,19 @@ export class EntityDetailViewComponent implements OnInit {
   harvestSaving = signal(false);
   harvestSaveError = signal<string | null>(null);
 
-  /** Open question resolution text */
-  openQuestionResolution = computed<string>(() => {
-    const entity = this.entity();
-    if (!entity || this.entityType() !== 'open-questions') return '';
-    const resolution = entity['resolution'];
-    return typeof resolution === 'string' && resolution.trim() ? resolution : '';
-  });
-
   /** Whether the open question is resolved */
   openQuestionIsResolved = computed<boolean>(() => {
     const entity = this.entity();
     if (!entity || this.entityType() !== 'open-questions') return false;
     const status = entity['status'];
     return status === 'RESOLVED' || status === 'WONT_FIX';
+  });
+
+  /** Latest answer (resolution) text from the answers collection */
+  latestAnswerText = computed<string>(() => {
+    const answers = this.answers();
+    if (answers.length === 0) return '';
+    return answers[answers.length - 1].answer || '';
   });
 
   /** Extracts forum thread route from the description field for discussion links */

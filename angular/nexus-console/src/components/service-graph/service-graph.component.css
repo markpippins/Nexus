@@ -25,6 +25,12 @@
   z-index: 30;
 }
 
+.graph-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .mode-switcher {
   display: flex;
   background: #1e293b;
@@ -219,6 +225,21 @@
 
 .canvas-container:focus {
   outline: none;
+}
+
+/* Component Creator overlay */
+.creator-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  background: #0f172a;
+  overflow: hidden;
+}
+
+.creator-overlay app-component-creator {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* Context Menu */

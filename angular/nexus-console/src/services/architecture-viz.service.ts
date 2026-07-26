@@ -1618,8 +1618,28 @@ export class ArchitectureVizService {
 
     // --- Animation & Config ---
 
+    private paused = false;
+
+    public setPaused(value: boolean): void {
+        if (this.paused === value) return;
+        this.paused = value;
+
+        if (this.paused) {
+            if (this.animationId !== null) {
+                cancelAnimationFrame(this.animationId);
+                this.animationId = null;
+            }
+        } else if (this.animationId === null) {
+            this.animate();
+        }
+    }
+
     private animate() {
         this.animationId = requestAnimationFrame(() => this.animate());
+
+        if (this.paused) {
+            return;
+        }
 
         // Handle Auto-Orbit if Simulation Active
         if (this.isSimulationActive()) {

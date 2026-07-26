@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 
 /** Default page size used by all paginated list views and the DataService methods. */
 export const DEFAULT_PAGE_SIZE = 25;
@@ -203,10 +203,8 @@ export interface OpenQuestion {
   category: string;
   status: string;
   blocking: boolean;
-  resolution: string | null;
   createdBy: string | null;
   createdAt: string;
-  resolvedAt: string | null;
   entityType?: string | null;
   entityId?: string | null;
   entityTitle?: string | null;
@@ -355,6 +353,21 @@ export interface ConversationBlock {
   createdAt: string;
 }
 
+/**
+ * Envelope returned by nebula-srv `GET /api/conversations/by-snapshot/:id/blocks`.
+ * Mirrors `bs.listBlocks` from `nebula-srv/src/block-segmentation.service.ts`.
+ * `blocks` is the only field the UI consumes; segments/overrides are surfaced
+ * for completeness and ignored by this consumer.
+ */
+export interface ConversationBlockEnvelope {
+  blocks: ConversationBlock[];
+  segments: unknown[];
+  overrides: unknown[];
+  conversationId?: string;
+  snapshotIndex?: number;
+  diff?: { added: number; modified: number; removed: number; unchanged: number };
+}
+
 export interface TimelineEvent {
   type: 'created' | 'resolved' | 'status_change' | 'note';
   label: string;
@@ -392,6 +405,13 @@ export interface SearchResponse {
 @Injectable({ providedIn: 'root' })
 export class DataService {
   private base = '/api';
+  // Proxy for nebula-domain reads (nebula-srv :3101). The dev proxy at
+  // /nebula in proxy.conf.json forwards to nebula-srv with a pathRewrite of
+  // /nebula → /api. Conversation snapshot/block reads live here rather than
+  // in assembly-srv because conversation_snapshots/conversation_blocks are
+  // nebula-schema tables owned by nebula-srv. See Assembly Issues thread
+  // 81eadf40-fb39-4767-8652-bc92c3f3a799 for the boundary decision.
+  private nebula = '/nebula';
 
   constructor(private http: HttpClient) {}
 
@@ -464,11 +484,17 @@ export class DataService {
   }
 
   getConversations(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
-    return this.http.get<Paged<ConversationSnapshot>>(`${this.base}/conversations?page=${page}&pageSize=${pageSize}`);
+    // Reads from nebula-srv directly (see Assembly issue 81eadf40 — these
+    // are nebula.conversation_snapshots rows). Same response shape as the
+    // former assembly-srv route, plus an extra `source_filename` column.
+    return this.http.get<Paged<ConversationSnapshot>>(`${this.nebula}/conversations?page=${page}&pageSize=${pageSize}`);
   }
 
   getConversation(id: string) {
-    return this.http.get<ConversationSnapshot>(`${this.base}/conversations/${id}`);
+    // `id` is the snapshot_id (the conversations list emits `item.id` =
+    // snapshot id; assembly-ui has always routed with that value as the
+    // entity handle). Hit the by-snapshot single endpoint on nebula-srv.
+    return this.http.get<ConversationSnapshot>(`${this.nebula}/conversations/by-snapshot/${id}`);
   }
 
   getOpenQuestions(page = 1, pageSize = DEFAULT_PAGE_SIZE, requirementId?: string | null) {
@@ -520,11 +546,13 @@ export class DataService {
   }
 
   getReports(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
-    return this.http.get<Paged<AgentRecord>>(`${this.base}/reports?page=${page}&pageSize=${pageSize}`);
+    // Reports view now uses agent-records endpoint with type filter
+    // (previously /api/reports which was deleted as dead code duplicate)
+    return this.http.get<Paged<AgentRecord>>(`${this.base}/agent-records?type=report&page=${page}&pageSize=${pageSize}`);
   }
 
   getReport(id: string) {
-    return this.http.get<AgentRecord>(`${this.base}/reports/${id}`);
+    return this.http.get<AgentRecord>(`${this.base}/agent-records/${id}`);
   }
 
   getAgentRecords(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
@@ -564,7 +592,14 @@ export class DataService {
   }
 
   getConversationBlocks(conversationId: string) {
-    return this.http.get<ConversationBlock[]>(`${this.base}/conversations/${conversationId}/blocks`);
+    // `conversationId` here is, in practice, a snapshot_id — the
+    // conversations-view routes detail by `item.id` which is the snapshot
+    // UUID. Hit the snapshot-keyed blocks endpoint on nebula-srv and unwrap
+    // the `{ blocks, segments, overrides, conversationId, snapshotIndex }`
+    // envelope to the bare `ConversationBlock[]` the consumer expects.
+    return this.http
+      .get<ConversationBlockEnvelope>(`${this.nebula}/conversations/by-snapshot/${conversationId}/blocks`)
+      .pipe(map(envelope => envelope.blocks));
   }
 
   getOpenQuestionAnswers(id: string) {

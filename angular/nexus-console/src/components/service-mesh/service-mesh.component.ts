@@ -7,7 +7,6 @@ import { ServiceMeshService } from '../../services/service-mesh.service.js';
 import { UiPreferencesService } from '../../services/ui-preferences.service.js';
 import { ServiceGraphComponent } from '../service-graph/service-graph.component.js';
 import { ServiceDetailsComponent } from '../service-details/service-details.component.js';
-import { ComponentCreatorComponent } from '../component-creator/component-creator.component.js';
 
 import {
   ServiceInstance,
@@ -24,8 +23,7 @@ import {
     MatIconModule,
     MatTabsModule,
     ServiceGraphComponent,
-    ServiceDetailsComponent,
-    ComponentCreatorComponent
+    ServiceDetailsComponent
   ],
   templateUrl: './service-mesh.component.html',
   styleUrls: ['./service-mesh.component.css'],

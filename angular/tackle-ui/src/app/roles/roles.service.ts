@@ -18,21 +18,21 @@ export interface RolesResponse {
 @Injectable({ providedIn: 'root' })
 export class RolesService {
   private http = inject(HttpClient);
-  private base = '/api/config';
+  private base = '/api';
 
   list(): Observable<RolesResponse> {
     return this.http.get<RolesResponse>(`${this.base}/roles`);
   }
 
   get(idOrName: string): Observable<Role> {
-    return this.http.get<Role>(`${this.base}/role/${encodeURIComponent(idOrName)}`);
+    return this.http.get<Role>(`${this.base}/roles/${encodeURIComponent(idOrName)}`);
   }
 
   upsert(role: { id?: string; name: string; description?: string }): Observable<{ saved: boolean; role: Role }> {
-    return this.http.post<{ saved: boolean; role: Role }>(`${this.base}/role`, role);
+    return this.http.post<{ saved: boolean; role: Role }>(`${this.base}/roles`, role);
   }
 
   delete(idOrName: string): Observable<{ deleted: boolean; id: string }> {
-    return this.http.delete<{ deleted: boolean; id: string }>(`${this.base}/role/${encodeURIComponent(idOrName)}`);
+    return this.http.delete<{ deleted: boolean; id: string }>(`${this.base}/roles/${encodeURIComponent(idOrName)}`);
   }
 }

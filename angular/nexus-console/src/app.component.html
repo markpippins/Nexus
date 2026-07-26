@@ -632,7 +632,7 @@
       [class.fixed]="isTerminalMaximized()"
       [class.inset-0]="isTerminalMaximized()"
       [class.z-50]="isTerminalMaximized()"
-      [style.height.%]="!isConsoleCollapsed() && !isTerminalMaximized() ? consolePaneHeight() : undefined"
+      [style.height.px]="!isConsoleCollapsed() && !isTerminalMaximized() ? consolePaneHeight() : undefined"
       [class.h-6]="isConsoleCollapsed()"
       [class.border-t]="isConsoleCollapsed()"
       [class.border-[rgb(var(--color-border-base))]]="isConsoleCollapsed()"

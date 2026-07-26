@@ -28,11 +28,12 @@ import { NodeType } from '../../models/component-config.js';
 import { AtlasService } from '../../services/atlas.service.js';
 import type { ConnectionData } from '../../models/graph-view.model.js';
 import { LoadViewDialogComponent } from '../load-view-dialog/load-view-dialog.component.js';
+import { ComponentCreatorComponent } from '../component-creator/component-creator.component.js';
 import * as THREE from 'three';
 
 @Component({
   selector: 'app-service-graph',
-  imports: [CommonModule, FormsModule, LoadViewDialogComponent],
+  imports: [CommonModule, FormsModule, LoadViewDialogComponent, ComponentCreatorComponent],
   templateUrl: './service-graph.component.html',
   styleUrls: ['./service-graph.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -351,6 +352,11 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         params.radius ?? this.vizService.bloomRadius(),
         params.threshold ?? this.vizService.bloomThreshold()
       );
+    }, { allowSignalWrites: true });
+
+    // Pause the 3D renderer while the Component Creator sub-view is open
+    effect(() => {
+      this.vizService.setPaused(this.graphSubView() === 'creator');
     }, { allowSignalWrites: true });
 
     // Auto-save after drag or camera changes (debounced 500ms)

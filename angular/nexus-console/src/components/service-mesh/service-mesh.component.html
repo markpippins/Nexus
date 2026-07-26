@@ -55,7 +55,7 @@
     }
 
     <!-- Graph View -->
-    @if (viewMode() === 'graph') { @if (graphSubView() === 'canvas') {
+    @if (viewMode() === 'graph') {
     <div class="service-graph-container">
       <app-service-graph
         [services]="services()"
@@ -70,10 +70,6 @@
         (refreshServices)="refreshServices.emit()"
       ></app-service-graph>
     </div>
-    } @else {
-    <div class="component-creator-container h-full">
-      <app-component-creator></app-component-creator>
-    </div>
-    } }
+    }
   </div>
 </div>

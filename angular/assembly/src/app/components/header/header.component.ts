@@ -11,7 +11,7 @@ import { Router } from '@angular/router';
 })
 export class HeaderComponent {
   @Input() label = 'Feed';
-  @Input() isDark = false;
+  @Input() currentTheme: 'light' | 'steel' | 'dark' = 'light';
   @Output() toggleSidebar = new EventEmitter<void>();
   @Output() toggleMobileSidebar = new EventEmitter<void>();
   @Output() toggleTheme = new EventEmitter<void>();

@@ -1,0 +1,6 @@
+{
+  "name": "Conduit Process Control Plane",
+  "description": "Process and task control plane, hierarchical project management, and deliberation surface for agentic software engineering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
