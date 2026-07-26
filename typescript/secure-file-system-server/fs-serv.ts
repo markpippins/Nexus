@@ -160,13 +160,21 @@ const server = http.createServer(async (req, res) => {
                     const items = [];
                     for (const itemName of await fs.readdir(targetPath)) {
                         const itemPath = path.join(targetPath, itemName);
-                        const itemStats = await fs.stat(itemPath);
-                        items.push({
-                            name: itemName,
-                            type: itemStats.isDirectory() ? 'directory' : 'file',
-                            size: itemStats.size,
-                            last_modified: itemStats.mtimeMs,
-                        });
+                        try {
+                            // lstat (not stat) so dangling symlinks don't throw ENOENT.
+                            const itemStats = await fs.lstat(itemPath);
+                            let type: 'directory' | 'file' | 'symlink' = 'file';
+                            if (itemStats.isSymbolicLink()) type = 'symlink';
+                            else if (itemStats.isDirectory()) type = 'directory';
+                            items.push({
+                                name: itemName,
+                                type,
+                                size: itemStats.size,
+                                last_modified: itemStats.mtimeMs,
+                            });
+                        } catch (e) {
+                            logger.warn('Skipping inaccessible entry', { path: targetPath, entry: itemName });
+                        }
                     }
                     responseData = { path: requestData.path, items };
                     logger.info('Directory listing completed', { itemCount: items.length, path: requestData.path });
