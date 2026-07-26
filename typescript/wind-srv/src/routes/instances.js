@@ -223,11 +223,10 @@ instancesRouter.post('/:id/execute', async (req, res, next) => {
       [ticket_id]
     );
 
-    // Call harness-srv (resolve-only for now — agent execution pending opencode agent config)
+    // Call harness-srv
     const harnessResult = await callHarness(ticket.node_task_id, {
       context: context || {},
       work_dir: process.env.HARNESS_WORK_DIR || '/home/codex/dev',
-      resolve_only: true,
     });
 
     res.json({

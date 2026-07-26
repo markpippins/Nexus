@@ -17,7 +17,7 @@ import express from "express";
 import { resolveContext, emitEvent, pool, redis } from "./db";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { writeFile, unlink, mkdir } from "fs/promises";
+import { writeFile, readFile, unlink, mkdir } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 
@@ -251,6 +251,9 @@ interface HarnessExecResult {
 async function executeHarness(params: HarnessExecParams): Promise<HarnessExecResult> {
   const { harness_id, prompt_file, work_dir, agent, role, timeout_ms } = params;
 
+  // Read the prompt content from file
+  const promptContent = await readFile(prompt_file, "utf-8");
+
   // Get harness config from DB
   const result = await pool.query(
     `SELECT invocation_semantics FROM tackle.harnesses WHERE id = $1`,
@@ -267,40 +270,93 @@ async function executeHarness(params: HarnessExecParams): Promise<HarnessExecRes
       : result.rows[0].invocation_semantics;
 
   const binary = config.binary;
-  if (!binary) {
-    throw new Error(`Harness ${harness_id} has no binary configured`);
-  }
 
-  // Build command based on harness type
-  let cmdArgs: string[] = [];
-
-  if (binary === "opencode") {
-    // opencode run --agent <role> --dir <work_dir> --format json --file <prompt_file> ""
-    cmdArgs = [
-      "run",
-      "--agent", agent,
-      "--dir", work_dir,
-      "--format", "json",
-      "--file", prompt_file,
-      "--dangerously-skip-permissions",
-      "",  // empty message — the prompt is in the file
-    ];
-  } else if (binary === "codex") {
-    // codex exec --cd <work_dir> < prompt_file
-    cmdArgs = ["exec", "--cd", work_dir];
+  // Route to the right executor
+  if (binary === "ollama") {
+    return executeOllama(promptContent, role, timeout_ms);
+  } else if (binary === "opencode") {
+    return executeOpencode(params);
   } else {
     throw new Error(`Harness ${harness_id} binary '${binary}' not yet supported`);
   }
+}
 
-  // Execute with timeout
+/**
+ * Execute via ollama HTTP API directly (no opencode, no tool access).
+ * This is the fast path for CPU-only environments.
+ */
+async function executeOllama(
+  prompt: string,
+  role: string,
+  timeout_ms: number
+): Promise<HarnessExecResult> {
+  const ollamaUrl = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+  const model = process.env.OLLAMA_MODEL || "qwen2.5:0.5b";
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout_ms);
+
+    const resp = await fetch(`${ollamaUrl}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: false,
+        options: {
+          num_predict: 1024,
+          temperature: 0.3,
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+
+    if (!resp.ok) {
+      const body = await resp.text();
+      return { exitCode: 1, stdout: "", stderr: `Ollama error (${resp.status}): ${body}` };
+    }
+
+    const data = await resp.json() as any;
+    return {
+      exitCode: 0,
+      stdout: data.response || "",
+      stderr: "",
+    };
+  } catch (error: any) {
+    if (error.name === "AbortError") {
+      return { exitCode: 124, stdout: "", stderr: `Ollama timeout after ${timeout_ms}ms` };
+    }
+    return { exitCode: 1, stdout: "", stderr: error.message };
+  }
+}
+
+/**
+ * Execute via opencode CLI (full tool access, requires GPU for reasonable speed).
+ */
+async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecResult> {
+  const { prompt_file, work_dir, agent, role, timeout_ms } = params;
+
+  const cmdArgs = [
+    "run",
+    "--agent", agent,
+    "--dir", work_dir,
+    "--format", "json",
+    "--file", prompt_file,
+    "--dangerously-skip-permissions",
+    "",
+  ];
+
   try {
     const { stdout, stderr } = await execFileAsync(
-      binary,
+      "opencode",
       cmdArgs,
       {
         cwd: work_dir,
         timeout: timeout_ms,
-        maxBuffer: 10 * 1024 * 1024, // 10MB
+        maxBuffer: 10 * 1024 * 1024,
         env: {
           ...process.env,
           HARNESS_ROLE: role,

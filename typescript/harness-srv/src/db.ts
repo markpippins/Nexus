@@ -188,7 +188,7 @@ async function getDefaultHarness(): Promise<{
   config: Record<string, any>;
 }> {
   const result = await pool.query(
-    `SELECT id, invocation_semantics FROM tackle.harnesses WHERE id = 'harn-opencode'`
+    `SELECT id, invocation_semantics FROM tackle.harnesses WHERE id = 'harn-ollama'`
   );
   if (result.rows.length === 0) {
     // Fallback to any harness
