@@ -10,6 +10,7 @@ import { RaiseQuestionComponent } from '../../components/raise-question/raise-qu
 import { SkeletonComponent } from '../../components/skeleton/skeleton.component';
 import { ErrorStateComponent } from '../../components/error-state/error-state.component';
 import { MarkdownRendererComponent } from '../../components/markdown-renderer/markdown-renderer.component';
+import { TtsButtonComponent } from '../../components/tts-button/tts-button.component';
 import { entityRouteForType, formatEntityType } from '../../utils/entity-route';
 
 export interface EntityTypeConfig {
@@ -40,7 +41,7 @@ const ENTITY_CONFIG: Record<string, EntityTypeConfig> = {
 @Component({
   selector: 'app-entity-detail-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent, StatusBadgeComponent, RaiseQuestionComponent, SkeletonComponent, ErrorStateComponent, MarkdownRendererComponent],
+  imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent, StatusBadgeComponent, RaiseQuestionComponent, SkeletonComponent, ErrorStateComponent, MarkdownRendererComponent, TtsButtonComponent],
   templateUrl: './entity-detail-view.component.html',
 })
 export class EntityDetailViewComponent implements OnInit {
@@ -100,6 +101,81 @@ export class EntityDetailViewComponent implements OnInit {
     return typeof text === 'string' ? text : '';
   });
 
+  /** Converts docklang JSONB to readable markdown */
+  private docklangToMarkdown(docklang: Record<string, unknown> | null): string {
+    if (!docklang) return '';
+    const parts: string[] = [];
+
+    // Meta section
+    const meta = docklang['meta'] as Record<string, any> | undefined;
+    if (meta) {
+      if (meta['title']) parts.push(`# ${meta['title']}`);
+      if (meta['model']) parts.push(`**Model:** ${meta['model']}`);
+      if (meta['description']) parts.push(meta['description']);
+      if (meta['date']) parts.push(`*Date: ${meta['date']}*`);
+      if (meta['source_filename']) parts.push(`*File: ${meta['source_filename']}*`);
+      parts.push('');
+    }
+
+    // Stats summary
+    const stats = docklang['stats'] as Record<string, any> | undefined;
+    if (stats) {
+      parts.push('---');
+      parts.push('');
+      const totalBlocks = stats['total_blocks'] || stats['totalBlocks'] || '?';
+      const totalUnits = stats['total_units'] || stats['totalUnits'] || (docklang['discourse_units'] as Array<any> | undefined)?.length || '?';
+      parts.push(`> **Stats:** ${totalUnits} turns, ${totalBlocks} blocks`);
+      const byTypeRaw = stats['by_type'] || stats['byType'];
+      if (byTypeRaw && typeof byTypeRaw === 'object') {
+        const breakdown = Object.entries(byTypeRaw as Record<string, number>)
+          .map(([k, v]) => `${k}: ${v}`).join(', ');
+        parts.push(`> ${breakdown}`);
+      }
+      parts.push('');
+    }
+
+    // Discourse units (turns with blocks)
+    const units = docklang['discourse_units'] as Array<any> | undefined;
+    if (units && Array.isArray(units)) {
+      for (const unit of units) {
+        if (unit.heading) parts.push(`## ${unit.heading}`);
+        const blocks = unit.blocks as Array<any> | undefined;
+        if (blocks && Array.isArray(blocks)) {
+          for (const block of blocks) {
+            if (block.type === 'code') {
+              const lang = block.content?.language || '';
+              const code = block.content?.code || block.content?.text || '';
+              parts.push('');
+              parts.push(`\`\`\`${lang}\n${code}\n\`\`\``);
+              parts.push('');
+            } else if (block.type === 'paragraph') {
+              parts.push((block.content?.text || '') + '\n');
+            } else if (block.content?.text) {
+              parts.push(block.content.text + '\n');
+            }
+          }
+        }
+        parts.push('');
+      }
+    }      // Raw content fallback — if no structured content was generated above,
+      // render whatever text-ish content we can extract from other keys
+    if (parts.length === 0) {
+      // Try to get the full docklang as a readable summary
+      const allKeys = Object.keys(docklang);
+      for (const key of allKeys) {
+        if (['meta', 'stats', 'discourse_units'].includes(key)) continue;
+        const val = docklang[key];
+        if (typeof val === 'string') {
+          parts.push(`## ${key}`);
+          parts.push(val);
+          parts.push('');
+        }
+      }
+    }
+
+    return parts.join('\n').trim();
+  }
+
   /** Extracts docklang from harvest entity for DockLang toggle */
   harvestDockLang = computed<string>(() => {
     const entity = this.entity();
@@ -113,18 +189,45 @@ export class EntityDetailViewComponent implements OnInit {
     }
   });
 
+  /** Docklang rendered as readable markdown — tries docklang field first,
+   *  then attempts to parse sourceText as docklang JSON if docklang is null */
+  harvestDockLangMarkdown = computed<string>(() => {
+    const entity = this.entity();
+    if (!entity || this.entityType() !== 'harvests') return '';
+
+    const docklang = entity['docklang'];
+    const sourceText = entity['sourceText'];
+
+    // Primary: convert docklang object to markdown
+    if (docklang) {
+      const md = this.docklangToMarkdown(docklang as Record<string, unknown> | null);
+      if (md) return md;
+    }
+
+    // Fallback: try to parse sourceText as docklang JSON (some imports store
+    // docklang data in sourceText when docklang field is null)
+    if (sourceText && typeof sourceText === 'string' && sourceText.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(sourceText);
+        if (parsed && typeof parsed === 'object') {
+          const md = this.docklangToMarkdown(parsed as Record<string, unknown>);
+          if (md) return md;
+        }
+      } catch {
+        // Not valid JSON — fall through to raw sourceText
+      }
+    }
+
+    // Last fallback: return sourceText as-is (the markdown renderer will handle it)
+    return typeof sourceText === 'string' ? sourceText : '';
+  });
+
   /** Whether DockLang view is active instead of markdown */
   showDockLang = signal(false);
 
   toggleDockLang() {
     this.showDockLang.update(v => !v);
   }
-
-  /** Harvest edit state */
-  editingHarvest = signal(false);
-  harvestEditContent = '';
-  harvestSaving = signal(false);
-  harvestSaveError = signal<string | null>(null);
 
   /** Whether the open question is resolved */
   openQuestionIsResolved = computed<boolean>(() => {
@@ -151,45 +254,6 @@ export class EntityDetailViewComponent implements OnInit {
     if (!match) return null;
     return ['/forums', match[1], match[2]];
   });
-
-  startHarvestEdit() {
-    this.harvestEditContent = this.harvestSourceText();
-    this.editingHarvest.set(true);
-    this.harvestSaveError.set(null);
-  }
-
-  cancelHarvestEdit() {
-    this.editingHarvest.set(false);
-    this.harvestEditContent = '';
-    this.harvestSaveError.set(null);
-  }
-
-  saveHarvestEdit() {
-    const id = this.entityId();
-    const content = this.harvestEditContent;
-    if (!id || !id.trim()) return;
-
-    this.harvestSaving.set(true);
-    this.harvestSaveError.set(null);
-
-    this.dataService.updateHarvest(id, content).subscribe({
-      next: () => {
-        // Update local entity state with the new sourceText
-        this.entity.update(e => {
-          if (e) {
-            return { ...e, sourceText: content };
-          }
-          return e;
-        });
-        this.editingHarvest.set(false);
-        this.harvestSaving.set(false);
-      },
-      error: err => {
-        this.harvestSaving.set(false);
-        this.harvestSaveError.set(err.message || 'Failed to save');
-      }
-    });
-  }
 
   /** Merges consecutive blocks by the same role into single-turn markdown sections */
   conversationMarkdown = computed<string>(() => {
@@ -361,11 +425,23 @@ export class EntityDetailViewComponent implements OnInit {
     return String(value || 'Untitled');
   }
 
+  /** Fields to exclude from the metadata table — these are large JSON blobs shown
+   *  in dedicated sections below, internal routing fields, or raw JSON that isn't
+   *  useful as key-value pairs. The rest are plain scalar values that display fine. */
+  private METADATA_EXCLUDED_KEYS = new Set([
+    'id', 'entityType', 'entityId',
+    'docklang',      // shown in dedicated DockLang toggle section
+    'sourceText',    // shown in dedicated Source Conversation section
+    'candidates',    // raw JSON — not useful in metadata table
+    'metadata',      // raw JSON — shows docklingVersion etc.
+    'runMetadata',   // raw JSON — empty or opaque
+  ]);
+
   get metadataEntries(): { key: string; value: unknown }[] {
     const entity = this.entity();
     if (!entity) return [];
     return Object.entries(entity)
-      .filter(([key]) => !['id', 'entityType', 'entityId'].includes(key))
+      .filter(([key]) => !this.METADATA_EXCLUDED_KEYS.has(key))
       .map(([key, value]) => ({ key: this.formatKey(key), value }));
   }
 
