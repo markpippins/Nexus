@@ -205,7 +205,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'kernel-ui': 'http://localhost:4207',
     'tackle-ui': 'http://localhost:4202',
     'cascade-ui': 'http://localhost:4203',
-    'execution-ui': 'http://localhost:4212',
+    'execution-ui': 'http://localhost:4205',
     'vision-ui': 'http://localhost:4208',
     'edit-ui': 'http://localhost:4223',
     'wind-ui': 'http://localhost:4209',
