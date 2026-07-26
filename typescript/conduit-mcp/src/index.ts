@@ -38,7 +38,6 @@ import {
   getWorkRequest,
   listWorkRequests,
   listReceiptsByPlan,
-  insertReceipt,
   appendEvent,
   getEvents,
   getAllEvents,
@@ -47,6 +46,7 @@ import {
   checkProjectionDrift,
   resolveWrUuid,
 } from "./db";
+import * as api from "./conduit-client";
 import {
   validateCompilerOutput,
   compilerOutputToEvent,
@@ -62,6 +62,7 @@ import {
 } from "./runtime-kernel";
 import http from "node:http";
 import { loadEnv } from "./env"; // shared .env loader (no dotenv dependency)
+import { validateReceipt } from "./receipts";
 
 // .env already loaded by env.ts at module evaluation time
 
@@ -324,8 +325,13 @@ app.post("/tickets/detect", async (_req, res) => {
 // Sessions endpoint (v066 — database-backed session history)
 // Sessions now own their workflow metadata natively (workflow_id, run_id, etc.)
 app.get("/sessions", async (_req, res) => {
-  const sessions = await getAllSessions();
-  res.json(sessions);
+  try {
+    const sessions = await api.getAllSessions();
+    res.json(sessions);
+  } catch (e: any) {
+    console.error("[sessions] Error:", e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Update session cost (v072 — captured after session ends by executor_cloud.py)
@@ -346,7 +352,7 @@ app.post("/sessions/:sessionId/cost", async (req, res) => {
   }
 
   try {
-    await updateSessionCost(sessionId, cost_usd);
+    await api.updateSessionCost(sessionId, cost_usd);
     res.json({ updated: true, sessionId, cost_usd });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -365,7 +371,7 @@ app.post("/sessions/:sessionId/heartbeat", async (req, res) => {
   }
 
   try {
-    await updateSessionHeartbeat(sessionId);
+    await api.updateSessionHeartbeat(sessionId);
     // Update in-memory agent state if role is provided in body
     const role = req.body?.role;
     if (role && watcher) {
@@ -390,9 +396,7 @@ app.post("/sessions/:sessionId/kill", async (req, res) => {
   if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
     res.status(400).json({ error: "Invalid session ID" });
     return;
-  }
-
-  const session = await getSession(sessionId);
+  }    const session = await api.getSession(sessionId);
   if (!session) {
     res.status(404).json({ error: `Session ${sessionId} not found` });
     return;
@@ -403,36 +407,8 @@ app.post("/sessions/:sessionId/kill", async (req, res) => {
       .status(400)
       .json({ killed: false, error: "Session is not running", sessionId });
     return;
-  }
-
-  const now = new Date().toISOString();
-  let killedPids: number[] = [];
-  const errors: string[] = [];
-
-  // ── SIGKILL the process (Temporal removed — direct kill always) ──
-  if (session.pid) {
-    try {
-      process.kill(-session.pid, "SIGKILL");
-      killedPids.push(session.pid);
-    } catch (e: any) {
-      try {
-        process.kill(session.pid, "SIGKILL");
-        killedPids.push(session.pid);
-      } catch (e2: any) {
-        errors.push(`PID ${session.pid}: ${e2.message}`);
-      }
-    }
-  }
-
-  // ── Always run DB cleanup ──
-  await endSession(sessionId, 137, now);
-
-  const released = await releaseSessionTickets(sessionId);
-  if (released > 0) {
-    console.log(
-      `[${now}] Released ${released} ticket(s) from killed session ${sessionId}`,
-    );
-  }
+  }    // Delegate to Python conduit which handles kill signal + DB cleanup atomically
+  const result = await api.killSession(sessionId);
 
   // Broadcast SSE event so UI updates immediately
   for (const client of sseClients) {
@@ -441,20 +417,14 @@ app.post("/sessions/:sessionId/kill", async (req, res) => {
         type: "session_killed",
         data: {
           sessionId,
-          killedPids,
-          timestamp: now,
+          killedPids: result.pids,
+          timestamp: result.timestamp,
         },
       })}\n\n`,
     );
   }
 
-  res.json({
-    killed: true,
-    sessionId,
-    pids: killedPids,
-    errors: errors.length > 0 ? errors : undefined,
-    timestamp: now,
-  });
+  res.json(result);
 });
 
 // Kill a running agent by role (v073 — kill builder/reviewer/planner from UI)
@@ -549,7 +519,7 @@ app.post("/circuit-breaker/trip", async (req, res) => {
   const { reason, detail, retryAfter } = req.body || {};
 
   try {
-    await tripBreaker({
+    await api.tripBreaker({
       error: reason || "MANUAL_TRIP",
       detail: detail || "Manually tripped from UI",
       source: "ui",
@@ -589,7 +559,7 @@ app.post("/circuit-breaker/trip", async (req, res) => {
 // Reset circuit breaker (v073 — manual reset from UI)
 app.post("/circuit-breaker/reset", async (_req, res) => {
   try {
-    await clearBreaker();
+    await api.clearBreaker();
 
     // Wake the Python scheduler so it re-polls immediately instead of
     // waiting out the idle backoff (SCHEDULER_IDLE_BACKOFF, 60s).
@@ -627,7 +597,7 @@ app.post("/circuit-breaker/reset", async (_req, res) => {
 // Pause conduit orchestration (v073 — workflow control, not failure mode)
 app.post("/conduit/pause", async (_req, res) => {
   try {
-    await setConduitPaused(true);
+    await api.setConduitPaused(true);
 
     const now = new Date().toISOString();
     console.log(`[${now}] CONDUIT paused from UI`);
@@ -650,7 +620,7 @@ app.post("/conduit/pause", async (_req, res) => {
 // Resume conduit orchestration (v073 — workflow control)
 app.post("/conduit/resume", async (_req, res) => {
   try {
-    await setConduitPaused(false);
+    await api.setConduitPaused(false);
 
     const now = new Date().toISOString();
     console.log(`[${now}] CONDUIT resumed from UI`);
@@ -939,7 +909,7 @@ app.get("/config/cron", async (_req, res) => {
 // Get failure recovery config (from circuit_breaker row)
 app.get("/config/failure-recovery", async (_req, res) => {
   try {
-    const breaker = await getBreaker();
+    const breaker = await api.getBreaker();
     res.json({
       max_retries_per_model: breaker.max_retries_per_model ?? 3,
       retry_delay_seconds: breaker.retry_delay_seconds ?? 120,
@@ -964,25 +934,13 @@ app.post("/config/failure-recovery", async (req, res) => {
     } = req.body || {};
 
     const now = new Date().toISOString();
-    const pool = getDb();
-    await pool.query(
-      `UPDATE circuit_breaker SET
-        max_retries_per_model = $1,
-        retry_delay_seconds = $2,
-        max_fallbacks = $3,
-        push_back_to_pending = $4,
-        retry_after = $5,
-        updated_at = $6
-      WHERE id = 1`,
-      [
-        typeof max_retries_per_model === 'number' ? max_retries_per_model : 3,
-        typeof retry_delay_seconds === 'number' ? retry_delay_seconds : 120,
-        typeof max_fallbacks === 'number' ? max_fallbacks : 3,
-        push_back_to_pending !== false ? 1 : 0,
-        typeof circuit_breaker_retry_after === 'number' ? circuit_breaker_retry_after : 1800,
-        now,
-      ]
-    );
+    await api.saveFailureRecoveryConfig({
+      max_retries_per_model,
+      retry_delay_seconds,
+      max_fallbacks,
+      push_back_to_pending,
+      circuit_breaker_retry_after,
+    });
 
     console.log(`[${now}] FAILURE RECOVERY config updated`);
     res.json({ saved: true });
@@ -1187,11 +1145,13 @@ app.get("/vision/receipts", async (req, res) => {
 });
 
 /**
- * POST /vision/receipts — Direct receipt insertion (no state machine).
+ * POST /vision/receipts — issue_receipt: validate and insert a receipt.
+ * Returns 400 error if validateReceipt rejects the receipt transition.
  * Used by the Python LOSM bridge for standalone work requests
- * that don't have a matching conduit plan. Skips the state machine
- * validation in tools.ts so the typed bridge can issue LOSM-native
- * ExecutionReceipts without creating dummy plans.
+ * that don't have a matching conduit plan. Validates the receipt
+ * transition via validateReceipt before inserting, so the typed
+ * bridge can issue LOSM-native ExecutionReceipts without creating
+ * dummy plans.
  */
 app.post("/vision/receipts", async (req, res) => {
   try {
@@ -1200,7 +1160,13 @@ app.post("/vision/receipts", async (req, res) => {
       res.status(400).json({ ok: false, error: "Missing required fields: id, plan_id, type, agent_role, created_at" });
       return;
     }
-    await insertReceipt({
+    // Validate receipt transition before inserting
+    const validation = await validateReceipt(plan_id, type);
+    if (!validation.valid) {
+      res.status(400).json({ ok: false, error: validation.error });
+      return;
+    }
+    await api.insertReceipt({
       id, plan_id, type, agent_role,
       session_id: session_id || '',
       ticket_id: req.body.ticket_id || null,

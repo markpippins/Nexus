@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { routes } from './routes/index.js';
 import { errorHandler } from './error-handler.js';
+import { runMigration } from './db.js';
 
 dotenv.config({ path: '../../.env' });
 dotenv.config({ path: '.env' });
@@ -19,6 +20,14 @@ app.use('/api', routes);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`assembly-srv listening on http://localhost:${PORT}`);
+async function main() {
+  await runMigration();
+  app.listen(PORT, () => {
+    console.log(`assembly-srv listening on http://localhost:${PORT}`);
+  });
+}
+
+main().catch(err => {
+  console.error('assembly-srv startup failed:', err);
+  process.exit(1);
 });

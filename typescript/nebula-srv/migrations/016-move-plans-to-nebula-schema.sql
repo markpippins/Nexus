@@ -137,28 +137,80 @@ BEGIN
 END $$;
 
 -- ═══════════════════════════════════════════════════════════════════════
---  4. Create a nebula-level plan_status view for direct nebula queries
+--  4. Create nebula.plan_status as canonical view (full definition,
+--     not a mirror of conduit)
 -- ═══════════════════════════════════════════════════════════════════════
 
--- This is the authoritative view for nebula-srv queries.
--- It lives in the conduit schema as well, but we also expose it here
--- so nebula-srv routes can query nebula.plan_status without cross-schema
--- references.
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.views
-    WHERE table_schema = 'nebula' AND table_name = 'plan_status'
-  ) THEN
-    CREATE VIEW nebula.plan_status AS SELECT * FROM conduit.plan_status;
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.views
-    WHERE table_schema = 'nebula' AND table_name = 'plans_by_status'
-  ) THEN
-    CREATE VIEW nebula.plans_by_status AS SELECT * FROM conduit.plans_by_status;
-  END IF;
-END $$;
+CREATE OR REPLACE VIEW nebula.plan_status AS
+SELECT
+  p.*,
+  CASE
+    WHEN EXISTS (
+      SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'HOLD'
+      AND NOT EXISTS (
+        SELECT 1 FROM vision.receipts r2
+        WHERE r2.plan_id = p.id
+        AND r2.type IN ('CANCELLED', 'ABANDONED')
+        AND r2.created_at > r.created_at
+      )
+    ) THEN 'HOLD'
+    WHEN (
+      SELECT r.type FROM vision.receipts r
+      WHERE r.plan_id = p.id
+      AND r.type NOT IN ('PLANNING', 'HOLD')
+      ORDER BY r.created_at DESC LIMIT 1
+    ) = 'REQUEUED' THEN 'PLAN_CREATE'
+    WHEN EXISTS (
+      SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_PASS'
+      AND NOT EXISTS (
+        SELECT 1 FROM vision.receipts r2
+        WHERE r2.plan_id = p.id
+        AND r2.type IN ('BLOCK', 'PLAN_BLOCK', 'CANCELLED', 'ABANDONED')
+        AND r2.created_at > r.created_at
+      )
+    ) THEN 'REVIEW_PASS'
+    WHEN EXISTS (
+      SELECT 1 FROM vision.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_REJECT'
+    ) THEN COALESCE(
+      (SELECT r.type FROM vision.receipts r
+       WHERE r.plan_id = p.id
+       AND r.type != 'BLOCK'
+       ORDER BY r.created_at DESC LIMIT 1),
+      'PLAN_CREATE'
+    )
+    ELSE COALESCE(
+      (SELECT r.type FROM vision.receipts r
+       WHERE r.plan_id = p.id
+       AND r.type NOT IN ('PLANNING', 'HOLD')
+       ORDER BY r.created_at DESC LIMIT 1),
+      (SELECT r.type FROM vision.receipts r
+       WHERE r.plan_id = p.id
+       ORDER BY r.created_at DESC LIMIT 1),
+      NULL
+    )
+  END AS derived_status
+FROM nebula.plans p
+WHERE p.deleted = 0;
+
+CREATE OR REPLACE VIEW nebula.plans_by_status AS
+SELECT
+  ps.id,
+  ps.file_name,
+  ps.title,
+  ps.project,
+  ps.goal,
+  ps.content,
+  ps.files_affected,
+  ps.acceptance_criteria,
+  ps.dependencies,
+  ps.prompt_ref,
+  ps.notes,
+  ps.priority,
+  ps.deleted,
+  ps.created_at,
+  ps.updated_at,
+  ps.derived_status AS status
+FROM nebula.plan_status ps;
 
 -- ═══════════════════════════════════════════════════════════════════════
 --  5. Verify
@@ -202,7 +254,7 @@ BEGIN
   RAISE NOTICE '   Table now lives in: nebula.plans';
   RAISE NOTICE '   conduit.plan_status → references nebula.plans';
   RAISE NOTICE '   conduit.plans_by_status → references conduit.plan_status';
-  RAISE NOTICE '   nebula.plan_status → mirror of conduit.plan_status';
+  RAISE NOTICE '   nebula.plan_status → canonical view (full derived_status logic)';
 END $$;
 
 COMMIT;

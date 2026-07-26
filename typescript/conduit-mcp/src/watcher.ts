@@ -1,4 +1,5 @@
 import path from "node:path";
+import crypto from "node:crypto";
 import {
   PipelineState,
   PlanCard,
@@ -16,6 +17,7 @@ import { AgentWatcher } from "./watchers/agent-watcher";
 import { AnalyticsEngine } from "./watchers/analytics-engine";
 import {
   initDb,
+  getDb,
   getPlansGroupedByStatus,
   planRowToPlanCard,
   getReceiptCount,
@@ -30,7 +32,10 @@ import {
   getSession,
   endSession,
   releaseSessionTickets,
+  createTicketIfMissing,
+  checkpointWal,
 } from "./db";
+import * as api from "./conduit-client";
 import { breakerRowToStatus } from "./watchers/cb-watcher";
 
 export class PipelineWatcher {
@@ -270,6 +275,120 @@ export class PipelineWatcher {
     }, 10000);
   }
 
+  // ── Auto-bootstrap: detect nebula-created plans (no receipts/tickets) ──
+  // When nebula-mcp creates plans via POST /api/plans, they land in
+  // nebula.implementation_plans with status='pending' but no PLAN_CREATE
+  // receipt or builder ticket. This method detects those and bootstraps
+  // the execution pipeline (receipt + ticket) so they become visible.
+  private bootstrapInterval: ReturnType<typeof setInterval> | null = null;
+  private readonly BOOTSTRAP_INTERVAL_MS = 30_000; // 30s, matches PlanWatcher refresh
+
+  async bootstrapUnclaimedPlans(): Promise<number> {
+    const db = getDb();
+    let bootstrapped = 0;
+
+    try {
+      // Find plans in nebula.implementation_plans with status='pending'
+      // that have NO receipts in vision.receipts
+      const { rows } = await db.query(
+        `SELECT p.plan_number, p.title
+         FROM nebula.implementation_plans p
+         WHERE p.status = 'pending'
+           AND NOT EXISTS (
+             SELECT 1 FROM vision.receipts r
+             WHERE r.plan_id = p.plan_number
+           )
+         ORDER BY p.created_at ASC
+         LIMIT 50`
+      );
+
+      for (const plan of rows) {
+        try {
+          const now = new Date().toISOString();
+          const receiptId = crypto.randomUUID();
+
+          // Create builder ticket so the conduit can pick this up
+          const ticketId = await createTicketIfMissing(
+            plan.plan_number,
+            "builder",
+            receiptId,
+            now,
+            plan.title,
+            "",
+            "builder",
+          );
+
+          // Issue PLAN_CREATE receipt with ticket reference
+          await api.insertReceipt({
+            id: receiptId,
+            plan_id: plan.plan_number,
+            type: "PLAN_CREATE",
+            agent_role: "planner",
+            session_id: "",
+            ticket_id: ticketId,
+            artifact_path: null,
+            summary: `Auto-bootstrapped: ${plan.title}`,
+            metadata_json: JSON.stringify({ auto_bootstrapped: true }),
+            tokens_used: 0,
+            created_at: now,
+          });
+
+          checkpointWal();
+
+          console.log(
+            `[${now}] Auto-bootstrapped plan ${plan.plan_number}: ${plan.title}` +
+            (ticketId ? ` (ticket ${ticketId})` : "")
+          );
+
+          // SSE: notify clients so the plan appears in the UI immediately
+          this.emit({
+            type: "plan_state_changed",
+            data: {
+              planNumber: plan.plan_number,
+              planTitle: plan.title,
+              receiptType: "PLAN_CREATE",
+              agentRole: "planner",
+              newDerivedStatus: "PLAN_CREATE",
+              timestamp: now,
+            },
+          });
+
+          bootstrapped++;
+        } catch (planErr: any) {
+          // 23505 = unique_violation — another bootstrapper already handled this plan
+          if (planErr?.code === "23505") continue;
+          console.warn(
+            `Auto-bootstrap failed for plan ${plan.plan_number}:`,
+            planErr?.message || planErr,
+          );
+        }
+      }
+    } catch (err: any) {
+      console.warn("Auto-bootstrap query failed:", err?.message || err);
+    }
+
+    return bootstrapped;
+  }
+
+  startAutoBootstrap() {
+    // Run immediately on startup
+    this.bootstrapUnclaimedPlans().then((n) => {
+      if (n > 0) console.log(`Auto-bootstrap: bootstrapped ${n} plan(s) on startup`);
+    });
+    // Then check periodically
+    this.bootstrapInterval = setInterval(
+      () => this.bootstrapUnclaimedPlans(),
+      this.BOOTSTRAP_INTERVAL_MS,
+    );
+  }
+
+  stopAutoBootstrap() {
+    if (this.bootstrapInterval) {
+      clearInterval(this.bootstrapInterval);
+      this.bootstrapInterval = null;
+    }
+  }
+
   // Stale session sweeper — runs every 60s, kills sessions whose last_heartbeat_at
   // exceeds STALE_SESSION_THRESHOLD_SECONDS (default 300s = 5 min).
   private staleSweepInterval: ReturnType<typeof setInterval> | null = null;
@@ -417,9 +536,11 @@ export class PipelineWatcher {
     await this.agentWatcher.initialize();
     this.startStateHeartbeat();
     this.startStaleSessionSweep();
+    this.startAutoBootstrap();
   }
 
   destroy() {
+    this.stopAutoBootstrap();
     this.planWatcher.destroy();
     this.builderWatcher.destroy();
     this.cbWatcher.destroy();

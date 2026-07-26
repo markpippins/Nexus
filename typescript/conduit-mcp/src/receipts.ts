@@ -1,4 +1,4 @@
-import { getLatestReceiptType } from "./db";
+import { getLatestReceiptType } from "./conduit-client";
 
 // Allowed transitions: from → to (v018: removed PROPOSED, added HOLD)
 // v019: added CCNF_EXECUTION — sub-event within implementation phase

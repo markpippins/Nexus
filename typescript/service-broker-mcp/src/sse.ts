@@ -3,7 +3,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { registerTools } from "./tools/index.js";
 import * as http from "http";
 
-const PORT = parseInt(process.env.SERVICE_BROKER_MCP_PORT || "3108", 10);
+const PORT = parseInt(process.env.SERVICE_BROKER_MCP_PORT || "3112", 10);
 
 async function main() {
   const server = new McpServer({
@@ -13,14 +13,88 @@ async function main() {
 
   registerTools(server);
 
+  // Track active transports keyed by session ID. Required so that the
+  // `POST /messages?sessionId=<id>` route can find the live SSE transport
+  // to feed inbound JSON-RPC requests back into. The spec-compliant shape
+  // is: open `GET /sse`, the SDK emits an `endpoint:` event naming
+  // `/messages?sessionId=<id>`, the client then POSTs to that URL with
+  // JSON-RPC envelopes and reads replies off the open SSE stream.
+  const sessions = new Map<string, SSEServerTransport>();
+
   const httpServer = http.createServer(async (req, res) => {
-    if (req.url === "/sse") {
-      const transport = new SSEServerTransport("/messages", res);
-      await server.connect(transport);
-    } else if (req.url === "/health") {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, service: "service-broker-mcp", port: PORT }));
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+
+    // CORS headers for cross-origin MCP clients
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
     }
+
+    if (req.method === "GET" && url.pathname === "/sse") {
+      // SSE endpoint — client opens a long-lived connection here
+      const transport = new SSEServerTransport("/messages", res);
+      const sessionId = transport.sessionId;
+      sessions.set(sessionId, transport);
+
+      req.socket.on("close", () => {
+        sessions.delete(sessionId);
+      });
+
+      try {
+        await server.connect(transport);
+      } catch (err: any) {
+        console.error(`[service-broker-mcp-sse] Session ${sessionId} error:`, err);
+        sessions.delete(sessionId);
+      }
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/messages") {
+      // Client messages endpoint — the SSE transport reads from here
+      const sessionId = url.searchParams.get("sessionId");
+      if (!sessionId || !sessions.has(sessionId)) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No active SSE session for sessionId" }));
+        return;
+      }
+
+      const transport = sessions.get(sessionId)!;
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      req.on("end", async () => {
+        const body = Buffer.concat(chunks).toString("utf-8");
+        try {
+          await transport.handlePostMessage(req, res, body);
+        } catch (err: any) {
+          console.error(`[service-broker-mcp-sse] Handle message error:`, err);
+          if (!res.headersSent) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: err.message }));
+          }
+        }
+      });
+      return;
+    }
+
+    // Health endpoint
+    if (req.method === "GET" && url.pathname === "/health") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        status: "ok",
+        service: "service-broker-mcp",
+        sessions: sessions.size,
+        port: PORT,
+      }));
+      return;
+    }
+
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Not found. Available: GET /sse, POST /messages, GET /health" }));
   });
 
   httpServer.listen(PORT, () => {

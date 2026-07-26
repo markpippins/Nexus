@@ -1,50 +1,5 @@
 import { createError } from "./errors";
-import {
-  getAIConfigSnapshot,
-  getAIProviders,
-  getAIProvider,
-  upsertAIProvider,
-  deleteAIProvider,
-  getAIHarnesses,
-  getAIHarness,
-  upsertAIHarness,
-  deleteAIHarness,
-  getAIModels,
-  getAIModel,
-  upsertAIModel,
-  deleteAIModel,
-  getAIRoleConfigs,
-  getAIRoleConfig,
-  upsertAIRoleConfig,
-  upsertConfigBundles,
-  upsertConfigBundle,
-  getConfigBundles,
-  getConfigBundle,
-  deleteConfigBundle,
-  validateAIConfig,
-  seedDefaultAIConfig,
-  importAIConfig,
-  getDb,
-} from "./db";
-import {
-  getProceduresForRole,
-  getProcedureBySlug,
-  hasRoleMemoryChangedSince,
-  triggerRefresh,
-  getLastUpdated,
-} from "./memory";
-import {
-  listSchedulerEntries,
-  getSchedulerEntry,
-  createSchedulerEntry,
-  updateSchedulerEntry,
-  deleteSchedulerEntry,
-  getDueSchedulerEntries,
-} from "./db";
-import {
-  getRoles,
-  getRole,
-} from "./db";
+import * as api from "./tackle-client";
 
 // ── Nebula RMS API helpers (HTTP calls to nebula-srv) ───────────────
 
@@ -627,16 +582,16 @@ export const toolDefinitions: MCPToolDefinition[] = [
 export function registerToolHandlers(): Record<string, Function> {
   return {
     get_ai_config: async (_args: any) => {
-      return await getAIConfigSnapshot();
+      return await api.getAIConfigSnapshot();
     },
 
     validate_ai_config: async (_args: any) => {
-      const warnings = await validateAIConfig();
-      return { valid: warnings.length === 0, warnings };
+      const result = await api.validateAIConfig();
+      return result;
     },
 
     seed_default_ai_config: async (args: { force?: boolean }) => {
-      return await seedDefaultAIConfig(!!args.force);
+      return await api.seedDefaultAIConfig(!!args.force);
     },
 
     import_ai_config: async (args: {
@@ -649,7 +604,7 @@ export function registerToolHandlers(): Record<string, Function> {
       if (!args.providers && !args.harnesses && !args.models && !args.roles) {
         throw createError("INVALID_ARGUMENTS", "No import data provided");
       }
-      return await importAIConfig({
+      return await api.importAIConfig({
         providers: args.providers || [],
         harnesses: args.harnesses || [],
         models: args.models || [],
@@ -659,13 +614,13 @@ export function registerToolHandlers(): Record<string, Function> {
     },
 
     list_ai_providers: async (_args: any) => {
-      const providers = await getAIProviders();
+      const providers = await api.getAIProviders();
       return { count: providers.length, providers };
     },
 
     get_ai_provider: async (args: { id: string }) => {
       if (!args.id) throw createError("INVALID_ARGUMENTS", "id is required");
-      const provider = await getAIProvider(args.id);
+      const provider = await api.getAIProvider(args.id);
       if (!provider) throw createError("NOT_FOUND", `Provider '${args.id}' not found`);
       return provider;
     },
@@ -681,25 +636,24 @@ export function registerToolHandlers(): Record<string, Function> {
       if (!validTypes.includes(args.type)) {
         throw createError("INVALID_ARGUMENTS", `Invalid provider type '${args.type}'. Must be one of: ${validTypes.join(", ")}`);
       }
-      await upsertAIProvider(args as any);
+      await api.upsertAIProvider(args as any);
       return { saved: true, id: args.id };
     },
 
     delete_ai_provider: async (args: { id: string }) => {
       if (!args.id) throw createError("INVALID_ARGUMENTS", "id is required");
-      const deleted = await deleteAIProvider(args.id);
-      if (!deleted) throw createError("NOT_FOUND", `Provider '${args.id}' not found`);
+      await api.deleteAIProvider(args.id);
       return { deleted: true, id: args.id };
     },
 
     list_ai_harnesses: async (_args: any) => {
-      const harnesses = await getAIHarnesses();
+      const harnesses = await api.getAIHarnesses();
       return { count: harnesses.length, harnesses };
     },
 
     get_ai_harness: async (args: { id: string }) => {
       if (!args.id) throw createError("INVALID_ARGUMENTS", "id is required");
-      const harness = await getAIHarness(args.id);
+      const harness = await api.getAIHarness(args.id);
       if (!harness) throw createError("NOT_FOUND", `Harness '${args.id}' not found`);
       return harness;
     },
@@ -710,25 +664,24 @@ export function registerToolHandlers(): Record<string, Function> {
       if (!args.id || !args.name) {
         throw createError("INVALID_ARGUMENTS", "id and name are required");
       }
-      await upsertAIHarness(args);
+      await api.upsertAIHarness(args);
       return { saved: true, id: args.id };
     },
 
     delete_ai_harness: async (args: { id: string }) => {
       if (!args.id) throw createError("INVALID_ARGUMENTS", "id is required");
-      const deleted = await deleteAIHarness(args.id);
-      if (!deleted) throw createError("NOT_FOUND", `Harness '${args.id}' not found`);
+      await api.deleteAIHarness(args.id);
       return { deleted: true, id: args.id };
     },
 
     list_ai_models: async (_args: any) => {
-      const models = await getAIModels();
+      const models = await api.getAIModels();
       return { count: models.length, models };
     },
 
     get_ai_model: async (args: { id: string }) => {
       if (!args.id) throw createError("INVALID_ARGUMENTS", "id is required");
-      const model = await getAIModel(args.id);
+      const model = await api.getAIModel(args.id);
       if (!model) throw createError("NOT_FOUND", `Model '${args.id}' not found`);
       return model;
     },
@@ -740,25 +693,24 @@ export function registerToolHandlers(): Record<string, Function> {
       if (!args.id || !args.name || !args.harness_id || !args.model_identifier) {
         throw createError("INVALID_ARGUMENTS", "id, name, harness_id, and model_identifier are required");
       }
-      await upsertAIModel(args);
+      await api.upsertAIModel(args);
       return { saved: true, id: args.id };
     },
 
     delete_ai_model: async (args: { id: string }) => {
       if (!args.id) throw createError("INVALID_ARGUMENTS", "id is required");
-      const deleted = await deleteAIModel(args.id);
-      if (!deleted) throw createError("NOT_FOUND", `Model '${args.id}' not found`);
+      await api.deleteAIModel(args.id);
       return { deleted: true, id: args.id };
     },
 
     list_ai_role_configs: async (_args: any) => {
-      const roles = await getAIRoleConfigs();
+      const roles = await api.getAIRoleConfigs();
       return { count: roles.length, roles };
     },
 
     get_ai_role_config: async (args: { role: string }) => {
       if (!args.role) throw createError("INVALID_ARGUMENTS", "role is required");
-      const rc = await getAIRoleConfig(args.role);
+      const rc = await api.getAIRoleConfig(args.role);
       if (!rc) throw createError("NOT_FOUND", `Role config '${args.role}' not found`);
       return rc;
     },
@@ -771,18 +723,12 @@ export function registerToolHandlers(): Record<string, Function> {
       if (!args.id || !args.role || !args.provider_id || !args.harness_id || !args.model_id) {
         throw createError("INVALID_ARGUMENTS", "id, role, provider_id, harness_id, and model_id are required");
       }
-      await upsertAIRoleConfig(args);
-
-      if (Array.isArray(args.bundles) && args.bundles.length > 0) {
-        await upsertConfigBundles(args.role, args.bundles);
-      }
-
-      return { saved: true, id: args.id, role: args.role };
+      return await api.upsertAIRoleConfig(args);
     },
 
     list_config_bundles: async (args: { role: string }) => {
       if (!args.role) throw createError("INVALID_ARGUMENTS", "role is required");
-      const bundles = await getConfigBundles(args.role);
+      const bundles = await api.getConfigBundles(args.role);
       return { role: args.role, count: bundles.length, bundles };
     },
 
@@ -794,7 +740,7 @@ export function registerToolHandlers(): Record<string, Function> {
       if (!args.id || !args.name || !args.role || !args.model_id) {
         throw createError("INVALID_ARGUMENTS", "id, name, role, and model_id are required");
       }
-      await upsertConfigBundle({
+      await api.upsertConfigBundle({
         ...args,
         invocation_mode: (args.invocation_mode || "CLI") as "CLI" | "HTTP" | "SDK" | "MCP",
       });
@@ -803,76 +749,53 @@ export function registerToolHandlers(): Record<string, Function> {
 
     delete_config_bundle: async (args: { id: string }) => {
       if (!args.id) throw createError("INVALID_ARGUMENTS", "id is required");
-      const deleted = await deleteConfigBundle(args.id);
-      if (!deleted) throw createError("NOT_FOUND", `Bundle '${args.id}' not found`);
+      await api.deleteConfigBundle(args.id);
       return { deleted: true, id: args.id };
     },
 
     // ── Roles Registry ──────────────────────────────────────────
 
     list_roles: async (_args: any) => {
-      const roles = await getRoles();
-      return { count: roles.length, roles };
+      const result = await api.getRoles();
+      return result;
     },
 
     get_role: async (args: { id: string }) => {
       if (!args.id) throw createError("INVALID_ARGUMENTS", "id is required");
-      const role = await getRole(args.id);
+      const role = await api.getRole(args.id);
       if (!role) throw createError("NOT_FOUND", `Role '${args.id}' not found`);
       return role;
     },
 
     // ── Memory Procedure Registry ───────────────────────────────
-    //
-    // Each tool reads from the Redis cache (populated by role-memory-srv on
-    // port 3500) for sub-millisecond response times.  The PG check tool
-    // queries PostgreSQL directly for temporal comparison.
 
     memory_get_procedures: async (args: { role: string }) => {
       if (!args.role) throw createError("INVALID_ARGUMENTS", "role is required");
-      const procedures = await getProceduresForRole(args.role);
-      return { role: args.role, count: procedures.length, procedures };
+      const result = await api.getProceduresForRole(args.role);
+      return result;
     },
 
     memory_get_procedure: async (args: { slug: string }) => {
       if (!args.slug) throw createError("INVALID_ARGUMENTS", "slug is required");
-      const card = await getProcedureBySlug(args.slug);
+      const card = await api.getProcedureBySlug(args.slug);
       if (!card) throw createError("NOT_FOUND", `Procedure '${args.slug}' not found`);
       return card;
     },
 
-    memory_check_since: async (args: { role: string; since: string }) => {
-      if (!args.role || !args.since) {
-        throw createError("INVALID_ARGUMENTS", "role and since are required");
-      }
-      const pool = getDb();
-      const changed = await hasRoleMemoryChangedSince(pool, args.role, args.since);
-      return { role: args.role, since: args.since, changed };
-    },
-
     memory_refresh: async (_args: any) => {
-      const result = await triggerRefresh();
-      if (!result.success) {
-        throw createError("INTERNAL_ERROR", `Refresh failed: ${result.error}`);
-      }
-      return {
-        refreshed: true,
-        procedures: result.result?.procedures ?? 0,
-        roleIndices: result.result?.roleIndices ?? 0,
-        timestamp: result.result?.timestamp ?? new Date().toISOString(),
-      };
+      return await api.triggerMemoryRefresh();
     },
 
     // ── Agent Scheduler ──────────────────────────────────────────
 
     tackle_list_scheduler_entries: async (_args: any) => {
-      const entries = await listSchedulerEntries();
-      return { count: entries.length, entries };
+      const result = await api.listSchedulerEntries();
+      return result;
     },
 
     tackle_get_scheduler_entry: async (args: { id: number }) => {
       if (args.id == null) throw createError("INVALID_ARGUMENTS", "id is required");
-      const entry = await getSchedulerEntry(args.id);
+      const entry = await api.getSchedulerEntry(args.id);
       if (!entry) throw createError("NOT_FOUND", `Scheduler entry '${args.id}' not found`);
       return entry;
     },
@@ -883,8 +806,7 @@ export function registerToolHandlers(): Record<string, Function> {
       project_dir?: string; enabled?: number;
     }) => {
       if (!args.role) throw createError("INVALID_ARGUMENTS", "role is required");
-      const entry = await createSchedulerEntry(args);
-      return { created: true, entry };
+      return await api.createSchedulerEntry(args);
     },
 
     tackle_update_scheduler_entry: async (args: {
@@ -894,15 +816,12 @@ export function registerToolHandlers(): Record<string, Function> {
       last_run_at?: string; last_run_status?: string;
     }) => {
       if (args.id == null) throw createError("INVALID_ARGUMENTS", "id is required");
-      const entry = await updateSchedulerEntry(args.id, args);
-      if (!entry) throw createError("NOT_FOUND", `Scheduler entry '${args.id}' not found or not updated`);
-      return { updated: true, entry };
+      return await api.updateSchedulerEntry(args.id, args);
     },
 
     tackle_delete_scheduler_entry: async (args: { id: number }) => {
       if (args.id == null) throw createError("INVALID_ARGUMENTS", "id is required");
-      const deleted = await deleteSchedulerEntry(args.id);
-      if (!deleted) throw createError("NOT_FOUND", `Scheduler entry '${args.id}' not found`);
+      await api.deleteSchedulerEntry(args.id);
       return { deleted: true, id: args.id };
     },
 

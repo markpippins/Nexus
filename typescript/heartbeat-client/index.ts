@@ -87,6 +87,7 @@ export class Heartbeat {
       const resp = await fetch(this.url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serviceId: this.opts.serviceId }),
         signal: controller.signal,
       });
 
@@ -209,9 +210,18 @@ export function getHeartbeat(): Heartbeat | null {
   return _active;
 }
 
+// ─── ESM CLI guard ──────────────────────────────────────────────────────────
+// Consumers are "type":"module" at runtime. The previous attempt to use
+// `createRequire(import.meta.url)` and check `require.main === module`
+// crashes with `ReferenceError: module is not defined in ES module scope`
+// because `module` is a CJS global that does not exist under ESM. We avoid
+// the CJS-era idiom entirely and detect "running as the entry point" by
+// comparing the script's own file URL to `process.argv[1]`.
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
 // ─── CLI entry point ───────────────────────────────────────────────────────
 
-if (require.main === module) {
+if (process.argv[1] === __filename) {
   const args = process.argv.slice(2);
   const get = (name: string): string | undefined => {
     const idx = args.indexOf(name);

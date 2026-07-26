@@ -8,9 +8,16 @@ export function errorHandler(err, _req, res, _next) {
   console.error('[error]', err);
 
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({ error: err.message });
+    const body = { error: err.message };
+    // Propagate PG error codes for client-side duplicate detection
+    if (err.code) body.code = err.code;
+    if (err.constraint) body.constraint = err.constraint;
+    res.status(err.statusCode).json(body);
     return;
   }
 
-  res.status(500).json({ error: 'Internal server error' });
+  // Propagate PG error codes on non-AppError errors too
+  const body = { error: 'Internal server error' };
+  if (err.code) body.code = err.code;
+  res.status(500).json(body);
 }

@@ -1820,6 +1820,38 @@ export function registerTools(server: McpServer) {
   );
 
   // ════════════════════════════════════════════════════════════════
+  //  IMPLEMENTATION PLANS
+  // ════════════════════════════════════════════════════════════════
+
+  server.tool(
+    "nebula_create_plan",
+    "Create a new implementation plan in nebula.implementation_plans. " +
+    "Generates the next plan number, inserts the record, and returns the created plan. " +
+    "Receipts and tickets are handled downstream by conduit-mcp.",
+    {
+      title: z.string().describe("Plan title (required)"),
+      project: z.string().optional().describe("Project name (default: 'nexus')"),
+      goal: z.string().optional().describe("Goal description"),
+      filesAffected: z.array(z.string()).optional().describe("List of files that will be affected"),
+      acceptanceCriteria: z.array(z.string()).optional().describe("List of acceptance criteria"),
+      dependencies: z.array(z.string()).optional().describe("List of dependency plan numbers"),
+      promptRef: z.string().optional().describe("Optional prompt reference"),
+    },
+    async (args) => {
+      const result = await NebulaClient.createPlan({
+        title: args.title,
+        project: args.project,
+        goal: args.goal,
+        filesAffected: args.filesAffected,
+        acceptanceCriteria: args.acceptanceCriteria,
+        dependencies: args.dependencies,
+        promptRef: args.promptRef,
+      });
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
   //  HEALTH
   // ════════════════════════════════════════════════════════════════
 

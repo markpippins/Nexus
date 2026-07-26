@@ -4,41 +4,28 @@ import { NotFoundError } from '../errors.js';
 
 export const conversationsRouter = Router();
 
+// GET / — paginated list of conversation snapshots
+// Queries nebula.conversation_snapshots directly (nebula-srv has no REST surface for this table).
 conversationsRouter.get('/', async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
-    const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+    const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '20'), 10)));
     const offset = (page - 1) * pageSize;
 
     const [dataResult, countResult] = await Promise.all([
       pool.query(
-        `SELECT
-          cs.id, cs.conversation_id, cs.snapshot_index, cs.source_hash,
-          cs.capture_mode, cs.block_count, cs.created_by, cs.created_at,
-          h.source_filename
-        FROM nebula.conversation_snapshots cs
-        LEFT JOIN nebula.harvests h ON h.id = cs.conversation_id
-        ORDER BY cs.created_at DESC
-        LIMIT $1 OFFSET $2`,
+        `SELECT id, conversation_id, snapshot_index, source_hash, capture_mode,
+                block_count, created_by, created_at
+         FROM nebula.conversation_snapshots
+         ORDER BY created_at DESC
+         LIMIT $1 OFFSET $2`,
         [pageSize, offset]
       ),
       pool.query('SELECT COUNT(*)::int AS total FROM nebula.conversation_snapshots'),
     ]);
 
-    const items = dataResult.rows.map(row => ({
-      id: row.id,
-      conversationId: row.conversation_id,
-      snapshotIndex: parseInt(row.snapshot_index, 10),
-      sourceHash: row.source_hash || null,
-      captureMode: row.capture_mode || null,
-      blockCount: row.block_count != null ? parseInt(row.block_count, 10) : null,
-      createdBy: row.created_by || null,
-      createdAt: new Date(row.created_at).toISOString(),
-      sourceFilename: row.source_filename || null,
-    }));
-
     res.json({
-      items,
+      items: dataResult.rows,
       total: parseInt(countResult.rows[0].total, 10),
       page,
       pageSize,
@@ -48,83 +35,37 @@ conversationsRouter.get('/', async (req, res, next) => {
   }
 });
 
+// GET /:id — single conversation snapshot
 conversationsRouter.get('/:id', async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT
-        cs.id, cs.conversation_id, cs.snapshot_index, cs.source_hash,
-        cs.capture_mode, cs.block_count, cs.created_by, cs.created_at,
-        h.source_filename
-      FROM nebula.conversation_snapshots cs
-      LEFT JOIN nebula.harvests h ON h.id = cs.conversation_id
-      WHERE cs.id = $1`,
+      `SELECT id, conversation_id, snapshot_index, source_hash, capture_mode,
+              block_count, created_by, created_at
+       FROM nebula.conversation_snapshots
+       WHERE id = $1`,
       [req.params.id]
     );
-
-    if (result.rows.length === 0) {
-      throw new NotFoundError('Not found');
-    }
-
-    const row = result.rows[0];
-    res.json({
-      id: row.id,
-      conversationId: row.conversation_id,
-      snapshotIndex: parseInt(row.snapshot_index, 10),
-      sourceHash: row.source_hash || null,
-      captureMode: row.capture_mode || null,
-      blockCount: row.block_count != null ? parseInt(row.block_count, 10) : null,
-      createdBy: row.created_by || null,
-      createdAt: new Date(row.created_at).toISOString(),
-      sourceFilename: row.source_filename || null,
-    });
+    if (result.rows.length === 0) throw new NotFoundError('Not found');
+    res.json(result.rows[0]);
   } catch (err) {
     next(err);
   }
 });
 
+// GET /:id/blocks — conversation blocks for latest snapshot
 conversationsRouter.get('/:id/blocks', async (req, res, next) => {
   try {
-    // First resolve the snapshot to get the actual conversation_id
-    const snapResult = await pool.query(
-      'SELECT conversation_id FROM nebula.conversation_snapshots WHERE id = $1',
+    const result = await pool.query(
+      `SELECT id, conversation_id, snapshot_id, block_index, parent_turn_id,
+              parent_block_id, block_type, content_md, content_hash,
+              dom_path, dom_fingerprint, first_line_no, last_line_no,
+              created_at, role
+       FROM nebula.conversation_blocks
+       WHERE snapshot_id = $1
+       ORDER BY block_index ASC`,
       [req.params.id]
     );
-    if (snapResult.rows.length === 0) {
-      throw new NotFoundError('Conversation snapshot not found');
-    }
-    const conversationId = snapResult.rows[0].conversation_id;
-
-    const result = await pool.query(
-      `SELECT id, conversation_id, snapshot_id, block_index,
-              parent_turn_id, parent_block_id, block_type,
-              content_md, content_hash, role,
-              dom_path, dom_fingerprint,
-              first_line_no, last_line_no, created_at
-       FROM nebula.conversation_blocks
-       WHERE conversation_id = $1
-       ORDER BY block_index ASC`,
-      [conversationId]
-    );
-
-    const blocks = result.rows.map(row => ({
-      id: row.id,
-      conversationId: row.conversation_id,
-      snapshotId: row.snapshot_id,
-      blockIndex: parseInt(row.block_index, 10),
-      parentTurnId: row.parent_turn_id || null,
-      parentBlockId: row.parent_block_id || null,
-      blockType: row.block_type,
-      contentMd: row.content_md || null,
-      contentHash: row.content_hash || null,
-      role: row.role || null,
-      domPath: row.dom_path || null,
-      domFingerprint: row.dom_fingerprint || null,
-      firstLineNo: row.first_line_no != null ? parseInt(row.first_line_no, 10) : null,
-      lastLineNo: row.last_line_no != null ? parseInt(row.last_line_no, 10) : null,
-      createdAt: new Date(row.created_at).toISOString(),
-    }));
-
-    res.json(blocks);
+    res.json(result.rows);
   } catch (err) {
     next(err);
   }

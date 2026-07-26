@@ -1,0 +1,25 @@
+{
+  "name": "heartbeat-client",
+  "version": "0.1.0",
+  "description": "Lightweight TypeScript client for service-registry heartbeats (POST /api/v1/registry/heartbeat/<serviceName>). Used by knowledge-srv (3109) and terrain-srv (3111) — sends periodic heartbeats every 30s; service-registry flips to DOWN after 90s of missing heartbeats.",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "prebuild": "rm -rf dist",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}

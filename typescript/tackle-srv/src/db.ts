@@ -2312,6 +2312,143 @@ export async function deleteRole(idOrName: string): Promise<boolean> {
   return changes > 0;
 }
 
+// ── Task registry (tackle.tasks) ────────────────────────────────────
+//
+// v7 created tackle.tasks; v8 seeded one inspector task. These exports
+// expose the registry to the /tasks REST route and to the inspector
+// dispatch flow. The CLI (nexus/typescript/tackle-cli) talks to PG
+// directly for its own queries — these functions are the server-side
+// mirror for in-process and HTTP consumers.
+
+export interface TackleTaskRow {
+  id: string;
+  role: string;
+  task_slug: string;
+  scope: string;
+  acceptance_criteria: string[];
+  prompt_id: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  // Joined from tackle.prompts for dispatch convenience.
+  prompt_role?: string;
+  prompt_slug?: string;
+  prompt_version?: number;
+}
+
+/**
+ * List tasks. Default: active only. If includeInactive=true, return all.
+ * If role is given, filter by role.
+ */
+export async function listTackleTasks(
+  role?: string,
+  includeInactive = false
+): Promise<TackleTaskRow[]> {
+  const conditions: string[] = [];
+  const params: Record<string, any> = {};
+  if (!includeInactive) conditions.push("active = TRUE");
+  if (role) {
+    params.role = role;
+    conditions.push("role = @role");
+  }
+  const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
+  return qAll(
+    `SELECT id, role, task_slug, scope, acceptance_criteria,
+            prompt_id, active, created_at, updated_at
+     FROM tasks
+     ${where}
+     ORDER BY role, task_slug`,
+    params
+  );
+}
+
+/**
+ * Fetch one task by task_slug, joining the referenced prompt so the
+ * caller gets the (role/slug/version) triple for the template the task
+ * binds to. Returns the most-recent active row, falling back to the
+ * most-recent inactive row if no active task exists with that slug.
+ */
+export async function getTackleTask(
+  taskSlug: string
+): Promise<TackleTaskRow | undefined> {
+  return qOne(
+    `SELECT t.id, t.role, t.task_slug, t.scope, t.acceptance_criteria,
+            t.prompt_id, t.active, t.created_at, t.updated_at,
+            p.role      AS prompt_role,
+            p.slug      AS prompt_slug,
+            p.version   AS prompt_version
+     FROM tasks t
+     LEFT JOIN prompts p ON p.id = t.prompt_id
+     WHERE t.task_slug = @slug
+     ORDER BY t.active DESC, t.updated_at DESC
+     LIMIT 1`,
+    { slug: taskSlug }
+  );
+}
+
+/**
+ * Resolve the dispatch payload for the inspector role: every active
+ * task assigned to `inspector`, each bundled with the full prompt body
+ * for its referenced template (latest version of that (role, slug)).
+ *
+ * This is the "wire" in "wire inspector task dispatch" — the /tasks
+ * route returns this and the inspector (or any consumer) gets a single
+ * JSON document containing both the task definition AND the prompt body
+ * needed to execute it, so the consumer doesn't need a second round-trip
+ * to resolve the template.
+ */
+export async function getInspectorDispatch(): Promise<{
+  tasks: Array<TackleTaskRow & {
+    prompt_body_md: string | null;
+    prompt_title: string | null;
+    prompt_parameter_schema: Record<string, any> | null;
+    prompt_tags: string[] | null;
+  }>;
+}> {
+  const tasks = await qAll(
+    `SELECT id, role, task_slug, scope, acceptance_criteria,
+            prompt_id, active, created_at, updated_at
+     FROM tasks
+     WHERE role = @role AND active = TRUE
+     ORDER BY task_slug`,
+    { role: "inspector" }
+  );
+
+  // Resolve each task's prompt_id to the full latest-version template.
+  // We do this with one extra query per task rather than a single JOIN
+  // because the task references a *specific* prompt_id (a specific
+  // version), but the consumer wants the LATEST version of the same
+  // (role, slug). Fetching the latest requires a DISTINCT ON window,
+  // which is fiddly to express as a JOIN — the per-task round-trip is
+  // small (today: exactly one inspector task) and keeps the query legible.
+  const enriched = await Promise.all(
+    tasks.map(async (t) => {
+      const prompt = await qOne(
+        `SELECT DISTINCT ON (role, slug)
+                id, role, slug, version, title, body_md,
+                parameter_schema, tags, created_at, updated_at
+         FROM prompts
+         WHERE role = (SELECT role FROM prompts WHERE id = @pid)
+           AND slug = (SELECT slug FROM prompts WHERE id = @pid)
+         ORDER BY role, slug, version DESC`,
+        { pid: t.prompt_id }
+      );
+      return {
+        ...t,
+        prompt_role: prompt?.role ?? null,
+        prompt_slug: prompt?.slug ?? null,
+        prompt_version: prompt?.version ?? null,
+        prompt_body_md: prompt?.body_md ?? null,
+        prompt_title: prompt?.title ?? null,
+        prompt_parameter_schema: prompt?.parameter_schema ?? null,
+        prompt_tags: prompt?.tags ?? null,
+      };
+    })
+  );
+
+  return { tasks: enriched };
+}
+
 export interface AgentSchedulerRow {
   id: number;
   role: string;

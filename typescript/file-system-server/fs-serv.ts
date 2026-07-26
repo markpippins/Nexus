@@ -86,7 +86,7 @@ const server = http.createServer(async (req, res) => {
 
     // Handle CORS pre-flight requests and set CORS headers for all responses.
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, PUT, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (req.method === 'OPTIONS') {
@@ -123,6 +123,112 @@ const server = http.createServer(async (req, res) => {
                 timestamp: new Date().toISOString(),
                 error: 'File system root directory not accessible'
             }));
+        }
+        return;
+    }
+
+    // --- REST API: GET /api/fs?path=<encoded_path> — list directory (flat, non-recursive) ---
+    if (req.method === 'GET' && req.url!.startsWith('/api/fs') && !req.url!.includes('/content')) {
+        logger.info('REST API: list directory', { url: req.url });
+        try {
+            const url = new URL(req.url!, `http://localhost:${PORT}`);
+            const rawPath = url.searchParams.get('path') || '';
+            const dirPath = rawPath.replace(/^\/+/, ''); // strip leading slashes
+            const targetPath = dirPath ? ensurePathExists(FS_ROOT_DIR, [dirPath]) : FS_ROOT_DIR;
+
+            const stats = await fs.stat(targetPath);
+            if (!stats.isDirectory()) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ detail: 'Path is not a directory' }));
+                return;
+            }
+
+            const entries = [];
+            for (const entry of await fs.readdir(targetPath)) {
+                try {
+                    const entryPath = path.join(targetPath, entry);
+                    const entryStats = await fs.stat(entryPath);
+                    const relPath = path.relative(FS_ROOT_DIR, entryPath);
+                    entries.push({
+                        name: entry,
+                        path: relPath || entry,
+                        type: entryStats.isDirectory() ? 'directory' : 'file',
+                        size: entryStats.isDirectory() ? undefined : entryStats.size,
+                    });
+                } catch (e) {
+                    logger.warn('Skipping inaccessible entry', { path: targetPath, entry });
+                }
+            }
+
+            // Sort: directories first, then alphabetically
+            entries.sort((a: any, b: any) => {
+                if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+                return a.name.localeCompare(b.name);
+            });
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ entries }));
+        } catch (error: any) {
+            logger.error('REST API list failed', { error: error.message });
+            res.writeHead(error.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ detail: error.message }));
+        }
+        return;
+    }
+
+    // --- REST API: GET /api/fs/content?path=<encoded_path> — read file content ---
+    if (req.method === 'GET' && req.url!.startsWith('/api/fs/content')) {
+        logger.info('REST API: read file content', { url: req.url });
+        try {
+            const url = new URL(req.url!, `http://localhost:${PORT}`);
+            const rawPath = url.searchParams.get('path');
+            if (!rawPath) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ detail: 'Query parameter "path" is required' }));
+                return;
+            }
+            const filePath = rawPath.replace(/^\/+/, ''); // strip leading slashes
+            const targetPath = ensurePathExists(FS_ROOT_DIR, [filePath]);
+            const content = await fs.readFile(targetPath, 'utf-8');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ content }));
+        } catch (error: any) {
+            logger.error('REST API read failed', { error: error.message });
+            const status = error.code === 'ENOENT' ? 404 : error.code === 'EISDIR' ? 400 : 500;
+            const msg = error.code === 'EISDIR' ? 'Path is a directory, not a file' : error.message;
+            res.writeHead(status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ detail: msg }));
+        }
+        return;
+    }
+
+    // --- REST API: PUT /api/fs/content?path=<encoded_path> — write file content ---
+    if (req.method === 'PUT' && req.url!.startsWith('/api/fs/content')) {
+        logger.info('REST API: write file content', { url: req.url });
+        try {
+            const url = new URL(req.url!, `http://localhost:${PORT}`);
+            const rawPath = url.searchParams.get('path');
+            if (!rawPath) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ detail: 'Query parameter "path" is required' }));
+                return;
+            }
+            const filePath = rawPath.replace(/^\/+/, ''); // strip leading slashes
+            let body = '';
+            for await (const chunk of req) {
+                body += chunk;
+            }
+            const { content } = JSON.parse(body);
+            const targetPath = ensurePathExists(FS_ROOT_DIR, [filePath]);
+            await fs.mkdir(path.dirname(targetPath), { recursive: true });
+            await fs.writeFile(targetPath, content || '', 'utf-8');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ saved: filePath }));
+        } catch (error: any) {
+            logger.error('REST API write failed', { error: error.message });
+            const status = error instanceof SyntaxError ? 400 : 500;
+            res.writeHead(status, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ detail: error.message }));
         }
         return;
     }

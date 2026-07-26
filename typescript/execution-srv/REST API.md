@@ -1,5 +1,20 @@
 schema: nexus/execution Observability API
 
+0. Paginated list endpoints (browse the four durable nouns)
+
+GET /api/execution/requests  ?status=&search=&limit=20&offset=0
+GET /api/execution/leases    ?status=&search=&limit=20&offset=0
+GET /api/execution/attempts  ?status=&search=&limit=20&offset=0
+GET /api/execution/receipts  ?type=&search=&limit=20&offset=0
+
+Each returns { total, limit, offset, items: [...] } with DB-native column
+shapes. Filters are optional — omit for unfiltered listing. Search performs
+ILIKE across text columns (business_key, title, executor_id, error,
+agent_role, summary, plus id::text and foreign-key casts). Limit defaults
+to 20, capped at 100. Receipts uses ?type= (not ?status=) to match the
+type column. The receipts filter param is type (not event_type) — see
+DRIFT.md in execution-ui for field-name differences from the UI types.
+
 1. Lifecycle state (per request — the natural aggregate root)
 
 GET /api/execution/requests/{id}/state
