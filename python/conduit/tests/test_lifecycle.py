@@ -12,11 +12,13 @@ Uses test-specific PostgreSQL schemas for isolation.
 
 import json
 import os
+import sys
 import unittest
 from datetime import datetime
 
 import psycopg2
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from db_adapter import DBAdapter
 
 
