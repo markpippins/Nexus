@@ -1,74 +1,245 @@
-Welcome to this explainer. Today we're unpacking part five of the AI agent factory curriculum. And honestly, we're taking a really structured look at the
-massive economic and technological shift that's driving the open claw developer revolution. Whether you're an experienced developer or just someone trying to figure out where on earth the
-software industry is heading in 2026, you are absolutely in the right place.
-We're going to break down exactly how you transition from being a simple AI user to actually building, monetizing, and publishing your own AI applications
-on what's rapidly becoming the defining platform of our era. Let's kick things off with a quote from Nvidia's Jensen Hong at GTC 2026 because it completely
-nails the sheer magnitude of the shift we're dealing with. He said, "Every company in the world today needs to have an open clause strategy and a gentic
-system strategy. This is the new computer." And you know what? The data completely backs up that bold claim.
-Think about this for a second. Openclaw achieved in mere weeks what Linux took 30 years to do. It became the largest, most popular, and fastest growing open
-ource project in history. Nvidia even built Nemo Claw directly on top of it.
-It effectively turns any standard computer into an AI agent platform that you can just ping via WhatsApp, Telegram, or really any messaging
-channel. So why are we focusing so heavily on this right now? Well, because we are looking at the defining market opportunity of 2026. Right now, there is
-this massive gaping hole in the market between companies that desperately need digital employees, what the source calls digital FTEEs or full-time equivalents,
-and the developers who actually know how to build them. Every single industry is hunting for this. A law firm needs a contract reviewer that works flawlessly
-at 2 a.m. A medical clinic needs a triage agent that speaks three different languages on demand. A tutoring company needs an educator that literally never
-sleeps. The tools to build these agents, they exist. The platform exists. What doesn't exist yet is a critical mass of developers who can take the idea of an
-AI employee and turn it into a published money-making product. And the global explosion of demand for this is just
-unprecedented. Our source highlights how OpenClaw triggered what the BBC actually called a national frenzy in China. The
-scale of adoption is staggering. I mean, we're talking hundreds of thousands of GitHub stars and forks in just weeks.
-Chinese developers immediately jumped in to integrate it with DeepSeek and massive domestic super apps like WeChat.
-It got so intense that tech giants like Tensson and BU literally set up physical locations where people waited in line to get free customized versions. We even
-saw local government stepping up. Wooi City alone offered up to 5 million yuana in incentives just for manufacturing applications. Though actually, it's
-worth noting that this explosive growth also prompted government cyber security authorities to step in and flag risks about improper installation, which
-really just highlights the urgent need for developers who can build these tools safely and professionally. To ground all this hype and some practical reality,
-take a look at this number, 200. Our source shares this fascinating anecdote about an IT engineer who customized his
-own openclaw agent just to manage his online shop. He used the agent to automatically list 200 products complete with better descriptions and automatic
-competitor price comparisons in exactly 2 minutes before openclaw. That exact same workload consumed his entire day.
-That is the true economic impact of this technology at the individual level.
-Section one, the developer's journey from user to publisher. To help bridge the gap between being just an impressed
-observer and becoming a published application developer, the curriculum gives you this exact road map through chapters 56 to 60. Part 5 is designed
-with a really specific focus. In the earlier parts, you were learning how to think with AI, right? But here, you're building on a platform that already
-handles all the messy under the hood stuff, the messaging, security, scheduling, orchestration, so you can focus entirely on making your
-application valuable. It's a beautifully structured path. You start in chapter 56 in the experience phase, just installing
-OpenClaw and building a working AI employee. Then you move to extend in chapter 57, adding new capabilities. By
-chapter 58, you're in the build phase, creating a complex ninetool product called Tutorclaw with real Stripe integration. Chapter 59 tackles the
-understand phase where we dive into the wild economics of these apps. And finally, in chapter 60, you hit the publish phase. document your
-architecture and push your release to Claw Hub. You start out as a user and you finish as a published developer on the new computer. Now, you might be
-thinking, "Do I need a massive server farm to do this?" The crucial point is how incredibly accessible it is to start
-for chapter 56. Your prerequisites are basically nothing. You don't need a supercomput. You just need to install Node.js version 22 or higher, which is
-completely free. You need a standard WhatsApp account, though Telegram or Discord work too if you prefer. And you can deploy your very first AI employee
-in under an hour using Google Gemini's free tier as your default model. The whole platform is model agnostic, meaning any capable model works, which
-makes that initial deployment basically frictionless. Then, as you advance into chapter 57, the training wheels come off, but in a really clever way. You're
-going to use cloud code and a specific skill called the MCP builder to create model context protocol or MCP servers.
-What's revolutionary here is the workflow itself. You literally just describe what you need and Claude Code actually writes the code to extend your
-agents capabilities. It's this awesome describe, steer, verify workflow that lets you seamlessly connect new complex tools directly to your agent without
-drowning in boilerplate code. Section two, flipping traditional SAS economics.
-The financial incentives of building these AI agents completely rewrite the rules of traditional software. This is not just a tech shift. It is a
-fundamental change in how software businesses are built and monetized. Get a load of the staggering number, 89%.
-According to the curriculum, when you build on an agent OS that handles all the heavy lifting like orchestration and security, your cost structure changes
-dramatically. You're able to achieve gross margins that approach an astonishing 89%. You're going to learn exactly why agent applications
-completely flipped the traditional software as a service model. And we're doing it with real numbers, not just fluffy business theory. So in chapter 58, you actually put those economic
-theories into practice. You'll learn exactly how to realize those incredible margins by building a full product called Tutor Claw. And listen, this
-isn't some toy app. It's a robust nine tool product. You learn how to implement tiered access control, meaning different users get access to different capabilities. You'll integrate Stripe
-payments directly into the agents workflow. and you'll learn how to leverage the near zero marginal cost of operating this software to build a highly highly profitable business
-architecture. Section three, open versus managed platforms. Now, while Open Claw is phenomenal, the whole industry is
-moving at lightning speed. We are watching the opening salvos of an impending war over where exactly these AI agents will ultimately live, operate,
-and who controls them. This really highlights the fundamental tension dividing the market right now. On one side, you've got OpenClaw. It's open source, runs on your own hardware, you choose the model, and you own the data.
-It is all about multi- vendor freedom.
-But on the other side, our source notes that Anthropic is testing a platform called Conway. Conway is a managed, always on agent platform. It lives as a
-persistent sidebar on your system, has native Chrome integration, and uses web hook triggers that can actually wake the agent without a human ever prompting it.
-But it's not open source, and it's not model agnostic. It represents a massive bet that most users will happily trade Ultimate Control for seamless out-of-the-box convenience. If this
-sounds familiar, well, it absolutely should. We've seen this movie before in tech history. Think of Linux versus Mac OS, or self-hosted WordPress versus
-managed Shopify, or Android's open ecosystem versus iOS. Every major AI lab from Open AI to Google wants to be the runtime environment, not just the
-underlying model. The reality is the open and managed AI layers will coexist.
-The open layer will always win on flexibility and cost control, while the managed layer will win on onboarding speed and integrated tooling. Neither approach is going to kill the other one
-off. And that is exactly why this curriculum focuses relentlessly on principles over platform specific procedures. You aren't just learning to
-depend on one single runtime. The MCP server protocols you build, they speak a language that Conway, OpenClaw, and every serious platform already supports.
-You'll learn to use architecture decision records or ADRs, which teach you to professionally document why you made a choice, like understanding why six attempts failed before the seventh
-model finally clicked. and the tiered monetization models you build are enduring business patterns, not just fleeting platform features. These are the deep skills that will outlast any
-single platform war. So, we're going to wrap up with a rather stark question echoing a warning directly from a Chinese state newspaper about this exact
-technological wave. They warned that missing this shift was akin to raising lobsters, meaning you're stuck doing irrelevant, outdated work while the
-whole world just passes you by. The tools are here. The platform is ready.
-The defining opportunity of 2026 is sitting right in front of us. The only question left is, are you ready to learn the enduring principles and actually
-build on the new computer, or will you sit back and let this incredible opportunity pass you by?
+I'm not going to say we saved the best till last, because that's probably not doing justice for our other speakers as well. But I'm really interested in this session.
+And Dave Farley's a great a great speaker. So vibe coding. Is this the best we can do?
+I think this is going to be an interesting look at the processes and the practices we do today with vibe coding, what needs to go forward into our new practices.
+This is the last session of the day before the party, so afterwards I'll let you know a little bit more about what the party is doing.
+But in the meantime, please make sure you're still doing your ratings and things like that on the app. But without further ado, please give it up for Dave Farley.
+Great. Thank you. Thank you. I'm the last speaker between you and beer, so I'll try not to go on to long.
+I'm interested in the the things that seem durable.
+And that may seem odd when we're talking about such a disruptive change as we are talking about when we're talking about the adoption of AI for programming.
+But I think there's quite a lot of things that are durable.
+There's a lot of behaviors that have stood the test of time and seem to continue to be important.
+And I'm not the only person that's been saying that today.
+If you've been listening carefully, there's been people saying very similar things as we go through.
+I'd like to look at maybe some of the reasons why, why this matters, and question some of the things that that we may otherwise think about the new world of agent programing.
+I think one of the things that we can certainly say, though, is that whatever does come next, it's going to be different.
+This is a huge change. This is a sea change in the way that our industry, and probably our industry is just a full and how our world is going to work.
+So, so, so what does this really mean?
+What does this mean in terms of the impact on people like us who are involved in the production of software at the moment?
+And I suppose to some degree the pathfinders for everybody else in the world as they start to adapt to some of these things.
+I think a starting point, if you'll forgive me for being slightly provocative, some of the differences that we talk about are kind of just dumb.
+So I would argue that vibe coding programing with natural languages while having a place are also kind of bad ideas.
+And I want to talk a little bit about what I mean by that, and we'll get into it. I think sacking all junior developers AIs will write all the code.
+We don't need no programmers. Some of these are kind of right. Some of them are probably true. And some of these are a terrible idea.
+I think AI generated tests also a terrible idea. So I'd like to explore all of these things in a bit more detail.
+And there's quite a lot of nuance in this, because there are aspects of these where they're all true. But let's talk about it.
+So first of all, I'd like to I'm a I'm a old school card carrying, test driven development developer.
+So let's start with tests because that's where you're supposed to start. What's a test for? Is it to prove success? Not really.
+Is it to find our mistakes? Well, kind of, but not really. Is it to challenge my genius as a programmer? Certainly not.
+It's not. Those are not really what tests are for. They're not what? Make tests useful.
+I would argue that what tests are for us. They are a form of measurement.
+They are the equivalent of a carpenter having a tape measure in his pocket that he can measure things with.
+We use tests to figure out that we're doing the right things.
+We use tests to figure out that when we've done them, they continue to be the right things, their measurements, to see if we've achieved our goals.
+But for that, we've got to define what our goals are, and we can't even further the goals from the solution because the solution can always be wrong.
+So anybody that's selling you free AI testing, that will come in and look at your existing system and test it.
+That might have some value, but it's not the same value as proper testing that we need as part of a development process.
+It's a different thing.
+And the reason for that is fairly obviously, if I, if I write a function something like this, calculate tax, and I'm going to return 50 times the amount that I put in.
+That's a very bad place to leave if that's what your tax looks like.
+But if that's my starting point, the only thing that an agent of AI or any other kind of AI can do is look at that and say, okay, here's my test.
+It's just going to reinforce the wrongness that I wrote into that function.
+All that a test can do at that point, because the only input it's got is the test is the is the working code is verified that the working code does what the working code does that has its use uses.
+That's very good.
+If you want to refactor the code, do behavior preserving change and not break anything. But it's rubbish.
+If you want to develop a new system and verify that this new system continues to do or does the right things, because now it's proving that it does the wrong thing because that's where we started from.
+So that's not giving us our ability and ability to define what we really wanted. AI generated tests.
+If the code is the only input, we can only verify that the code remains the same.
+We can't infer the goals from the solution because the solution can always be wrong.
+So they're mostly a dumb idea. They have a they have a place, but mostly a dumb idea.
+They tend to be a cop out for people who don't can't be bothered to state their goals.
+And I think that's a problem because specifying the goals is kind of what our job is. It's kind of what we're here to do as software developers.
+My next question what's the program for? To define a sequence of instructions.
+Well not really. That's not the goal. It might be what it is, but to encode algorithms, that's not the goal.
+Again of of a program. That's not what we do it for.
+That's not the value that it brings to implement our brilliant design.
+Again, that's some of the self-fulfillment that I as a programmer might get from it. But that's not the goal. That's that's not the goal.
+That's not the reason that people pay me to do it.
+So the commercial pressure is not none of those things. That's not really what it's for. As much as we might might like to think of it in that way as programmers.
+Programing languages, I would argue, have three goals as tools.
+So first, they are tools that have been designed to help us to organize our thinking about a problem.
+They allow us to explore the surface area of a problem and kind of understand it in more detail, in more depth, and they're designed to work that way.
+Programing languages aren't difficult because we want it to be obscure in a truce.
+We wanted tools that would help us to explore the problems in these kind of way. They're designed to help us to do that.
+They're also a means of communicating our understanding with other programmers or the humans.
+So they are communication tool between us, so we can work as part of a team and understand what we are in some technical detail,
+exploring the depth and the breadth and the complexity of a of of the problem that we're trying to solve and the solution that we've come up with encoded as a program in a programming language.
+And ultimately they're there to tell a computer what to do.
+But that's kind of the last part, because assembly language instructions inform a computer what to do perfectly well.
+And we not many of us, spend our time writing programs in assembly language.
+There are also three techniques that are embodied in programing.
+Languages that are think are important for us to think about and to remember when we're talking about programing as a discipline.
+The first is we have a simple, consistent grammar.
+It allows us to express our ideas in a concrete, specific, precise way, precisely enough to be executable by a computer.
+They are an unambiguous expression of our intent in that respect and that this, this matters.
+And they're repeatable and deterministic in terms of execution. And this matters a lot too.
+If we write something in the programming language of our choice and run it twice, given the same inputs, we're going to get the same result.
+But every time that's important, it means that we can reason about it. It means that we can test it.
+It means that we can understand what it means, and we can design systems that are more or less repeatable in that sense.
+But the tools themselves are repeatable. How does natural language measure up to that?
+Because natural language, somebody said today, I think they quoted Andrei Karpathy saying that the programing language of the future is English.
+I don't like that idea very much for the reasons that I'm talking about. It's not precise enough, it's too vague. Natural language helps us.
+How does that measure up? Helps us to organize our thinking about a problem? Well, it's too vague, really.
+Natural language is open to misinterpretation. If anybody's been around. I can't really see you very well.
+But if you've got a gray beard like mine and you've been around enough, I bet that you've been in a situation where somebody coming down from on high
+and given a very vague instruction to a bunch of programmers and gone away and then been really disappointed in the results because they didn't tell us in enough detail, that's really common.
+It's really easy to misinterpret what the goal really is.
+Natural language is always open to interpretation. Time flies like an arrow. These are some time flies.
+Liking arrows. Vibe coding alone is simply not good enough.
+If we're just chatting with the computer to express our needs, that's not enough.
+We need tools that allow us to be more precise than that, to be more specific than that, to be better prompts of what it is that we want to achieve.
+That doesn't mean that we need to look at all the code, and are only allowed to do this in a programming language.
+I'm I'm in the category of its been a long time now since I've.
+So I've written any code by hand because my AI agent writes all the code, but I've been more precise than just natural language in some respects.
+In specifying what I want from it, I'm able to get what I want from it by using a precise, prescriptive version of natural language in order to be able to prompt it.
+And that's what I'm really talking about here. So does it communicate our understanding with other humans?
+It's a bit too ambiguous to do that very well, because as we as we all know, does it tell a computer what we want it to do?
+It's too imprecise for that.
+So it's very easy unless what we're telling it is something very obvious, like asking our AI assistant to implement a buzz for us.
+It might do that in a repeated way, but otherwise it's probably not.
+It's going to be a little bit different and give us something a little bit different every time.
+Certainly in the earlier versions of AI coding assistance, we've all seen that.
+Where we've asked system to build something, you ask it the same thing again and you get something very different.
+That certainly happened to me a few times. So we've got these.
+What about these three techniques that we have? Simple, consistent formal grammar. Does natural language give us that?
+No. It's complex and inconsistent. Unambiguous expression of intent. No, it's ambiguous and vague.
+Repeatable. Deterministic. Not repeatable. Not deterministic, not version controllable.
+As a result, we can if we version control the language that we prompted real with.
+That's not enough to get back to the same result again on its own.
+So programing with a AI presents three important problems for us to replace traditional programing.
+So how do we specify what we want with precision. That's problem one.
+Problem two is how do we confirm that we got what we wanted. This is the verification problem.
+And problem three is that we don't work in the same way as the machines.
+They don't work in the same way as us either way, which you look at that, the way that we do things is that we tend to deal with problems with, with the limits of our own context window.
+So what will fit inside our heads at a time?
+We might have a picture of what it is that we want to build, but then small change by small change. The way that we deal with it is that we do incrementally.
+We do a small piece of work, we evaluate that piece of work, and then we then we move on to the next small piece of work.
+I would argue that high quality system development in software is always an incremental process of learning and discovery.
+We are always exploring the problem space and trying to understand it over time, bit by bit by bit. I'd go further than that.
+I would say that's all engineering.
+All engineering is a is an act of incrementally improving on
+what we know about the problem and dealing with the with the new things that we learn as we do that over time.
+And that's a hard part of software development, a hard part of engineering in general.
+And then we've got to verify that we got what we wanted. And it does all of the things that we need in a repeatable, reliable way.
+And that's a hard part of software development as well. And what have we done? We sped up the coding bit.
+That was the easy part of software development, which is good. It's great. It does accelerate us, but it also moves the bottleneck.
+If you've ever read the goal, the Theory of Constraints, that's what we've done. We've just moved the bottleneck to somewhere else.
+And actually we probably haven't moved the bottleneck because the bottleneck was nearly always about verification and release, rather,
+and figuring out what we really wanted rather than the encoding of it if we were any good as delivery agents.
+So an AI works differently and AI works.
+It kind of builds this context, this picture, and then it goes bang and it makes a huge change.
+Probably until recently, you kind of rewrite the whole system every time, and there's nothing really to stop it while it's
+building your stuck control system to write Space Invaders instead, if we haven't told it not to, if we haven't defined what that goals are and are in a position where we're able to evaluate it.
+Now, part of the problem here is that a lot of people that talk about using AI,
+AI's, and agents to help with coding are often talking from a perspective of building small, simple systems.
+I don't know about all of you, but those aren't the sorts of systems that I generally build professionally. They're certainly how I've played with the A's.
+I've written Space Invaders with an AI agent, and I've done simple things like that, all those nice, straightforward things.
+But my professional building of software has been for bigger, more complicated systems than that. And that's not good enough.
+Just just being able to check them manually to see if they're okay. He's not even close to being good enough to verify that we get what we wanted.
+So if the AI is making huge steps and changing things in one big,
+big, big change at a time, and we're not able to verify that we got what we wanted effectively, how do we learn?
+How do we find our understanding? How do we reliably update our solution to improve it? And how do we regenerate if it's regenerating it from scratch every time?
+We can't.
+It's not really helping us to learn and adapt and figure out where we are and figure out what we need to do next.
+It's it's a problem.
+The last two problems, problems two and three mean that we losing our ability to work incrementally.
+And that is fundamental to building complex systems of any kind, but certainly complex software systems.
+It's this process of learning and discovery.
+So how do we keep our ability to learn, discover and incrementally add to our systems as we go?
+We have to have we have to have a means that can keep up with the rate at which we can produce software.
+I spoke to somebody not very long ago who, who's who's engaged wholeheartedly in the adoption of agents, programing, using multiple agents to build systems.
+He's writing a game. He reckons he he writes 12,000 lines of code per day.
+No human being can review 12,000 lines of code per day.
+No human being can test manually test the output of 12,000 lines a day behaviorally, to figure out whether it's doing the right things.
+We've got to find ways of speeding up the rate of verification and assurance to tell whether we got what we wanted to keep up with that speed of generation of code.
+It's the only thing that makes sense, it seems to me, if we're not to suffer from the theory of constraints problem.
+How do we confirm then that we always get what we want?
+So first we've got to specify what we want, clearly reproduce in a reproducible manner, and then we've got to be able to verify repeatedly that we still have it after every change.
+If you're familiar with my work with continuous delivery and so on, that might sound familiar. It's because it is.
+It is the same that we've been doing when we're talking about practicing continuous delivery. It's table stakes.
+We have to have this fast cycle of verifying that we got what we want.
+So how should programing change to keep up with all of this? So problem one specifying what we want with precision.
+In the past, the way that we did this was that a program was a precise solution encoded as algorithms.
+Weirdly, we kind of lost what the problem was.
+It's kind of implicit in our solution, but we'd keep that in our heads and we'd build a solution, and that would be a definition that we'd work to.
+But the solution itself was implicit. So in this in my example, this is a routing algorithm.
+So I'd like to find my way home is the outcome that I'm trying to achieve here.
+In the future a program will be a precise description of what it is that we want,
+I think encoded as specifications, translated into executable instructions by the AI that will verify that we got what we wanted
+and what we want now is explicitly part of if you like the program.
+So the program moves away from being solution focus to being a more accurate description of the problem that we're trying to solve.
+I'm describing a form of spectrum development, but the specification takes the form of executable specifications tests.
+If you like that, both specify what we want and also verify that we got it.
+What it takes to achieve that program.
+I've just just repeating what I said designing a domain specific language, if you like, for specifying what it is that we want from our software with a deal of precision
+and then specifying what we aim to achieve in detail all of the time.
+And those those are all of the behaviors of the system, not just the conventional user behaviors that we might think about.
+We're not talking about sketchy testing of the system, but all of the behaviors of the system. So how fast would we like the results back?
+If performance matters, how secure do we want it to be? If we want secure our system to be secure?
+Because all of those are contextual, you can't have the AI to infer that to make it up, because it depends the real how security you want your system to be.
+You'd be stupid to apply the level of security to a single user game. Then you would.
+If you were building a system for a bank, because you'd be over engineering the game and probably under engineering the bank.
+So you need to be specific about what it is that you're trying to achieve in all of the dimensions of architecture and design.
+So some of those are behaviors of the system that we need to specify to the second problem. How does it. How about that.
+So how do we confirm that we got what we wanted in the past. We hoped that our solution solved the problem.
+Language verified some aspects of this in terms of the syntax that we use, particularly if we use typed languages and stuff like that.
+But they didn't. It didn't work to verify functional correctness.
+If you were a well-behaved, test driven development developer, then testing would would fill that gap
+and would verify that our code did what we wanted it to do from that, from that, in that sense, but otherwise, maybe not.
+In the future.
+Executable specifications will work as the verification of our system, as well as the specification of what it is that we aim to achieve.
+I think this makes the AI we can do this in in human language.
+This doesn't have to be difficult or hard.
+The way that I do it is that I teach my AI how to do the kind of
+BDD style tests that I like to use, and I specify what I want, and my AI fills in the gaps from relatively simple
+English descriptions of what it is, what the specification that I that of what I want.
+AI generates solutions that match the specifications, and now we can run those tests against those solutions.
+We can verify that the ALS doing the right thing by giving test test values that it hasn't seen before.
+So it can't cheat the tests and get feedback that we got.
+We actually did get what we wanted, what it takes to achieve that. The programmer.
+Invents problem specific DSL, defines all of the desired behaviors of the system
+as prompts to the AI in the form of BDD style specifications, and the AI takes the specifications, builds test infrastructure to make them executable.
+Generates code to fulfill all of the executable specifications. And we've got what we wanted.
+We've got the the a precise definition of the behaviors that we want and a verification that we got those behaviors.
+Regaining the last of the three regaining incrementalism.
+So in the past we would work iteratively in small steps adding new tests and code.
+We would gather feedback validated by our deployment pipelines, build systems incrementally treat each changes, and experiment and value empirical learning in the future.
+We're going to work iteratively in small steps, adding new tests and code.
+The AI will generate the code, gather feedback to validate every change. Build systems incrementally.
+Many small changes, treat each changes, and experiment and value empirical learning. So it's exactly the same.
+So the stuff if you've been practicing continuous delivery as two of the speakers that I heard
+speaking today said, at least implicitly, then things become easier because that's what we're doing.
+The same things.
+We're evaluating stuff as we go, working in small steps, and we're understanding where we are at all times, and so are our AI agents.
+What does this take to regain the incrementalism in this sense?
+Well, we version control the specifications because those are now in effect program.
+We run the test cells in a deployment pipeline. Otherwise the AI is going to cheat.
+And we're going to stop the AI gaming the tests by using the sorts of techniques that I mentioned about maybe keeping some tests back and not showing the AI for what's going to what's, so it can't cheat them.
+Most of this that I've described is how acceptance testing with behavior driven development already works. So this isn't anything necessarily new.
+If you've been working this way before, this is a really simple step.
+Here's an example that I've used. I've done this now several times, many times for building real systems.
+This is not a real system.
+This is this is an example from a training course that I that I did an exercise with. So here are some the kinds of specifications that I'm talking about.
+If you think about what I'm trying to describe, we start off with a vague wish of what we want.
+We get to a slightly more formal version of describing that which is a user story, and then we come up with some examples that would demonstrate that the feature that the story describes exists.
+Those are examples. Those are our executable specifications. That's what these things are on the screen. These are the ones that prompted building a system that actually did this.
+It actually did flight planning in this way.
+My conclusions are that natural language alone is not good enough.
+BDD domain specific languages are the best alternative for prompting effectively,
+and giving us the combination of precise specification of what we want and built in verification that we got it.
+Automating testing from a solution is a bit of a joke. It's it's a niche.
+It has some utility, but it's a corner case. It doesn't solve the real problem.
+We should treat skills to analyze and decompose problems as the real core of our discipline. That's the real discipline that we as engineers technologists bring.
+It's that way of reasoning about a problem of decomposing it and thinking about the corner cases, thinking about the kind of the architecture level.
+One of the ways of thinking about all of this is that effectively what we're doing is we're involved in invoking a fifth generation programming language, a fifth generation programming system, and I think that's where we're at.
+So we need a different model for the role of AI. AI assistance is rather like the compiler.
+We're not going to care for very much longer at all if we do. Now about the code that it generates, because we'll verify that we got the results.
+And as long as we get the results, who cares about the implementation?
+It's rather like the move from assembly language programing to high level language programing.
+I don't know if anybody in the room is old enough to remember that I, I don't quite, but I was an assembly language programmer for a while, and for a while
+I used to look at what the assembly language was that was generated by my compilers, but I haven't done that for years and most people have never done that.
+So why should we care about what the code that was generated was? If we can verify that the behaviors that we wanted are the ones that we got.
+If you'd like to see a demonstration of this in use, there's an open source project called NYSE that's worth a look that imply that applies this thinking and promotes this way of development.
+So that's.
+I'm going to skip over here because I got where am I. There. That's the end of my talk.
+Thank you very much.
 
