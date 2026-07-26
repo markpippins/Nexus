@@ -79,3 +79,9 @@ WORK_TO_DATE.md
 python/rover/.embedding_cache/
 typescript/image-server/images/
 audit/
+
+# Generated TTS audio files
+.tts-audio/
+
+# npm cache
+.npm-cache/
