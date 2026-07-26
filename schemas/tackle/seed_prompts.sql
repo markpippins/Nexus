@@ -18,12 +18,20 @@
 -- Re-runnable without error.
 -- ============================================================================
 
--- ── 1. Add the 'builder-fallback' role (it's referenced by
---    .opencode/agents/builder-fallback.md but isn't in tackle.roles
---    yet). All other persona roles already exist.
+-- ── 1. Add roles that don't yet exist:
+--    - 'builder-fallback': referenced by .opencode/agents/builder-fallback.md
+--      but isn't in tackle.roles (added by seedDefaultRoles v5) yet.
+--    - 'operator': referenced by the operator system-prompt-base/tail rows
+--      below. On the dev DB this role was added manually on 2026-07-19 by
+--      a separate process; on a green-field install the role doesn't exist
+--      yet, so v8 must create it before inserting operator prompts (FK
+--      tackle.prompts.role -> tackle.roles.name). Both inserts are
+--      idempotent via ON CONFLICT (name) DO UPDATE.
 
 INSERT INTO tackle.roles (name, description, created_at, updated_at)
-VALUES ('builder-fallback', 'Fallback builder for local inference (ollama). Deterministic execution engine; activated when API circuit breaker trips.', NOW(), NOW())
+VALUES
+    ('builder-fallback', 'Fallback builder for local inference (ollama). Deterministic execution engine; activated when API circuit breaker trips.', NOW(), NOW()),
+    ('operator', 'Operator chat-server host personality. Friendly interface between the user and the Nexus infrastructure; answers questions about pipeline state, requirements, plans, service status, architecture.', NOW(), NOW())
 ON CONFLICT (name) DO UPDATE
     SET description = EXCLUDED.description,
         updated_at = NOW();
