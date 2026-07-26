@@ -7,10 +7,9 @@ vector embeddings via Ollama (nomic-embed-text, 768-dim), and stores
 them in nebula.harvest_candidate_embeddings.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 embed_harvests.py
-    python3 embed_harvests.py --dry-run
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/embed_harvests.py
+    python3 bin/embed_harvests.py --dry-run
 """
 
 import argparse

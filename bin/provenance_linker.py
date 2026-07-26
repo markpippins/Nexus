@@ -12,10 +12,9 @@ Creates bidirectional cross-references in nebula.cross_references:
   - harvest → knowledge_entity (relType: informs)
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 provenance_linker.py
-    python3 provenance_linker.py --dry-run
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/provenance_linker.py
+    python3 bin/provenance_linker.py --dry-run
 """
 
 import argparse

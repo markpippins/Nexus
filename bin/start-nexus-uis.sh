@@ -1,121 +1,83 @@
 #!/bin/bash
-# bin/start-nexus-uis.sh — bring up ALL Nexus UI dev servers in a tmux session
+# bin/start-nexus-uis.sh — manage ALL Nexus UI dev servers via systemd user units
+#
+# All 14 UIs run as systemd --user services, each in its own unit.
+# This script provides a unified interface to start/stop/status them.
 #
 # Usage:
 #   bin/start-nexus-uis.sh start    # start all nexus UIs (idempotent)
-#   bin/start-nexus-uis.sh status   # show tmux session + port status
-#   bin/start-nexus-uis.sh stop     # stop all nexus UIs (kill tmux session)
+#   bin/start-nexus-uis.sh status   # show systemd status for all UIs
+#   bin/start-nexus-uis.sh stop     # stop all nexus UIs
 #   bin/start-nexus-uis.sh restart  # restart all nexus UIs
-#   bin/start-nexus-uis.sh attach   # attach to the tmux session
+#   bin/start-nexus-uis.sh logs     # tail logs for a specific UI
 #
-# All UIs run in a single tmux session "nexus-uis" with one window per app.
+# Previously used tmux (session "nexus-uis"). Migrated to systemd 2026-07-24.
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NEXUS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEV_ROOT="$(cd "$NEXUS_ROOT/.." && pwd)"
-SESSION="nexus-uis"
 
-# ── UI list (name, relative_path_from_dev_root, start_command, port) ────
-declare -A UI_PATHS
-declare -A UI_COMMANDS
+# ── UI list (name, port) — sorted by port for status output ────────────
 declare -A UI_PORTS
 
 UI_NAMES=(
-    "nexus-console"
-    "conduit-ui"
-    "tackle-ui"
-    "nebula-ui"
-    "duality-ui"
-    "plurality-ui"
-    "angular-assembly"
-    "cascade-ui"
-    "execution-ui"
-    "view-architect"
+    "nebula-ui"          # 3000
+    "duality-ui"         # 3002
+    "view-architect"     # 3003
+    "plurality-ui"       # 3004
+    "nexus-console"      # 4200
+    "conduit-ui"         # 4201
+    "tackle-ui"          # 4202
+    "cascade-ui"         # 4203
+    "angular-assembly"   # 4204
+    "execution-ui"       # 4205
+    "peb-ui"             # 4206
+    "semantic-kernel-ui" # 4207
+    "vision-ui"          # 4208
+    "wind-ui"            # 4209
 )
 
-UI_PATHS[nexus-console]="nexus/angular/nexus-console"
-UI_COMMANDS[nexus-console]="npm start"
-UI_PORTS[nexus-console]=4200
-
-UI_PATHS[conduit-ui]="nexus/angular/conduit-ui"
-UI_COMMANDS[conduit-ui]="npm start"
-UI_PORTS[conduit-ui]=4201
-
-UI_PATHS[tackle-ui]="nexus/angular/tackle-ui"
-UI_COMMANDS[tackle-ui]="npm start"
-UI_PORTS[tackle-ui]=4202
-
-UI_PATHS[nebula-ui]="nexus/angular/nebula-ui"
-UI_COMMANDS[nebula-ui]="npm run dev"
 UI_PORTS[nebula-ui]=3000
-
-UI_PATHS[duality-ui]="nexus/angular/duality-ui"
-UI_COMMANDS[duality-ui]="npm run dev"
 UI_PORTS[duality-ui]=3002
-
-UI_PATHS[angular-assembly]="nexus/angular/assembly"
-UI_COMMANDS[angular-assembly]="npm run dev"
-UI_PORTS[angular-assembly]=4204
-
-UI_PATHS[cascade-ui]="nexus/angular/cascade-ui"
-UI_COMMANDS[cascade-ui]="npm start"
-UI_PORTS[cascade-ui]=4203
-
-UI_PATHS[plurality-ui]="nexus/angular/plurality-ui"
-UI_COMMANDS[plurality-ui]="npm run dev"
-UI_PORTS[plurality-ui]=3004
-
-UI_PATHS[execution-ui]="nexus/angular/execution-ui"
-UI_COMMANDS[execution-ui]="npm run dev"
-UI_PORTS[execution-ui]=4205
-
-UI_PATHS[view-architect]="nexus/angular/view-architect"
-UI_COMMANDS[view-architect]="npm run dev"
 UI_PORTS[view-architect]=3003
+UI_PORTS[plurality-ui]=3004
+UI_PORTS[nexus-console]=4200
+UI_PORTS[conduit-ui]=4201
+UI_PORTS[tackle-ui]=4202
+UI_PORTS[cascade-ui]=4203
+UI_PORTS[angular-assembly]=4204
+UI_PORTS[execution-ui]=4205
+UI_PORTS[peb-ui]=4206
+UI_PORTS[semantic-kernel-ui]=4207
+UI_PORTS[vision-ui]=4208
+UI_PORTS[wind-ui]=4209
 
-# ── Commands ────────────────────────────────────────────────────────────
-
-tmux_session_exists() {
-    tmux has-session -t "$SESSION" 2>/dev/null
-}
+# ── Helpers ─────────────────────────────────────────────────────────────
 
 port_is_listening() {
     ss -tln 2>/dev/null | awk -v p=":$1$" '$4 ~ p {found=1} END {exit !found}'
 }
 
+# ── Commands ────────────────────────────────────────────────────────────
+
 cmd_start_all() {
-    echo "=== Starting Nexus UIs ==="
+    echo "=== Starting Nexus UIs (via systemd) ==="
 
-    if tmux_session_exists; then
-        echo "Session '$SESSION' already exists — UIs are already running."
-        echo "Use 'bin/start-nexus-uis.sh attach' to connect, or 'restart' to rebuild."
-        cmd_status_all
-        return 0
-    fi
+    systemctl --user daemon-reload 2>/dev/null || true
 
-    # Create session with first UI
-    local first="${UI_NAMES[0]}"
-    local first_path="${UI_PATHS[$first]}"
-    echo "  Creating session with $first (port ${UI_PORTS[$first]})"
-    tmux new-session -d -s "$SESSION" -n "${first}" \
-        "cd '$DEV_ROOT/$first_path' && echo '▶ Starting $first on :${UI_PORTS[$first]}' && ${UI_COMMANDS[$first]}"
-
-    # Add remaining UIs as additional windows
-    for ((i = 1; i < ${#UI_NAMES[@]}; i++)); do
-        local name="${UI_NAMES[$i]}"
-        local path="${UI_PATHS[$name]}"
-        echo "  Adding window for $name (port ${UI_PORTS[$name]})"
-        tmux new-window -t "$SESSION" -n "${name}" \
-            "cd '$DEV_ROOT/$path' && echo '▶ Starting $name on :${UI_PORTS[$name]}' && ${UI_COMMANDS[$name]}"
+    echo
+    for name in "${UI_NAMES[@]}"; do
+        echo -n "  $name (port ${UI_PORTS[$name]}): "
+        systemctl --user enable "$name.service" 2>/dev/null && \
+          systemctl --user start "$name.service" 2>/dev/null && \
+          echo "✅ started" || echo "❌ FAILED"
     done
 
     echo
-    echo "All UI windows created. Waiting for servers to bind..."
-    sleep 5
+    echo "Waiting for servers to bind..."
+    sleep 10
 
-    # Verify ports
     echo
     local all_up=true
     for name in "${UI_NAMES[@]}"; do
@@ -134,59 +96,58 @@ cmd_start_all() {
     else
         echo "Some UIs are still compiling. Check with 'bin/start-nexus-uis.sh status'."
     fi
-    echo "Attach with: tmux attach -t $SESSION  (Ctrl+B D to detach)"
+    echo "Check logs with: bin/start-nexus-uis.sh logs <name>"
     echo "=== Done ==="
 }
 
 cmd_status_all() {
-    echo "=== Nexus UI Status ==="
-    printf "%-22s %-6s %-12s %s\n" "UI" "PORT" "LISTENING" "URL"
-    printf "%-22s %-6s %-12s %s\n" "--------------------" "------" "------------" "-------------------------"
+    echo "=== Nexus UI Status (systemd) ==="
+    printf "%-22s %-6s %-12s %-10s %s\n" "UI" "PORT" "SYSTEMD" "LISTENING" "URL"
+    printf "%-22s %-6s %-12s %-10s %s\n" "--------------------" "------" "----------" "----------" "-------------------------"
 
     for name in "${UI_NAMES[@]}"; do
         local port="${UI_PORTS[$name]}"
+        local active="inactive"
+        local systemd_status
+        systemd_status="$(systemctl --user is-active "$name.service" 2>/dev/null || echo "unknown")"
+        case "$systemd_status" in
+            active)   active="✅ active" ;;
+            activating) active="⏳ compiling" ;;
+            failed)   active="❌ failed" ;;
+            inactive) active="💤 stopped" ;;
+            *)        active="❓ $systemd_status" ;;
+        esac
         local listening="❌"
         if port_is_listening "$port"; then
-            listening="✅"
+            listening="✅ UP"
         fi
-        printf "%-22s %-6s %-12s http://localhost:%s\n" "$name" "$port" "$listening" "$port"
+        printf "%-22s %-6s %-12s %-10s http://localhost:%s\n" "$name" "$port" "$active" "$listening" "$port"
     done
-
-    echo
-    if tmux_session_exists; then
-        echo "tmux session '$SESSION' exists."
-        echo "Windows:"
-        tmux list-windows -t "$SESSION" 2>/dev/null | while read -r line; do
-            echo "  $line"
-        done
-        echo "Attach: tmux attach -t $SESSION"
-    else
-        echo "No tmux session '$SESSION' found."
-    fi
 }
 
 cmd_stop_all() {
-    echo "=== Stopping Nexus UIs ==="
+    echo "=== Stopping Nexus UIs (via systemd) ==="
 
-    if tmux_session_exists; then
-        tmux kill-session -t "$SESSION"
-        echo "Session '$SESSION' killed."
-    else
-        echo "No tmux session '$SESSION' to stop."
-    fi
+    for name in "${UI_NAMES[@]}"; do
+        echo -n "  $name: "
+        systemctl --user stop "$name.service" 2>/dev/null && echo "stopped" || echo "already stopped"
+    done
 
-    # Also kill any lingering dev servers on our ports (in case tmux didn't clean up)
-    echo "Checking for lingering processes..."
+    # Verify
+    echo
+    local any_live=false
     for name in "${UI_NAMES[@]}"; do
         local port="${UI_PORTS[$name]}"
-        local pid
-        pid=$(lsof -ti ":$port" 2>/dev/null || true)
-        if [ -n "$pid" ]; then
-            echo "  Killing process on port $port (PID $pid)"
-            kill "$pid" 2>/dev/null || true
+        if port_is_listening "$port"; then
+            echo "  ⚠️  $name still on port $port — killing PID $(lsof -ti :$port 2>/dev/null)"
+            kill "$(lsof -ti :"$port" 2>/dev/null)" 2>/dev/null || true
+            any_live=true
         fi
     done
 
+    if ! $any_live; then
+        echo "All UIs stopped."
+    fi
     echo "=== Done ==="
 }
 
@@ -196,13 +157,14 @@ cmd_restart_all() {
     cmd_start_all
 }
 
-cmd_attach() {
-    if tmux_session_exists; then
-        exec tmux attach -t "$SESSION"
-    else
-        echo "No tmux session '$SESSION' running. Start it with 'bin/start-nexus-uis.sh start'."
+cmd_logs() {
+    local name="$1"
+    if [ -z "$name" ]; then
+        echo "Usage: bin/start-nexus-uis.sh logs <ui-name>"
+        echo "Available: ${UI_NAMES[*]}"
         exit 1
     fi
+    journalctl --user -u "$name.service" --no-pager -n 50 -f
 }
 
 # ── Main ────────────────────────────────────────────────────────────────
@@ -212,9 +174,14 @@ case "${1:-status}" in
     status)  cmd_status_all ;;
     stop)    cmd_stop_all ;;
     restart) cmd_restart_all ;;
-    attach)  cmd_attach ;;
+    logs)    cmd_logs "$2" ;;
+    attach)
+        echo "tmux session no longer used — UIs are managed by systemd."
+        echo "Use 'bin/start-nexus-uis.sh logs <ui-name>' to view logs,"
+        echo "or 'journalctl --user -u <ui-name>.service -f' to follow."
+        ;;
     *)
-        echo "Usage: $0 {start|status|stop|restart|attach}"
+        echo "Usage: $0 {start|status|stop|restart|logs|attach}"
         exit 1
         ;;
 esac

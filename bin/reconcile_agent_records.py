@@ -19,12 +19,11 @@ Candidates matched to an agent record indicating completed work are marked
 Embeddings are cached to disk so re-runs are fast.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 reconcile_agent_records.py --dry-run
-    python3 reconcile_agent_records.py --apply --threshold 0.65
-    python3 reconcile_agent_records.py --dry-run --limit 20
-    python3 reconcile_agent_records.py --dry-run --top-k 3
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/reconcile_agent_records.py --dry-run
+    python3 bin/reconcile_agent_records.py --apply --threshold 0.65
+    python3 bin/reconcile_agent_records.py --dry-run --limit 20
+    python3 bin/reconcile_agent_records.py --dry-run --top-k 3
 """
 
 from __future__ import annotations

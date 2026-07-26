@@ -6,14 +6,13 @@ Outputs candidates sorted by compilation_readiness as JSON,
 ready for the DeepSeek team to hook into the frontend.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 cpf_query.py                          # all ready candidates (CPF >= 0.7)
-    python3 cpf_query.py --threshold 0.5           # custom threshold
-    python3 cpf_query.py --candidate <uuid>        # single candidate detail
-    python3 cpf_query.py --all                     # all candidates regardless of readiness
-    python3 cpf_query.py --json                    # JSON output (for API consumers)
-    python3 cpf_query.py --count                   # just the count
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/cpf_query.py                          # all ready candidates (CPF >= 0.7)
+    python3 bin/cpf_query.py --threshold 0.5           # custom threshold
+    python3 bin/cpf_query.py --candidate <uuid>        # single candidate detail
+    python3 bin/cpf_query.py --all                     # all candidates regardless of readiness
+    python3 bin/cpf_query.py --json                    # JSON output (for API consumers)
+    python3 bin/cpf_query.py --count                   # just the count
 
 The --json output is designed for the DeepSeek UI: it includes candidate title,
 intent_description, readiness score, component breakdown, system/subsystem names,

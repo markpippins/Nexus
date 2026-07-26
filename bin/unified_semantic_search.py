@@ -8,11 +8,10 @@ simultaneously. Merges results with provenance labels (curated vs harvested)
 and returns sorted by relevance.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 unified_semantic_search.py "TypeSpec contract-first architecture"
-    python3 unified_semantic_search.py "agent orchestration leases" --limit 10
-    python3 unified_semantic_search.py "TypeSpec" --json
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/unified_semantic_search.py "TypeSpec contract-first architecture"
+    python3 bin/unified_semantic_search.py "agent orchestration leases" --limit 10
+    python3 bin/unified_semantic_search.py "TypeSpec" --json
 """
 
 import argparse

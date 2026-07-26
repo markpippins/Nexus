@@ -7,9 +7,8 @@ Wave 1 batch processing — deterministic Stage 1 only.
 3. Save markdown and chunks to output dir for agent-in-the-loop extraction
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 batch_wave1.py [--dry-run]
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/batch_wave1.py [--dry-run]
 """
 
 import argparse

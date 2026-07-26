@@ -11,14 +11,13 @@ NOTE: Run after archiving old agendas and deleting old agenda_items:
     DELETE FROM nebula.agenda_items;
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
 
     # Preview (simulates clean-slate clustering)
-    python3 recluster_intents.py --dry-run
+    python3 bin/recluster_intents.py --dry-run
 
     # Apply (rebuilds agendas from scratch)
-    python3 recluster_intents.py --apply
+    python3 bin/recluster_intents.py --apply
 """
 
 from __future__ import annotations

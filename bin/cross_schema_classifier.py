@@ -8,10 +8,9 @@ between their pre-computed embeddings (both in pgvector tables).
 Replaces the v1 keyword Jaccard approach with much higher precision.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 cross_schema_classifier.py
-    python3 cross_schema_classifier.py --threshold 0.20 --dry-run
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/cross_schema_classifier.py
+    python3 bin/cross_schema_classifier.py --threshold 0.20 --dry-run
 """
 
 import argparse

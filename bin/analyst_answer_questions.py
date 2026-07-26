@@ -9,17 +9,16 @@ Processes OPEN questions with no answer (answered_by IS NULL):
   4. Records answers via nebula_answer_question (status stays OPEN)
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
 
     # Answer all unanswered questions (up to limit)
-    python3 analyst_answer_questions.py
+    python3 bin/analyst_answer_questions.py
 
     # Answer a specific number
-    python3 analyst_answer_questions.py --limit 3
+    python3 bin/analyst_answer_questions.py --limit 3
 
     # Dry run (no LLM call, no DB writes)
-    python3 analyst_answer_questions.py --dry-run
+    python3 bin/analyst_answer_questions.py --dry-run
 """
 
 import argparse

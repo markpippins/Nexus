@@ -13,17 +13,16 @@ agendas. Only items with `included IS NULL` (no human decision yet) are
 eligible for reassignment.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
 
     # Dry-run: show what would change without making changes
-    python3 heal_agendas.py --dry-run
+    python3 bin/heal_agendas.py --dry-run
 
     # Apply the reassignments
-    python3 heal_agendas.py --apply
+    python3 bin/heal_agendas.py --apply
 
     # Tighter matching
-    python3 heal_agendas.py --apply --threshold 0.65 --margin 0.05
+    python3 bin/heal_agendas.py --apply --threshold 0.65 --margin 0.05
 """
 
 from __future__ import annotations

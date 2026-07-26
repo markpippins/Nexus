@@ -6,9 +6,8 @@ Creates classified_as cross-references linking harvest candidates to their
 mapped systems/subsystems in the Nebula hierarchy.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 batch_create_cross_references.py [--dry-run]
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/batch_create_cross_references.py [--dry-run]
 """
 
 import json

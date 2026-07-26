@@ -187,6 +187,20 @@ CANDIDATES: tuple[Candidate, ...] = (
         workspace_path="nexus/python/vision/vision-srv",
     ),
     Candidate(
+        name="tackle-srv",
+        port=3410,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3410/health",
+        description=(
+            "Tackle REST API — AI configuration registry and role memory "
+            "procedure server. Backs tackle-mcp with canonical PostgreSQL + "
+            "Redis access. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start tackle-srv.service",
+        workspace_path="nexus/typescript/tackle-srv",
+    ),
+    Candidate(
         name="tackle-mcp",
         port=3400,
         kind="mcp_server",
@@ -366,7 +380,7 @@ CANDIDATES: tuple[Candidate, ...] = (
         health_cmd="docker exec atomic-redis-dev redis-cli ping | grep -q PONG",
         description=(
             "Redis in-memory cache via Docker (atomic-redis-dev). "
-            "Used by role-memory-srv and tackle-mcp. Systemd-managed "
+            "Used by role-memory-srv, tackle-srv, and tackle-mcp. Systemd-managed "
             "(oneshot). Auto-prunes old Docker artifacts before start."
         ),
         startup="systemd: systemctl --user start redis.service",
@@ -403,19 +417,18 @@ CANDIDATES: tuple[Candidate, ...] = (
     ),
     Candidate(
         name="assembly-mcp",
-        port=3107,
+        port=3113,
         kind="mcp_server",
         transport_type="streamable-http",
-        health_url="http://localhost:3107/health",
+        health_url="http://localhost:3113/health",
         description=(
             "MCP server for the assembly (social/deliberation) schema - "
             "agent short-route to forums, threads, posts, and bridge "
             "tables to nebula artifacts. Express + JSON-RPC over POST / on "
-            "ASSEMBLY_MCP_PORT (default 3107). Talks to Postgres directly; "
-            "no dependency on nebula-srv at the network layer. "
-            "Note: 3107 chosen to avoid collision with nebula-mcp-sse@3102."
+            "ASSEMBLY_MCP_PORT (now 3113; 3112 is taken by service-broker-mcp). "
+            "Systemd-managed. Delegates to assembly-srv REST API."
         ),
-        startup="cd typescript/assembly-mcp && bash scripts/mcp-daemon.sh start",
+        startup="systemd: systemctl --user start assembly-mcp.service",
         workspace_path="nexus/typescript/assembly-mcp",
     ),
     Candidate(
@@ -458,6 +471,7 @@ DEPENDENCIES: tuple[tuple[str, str, str, str], ...] = (
     ("mcp_server", "terrain-mcp", "runnable_service", "nebula-srv"),
     ("mcp_server", "nebula-mcp", "runnable_service", "nebula-srv"),
     ("mcp_server", "conduit-mcp", "runnable_service", "nebula-srv"),
+    ("mcp_server", "tackle-mcp", "runnable_service", "tackle-srv"),
     ("mcp_server", "tackle-mcp", "runnable_service", "nebula-srv"),
     ("mcp_server", "tackle-mcp", "runnable_service", "redis"),
     ("mcp_server", "terrain-mcp", "runnable_service", "terrain"),

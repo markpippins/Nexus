@@ -9,17 +9,16 @@ Processes requirements in ToDo status:
   4. Gate: moves to InProgress only when no blocking open questions
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
 
     # Process all ToDo requirements
-    python3 architect_process_todo.py
+    python3 bin/architect_process_todo.py
 
     # Process a specific requirement
-    python3 architect_process_todo.py --requirement <uuid>
+    python3 bin/architect_process_todo.py --requirement <uuid>
 
     # Dry run
-    python3 architect_process_todo.py --dry-run
+    python3 bin/architect_process_todo.py --dry-run
 """
 
 import argparse
@@ -910,9 +909,8 @@ def resolve_needs_spec_question(question_id: str, answer: str, dry_run: bool = F
     sql = f"""
         UPDATE nebula.open_questions
         SET status = 'RESOLVED',
-            resolution = '{answer.replace("'", "''")}',
-            resolved_by = 'architect',
-            resolved_at = now(),
+            answered_by = 'architect',
+            answered_at = now(),
             updated_at = now()
         WHERE id = '{question_id}'::uuid
           AND status = 'OPEN'

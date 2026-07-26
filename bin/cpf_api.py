@@ -33,7 +33,7 @@ logging.basicConfig(
 log = logging.getLogger("cpf-api")
 
 PROJECT_DIR = "/home/codex/dev/nexus"
-SCRIPT_DIR = f"{PROJECT_DIR}/python/rover"
+SCRIPT_DIR = f"{PROJECT_DIR}/bin"
 CPF_QUERY = f"{SCRIPT_DIR}/cpf_query.py"
 PROMOTE_SCRIPT = f"{PROJECT_DIR}/scripts/bash/promote-ready.sh"
 

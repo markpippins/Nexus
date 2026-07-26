@@ -16,11 +16,10 @@ SCORING COMPONENTS:
 Total: 1.00
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 cpf_compute.py                     # compute all candidates
-    python3 cpf_compute.py --candidate <uuid>  # compute single candidate
-    python3 cpf_compute.py --dry-run            # preview without writing
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/cpf_compute.py                     # compute all candidates
+    python3 bin/cpf_compute.py --candidate <uuid>  # compute single candidate
+    python3 bin/cpf_compute.py --dry-run            # preview without writing
 """
 
 import argparse

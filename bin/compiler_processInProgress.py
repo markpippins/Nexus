@@ -11,17 +11,16 @@ and no blocking open questions:
   4. Moves requirement to Active
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
 
     # Process all InProgress requirements
-    python3 compiler_processInProgress.py
+    python3 bin/compiler_processInProgress.py
 
     # Process a specific requirement
-    python3 compiler_processInProgress.py --requirement <uuid>
+    python3 bin/compiler_processInProgress.py --requirement <uuid>
 
     # Dry run
-    python3 compiler_processInProgress.py --dry-run
+    python3 bin/compiler_processInProgress.py --dry-run
 """
 
 import argparse
@@ -182,7 +181,7 @@ def compile_requirement(req_id: str, dry_run: bool = False) -> dict:
     script = subprocess.run(
         cmd,
         capture_output=True, text=True, timeout=120,
-        cwd="/home/codex/dev/nexus/python/rover",
+        cwd="/home/codex/dev/nexus/python/tackle",
     )
 
     if script.returncode != 0:

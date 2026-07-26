@@ -14,9 +14,8 @@ Candidates matched to a completed plan are marked `completed = true`, building
 the audit trail for conduit-era work that predates the WRP runtime.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 batch_mark_completed.py [--dry-run] [--batch N]
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/batch_mark_completed.py [--dry-run] [--batch N]
 """
 
 import argparse
@@ -83,7 +82,7 @@ def fetch_completed_plans() -> list[dict]:
             'title', p.title,
             'goal', LEFT(p.goal, 300)
         ) ORDER BY p.id)
-        FROM conduit.plan_status ps
+        FROM nebula.plan_status ps
         JOIN nebula.plans p ON p.id = ps.id
         WHERE ps.derived_status = 'REVIEW_PASS'
     """)
@@ -105,7 +104,7 @@ def fetch_uncompleted_candidates() -> list[dict]:
         FROM nebula.harvest_candidates hc
         LEFT JOIN nebula.cross_references cr ON cr.source_id = hc.id::text
             AND cr.rel_type = 'spawns_plan' AND cr.source_type = 'harvest_candidate'
-        LEFT JOIN conduit.plan_status ps ON ps.id = cr.target_id
+        LEFT JOIN nebula.plan_status ps ON ps.id = cr.target_id
         WHERE hc.completed = false
     """)
     if not data or data == "NULL":

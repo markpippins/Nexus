@@ -41,6 +41,7 @@ STATE_FILE="$STATE_DIR/dependency-state.json"
 REDIS_DEPENDENT_SERVICES=(
     "service-registry.service"
     "role-memory-srv.service"
+    "tackle-srv.service"
     "tackle-mcp.service"
     "cascade-event-bridge.service"
     "cascade-pg-bridge.service"
@@ -116,6 +117,9 @@ POSTGRESQL_DEPENDENT_SERVICES=(
     "execution-srv.service"
     "cascade-srv.service"
     "vision-srv-py.service"
+    # Tackle stack — AI config registry backed by tackle schema
+    "tackle-srv.service"
+    "tackle-mcp.service"
 )
 
 _postgresql_healthy() {

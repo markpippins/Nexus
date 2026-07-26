@@ -7,9 +7,8 @@ nomic-embed-text model, matches them against knowledge entities via pgvector
 cosine similarity, and creates cross_schema cross-references.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 batch_embed_and_match.py [--dry-run] [--threshold 0.65]
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/batch_embed_and_match.py [--dry-run] [--threshold 0.65]
 """
 
 import json

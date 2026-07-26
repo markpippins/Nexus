@@ -8,9 +8,8 @@ features), creates harvest candidates via the nebula-srv REST API, and
 optionally publishes to the Assembly forum.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 batch_file_candidates.py [--dry-run] [--limit N] [--batch N] [--publish]
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/batch_file_candidates.py [--dry-run] [--limit N] [--batch N] [--publish]
 """
 
 import argparse
@@ -402,7 +401,7 @@ def create_candidate(harvest_id: str, candidate: dict) -> str | None:
     return result.get("id")
 
 
-ASSEMBLY_MCP_URL = "http://localhost:3107"
+ASSEMBLY_MCP_URL = "http://localhost:3112"
 
 
 def assembly_mcp_call(method: str, params: dict) -> dict:

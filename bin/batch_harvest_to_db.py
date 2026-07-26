@@ -9,9 +9,8 @@ and writes results into nebula.harvests via the nebula-srv REST API
 Pipeline: Dockling (deterministic) → API insert (with docklang)
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 batch_harvest_to_db.py [--dry-run] [--limit N]
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/batch_harvest_to_db.py [--dry-run] [--limit N]
 """
 
 import argparse

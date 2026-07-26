@@ -4,12 +4,11 @@ Backfill DockLang — scan existing HTML chat exports, generate DockLang via
 Dockling, and upsert into the nebula.harvests.docklang column.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 backfill_docklang.py                    # upsert missing only
-    python3 backfill_docklang.py --force             # regenerate all
-    python3 backfill_docklang.py --dry-run           # preview only
-    python3 backfill_docklang.py --slug plurality    # specific file
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/backfill_docklang.py                    # upsert missing only
+    python3 bin/backfill_docklang.py --force             # regenerate all
+    python3 bin/backfill_docklang.py --dry-run           # preview only
+    python3 bin/backfill_docklang.py --slug plurality    # specific file
 """
 
 import argparse

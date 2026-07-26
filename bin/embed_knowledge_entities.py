@@ -6,10 +6,9 @@ Embeds all knowledge.graph_entities into knowledge.graph_entity_embeddings
 using Ollama nomic-embed-text (768-dim). Uses psycopg2 for direct PostgreSQL connection.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 embed_knowledge_entities.py
-    python3 embed_knowledge_entities.py --dry-run
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/embed_knowledge_entities.py
+    python3 bin/embed_knowledge_entities.py --dry-run
 """
 
 import argparse

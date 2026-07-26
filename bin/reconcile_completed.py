@@ -16,12 +16,11 @@ Candidates matched to a completed plan are marked `completed = true`.
 This replaces the Gemini-based inference in batch_mark_completed.py.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 reconcile_completed.py [--dry-run] [--apply] [--threshold 0.45]
-    python3 reconcile_completed.py --apply --only-high
-    python3 reconcile_completed.py --apply --min-confidence medium
-    python3 reconcile_completed.py --skip-dco --dry-run
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/reconcile_completed.py [--dry-run] [--apply] [--threshold 0.45]
+    python3 bin/reconcile_completed.py --apply --only-high
+    python3 bin/reconcile_completed.py --apply --min-confidence medium
+    python3 bin/reconcile_completed.py --skip-dco --dry-run
 """
 
 import argparse
@@ -55,7 +54,7 @@ def fetch_completed_plans() -> list[dict]:
             'title', p.title,
             'goal', LEFT(p.goal, 500)
         ) ORDER BY p.id)
-        FROM conduit.plan_status ps
+        FROM nebula.plan_status ps
         JOIN nebula.plans p ON p.id = ps.id
         WHERE ps.derived_status = 'REVIEW_PASS'
     """)
@@ -77,7 +76,7 @@ def fetch_uncompleted_candidates() -> list[dict]:
         FROM nebula.harvest_candidates hc
         JOIN nebula.cross_references cr ON cr.source_id = hc.id::text
             AND cr.rel_type = 'spawns_plan' AND cr.source_type = 'harvest_candidate'
-        LEFT JOIN conduit.plan_status ps ON ps.id = cr.target_id
+        LEFT JOIN nebula.plan_status ps ON ps.id = cr.target_id
         WHERE hc.completed = false
     """)
     _, implicit = psql("""

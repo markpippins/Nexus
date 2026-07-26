@@ -3,8 +3,7 @@
 Update cross-references and harvest-references for the latest harvest only.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    python3 update_latest_harvest_refs.py [--dry-run]
+    python3 bin/update_latest_harvest_refs.py [--dry-run]
 """
 
 import json, logging, sys, subprocess, time, uuid

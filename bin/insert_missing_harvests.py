@@ -9,9 +9,8 @@ harvested markdown for source_text, and inserts them all in batch.
 No Ollama extraction needed — the candidate data already exists in the JSONs.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 insert_missing_harvests.py
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/insert_missing_harvests.py
 """
 
 import json

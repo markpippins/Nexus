@@ -10,9 +10,8 @@ different UUIDs from re-ingestion), keeping only the most recent per filename.
 Supports --validate to run data integrity checks before publishing.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 batch_publish_harvests.py [--dry-run] [--limit N] [--validate] [--deduplicate]
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/batch_publish_harvests.py [--dry-run] [--limit N] [--validate] [--deduplicate]
 """
 
 import argparse
@@ -26,7 +25,7 @@ import urllib.error
 
 log = logging.getLogger("batch_publish")
 
-ASSEMBLY_MCP_URL = "http://localhost:3107"
+ASSEMBLY_MCP_URL = "http://localhost:3112"
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 
 logging.basicConfig(

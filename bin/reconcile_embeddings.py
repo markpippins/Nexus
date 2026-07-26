@@ -13,13 +13,12 @@ Candidates matched to a completed plan are marked `completed = true`.
 Embeddings are cached to disk so re-runs are fast.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
-    python3 reconcile_embeddings.py --dry-run
-    python3 reconcile_embeddings.py --apply --threshold 0.65
-    python3 reconcile_embeddings.py --apply --only-high --model nomic-embed-text
-    python3 reconcile_embeddings.py --dry-run --top-k 3 --output /tmp/embed_matches.json
-    python3 reconcile_embeddings.py --dry-run --limit 20
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
+    python3 bin/reconcile_embeddings.py --dry-run
+    python3 bin/reconcile_embeddings.py --apply --threshold 0.65
+    python3 bin/reconcile_embeddings.py --apply --only-high --model nomic-embed-text
+    python3 bin/reconcile_embeddings.py --dry-run --top-k 3 --output /tmp/embed_matches.json
+    python3 bin/reconcile_embeddings.py --dry-run --limit 20
 """
 
 from __future__ import annotations
@@ -68,7 +67,7 @@ def fetch_completed_plans() -> list[dict]:
             'title', p.title,
             'goal', LEFT(p.goal, 800)
         ) ORDER BY p.id)
-        FROM conduit.plan_status ps
+        FROM nebula.plan_status ps
         JOIN nebula.plans p ON p.id = ps.id
         WHERE ps.derived_status = 'REVIEW_PASS'
     """)
@@ -90,7 +89,7 @@ def fetch_uncompleted_candidates() -> list[dict]:
         FROM nebula.harvest_candidates hc
         JOIN nebula.cross_references cr ON cr.source_id = hc.id::text
             AND cr.rel_type = 'spawns_plan' AND cr.source_type = 'harvest_candidate'
-        LEFT JOIN conduit.plan_status ps ON ps.id = cr.target_id
+        LEFT JOIN nebula.plan_status ps ON ps.id = cr.target_id
         WHERE hc.completed = false
     """)
     _, implicit = psql("""
