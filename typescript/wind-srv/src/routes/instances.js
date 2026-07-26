@@ -240,6 +240,8 @@ instancesRouter.post('/:id/execute', async (req, res, next) => {
         stderr: harnessResult.stderr,
         duration_ms: harnessResult.duration_ms,
       },
+      outcome: harnessResult.outcome,
+      outcomes: harnessResult.outcomes || [],
     });
   } catch (err) { next(err); }
 });

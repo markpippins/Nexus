@@ -58,10 +58,17 @@ export interface TaskContext {
   acceptance_criteria: string[];
 }
 
+export interface TaskOutcome {
+  id: string;
+  code: string;
+  description: string;
+}
+
 export interface ResolvedContext {
   role: string;
   prompt: string; // fully resolved prompt with {{PROCEDURE_INDEX}} replaced
   task: TaskContext;
+  outcomes: TaskOutcome[];
   harness_id: string;
   harness_config: Record<string, any>;
 }
@@ -122,7 +129,13 @@ export async function resolveContext(
     procedureIndexText
   );
 
-  // 5. Determine harness (default to opencode)
+  // 5. Get task outcomes from wind.task_outcomes
+  const outcomesResult = await pool.query(
+    `SELECT id, code, description FROM wind.task_outcomes WHERE task_id = $1`,
+    [row.wind_task_id]
+  );
+
+  // 6. Determine harness
   const harness = await getDefaultHarness();
 
   return {
@@ -138,6 +151,7 @@ export async function resolveContext(
       scope: row.scope,
       acceptance_criteria: row.acceptance_criteria || [],
     },
+    outcomes: outcomesResult.rows as TaskOutcome[],
     harness_id: harness.id,
     harness_config: harness.config,
   };

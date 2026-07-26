@@ -86,10 +86,12 @@ app.post("/run", async (req, res) => {
       actor_type: "system",
     });
 
-    // 4. Write resolved prompt to temp file
+    // 4. Append outcome instruction to prompt and write to temp file
+    const outcomeInstruction = buildOutcomeInstruction(resolved.outcomes || []);
+    const fullPrompt = resolved.prompt + "\n\n" + outcomeInstruction;
     await mkdir(PROMPT_DIR, { recursive: true });
     const promptFile = join(PROMPT_DIR, `${jobId}.md`);
-    await writeFile(promptFile, resolved.prompt, "utf-8");
+    await writeFile(promptFile, fullPrompt, "utf-8");
 
     // 5. Execute via harness (or resolve-only mode)
     let exitCode = 0;
@@ -149,7 +151,10 @@ app.post("/run", async (req, res) => {
       caused_by_event_type: "harness.started",
     });
 
-    // 7. Return result
+    // 7. Parse outcome from agent output
+    const parsedOutcome = parseOutcome(stdout, resolved.outcomes || []);
+
+    // 8. Return result
     res.json({
       job_id: jobId,
       role: resolved.role,
@@ -159,6 +164,8 @@ app.post("/run", async (req, res) => {
         task_slug: resolved.task.task_slug,
         scope: resolved.task.scope,
       },
+      outcomes: (resolved.outcomes || []).map((o) => ({ code: o.code, description: o.description })),
+      outcome: parsedOutcome, // { code, id, confidence } or null
       prompt_preview: resolved.prompt.slice(0, 300) + "...",
       harness_id: effectiveHarnessId,
       exit_code: exitCode,
@@ -373,6 +380,73 @@ async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecRe
       stderr: error.stderr || error.message,
     };
   }
+}
+
+// ── Outcome helpers ─────────────────────────────────────────────────
+
+/**
+ * Build instruction text telling the agent to emit an OUTCOME line.
+ */
+function buildOutcomeInstruction(outcomes: { code: string; description: string }[]): string {
+  if (outcomes.length === 0) return "";
+  const codes = outcomes.map((o) => o.code).join(", ");
+  const descriptions = outcomes
+    .map((o) => `  - ${o.code}: ${o.description}`)
+    .join("\n");
+  return `## Outcome Declaration
+
+When you have completed your analysis, you MUST end your response with a line
+in exactly this format:
+
+OUTCOME: <code>
+
+Where <code> is one of: ${codes}
+
+Outcome descriptions:
+${descriptions}
+
+Choose the outcome that best reflects your conclusion.`;
+}
+
+/**
+ * Parse the agent's output for an OUTCOME: <code> line.
+ * Returns the matched outcome or null.
+ */
+function parseOutcome(
+  output: string,
+  outcomes: { id: string; code: string; description: string }[]
+): { code: string; id: string; confidence: string } | null {
+  // Look for "OUTCOME: <code>" in the last few lines
+  const lines = output.trim().split("\n");
+  const lastLines = lines.slice(-10); // check last 10 lines
+
+  for (const line of lastLines) {
+    const match = line.trim().match(/^OUTCOME:\s*(\w[\w-]*)\s*$/i);
+    if (match) {
+      const code = match[1].toLowerCase();
+      const outcome = outcomes.find((o) => o.code === code);
+      if (outcome) {
+        return { code: outcome.code, id: outcome.id, confidence: "exact" };
+      }
+      // Close match (ignore case, underscores)
+      const fuzzy = outcomes.find(
+        (o) => o.code.replace(/_/g, "-") === code.replace(/_/g, "-")
+      );
+      if (fuzzy) {
+        return { code: fuzzy.code, id: fuzzy.id, confidence: "fuzzy" };
+      }
+    }
+  }
+
+  // Fallback: keyword scan in full output
+  for (const outcome of outcomes) {
+    const pattern = new RegExp(`\\b${outcome.code.replace(/_/g, "[-_]?")}\\b`, "i");
+    if (pattern.test(output)) {
+      return { code: outcome.code, id: outcome.id, confidence: "keyword" };
+    }
+  }
+
+  return null;
 }
 
 // ── Start ───────────────────────────────────────────────────────────
