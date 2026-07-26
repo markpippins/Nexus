@@ -1,7 +1,7 @@
 package com.angrysurfer.shrapnel.component.writer;
 
-import com.angrysurfer.shrapnel.field.IField;
-import com.angrysurfer.shrapnel.property.IPropertyAccessor;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.property.IPropertyAccessor;
 
 import java.util.List;
 

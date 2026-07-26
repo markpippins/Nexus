@@ -6,9 +6,9 @@ import java.util.stream.Collectors;
 
 import com.angrysurfer.shrapnel.Export;
 import com.angrysurfer.shrapnel.IExport;
-import com.angrysurfer.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
 import com.angrysurfer.shrapnel.model.DBExport;
-import com.angrysurfer.shrapnel.property.PropertyMapAccessor;
+import com.aibizarchitect.nexus.shrapnel.property.PropertyMapAccessor;
 import com.angrysurfer.shrapnel.service.Request;
 import com.itextpdf.kernel.geom.PageSize;
 

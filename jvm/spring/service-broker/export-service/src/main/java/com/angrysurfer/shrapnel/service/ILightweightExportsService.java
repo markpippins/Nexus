@@ -1,6 +1,6 @@
 package com.angrysurfer.shrapnel.service;
 
-import com.angrysurfer.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
 import com.angrysurfer.shrapnel.component.writer.ExcelDataWriter;
 import com.angrysurfer.shrapnel.component.writer.PdfDataWriter;
 

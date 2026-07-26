@@ -1,7 +1,7 @@
 package com.angrysurfer.shrapnel;
 
-import com.angrysurfer.shrapnel.field.Fields;
-import com.angrysurfer.shrapnel.field.IFields;
+import com.aibizarchitect.nexus.shrapnel.field.Fields;
+import com.aibizarchitect.nexus.shrapnel.field.IFields;
 
 import lombok.Getter;
 import lombok.Setter;

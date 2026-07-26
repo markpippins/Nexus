@@ -1,6 +1,6 @@
 package com.angrysurfer.shrapnel.component.writer.style.provider;
 
-import com.angrysurfer.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
 import com.angrysurfer.shrapnel.component.writer.style.adapter.StyleAdapter;
 import com.itextpdf.layout.Style;
 import lombok.extern.slf4j.Slf4j;

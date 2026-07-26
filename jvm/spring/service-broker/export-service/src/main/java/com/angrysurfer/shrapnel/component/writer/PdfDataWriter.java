@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import com.angrysurfer.shrapnel.field.IField;
-import com.angrysurfer.shrapnel.field.IValueFormatter;
-import com.angrysurfer.shrapnel.filter.DataFilters;
-import com.angrysurfer.shrapnel.filter.IDataFilters;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.field.IValueFormatter;
+import com.aibizarchitect.nexus.shrapnel.filter.DataFilters;
+import com.aibizarchitect.nexus.shrapnel.filter.IDataFilters;
 import com.angrysurfer.shrapnel.component.writer.style.provider.CombinedStyleProvider;
 import com.angrysurfer.shrapnel.component.writer.style.provider.StyleProvider;
 import com.itextpdf.layout.element.Cell;

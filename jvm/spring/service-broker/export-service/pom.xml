@@ -2,8 +2,8 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
     <parent>
-        <groupId>com.angrysurfer.atomic</groupId>
-        <artifactId>nucleus</artifactId>
+        <groupId>com.aibizarchitect.nexus</groupId>
+        <artifactId>nexus</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
@@ -11,23 +11,47 @@
     <artifactId>export-service</artifactId>
     <packaging>jar</packaging>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-collections4</artifactId>
+                <version>4.5.0</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
+        <!-- commons-beanutils2 (transitive via shrapnel-data) needs
+             ConcurrentReferenceHashMap which was removed in 4.3-4.4
+             but restored in 4.5.0. Must come first for mediation. -->
         <dependency>
-            <groupId>com.angrysurfer.atomic</groupId>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-gateway-sec-bot</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.angrysurfer.atomic</groupId>
+            <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>shrapnel-data</artifactId>
             <version>${project.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-collections4</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
-            <groupId>com.angrysurfer.atomic</groupId>
+            <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-service-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.angrysurfer.atomic</groupId>
+            <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-service-spi</artifactId>
         </dependency>
 
@@ -39,35 +63,43 @@
         <dependency>
             <groupId>com.itextpdf</groupId>
             <artifactId>kernel</artifactId>
+            <version>8.0.5</version>
         </dependency>
         <dependency>
             <groupId>com.itextpdf</groupId>
             <artifactId>io</artifactId>
+            <version>8.0.5</version>
         </dependency>
         <dependency>
             <groupId>com.itextpdf</groupId>
             <artifactId>layout</artifactId>
+            <version>8.0.5</version>
         </dependency>
         <dependency>
             <groupId>com.itextpdf</groupId>
             <artifactId>pdfa</artifactId>
+            <version>8.0.5</version>
         </dependency>
         <dependency>
             <groupId>com.itextpdf</groupId>
             <artifactId>font-asian</artifactId>
+            <version>8.0.5</version>
         </dependency>
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
+            <version>5.3.0</version>
         </dependency>
 
         <dependency>
             <groupId>commons-validator</groupId>
             <artifactId>commons-validator</artifactId>
+            <version>1.8.0</version>
         </dependency>
         <dependency>
             <groupId>com.github.ulisesbocchio</groupId>
             <artifactId>jasypt-spring-boot-starter</artifactId>
+            <version>3.0.5</version>
         </dependency>
 
         <dependency>
@@ -86,6 +118,13 @@
         <dependency>
             <groupId>jakarta.annotation</groupId>
             <artifactId>jakarta.annotation-api</artifactId>
+        </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

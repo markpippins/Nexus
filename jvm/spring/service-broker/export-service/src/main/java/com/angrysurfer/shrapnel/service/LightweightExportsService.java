@@ -11,7 +11,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import com.angrysurfer.shrapnel.component.writer.CsvDataWriter;
 import com.angrysurfer.shrapnel.component.writer.ExcelDataWriter;
 import com.angrysurfer.shrapnel.component.writer.PdfDataWriter;
-import com.angrysurfer.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
 import com.angrysurfer.shrapnel.util.ExcelUtil;
 import com.angrysurfer.shrapnel.util.FileUtil;
 import com.angrysurfer.shrapnel.util.PdfUtil;

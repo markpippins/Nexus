@@ -11,12 +11,12 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
-import com.angrysurfer.shrapnel.field.IField;
-import com.angrysurfer.shrapnel.field.IValueFormatter;
-import com.angrysurfer.shrapnel.filter.DataFilters;
-import com.angrysurfer.shrapnel.filter.IDataFilters;
-import com.angrysurfer.shrapnel.writer.IDataWriter;
-import com.angrysurfer.shrapnel.exception.ShrapnelException;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.field.IValueFormatter;
+import com.aibizarchitect.nexus.shrapnel.filter.DataFilters;
+import com.aibizarchitect.nexus.shrapnel.filter.IDataFilters;
+import com.aibizarchitect.nexus.shrapnel.writer.IDataWriter;
+import com.aibizarchitect.nexus.shrapnel.exception.ShrapnelException;
 import com.angrysurfer.shrapnel.component.writer.style.provider.CombinedStyleProvider;
 import com.angrysurfer.shrapnel.component.writer.style.provider.IExcelStyleProvider;
 

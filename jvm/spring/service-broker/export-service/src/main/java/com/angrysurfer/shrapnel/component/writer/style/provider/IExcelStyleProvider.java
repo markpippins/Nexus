@@ -1,6 +1,6 @@
 package com.angrysurfer.shrapnel.component.writer.style.provider;
 
-import com.angrysurfer.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;

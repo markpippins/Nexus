@@ -10,7 +10,7 @@ import org.springframework.core.io.ByteArrayResource;
 
 import com.angrysurfer.shrapnel.IExport;
 import com.angrysurfer.shrapnel.component.writer.PdfDataWriter;
-import com.angrysurfer.shrapnel.exception.ShrapnelException;
+import com.aibizarchitect.nexus.shrapnel.exception.ShrapnelException;
 import com.angrysurfer.shrapnel.factory.IExportFactory;
 import com.angrysurfer.shrapnel.util.ExcelUtil;
 import com.angrysurfer.shrapnel.util.FileUtil;

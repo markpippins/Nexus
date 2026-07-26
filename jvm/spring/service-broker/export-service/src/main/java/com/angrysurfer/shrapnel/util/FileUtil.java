@@ -19,7 +19,7 @@ import org.springframework.core.io.ByteArrayResource;
 import com.angrysurfer.shrapnel.IExport;
 import com.angrysurfer.shrapnel.PropertyConfig;
 import com.angrysurfer.shrapnel.component.writer.CsvDataWriter;
-import com.angrysurfer.shrapnel.exception.ShrapnelException;
+import com.aibizarchitect.nexus.shrapnel.exception.ShrapnelException;
 import com.angrysurfer.shrapnel.factory.IExportFactory;
 
 import lombok.extern.slf4j.Slf4j;
