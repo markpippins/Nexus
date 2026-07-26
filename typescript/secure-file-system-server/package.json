@@ -1,0 +1,22 @@
+{
+  "name": "file-system-server",
+  "version": "1.0.0",
+  "description": "Node.js file system proxy server",
+  "type": "module",
+  "main": "src/server.ts",
+  "scripts": {
+    "start": "bash start.sh",
+    "dev": "bun run --watch fs-serv.ts fs_root/",
+    "test": "bash run-tests.sh"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "temporal-polyfill": "^0.2.5",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.41",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

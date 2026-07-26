@@ -1,0 +1,27 @@
+{
+  "name": "@nexus/tackle-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Operator CLI for the tackle prompt/task registry — inspect, diff, and render prompts and tasks without entering an agent session.",
+  "type": "module",
+  "bin": {
+    "tackle": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "lint": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "~5.8.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

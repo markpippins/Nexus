@@ -1,0 +1,31 @@
+{
+  "name": "knowledge-srv",
+  "version": "1.0.0",
+  "description": "REST API serving the knowledge.* Postgres schema (graph_entities, graph_edges, graph_cross_references, graph_migrations). Knowledge-mcp is a thin REST-proxy on this.",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "heartbeat-client": "file:../heartbeat-client",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.8.2",
+    "vitest": "^2.0.0"
+  }
+}

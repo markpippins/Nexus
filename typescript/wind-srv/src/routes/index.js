@@ -1,0 +1,30 @@
+import { Router } from 'express';
+import { officesRouter } from './offices.js';
+import { titlesRouter } from './titles.js';
+import { tasksRouter } from './tasks.js';
+import { outcomesRouter } from './outcomes.js';
+import { workflowsRouter } from './workflows.js';
+import { versionsRouter } from './versions.js';
+import { nodesRouter } from './nodes.js';
+import { edgesRouter } from './edges.js';
+import { instancesRouter } from './instances.js';
+import { ticketsRouter } from './tickets.js';
+import { receiptsRouter } from './receipts.js';
+import { validateRouter } from './validate.js';
+import { vRolesRouter } from './v-roles.js';
+
+export const routes = Router();
+
+routes.use('/offices', officesRouter);
+routes.use('/titles', titlesRouter);
+routes.use('/tasks', tasksRouter);
+routes.use('/outcomes', outcomesRouter);
+routes.use('/workflows', workflowsRouter);
+routes.use('/versions', versionsRouter);
+routes.use('/nodes', nodesRouter);
+routes.use('/edges', edgesRouter);
+routes.use('/instances', instancesRouter);
+routes.use('/tickets', ticketsRouter);
+routes.use('/receipts', receiptsRouter);
+routes.use('/validate', validateRouter);
+routes.use('/v-roles', vRolesRouter);
