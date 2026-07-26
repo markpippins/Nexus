@@ -4,6 +4,27 @@ import { BadRequestError, NotFoundError } from '../errors.js';
 
 export const instancesRouter = Router();
 
+// ── Harness integration ─────────────────────────────────────────────
+
+const HARNESS_URL = process.env.HARNESS_URL || 'http://127.0.0.1:3420';
+
+/**
+ * Call harness-srv to execute a task.
+ * Returns the harness result (exit_code, stdout, stderr, role, task).
+ */
+async function callHarness(windTaskId, overrides) {
+  const resp = await fetch(`${HARNESS_URL}/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ wind_task_id: windTaskId, ...overrides }),
+  });
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Harness call failed (${resp.status}): ${body}`);
+  }
+  return resp.json();
+}
+
 // List instances (optionally filter by status or workflow_id)
 instancesRouter.get('/', async (req, res, next) => {
   try {
@@ -164,6 +185,63 @@ instancesRouter.post('/:id/stop', async (req, res, next) => {
     );
     if (result.rows.length === 0) throw new NotFoundError('Instance not found or not stoppable');
     res.json(result.rows[0]);
+  } catch (err) { next(err); }
+});
+
+// Execute — run the harness for a ticket's task
+instancesRouter.post('/:id/execute', async (req, res, next) => {
+  try {
+    const { ticket_id, context } = req.body;
+    if (!ticket_id) throw new BadRequestError('ticket_id is required');
+
+    // Verify instance is active
+    const instResult = await query(
+      "SELECT id, workflow_version_id FROM wind.workflow_instances WHERE id = $1 AND status = 'ACTIVE'",
+      [req.params.id]
+    );
+    if (instResult.rows.length === 0) throw new NotFoundError('Instance not found or not active');
+
+    // Get the ticket and its task
+    const ticketResult = await query(
+      `SELECT t.id, t.node_id, t.node_task_id, t.status, t.input_artifact_id,
+              n.name as node_name
+       FROM wind.tickets t
+       JOIN wind.workflow_nodes n ON t.node_id = n.id
+       WHERE t.id = $1 AND t.workflow_instance_id = $2`,
+      [ticket_id, req.params.id]
+    );
+    if (ticketResult.rows.length === 0) throw new NotFoundError('Ticket not found');
+    const ticket = ticketResult.rows[0];
+
+    if (ticket.status !== 'PENDING') {
+      throw new BadRequestError(`Ticket is ${ticket.status}, not PENDING`);
+    }
+
+    // Mark ticket as in-progress
+    await query(
+      "UPDATE wind.tickets SET status = 'IN_PROGRESS', updated_at = clock_timestamp() WHERE id = $1",
+      [ticket_id]
+    );
+
+    // Call harness-srv (resolve-only for now — agent execution pending opencode agent config)
+    const harnessResult = await callHarness(ticket.node_task_id, {
+      context: context || {},
+      work_dir: process.env.HARNESS_WORK_DIR || '/home/codex/dev',
+      resolve_only: true,
+    });
+
+    res.json({
+      ticket_id,
+      node_name: ticket.node_name,
+      harness: {
+        job_id: harnessResult.job_id,
+        role: harnessResult.role,
+        exit_code: harnessResult.exit_code,
+        stdout: harnessResult.stdout,
+        stderr: harnessResult.stderr,
+        duration_ms: harnessResult.duration_ms,
+      },
+    });
   } catch (err) { next(err); }
 });
 
