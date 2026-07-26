@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply antialiased font-sans selection:bg-blue-500 selection:text-white transition-colors duration-150;
+  }
+}
+
+/* Base Body background for each theme */
+html.dark body, body {
+  background-color: #09090b;
+  color: #fafafa;
+}
+
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.steel body {
+  background-color: #0f141d;
+  color: #f0f6fc;
+}
+
+/* =========================================================
+   LIGHT MODE OVERRIDES (Crisp, High-Contrast Bento Layout)
+   ========================================================= */
+html.light {
+  color-scheme: light;
+}
+
+html.light .bg-\[\#09090b\] { background-color: #f8fafc !important; }
+html.light .bg-\[\#0c0c0e\] { background-color: #f1f5f9 !important; }
+html.light .bg-\[\#18181b\] { background-color: #ffffff !important; }
+html.light .bg-\[\#202024\] { background-color: #f8fafc !important; }
+html.light .bg-\[\#27272a\] { background-color: #e2e8f0 !important; }
+html.light .bg-[#1e293b] { background-color: #e2e8f0 !important; }
+html.light .bg-slate-900 { background-color: #ffffff !important; }
+html.light .bg-slate-950 { background-color: #f1f5f9 !important; }
+
+html.light .border-\[\#27272a\] { border-color: #cbd5e1 !important; }
+html.light .border-\[\#3f3f46\] { border-color: #94a3b8 !important; }
+html.light .border-slate-800 { border-color: #e2e8f0 !important; }
+
+html.light .text-zinc-100 { color: #0f172a !important; }
+html.light .text-zinc-200 { color: #1e293b !important; }
+html.light .text-zinc-300 { color: #334155 !important; }
+html.light .text-zinc-400 { color: #475569 !important; }
+html.light .text-zinc-500 { color: #64748b !important; }
+
+html.light .text-slate-100 { color: #0f172a !important; }
+html.light .text-slate-200 { color: #1e293b !important; }
+html.light .text-slate-300 { color: #334155 !important; }
+html.light .text-slate-400 { color: #475569 !important; }
+html.light .text-slate-500 { color: #64748b !important; }
+
+/* Light mode card shadows */
+html.light .bg-\[\#18181b\], 
+html.light .bg-slate-900 {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* =========================================================
+   STEEL MODE OVERRIDES (Metallic Industrial Slate Theme)
+   ========================================================= */
+html.steel {
+  color-scheme: dark;
+}
+
+html.steel .bg-\[\#09090b\] { background-color: #0f141d !important; }
+html.steel .bg-\[\#0c0c0e\] { background-color: #121822 !important; }
+html.steel .bg-\[\#18181b\] { background-color: #18202c !important; }
+html.steel .bg-\[\#202024\] { background-color: #1f2a3a !important; }
+html.steel .bg-\[\#27272a\] { background-color: #283548 !important; }
+html.steel .bg-slate-900 { background-color: #18202c !important; }
+html.steel .bg-slate-950 { background-color: #0f141d !important; }
+
+html.steel .border-\[\#27272a\] { border-color: #2a384d !important; }
+html.steel .border-\[\#3f3f46\] { border-color: #3b4d68 !important; }
+html.steel .border-slate-800 { border-color: #2a384d !important; }
+
+html.steel .text-zinc-100 { color: #f0f6fc !important; }
+html.steel .text-zinc-200 { color: #e6edf3 !important; }
+html.steel .text-zinc-300 { color: #cbd5e1 !important; }
+html.steel .text-zinc-400 { color: #94a3b8 !important; }
+html.steel .text-zinc-500 { color: #64748b !important; }
+
+html.steel .text-slate-100 { color: #f0f6fc !important; }
+html.steel .text-slate-200 { color: #e6edf3 !important; }
+html.steel .text-slate-300 { color: #cbd5e1 !important; }
+html.steel .text-slate-400 { color: #94a3b8 !important; }
+html.steel .text-slate-500 { color: #64748b !important; }
+
+/* Custom Bento IDE Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+html.steel ::-webkit-scrollbar-thumb {
+  background: #283548;
+}
