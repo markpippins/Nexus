@@ -135,13 +135,13 @@ def build_question_context(conn, question: dict) -> dict:
 
     # Similar answered questions (same category, already answered)
     cur.execute("""
-        SELECT title, resolution, answered_by, category
-        FROM nebula.open_questions
-        WHERE category = %s
-          AND status = 'OPEN'
-          AND answered_by IS NOT NULL
-          AND id != %s
-        ORDER BY answered_at DESC
+        SELECT oq.title, oqa.answer, oqa.role, oq.category
+        FROM nebula.open_questions oq
+        JOIN nebula.open_question_answers oqa ON oqa.question_id = oq.id
+        WHERE oq.category = %s
+          AND oq.status = 'RESOLVED'
+          AND oq.id != %s
+        ORDER BY oqa.answered_at DESC
         LIMIT 5
     """, (question.get("category", ""), q_id))
     cols = [d.name for d in cur.description]
@@ -231,7 +231,7 @@ class AnalystHarness(Harness):
                 parts.append("**Similar Answered Questions:**")
                 for s in similar[:3]:
                     parts.append(f"- Q: {s['title']}")
-                    parts.append(f"  A: {s.get('resolution', 'No answer yet')}")
+                    parts.append(f"  A: {s.get('answer', 'No answer yet')}")
                 parts.append("")
 
             parts.append("---")

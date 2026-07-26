@@ -14,6 +14,12 @@ import logging
 import sys
 
 # ── Monkey-patch convert_to_markdown before any rover imports ────────
+# Ensure bin/ is on sys.path so moved modules (harvest_pipeline, qwen_extract) resolve
+import os
+_bin_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "bin")
+if _bin_dir not in sys.path:
+    sys.path.insert(0, _bin_dir)
+
 from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 import warnings
 warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)

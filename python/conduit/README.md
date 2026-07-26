@@ -185,13 +185,19 @@ python3 main.py --kernel-sync-daemon
 
 ### Kernel Runtime API
 
-The `app/` module provides a FastAPI server (port 3103) exposing:
+The `app/` module provides a FastAPI server (port 3103). See the **[full API reference](./REST-API.md)** for complete endpoint documentation with request/response schemas.
 
-| Endpoint       | Description |
-|---------------|-------------|
-| `POST /delta`  | Ingest a KernelDelta batch |
-| `GET /state`   | Inspect current KernelState |
-| `GET /replay`  | Replay deltas from a snapshot |
-| `GET /metrics` | Prometheus metrics endpoint |
-| `GET /healthz` | Liveness probe |
-| `GET /readyz`  | Readiness probe (checks DB + engine) |
+**Quick reference:**
+
+| Endpoint Group     | Description |
+|--------------------|-------------|
+| `POST /delta`      | Ingest a KernelDelta batch through the reduce pipeline |
+| `GET /state`       | Inspect current KernelState (summary or full) |
+| `GET /replay`      | Reconstruct KernelState via KSRA |
+| `GET /admin`       | Identity CRUD, consistency checks |
+| `GET /api/sessions`| Session lifecycle (list, kill, heartbeat) |
+| `GET /api/breaker` | Circuit breaker (trip, reset, pause, resume) |
+| `GET /api/receipts`| Receipt CRUD (get, insert, delete by type) |
+| `GET /metrics`     | Prometheus metrics endpoint |
+| `GET /healthz`     | Liveness probe |
+| `GET /readyz`      | Readiness probe (checks DB + engine) |

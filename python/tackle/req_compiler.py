@@ -21,20 +21,19 @@ Every compilation produces a journal entry in the audit substrate
 (nebula.req_compilation_log) for traceability.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
 
     # Compile a single requirement
-    python3 req_compiler.py --requirement <uuid>
+    python3 python/tackle/req_compiler.py --requirement <uuid>
 
     # Compile and create a conduit plan
-    python3 req_compiler.py --requirement <uuid> --create-plan
+    python3 python/tackle/req_compiler.py --requirement <uuid> --create-plan
 
     # Dry-run: show compiled IR without creating a plan
-    python3 req_compiler.py --requirement <uuid> --dry-run
+    python3 python/tackle/req_compiler.py --requirement <uuid> --dry-run
 
     # Stage 1 only (normalization without compilation)
-    python3 req_compiler.py --requirement <uuid> --stage-1-only
+    python3 python/tackle/req_compiler.py --requirement <uuid> --stage-1-only
 """
 
 import argparse

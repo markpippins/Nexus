@@ -23,6 +23,11 @@ from typing import Any
 import httpx
 from mcp.server.fastmcp import FastMCP
 
+# Ensure bin/ is on sys.path so moved modules (harvest_pipeline, qwen_extract) resolve
+_bin_dir = Path(__file__).resolve().parent.parent.parent / "bin"
+if str(_bin_dir) not in sys.path:
+    sys.path.insert(0, str(_bin_dir))
+
 from harvest_pipeline import (
     convert_to_markdown,
 )
@@ -309,7 +314,7 @@ def rover_compile_agenda(job_id: str, output_path: str) -> str:
             continue
         try:
             agenda = SpecificationAgenda.model_validate(data)
-            md_lines.append(agenda_to_markdown(agenda, chunk_label=f"chunk-{i}"))
+            md_lines.append(agenda_to_markdown([a.model_dump() for a in agenda.agenda_items]))
         except Exception:
             pass
 

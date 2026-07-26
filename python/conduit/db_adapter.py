@@ -554,7 +554,7 @@ class DBAdapter:
 
         if role == "reviewer":
             query = f"""
-                SELECT ps.* FROM plan_status ps
+                SELECT ps.* FROM nebula.plan_status ps
                 JOIN tickets t ON t.plan_id = ps.id
                 WHERE t.role = 'reviewer' AND t.status = 'open'
                 AND ps.derived_status IN ({placeholders})
@@ -563,7 +563,7 @@ class DBAdapter:
             """
         else:
             query = f"""
-                SELECT ps.* FROM plan_status ps
+                SELECT ps.* FROM nebula.plan_status ps
                 JOIN tickets t ON t.plan_id = ps.id
                 WHERE t.role = %s AND t.status = 'open'
                 AND ps.derived_status IN ({placeholders})
@@ -581,7 +581,7 @@ class DBAdapter:
 
     def get_blocked_plans(self) -> List[Dict[str, Any]]:
         _log.debug("get_blocked_plans")
-        query = "SELECT * FROM plan_status WHERE derived_status = 'BLOCK'"
+        query = "SELECT * FROM nebula.plan_status WHERE derived_status = 'BLOCK'"
         with self._get_connection() as conn:
             cursor = conn.execute(query)
             plans = cursor.dict_fetchall()
@@ -1112,7 +1112,7 @@ class DBAdapter:
         _log.debug("close_orphaned_tickets: plan=%s", plan_id)
         with self._get_connection() as conn:
             row = conn.execute(
-                "SELECT derived_status FROM plan_status WHERE id = %s",
+                "SELECT derived_status FROM nebula.plan_status WHERE id = %s",
                 (plan_id,),
             ).fetchone()
             if not row:

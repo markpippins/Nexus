@@ -13,20 +13,19 @@ Promotion criteria (all must pass):
 Non-blocking: questions with blocking=false are ignored.
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
 
     # Promote all eligible draft IRs
-    python3 intent_requirement_promote.py
+    python3 python/tackle/intent_requirement_promote.py
 
     # Promote a specific IR
-    python3 intent_requirement_promote.py --intent-record <uuid>
+    python3 python/tackle/intent_requirement_promote.py --intent-record <uuid>
 
     # Dry run
-    python3 intent_requirement_promote.py --dry-run
+    python3 python/tackle/intent_requirement_promote.py --dry-run
 
     # Custom threshold
-    python3 intent_requirement_promote.py --threshold 0.8
+    python3 python/tackle/intent_requirement_promote.py --threshold 0.8
 """
 
 import argparse

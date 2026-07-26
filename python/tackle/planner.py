@@ -15,20 +15,19 @@ Events emitted:
   - candidate.escalated — needs human review (risk == CRITICAL OR evidence found)
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
     
     # Full grooming cycle
-    python3 planner.py
+    python3 python/tackle/planner.py
     
     # Assess specific candidate
-    python3 planner.py --candidate <uuid>
+    python3 python/tackle/planner.py --candidate <uuid>
     
     # Dry run (no DB writes, no events)
-    python3 planner.py --dry-run
+    python3 python/tackle/planner.py --dry-run
     
     # Generate questions only (no promotion)
-    python3 planner.py --questions-only
+    python3 python/tackle/planner.py --questions-only
 """
 
 import argparse
@@ -54,6 +53,9 @@ from planner_mcp_server import (
     write_duplicate_question,
     write_evidence_question,
     get_candidate_questions,
+    check_hierarchy_evidence,
+    check_tag_evidence,
+    check_completion_status,
 )
 
 log = logging.getLogger("planner")
@@ -159,8 +161,11 @@ def check_linked_evidence(candidate_id: str) -> dict:
 def create_questions(candidate_id: str, assessment: dict, dry_run: bool = False) -> list[dict]:
     """Generate open questions from CPF gaps.
     
-    Skips has_artifacts questions when linked agent_records exist
-    (evidence from history ingestion).
+    Pre-checks available evidence to skip questions that can be auto-resolved:
+    - has_artifacts: skipped when linked agent_records exist
+    - hierarchy_mapped (system/subsystem): skipped when related artifacts have hierarchy
+    - tagged: skipped when parent harvest or similar requirements have tags
+    - reconciled: skipped when work_requests or requirements show completion
     """
     questions = assessment.get("suggested_questions", [])
     
@@ -174,8 +179,45 @@ def create_questions(candidate_id: str, assessment: dict, dry_run: bool = False)
         log.info("  Found %d linked agent_records — skipping has_artifacts questions", linked["count"])
         questions = [q for q in questions if q.get("component") != "has_artifacts"]
     
+    # Check hierarchy evidence — skip system/subsystem questions if inferable
+    try:
+        hierarchy = json.loads(check_hierarchy_evidence(candidate_id))
+        if hierarchy.get("inferred_system_id"):
+            log.info("  Inferred system from related artifacts — skipping system question")
+            questions = [q for q in questions if not (
+                q.get("component") == "hierarchy_mapped"
+                and "system" in q.get("question", "").lower()
+                and "subsystem" not in q.get("question", "").lower()
+            )]
+        if hierarchy.get("inferred_subsystem_id"):
+            log.info("  Inferred subsystem from related artifacts — skipping subsystem question")
+            questions = [q for q in questions if not (
+                q.get("component") == "hierarchy_mapped"
+                and "subsystem" in q.get("question", "").lower()
+            )]
+    except Exception as e:
+        log.warning("  Hierarchy evidence check failed: %s", e)
+    
+    # Check tag evidence — skip tag questions if harvest or similar artifacts have tags
+    try:
+        tags = json.loads(check_tag_evidence(candidate_id))
+        if tags.get("tags_added", 0) > 0 and len(tags.get("inferred_tags", [])) >= 2:
+            log.info("  Inferred %d tags from harvest/related artifacts — skipping tag questions", tags["tags_added"])
+            questions = [q for q in questions if q.get("component") != "tagged"]
+    except Exception as e:
+        log.warning("  Tag evidence check failed: %s", e)
+    
+    # Check completion status — skip reconciled question if work is already done
+    try:
+        completion = json.loads(check_completion_status(candidate_id))
+        if completion.get("is_completed"):
+            log.info("  Work already completed (WR/requirement found) — skipping reconciled question")
+            questions = [q for q in questions if q.get("component") != "reconciled"]
+    except Exception as e:
+        log.warning("  Completion status check failed: %s", e)
+    
     if not questions:
-        log.info("  All gaps answered by linked evidence")
+        log.info("  All gaps answered by evidence")
         return []
     
     log.info("  Creating %d open questions...", len(questions))
@@ -295,13 +337,15 @@ def check_knowledge_graph_evidence(candidate_id: str, dry_run: bool = False) -> 
 def create_evidence_questions(candidate_id: str, evidence: dict, dry_run: bool = False) -> list[dict]:
     """Create open questions from knowledge graph evidence via MCP server.
     
-    If evidence suggests work is completed, create blocking questions.
+    When recommendation is 'auto_close', questions are inserted as RESOLVED
+    (non-blocking) to preserve the audit trail without blocking the pipeline.
     """
     recommendation = evidence.get("recommendation", "clear")
     
     if recommendation == "clear":
         return []
     
+    auto_close = (recommendation == "auto_close")
     questions = []
     
     # Create question for each evidence type
@@ -332,12 +376,13 @@ def create_evidence_questions(candidate_id: str, evidence: dict, dry_run: bool =
     if not questions:
         return []
     
-    log.info("  Creating %d evidence questions...", len(questions))
+    log.info("  Creating %d evidence questions%s...", len(questions), " (auto-closed)" if auto_close else "")
     created = []
     
     for q in questions:
         if dry_run:
-            log.info("    [DRY RUN] Would create: %s (%s)", q["question"][:60], q["category"])
+            log.info("    [DRY RUN] Would create: %s (%s) %s", q["question"][:60], q["category"],
+                     "[auto-closed]" if auto_close else "")
             created.append(q)
             continue
         
@@ -347,11 +392,12 @@ def create_evidence_questions(candidate_id: str, evidence: dict, dry_run: bool =
                 evidence_type=q.get("evidence_type", "unknown"),
                 evidence_title=q["question"][:100],
                 evidence_id="",
-                confidence="medium",
+                confidence="high" if auto_close else "medium",
+                auto_close=auto_close,
             )
             
             if question_id:
-                log.info("    Created question: %s", question_id[:8])
+                log.info("    Created question: %s%s", question_id[:8], " [auto-closed]" if auto_close else "")
                 emit_question_created(
                     question_id=question_id,
                     candidate_id=candidate_id,
@@ -359,7 +405,7 @@ def create_evidence_questions(candidate_id: str, evidence: dict, dry_run: bool =
                     title=q["question"],
                     causation_id=None,
                 )
-                created.append({"id": question_id, **q})
+                created.append({"id": question_id, "auto_closed": auto_close, **q})
             else:
                 log.error("    Failed to create question: %s", q["question"][:40])
         except Exception as e:

@@ -36,6 +36,9 @@ from app.api.routes_delta import router as delta_router
 from app.api.routes_state import router as state_router
 from app.api.routes_replay import router as replay_router
 from app.api.routes_admin import router as admin_router
+from app.api.routes_sessions import router as sessions_router
+from app.api.routes_breaker import router as breaker_router
+from app.api.routes_receipts import router as receipts_router
 
 # ── Logging ──────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -200,6 +203,9 @@ app.include_router(delta_router, prefix="/delta", tags=["delta"])
 app.include_router(state_router, prefix="/state", tags=["state"])
 app.include_router(replay_router, prefix="/replay", tags=["replay"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
+app.include_router(sessions_router, prefix="/api/sessions", tags=["sessions"])
+app.include_router(breaker_router, prefix="/api/breaker", tags=["breaker"])
+app.include_router(receipts_router, prefix="/api/receipts", tags=["receipts"])
 
 
 # ── Exception handlers ──────────────────────────────────────────────

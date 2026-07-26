@@ -54,7 +54,7 @@ class WorkRequestUpdate(BaseModel):
 
 
 class BranchCreate(BaseModel):
-    branch_id: str
+    branch_id: Optional[str] = None
     wr_id: str
     label: Optional[str] = None
     parent_branch_id: Optional[str] = None

@@ -31,9 +31,8 @@ def batch_resolve():
     sql = """
     UPDATE nebula.open_questions oq
     SET status = 'RESOLVED',
-        resolution = 'auto_resolved_by_history_ingestion',
-        resolved_at = now(),
-        resolved_by = 'planner-auto'
+        answered_by = 'planner-auto',
+        answered_at = now()
     WHERE oq.candidate_id::text IN (
         SELECT cr.target_id
         FROM nebula.cross_references cr

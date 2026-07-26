@@ -17,20 +17,19 @@ implementation plans.
 Traceability: harvest → candidate → intent_record → requirements → ...
 
 Usage:
-    cd /home/codex/dev/nexus/python/rover
-    source .venv/bin/activate
+    source /home/codex/dev/nexus/python/rover/.venv/bin/activate
 
     # Promote a specific candidate by UUID
-    python3 candidate_promote.py --candidate <uuid>
+    python3 python/tackle/candidate_promote.py --candidate <uuid>
 
     # Promote all ready candidates (CPF >= 0.7)
-    python3 candidate_promote.py --ready
+    python3 python/tackle/candidate_promote.py --ready
 
     # Promote specific candidates from a list
-    python3 candidate_promote.py --candidates <uuid1> <uuid2>
+    python3 python/tackle/candidate_promote.py --candidates <uuid1> <uuid2>
 
     # Dry-run: show what would be promoted
-    python3 candidate_promote.py --ready --dry-run
+    python3 python/tackle/candidate_promote.py --ready --dry-run
 """
 
 import argparse
