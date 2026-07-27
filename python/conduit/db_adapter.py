@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import uuid
 from contextlib import contextmanager
 from typing import List, Optional, Dict, Any
@@ -26,6 +27,14 @@ def _get_schema(explicit: str | None = None) -> str:
             "Using it for Conduit tables could conflict with other "
             "applications. Use 'conduit' (or another name) "
             "for Conduit application data."
+        )
+    # SECURITY: validate schema is a safe PostgreSQL identifier before
+    # DDL interpolation (SET search_path doesn't support parameterized ids).
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
+        raise ValueError(
+            f"Invalid schema name '{schema}': must match "
+            f"/^[a-zA-Z_][a-zA-Z0-9_]*$/. Only unquoted PostgreSQL "
+            f"identifiers are allowed."
         )
     return schema
 
@@ -82,7 +91,7 @@ class _ConnectionProxy:
             )
         try:
             cur = conn.cursor()
-            cur.execute(f"SET search_path TO {schema},execution,vision,peb,tackle")
+            cur.execute(f"SET search_path TO {schema},execution,vision,peb,tackle,nebula")
             cur.close()
         except Exception:
             pass
@@ -180,10 +189,14 @@ class DBAdapter:
             # in the vision schema and sessions/circuit_breaker
             # in the conduit schema — we do not create those here.
             # Plans table lives in nebula schema (migrated from conduit).
+            # NOTE: FK to nebula.plans removed — nebula.plans is a VIEW
+            # (not a TABLE), and FKs cannot reference views.
+            # Production tables are created by schema migrations.
+            # plan_id kept nullable to match original semantics.
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS work_requests (
                     id TEXT PRIMARY KEY,
-                    plan_id TEXT REFERENCES nebula.plans(id),
+                    plan_id TEXT,
                     title TEXT NOT NULL DEFAULT '',
                     status TEXT NOT NULL,
                     dco_json TEXT NOT NULL,
@@ -486,6 +499,8 @@ class DBAdapter:
                 next_roles = ["builder"]
             elif ticket_role == "planner":
                 next_roles = ["planner"]
+            elif ticket_role == "critic":
+                next_roles = ["planner"]
 
         if not next_roles:
             _log.debug("create_next_tickets: no next roles for %s %s", ticket_role, terminal_status)
@@ -504,7 +519,7 @@ class DBAdapter:
         count = 0
         with self._get_connection() as conn:
             for role in next_roles:
-                ticket_id = f"ticket-{plan_id}-{role}-{int(datetime.utcnow().timestamp())}"
+                ticket_id = f"ticket-{plan_id}-{role}-{int(datetime.utcnow().timestamp())}-{uuid.uuid4().hex[:8]}"
                 spawn_reason = f"{ticket_role} {terminal_status} → {role}"
                 cursor = conn.execute(
                     """
@@ -554,7 +569,7 @@ class DBAdapter:
 
         if role == "reviewer":
             query = f"""
-                SELECT ps.* FROM nebula.plan_status ps
+                SELECT ps.* FROM plan_status ps
                 JOIN tickets t ON t.plan_id = ps.id
                 WHERE t.role = 'reviewer' AND t.status = 'open'
                 AND ps.derived_status IN ({placeholders})
@@ -563,7 +578,7 @@ class DBAdapter:
             """
         else:
             query = f"""
-                SELECT ps.* FROM nebula.plan_status ps
+                SELECT ps.* FROM plan_status ps
                 JOIN tickets t ON t.plan_id = ps.id
                 WHERE t.role = %s AND t.status = 'open'
                 AND ps.derived_status IN ({placeholders})
@@ -581,7 +596,7 @@ class DBAdapter:
 
     def get_blocked_plans(self) -> List[Dict[str, Any]]:
         _log.debug("get_blocked_plans")
-        query = "SELECT * FROM nebula.plan_status WHERE derived_status = 'BLOCK'"
+        query = "SELECT * FROM plan_status WHERE derived_status = 'BLOCK'"
         with self._get_connection() as conn:
             cursor = conn.execute(query)
             plans = cursor.dict_fetchall()
@@ -680,7 +695,7 @@ class DBAdapter:
                 receipt_id, plan_id, receipt_type, agent_role, session_id,
                 ticket_id, summary, artifact_path, meta_json, tokens_used, now,
             ))
-            conn.execute("UPDATE nebula.plans SET updated_at = %s WHERE id = %s", (now, plan_id))
+            conn.execute("UPDATE plans SET updated_at = %s WHERE id = %s", (now, plan_id))
             conn.commit()
         _log.debug("insert_receipt: created %s", receipt_id)
 
@@ -793,7 +808,7 @@ class DBAdapter:
     def get_plan_by_id(self, plan_id: str) -> Optional[Dict[str, Any]]:
         _log.debug("get_plan_by_id: plan=%s", plan_id)
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT * FROM nebula.plans WHERE id = %s", (plan_id,))
+            cursor = conn.execute("SELECT * FROM plans WHERE id = %s", (plan_id,))
             plan = cursor.dict_fetchone()
             _log.debug("get_plan_by_id: plan=%s found=%s", plan_id, plan is not None)
             return plan
@@ -830,9 +845,52 @@ class DBAdapter:
             )
             conn.commit()
 
+    # ── ADR-016: Kernel transition recording (Python side) ──────────
+
+    def _record_kernel_transition(
+        self,
+        conn,
+        aggregate_type: str,
+        aggregate_id: str,
+        event_type: str,
+        actor: str = "conduit-python",
+        authority: str = "system",
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Insert into kernel.transition_event within an existing transaction.
+
+        ADR-016: Python conduit must record kernel transitions for every
+        state change so the trg_authorize_trigger enforces policy rules.
+        This method is called within the same connection/transaction as the
+        UPDATE it accompanies, ensuring atomicity.
+        """
+        event_id = str(uuid.uuid4())
+        conn.execute(
+            """
+            INSERT INTO kernel.transition_event
+                (event_id, event_type, aggregate_type, aggregate_id,
+                 actor, authority, payload)
+            VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
+            """,
+            (
+                event_id,
+                event_type,
+                aggregate_type,
+                aggregate_id,
+                actor,
+                authority,
+                json.dumps(payload or {}),
+            ),
+        )
+
     def detect_stale_tickets(self) -> int:
         threshold = (datetime.utcnow() - timedelta(seconds=DEFAULT_STALE_SECONDS)).isoformat() + "Z"
         with self._get_connection() as conn:
+            # ADR-016: SELECT affected tickets before UPDATE for kernel transition recording
+            affected = conn.execute(
+                "SELECT id FROM tickets WHERE status = 'claimed' AND last_activity IS NOT NULL AND last_activity < %s",
+                (threshold,),
+            ).fetchall()
             cursor = conn.execute(
                 """
                 UPDATE tickets SET status = 'stale'
@@ -842,6 +900,15 @@ class DBAdapter:
                 """,
                 (threshold,),
             )
+            # ADR-016: Record kernel transitions within the same transaction
+            for row in (affected or []):
+                self._record_kernel_transition(
+                    conn,
+                    aggregate_type="ticket",
+                    aggregate_id=row[0],
+                    event_type="transition.requested",
+                    payload={"from_status": "claimed", "to_status": "stale", "reason": "stale_detection"},
+                )
             conn.commit()
             n = cursor.rowcount
             if n:
@@ -851,6 +918,11 @@ class DBAdapter:
     def detect_expired_tickets(self) -> int:
         now = datetime.utcnow().isoformat() + "Z"
         with self._get_connection() as conn:
+            # ADR-016: SELECT affected tickets before UPDATE for kernel transition recording
+            affected = conn.execute(
+                "SELECT id, status FROM tickets WHERE status IN ('open', 'claimed', 'stale') AND expires_at IS NOT NULL AND expires_at < %s",
+                (now,),
+            ).fetchall()
             cursor = conn.execute(
                 """
                 UPDATE tickets SET status = 'expired'
@@ -860,6 +932,15 @@ class DBAdapter:
                 """,
                 (now,),
             )
+            # ADR-016: Record kernel transitions within the same transaction
+            for row in (affected or []):
+                self._record_kernel_transition(
+                    conn,
+                    aggregate_type="ticket",
+                    aggregate_id=row[0],
+                    event_type="transition.rejected",
+                    payload={"from_status": row[1], "to_status": "expired", "reason": "expiry_detection"},
+                )
             conn.commit()
             n = cursor.rowcount
             if n:
@@ -1112,7 +1193,7 @@ class DBAdapter:
         _log.debug("close_orphaned_tickets: plan=%s", plan_id)
         with self._get_connection() as conn:
             row = conn.execute(
-                "SELECT derived_status FROM nebula.plan_status WHERE id = %s",
+                "SELECT derived_status FROM plan_status WHERE id = %s",
                 (plan_id,),
             ).fetchone()
             if not row:

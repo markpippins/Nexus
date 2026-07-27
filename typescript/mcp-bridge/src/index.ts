@@ -70,7 +70,11 @@ function parseTargets(): BridgeTarget[] {
     const args = argsRaw ? argsRaw.split(";").map((a) => a).filter(Boolean) : [];
     const envExtra: Record<string, string> = {};
     for (const key of Object.keys(env)) {
-      const m = key.match(new RegExp(`^${pfx}ENV_([A-Z0-9_]+)$`, "i"));
+      // SECURITY: escape regex metacharacters in pfx before interpolation.
+      // name is constrained to [A-Z0-9_]+ by the extraction regex, but
+      // defense-in-depth: escape anyway in case the constraint changes.
+      const escapedPfx = pfx.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const m = key.match(new RegExp(`^${escapedPfx}ENV_([A-Z0-9_]+)$`, "i"));
       if (m) envExtra[m[1]] = env[key]!;
     }
     targets.push({ name, port, command, args, cwd, env: envExtra });

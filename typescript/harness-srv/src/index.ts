@@ -440,7 +440,9 @@ function parseOutcome(
 
   // Fallback: keyword scan in full output
   for (const outcome of outcomes) {
-    const pattern = new RegExp(`\\b${outcome.code.replace(/_/g, "[-_]?")}\\b`, "i");
+    // SECURITY: escape regex metacharacters in outcome.code before interpolation
+    const escapedCode = outcome.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`\\b${escapedCode.replace(/_/g, "[-_]?")}\\b`, "i");
     if (pattern.test(output)) {
       return { code: outcome.code, id: outcome.id, confidence: "keyword" };
     }

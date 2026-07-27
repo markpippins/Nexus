@@ -585,6 +585,47 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // GET /api/requirements/:id — single requirement by ID
+  router.get('/requirements/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [reqt] } = await pool.query(
+        'SELECT * FROM requirements WHERE id = $1',
+        [id]
+      );
+      if (!reqt) return res.status(404).json({ error: 'Requirement not found' });
+
+      // Fetch question counts
+      const { rows: qcRows } = await pool.query(
+        `SELECT COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE status = 'OPEN')::int AS open_count,
+                COUNT(*) FILTER (WHERE status = 'OPEN' AND blocking = true)::int AS blocking_count
+         FROM nebula.open_questions
+         WHERE requirement_id = $1`,
+        [id]
+      );
+
+      res.json({
+        ...toEpochMs(reqt, 'created_at'),
+        systemId: reqt.system_id,
+        subsystemId: reqt.subsystem_id,
+        featureId: reqt.feature_id,
+        startDate: reqt.start_date,
+        completionDate: reqt.completion_date,
+        parentId: reqt.parent_id,
+        reqType: reqt.req_type,
+        acceptanceCriteria: reqt.acceptance_criteria,
+        candidateId: reqt.candidate_id,
+        conduitPlanId: reqt.conduit_plan_id,
+        questionCounts: qcRows.length > 0
+          ? { total: qcRows[0].total, openCount: qcRows[0].open_count, blockingCount: qcRows[0].blocking_count }
+          : { total: 0, openCount: 0, blockingCount: 0 },
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/requirements/:id/children — fetch direct child requirements with pagination
   router.get('/requirements/:id/children', async (req: Request, res: Response) => {
     try {
@@ -4844,7 +4885,14 @@ export function createRoutes(pool: Pool): Router {
           // Replace all {{key}} placeholders with values from the row
           for (const [key, value] of Object.entries(row)) {
             const val = value === null ? '' : String(value);
-            content = content.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), val);
+            // SECURITY: escape regex metacharacters in the key to prevent
+            // regex injection via user-controlled source_query column names.
+            const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // SECURITY: escape $ in the replacement value to prevent
+            // replacement-string injection ($&, $`, $', $n patterns in
+            // String.replace() are interpreted specially).
+            const safeVal = val.replace(/\$/g, '$$$$');
+            content = content.replace(new RegExp(`\\{\\{${escapedKey}\\}\\}`, 'g'), safeVal);
           }
           const targetPath = proj.target_path
             .replace(/\{\{id\}\}/g, row.id || '')
@@ -5180,7 +5228,7 @@ export function createRoutes(pool: Pool): Router {
       if (rows.length === 0) {
         return res.status(404).json({ error: 'Snapshot not found' });
       }
-      res.json(rows[0]);
+      res.json(camelCaseRow(rows[0]));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5208,7 +5256,7 @@ export function createRoutes(pool: Pool): Router {
       ]);
 
       res.json({
-        items: dataResult.rows,
+        items: dataResult.rows.map((r: any) => camelCaseRow(r)),
         total: parseInt(countResult.rows[0].total, 10),
         page,
         pageSize,
@@ -7937,15 +7985,44 @@ export function createRoutes(pool: Pool): Router {
   });
 
   // POST /api/refresh-stats — refresh materialized views
+  // SECURITY: matviewname is validated against a strict PostgreSQL identifier
+  // pattern before interpolation. REFRESH MATERIALIZED VIEW does not accept
+  // parameterized identifiers ($1), so we sanitize via regex instead.
   router.post('/refresh-stats', async (_req: Request, res: Response) => {
     try {
       const { rows } = await pool.query(
         "SELECT matviewname FROM pg_matviews WHERE schemaname = 'nebula'"
       );
+      // Strict identifier validation: only letters, digits, underscores,
+      // starting with a letter or underscore (valid PostgreSQL unquoted ident).
+      // This prevents any injection via matviewname interpolation.
+      const SAFE_IDENT = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+      const refreshed: string[] = [];
+      const skipped: string[] = [];
+      const errors: string[] = [];
       for (const row of rows) {
-        await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY nebula.${row.matviewname}`);
+        const name = String(row.matviewname);
+        if (!SAFE_IDENT.test(name)) {
+          skipped.push(name);
+          continue;
+        }
+        let success = false;
+        try {
+          // CONCURRENTLY requires a unique index; fall back to a blocking
+          // refresh if the matview doesn't have one.
+          await pool.query(`REFRESH MATERIALIZED VIEW CONCURRENTLY nebula.${name}`);
+          success = true;
+        } catch {
+          try {
+            await pool.query(`REFRESH MATERIALIZED VIEW nebula.${name}`);
+            success = true;
+          } catch (fallbackErr: any) {
+            errors.push(`${name}: ${fallbackErr.message}`);
+          }
+        }
+        if (success) refreshed.push(name);
       }
-      res.json({ ok: true, refreshed: rows.map((r: any) => r.matviewname) });
+      res.json({ ok: true, refreshed, skipped, errors });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

@@ -71,6 +71,14 @@ types.setTypeParser(types.builtins.TIMESTAMP, (val: string) => val);
 // ── Connection ──────────────────────────────────────────────────────
 
 const PG_SCHEMA = process.env.CONDUIT_PG_SCHEMA || "conduit";
+// SECURITY: validate env-var-derived schema name before DDL interpolation.
+// DDL (SET search_path, CREATE SCHEMA) doesn't support parameterized
+// identifiers, so we validate against the safe-identifier regex at startup.
+if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(PG_SCHEMA)) {
+  throw new Error(
+    `Invalid CONDUIT_PG_SCHEMA="${PG_SCHEMA}": must match /^[a-zA-Z_][a-zA-Z0-9_]*$/`
+  );
+}
 const TACKLE_SCHEMA = "tackle";
 const VISION_SCHEMA = "vision";
 const PEB_SCHEMA = "peb";
@@ -293,14 +301,23 @@ export async function recordTransition(opts: {
   receipt?: string;         // receipt hash if applicable
   causationId?: string;     // UUID of the event that caused this transition
   correlationId?: string;   // UUID for grouping related transitions
+  client?: PoolClient;      // ADR-016: pass when inside withTransaction() for atomicity
 }): Promise<void> {
   const eventId = crypto.randomUUID();
   const {
     aggregateType, aggregateId, eventType, actor,
     authority, payload = {}, receipt, causationId, correlationId,
+    client,
   } = opts;
 
-  await q(
+  // ADR-016: Use the transactional client when provided, pool otherwise.
+  // Inside withTransaction(), the INSERT participates in the same TX as the
+  // caller's UPDATE — if the trigger rejects, both are rolled back atomically.
+  const queryFn = client
+    ? (sql: string, params: Record<string, any>) => _rawQuery(client, sql, params)
+    : q;
+
+  await queryFn(
     `INSERT INTO ${KERNEL_SCHEMA}.transition_event
        (event_id, event_type, aggregate_type, aggregate_id, actor,
         authority, payload, receipt, causation_id, correlation_id)
@@ -351,6 +368,9 @@ async function tRun(client: PoolClient, sql: string, params: Record<string, any>
 }
 async function tAll(client: PoolClient, sql: string, params: Record<string, any> = {}): Promise<any[]> {
   const r = await _rawQuery(client, sql, params); return r.rows;
+}
+async function tOne(client: PoolClient, sql: string, params: Record<string, any> = {}): Promise<any | undefined> {
+  const r = await _rawQuery(client, sql, params); return r.rows[0];
 }
 
 /** Transaction wrapper. */
@@ -3577,56 +3597,64 @@ export async function createTicketIfMissing(
 }
 
 export async function releaseSessionTickets(sessionId: string): Promise<number> {
-  const now = new Date().toISOString();
-  // ADR-016: Capture affected tickets before transition
-  const affected = await qAll(
-    `SELECT id FROM ${VISION_SCHEMA}.tickets WHERE session_id = @sessionId AND status = 'claimed'`,
-    { sessionId },
-  );
-  const count = await qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', session_id = NULL,
-      claimed_at = NULL, last_activity = @now
-    WHERE session_id = @sessionId AND status = 'claimed'`,
-    { sessionId, now }
-  );
-  // ADR-016: Record kernel transitions for each released ticket
-  for (const t of affected) {
-    await recordTransition({
-      aggregateType: "ticket",
-      aggregateId: t.id,
-      eventType: "transition.committed",
-      actor: "conduit-mcp",
-      authority: "system",
-      payload: { from_status: "claimed", to_status: "open", reason: "session_released", session_id: sessionId },
-    });
-  }
-  return count;
+  // ADR-016: Wrap UPDATE + recordTransition in single transaction for atomicity.
+  // If the trigger rejects a transition, the UPDATE is rolled back too.
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const affected = await tAll(
+      client,
+      `SELECT id FROM ${VISION_SCHEMA}.tickets WHERE session_id = @sessionId AND status = 'claimed'`,
+      { sessionId },
+    );
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', session_id = NULL,
+        claimed_at = NULL, last_activity = @now
+      WHERE session_id = @sessionId AND status = 'claimed'`,
+      { sessionId, now }
+    );
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.committed",
+        actor: "conduit-mcp",
+        authority: "system",
+        payload: { from_status: "claimed", to_status: "open", reason: "session_released", session_id: sessionId },
+      });
+    }
+    return count;
+  });
 }
 
 export async function resetAbandonedTickets(): Promise<number> {
-  const now = new Date().toISOString();
-  // ADR-016: Capture affected tickets before transition
-  const affected = await qAll(
-    `SELECT id FROM ${VISION_SCHEMA}.tickets WHERE status = 'abandoned'`,
-    {},
-  );
-  const count = await qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', closed_at = NULL, last_activity = @now
-    WHERE status = 'abandoned'`,
-    { now }
-  );
-  // ADR-016: Record kernel transitions for each reset ticket
-  for (const t of affected) {
-    await recordTransition({
-      aggregateType: "ticket",
-      aggregateId: t.id,
-      eventType: "transition.committed",
-      actor: "conduit-mcp",
-      authority: "system",
-      payload: { from_status: "abandoned", to_status: "open", reason: "abandoned_reset" },
-    });
-  }
-  return count;
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const affected = await tAll(
+      client,
+      `SELECT id FROM ${VISION_SCHEMA}.tickets WHERE status = 'abandoned'`,
+      {},
+    );
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', closed_at = NULL, last_activity = @now
+      WHERE status = 'abandoned'`,
+      { now }
+    );
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.committed",
+        actor: "conduit-mcp",
+        authority: "system",
+        payload: { from_status: "abandoned", to_status: "open", reason: "abandoned_reset" },
+      });
+    }
+    return count;
+  });
 }
 
 // ── Stale / expired detection ───────────────────────────────────────
@@ -3634,57 +3662,63 @@ export async function resetAbandonedTickets(): Promise<number> {
 const DEFAULT_STALE_SECONDS = 6 * 3600;
 
 export async function detectStaleTickets(): Promise<number> {
-  const threshold = new Date(Date.now() - DEFAULT_STALE_SECONDS * 1000).toISOString();
-  // ADR-016: Capture affected tickets before transition
-  const affected = await qAll(
-    `SELECT id FROM ${VISION_SCHEMA}.tickets
-    WHERE status = 'claimed' AND last_activity IS NOT NULL AND last_activity < @threshold`,
-    { threshold },
-  );
-  const count = await qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'stale'
-    WHERE status = 'claimed' AND last_activity IS NOT NULL AND last_activity < @threshold`,
-    { threshold }
-  );
-  // ADR-016: Record kernel transitions for each stale ticket
-  for (const t of affected) {
-    await recordTransition({
-      aggregateType: "ticket",
-      aggregateId: t.id,
-      eventType: "transition.requested",
-      actor: "conduit-mcp",
-      authority: "system",
-      payload: { from_status: "claimed", to_status: "stale", reason: "stale_detection" },
-    });
-  }
-  return count;
+  return withTransaction(async (client) => {
+    const threshold = new Date(Date.now() - DEFAULT_STALE_SECONDS * 1000).toISOString();
+    const affected = await tAll(
+      client,
+      `SELECT id FROM ${VISION_SCHEMA}.tickets
+      WHERE status = 'claimed' AND last_activity IS NOT NULL AND last_activity < @threshold`,
+      { threshold },
+    );
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'stale'
+      WHERE status = 'claimed' AND last_activity IS NOT NULL AND last_activity < @threshold`,
+      { threshold }
+    );
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.requested",
+        actor: "conduit-mcp",
+        authority: "system",
+        payload: { from_status: "claimed", to_status: "stale", reason: "stale_detection" },
+      });
+    }
+    return count;
+  });
 }
 
 export async function detectExpiredTickets(): Promise<number> {
-  const now = new Date().toISOString();
-  // ADR-016: Capture affected tickets before transition
-  const affected = await qAll(
-    `SELECT id, status FROM ${VISION_SCHEMA}.tickets
-    WHERE status IN ('open', 'claimed', 'stale') AND expires_at IS NOT NULL AND expires_at < @now`,
-    { now },
-  );
-  const count = await qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'expired'
-    WHERE status IN ('open', 'claimed', 'stale') AND expires_at IS NOT NULL AND expires_at < @now`,
-    { now }
-  );
-  // ADR-016: Record kernel transitions for each expired ticket
-  for (const t of affected) {
-    await recordTransition({
-      aggregateType: "ticket",
-      aggregateId: t.id,
-      eventType: "transition.rejected",
-      actor: "conduit-mcp",
-      authority: "system",
-      payload: { from_status: t.status, to_status: "expired", reason: "expiry_detection" },
-    });
-  }
-  return count;
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const affected = await tAll(
+      client,
+      `SELECT id, status FROM ${VISION_SCHEMA}.tickets
+      WHERE status IN ('open', 'claimed', 'stale') AND expires_at IS NOT NULL AND expires_at < @now`,
+      { now },
+    );
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'expired'
+      WHERE status IN ('open', 'claimed', 'stale') AND expires_at IS NOT NULL AND expires_at < @now`,
+      { now }
+    );
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.rejected",
+        actor: "conduit-mcp",
+        authority: "system",
+        payload: { from_status: t.status, to_status: "expired", reason: "expiry_detection" },
+      });
+    }
+    return count;
+  });
 }
 
 // ── Supersede / cancel ──────────────────────────────────────────────
@@ -3696,96 +3730,103 @@ export async function supersedeTicket(
   oldTicket?: { plan_id: string; role: string; objective: string | null; owner: string };
   replacementId?: string;
 }> {
-  const now = new Date().toISOString();
-  const old = await qOne(
-    `SELECT plan_id, role, objective, owner FROM ${VISION_SCHEMA}.tickets
-     WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
-    { ticketId }
-  );
-  if (!old) return { superseded: false };
-
-  const fromStatus = (await qOne(
-    `SELECT status FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
-    { ticketId },
-  ))?.status || "unknown";
-
-  await qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'superseded', closed_at = @now,
-      last_activity = @now, closure_reason = @reason
-    WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
-    { ticketId, now, reason }
-  );
-
-  // ADR-016: Record kernel transition for superseded ticket
-  await recordTransition({
-    aggregateType: "ticket",
-    aggregateId: ticketId,
-    eventType: "transition.rejected",
-    actor: "conduit-mcp",
-    authority: "builder",
-    payload: { from_status: fromStatus, to_status: "superseded", reason },
-  });
-
-  let replacementId: string | undefined;
-  if (replace) {
-    const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-    replacementId = `ticket-${old.plan_id}-${old.role}-${Date.now()}`;
-    await qRun(
-      `INSERT INTO ${VISION_SCHEMA}.tickets
-        (id, plan_id, role, status, created_at,
-         objective, owner,
-         spawn_reason, last_activity, expires_at, replacement_of)
-      VALUES (@id, @plan_id, @role, 'open', @created_at,
-              @objective, @owner,
-              @spawn_reason, @last_activity, @expires_at, @replacement_of)`,
-      {
-        id: replacementId, plan_id: old.plan_id, role: old.role,
-        created_at: now, objective: old.objective || "",
-        owner: old.owner || old.role, spawn_reason: "replacement after supersede",
-        last_activity: now, expires_at: expiresAt, replacement_of: ticketId,
-      }
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const old = await tOne(
+      client,
+      `SELECT plan_id, role, objective, owner FROM ${VISION_SCHEMA}.tickets
+       WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
+      { ticketId }
     );
-  }
+    if (!old) return { superseded: false };
 
-  return { superseded: true, oldTicket: old, replacementId };
-}
+    const fromStatus = (await tOne(
+      client,
+      `SELECT status FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
+      { ticketId },
+    ))?.status || "unknown";
 
-export async function cancelTicket(ticketId: string, reason: string): Promise<number> {
-  const now = new Date().toISOString();
+    await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'superseded', closed_at = @now,
+        last_activity = @now, closure_reason = @reason
+      WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
+      { ticketId, now, reason }
+    );
 
-  // Look up the plan_id so we can cascade to work_requests/sessions
-  const ticket = await qOne(
-    `SELECT plan_id, status FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
-    { ticketId }
-  );
-  const fromStatus = ticket?.status || "unknown";
-
-  const cancelled = await qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
-      last_activity = @now, closure_reason = @reason
-    WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
-    { ticketId, now, reason }
-  );
-
-  // ADR-016: Record kernel transition for cancelled ticket
-  if (cancelled > 0) {
     await recordTransition({
+      client,
       aggregateType: "ticket",
       aggregateId: ticketId,
       eventType: "transition.rejected",
       actor: "conduit-mcp",
       authority: "builder",
-      payload: { from_status: fromStatus, to_status: "cancelled", reason },
+      payload: { from_status: fromStatus, to_status: "superseded", reason },
     });
-  }
 
-  // Cascade: if we cancelled the ticket, clean up work_requests and
-  // sessions for the plan to prevent orphaned state.
-  if (cancelled > 0 && ticket) {
-    await _cancelWorkRequestsAndSessions(ticket.plan_id, now);
-  }
+    let replacementId: string | undefined;
+    if (replace) {
+      const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+      replacementId = `ticket-${old.plan_id}-${old.role}-${Date.now()}`;
+      await tRun(
+        client,
+        `INSERT INTO ${VISION_SCHEMA}.tickets
+          (id, plan_id, role, status, created_at,
+           objective, owner,
+           spawn_reason, last_activity, expires_at, replacement_of)
+        VALUES (@id, @plan_id, @role, 'open', @created_at,
+                @objective, @owner,
+                @spawn_reason, @last_activity, @expires_at, @replacement_of)`,
+        {
+          id: replacementId, plan_id: old.plan_id, role: old.role,
+          created_at: now, objective: old.objective || "",
+          owner: old.owner || old.role, spawn_reason: "replacement after supersede",
+          last_activity: now, expires_at: expiresAt, replacement_of: ticketId,
+        }
+      );
+    }
 
-  return cancelled;
+    return { superseded: true, oldTicket: old, replacementId };
+  });
+}
+
+export async function cancelTicket(ticketId: string, reason: string): Promise<number> {
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+
+    const ticket = await tOne(
+      client,
+      `SELECT plan_id, status FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
+      { ticketId }
+    );
+    const fromStatus = ticket?.status || "unknown";
+
+    const cancelled = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
+        last_activity = @now, closure_reason = @reason
+      WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
+      { ticketId, now, reason }
+    );
+
+    if (cancelled > 0) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: ticketId,
+        eventType: "transition.rejected",
+        actor: "conduit-mcp",
+        authority: "builder",
+        payload: { from_status: fromStatus, to_status: "cancelled", reason },
+      });
+    }
+
+    if (cancelled > 0 && ticket) {
+      await _cancelWorkRequestsAndSessions(ticket.plan_id, now, client);
+    }
+
+    return cancelled;
+  });
 }
 
 /**
@@ -3795,16 +3836,29 @@ export async function cancelTicket(ticketId: string, reason: string): Promise<nu
  * Work requests reference sessions via dco_json.metadata.session_id.
  * When tickets are cancelled, the corresponding work requests and
  * harness sessions become orphans unless explicitly cleaned up here.
+ *
+ * ADR-016: Accepts optional client to participate in caller's transaction.
  */
-async function _cancelWorkRequestsAndSessions(planId: string, now: string): Promise<void> {
-  // ADR-016: Capture affected work requests before transition
-  const affectedWRs = await qAll(
+async function _cancelWorkRequestsAndSessions(
+  planId: string, now: string, client?: PoolClient,
+): Promise<void> {
+  const queryFn = client
+    ? (sql: string, params: Record<string, any>) => _rawQuery(client, sql, params)
+    : q;
+  const runFn = client
+    ? (sql: string, params: Record<string, any>) => queryFn(sql, params).then(r => r.changes)
+    : qRun;
+  const allFn = client
+    ? (sql: string, params: Record<string, any>) => queryFn(sql, params).then(r => r.rows)
+    : qAll;
+
+  const affectedWRs = await allFn(
     `SELECT work_request_uuid, status FROM ${VISION_SCHEMA}.work_requests
      WHERE context->>'plan_id' = @planId AND status = 'pending'`,
     { planId },
   );
 
-  const wrCancelled = await qRun(
+  const wrCancelled = await runFn(
     `UPDATE ${VISION_SCHEMA}.work_requests SET status = 'cancelled', recorded_until_dt = NOW()
      WHERE context->>'plan_id' = @planId AND status = 'pending'`,
     { planId, now }
@@ -3813,9 +3867,9 @@ async function _cancelWorkRequestsAndSessions(planId: string, now: string): Prom
     console.log(
       `[${now}] cancelled ${wrCancelled} pending work_request(s) for plan ${planId}`,
     );
-    // ADR-016: Record kernel transitions for each cancelled work request
     for (const wr of affectedWRs) {
       await recordTransition({
+        client,
         aggregateType: "work_request",
         aggregateId: wr.work_request_uuid,
         eventType: "work_request.failed",
@@ -3826,8 +3880,7 @@ async function _cancelWorkRequestsAndSessions(planId: string, now: string): Prom
     }
   }
 
-  // Note: sessions stay in conduit — not being migrated
-  const sessionsClosed = await qRun(
+  const sessionsClosed = await runFn(
     `UPDATE ${PG_SCHEMA}.sessions SET is_running = 0, end_iso = @now
      WHERE is_running = 1 AND id IN (
        SELECT context->>'session_id'
@@ -3845,38 +3898,40 @@ async function _cancelWorkRequestsAndSessions(planId: string, now: string): Prom
 }
 
 export async function cancelTicketsByPlan(planId: string, reason: string): Promise<number> {
-  const now = new Date().toISOString();
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
 
-  // Cascade: cancel pending work_requests and close linked running sessions.
-  await _cancelWorkRequestsAndSessions(planId, now);
+    await _cancelWorkRequestsAndSessions(planId, now, client);
 
-  // ADR-016: Capture affected tickets before transition
-  const affected = await qAll(
-    `SELECT id, status FROM ${VISION_SCHEMA}.tickets
-    WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
-    { planId },
-  );
+    const affected = await tAll(
+      client,
+      `SELECT id, status FROM ${VISION_SCHEMA}.tickets
+      WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
+      { planId },
+    );
 
-  const count = await qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
-      last_activity = @now, closure_reason = @reason
-    WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
-    { planId, now, reason }
-  );
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
+        last_activity = @now, closure_reason = @reason
+      WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
+      { planId, now, reason }
+    );
 
-  // ADR-016: Record kernel transitions for each cancelled ticket
-  for (const t of affected) {
-    await recordTransition({
-      aggregateType: "ticket",
-      aggregateId: t.id,
-      eventType: "transition.rejected",
-      actor: "conduit-mcp",
-      authority: "builder",
-      payload: { from_status: t.status, to_status: "cancelled", reason, plan_id: planId },
-    });
-  }
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.rejected",
+        actor: "conduit-mcp",
+        authority: "builder",
+        payload: { from_status: t.status, to_status: "cancelled", reason, plan_id: planId },
+      });
+    }
 
-  return count;
+    return count;
+  });
 }
 
 // ── Work Request CRUD (vision schema) ───────────────────────────────
@@ -3991,73 +4046,76 @@ export async function appendEvent(
   eventType: string,
   payload: Record<string, unknown> = {},
 ): Promise<void> {
-  const uuid = await resolveWrUuid(wrId);
+  return withTransaction(async (client) => {
+    const uuid = await resolveWrUuid(wrId);
 
-  // ADR-016: Capture from_status BEFORE the transition
-  const currentRow = await qOne(
-    `SELECT status FROM ${VISION_SCHEMA}.work_requests WHERE work_request_uuid = @uuid`,
-    { uuid },
-  );
-  const fromStatus = currentRow?.status || "unknown";
+    const currentRow = await tOne(
+      client,
+      `SELECT status FROM ${VISION_SCHEMA}.work_requests WHERE work_request_uuid = @uuid`,
+      { uuid },
+    );
+    const fromStatus = currentRow?.status || "unknown";
 
-  const eventId = crypto.randomUUID();
-  await q(
-    `INSERT INTO ${PG_SCHEMA}.work_request_events
-       (event_id, work_request_id, event_type, payload, actor_type, actor_id)
-     VALUES (@eventId::uuid, @uuid::uuid, @eventType, @payload::jsonb, 'system', '')`,
-    { eventId, uuid, eventType, payload: JSON.stringify(payload) },
-  );
+    const eventId = crypto.randomUUID();
+    await tQuery(
+      client,
+      `INSERT INTO ${PG_SCHEMA}.work_request_events
+         (event_id, work_request_id, event_type, payload, actor_type, actor_id)
+       VALUES (@eventId::uuid, @uuid::uuid, @eventType, @payload::jsonb, 'system', '')`,
+      { eventId, uuid, eventType, payload: JSON.stringify(payload) },
+    );
 
-  const statusMap: Record<string, string> = {
-    WR_SUBMITTED: "validated",
-    WR_VALIDATED: "queued",
-    WR_QUEUED: "claimed",
-    WR_CLAIMED: "acked",
-    WR_ACKED: "settled",
-    WR_SETTLED: "settled",
-    WR_REJECTED: "rejected",
-    WR_FAILED: "failed",
-    WR_NOOP: "noop",
-    WR_DEFERRED: "deferred",
-    "WORKREQUEST.CREATED": "proposed",
-    "STATE.TRANSITION_COMMITTED": (payload.new_state as string)?.toLowerCase() || "pending",
-    "EXECUTION.STARTED": "implementing",
-    "EXECUTION.COMPLETED": "completed",
-    "EXECUTION.FAILED": "failed",
-  };
-  const newStatus = statusMap[eventType] || "pending";
-  await q(
-    `UPDATE ${VISION_SCHEMA}.work_requests SET status = @newStatus WHERE work_request_uuid = @uuid`,
-    { newStatus, uuid },
-  );
+    const statusMap: Record<string, string> = {
+      WR_SUBMITTED: "validated",
+      WR_VALIDATED: "queued",
+      WR_QUEUED: "claimed",
+      WR_CLAIMED: "acked",
+      WR_ACKED: "settled",
+      WR_SETTLED: "settled",
+      WR_REJECTED: "rejected",
+      WR_FAILED: "failed",
+      WR_NOOP: "noop",
+      WR_DEFERRED: "deferred",
+      "WORKREQUEST.CREATED": "proposed",
+      "STATE.TRANSITION_COMMITTED": (payload.new_state as string)?.toLowerCase() || "pending",
+      "EXECUTION.STARTED": "implementing",
+      "EXECUTION.COMPLETED": "completed",
+      "EXECUTION.FAILED": "failed",
+    };
+    const newStatus = statusMap[eventType] || "pending";
+    await tQuery(
+      client,
+      `UPDATE ${VISION_SCHEMA}.work_requests SET status = @newStatus WHERE work_request_uuid = @uuid`,
+      { newStatus, uuid },
+    );
 
-  // ADR-016: Record kernel transition — trigger enforces policy rules
-  // Map conduit event types to kernel.event_type enum values
-  const kernelEventTypeMap: Record<string, string> = {
-    WR_SUBMITTED: "work_request.created",
-    WR_VALIDATED: "work_request.dispatched",
-    WR_QUEUED: "transition.committed",
-    WR_CLAIMED: "work_request.dispatched",
-    WR_ACKED: "transition.committed",
-    WR_SETTLED: "work_request.completed",
-    WR_REJECTED: "work_request.failed",
-    WR_FAILED: "work_request.failed",
-    WR_NOOP: "transition.committed",
-    WR_DEFERRED: "transition.requested",
-    "WORKREQUEST.CREATED": "work_request.created",
-    "STATE.TRANSITION_COMMITTED": "transition.committed",
-    "EXECUTION.STARTED": "work_request.dispatched",
-    "EXECUTION.COMPLETED": "work_request.completed",
-    "EXECUTION.FAILED": "work_request.failed",
-  };
-  await recordTransition({
-    aggregateType: "work_request",
-    aggregateId: uuid,
-    eventType: kernelEventTypeMap[eventType] || "transition.committed",
-    actor: "conduit-mcp",
-    authority: "builder",
-    payload: { from_status: fromStatus, to_status: newStatus, conduit_event_type: eventType, event_id: eventId },
-    causationId: eventId,
+    const kernelEventTypeMap: Record<string, string> = {
+      WR_SUBMITTED: "work_request.created",
+      WR_VALIDATED: "work_request.dispatched",
+      WR_QUEUED: "transition.committed",
+      WR_CLAIMED: "work_request.dispatched",
+      WR_ACKED: "transition.committed",
+      WR_SETTLED: "work_request.completed",
+      WR_REJECTED: "work_request.failed",
+      WR_FAILED: "work_request.failed",
+      WR_NOOP: "transition.committed",
+      WR_DEFERRED: "transition.requested",
+      "WORKREQUEST.CREATED": "work_request.created",
+      "STATE.TRANSITION_COMMITTED": "transition.committed",
+      "EXECUTION.STARTED": "work_request.dispatched",
+      "EXECUTION.COMPLETED": "work_request.completed",
+      "EXECUTION.FAILED": "work_request.failed",
+    };
+    await recordTransition({
+      client,
+      aggregateType: "work_request",
+      aggregateId: uuid,
+      eventType: kernelEventTypeMap[eventType] || "transition.committed",
+      actor: "conduit-mcp",
+      authority: "builder",
+      payload: { from_status: fromStatus, to_status: newStatus, conduit_event_type: eventType, event_id: eventId },
+      causationId: eventId,
+    });
   });
 }
 
