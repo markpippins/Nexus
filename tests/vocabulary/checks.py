@@ -226,59 +226,9 @@ def run():
     else:
         check("Ticket status extraction", False, "Could not extract from one or both sources")
 
-    print("\n--- D-6: Absorb reducer vs canonical WRP adjacency matrix ---")
-    try:
-        absorb_src = read_file("python/absorb/html/conduit_wrp_reducer.py")
-        canonical_src = read_file("python/nexus_core/wrp/states.py")
-
-        # Extract absorb matrix: state -> set of target states
-        absorb_m = re.search(r"_WRP_ADJACENCY_MATRIX\s*:\s*dict\s*=\s*\{(.*?)\n\}", absorb_src, re.DOTALL)
-        # Extract canonical matrix: state -> set of target states
-        canonical_m = re.search(r"WRP_ADJACENCY_MATRIX\s*:\s*Dict\[str,\s*Set\[str\]\]\s*=\s*\{(.*?)\n\}", canonical_src, re.DOTALL)
-
-        if absorb_m and canonical_m:
-            # Parse absorb: state -> set of target states
-            absorb_states = {}
-            for line in absorb_m.group(1).split("\n"):
-                state_m = re.search(r'"(\w+)"\s*:\s*\{([^}]*)\}', line)
-                if state_m:
-                    targets = set(re.findall(r'"(\w+)"', state_m.group(2)))
-                    absorb_states[state_m.group(1)] = targets
-
-            # Parse canonical: state -> set of target states
-            ref_states = {}
-            for line in canonical_m.group(1).split("\n"):
-                state_m = re.search(r'"(\w+)"\s*:\s*\{([^}]*)\}', line)
-                if state_m:
-                    targets = set(re.findall(r'"(\w+)"', state_m.group(2)))
-                    ref_states[state_m.group(1)] = targets
-
-            if absorb_states and ref_states:
-                # Compare state sets
-                absorb_keys = set(absorb_states.keys())
-                ref_keys = set(ref_states.keys())
-                missing_in_absorb = ref_keys - absorb_keys
-                extra_in_absorb = absorb_keys - ref_keys
-                check("Absorb reducer has all canonical states",
-                      not missing_in_absorb,
-                      f"Missing from absorb: {sorted(missing_in_absorb)}" if missing_in_absorb else "")
-
-                # Compare transitions for shared states
-                mismatches = []
-                for state in sorted(absorb_keys & ref_keys):
-                    a = absorb_states[state]
-                    c = ref_states[state]
-                    if a != c:
-                        mismatches.append(f"{state}: absorb={sorted(a)} ref={sorted(c)}")
-                check("Absorb reducer transitions match canonical",
-                      not mismatches,
-                      "\n".join(mismatches) if mismatches else "")
-            else:
-                check("Matrix parsing", False, "Could not parse one or both matrices")
-        else:
-            check("Matrix extraction", False, f"absorb={'found' if absorb_m else 'missing'}, canonical={'found' if canonical_m else 'missing'}")
-    except FileNotFoundError:
-        check("D-6 absorb matrix", False, "absorb reducer or nexus_core not found")
+    # NOTE: D-6 absorb reducer check removed — absorb is deprecated, superseded by rover.
+    # The cross-language contract test (python/nexus_core/wrp/tests/test_cross_language_contract.py)
+    # now covers WRP adjacency matrix consistency across all canonical sources.
 
     print("\n--- C-3: _init_db schema reference ---")
     try:

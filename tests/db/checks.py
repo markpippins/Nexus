@@ -210,4 +210,46 @@ def run():
           result is not None and int(result) > 0,
           f"0 rows — cascade subscribers may not be running" if result == "0" else "")
 
+    print("\n--- C-1: execution.receipts CHECK includes CCNF_EXECUTION ---")
+    result = query("""
+        SELECT pg_get_constraintdef(con.oid)
+        FROM pg_constraint con
+        JOIN pg_class c ON con.conrelid = c.oid
+        JOIN pg_namespace n ON c.relnamespace = n.oid
+        WHERE n.nspname = 'execution'
+          AND c.relname = 'receipts'
+          AND con.contype = 'c'
+          AND pg_get_constraintdef(con.oid) LIKE '%type%';
+    """)
+    if result:
+        has_ccnf = 'CCNF_EXECUTION' in result
+        check("execution.receipts CHECK constraint includes CCNF_EXECUTION",
+              has_ccnf,
+              f"constraint found but CCNF_EXECUTION not in allowed values: {result[:200]}")
+    else:
+        check("execution.receipts CHECK constraint includes CCNF_EXECUTION",
+              False,
+              "no type CHECK constraint found on execution.receipts")
+
+    print("\n--- C-1: vision.receipts CHECK includes CCNF_EXECUTION ---")
+    result = query("""
+        SELECT pg_get_constraintdef(con.oid)
+        FROM pg_constraint con
+        JOIN pg_class c ON con.conrelid = c.oid
+        JOIN pg_namespace n ON c.relnamespace = n.oid
+        WHERE n.nspname = 'vision'
+          AND c.relname = 'receipts'
+          AND con.contype = 'c'
+          AND pg_get_constraintdef(con.oid) LIKE '%type%';
+    """)
+    if result:
+        has_ccnf = 'CCNF_EXECUTION' in result
+        check("vision.receipts CHECK constraint includes CCNF_EXECUTION",
+              has_ccnf,
+              f"constraint found but CCNF_EXECUTION not in allowed values: {result[:200]}")
+    else:
+        check("vision.receipts CHECK constraint includes CCNF_EXECUTION",
+              False,
+              "no type CHECK constraint found on vision.receipts")
+
     return passed, failed, skipped

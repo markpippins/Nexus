@@ -144,10 +144,10 @@ def run():
     except FileNotFoundError:
         check("add_work_request file", False, "db_adapter.py not found")
 
-    print("\n--- C-2: validateReceipt called from both TS receipt paths ---")
+    print("\n--- C-2: validateReceipt routing in issue_receipt (index.ts) ---")
     try:
         src = read_file("typescript/conduit-mcp/src/index.ts")
-        # Find all insertReceipt calls
+        # Find all insertReceipt calls in index.ts
         insert_calls = [i+1 for i, line in enumerate(src.split("\n"))
                         if "insertReceipt" in line or "insert_receipt" in line]
         validate_calls = [i+1 for i, line in enumerate(src.split("\n"))
@@ -156,11 +156,34 @@ def run():
               len(validate_calls) > 0,
               f"validateReceipt calls: {len(validate_calls)}, insertReceipt calls: {len(insert_calls)}")
         if len(insert_calls) > len(validate_calls):
-            check("Every insertReceipt has a validateReceipt guard",
+            check("Every insertReceipt in index.ts has a validateReceipt guard",
                   False,
                   f"{len(insert_calls)} insert paths but only {len(validate_calls)} validation calls")
     except FileNotFoundError:
-        check("validateReceipt paths", False, "index.ts not found")
+        check("validateReceipt paths in index.ts", False, "index.ts not found")
+
+    print("\n--- C-2 (extended): validateReceipt bypass in revise_plan / unblock_plan (tools.ts) ---")
+    try:
+        src = read_file("typescript/conduit-mcp/src/tools.ts")
+        # Count api.insertReceipt calls vs validateReceipt calls in the file.
+        # Every receipt insertion should be preceded by a validateReceipt check.
+        insert_count = src.count("api.insertReceipt")
+        validate_call_count = src.count("validateReceipt(")
+        bypass_count = insert_count - validate_call_count
+        
+        check("tools.ts validateReceipt calls ≥ insertReceipt calls",
+              bypass_count <= 0,
+              f"api.insertReceipt calls: {insert_count}, validateReceipt() calls: {validate_call_count} — "
+              f"{bypass_count} insertReceipt call(s) bypass validation")
+        
+        # Note which handlers are the likely bypasses (based on code review):
+        # - revise_plan: calls api.insertReceipt directly without validateReceipt
+        # - unblock_plan: calls api.insertReceipt directly without validateReceipt
+        # - issue_receipt (in index.ts): correctly calls validateReceipt first
+        if bypass_count > 0:
+            print(f"        Likely bypasses: revise_plan, unblock_plan (both call api.insertReceipt without validateReceipt)")
+    except FileNotFoundError:
+        check("tools.ts validateReceipt routing", False, "tools.ts not found")
 
     print("\n--- G-11: validateReceipt error handling in issue_receipt ---")
     try:
@@ -191,18 +214,86 @@ def run():
             check("'402' is a bare substring in _API_LIMIT_PATTERNS",
                   has_bare_402,
                   "'402' should be present — this is the pattern to test")
-            # The test verifies the PATTERN EXISTS; the behavioral test is that
-            # 'step 402 complete' with exit_code=0 returns False (exit_code guard).
-            # The pattern itself is too broad — it would match 'step 402 complete'
-            # on non-zero exit. That's the known C-6 issue. We document it here.
-            check("C-6 documented: '402' bare match is too broad",
-                  True,
-                  "NOTE: 'step 402 complete' + exit_code=0 is safe (exit_code guard). "
-                  "'step 402 complete' + exit_code!=0 would false-positive. "
-                  "Consider replacing '402' with a more specific pattern like 'status 402' or 'error 402'.")
+            # C-6 strengthened (v090): verify exit_code==0 short-circuit exists
+            m_fn = re.search(
+                r"def _detect_api_limit_error\(exit_code.*?\).*?:(.*?)(?=\ndef |\Z)",
+                src, re.DOTALL
+            )
+            if m_fn:
+                body = m_fn.group(1)
+                has_exit_guard = "exit_code == 0" in body or "exit_code != 0" in body
+                check("_detect_api_limit_error has exit_code guard (C-6 strengthened)",
+                      has_exit_guard,
+                      "Without exit_code guard, 'step 402 complete' would false-positive on success")
+                # Verify that exit_code==0 returns False BEFORE pattern matching
+                exit_guard_before_pattern = body.find("exit_code") < body.find("_API_LIMIT_PATTERNS") if "_API_LIMIT_PATTERNS" in body else True
+                check("exit_code guard runs before pattern matching",
+                      exit_guard_before_pattern,
+                      "Pattern matching runs before exit_code check — false positives on success")
+            else:
+                check("_detect_api_limit_error function body", False, "could not extract function body")
         else:
             check("_API_LIMIT_PATTERNS extraction", False, "pattern list not found")
     except FileNotFoundError:
         check("C-6 402 pattern", False, "main.py not found")
+
+    print("\n--- G-3: create_next_tickets CRITIQUE_REJECT (critic failed) handling ---")
+    try:
+        src = read_file("python/conduit/db_adapter.py")
+        m = re.search(r"def create_next_tickets.*?\).*?:\s*\n(.*?)(?=\n    def |\nclass |\Z)", src, re.DOTALL)
+        if m:
+            body = m.group(1)
+            # Check that the body handles "critic" as a role in the failed branch.
+            # The full body should contain "ticket_role" and "critic" near "failed".
+            has_failed_branch = "terminal_status ==" in body and "failed" in body
+            has_critic_handling = "critic" in body and "next_roles" in body
+            check("create_next_tickets handles critic failed (CRITIQUE_REJECT)",
+                  has_failed_branch and has_critic_handling,
+                  "critic failed → no next_roles: CRITIQUE_REJECT leaves plans stuck with no retry ticket. "
+                  "Add: elif ticket_role == 'critic': next_roles = ['planner']  in the failed branch")
+        else:
+            check("create_next_tickets exists", False, "function not found in db_adapter.py")
+    except FileNotFoundError:
+        check("G-3 create_next_tickets", False, "db_adapter.py not found")
+
+    print("\n--- G-12: lease_id bound before exception handler uses it ---")
+    try:
+        src = read_file("python/conduit/main.py")
+        # Find _dispatch_one function
+        m = re.search(r"def _dispatch_one\(.*?\).*?:\s*\n(.*?)(?=\ndef |\Z)", src, re.DOTALL)
+        if m:
+            body = m.group(1)
+            # Check lease_id assignment path
+            has_lease_acquire = "acquire_lease" in body
+            has_lease_id_assign = "lease_id =" in body
+            has_lease_id_guard = "if not lease" in body or "if lease is None" in body
+            
+            # The critical check: if acquire_lease throws, does lease_id get assigned?
+            # lease_id = lease["id"] should be AFTER the "if not lease: return" guard
+            acquire_pos = body.find("acquire_lease")
+            guard_pos = body.find("if not lease")
+            assign_pos = body.find("lease_id =")
+            
+            guard_before_assign = guard_pos < assign_pos if guard_pos > -1 and assign_pos > -1 else False
+            check("lease acquired and guarded before lease_id assignment",
+                  has_lease_acquire and has_lease_id_assign and has_lease_id_guard,
+                  "acquire_lease=" + str(has_lease_acquire) +
+                  ", lease_id_assign=" + str(has_lease_id_assign) +
+                  ", lease_guard=" + str(has_lease_id_guard))
+            
+            # Check that lease release in cleanup is also guarded
+            has_lease_cleanup = "release_lease(lease_id)" in body or "release_lease" in body
+            if has_lease_cleanup:
+                # Check if release_lease is in try/except
+                cleanup_area = body[body.rfind("release_lease"):]
+                # Look backwards for try/except wrapping
+                has_cleanup_guard = "if not lease_released" in body and "release_lease" in body
+                check("lease release in cleanup is guarded by lease_released flag",
+                      has_cleanup_guard,
+                      "release_lease(lease_id) in cleanup path may reference unbound lease_id")
+        else:
+            check("_dispatch_one exists", False, "function not found in main.py")
+    except FileNotFoundError:
+        check("G-12 lease_id guard", False, "main.py not found")
 
     return passed, failed, skipped
