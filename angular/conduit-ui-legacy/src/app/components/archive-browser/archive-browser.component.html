@@ -1,0 +1,103 @@
+<div class="archive-browser">
+  <div class="archive-header">
+    <h2 class="page-title">🔍 Archive Browser</h2>
+  </div>
+
+  <!-- Category tabs -->
+  <div class="tabs">
+    <button
+      *ngFor="let tab of tabs"
+      class="tab"
+      [ngClass]="{ active: activeTab() === tab.key }"
+      (click)="selectTab(tab.key)"
+    >
+      {{ tab.icon }} {{ tab.label }}
+      <span class="tab-count" *ngIf="activeTab() === tab.key && total() > 0">
+        ({{ total() }})
+      </span>
+    </button>
+  </div>
+
+  <!-- Search + date filters -->
+  <div class="filters">
+    <input
+      type="text"
+      class="search-input"
+      placeholder="Search archive..."
+      [ngModel]="searchQuery()"
+      (ngModelChange)="onSearch($event)"
+    />
+    <div class="date-presets">
+      <button
+        *ngFor="let p of [{v:'all',l:'All time'},{v:'24h',l:'24h'},{v:'7d',l:'7d'},{v:'30d',l:'30d'}]"
+        class="preset"
+        [ngClass]="{ active: datePreset() === p.v }"
+        (click)="setPreset(p.v)"
+      >
+        {{ p.l }}
+      </button>
+    </div>
+  </div>
+
+  <app-loading-spinner *ngIf="loading()" />
+  <app-error-banner *ngIf="error() as e" [message]="e" retryLabel="Retry" (retry)="loadArchive()" />
+
+  <ng-container *ngIf="!loading() && !error()">
+    <!-- Results -->
+    <div class="results-list">
+      <div
+        *ngFor="let entry of results()"
+        class="result-row"
+        [ngClass]="{ expanded: expandedEntry()?.path === entry.path }"
+        (click)="toggleEntry(entry)"
+      >
+        <div class="row-main">
+          <span class="row-icon">{{ getCategoryIcon(entry.category) }}</span>
+          <span class="row-name">{{ entry.planNumber ? entry.planNumber + ': ' : '' }}{{ entry.title || entry.fileName }}</span>
+          <span class="row-age">{{ getAge(entry.mtime) }}</span>
+        </div>
+
+        <!-- Expanded detail -->
+        <div class="row-detail" *ngIf="expandedEntry()?.path === entry.path">
+          <div class="detail-grid">
+            <div class="detail-field" *ngIf="entry.goal">
+              <span class="detail-label">Goal</span>
+              <span class="detail-value">{{ entry.goal }}</span>
+            </div>
+            <div class="detail-field" *ngIf="entry.filesAffected?.length">
+              <span class="detail-label">Files Affected</span>
+              <ul class="detail-list">
+                <li *ngFor="let f of entry.filesAffected"><code>{{ f }}</code></li>
+              </ul>
+            </div>
+            <div class="detail-field" *ngIf="entry.acceptanceCriteria">
+              <span class="detail-label">Acceptance Criteria</span>
+              <pre class="detail-pre">{{ entry.acceptanceCriteria }}</pre>
+            </div>
+            <div class="detail-field" *ngIf="entry.dependencies">
+              <span class="detail-label">Dependencies</span>
+              <span class="detail-value">{{ entry.dependencies }}</span>
+            </div>
+            <div class="detail-field" *ngIf="entry.sessionId">
+              <span class="detail-label">Session</span>
+              <span class="detail-value"><code>{{ entry.sessionId }}</code></span>
+            </div>
+            <div class="detail-field" *ngIf="entry.exitCode != null">
+              <span class="detail-label">Exit Code</span>
+              <span class="detail-value">{{ entry.exitCode }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <app-empty-state *ngIf="results().length === 0" icon="🔍" title="No archive entries found" description="Try adjusting your search or date filter." />
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" *ngIf="totalPages() > 1">
+      <button class="page-btn" [disabled]="page() <= 1" (click)="goToPage(page() - 1)">← Prev</button>
+      <span class="page-info">{{ page() }} / {{ totalPages() }}</span>
+      <button class="page-btn" [disabled]="page() >= totalPages()" (click)="goToPage(page() + 1)">Next →</button>
+    </div>
+  </ng-container>
+</div>
