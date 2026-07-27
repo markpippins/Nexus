@@ -1,6 +1,7 @@
 """FastAPI application — exposes vision schema tables as REST endpoints."""
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
@@ -25,6 +26,16 @@ from losm_ir.dag import (
 )
 
 app = FastAPI(title="vision-srv", version="0.1.0")
+
+# ── CORS ────────────────────────────────────────────────────────────────────
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ── Dependencies ────────────────────────────────────────────────────────────
