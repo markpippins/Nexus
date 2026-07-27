@@ -926,6 +926,11 @@ export function registerToolHandlers(
       });
 
       // Issue PLANNING receipt (no ticket_id — this is a revision, not a bootstrap)
+      // Validate receipt transition before inserting (C-2 fix)
+      const reviseValidation = await validateReceipt(revised.planNumber, "PLANNING");
+      if (!reviseValidation.valid) {
+        throw createError("INVALID_ARGUMENTS", `Cannot issue PLANNING receipt for revision: ${reviseValidation.error}`, null);
+      }
       const receiptId = crypto.randomUUID();
       await api.insertReceipt({
         id: receiptId,
@@ -1722,6 +1727,11 @@ export function registerToolHandlers(
         console.log(
           `[${now}] unblock_plan: bootstrapped builder ticket ${ticketId} for plan ${args.planNumber}`,
         );
+      }
+      // Validate receipt transition before inserting (C-2 fix)
+      const unblockValidation = await validateReceipt(args.planNumber, "PLAN_CREATE");
+      if (!unblockValidation.valid) {
+        throw createError("INVALID_ARGUMENTS", `Cannot issue PLAN_CREATE receipt for unblock: ${unblockValidation.error}`, null);
       }
       await api.insertReceipt({
         id: receiptId,

@@ -8,39 +8,16 @@ import { PipelineWatcher } from "./watcher";
 import { registerToolHandlers, toolDefinitions } from "./tools";
 import { createError, createSuccess } from "./errors";
 import {
-  getAllSessions,
-  getSession,
-  endSession,
-  updateSessionCost,
-  updateSessionHeartbeat,
-  tripBreaker,
-  clearBreaker,
-  setConduitPaused,
   getBreaker,
-  getDb,
   getPlanById,
   releaseSessionTickets,
   resetAbandonedTickets,
-  detectStaleTickets,
-  detectExpiredTickets,
   supersedeTicket,
   cancelTicket,
-  getTokenUsageByPlan,
-  getTokenUsageByRole,
-  getTokenUsageByTicket,
-  getTicketLineage,
   requestSchedulerWake,
-  startSession,
-  updateSessionPid,
-  replayGovernanceEvents,
-  listGovernanceEvents,
   createWorkRequest,
-  getWorkRequest,
-  listWorkRequests,
-  listReceiptsByPlan,
   appendEvent,
   getEvents,
-  getAllEvents,
   selectNextRunnable,
   listWorkRequestStates,
   checkProjectionDrift,
@@ -53,14 +30,9 @@ import {
   foldEvents,
   decide,
   validateTransition,
-  createDraftState,
-  getDecisionPriority,
   dbEventsToRuntimeEvents,
-  CompilerOutput,
   WorkRequestState,
-  RuntimeEvent,
 } from "./runtime-kernel";
-import http from "node:http";
 import { loadEnv } from "./env"; // shared .env loader (no dotenv dependency)
 import { validateReceipt } from "./receipts";
 
@@ -280,47 +252,9 @@ app.get("/health", async (_req, res) => {
   });
 });
 
-// Workflow status endpoint — backed by sessions (Temporal removed).
-// Returns active sessions formatted the same way the UI expects.
-app.get("/workflows", async (req, res) => {
-  try {
-    const sessions = await getAllSessions();
-    const active = sessions.filter((s: any) => s.is_running === 1 || s.is_running === true);
-    const workflows = active.map((s: any) => {
-      let planId = "";
-      try {
-        const plans = JSON.parse(s.plans_processed || "[]");
-        if (Array.isArray(plans) && plans.length > 0) planId = plans[0];
-      } catch {}
-      return {
-        workflowId: planId ? `plan-${planId}-${s.agent_role}` : s.id,
-        runId: s.id,
-        status: "running",
-        startTime: s.start_iso || s.created_at || null,
-        closeTime: s.end_iso || null,
-        planId,
-        role: s.agent_role,
-        pid: s.pid ?? null,
-      };
-    });
-    const counts = { running: workflows.length, completed: 0, failed: 0, cancelled: 0, total: workflows.length };
-    res.json({ connected: true, counts, workflows });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Ticket lifecycle detection (v080 — dedicated endpoint, separate from health)
-app.post("/tickets/detect", async (_req, res) => {
-  const stale = await detectStaleTickets();
-  const expired = await detectExpiredTickets();
-  res.json({
-    detected: true,
-    stale,
-    expired,
-    timestamp: new Date().toISOString(),
-  });
-});
+// ── Routes below extracted to conduit-srv (port 3104) per Architect decision ──
+// Removed: GET /workflows, POST /tickets/detect → conduit-srv
+// Kept: Sessions, agents/kill, circuit-breaker, conduit pause/resume (Phase 2)
 
 // Sessions endpoint (v066 — database-backed session history)
 // Sessions now own their workflow metadata natively (workflow_id, run_id, etc.)
@@ -845,304 +779,10 @@ app.post("/tickets/:ticketId/cancel", async (req, res) => {
   }
 });
 
-// ── v080: Token usage reporting ────────────────────────────────────
-app.get("/tokens/plan/:planId", async (req, res) => {
-  const { planId } = req.params;
-  if (!/^[a-zA-Z0-9_-]+$/.test(planId)) {
-    res.status(400).json({ error: "Invalid plan ID" });
-    return;
-  }
-  res.json(await getTokenUsageByPlan(planId));
-});
-app.get("/tokens/role/:role", async (req, res) => {
-  const { role } = req.params;
-  if (!["builder", "reviewer", "planner", "critic"].includes(role)) {
-    res.status(400).json({ error: `Invalid role: ${role}` });
-    return;
-  }
-  res.json(await getTokenUsageByRole(role));
-});
-app.get("/tokens/ticket/:ticketId", async (req, res) => {
-  const { ticketId } = req.params;
-  if (!/^[a-zA-Z0-9_-]+$/.test(ticketId)) {
-    res.status(400).json({ error: "Invalid ticket ID" });
-    return;
-  }
-  res.json(await getTokenUsageByTicket(ticketId));
-});
-
-// ── v081: Ticket lineage (audit trail) ─────────────────────────────
-app.get("/tickets/lineage/:planId", async (req, res) => {
-  const { planId } = req.params;
-  if (!/^[a-zA-Z0-9_-]+$/.test(planId)) {
-    res.status(400).json({ error: "Invalid plan ID" });
-    return;
-  }
-  res.json({
-    plan_id: planId,
-    tickets: await getTicketLineage(planId),
-  });
-});
-
-// ── Cron schedule configuration ────────────────────────────────────
-// Exposes the pipeline-manager's cron interval so the UI can
-// display an accurate countdown to the next scheduled execution.
-// The interval is read from the PIPELINE_CRON env var (default */3).
-
-const PIPELINE_CRON = process.env.PIPELINE_CRON || "*/3";
-
-app.get("/config/cron", async (_req, res) => {
-  // Parse the interval from cron expression (only */N supported for now)
-  const match = PIPELINE_CRON.match(/^\*\/(\d+)$/);
-  const intervalMinutes = match ? parseInt(match[1], 10) : 3;
-
-  res.json({
-    cron: PIPELINE_CRON,
-    intervalMinutes,
-    description: `Every ${intervalMinutes} minute${intervalMinutes === 1 ? '' : 's'}`,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// ── v105: Failure Recovery Configuration ──────────────────────────
-
-// Get failure recovery config (from circuit_breaker row)
-app.get("/config/failure-recovery", async (_req, res) => {
-  try {
-    const breaker = await api.getBreaker();
-    res.json({
-      max_retries_per_model: breaker.max_retries_per_model ?? 3,
-      retry_delay_seconds: breaker.retry_delay_seconds ?? 120,
-      max_fallbacks: breaker.max_fallbacks ?? 3,
-      push_back_to_pending: breaker.push_back_to_pending === 1 || breaker.push_back_to_pending === null,
-      circuit_breaker_retry_after: breaker.retry_after ?? 1800,
-    });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Save failure recovery config
-app.post("/config/failure-recovery", async (req, res) => {
-  try {
-    const {
-      max_retries_per_model,
-      retry_delay_seconds,
-      max_fallbacks,
-      push_back_to_pending,
-      circuit_breaker_retry_after,
-    } = req.body || {};
-
-    const now = new Date().toISOString();
-    await api.saveFailureRecoveryConfig({
-      max_retries_per_model,
-      retry_delay_seconds,
-      max_fallbacks,
-      push_back_to_pending,
-      circuit_breaker_retry_after,
-    });
-
-    console.log(`[${now}] FAILURE RECOVERY config updated`);
-    res.json({ saved: true });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── AI Configuration Registry removed — owned by tackle-mcp (:3400) ──
-
-// (All /config/ai/* endpoints deleted. Use tackle-mcp for AI config.)
-
-// ── Agent chat removed — now handled by operator_svc (port 3018) ──
-// Chat endpoints (POST /chat/send, GET /chat/config, GET /chat/sessions)
-// were removed from conduit-mcp. The UI connects directly to operator_svc.
-
-// Session log SSE endpoint (v071 — streaming live builder output)
-app.get("/log/:sessionId", async (req, res) => {
-  const { sessionId } = req.params;
-
-  // Sanitize sessionId — prevent path traversal
-  if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
-    res.status(400).json({ error: "Invalid session ID" });
-    return;
-  }
-
-  const sessionsDir = path.join(PIPELINE_DIR, "sessions");
-  const logPath = path.join(sessionsDir, `${sessionId}.log`);
-
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "Access-Control-Allow-Origin": "*",
-  });
-
-  let lastSize = 0;
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
-  let resolved = false;
-
-  const sendLines = () => {
-    try {
-      if (!fs.existsSync(logPath)) return;
-      const stats = fs.statSync(logPath);
-      if (stats.size <= lastSize) return;
-
-      const fd = fs.openSync(logPath, "r");
-      const buf = Buffer.alloc(stats.size - lastSize);
-      fs.readSync(fd, buf, 0, buf.length, lastSize);
-      fs.closeSync(fd);
-      lastSize = stats.size;
-
-      const newContent = buf.toString("utf-8");
-      const lines = newContent.split("\n");
-      for (const line of lines) {
-        if (line.length === 0) continue;
-        // Detect stderr lines from executor_cloud.py's [stderr] prefix
-        const isStderr = line.startsWith("[stderr] ") || line.startsWith("[stderr]");
-        const logType = isStderr ? "stderr" : "stdout";
-        const event = JSON.stringify({
-          type: "session_log",
-          data: {
-            sessionId,
-            line,
-            timestamp: new Date().toISOString(),
-            logType,
-          },
-        });
-        res.write(`data: ${event}\n\n`);
-      }
-    } catch {
-      // file may disappear — stop polling
-    }
-  };
-
-  // Send meta event so the UI knows whether a log file exists
-  const logExists = fs.existsSync(logPath);
-  res.write(
-    `data: ${JSON.stringify({
-      type: "session_log_meta",
-      data: { sessionId, logFileExists: logExists, logPath },
-    })}\n\n`,
-  );
-
-  // Send any existing content immediately (only if file exists)
-  if (logExists) {
-    sendLines();
-  }
-
-  // Poll for new content every 500ms (only if file exists)
-  if (logExists) {
-    pollTimer = setInterval(() => {
-      if (resolved) return;
-      sendLines();
-    }, 500);
-  }
-
-  // Keep-alive ping every 15 seconds
-  const keepAlive = setInterval(() => {
-    if (resolved) return;
-    res.write(`: keepalive\n\n`);
-  }, 15000);
-
-  req.on("close", () => {
-    resolved = true;
-    if (pollTimer) clearInterval(pollTimer);
-    clearInterval(keepAlive);
-  });
-});
-
-// ── Governance Events ───────────────────────────────────────────────
-// Observability spine: replay historical receipts into peb.governance_events
-// and list events for debugging/monitoring.
-
-app.post("/governance/replay", async (_req, res) => {
-  try {
-    const result = await replayGovernanceEvents();
-    res.json({ ok: true, ...result });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.get("/governance/events", async (req, res) => {
-  try {
-    const events = await listGovernanceEvents({
-      planId: req.query.planId as string | undefined,
-      eventType: req.query.eventType as string | undefined,
-      asOf: req.query.asOf as string | undefined,
-      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
-    });
-    res.json({ ok: true, events });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-// ── Vision HTTP API (for the Python vision_bridge module) ──────────
-// These endpoints are consumed by the LOSM bridge
-// (python/tackle/vision_bridge.py) which is the canonical typed writer.
-
-app.post("/vision/work-requests", async (req, res) => {
-  try {
-    const { id, work_request_uuid, dco_json, context, status } = req.body;
-    if (!id) {
-      res.status(400).json({ ok: false, error: "Missing required field: id" });
-      return;
-    }
-    const result = await createWorkRequest({
-      id,
-      work_request_uuid: work_request_uuid || undefined,
-      dco_json: dco_json || "{}",
-      context: context || {},
-      status: status || "pending",
-      title: req.body.title || "",
-    });
-    res.json({ ...result });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.get("/vision/work-requests", async (req, res) => {
-  try {
-    const wrs = await listWorkRequests({
-      planId: req.query.planId as string | undefined,
-      status: req.query.status as string | undefined,
-      limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 50,
-    });
-    res.json({ ok: true, work_requests: wrs });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.get("/vision/work-requests/:id", async (req, res) => {
-  try {
-    const wr = await getWorkRequest(req.params.id);
-    if (!wr) {
-      res.status(404).json({ ok: false, error: "Not found" });
-      return;
-    }
-    res.json({ ok: true, work_request: wr });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
-
-app.get("/vision/receipts", async (req, res) => {
-  try {
-    const planId = req.query.planId as string;
-    const asOf = req.query.asOf as string | undefined;
-    if (!planId) {
-      res.status(400).json({ ok: false, error: "Missing required query: planId" });
-      return;
-    }
-    const receipts = await listReceiptsByPlan(planId, asOf);
-    res.json({ ok: true, receipts });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
-});
+// ── Routes below extracted to conduit-srv (port 3104) per Architect decision ──
+// Removed: /tokens/*, /tickets/lineage, /config/*, /log/:sessionId, /governance/*,
+//          /vision/work-requests (POST+GET+GET:id), GET /vision/receipts → conduit-srv
+// Kept: POST /vision/receipts (validateReceipt dependency), /wr/* (runtime-kernel dependency)
 
 /**
  * POST /vision/receipts — issue_receipt: validate and insert a receipt.

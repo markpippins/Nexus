@@ -4,9 +4,10 @@ import { getLatestReceiptType } from "./conduit-client";
 // v019: added CCNF_EXECUTION — sub-event within implementation phase
 const ALLOWED: Record<string, string[]> = {
   // Anything can be created, or start from a requirement idea:
-  "": ["PLAN_CREATE", "BLOCK"],
+  // PLANNING is for revise_plan (fresh revision plans start with PLANNING receipt):
+  "": ["PLAN_CREATE", "BLOCK", "PLANNING"],
   // After creation, builder can implement, hold, or route to critique:
-  PLAN_CREATE: ["IMPLEMENTATION", "BLOCK", "CRITIQUE", "HOLD"],
+  PLAN_CREATE: ["IMPLEMENTATION", "BLOCK", "CRITIQUE", "HOLD", "PLAN_CREATE"],
   // After implementation, reviewer can pass, reject, or hold:
   // CCNF_EXECUTION is a sub-event that records CCNF conformance runs
   IMPLEMENTATION: ["REVIEW_PASS", "REVIEW_REJECT", "REVIEW", "HOLD", "CCNF_EXECUTION"],
