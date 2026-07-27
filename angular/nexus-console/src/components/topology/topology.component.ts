@@ -164,30 +164,30 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
               <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Third-Party Dependencies</h3>
               <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
                 <table class="w-full text-left border-collapse">
-                  <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase">
+                  <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                     <tr>
-                      <th class="p-3 font-semibold">Name</th>
-                      <th class="p-3 font-semibold">Port</th>
-                      <th class="p-3 font-semibold">Transport</th>
-                      <th class="p-3 font-semibold">Status</th>
-                      <th class="p-3 font-semibold">Health Check</th>
+                      <th class="px-3 py-1.5 font-semibold">Name</th>
+                      <th class="px-3 py-1.5 font-semibold">Port</th>
+                      <th class="px-3 py-1.5 font-semibold">Transport</th>
+                      <th class="px-3 py-1.5 font-semibold">Status</th>
+                      <th class="px-3 py-1.5 font-semibold">Health Check</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (mcp of s.mcpServers; track mcp.id) {
                       @let eff = getEffectiveStatus(mcp);
                       @let probed = isLiveProbed(mcp);
-                      <tr class="border-t border-[rgb(var(--color-border-muted))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                      <tr class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100"
                         [class.opacity-50]="!mcp.activeFlag">
-                        <td class="p-3 text-sm">
+                        <td class="px-3 py-1 text-[13px]">
                           <span class="font-medium text-[rgb(var(--color-text-base))]">{{ mcp.name }}</span>
                           @if (mcp.version) {
                             <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ mcp.version }}</span>
                           }
                         </td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono">{{ mcp.port || '—' }}</td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))]">{{ mcp.transportType || '—' }}</td>
-                        <td class="p-3">
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ mcp.port || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ mcp.transportType || '—' }}</td>
+                        <td class="px-3 py-1">
                           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
                             [class.bg-green-500/10]="eff === 'ON'"
                             [class.text-green-600]="eff === 'ON'"
@@ -211,7 +211,7 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
                             <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ mcp.status }}</span>
                           }
                         </td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ mcp.healthCheckUrl || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ mcp.healthCheckUrl || '—' }}</td>
                       </tr>
                     }
                   </tbody>
@@ -230,30 +230,30 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
               <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Internal Services</h3>
               <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
                 <table class="w-full text-left border-collapse">
-                  <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase">
+                  <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                     <tr>
-                      <th class="p-3 font-semibold">Name</th>
-                      <th class="p-3 font-semibold">Port</th>
-                      <th class="p-3 font-semibold">Workspace</th>
-                      <th class="p-3 font-semibold">Status</th>
-                      <th class="p-3 font-semibold">Health Check</th>
+                      <th class="px-3 py-1.5 font-semibold">Name</th>
+                      <th class="px-3 py-1.5 font-semibold">Port</th>
+                      <th class="px-3 py-1.5 font-semibold">Workspace</th>
+                      <th class="px-3 py-1.5 font-semibold">Status</th>
+                      <th class="px-3 py-1.5 font-semibold">Health Check</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (svc of s.runnableServices; track svc.id) {
                       @let eff = getEffectiveStatus(svc);
                       @let probed = isLiveProbed(svc);
-                      <tr class="border-t border-[rgb(var(--color-border-muted))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                      <tr class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100"
                         [class.opacity-50]="!svc.activeFlag">
-                        <td class="p-3 text-sm">
+                        <td class="px-3 py-1 text-[13px]">
                           <span class="font-medium text-[rgb(var(--color-text-base))]">{{ svc.name }}</span>
                           @if (svc.version) {
                             <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ svc.version }}</span>
                           }
                         </td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono">{{ svc.port || '—' }}</td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ svc.workspacePath || '—' }}</td>
-                        <td class="p-3">
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ svc.port || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ svc.workspacePath || '—' }}</td>
+                        <td class="px-3 py-1">
                           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
                             [class.bg-green-500/10]="eff === 'ON'"
                             [class.text-green-600]="eff === 'ON'"
@@ -277,7 +277,7 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
                             <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ svc.status }}</span>
                           }
                         </td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ svc.healthCheckUrl || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ svc.healthCheckUrl || '—' }}</td>
                       </tr>
                     }
                   </tbody>
@@ -296,22 +296,22 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
               <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Host Servers</h3>
               <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
                 <table class="w-full text-left border-collapse">
-                  <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase">
+                  <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                     <tr>
-                      <th class="p-3 font-semibold">Hostname</th>
-                      <th class="p-3 font-semibold">IP Address</th>
-                      <th class="p-3 font-semibold">OS</th>
-                      <th class="p-3 font-semibold">Status</th>
+                      <th class="px-3 py-1.5 font-semibold">Hostname</th>
+                      <th class="px-3 py-1.5 font-semibold">IP Address</th>
+                      <th class="px-3 py-1.5 font-semibold">OS</th>
+                      <th class="px-3 py-1.5 font-semibold">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (server of s.servers; track server.id) {
-                      <tr class="border-t border-[rgb(var(--color-border-muted))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                      <tr class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100"
                         [class.opacity-50]="!server.activeFlag">
-                        <td class="p-3 text-sm font-medium text-[rgb(var(--color-text-base))]">{{ server.hostname }}</td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))] font-mono">{{ server.ipAddress || '—' }}</td>
-                        <td class="p-3 text-sm text-[rgb(var(--color-text-muted))]">{{ server.os || '—' }}</td>
-                        <td class="p-3">
+                        <td class="px-3 py-1 text-[13px] font-medium text-[rgb(var(--color-text-base))]">{{ server.hostname }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ server.ipAddress || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ server.os || '—' }}</td>
+                        <td class="px-3 py-1">
                           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
                             [class.bg-green-500/10]="server.status === 'ONLINE'"
                             [class.text-green-600]="server.status === 'ONLINE'"

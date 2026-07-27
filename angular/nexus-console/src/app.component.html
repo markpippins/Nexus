@@ -334,6 +334,20 @@
           (resetCamera)="onResetCamera()"
           (clearGraph)="onClearGraph()"
           (graphSubViewChange)="onGraphSubViewChange($event)"
+          (meshSwitchToConsole)="onMeshViewModeChange('console')"
+          (meshSwitchToGraph)="onMeshViewModeChange('graph')"
+          (meshRefresh)="onRefreshServices()"
+          (meshDeploy)="onMeshToolbarAction('deploy')"
+          (meshStart)="onMeshToolbarAction('start')"
+          (meshStop)="onMeshToolbarAction('stop')"
+          (meshRestart)="onMeshToolbarAction('restart')"
+          (meshLogs)="onMeshToolbarAction('logs')"
+          (meshGithub)="onMeshToolbarAction('github')"
+          (meshJenkins)="onMeshToolbarAction('jenkins')"
+          (meshDocker)="onMeshToolbarAction('docker')"
+          (meshSwarm)="onMeshToolbarAction('swarm')"
+          (meshK8s)="onMeshToolbarAction('k8s')"
+          [meshHasSelection]="meshHasSelection()"
         >
         </app-toolbar>
         }
@@ -443,6 +457,7 @@
                       [graphSubView]="graphSubView()"
                       [paletteCollapsed]="paletteCollapsed()"
                       [(showRunningOnly)]="showRunningOnly"
+                      [toolbarAction]="meshToolbarAction()"
                       (viewModeChange)="onMeshViewModeChange($event)"
                       (graphSubViewChange)="onGraphSubViewChange($event)"
                       (refreshServices)="onRefreshServices()"

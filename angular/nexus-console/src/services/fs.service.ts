@@ -65,11 +65,17 @@ export class FsService {
   }
 
   hasFile(brokerUrl: string, token: string, path: string[], filename: string): Promise<boolean> {
-    return this.brokerService.submitRequest<boolean>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'hasFile', { path, filename, token });
+    // Backend returns { exists: boolean, path, type } — read the actual field
+    // rather than trusting the truthy Map object (a non-null object is always
+    // truthy, which previously made every folder appear magnetized).
+    return this.brokerService.submitRequest<{ exists: boolean }>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'hasFile', { path, filename, token })
+      .then(res => res?.exists === true);
   }
 
   hasFolder(brokerUrl: string, token: string, path: string[], folderName: string): Promise<boolean> {
-    return this.brokerService.submitRequest<boolean>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'hasFolder', { path, folderName, token });
+    // Backend returns { exists: boolean, path, type } — read the actual field.
+    return this.brokerService.submitRequest<{ exists: boolean }>(this.constructBrokerUrl(brokerUrl), SERVICE_NAME, 'hasFolder', { path, folderName, token })
+      .then(res => res?.exists === true);
   }
 
   move(brokerUrl: string, token: string, sourcePath: string[], destPath: string[], items: ItemReference[]): Promise<void> {

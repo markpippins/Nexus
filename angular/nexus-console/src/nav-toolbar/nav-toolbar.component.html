@@ -2,24 +2,29 @@
   <!-- Nexus Orb at the top of the toolbar -->
   <app-orb class="orb-wrapper"></app-orb>
   <div class="nav-toolbar-divider"></div>
-  @for (item of navItems; track item.key) {
-    <button
-      class="nav-toolbar-btn"
-      [class.active]="viewMode() === item.key"
-      [title]="item.title"
-      (click)="viewModeChange.emit(item.key)"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="nav-toolbar-icon"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        stroke-width="1.5"
+
+  @for (item of navItems; track $index) {
+    @if (item.type === 'separator') {
+      <div class="nav-toolbar-separator"></div>
+    } @else {
+      <button
+        class="nav-toolbar-btn"
+        [class.active]="viewMode() === item.key"
+        [title]="item.title"
+        (click)="viewModeChange.emit(item.key)"
       >
-        <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.iconPath" />
-      </svg>
-    </button>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="nav-toolbar-icon"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.iconPath" />
+        </svg>
+      </button>
+    }
   }
 
   <!-- Spacer pushes theme toggle to the bottom -->

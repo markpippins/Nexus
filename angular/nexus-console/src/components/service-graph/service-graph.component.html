@@ -147,7 +147,67 @@
         <button (click)="clearCanvas()" class="danger">Clear</button>
       </div>
 
+      <!-- Search & Highlight -->
+      <div class="search-box">
+        <input
+          type="text"
+          [ngModel]="searchTerm()"
+          (ngModelChange)="onSearchInput($event)"
+          placeholder="Search nodes..."
+          class="search-input"
+        />
+        @if (searchTerm()) {
+        <button (click)="clearSearch()" class="search-clear" title="Clear search">✕</button>
+        }
+      </div>
+
+      <!-- Layout Presets -->
+      <div class="layout-presets">
+        <button (click)="onApplyLayout('radial')" title="Radial layout" class="icon-btn">◎</button>
+        <button (click)="onApplyLayout('grid')" title="Grid layout" class="icon-btn">▦</button>
+        <button (click)="onApplyLayout('hierarchical')" title="Hierarchical layout" class="icon-btn">☰</button>
+        <button (click)="onApplyLayout('force')" title="Force-directed layout" class="icon-btn">✦</button>
+      </div>
+
+      <!-- Undo/Redo -->
+      <div class="undo-redo">
+        <button (click)="onUndo()" [disabled]="!canUndo()" title="Undo (Ctrl+Z)" class="icon-btn">↶</button>
+        <button (click)="onRedo()" [disabled]="!canRedo()" title="Redo (Ctrl+Y)" class="icon-btn">↷</button>
+      </div>
+
       <div class="toolbar-separator"></div>
+
+      <!-- Edge Labels Toggle -->
+      <button (click)="onToggleEdgeLabels()" [class.active]="edgeLabelsVisible()" title="Toggle edge labels (dependency type)" class="icon-btn">🏷</button>
+
+      <!-- Health Pulse Toggle -->
+      <button (click)="onToggleHealthPulse()" [class.active]="healthPulseEnabled()" title="Toggle live health pulse" class="icon-btn">❤</button>
+
+      <!-- Minimap Toggle -->
+      <button (click)="showMinimap.set(!showMinimap())" [class.active]="showMinimap()" title="Toggle mini-map" class="icon-btn">🗺</button>
+
+      <!-- Auto-Detect Systems -->
+      <button (click)="onAutoDetectSystems()" title="Auto-detect tightly-connected clusters" class="icon-btn">
+        <span style="font-size: 14px;">⊕</span>
+      </button>
+
+      <!-- Diff Mode -->
+      @if (!diffModeActive()) {
+      <button (click)="onCaptureDiffBaseline()" title="Capture diff baseline" class="icon-btn">≅</button>
+      } @else {
+      <button (click)="onClearDiffMode()" title="Clear diff mode" class="icon-btn active">≅</button>
+      }
+
+      <!-- Export -->
+      <div class="export-menu">
+        <button (click)="showExportMenu.set(!showExportMenu())" title="Export" class="icon-btn">⤓</button>
+        @if (showExportMenu()) {
+        <div class="export-dropdown">
+          <button (click)="onExportPNG()">📸 PNG Screenshot</button>
+          <button (click)="onExportJSON()">📄 JSON Topology</button>
+        </div>
+        }
+      </div>
 
       <button
         (click)="showDeleteConfirm.set(true)"
@@ -193,8 +253,48 @@
         </div>
       </div>
 
+      <!-- Add Registered Service — only when no node is targeted -->
+      @if (!contextMenu().targetNodeId) {
+      <button (click)="onAddRegisteredService()" class="menu-item-add-service">
+        <span class="add-service-icon">⊕</span>
+        Add Registered Service...
+      </button>
+      }
+
+      <!-- Escape — shown when in drill-down mode (right-click anywhere) -->
+      @if (vizService.isDrilledDown()) {
+      <button (click)="onEscapeDrillDown()" class="menu-item-escape">
+        <span class="escape-icon">⤫</span>
+        Escape
+      </button>
+      }
+
       <div class="menu-separator"></div>
-      <button disabled>Edit...</button>
+
+      <!-- Collapse — shown when target is a System (has children) and NOT already collapsed -->
+      @if (targetHasChildren() && !targetIsCollapsed()) {
+      <button (click)="onCollapseSystem()" class="menu-item-collapse">
+        <span class="collapse-icon">⤵</span>
+        Collapse
+      </button>
+      }
+
+      <!-- Explode — shown when target is a System and IS currently collapsed -->
+      @if (targetIsCollapsed()) {
+      <button (click)="onExplodeSystem()" class="menu-item-explode">
+        <span class="explode-icon">✸</span>
+        Explode
+      </button>
+      }
+
+      <button
+        (click)="onEditComponent()"
+        [disabled]="!contextMenu().targetNodeId"
+        class="menu-item-edit"
+      >
+        <span class="edit-icon">✏️</span>
+        Edit...
+      </button>
       <button
         (click)="onContextAction('delete')"
         [disabled]="!contextMenu().targetNodeId"
@@ -211,6 +311,74 @@
       (close)="closeLoadDialog()"
       (viewSelected)="onSelectLoadView($event)"
     ></app-load-view-dialog>
+
+    <!-- Add Registered Service Dialog -->
+    <app-add-service-dialog
+      [isOpen]="showAddServiceDialog()"
+      [existingNodeIds]="existingNodeIds()"
+      (close)="showAddServiceDialog.set(false)"
+      (serviceSelected)="onServiceSelected($event)"
+    ></app-add-service-dialog>
+
+    <!-- Mini-map -->
+    <app-minimap [isOpen]="showMinimap()"></app-minimap>
+
+    <!-- Drag-to-Connect Direction Popup -->
+    @if (showConnDirectionPopup()) {
+    <div class="conn-direction-popup-overlay" (click)="cancelDragConnection()">
+      <div
+        class="conn-direction-popup"
+        [style.left.px]="connPopupPos().x"
+        [style.top.px]="connPopupPos().y"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="conn-popup-label">Connection Direction</div>
+        <div class="conn-popup-buttons">
+          <button (click)="confirmDragConnection('bidirectional')" class="conn-dir-btn conn-dir-bidir active" title="Bidirectional (default)">
+            ↔
+          </button>
+          <button (click)="confirmDragConnection('out')" class="conn-dir-btn conn-dir-out" title="Outbound (→)">
+            →
+          </button>
+          <button (click)="confirmDragConnection('in')" class="conn-dir-btn conn-dir-in" title="Inbound (←)">
+            ←
+          </button>
+        </div>
+        <div class="conn-popup-hint">↔ Bidirectional (default) · auto-apply in 4s</div>
+      </div>
+    </div>
+    }
+
+    <!-- Auto-Detect Systems Popup -->
+    @if (showAutoDetectPopup()) {
+    <div class="dialog-overlay" (click)="showAutoDetectPopup.set(false)">
+      <div class="dialog-panel" (click)="$event.stopPropagation()">
+        <div class="dialog-header">
+          <h3>Auto-Detected Clusters</h3>
+          <button (click)="showAutoDetectPopup.set(false)" class="dialog-close">✕</button>
+        </div>
+        <div class="dialog-body">
+          <p class="hint">{{ detectedSystems().length }} tightly-connected cluster(s) detected via strongly connected components analysis.</p>
+          @for (cluster of detectedSystems(); track $index) {
+          <div class="detected-cluster">
+            <div class="cluster-info">
+              <strong>Cluster {{ $index + 1 }}</strong>
+              <span class="cluster-count">{{ cluster.length }} nodes</span>
+            </div>
+            <div class="cluster-members">
+              @for (memberId of cluster; track memberId) {
+              <span class="cluster-member">{{ vizService.getNode(memberId)?.label ?? memberId }}</span>
+              }
+            </div>
+            <button (click)="onCollapseDetected(cluster)" class="cluster-collapse-btn">
+              ⤵ Collapse
+            </button>
+          </div>
+          }
+        </div>
+      </div>
+    </div>
+    }
 
     <!-- Delete Confirmation Dialog -->
     @if (showDeleteConfirm()) {

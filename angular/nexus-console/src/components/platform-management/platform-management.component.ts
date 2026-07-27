@@ -35,7 +35,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
         <!-- Content -->
 
         <!-- Content -->
-        <div class="flex-1 overflow-auto p-4">
+        <div class="flex-1 overflow-auto">
             @if (loading()) {
                 <div class="flex justify-center items-center h-32">
                     <span class="material-icons animate-spin text-2xl text-[rgb(var(--color-text-muted))]">refresh</span>
@@ -51,9 +51,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             <!-- Services List -->
                             <div class="overflow-x-auto flex-1">
                                 <table class="w-full text-left border-collapse">
-                                    <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+                                    <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                                         <tr>
-                                            <th (click)="onSort('name')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('name')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Name
                                                     @if (sortState().column === 'name') {
@@ -61,7 +61,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th (click)="onSort('type')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('type')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Type
                                                     @if (sortState().column === 'type') {
@@ -69,7 +69,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th (click)="onSort('framework')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('framework')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Framework
                                                     @if (sortState().column === 'framework') {
@@ -77,7 +77,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th (click)="onSort('status')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('status')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Status
                                                     @if (sortState().column === 'status') {
@@ -85,7 +85,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th class="p-2 font-semibold text-right">Actions</th>
+                                            <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -94,12 +94,12 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 tabindex="0"
                                                 (dblclick)="onEdit(service)"
                                                 (keydown.enter)="onEdit(service)"
-                                                class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]"
+                                                class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]"
                                                 [class.border-dashed]="service.status === 'PLANNED'"
                                                 [class.border-blue-400]="service.status === 'PLANNED'"
                                                 [class.opacity-50]="service.status === 'DEPRECATED' || service.status === 'ARCHIVED'"
                                             >
-                                                <td class="p-2 py-1.5" [class.text-[rgb(var(--color-text-base))]]="service.status === 'ACTIVE'" [class.text-[rgb(var(--color-text-muted))]]="service.status !== 'ACTIVE'" [class.line-through]="service.status === 'DEPRECATED'">
+                                                <td class="px-3 py-1 text-[13px]" [class.text-[rgb(var(--color-text-base))]]="service.status === 'ACTIVE'" [class.text-[rgb(var(--color-text-muted))]]="service.status !== 'ACTIVE'" [class.line-through]="service.status === 'DEPRECATED'">
                                                     @if (service.parentServiceId) {
                                                         <span class="inline-flex items-center gap-1">
                                                             <span class="text-[rgb(var(--color-text-muted))] text-xs">└─</span>
@@ -110,27 +110,27 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                         {{ service.name }}
                                                     }
                                                 </td>
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ service.type?.name }}</td>
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ service.framework?.name }}</td>
-                                                <td class="p-2 py-1.5">
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ service.type?.name }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ service.framework?.name }}</td>
+                                                <td class="px-3 py-1 text-[13px]">
                                                     <span [class]="'px-2 py-0.5 rounded-full text-xs font-medium ' + getServiceStatusClass(service.status)">
                                                         {{ service.status }}
                                                     </span>
                                                 </td>
-                                                <td class="p-2 py-1.5 text-right">
-                                                    <button (click)="onEdit(service)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
-                                                    <button (click)="onDelete(service)" class="text-red-500 hover:underline text-xs">Delete</button>
+                                                <td class="px-3 py-1 text-[13px] text-right">
+                                                    <button (click)="onEdit(service)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                                                    <button (click)="onDelete(service)" class="text-red-500 hover:underline text-[11px]">Delete</button>
                                                 </td>
                                             </tr>
                                         } @empty {
                                             <tr>
-                                                <td colspan="5" class="p-8 text-center text-[rgb(var(--color-text-muted))]">No services found.</td>
+                                                <td colspan="5" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No services found.</td>
                                             </tr>
                                         }                                </tbody>
                             </table>
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                     <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
@@ -191,9 +191,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                     @case ('libraries') {
                         <div class="overflow-x-auto flex-1">
                             <table class="w-full text-left border-collapse">
-                                <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+                                <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                                     <tr>
-                                        <th (click)="onSort('name')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('name')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Name
                                                 @if (sortState().column === 'name') {
@@ -201,7 +201,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('category')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('category')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Category
                                                 @if (sortState().column === 'category') {
@@ -209,7 +209,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('language')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('language')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Language
                                                 @if (sortState().column === 'language') {
@@ -217,7 +217,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('package')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('package')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Package
                                                 @if (sortState().column === 'package') {
@@ -225,7 +225,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('version')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('version')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Version
                                                 @if (sortState().column === 'version') {
@@ -233,32 +233,32 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th class="p-2 font-semibold text-right">Actions</th>
+                                        <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @for (lib of libraries(); track lib.id) {
-                                        <tr tabindex="0" (dblclick)="onEdit(lib)" (keydown.enter)="onEdit(lib)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))]">{{ lib.name }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ lib.category?.name || '-' }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ lib.language?.name || '-' }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ lib.packageName || '-' }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ lib.currentVersion || '-' }}</td>
-                                            <td class="p-2 py-1.5 text-right">
-                                                <button (click)="onEdit(lib)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
-                                                <button (click)="onDelete(lib)" class="text-red-500 hover:underline text-xs">Delete</button>
+                                        <tr tabindex="0" (dblclick)="onEdit(lib)" (keydown.enter)="onEdit(lib)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">{{ lib.name }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ lib.category?.name || '-' }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ lib.language?.name || '-' }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ lib.packageName || '-' }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ lib.currentVersion || '-' }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-right">
+                                                <button (click)="onEdit(lib)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                                                <button (click)="onDelete(lib)" class="text-red-500 hover:underline text-[11px]">Delete</button>
                                             </td>
                                         </tr>
                                     } @empty {
                                         <tr>
-                                            <td colspan="6" class="p-8 text-center text-[rgb(var(--color-text-muted))]">No libraries found.</td>
+                                            <td colspan="6" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No libraries found.</td>
                                         </tr>
                                     }
                                 </tbody>
                             </table>
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                     <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
@@ -318,9 +318,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                     @case ('frameworks') {
                          <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
-                                <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+                                <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                                     <tr>
-                                        <th (click)="onSort('name')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('name')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Name
                                                 @if (sortState().column === 'name') {
@@ -328,7 +328,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('category')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('category')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Category
                                                 @if (sortState().column === 'category') {
@@ -336,7 +336,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('language')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('language')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Language
                                                 @if (sortState().column === 'language') {
@@ -344,7 +344,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('version')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('version')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Version
                                                 @if (sortState().column === 'version') {
@@ -352,31 +352,31 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th class="p-2 font-semibold text-right">Actions</th>
+                                        <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @for (fw of frameworks(); track fw.id) {
-                                        <tr tabindex="0" (dblclick)="onEdit(fw)" (keydown.enter)="onEdit(fw)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))]">{{ fw.name }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ fw.category?.name }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ fw.language?.name }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ fw.currentVersion || fw.latestVersion || '-' }}</td>
-                                            <td class="p-2 py-1.5 text-right">
-                                                <button (click)="onEdit(fw)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
-                                                <button (click)="onDelete(fw)" class="text-red-500 hover:underline text-xs">Delete</button>
+                                        <tr tabindex="0" (dblclick)="onEdit(fw)" (keydown.enter)="onEdit(fw)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">{{ fw.name }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ fw.category?.name }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ fw.language?.name }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ fw.currentVersion || fw.latestVersion || '-' }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-right">
+                                                <button (click)="onEdit(fw)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                                                <button (click)="onDelete(fw)" class="text-red-500 hover:underline text-[11px]">Delete</button>
                                             </td>
                                         </tr>
                                     } @empty {
                                         <tr>
-                                            <td colspan="5" class="p-8 text-center text-[rgb(var(--color-text-muted))]">No frameworks found.</td>
+                                            <td colspan="5" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No frameworks found.</td>
                                         </tr>
                                     }
                                 </tbody>
                             </table>
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                     <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
@@ -436,9 +436,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                     @case ('deployments') {
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
-                                <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+                                <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                                     <tr>
-                                        <th (click)="onSort('service')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('service')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Service
                                                 @if (sortState().column === 'service') {
@@ -446,7 +446,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('environment')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('environment')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Environment
                                                 @if (sortState().column === 'environment') {
@@ -454,7 +454,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('server')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('server')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Server
                                                 @if (sortState().column === 'server') {
@@ -462,7 +462,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('status')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('status')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Status
                                                 @if (sortState().column === 'status') {
@@ -470,7 +470,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th (click)="onSort('version')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                        <th (click)="onSort('version')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                             <div class="flex items-center">
                                                 Version
                                                 @if (sortState().column === 'version') {
@@ -478,13 +478,13 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 }
                                             </div>
                                         </th>
-                                        <th class="p-2 font-semibold text-right">Actions</th>
+                                        <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @for (d of deployments(); track d.id) {
-                                        <tr tabindex="0" (dblclick)="onEdit(d)" (keydown.enter)="onEdit(d)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))]">
+                                        <tr tabindex="0" (dblclick)="onEdit(d)" (keydown.enter)="onEdit(d)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">
                                                 @if (d.service?.parentServiceId) {
                                                     <span class="inline-flex items-center gap-1">
                                                         <span class="text-[rgb(var(--color-text-muted))] text-xs">└─</span>
@@ -495,29 +495,29 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     {{ d.service?.name }}
                                                 }
                                             </td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.environment }}</td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.server?.hostname }}</td>
-                                            <td class="p-2 py-1.5">
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.environment }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.server?.hostname }}</td>
+                                            <td class="px-3 py-1 text-[13px]">
                                                  <span [class]="'px-2 py-0.5 rounded-full text-xs font-medium ' + getStatusClass(d.status)">
                                                     {{ d.status }}
                                                 </span>
                                             </td>
-                                            <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ d.version }}</td>
-                                            <td class="p-2 py-1.5 text-right">
-                                                <button (click)="onEdit(d)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
-                                                <button (click)="onDelete(d)" class="text-red-500 hover:underline text-xs">Delete</button>
+                                            <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.version }}</td>
+                                            <td class="px-3 py-1 text-[13px] text-right">
+                                                <button (click)="onEdit(d)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                                                <button (click)="onDelete(d)" class="text-red-500 hover:underline text-[11px]">Delete</button>
                                             </td>
                                         </tr>
                                     } @empty {
                                         <tr>
-                                            <td colspan="6" class="p-8 text-center text-[rgb(var(--color-text-muted))]">No deployments found.</td>
+                                            <td colspan="6" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">No deployments found.</td>
                                         </tr>
                                     }
                                 </tbody>
                             </table>
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                     <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
@@ -579,9 +579,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             <!-- Hosts / Servers List -->
                             <div class="overflow-x-auto flex-1">
                                 <table class="w-full text-left border-collapse">
-                                    <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+                                    <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                                         <tr>
-                                            <th (click)="onSort('hostname')" class="p-2 font-semibold w-1/4 cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('hostname')" class="px-3 py-1.5 font-semibold w-1/4 cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Hostname
                                                     @if (sortState().column === 'hostname') {
@@ -589,7 +589,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th (click)="onSort('ipAddress')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('ipAddress')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     IP Address
                                                     @if (sortState().column === 'ipAddress') {
@@ -597,7 +597,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th (click)="onSort('serverTypeId')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('serverTypeId')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Type
                                                     @if (sortState().column === 'serverTypeId') {
@@ -605,7 +605,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th class="p-2 font-semibold text-right">Actions</th>
+                                            <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -614,19 +614,19 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 tabindex="0"
                                                 (dblclick)="onEdit(h)"
                                                 (keydown.enter)="onEdit(h)"
-                                                class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]"
+                                                class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]"
                                             >
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))] font-medium">{{ h.hostname }}</td>
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.ipAddress || '-' }}</td>
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ h.serverTypeId || '-' }}</td>
-                                                <td class="p-2 py-1.5 text-right whitespace-nowrap">
-                                                    <button (click)="onEdit(h)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
-                                                    <button (click)="onDelete(h)" class="text-red-500 hover:underline text-xs">Delete</button>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))] font-medium">{{ h.hostname }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ h.ipAddress || '-' }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ h.serverTypeId || '-' }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-right whitespace-nowrap">
+                                                    <button (click)="onEdit(h)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                                                    <button (click)="onDelete(h)" class="text-red-500 hover:underline text-[11px]">Delete</button>
                                                 </td>
                                             </tr>
                                         } @empty {
                                             <tr>
-                                                <td colspan="4" class="p-8 text-center text-[rgb(var(--color-text-muted))]">
+                                                <td colspan="4" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">
                                                     No hosts found.
                                                 </td>
                                             </tr>
@@ -635,7 +635,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             </table>
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
-                                <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                     <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
@@ -729,9 +729,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                         <div class="flex flex-col h-full">
                             <div class="overflow-x-auto flex-1">
                                 <table class="w-full text-left border-collapse">
-                                    <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+                                    <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
                                         <tr>
-                                            <th (click)="onSort('name')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('name')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Name
                                                     @if (sortState().column === 'name') {
@@ -739,7 +739,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th (click)="onSort('type')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('type')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Type
                                                     @if (sortState().column === 'type') {
@@ -747,7 +747,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th (click)="onSort('description')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+                                            <th (click)="onSort('description')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                                                 <div class="flex items-center">
                                                     Description
                                                     @if (sortState().column === 'description') {
@@ -755,7 +755,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     }
                                                 </div>
                                             </th>
-                                            <th class="p-2 font-semibold text-right">Actions</th>
+                                            <th class="px-3 py-1.5 font-semibold text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -764,19 +764,19 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 tabindex="0"
                                                 (dblclick)="onEdit(s)"
                                                 (keydown.enter)="onEdit(s)"
-                                                class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]"
+                                                class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]"
                                             >
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))] font-medium">{{ s.name }}</td>
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ s.type || '-' }}</td>
-                                                <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))] text-sm max-w-md truncate">{{ s.description || '-' }}</td>
-                                                <td class="p-2 py-1.5 text-right whitespace-nowrap">
-                                                    <button (click)="onEdit(s)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
-                                                    <button (click)="onDelete(s)" class="text-red-500 hover:underline text-xs">Delete</button>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))] font-medium">{{ s.name }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ s.type || '-' }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] max-w-md truncate">{{ s.description || '-' }}</td>
+                                                <td class="px-3 py-1 text-[13px] text-right whitespace-nowrap">
+                                                    <button (click)="onEdit(s)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                                                    <button (click)="onDelete(s)" class="text-red-500 hover:underline text-[11px]">Delete</button>
                                                 </td>
                                             </tr>
                                         } @empty {
                                             <tr>
-                                                <td colspan="4" class="p-8 text-center text-[rgb(var(--color-text-muted))]">
+                                                <td colspan="4" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">
                                                     No systems found.
                                                 </td>
                                             </tr>
@@ -785,7 +785,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                 </table>
                                 <!-- Pagination -->
                                 @if (totalPages() > 1 || totalItems() > 0) {
-                                    <div class="flex items-center justify-between px-2 py-2.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
+                                    <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]">
                                         <div class="text-xs text-[rgb(var(--color-text-muted))]">
                                             {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                         </div>
@@ -843,7 +843,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                         </div>
                     }
                     @default {
-                        <div class="p-8 text-center text-[rgb(var(--color-text-muted))]">
+                        <div class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">
                             Management UI for {{ managementType() }} coming soon.
                         </div>
                     }

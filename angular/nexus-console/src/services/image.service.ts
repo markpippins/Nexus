@@ -16,7 +16,7 @@ export class ImageService {
   ) { }
 
   getIconUrl(item: FileSystemNode, customImageName?: string | null): string | null {
-    if (item.type !== 'folder' && item.type !== 'registry-server') {
+    if (item.type !== 'folder' && item.type !== 'registry-server' && item.type !== 'symlink') {
       return null;
     }
 
@@ -51,6 +51,10 @@ export class ImageService {
 
     if (item.type === 'registry-server') {
       folderName = 'registry-server';
+    } else if (item.type === 'symlink') {
+      // Symlinks always request the dedicated "symlink" image from the image
+      // server, regardless of the link's own name.
+      folderName = 'symlink';
     } else if (customImageName) {
       folderName = customImageName;
     } else {

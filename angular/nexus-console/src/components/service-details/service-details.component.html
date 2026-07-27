@@ -14,36 +14,6 @@
     <div class="service-type">Type: {{ service()?.type.name }}</div>
   </div>
 
-  <!-- Service Actions -->
-  <div class="service-actions">
-    <button
-      mat-raised-button
-      color="primary"
-      (click)="onStartService()"
-      [disabled]="isAllDeploymentsRunning()"
-    >
-      <mat-icon>play_arrow</mat-icon>
-      Start
-    </button>
-    <button
-      mat-raised-button
-      color="warn"
-      (click)="onStopService()"
-      [disabled]="isAllDeploymentsStopped()"
-    >
-      <mat-icon>stop</mat-icon>
-      Stop
-    </button>
-    <button mat-raised-button color="accent" (click)="onRestartService()">
-      <mat-icon>refresh</mat-icon>
-      Restart
-    </button>
-    <button mat-raised-button (click)="onViewLogs()">
-      <mat-icon>description</mat-icon>
-      Logs
-    </button>
-  </div>
-
   <!-- Basic Info -->
   <div class="info-section">
     <h3>Basic Information</h3>

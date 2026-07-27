@@ -10,24 +10,24 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
     imports: [CommonModule, ReactiveFormsModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-    <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" *ngIf="isOpen()" (window:keydown.escape)="onCancel()">
-       <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-xl rounded-lg w-full max-w-2xl flex flex-col max-h-[90vh]">
-          <div class="p-4 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
-            <h2 class="text-lg font-semibold text-[rgb(var(--color-text-base))]">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" *ngIf="isOpen()" (window:keydown.escape)="onCancel()">
+       <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-2xl rounded-xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
+            <h2 class="text-base font-semibold text-[rgb(var(--color-text-prominent))]">
               {{ deployment() ? 'Edit' : 'Add' }} Deployment
             </h2>
-            <button (click)="onCancel()" class="text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))]">
+            <button (click)="onCancel()" class="p-1 rounded-md text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors">
               <span class="material-icons">close</span>
             </button>
           </div>
           
-          <div class="p-6 overflow-y-auto flex-1">
-             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+          <div class="px-5 py-4 overflow-y-auto flex-1">
+             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-3.5">
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Service -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Service *</label>
-                        <select formControlName="serviceId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Service *</label>
+                        <select formControlName="serviceId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Service</option>
                             <option *ngFor="let s of standaloneServices()" [value]="s.id">{{ s.name }}</option>
                         </select>
@@ -35,9 +35,9 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
                      </div>
 
                      <!-- Server -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Server *</label>
-                        <select formControlName="serverId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Server *</label>
+                        <select formControlName="serverId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Server</option>
                             <option *ngFor="let s of servers()" [value]="s.id">{{ s.hostname }}</option>
                         </select>
@@ -46,18 +46,18 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
 
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Environment -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Environment *</label>
-                        <select formControlName="environmentId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Environment *</label>
+                        <select formControlName="environmentId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Environment</option>
                             <option *ngFor="let e of environments()" [value]="e.id">{{ e.name }}</option>
                         </select>
                      </div>
 
                       <!-- Status -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Status</label>
-                        <select formControlName="status" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Status</label>
+                        <select formControlName="status" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option value="STOPPED">STOPPED</option>
                             <option value="RUNNING">RUNNING</option>
                             <option value="STARTING">STARTING</option>
@@ -69,35 +69,35 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
 
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Version -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Version</label>
-                        <input type="text" formControlName="version" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="v1.0.0">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Version</label>
+                        <input type="text" formControlName="version" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="v1.0.0">
                      </div>
 
                      <!-- Port -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Port</label>
-                        <input type="number" formControlName="port" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="8081">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Port</label>
+                        <input type="number" formControlName="port" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="8081">
                      </div>
                  </div>
 
                  <!-- Context API Path -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Context Path</label>
-                    <input type="text" formControlName="contextPath" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="/api/v1">
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Context Path</label>
+                    <input type="text" formControlName="contextPath" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="/api/v1">
                  </div>
 
                  <!-- Health Check URL -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Health Check URL</label>
-                    <input type="text" formControlName="healthCheckUrl" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="http://host:port/health">
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Health Check URL</label>
+                    <input type="text" formControlName="healthCheckUrl" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="http://host:port/health">
                  </div>
              </form>
           </div>
 
-          <div class="p-4 border-t border-[rgb(var(--color-border-base))] flex justify-end gap-3 bg-[rgb(var(--color-surface-sidebar))] rounded-b-lg">
-             <button type="button" (click)="onCancel()" class="px-4 py-2 rounded text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]">Cancel</button>
-             <button type="button" (click)="onSubmit()" [disabled]="form.invalid || isSaving()" class="px-4 py-2 rounded bg-[rgb(var(--color-accent-ring))] text-white hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2">
+          <div class="px-5 py-3.5 border-t border-[rgb(var(--color-border-base))] flex justify-end gap-2.5 bg-[rgb(var(--color-surface-muted))]">
+             <button type="button" (click)="onCancel()" class="px-3.5 py-1.5 text-sm font-medium rounded-md text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))] transition-colors">Cancel</button>
+             <button type="button" (click)="onSubmit()" [disabled]="form.invalid || isSaving()" class="px-4 py-1.5 text-sm font-semibold rounded-md bg-[rgb(var(--color-accent-ring))] text-white hover:bg-[rgb(var(--color-accent-ring))]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors">
                 <span *ngIf="isSaving()" class="material-icons text-sm animate-spin">refresh</span>
                 Save
              </button>

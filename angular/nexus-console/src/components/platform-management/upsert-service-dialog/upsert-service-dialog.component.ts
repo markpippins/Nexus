@@ -11,46 +11,46 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
     imports: [CommonModule, ReactiveFormsModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-    <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" *ngIf="isOpen()" (window:keydown.escape)="onCancel()">
-       <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-xl rounded-lg w-full max-w-2xl flex flex-col max-h-[90vh]">
-          <div class="p-4 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
-            <h2 class="text-lg font-semibold text-[rgb(var(--color-text-base))]">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" *ngIf="isOpen()" (window:keydown.escape)="onCancel()">
+       <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-2xl rounded-xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
+            <h2 class="text-base font-semibold text-[rgb(var(--color-text-prominent))]">
               {{ service() ? 'Edit' : 'Add' }} Service
             </h2>
-            <button (click)="onCancel()" class="text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))]">
+            <button (click)="onCancel()" class="p-1 rounded-md text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors">
               <span class="material-icons">close</span>
             </button>
           </div>
           
-          <div class="p-6 overflow-y-auto flex-1">
-             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+          <div class="px-5 py-4 overflow-y-auto flex-1">
+             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-3.5">
                  <!-- Name -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Name *</label>
-                    <input type="text" formControlName="name" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="service-name">
-                    <span class="text-xs text-red-500" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">Name is required</span>
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Name *</label>
+                    <input type="text" formControlName="name" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="service-name">
+                    <span class="text-xs text-red-400" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">Name is required</span>
                  </div>
 
                  <!-- Description -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Description</label>
-                    <textarea formControlName="description" rows="3" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="Service description"></textarea>
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
+                    <textarea formControlName="description" rows="3" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="Service description"></textarea>
                  </div>
 
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Framework -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Framework *</label>
-                        <select formControlName="frameworkId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Framework *</label>
+                        <select formControlName="frameworkId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Framework</option>
                             <option *ngFor="let f of frameworks()" [value]="f.id">{{ f.name }}</option>
                         </select>
                      </div>
 
                      <!-- Service Type -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Service Type *</label>
-                         <select formControlName="serviceTypeId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Service Type *</label>
+                         <select formControlName="serviceTypeId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Type</option>
                             <option *ngFor="let t of serviceTypes()" [value]="t.id">{{ t.name }}</option>
                         </select>
@@ -58,9 +58,9 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
                  </div>
 
                  <!-- Parent Service (for sub-modules) -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Parent Service (Optional)</label>
-                    <select formControlName="parentServiceId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Parent Service (Optional)</label>
+                    <select formControlName="parentServiceId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                         <option [value]="null">-- Standalone Service --</option>
                         <option *ngFor="let p of parentServices()" [value]="p.id">{{ p.name }}</option>
                     </select>
@@ -68,9 +68,9 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
                  </div>
 
                  <!-- Visual Override -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Visual Style Override</label>
-                    <select formControlName="componentOverrideId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Visual Style Override</label>
+                    <select formControlName="componentOverrideId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                         <option [value]="null">-- Default (Use Service Type) --</option>
                         <option *ngFor="let comp of registry.allComponents()" [value]="comp.id">
                             {{ comp.name }} ({{ comp.geometry }})
@@ -80,15 +80,15 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
 
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Default Port -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Default Port</label>
-                        <input type="number" formControlName="defaultPort" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="8081">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Default Port</label>
+                        <input type="number" formControlName="defaultPort" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="8081">
                      </div>
 
                      <!-- Status -->
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Status</label>
-                        <select formControlName="status" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Status</label>
+                        <select formControlName="status" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option value="ACTIVE">Active</option>
                             <option value="DEPRECATED">Deprecated</option>
                             <option value="ARCHIVED">Archived</option>
@@ -98,21 +98,21 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
                  </div>
 
                  <!-- API Base Path -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">API Base Path</label>
-                    <input type="text" formControlName="apiBasePath" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="/api/v1/resource">
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">API Base Path</label>
+                    <input type="text" formControlName="apiBasePath" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="/api/v1/resource">
                  </div>
 
                  <!-- Repository URL -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Repository URL</label>
-                    <input type="text" formControlName="repositoryUrl" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="https://github.com/...">
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Repository URL</label>
+                    <input type="text" formControlName="repositoryUrl" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="https://github.com/...">
                  </div>
 
                  <!-- System -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">System</label>
-                    <select formControlName="systemId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">System</label>
+                    <select formControlName="systemId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                         <option [value]="null">-- No System --</option>
                         @for (sys of systems(); track sys.id) {
                             <option [value]="sys.name">{{ sys.name }}</option>
@@ -123,9 +123,9 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
              </form>
           </div>
 
-          <div class="p-4 border-t border-[rgb(var(--color-border-base))] flex justify-end gap-3 bg-[rgb(var(--color-surface-sidebar))] rounded-b-lg">
-             <button type="button" (click)="onCancel()" class="px-4 py-2 rounded text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]">Cancel</button>
-             <button type="button" (click)="onSubmit()" [disabled]="form.invalid || isSaving()" class="px-4 py-2 rounded bg-[rgb(var(--color-accent-ring))] text-white hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2">
+          <div class="px-5 py-3.5 border-t border-[rgb(var(--color-border-base))] flex justify-end gap-2.5 bg-[rgb(var(--color-surface-muted))]">
+             <button type="button" (click)="onCancel()" class="px-3.5 py-1.5 text-sm font-medium rounded-md text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))] transition-colors">Cancel</button>
+             <button type="button" (click)="onSubmit()" [disabled]="form.invalid || isSaving()" class="px-4 py-1.5 text-sm font-semibold rounded-md bg-[rgb(var(--color-accent-ring))] text-white hover:bg-[rgb(var(--color-accent-ring))]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors">
                 <span *ngIf="isSaving()" class="material-icons text-sm animate-spin">refresh</span>
                 Save
              </button>

@@ -127,7 +127,7 @@
             >
               <div class="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-4">
                 @for (item of filteredItems(); track item.name) {
-                  @if (item.type === 'folder') {
+                  @if (item.type === 'folder' || item.type === 'symlink') {
                     <app-folder
                       #selectableItem
                       [item]="item"
@@ -401,7 +401,7 @@
                     [attr.data-item-name]="item.name"
                   >
                     <td class="px-2 py-1.5">
-                      @if (item.type === 'folder') {
+                      @if (item.type === 'folder' || item.type === 'symlink') {
                         <div class="relative h-5 w-5">
                           <svg
                             xmlns="http://www.w3.org/2000/svg"

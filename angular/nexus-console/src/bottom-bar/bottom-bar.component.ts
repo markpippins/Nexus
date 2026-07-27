@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { EXTERNAL_SITES } from '../components/external-site-selector/external-site-selector.component.js';
 import { MessageBoxService } from '../services/message-box.service.js';
 
-export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui';
+export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui' | 'nebula-cp' | 'monaco-judge' | 'conduit-legacy-ui';
 
 @Component({
   selector: 'app-bottom-bar',

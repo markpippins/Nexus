@@ -1,9 +1,6 @@
-import { Component, input, output, computed, inject } from '@angular/core';
+import { Component, input, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { ServiceMeshService } from '../../services/service-mesh.service.js';
-import { RegistryServerProfileService } from '../../services/registry-server-profile.service.js';
+
 import {
   ServiceInstance,
   Deployment,
@@ -15,16 +12,12 @@ import {
   selector: 'app-service-details',
   standalone: true,
   imports: [
-    CommonModule,
-    MatButtonModule,
-    MatIconModule
+    CommonModule
   ],
   templateUrl: './service-details.component.html',
   styleUrls: ['./service-details.component.css']
 })
 export class ServiceDetailsComponent {
-  private serviceMeshService = inject(ServiceMeshService);
-  private registryServerProfileService = inject(RegistryServerProfileService);
 
   service = input<ServiceInstance | null>(null);
   deployments = input<Deployment[]>([]);
@@ -66,81 +59,4 @@ export class ServiceDetailsComponent {
     return getHealthStatusColor(status as any);
   }
 
-  isAllDeploymentsRunning(): boolean {
-    return this.serviceDeployments().every(d => d.status === 'RUNNING');
-  }
-
-  isAllDeploymentsStopped(): boolean {
-    return this.serviceDeployments().every(d => d.status === 'STOPPED');
-  }
-
-  async onRestartService(): Promise<void> {
-    const service = this.service();
-    if (service) {
-      // Find the first host profile to use for the operation
-      const profiles = this.registryServerProfileService.profiles();
-      if (profiles.length > 0) {
-        const profile = profiles[0]; // In a more sophisticated version, we could select based on service metadata
-        const result = await this.serviceMeshService.executeServiceOperation(service.id, 'restart', profile);
-        console.log('Restart operation result:', result);
-
-        if (!result.success) {
-          console.error('Failed to restart service:', result.message);
-        }
-      }
-    }
-  }
-
-  async onViewLogs(): Promise<void> {
-    const service = this.service();
-    if (service) {
-      // Find the first host profile to use for the operation
-      const profiles = this.registryServerProfileService.profiles();
-      if (profiles.length > 0) {
-        const profile = profiles[0];
-        const result = await this.serviceMeshService.executeServiceOperation(service.id, 'view-logs', profile);
-        console.log('View logs operation result:', result);
-
-        // In a real implementation, we would open logs in a new window/tab
-        if (result.success && result.data && typeof result.data === 'object' && 'logsUrl' in result.data) {
-          const logsUrl = (result.data as any).logsUrl;
-          window.open(logsUrl, '_blank');
-        }
-      }
-    }
-  }
-
-  async onStartService(): Promise<void> {
-    const service = this.service();
-    if (service) {
-      // Find the first host profile to use for the operation
-      const profiles = this.registryServerProfileService.profiles();
-      if (profiles.length > 0) {
-        const profile = profiles[0];
-        const result = await this.serviceMeshService.executeServiceOperation(service.id, 'start', profile);
-        console.log('Start operation result:', result);
-
-        if (!result.success) {
-          console.error('Failed to start service:', result.message);
-        }
-      }
-    }
-  }
-
-  async onStopService(): Promise<void> {
-    const service = this.service();
-    if (service) {
-      // Find the first host profile to use for the operation
-      const profiles = this.registryServerProfileService.profiles();
-      if (profiles.length > 0) {
-        const profile = profiles[0];
-        const result = await this.serviceMeshService.executeServiceOperation(service.id, 'stop', profile);
-        console.log('Stop operation result:', result);
-
-        if (!result.success) {
-          console.error('Failed to stop service:', result.message);
-        }
-      }
-    }
-  }
 }

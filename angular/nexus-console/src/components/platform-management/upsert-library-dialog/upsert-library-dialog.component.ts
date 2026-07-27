@@ -9,163 +9,167 @@ import { Library } from '../../../models/service-mesh.model.js';
     imports: [CommonModule, ReactiveFormsModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <div class="fixed inset-0 bg-black/60 flex items-center justify-center z-50" (click)="onCancel()" (window:keydown.escape)="onCancel()">
-            <div class="bg-[rgb(var(--color-surface-dialog))] rounded-lg shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" (click)="$event.stopPropagation()">
+        <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" (click)="onCancel()" (window:keydown.escape)="onCancel()">
+            <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-2xl rounded-xl w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden" (click)="$event.stopPropagation()">
                 <!-- Header -->
-                <div class="flex items-center justify-between p-4 border-b border-[rgb(var(--color-border-base))]">
-                    <h2 class="text-lg font-semibold text-[rgb(var(--color-text-base))]">
+                <div class="px-5 py-3.5 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
+                    <h2 class="text-base font-semibold text-[rgb(var(--color-text-prominent))]">
                         {{ library() ? 'Edit Library' : 'Add Library' }}
                     </h2>
                     <button
                         (click)="onCancel()"
-                        class="text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] transition-colors"
+                        class="p-1 rounded-md text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                     >
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
+                        <span class="material-icons">close</span>
                     </button>
                 </div>
 
-                <!-- Form -->
-                <form [formGroup]="form" (ngSubmit)="onSubmit()" class="p-4 space-y-4">
-                    <!-- Name -->
-                    <div>
-                        <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">Name *</label>
-                        <input
-                            formControlName="name"
-                            type="text"
-                            class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                            placeholder="e.g., Three.js"
-                        />
-                    </div>
-
-                    <!-- Description -->
-                    <div>
-                        <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">Description</label>
-                        <textarea
-                            formControlName="description"
-                            rows="2"
-                            class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                            placeholder="Library description..."
-                        ></textarea>
-                    </div>
-
-                    <!-- Category & Language Row -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">Category</label>
-                            <select
-                                formControlName="categoryId"
-                                class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                            >
-                                <option [ngValue]="null">Select category...</option>
-                                @for (cat of categories(); track cat.id) {
-                                    <option [ngValue]="cat.id">{{ cat.name }}</option>
-                                }
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">Language</label>
-                            <select
-                                formControlName="languageId"
-                                class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                            >
-                                <option [ngValue]="null">Select language...</option>
-                                @for (lang of languages(); track lang.id) {
-                                    <option [ngValue]="lang.id">{{ lang.name }}</option>
-                                }
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Package Info Row -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">Package Name</label>
+                <!-- Body -->
+                <div class="px-5 py-4 overflow-y-auto flex-1">
+                    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-3.5">
+                        <!-- Name -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Name *</label>
                             <input
-                                formControlName="packageName"
+                                formControlName="name"
                                 type="text"
-                                class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                                placeholder="e.g., three"
+                                class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                placeholder="e.g., Three.js"
                             />
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">Package Manager</label>
-                            <select
-                                formControlName="packageManager"
-                                class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                            >
-                                <option value="">Select...</option>
-                                <option value="npm">npm</option>
-                                <option value="maven">Maven</option>
-                                <option value="pip">pip</option>
-                                <option value="cargo">Cargo</option>
-                                <option value="nuget">NuGet</option>
-                                <option value="go">Go Modules</option>
-                            </select>
-                        </div>
-                    </div>
 
-                    <!-- Version & License Row -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">Current Version</label>
+                        <!-- Description -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
+                            <textarea
+                                formControlName="description"
+                                rows="2"
+                                class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                placeholder="Library description..."
+                            ></textarea>
+                        </div>
+
+                        <!-- Category & Language Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Category</label>
+                                <select
+                                    formControlName="categoryId"
+                                    class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                >
+                                    <option [ngValue]="null">Select category...</option>
+                                    @for (cat of categories(); track cat.id) {
+                                        <option [ngValue]="cat.id">{{ cat.name }}</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Language</label>
+                                <select
+                                    formControlName="languageId"
+                                    class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                >
+                                    <option [ngValue]="null">Select language...</option>
+                                    @for (lang of languages(); track lang.id) {
+                                        <option [ngValue]="lang.id">{{ lang.name }}</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Package Info Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Package Name</label>
+                                <input
+                                    formControlName="packageName"
+                                    type="text"
+                                    class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                    placeholder="e.g., three"
+                                />
+                            </div>
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Package Manager</label>
+                                <select
+                                    formControlName="packageManager"
+                                    class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                >
+                                    <option value="">Select...</option>
+                                    <option value="npm">npm</option>
+                                    <option value="maven">Maven</option>
+                                    <option value="pip">pip</option>
+                                    <option value="cargo">Cargo</option>
+                                    <option value="nuget">NuGet</option>
+                                    <option value="go">Go Modules</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Version & License Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Current Version</label>
+                                <input
+                                    formControlName="currentVersion"
+                                    type="text"
+                                    class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                    placeholder="e.g., 0.161.0"
+                                />
+                            </div>
+                            <div class="flex flex-col gap-1.5">
+                                <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">License</label>
+                                <input
+                                    formControlName="license"
+                                    type="text"
+                                    class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                    placeholder="e.g., MIT"
+                                />
+                            </div>
+                        </div>
+
+                        <!-- URLs -->
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Homepage URL</label>
                             <input
-                                formControlName="currentVersion"
-                                type="text"
-                                class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                                placeholder="e.g., 0.161.0"
+                                formControlName="url"
+                                type="url"
+                                class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                placeholder="https://..."
                             />
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">License</label>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Repository URL</label>
                             <input
-                                formControlName="license"
-                                type="text"
-                                class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                                placeholder="e.g., MIT"
+                                formControlName="repositoryUrl"
+                                type="url"
+                                class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors"
+                                placeholder="https://github.com/..."
                             />
                         </div>
-                    </div>
+                    </form>
+                </div>
 
-                    <!-- URLs -->
-                    <div>
-                        <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">Homepage URL</label>
-                        <input
-                            formControlName="url"
-                            type="url"
-                            class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                            placeholder="https://..."
-                        />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[rgb(var(--color-text-muted))] mb-1">Repository URL</label>
-                        <input
-                            formControlName="repositoryUrl"
-                            type="url"
-                            class="w-full px-3 py-2 bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-base))] rounded-md text-[rgb(var(--color-text-base))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]"
-                            placeholder="https://github.com/..."
-                        />
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="flex justify-end gap-3 pt-4 border-t border-[rgb(var(--color-border-base))]">
-                        <button
-                            type="button"
-                            (click)="onCancel()"
-                            class="px-4 py-2 text-sm font-medium text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            [disabled]="!form.valid || saving()"
-                            class="px-4 py-2 text-sm font-medium bg-[rgb(var(--color-accent-ring))] text-white rounded-md hover:bg-[rgb(var(--color-accent-ring))]/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {{ saving() ? 'Saving...' : (library() ? 'Update' : 'Create') }}
-                        </button>
-                    </div>
-                </form>
+                <!-- Footer -->
+                <div class="px-5 py-3.5 border-t border-[rgb(var(--color-border-base))] flex justify-end gap-2.5 bg-[rgb(var(--color-surface-muted))]">
+                    <button
+                        type="button"
+                        (click)="onCancel()"
+                        class="px-3.5 py-1.5 text-sm font-medium rounded-md text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))] transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        (click)="onSubmit()"
+                        [disabled]="!form.valid || saving()"
+                        class="px-4 py-1.5 text-sm font-semibold rounded-md bg-[rgb(var(--color-accent-ring))] text-white hover:bg-[rgb(var(--color-accent-ring))]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                    >
+                        @if (saving()) {
+                            <span class="material-icons text-sm animate-spin">refresh</span>
+                        }
+                        {{ saving() ? 'Saving...' : (library() ? 'Update' : 'Create') }}
+                    </button>
+                </div>
             </div>
         </div>
     `

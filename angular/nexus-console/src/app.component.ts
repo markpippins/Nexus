@@ -185,7 +185,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui' | 'nebula-cp' | 'monaco-judge' | 'conduit-legacy-ui'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -209,6 +209,9 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'vision-ui': 'http://localhost:4208',
     'edit-ui': 'http://localhost:4223',
     'wind-ui': 'http://localhost:4209',
+    'nebula-cp': 'http://localhost:4014',
+    'monaco-judge': 'http://localhost:4016',
+    'conduit-legacy-ui': 'http://localhost:4015',
   };
 
   isIframeMode = computed(() =>
@@ -224,7 +227,10 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentViewMode() === 'execution-ui' ||
     this.currentViewMode() === 'vision-ui' ||
     this.currentViewMode() === 'edit-ui' ||
-    this.currentViewMode() === 'wind-ui'
+    this.currentViewMode() === 'wind-ui' ||
+    this.currentViewMode() === 'nebula-cp' ||
+    this.currentViewMode() === 'monaco-judge' ||
+    this.currentViewMode() === 'conduit-legacy-ui'
   );
 
   isKanbanMode = computed(() => this.currentViewMode() === 'kanban');
@@ -1885,6 +1891,16 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onRefreshServices(): void {
     this.serviceMeshService.fetchAllData();
+  }
+
+  /** Forward toolbar actions (deploy/start/stop/restart/logs/github/jenkins/docker/swarm/k8s) to the service mesh. */
+  meshToolbarAction = signal<{ name: string; id: number } | null>(null);
+
+  /** Whether a service is currently selected in the mesh (drives toolbar button enabled state). */
+  meshHasSelection = computed(() => !!this.serviceMeshService.selectedService());
+
+  onMeshToolbarAction(action: string): void {
+    this.meshToolbarAction.set({ name: action, id: Date.now() });
   }
 
   onNavCollapseToggle(): void {

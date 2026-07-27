@@ -10,9 +10,9 @@ import { LookupItem } from '../../../services/platform-management.service.js';
   template: `
     <div class="overflow-x-auto">
       <table class="w-full text-left border-collapse">
-        <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
+        <thead class="bg-[rgb(var(--color-surface-muted))] border-b border-[rgb(var(--color-border-base))] text-[11px] tracking-wider text-[rgb(var(--color-text-muted))] uppercase sticky top-0 z-10">
           <tr>
-            <th (click)="onSort('name')" class="p-2 font-semibold w-1/4 cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+            <th (click)="onSort('name')" class="px-3 py-1.5 font-semibold w-1/4 cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                 <div class="flex items-center">
                     Name
                     @if (sortState().column === 'name') {
@@ -20,7 +20,7 @@ import { LookupItem } from '../../../services/platform-management.service.js';
                     }
                 </div>
             </th>
-            <th (click)="onSort('description')" class="p-2 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
+            <th (click)="onSort('description')" class="px-3 py-1.5 font-semibold cursor-pointer hover:bg-[rgb(var(--color-surface-hover))]">
                 <div class="flex items-center">
                     Description
                     @if (sortState().column === 'description') {
@@ -28,22 +28,22 @@ import { LookupItem } from '../../../services/platform-management.service.js';
                     }
                 </div>
             </th>
-            <th class="p-2 font-semibold w-24 text-right">Actions</th>
+            <th class="px-3 py-1.5 font-semibold w-24 text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
           @for (item of sortedItems(); track item.id) {
-            <tr tabindex="0" (dblclick)="onEdit.emit(item)" (keydown.enter)="onEdit.emit(item)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
-              <td class="p-2 py-1.5 text-[rgb(var(--color-text-base))] font-medium">{{ item.name }}</td>
-              <td class="p-2 py-1.5 text-[rgb(var(--color-text-muted))]">{{ item.description || '-' }}</td>
-              <td class="p-2 py-1.5 text-right whitespace-nowrap">
-                <button (click)="onEdit.emit(item)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-xs">Edit</button>
-                <button (click)="onDelete.emit(item)" class="text-red-500 hover:underline text-xs">Delete</button>
+            <tr tabindex="0" (dblclick)="onEdit.emit(item)" (keydown.enter)="onEdit.emit(item)" class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100 cursor-pointer group focus:outline-none focus:bg-[rgb(var(--color-surface-hover))]">
+              <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))] font-medium">{{ item.name }}</td>
+              <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ item.description || '-' }}</td>
+              <td class="px-3 py-1 text-[13px] text-right whitespace-nowrap">
+                <button (click)="onEdit.emit(item)" class="text-[rgb(var(--color-accent-ring))] hover:underline mr-3 text-[11px]">Edit</button>
+                <button (click)="onDelete.emit(item)" class="text-red-500 hover:underline text-[11px]">Delete</button>
               </td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="3" class="p-8 text-center text-[rgb(var(--color-text-muted))]">
+              <td colspan="3" class="py-10 px-3 text-center text-[13px] text-[rgb(var(--color-text-muted))]">
                 No {{ type() | lowercase | replace:'-':' ' }} found.
               </td>
             </tr>

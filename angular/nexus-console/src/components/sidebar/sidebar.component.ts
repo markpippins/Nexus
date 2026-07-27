@@ -116,9 +116,10 @@ export class SidebarComponent implements OnDestroy {
 
   constructor() {
     // Prune stale expanded paths when the tree structure changes (e.g., a profile disconnects).
-    // Walks the full tree to validate each path, not just the root segment — this prevents
-    // intermediate nodes from being collapsed during tree rebuilds (e.g., when a gateway
-    // connects and the "File Systems" node gets populated with children).
+    // Walks the full tree to validate each path. Importantly, nodes with childrenLoaded === false
+    // are treated as "may still have children" — we do NOT prune paths that pass through them,
+    // because the children simply haven't been lazy-loaded yet (e.g., after a tree rebuild from
+    // loadFolderTree()). Pruning those paths would collapse nodes the user deliberately expanded.
     effect(() => {
       const tree = this.folderTree();
       if (!tree?.children) return;
@@ -130,7 +131,6 @@ export class SidebarComponent implements OnDestroy {
 
         for (const key of next) {
           if (!key) continue;
-          // Walk the tree to verify this full path exists in the current tree
           const segments = key.split('/').filter(s => s.length > 0);
           let found = true;
           let currentNode: FileSystemNode | undefined | null = tree;
@@ -144,6 +144,11 @@ export class SidebarComponent implements OnDestroy {
             if (!child) {
               found = false;
               break;
+            }
+            // If this child has childrenLoaded === false, its children haven't been
+            // fetched yet. The path is still valid — stop walking and keep it.
+            if (child.childrenLoaded === false && segment !== segments[segments.length - 1]) {
+              break; // path is valid up to this lazy-loaded node; keep it
             }
             currentNode = child;
           }
