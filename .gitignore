@@ -85,3 +85,21 @@ audit/
 
 # npm cache
 .npm-cache/
+typescript/secure-file-system-server/fs_root/
+typescript/secure-file-system-server/root/
+typescript/file-system-server/root/.fsref
+typescript/file-system-server/root/
+typescript/file-system-server/root/.fsref
+typescript/file-system-server/root/users/admin/default/magnets.md
+typescript/file-system-server/root/users/admin/default/www.bun.org.md
+typescript/file-system-server/root/users/admin/default/ai/ai.md
+typescript/file-system-server/root/users/admin/default/ai/.space/def.json
+typescript/file-system-server/root/users/admin/default/dev/jvm/spring/spring-projects/dirs.txt
+typescript/file-system-server/root/users/admin/default/homelab/docker swarm/stacks/excalidraw/compose.yaml
+typescript/file-system-server/root/users/admin/default/knowledge/knowledge.md
+typescript/file-system-server/root/users/admin/default/knowledge/.space/def.json
+typescript/file-system-server/root/users/admin/default/sec/sec.md
+typescript/file-system-server/root/users/admin/default/sec/.space/def.json
+typescript/file-system-server/root/users/architect/default/.magnet
+typescript/file-system-server/root/users/architect/default/mag2/.magnet
+typescript/file-system-server/root/users/architect/default/magnet-test/.magnet

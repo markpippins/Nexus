@@ -445,6 +445,51 @@ CANDIDATES: tuple[Candidate, ...] = (
         startup="systemd: systemctl --user start timeclock.service",
         workspace_path="nexus/python/timeclock",
     ),
+    Candidate(
+        name="wind-srv",
+        port=3300,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3300/health",
+        description=(
+            "Wind IDE workflow API server. Express.js CRUD for offices, "
+            "titles, tasks, outcomes, workflows, nodes, edges, instances, "
+            "tickets, receipts, v-roles. Used by wind-ui and conduit-ui "
+            "legacy. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start wind-srv.service",
+        workspace_path="nexus/typescript/wind-srv",
+    ),
+    Candidate(
+        name="conduit-ui-legacy",
+        port=4015,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:4015/",
+        description=(
+            "Conduit Legacy UI — production build of the Angular conduit-ui "
+            "dashboard served via Express. Proxies API calls to conduit-mcp "
+            "(port 3100). Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start conduit-ui-legacy.service",
+        workspace_path="nexus/angular/conduit-ui-legacy",
+    ),
+    Candidate(
+        name="conduit-srv",
+        port=3104,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3104/health",
+        description=(
+            "Conduit REST API — standalone Express service extracted from "
+            "conduit-mcp per the 'No SQL in MCP Servers' architectural "
+            "directive. Serves 16 pure-DB REST routes (workflows, tickets, "
+            "tokens, config, governance, vision, session-log) with direct "
+            "PostgreSQL access via the conduit schema. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start conduit-srv.service",
+        workspace_path="nexus/typescript/conduit-srv",
+    ),
 )
 
 
@@ -480,6 +525,9 @@ DEPENDENCIES: tuple[tuple[str, str, str, str], ...] = (
     ("runnable_service", "role-memory-srv", "runnable_service", "redis"),
     ("runnable_service", "wrp-bridge-daemon", "runnable_service", "nebula-srv"),
     ("mcp_server", "timeclock-mcp", "runnable_service", "nebula-srv"),
+    ("runnable_service", "wind-srv", "runnable_service", "nebula-srv"),
+    ("runnable_service", "conduit-ui-legacy", "mcp_server", "conduit-mcp"),
+    ("runnable_service", "conduit-srv", "runnable_service", "nebula-srv"),
 )
 
 

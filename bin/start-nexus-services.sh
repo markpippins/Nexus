@@ -27,7 +27,8 @@ ALL_SERVICES=(
     "service-registry.service"  # port 8085 — service discovery
     "broker-gateway.service"    # port 8081 — service broker gateway
     "terrain.service"          # port 8084 — topology registry
-    "file-system-server.service" # port 4040 — file system operations
+    "file-system-server.service"        # port 4042 — file system operations (edit-ui)
+    "secure-file-system-server.service" # port 4041 — secure file system operations (service-broker)
     "ui-event-bus.service"     # port 3200 — cross-app UI event bus (SSE)
     "peb-kernel.service"       # port 8080 — engineering brain
     "kernel-srv.service"       # port 8100 — Semantic Kernel REST API (wraps sys_transition, sys_issue_receipt, v_* views; SSE over pg_notify)
@@ -54,6 +55,7 @@ ALL_SERVICES=(
     # Operator + MCP servers
     "operator-svc.service"     # port 3018 — Operator host personality
     "conduit-mcp.service"      # port 3100 — work request orchestration
+    "conduit-srv.service"      # port 3104 — conduit REST API (extracted from conduit-mcp)
     "pty-srv.service"          # port 3120 — WebSocket PTY bridge for xterm.js
     "nebula-mcp-sse.service"   # port 3102 — Nebula MCP SSE
     "nebula-mcp.service"       # stdio  — Nebula MCP (on-demand; clients spawn independently)
@@ -68,6 +70,9 @@ ALL_SERVICES=(
     "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator
     "service-broker-mcp.service" # port 3112 — service-broker MCP over SSE (auth/token tools)
     "substance.service"        # port 3115 — Segment Sets API (FastAPI)
+
+    # API servers (non-UI services)
+    "wind-srv.service"         # port 3300 — Wind IDE workflow API
 
     # UI dev servers (Angular/Vite — managed via systemd, not tmux)
     "nebula-ui.service"         # port 3000 — Nebula RMS UI
@@ -93,7 +98,8 @@ SERVICE_PORTS=(
     ["service-registry.service"]="8085"
     ["broker-gateway.service"]="8081"
     ["terrain.service"]="8084"
-    ["file-system-server.service"]="4040"
+    ["file-system-server.service"]="4042"
+    ["secure-file-system-server.service"]="4041"
     ["ui-event-bus.service"]="3200"
     ["peb-kernel.service"]="8080"
     ["kernel-srv.service"]="8100"
@@ -109,6 +115,7 @@ SERVICE_PORTS=(
     ["assembly-srv.service"]="3107"
     ["assembly-mcp.service"]="3113"
     ["conduit-mcp.service"]="3100"
+    ["conduit-srv.service"]="3104"
     ["nebula-mcp-sse.service"]="3102"
     # nebula-mcp.service — stdio, on-demand (no port)
     # terrain-mcp.service — stdio, on-demand (no port)
@@ -124,6 +131,7 @@ SERVICE_PORTS=(
     ["mcp-bridge.service"]="3131"     # one of ports 3131-3134 — any bridge target's /health works
     ["tools-aggregator.service"]="3210"
     ["service-broker-mcp.service"]="3112"
+    ["wind-srv.service"]="3300"
     ["substance.service"]="3115"
     ["nebula-ui.service"]="3000"
     ["duality-ui.service"]="3002"

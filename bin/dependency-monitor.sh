@@ -113,6 +113,7 @@ POSTGRESQL_DEPENDENT_SERVICES=(
     # Infrastructure that tracks DB state
     "nebula-srv.service"
     "conduit-mcp.service"
+    "conduit-srv.service"
     "cpf-api.service"
     "execution-srv.service"
     "cascade-srv.service"
@@ -120,6 +121,8 @@ POSTGRESQL_DEPENDENT_SERVICES=(
     # Tackle stack — AI config registry backed by tackle schema
     "tackle-srv.service"
     "tackle-mcp.service"
+    # Wind — database-backed API server
+    "wind-srv.service"
 )
 
 _postgresql_healthy() {

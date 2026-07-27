@@ -36,6 +36,9 @@ UI_NAMES=(
     "semantic-kernel-ui" # 4207
     "vision-ui"          # 4208
     "wind-ui"            # 4209
+    "nebula-control-plane" # 4014
+    "monaco-judge"        # 4016
+    "conduit-ui-legacy"  # 4015
 )
 
 UI_PORTS[nebula-ui]=3000
@@ -52,6 +55,9 @@ UI_PORTS[peb-ui]=4206
 UI_PORTS[semantic-kernel-ui]=4207
 UI_PORTS[vision-ui]=4208
 UI_PORTS[wind-ui]=4209
+UI_PORTS[nebula-control-plane]=4014
+UI_PORTS[monaco-judge]=4016
+UI_PORTS[conduit-ui-legacy]=4015
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 

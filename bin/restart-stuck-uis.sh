@@ -44,6 +44,7 @@ UI_SERVICES=(
     "view-architect"
     "peb-ui"
     "semantic-kernel-ui"
+    "conduit-ui-legacy"
 )
 
 # ── Helpers ─────────────────────────────────────────────────────────────
