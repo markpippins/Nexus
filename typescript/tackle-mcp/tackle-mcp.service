@@ -28,7 +28,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 PrivateTmp=true
 ProtectHome=read-only
-ReadWritePaths=/home/codex/dev/nexus/typescript/tackle-mcp
+ReadWritePaths=/home/codex/dev/nexus/typescript/tackle-mcp /home/codex/.npm
 
 [Install]
 WantedBy=default.target
