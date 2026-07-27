@@ -353,6 +353,31 @@ class TestPlanLifecycle(unittest.TestCase):
         self.assertGreater(count, 0)
         self.assertGreater(self._count_open_tickets("builder"), 0)
 
+    # ── G-3: CRITIQUE_REJECT (critic failed) flow ──────────────────
+
+    def test_critic_failed_spawns_planner(self):
+        """G-3: After critic fails (CRITIQUE_REJECT), a planner ticket must
+        be spawned so the plan can be revised instead of stuck forever."""
+        self._issue_receipt("PLAN_CREATE", agent_role="planner")
+        count = self.db.create_next_tickets("0001", "critic", "failed")
+        self.assertGreater(count, 0)
+        self.assertGreater(self._count_open_tickets("planner"), 0)
+
+    def test_critic_failed_full_lifecycle(self):
+        """G-3: Full lifecycle — planner → builder → critic rejects →
+        planner picks up for revision."""
+        self._issue_receipt("PLAN_CREATE", agent_role="planner")
+        self.db.create_next_tickets("0001", "planner", "completed")
+        # builder ticket created, mark it completed
+        self.db.create_next_tickets("0001", "builder", "completed")
+        # critic rejects
+        self._issue_receipt("CRITIQUE_REJECT", agent_role="critic")
+        count = self.db.create_next_tickets("0001", "critic", "failed")
+        self.assertGreater(count, 0)
+        self.assertGreater(self._count_open_tickets("planner"), 0)
+        # plan is not stuck — derived_status reflects the latest receipt
+        self.assertEqual(self._get_derived_status(), "CRITIQUE_REJECT")
+
     # ── Plan number allocation (DB-authoritative) ─────────────────
 
     def test_plan_number_allocated_from_db(self):
@@ -447,6 +472,76 @@ class TestPlanLifecycle(unittest.TestCase):
         self.assertEqual(json.loads(row[0]), criteria)
         self.assertEqual(json.loads(row[1]), deps)
         self.assertEqual(json.loads(row[2]), files)
+
+    # ── C-6: Full lifecycle integration test ──────────────────────
+
+    def test_full_lifecycle_integration(self):
+        """C-6: Complete lifecycle from plan creation through review pass,
+        verifying derived_status and ticket creation at every step."""
+
+        # Step 1: Plan created
+        self._issue_receipt("PLAN_CREATE", agent_role="planner")
+        self.assertEqual(self._get_derived_status(), "PLAN_CREATE")
+
+        # Step 2: Planner completes → builder + critic tickets spawned
+        count = self.db.create_next_tickets("0001", "planner", "completed")
+        self.assertGreater(count, 1)
+        self.assertEqual(self._count_open_tickets("builder"), 1)
+        self.assertEqual(self._count_open_tickets("critic"), 1)
+
+        # Step 3: Builder completes → reviewer ticket spawned
+        count = self.db.create_next_tickets("0001", "builder", "completed")
+        self.assertGreater(count, 0)
+        self.assertEqual(self._count_open_tickets("reviewer"), 1)
+        self._issue_receipt("IMPLEMENTATION", agent_role="builder")
+        self.assertEqual(self._get_derived_status(), "IMPLEMENTATION")
+
+        # Step 4: Reviewer passes → terminal state, no more tickets
+        self._issue_receipt("REVIEW_PASS", agent_role="reviewer")
+        self.assertEqual(self._get_derived_status(), "REVIEW_PASS")
+        count = self.db.create_next_tickets("0001", "reviewer", "completed")
+        self.assertEqual(count, 0)
+        # No new tickets for any role after review pass
+        self.assertEqual(self._count_open_tickets("builder"), 0)
+        self.assertEqual(self._count_open_tickets("reviewer"), 0)
+
+    def test_full_lifecycle_with_rejection_and_rework(self):
+        """C-6: Full lifecycle with reviewer rejection, rework, and eventual pass."""
+
+        # Create plan
+        self._issue_receipt("PLAN_CREATE", agent_role="planner")
+        self.db.create_next_tickets("0001", "planner", "completed")
+        # Planner completed → builder + critic tickets spawned
+        self.assertGreater(self._count_open_tickets("builder"), 0)
+        self.assertGreater(self._count_open_tickets("critic"), 0)
+
+        # Builder implements
+        self._issue_receipt("IMPLEMENTATION", agent_role="builder")
+        self.db.create_next_tickets("0001", "builder", "completed")
+        # Builder completed → reviewer ticket spawned
+        # close_orphaned_tickets closed builder ticket (not valid for IMPLEMENTATION)
+        self.assertEqual(self._count_open_tickets("builder"), 0)
+        self.assertGreater(self._count_open_tickets("reviewer"), 0)
+
+        # Reviewer rejects → derived_status becomes REVIEW_REJECT
+        self._issue_receipt("REVIEW_REJECT", agent_role="reviewer")
+        self.assertEqual(self._get_derived_status(), "REVIEW_REJECT")
+
+        # Reviewer failed → builder ticket spawned for rework
+        count = self.db.create_next_tickets("0001", "reviewer", "failed")
+        self.assertGreater(count, 0)
+        self.assertGreater(self._count_open_tickets("builder"), 0)
+
+        # Builder re-implements
+        self._issue_receipt("IMPLEMENTATION", agent_role="builder")
+        self.db.create_next_tickets("0001", "builder", "completed")
+        self.assertEqual(self._get_derived_status(), "IMPLEMENTATION")
+
+        # Reviewer passes on rework → terminal
+        self._issue_receipt("REVIEW_PASS", agent_role="reviewer")
+        self.assertEqual(self._get_derived_status(), "REVIEW_PASS")
+        count = self.db.create_next_tickets("0001", "reviewer", "completed")
+        self.assertEqual(count, 0)
 
 
 if __name__ == "__main__":

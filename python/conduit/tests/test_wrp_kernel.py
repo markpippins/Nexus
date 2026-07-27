@@ -572,10 +572,14 @@ class TestEngineUtilities:
 
     def test_valid_transition_fail(self):
         """Any non-terminal state can transition to FAILED.
-        ARCHIVED and COMPLETED are terminal and cannot transition."""
+        ARCHIVED and COMPLETED are terminal and cannot transition.
+        CREATED is a transient entry state that can only go to INTAKE
+        before any failure path is available."""
         terminal_states = {"ARCHIVED", "COMPLETED", "FAILED"}
+        # CREATED is non-terminal but can only transition to INTAKE, not FAILED
+        non_fail_states = terminal_states | {"CREATED"}
         for state in WRP_ADJACENCY_MATRIX:
-            if state not in terminal_states:
+            if state not in non_fail_states:
                 assert is_valid_transition(state, "FAILED") is True
 
     def test_invalid_transition(self):
