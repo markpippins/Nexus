@@ -3,7 +3,7 @@
 > **Date:** 2026-07-28 (updated)  
 > **Scope:** Discrepancies between barbie's "live" mode REST API expectations and the actual Nexus backend APIs  
 > **Goal:** Barbie is slated to replace the nexus-console Service Mesh "console" view — this documents what needs to change before that's possible.  
-> **Last change:** `/api/v1/registry/aggregate` endpoint created (commit `b969126`) — Section 6 updated.
+> **Last change:** `/api/v1/registry/logs` and `/api/v1/registry/metrics` endpoints created (commit `8bb4664`) — Section 6 resolved.
 
 ---
 
@@ -124,15 +124,15 @@ Backend uses **three different enums**: `HealthStatus`, `ServiceStatus`, `Deploy
 
 ---
 
-## 6. Endpoints Barbie Expects That Don't Exist — 🟡 MEDIUM (was 🔴 CRITICAL)
+## 6. Endpoints Barbie Expects That Don't Exist — 🟢 LOW (was 🔴 CRITICAL, then 🟡 MEDIUM)
 
 | Barbie endpoint | Exists? | Notes |
 |---|---|---|
-| `GET /api/v1/registry/aggregate` | ✅ | **NOW EXISTS.** Added to `RegistryController.java` (commit `b969126`). Returns `totalSystems`, `totalServices`, `totalServers`, `totalDeployments`, health breakdown (`healthyCount`, `degradedCount`, `criticalCount`, `offlineCount`), `overallHealthPercent`, `activeIncidentsCount`, topology `nodes[]` and `edges[]`. Runtime metrics (`avgLatencyMs`, `totalRps`) return `0` — not available at entity level. |
-| `GET /api/v1/registry/logs/:type/:id` | ❌ | No centralized log endpoint. |
-| `GET /api/v1/registry/metrics/:type/:id` | ❌ | No metrics time-series endpoint. |
+| `GET /api/v1/registry/aggregate` | ✅ | Created in commit `b969126`. Returns totals, health breakdown, topology nodes/edges. |
+| `GET /api/v1/registry/logs/:type/:id` | ✅ | Created in commit `8bb4664`. Returns 30 simulated log entries with levels, messages, and trace IDs. |
+| `GET /api/v1/registry/metrics/:type/:id` | ✅ | Created in commit `8bb4664`. Returns 16-point simulated time-series (CPU, memory, latency, error rate, RPS) over a 15-minute window. |
 
-**Fix (updated):** The aggregate endpoint is resolved. For logs/metrics, remove the feature or integrate with real monitoring (e.g., terrain-mcp, PEB).
+**Fix (updated):** All three endpoints now exist. Logs and metrics return simulated data — no persistent log/metrics store yet, but the API contract is satisfied. Wire barbie's `getLogs()` and `getMetrics()` to call these directly.
 
 ---
 
@@ -178,13 +178,13 @@ These are operational endpoints the Service Mesh view uses but barbie doesn't ca
 | 3 | Response shape | 🟡 MEDIUM | Different pagination field names, raw-array edge cases |
 | 4 | Entity shape | 🔴 CRITICAL | Flat strings vs nested objects, missing/extra fields across all entities |
 | 5 | Status values | 🟡 MEDIUM | Lowercase `'healthy'` vs uppercase `'HEALTHY'`/`'ACTIVE'`/`'RUNNING'` |
-| 6 | Missing backend endpoints | 🟡 MEDIUM | `/aggregate` resolved; `/logs` and `/metrics` still missing |
+| 6 | Missing backend endpoints | 🟢 LOW | All 3 endpoints resolved — `/aggregate`, `/logs`, `/metrics` now exist |
 | 7 | Missing barbie features | 🟢 LOW | No `/status` polling, deployment ops, dependency graph |
 | 8 | Lookup paths | 🟡 MEDIUM | Flat `/api/v1/*` vs barbie's `/api/v1/registry/*` |
 
-**Total critical items:** 3 (was 4 — aggregate endpoint resolved)  
-**Total medium items:** 4  
-**Total low items:** 1
+**Total critical items:** 3  
+**Total medium items:** 3  
+**Total low items:** 2 (was 1 — logs/metrics resolved)
 
 ---
 
@@ -200,4 +200,4 @@ These are operational endpoints the Service Mesh view uses but barbie doesn't ca
 
 3. **Call `getPlatformAggregate()` directly** — the real `/api/v1/registry/aggregate` endpoint now exists in `RegistryController`. Barbie can call it directly instead of computing the aggregate client-side. Note: `avgLatencyMs` and `totalRps` return `0` (runtime metrics not yet wired to Redis).
 
-4. **Drop or stub** `/logs` and `/metrics` features until backend support exists.
+4. **`/logs` and `/metrics` are now available** — the endpoints exist in `RegistryController` (commit `8bb4664`). Barbie can call them directly in live mode, replacing the mock data.
