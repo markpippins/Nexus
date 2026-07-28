@@ -1,7 +1,23 @@
-import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, OnDestroy } from '@angular/core';
+import { Component, ChangeDetectionStrategy, inject, input, signal, effect, computed, OnDestroy, Signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TerrainService, TerrainHealthSummary, McpServer, RunnableService } from '../../services/terrain.service.js';
 import { ServicePollMonitorComponent } from '../system-health/service-poll-monitor.component.js';
+
+/** Unified item representing either an MCP server or a runnable service in the topology tables. */
+interface TopologyServiceItem {
+  id: number;
+  name: string;
+  port: number | null;
+  healthCheckUrl: string;
+  status: string;
+  liveStatus?: string;
+  version: string;
+  activeFlag: boolean;
+  isInternal: boolean;
+  entityType: 'MCP Server' | 'Service';
+  /** transportType for MCP servers, workspacePath for runnable services */
+  detail: string;
+}
 
 @Component({
   selector: 'app-topology',
@@ -69,45 +85,45 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
         } @else if (summary(); as s) {
           <!--
             Service taxonomy for this view:
-              • Third-Party Dependencies  ← MCP Servers (typically external integrations we connect to)
-              • Internal Services         ← Runnable Services (services we deploy and operate)
-              • Host Servers              ← infrastructure / machines (shown separately, no taxonomy applied)
-            Override per-item by adding an &quot;isThirdParty&quot; boolean to McpServer, or by
-            deriving it from &quot;repositoryUrl&quot;; this is the current default.
+              • Third-Party Dependencies  ← items where isInternal=false (from both MCP & Runnable)
+              • Internal Services         ← items where isInternal=true (from both MCP & Runnable)
+              • Host Servers              ← infrastructure / machines (shown separately)
+            The isInternal flag is set in the database per-service and returned by the
+            /api/v1/platform/health endpoint.
           -->
           <!-- Summary Cards -->
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <!-- Third-Party Dependencies Card (MCP Servers are typically external integrations) -->
+            <!-- Third-Party Dependencies Card -->
             <div class="p-5 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))]">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Third-Party Dependencies</span>
-                <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ s.mcpServers.length }}</span>
+                <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ thirdPartyItems().length }}</span>
               </div>
               <div class="flex gap-2 text-xs">
-                <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countEffective(s.mcpServers, 'ON') }} Online</span>
-                <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countEffective(s.mcpServers, 'OFFLINE') }} Offline</span>
-                @if (countEffective(s.mcpServers, 'DEGRADED') > 0) {
-                  <span class="px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600">{{ countEffective(s.mcpServers, 'DEGRADED') }} Degraded</span>
+                <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countEffective(thirdPartyItems(), 'ON') }} Online</span>
+                <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countEffective(thirdPartyItems(), 'OFFLINE') }} Offline</span>
+                @if (countEffective(thirdPartyItems(), 'DEGRADED') > 0) {
+                  <span class="px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600">{{ countEffective(thirdPartyItems(), 'DEGRADED') }} Degraded</span>
                 }
               </div>
             </div>
 
-            <!-- Internal Services Card (Runnable Services are services we deploy and operate) -->
+            <!-- Internal Services Card -->
             <div class="p-5 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))]">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Internal Services</span>
-                <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ s.runnableServices.length }}</span>
+                <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ internalItems().length }}</span>
               </div>
               <div class="flex gap-2 text-xs">
-                <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countEffective(s.runnableServices, 'ON') }} Online</span>
-                <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countEffective(s.runnableServices, 'OFFLINE') }} Offline</span>
-                @if (countEffective(s.runnableServices, 'DEGRADED') > 0) {
-                  <span class="px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600">{{ countEffective(s.runnableServices, 'DEGRADED') }} Degraded</span>
+                <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countEffective(internalItems(), 'ON') }} Online</span>
+                <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countEffective(internalItems(), 'OFFLINE') }} Offline</span>
+                @if (countEffective(internalItems(), 'DEGRADED') > 0) {
+                  <span class="px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-600">{{ countEffective(internalItems(), 'DEGRADED') }} Degraded</span>
                 }
               </div>
             </div>
 
-            <!-- Servers Card -->
+            <!-- Host Servers Card -->
             <div class="p-5 bg-[rgb(var(--color-surface-muted))] rounded-xl border border-[rgb(var(--color-border-muted))]">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Host Servers</span>
@@ -158,8 +174,8 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
             </div>
           </div>
 
-          <!-- Third-Party Dependencies Table (MCP Servers we connect to) -->
-          @if (s.mcpServers.length > 0) {
+          <!-- Third-Party Dependencies Table (isInternal=false items) -->
+          @if (thirdPartyItems().length > 0) {
             <div class="mb-8">
               <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Third-Party Dependencies</h3>
               <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
@@ -168,25 +184,34 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
                     <tr>
                       <th class="px-3 py-1.5 font-semibold">Name</th>
                       <th class="px-3 py-1.5 font-semibold">Port</th>
-                      <th class="px-3 py-1.5 font-semibold">Transport</th>
+                      <th class="px-3 py-1.5 font-semibold">Type</th>
+                      <th class="px-3 py-1.5 font-semibold">Details</th>
                       <th class="px-3 py-1.5 font-semibold">Status</th>
                       <th class="px-3 py-1.5 font-semibold">Health Check</th>
                     </tr>
                   </thead>
                   <tbody>
-                    @for (mcp of s.mcpServers; track mcp.id) {
-                      @let eff = getEffectiveStatus(mcp);
-                      @let probed = isLiveProbed(mcp);
+                    @for (item of thirdPartyItems(); track item.id) {
+                      @let eff = getEffectiveStatus(item);
+                      @let probed = isLiveProbed(item);
                       <tr class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100"
-                        [class.opacity-50]="!mcp.activeFlag">
+                        [class.opacity-50]="!item.activeFlag">
                         <td class="px-3 py-1 text-[13px]">
-                          <span class="font-medium text-[rgb(var(--color-text-base))]">{{ mcp.name }}</span>
-                          @if (mcp.version) {
-                            <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ mcp.version }}</span>
+                          <span class="font-medium text-[rgb(var(--color-text-base))]">{{ item.name }}</span>
+                          @if (item.version) {
+                            <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ item.version }}</span>
                           }
                         </td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ mcp.port || '—' }}</td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ mcp.transportType || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ item.port || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px]">
+                          <span class="px-1.5 py-0.5 rounded text-xs font-medium"
+                            [class.bg-blue-500/10]="item.entityType === 'MCP Server'"
+                            [class.text-blue-600]="item.entityType === 'MCP Server'"
+                            [class.bg-purple-500/10]="item.entityType === 'Service'"
+                            [class.text-purple-600]="item.entityType === 'Service'"
+                          >{{ item.entityType }}</span>
+                        </td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ item.detail || '—' }}</td>
                         <td class="px-3 py-1">
                           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
                             [class.bg-green-500/10]="eff === 'ON'"
@@ -207,11 +232,11 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
                             ></span>
                             {{ eff }}
                           </span>
-                          @if (probed && eff !== mcp.status) {
-                            <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ mcp.status }}</span>
+                          @if (probed && eff !== item.status) {
+                            <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ item.status }}</span>
                           }
                         </td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ mcp.healthCheckUrl || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ item.healthCheckUrl || '—' }}</td>
                       </tr>
                     }
                   </tbody>
@@ -220,12 +245,12 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
             </div>
           } @else {
             <div class="mb-8 p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
-              <p class="text-sm">No third-party dependencies registered in terrain (no MCP servers).</p>
+              <p class="text-sm">No third-party dependencies registered in terrain.</p>
             </div>
           }
 
-          <!-- Internal Services Table (services we deploy and run) -->
-          @if (s.runnableServices.length > 0) {
+          <!-- Internal Services Table (isInternal=true items) -->
+          @if (internalItems().length > 0) {
             <div class="mb-8">
               <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Internal Services</h3>
               <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
@@ -234,25 +259,34 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
                     <tr>
                       <th class="px-3 py-1.5 font-semibold">Name</th>
                       <th class="px-3 py-1.5 font-semibold">Port</th>
-                      <th class="px-3 py-1.5 font-semibold">Workspace</th>
+                      <th class="px-3 py-1.5 font-semibold">Type</th>
+                      <th class="px-3 py-1.5 font-semibold">Details</th>
                       <th class="px-3 py-1.5 font-semibold">Status</th>
                       <th class="px-3 py-1.5 font-semibold">Health Check</th>
                     </tr>
                   </thead>
                   <tbody>
-                    @for (svc of s.runnableServices; track svc.id) {
-                      @let eff = getEffectiveStatus(svc);
-                      @let probed = isLiveProbed(svc);
+                    @for (item of internalItems(); track item.id) {
+                      @let eff = getEffectiveStatus(item);
+                      @let probed = isLiveProbed(item);
                       <tr class="border-b border-[rgb(var(--color-border-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors duration-100"
-                        [class.opacity-50]="!svc.activeFlag">
+                        [class.opacity-50]="!item.activeFlag">
                         <td class="px-3 py-1 text-[13px]">
-                          <span class="font-medium text-[rgb(var(--color-text-base))]">{{ svc.name }}</span>
-                          @if (svc.version) {
-                            <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ svc.version }}</span>
+                          <span class="font-medium text-[rgb(var(--color-text-base))]">{{ item.name }}</span>
+                          @if (item.version) {
+                            <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ item.version }}</span>
                           }
                         </td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ svc.port || '—' }}</td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ svc.workspacePath || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ item.port || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px]">
+                          <span class="px-1.5 py-0.5 rounded text-xs font-medium"
+                            [class.bg-blue-500/10]="item.entityType === 'MCP Server'"
+                            [class.text-blue-600]="item.entityType === 'MCP Server'"
+                            [class.bg-purple-500/10]="item.entityType === 'Service'"
+                            [class.text-purple-600]="item.entityType === 'Service'"
+                          >{{ item.entityType }}</span>
+                        </td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ item.detail || '—' }}</td>
                         <td class="px-3 py-1">
                           <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
                             [class.bg-green-500/10]="eff === 'ON'"
@@ -273,11 +307,11 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
                             ></span>
                             {{ eff }}
                           </span>
-                          @if (probed && eff !== svc.status) {
-                            <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ svc.status }}</span>
+                          @if (probed && eff !== item.status) {
+                            <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ item.status }}</span>
                           }
                         </td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ svc.healthCheckUrl || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ item.healthCheckUrl || '—' }}</td>
                       </tr>
                     }
                   </tbody>
@@ -286,11 +320,11 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
             </div>
           } @else {
             <div class="mb-8 p-6 text-center text-[rgb(var(--color-text-muted))] bg-[rgb(var(--color-surface-muted))] rounded-lg border border-[rgb(var(--color-border-muted))]">
-              <p class="text-sm">No internal services deployed yet (no runnable services).</p>
+              <p class="text-sm">No internal services deployed yet.</p>
             </div>
           }
 
-          <!-- Servers Table -->
+          <!-- Host Servers Table -->
           @if (s.servers.length > 0) {
             <div class="mb-8">
               <h3 class="text-sm font-semibold uppercase tracking-wide text-[rgb(var(--color-text-muted))] mb-3">Host Servers</h3>
@@ -344,7 +378,7 @@ import { ServicePollMonitorComponent } from '../system-health/service-poll-monit
           }
 
           <!-- Empty state when no data at all -->
-          @if (s.mcpServers.length === 0 && s.runnableServices.length === 0 && s.servers.length === 0) {
+          @if (thirdPartyItems().length === 0 && internalItems().length === 0 && s.servers.length === 0) {
             <div class="flex flex-col items-center justify-center py-16 text-center">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-[rgb(var(--color-text-muted))] opacity-30 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75" />
@@ -441,6 +475,63 @@ export class TopologyComponent implements OnDestroy {
     });
   }
 
+  /**
+   * Merge MCP servers and runnable services into a unified list,
+   * filtering by the isInternal flag.
+   */
+  private toTopologyItems(
+    internal: boolean,
+    mcpServers: McpServer[],
+    runnableServices: RunnableService[],
+  ): TopologyServiceItem[] {
+    const fromMcp: TopologyServiceItem[] = mcpServers
+      .filter(m => (m.isInternal ?? true) === internal)
+      .map(m => ({
+        id: m.id,
+        name: m.name,
+        port: m.port,
+        healthCheckUrl: m.healthCheckUrl,
+        status: m.status,
+        liveStatus: m.liveStatus,
+        version: m.version,
+        activeFlag: m.activeFlag,
+        isInternal: m.isInternal ?? true,
+        entityType: 'MCP Server' as const,
+        detail: m.transportType || '—',
+      }));
+    const fromRunnable: TopologyServiceItem[] = runnableServices
+      .filter(r => (r.isInternal ?? true) === internal)
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        port: r.port,
+        healthCheckUrl: r.healthCheckUrl,
+        status: r.status,
+        liveStatus: r.liveStatus,
+        version: r.version,
+        activeFlag: r.activeFlag,
+        isInternal: r.isInternal ?? true,
+        entityType: 'Service' as const,
+        detail: r.workspacePath || '—',
+      }));
+    // Combined sorted by name
+    return [...fromMcp, ...fromRunnable].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Items with isInternal=false (third-party services from both MCP and Runnable lists). */
+  thirdPartyItems: Signal<TopologyServiceItem[]> = computed(() => {
+    const s = this.summary();
+    if (!s) return [];
+    return this.toTopologyItems(false, s.mcpServers, s.runnableServices);
+  });
+
+  /** Items with isInternal=true (internal services from both MCP and Runnable lists). */
+  internalItems: Signal<TopologyServiceItem[]> = computed(() => {
+    const s = this.summary();
+    if (!s) return [];
+    return this.toTopologyItems(true, s.mcpServers, s.runnableServices);
+  });
+
   private async loadData(baseUrl: string, showLoading = false): Promise<void> {
     if (showLoading) {
       this.loading.set(true);
@@ -451,26 +542,21 @@ export class TopologyComponent implements OnDestroy {
       const summary = await this.terrainService.getHealthSummary(baseUrl);
       this.summary.set(summary);
 
-      // Count issues from probed services
+      // Count issues from all services (both third-party and internal)
       let offline = 0;
       let degraded = 0;
-      for (const mcp of summary.mcpServers) {
-        const eff = this.getEffectiveStatus(mcp);
-        if (eff === 'OFFLINE') offline++;
-        if (eff === 'DEGRADED') degraded++;
-      }
-      for (const svc of summary.runnableServices) {
-        const eff = this.getEffectiveStatus(svc);
+      const allItems = [
+        ...summary.mcpServers,
+        ...summary.runnableServices,
+      ];
+      for (const item of allItems) {
+        const eff = this.getEffectiveStatus(item);
         if (eff === 'OFFLINE') offline++;
         if (eff === 'DEGRADED') degraded++;
       }
       this.countOffline.set(offline);
       this.countDegraded.set(degraded);
 
-      // terrainUp=false + no terrainError → terrain responded, downstream
-      // services are just offline. The banner handles this as "Degraded".
-      // terrainUp=false + terrainError → terrain is genuinely unreachable.
-      // Show the error screen so the user sees the connection problem.
       if (!summary.terrainUp && summary.terrainError) {
         this.error.set(true);
       }
@@ -488,7 +574,6 @@ export class TopologyComponent implements OnDestroy {
       this.countDegraded.set(0);
     } finally {
       this.loading.set(false);
-      // Always reschedule auto-refresh so it keeps retrying even when terrain is down
       this.scheduleAutoRefresh();
     }
   }
@@ -497,7 +582,6 @@ export class TopologyComponent implements OnDestroy {
     this.loadData(this.baseUrl(), true);
   }
 
-  /** Toggle auto-refresh on/off */
   toggleAutoRefresh(): void {
     this.autoRefresh.update(v => !v);
     if (this.autoRefresh()) {
@@ -507,26 +591,18 @@ export class TopologyComponent implements OnDestroy {
     }
   }
 
-  /** Schedule the next auto-refresh cycle */
   private scheduleAutoRefresh(): void {
     this.clearAutoRefresh();
     if (!this.autoRefresh()) return;
-
-    // Reset countdown
     this.nextRefreshIn.set(Math.round(this.AUTO_REFRESH_MS / 1000));
-
-    // Countdown every second
     this.countdownTimerId = setInterval(() => {
       this.nextRefreshIn.update(v => Math.max(0, v - 1));
     }, 1000);
-
-    // Auto-refresh after interval — no loading spinner to avoid blink
     this.autoRefreshTimerId = setTimeout(() => {
       this.loadData(this.baseUrl(), false);
     }, this.AUTO_REFRESH_MS);
   }
 
-  /** Clear all auto-refresh timers */
   private clearAutoRefresh(): void {
     if (this.autoRefreshTimerId !== null) {
       clearTimeout(this.autoRefreshTimerId);
@@ -542,34 +618,19 @@ export class TopologyComponent implements OnDestroy {
     this.clearAutoRefresh();
   }
 
-  /**
-   * Get the effective status for a service item.
-   *
-   * Priority:
-   * 1. liveStatus from the live probe (ON, OFFLINE, DEGRADED) — the ground truth
-   * 2. Stored status, normalized to probe-style values (ONLINE→ON, OFFLINE→OFFLINE)
-   *
-   * This ensures probed-offline services properly show as OFFLINE (red)
-   * rather than falling through to a stale stored ONLINE status.
-   */
   getEffectiveStatus(item: { status: string; liveStatus?: string }): string {
-    // If the probe returned a meaningful result, use it directly
     if (item.liveStatus && item.liveStatus !== 'UNKNOWN') {
       return item.liveStatus;
     }
-    // Normalize stored status to probe-style values
     if (item.status === 'ONLINE') return 'ON';
     if (item.status === 'OFFLINE') return 'OFFLINE';
-    // Keep STARTING, ERROR, etc. as-is (they'll render gray in the template)
     return item.status;
   }
 
-  /** Whether the live probe ran (any meaningful result, not just ON). */
   isLiveProbed(item: { liveStatus?: string }): boolean {
     return !!item.liveStatus && item.liveStatus !== 'UNKNOWN';
   }
 
-  /** Count items by effective status (liveStatus preferred). */
   countEffective(items: { status: string; liveStatus?: string }[], status: string): number {
     return items.filter(i => this.getEffectiveStatus(i) === status).length;
   }
