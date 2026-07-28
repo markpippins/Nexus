@@ -1994,33 +1994,39 @@ export function createRoutes(pool: Pool): Router {
       // Upsert each file
       const results: { id: string; filePath: string; content: string; sizeBytes: number; recordedOn: string }[] = [];
       for (const file of scanned) {
-        const content = fs.readFileSync(file.absPath, 'utf-8');
-      await client.query(
-        `UPDATE nebula.audit_files_history
-         SET recorded_until_dt = NOW()
-         WHERE file_path = $1
-           AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
-        [file.filePath]
-      );
-      const { rows: [row] } = await client.query(
-        `INSERT INTO nebula.audit_files_history (file_path, content, size_bytes, recorded_on_dt, recorded_until_dt)
-         VALUES ($1, $2, $3, NOW(), '9999-12-31 23:59:59+00')
-         RETURNING id, file_path, content, size_bytes, recorded_on_dt`,
-        [file.filePath, content, file.sizeBytes]
-      );
-        results.push({
-          id: row.id,
-          filePath: row.file_path,
-          content: row.content,
-          sizeBytes: row.size_bytes,
-          recordedOn: row.recorded_on_dt,
-        });
+        try {
+          const content = await fs.promises.readFile(file.absPath, 'utf-8');
+          await client.query(
+            `UPDATE nebula.audit_files_history
+             SET recorded_until_dt = NOW()
+             WHERE file_path = $1
+               AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+            [file.filePath]
+          );
+          const { rows: [row] } = await client.query(
+            `INSERT INTO nebula.audit_files_history (file_path, content, size_bytes, recorded_on_dt, recorded_until_dt)
+             VALUES ($1, $2, $3, NOW(), '9999-12-31 23:59:59+00')
+             RETURNING id, file_path, content, size_bytes, recorded_on_dt`,
+            [file.filePath, content, file.sizeBytes]
+          );
+          results.push({
+            id: row.id,
+            filePath: row.file_path,
+            content: row.content,
+            sizeBytes: row.size_bytes,
+            recordedOn: row.recorded_on_dt,
+          });
+        } catch (fileErr: any) {
+          // Per-file failure: log and skip this file, continue with the rest.
+          // This prevents one unreadable file from aborting the entire sync.
+          console.warn(`[audit/sync] Skipping ${file.filePath}: ${fileErr.message}`);
+        }
       }
 
       await client.query('COMMIT');
       return results;
     } catch (err) {
-      await client.query('ROLLBACK');
+      try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
       throw err;
     } finally {
       client.release();

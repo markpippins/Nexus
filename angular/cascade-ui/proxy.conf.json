@@ -1,0 +1,7 @@
+{
+  "/cascade": {
+    "target": "http://localhost:3106",
+    "secure": false,
+    "changeOrigin": true
+  }
+}

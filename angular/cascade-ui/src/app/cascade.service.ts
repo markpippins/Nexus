@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-const API = 'http://localhost:3106/cascade';
+const API = '/cascade';
 
 export interface CascadeEvent {
   event_id: string;
