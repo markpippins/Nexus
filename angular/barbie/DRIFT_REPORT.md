@@ -1,8 +1,9 @@
 # Barbie ↔ Backend API Drift Report
 
-> **Date:** 2026-07-28  
+> **Date:** 2026-07-28 (updated)  
 > **Scope:** Discrepancies between barbie's "live" mode REST API expectations and the actual Nexus backend APIs  
-> **Goal:** Barbie is slated to replace the nexus-console Service Mesh "console" view — this documents what needs to change before that's possible.
+> **Goal:** Barbie is slated to replace the nexus-console Service Mesh "console" view — this documents what needs to change before that's possible.  
+> **Last change:** `/api/v1/registry/aggregate` endpoint created (commit `b969126`) — Section 6 updated.
 
 ---
 
@@ -123,15 +124,15 @@ Backend uses **three different enums**: `HealthStatus`, `ServiceStatus`, `Deploy
 
 ---
 
-## 6. Endpoints Barbie Expects That Don't Exist — 🔴 CRITICAL
+## 6. Endpoints Barbie Expects That Don't Exist — 🟡 MEDIUM (was 🔴 CRITICAL)
 
 | Barbie endpoint | Exists? | Notes |
 |---|---|---|
-| `GET /api/v1/registry/aggregate` | ❌ | No single aggregate endpoint. Console computes summary from multiple calls (`services` + `deployments` + `servers` + `frameworks`). Barbie would need to do the same, or a new backend endpoint would need to be created. |
+| `GET /api/v1/registry/aggregate` | ✅ | **NOW EXISTS.** Added to `RegistryController.java` (commit `b969126`). Returns `totalSystems`, `totalServices`, `totalServers`, `totalDeployments`, health breakdown (`healthyCount`, `degradedCount`, `criticalCount`, `offlineCount`), `overallHealthPercent`, `activeIncidentsCount`, topology `nodes[]` and `edges[]`. Runtime metrics (`avgLatencyMs`, `totalRps`) return `0` — not available at entity level. |
 | `GET /api/v1/registry/logs/:type/:id` | ❌ | No centralized log endpoint. |
 | `GET /api/v1/registry/metrics/:type/:id` | ❌ | No metrics time-series endpoint. |
 
-**Fix:** Either create these endpoints on the backend, or refactor barbie's `AggregatePlatformVisualizer` to call the individual entity endpoints and compute the summary client-side (matching how `service-mesh.service.ts` does it). For logs/metrics, remove the feature or integrate with real monitoring (e.g., terrain-mcp, PEB).
+**Fix (updated):** The aggregate endpoint is resolved. For logs/metrics, remove the feature or integrate with real monitoring (e.g., terrain-mcp, PEB).
 
 ---
 
@@ -177,12 +178,12 @@ These are operational endpoints the Service Mesh view uses but barbie doesn't ca
 | 3 | Response shape | 🟡 MEDIUM | Different pagination field names, raw-array edge cases |
 | 4 | Entity shape | 🔴 CRITICAL | Flat strings vs nested objects, missing/extra fields across all entities |
 | 5 | Status values | 🟡 MEDIUM | Lowercase `'healthy'` vs uppercase `'HEALTHY'`/`'ACTIVE'`/`'RUNNING'` |
-| 6 | Missing backend endpoints | 🔴 CRITICAL | No `/aggregate`, `/logs`, `/metrics` — must compute client-side |
+| 6 | Missing backend endpoints | 🟡 MEDIUM | `/aggregate` resolved; `/logs` and `/metrics` still missing |
 | 7 | Missing barbie features | 🟢 LOW | No `/status` polling, deployment ops, dependency graph |
 | 8 | Lookup paths | 🟡 MEDIUM | Flat `/api/v1/*` vs barbie's `/api/v1/registry/*` |
 
-**Total critical items:** 4  
-**Total medium items:** 3  
+**Total critical items:** 3 (was 4 — aggregate endpoint resolved)  
+**Total medium items:** 4  
 **Total low items:** 1
 
 ---
@@ -197,6 +198,6 @@ These are operational endpoints the Service Mesh view uses but barbie doesn't ca
 
 2. **Rewrite `types.ts`** to match the real backend data model, then update all components.
 
-3. **Replace `getPlatformAggregate()`** with client-side computation from individual `/api/v1/services`, `/api/v1/deployments`, `/api/v1/servers`, `/api/v1/frameworks` calls — matching how `service-mesh.service.ts` builds its `summary` computed signal.
+3. **Call `getPlatformAggregate()` directly** — the real `/api/v1/registry/aggregate` endpoint now exists in `RegistryController`. Barbie can call it directly instead of computing the aggregate client-side. Note: `avgLatencyMs` and `totalRps` return `0` (runtime metrics not yet wired to Redis).
 
 4. **Drop or stub** `/logs` and `/metrics` features until backend support exists.
