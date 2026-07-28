@@ -54,6 +54,20 @@ const server = app.listen(PORT, () => {
   console.log(`nebula-srv listening on http://localhost:${PORT}`);
 });
 
+// Handle listen-time errors (e.g. EADDRINUSE) cleanly so a port conflict
+// produces a one-line log line + non-zero exit instead of an unhandled
+// 'error' event that crashes the process with a stack trace. This also
+// lets systemd's Restart=on-failure behave predictably: a taken port is
+// a fatal-but-clean condition, not a crash.
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`nebula-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('nebula-srv: listen error:', err.message);
+  }
+  process.exit(1);
+});
+
 // ── Graceful shutdown ──────────────────────────────────────────────
 process.on('SIGTERM', async () => {
   console.log('[server] SIGTERM received, shutting down...');
