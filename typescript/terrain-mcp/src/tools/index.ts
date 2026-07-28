@@ -2,6 +2,38 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { callTerrainJson } from "../db/client.js";
 
+// ── Helper: search across mcp-servers and runnable-services by name ──
+async function findServiceByName(name: string): Promise<any> {
+  // Try MCP servers first
+  try {
+    const mcpData = await callTerrainJson<any>(`/mcp-servers`);
+    const mcpList = mcpData.data ?? mcpData.mcpServers ?? mcpData;
+    const mcpServers = Array.isArray(mcpList) ? mcpList : [];
+    const mcpMatch = mcpServers.find((s: any) => s.name === name);
+    if (mcpMatch) return { ...mcpMatch, type: "MCP Server" };
+  } catch { /* continue */ }
+
+  // Try runnable services
+  try {
+    const svcData = await callTerrainJson<any>(`/runnable-services`);
+    const svcList = svcData.data ?? svcData.services ?? svcData;
+    const svcServices = Array.isArray(svcList) ? svcList : [];
+    const svcMatch = svcServices.find((s: any) => s.name === name);
+    if (svcMatch) return { ...svcMatch, type: "Runnable Service" };
+  } catch { /* continue */ }
+
+  // Try servers (hosts)
+  try {
+    const srvData = await callTerrainJson<any>(`/servers`);
+    const srvList = srvData.data ?? srvData.servers ?? srvData;
+    const servers = Array.isArray(srvList) ? srvList : [];
+    const srvMatch = servers.find((s: any) => s.hostname === name || s.name === name);
+    if (srvMatch) return { ...srvMatch, type: "Server" };
+  } catch { /* continue */ }
+
+  return null;
+}
+
 export function registerTools(server: McpServer) {
 
   // ── SERVERS (hosts) ────────────────────────────────────────────────
@@ -11,7 +43,7 @@ export function registerTools(server: McpServer) {
     "List all registered server hosts with their status, OS, and metadata.",
     {},
     async () => {
-      const data = await callTerrainJson(`/terrain/servers`);
+      const data = await callTerrainJson(`/servers`);
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }
   );
@@ -23,7 +55,7 @@ export function registerTools(server: McpServer) {
     "List all registered MCP servers with ports, transport type, status, and health check URLs.",
     {},
     async () => {
-      const data = await callTerrainJson(`/terrain/mcp-servers`);
+      const data = await callTerrainJson(`/mcp-servers`);
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }
   );
@@ -44,7 +76,7 @@ export function registerTools(server: McpServer) {
       health: z.string().optional(),
     },
     async (args) => {
-      const data = await callTerrainJson(`/terrain/mcp-servers`, {
+      const data = await callTerrainJson(`/mcp-servers`, {
         method: "POST",
         body: JSON.stringify(args),
       });
@@ -59,7 +91,7 @@ export function registerTools(server: McpServer) {
     "List all registered runnable services (Express, Bun, Spring Boot, UI apps, etc.) with ports, status, and health check URLs.",
     {},
     async () => {
-      const data = await callTerrainJson(`/terrain/runnable-services`);
+      const data = await callTerrainJson(`/runnable-services`);
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }
   );
@@ -80,7 +112,7 @@ export function registerTools(server: McpServer) {
       service_type_id: z.number().optional().describe("Service type ID: 2=Microservice, 3=Express, 12=Python Service (default 3)"),
     },
     async (args) => {
-      const data = await callTerrainJson(`/terrain/runnable-services`, {
+      const data = await callTerrainJson(`/runnable-services`, {
         method: "POST",
         body: JSON.stringify(args),
       });
@@ -95,7 +127,7 @@ export function registerTools(server: McpServer) {
     "List all registered CLI tools with language, category, invocation, and file path.",
     {},
     async () => {
-      const data = await callTerrainJson(`/terrain/cli-tools`);
+      const data = await callTerrainJson(`/cli-tools`);
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }
   );
@@ -117,7 +149,7 @@ export function registerTools(server: McpServer) {
       build_command: z.string().optional(),
     },
     async (args) => {
-      const data = await callTerrainJson(`/terrain/cli-tools`, {
+      const data = await callTerrainJson(`/cli-tools`, {
         method: "POST",
         body: JSON.stringify(args),
       });
@@ -126,6 +158,8 @@ export function registerTools(server: McpServer) {
   );
 
   // ── SERVICE STATUS ─────────────────────────────────────────────────
+  // Spring Boot terrain doesn't have a unified service lookup endpoint,
+  // so we search across MCP servers, runnable services, and servers.
 
   server.tool(
     "terrain_get_service_status",
@@ -135,8 +169,11 @@ export function registerTools(server: McpServer) {
     },
     async (args) => {
       try {
-        const data = await callTerrainJson(`/terrain/services/${encodeURIComponent(args.name)}`);
-        return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+        const match = await findServiceByName(args.name);
+        if (!match) {
+          return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Service "${args.name}" not found in terrain` }, null, 2) }] };
+        }
+        return { content: [{ type: "text" as const, text: JSON.stringify(match, null, 2) }] };
       } catch (err: any) {
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: err?.message ?? String(err) }, null, 2) }] };
       }
@@ -150,8 +187,13 @@ export function registerTools(server: McpServer) {
       name: z.string().describe("Service name (e.g. 'conduit-mcp', 'nebula-srv')"),
     },
     async (args) => {
-      const data = await callTerrainJson(`/terrain/services/${encodeURIComponent(args.name)}/running`);
-      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+      try {
+        const match = await findServiceByName(args.name);
+        const running = match?.status === "ONLINE";
+        return { content: [{ type: "text" as const, text: JSON.stringify({ name: args.name, running, status: match?.status ?? "unknown" }, null, 2) }] };
+      } catch (err: any) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ name: args.name, running: false, error: err?.message ?? String(err) }, null, 2) }] };
+      }
     }
   );
 
@@ -163,11 +205,36 @@ export function registerTools(server: McpServer) {
       status: z.string().describe("New status: ONLINE, OFFLINE, STARTING, ERROR"),
     },
     async (args) => {
-      const data = await callTerrainJson(`/terrain/services/status`, {
-        method: "PATCH",
-        body: JSON.stringify(args),
-      });
-      return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+      // Find which table the service is in, then update via the appropriate endpoint
+      try {
+        const mcpData = await callTerrainJson<any>(`/mcp-servers`);
+        const mcpList = mcpData.data ?? mcpData.mcpServers ?? mcpData;
+        const mcpServers = Array.isArray(mcpList) ? mcpList : [];
+        const mcpMatch = mcpServers.find((s: any) => s.name === args.name);
+        if (mcpMatch) {
+          const data = await callTerrainJson(`/mcp-servers/${mcpMatch.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ ...mcpMatch, status: args.status }),
+          });
+          return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+        }
+
+        const svcData = await callTerrainJson<any>(`/runnable-services`);
+        const svcList = svcData.data ?? svcData.services ?? svcData;
+        const svcServices = Array.isArray(svcList) ? svcList : [];
+        const svcMatch = svcServices.find((s: any) => s.name === args.name);
+        if (svcMatch) {
+          const data = await callTerrainJson(`/runnable-services/${svcMatch.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ ...svcMatch, status: args.status }),
+          });
+          return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+        }
+
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: `Service "${args.name}" not found in terrain` }, null, 2) }] };
+      } catch (err: any) {
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: err?.message ?? String(err) }, null, 2) }] };
+      }
     }
   );
 
@@ -178,7 +245,7 @@ export function registerTools(server: McpServer) {
     "Get a complete snapshot of all registered infrastructure — servers, MCP servers, runnable services, CLI tools, dependencies, and their status counts.",
     {},
     async () => {
-      const data = await callTerrainJson(`/terrain/summary`);
+      const data = await callTerrainJson(`/platform/health`);
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }
   );
@@ -190,7 +257,7 @@ export function registerTools(server: McpServer) {
     "List all service dependency relationships (which services depend on which other services).",
     {},
     async () => {
-      const data = await callTerrainJson(`/terrain/dependencies`);
+      const data = await callTerrainJson(`/service-dependencies`);
       return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
     }
   );
@@ -207,7 +274,7 @@ export function registerTools(server: McpServer) {
       description: z.string().optional(),
     },
     async (args) => {
-      const data = await callTerrainJson(`/terrain/dependencies`, {
+      const data = await callTerrainJson(`/service-dependencies`, {
         method: "POST",
         body: JSON.stringify(args),
       });

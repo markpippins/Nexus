@@ -37,7 +37,7 @@
 // Decision for this engineering epoch: AUDIT ONLY.
 //
 //   - knowledge-mcp → full split into knowledge-srv (port 3109) ✅
-//   - terrain-mcp   → scaffold pass-through into terrain-srv (port 3111) ✅
+//   - terrain-mcp   → repointed to Spring Boot terrain (:8084/api/v1/) ✅
 //   - conduit-mcp   → THIS FILE — header audit block only. NO SQL
 //                       moved into a sibling server this session.
 //                       Blocked on schema-bootstrap-ownership decision

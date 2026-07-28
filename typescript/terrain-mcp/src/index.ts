@@ -5,7 +5,7 @@ import { registerTools } from "./tools/index.js";
 async function main() {
   const server = new McpServer({
     name: "terrain-mcp",
-    version: "1.1.0",
+    version: "1.2.0",
   });
 
   registerTools(server);
@@ -13,7 +13,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.error("terrain-mcp running on stdio (REST proxy of terrain-srv @ http://localhost:3111)");
+  console.error("terrain-mcp running on stdio (proxy of Spring Boot terrain @ http://localhost:8084/api/v1)");
 }
 
 main().catch((err) => {

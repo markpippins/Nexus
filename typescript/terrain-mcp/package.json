@@ -1,7 +1,7 @@
 {
   "name": "terrain-mcp",
-  "version": "1.1.0",
-  "description": "MCP server for infrastructure topology — thin REST-proxy on terrain-srv (port 3111). All SQL access has moved to that service.",
+  "version": "1.2.0",
+  "description": "MCP server for infrastructure topology — REST proxy on Spring Boot terrain (port 8084, /api/v1/). No direct SQL access.",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
