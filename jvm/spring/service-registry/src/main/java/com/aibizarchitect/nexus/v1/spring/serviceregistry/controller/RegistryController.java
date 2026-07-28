@@ -1,9 +1,11 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -337,6 +339,88 @@ public class RegistryController {
         response.put("edges", edges);
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Simulated log stream for a given entity (service, server, etc.).
+     * Returns 30 synthetic log entries with varying levels and messages.
+     *
+     * GET /api/v1/registry/logs/{entityType}/{entityId}
+     */
+    @GetMapping("/logs/{entityType}/{entityId}")
+    public ResponseEntity<Map<String, Object>> getLogs(
+            @PathVariable String entityType,
+            @PathVariable String entityId) {
+
+        String[] levels = {"info", "info", "info", "warn", "error", "debug"};
+        String[] messages = {
+            "Received HTTP GET /v1/healthcheck 200 OK - 2ms",
+            "Database connection pool active: 12 connections",
+            "Processing batch payload (248 records) from queue",
+            "Cache hit ratio: 94.2% on Redis key namespace",
+            "Slow query detected: SELECT * FROM transaction_ledger WHERE status = 'pending' (124ms)",
+            "Failed to authenticate JWT token: Expired signature from 10.128.0.14",
+            "Heartbeat ping broadcast acknowledged by registry server",
+            "GC pause duration: 18ms (young generation collection)",
+            "Rate limiter bucket consumed: 12 tokens remaining for key ip_35.210",
+            "Outbound HTTP call to Stripe API completed with status 200 (42ms)"
+        };
+
+        List<Map<String, Object>> logEntries = new ArrayList<>();
+        long nowMs = Instant.now().toEpochMilli();
+
+        for (int i = 0; i < 30; i++) {
+            long time = nowMs - (30L - i) * 3000L;
+            String level = levels[ThreadLocalRandom.current().nextInt(levels.length)];
+            String msg = messages[ThreadLocalRandom.current().nextInt(messages.length)];
+
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("id", "log-" + i + "-" + Instant.now().toEpochMilli());
+            entry.put("timestamp", Instant.ofEpochMilli(time).toString());
+            entry.put("level", level);
+            entry.put("message", "[" + entityType.toUpperCase() + ":" + entityId + "] " + msg);
+            entry.put("serviceName", entityId);
+            entry.put("traceId", "tr-" + Integer.toHexString(ThreadLocalRandom.current().nextInt(0x1000000)));
+            logEntries.add(entry);
+        }
+
+        return ResponseEntity.ok(Map.of("logs", logEntries));
+    }
+
+    /**
+     * Simulated metrics time-series for a given entity.
+     * Returns 16 data points (15-minute window) with CPU, memory, latency, error rate, and RPS.
+     *
+     * GET /api/v1/registry/metrics/{entityType}/{entityId}
+     */
+    @GetMapping("/metrics/{entityType}/{entityId}")
+    public ResponseEntity<Map<String, Object>> getMetrics(
+            @PathVariable String entityType,
+            @PathVariable String entityId) {
+
+        List<Map<String, Object>> points = new ArrayList<>();
+        long nowMs = Instant.now().toEpochMilli();
+
+        log.debug("Generating simulated metrics for {}:{}", entityType, entityId);
+
+        for (int i = 15; i >= 0; i--) {
+            long time = nowMs - (long) i * 60_000L;
+            Instant t = Instant.ofEpochMilli(time);
+            java.time.LocalTime localTime = t.atZone(java.time.ZoneId.systemDefault()).toLocalTime();
+            ThreadLocalRandom rng = ThreadLocalRandom.current();
+
+            Map<String, Object> point = new HashMap<>();
+            point.put("timestamp", t.toString());
+            point.put("timeLabel", String.format("%02d:%02d", localTime.getHour(), localTime.getMinute()));
+            point.put("cpu", Math.min(100, Math.max(10, 40 + (int) (Math.sin(i) * 20) + rng.nextInt(15))));
+            point.put("memory", Math.min(100, Math.max(20, 60 + (int) (Math.cos(i) * 15) + rng.nextInt(10))));
+            point.put("latency", Math.max(5, 20 + (int) (Math.sin(i * 0.5) * 15) + rng.nextInt(25)));
+            point.put("errorRate", Math.round(rng.nextDouble() * 0.5 * 100.0) / 100.0);
+            point.put("rps", 1200 + (int) (Math.sin(i) * 400) + rng.nextInt(200));
+            points.add(point);
+        }
+
+        return ResponseEntity.ok(Map.of("metrics", points));
     }
 
     /**
