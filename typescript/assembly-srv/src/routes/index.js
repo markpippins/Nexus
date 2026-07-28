@@ -16,7 +16,7 @@ import { observationsRouter } from './observations.js';
 import { agentRecordsRouter } from './agent-records.js';
 import { specificationsRouter } from './specifications.js';
 import { usersRouter } from './users.js';
-import { specsRouter } from './specs.js';
+
 import { countsRouter } from './counts.js';
 import { plansRouter } from './plans.js';
 import { searchRouter } from './search.js';
@@ -43,6 +43,6 @@ routes.use('/observations', observationsRouter);
 routes.use('/agent-records', agentRecordsRouter);
 routes.use('/specifications', specificationsRouter);
 routes.use('/users', usersRouter);
-routes.use('/specs', specsRouter);
+
 routes.use('/plans', plansRouter);
 routes.use('/bridges', bridgesRouter);

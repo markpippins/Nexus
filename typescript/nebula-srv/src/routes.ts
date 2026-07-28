@@ -3960,7 +3960,8 @@ export function createRoutes(pool: Pool): Router {
     const client = await pool.connect();
     try {
       const { id } = req.params;
-      const { title, intentDescription, status, systemId, subsystemId, featureId, tags, planRef, workRequestId, completed } = req.body;
+      const { title, intentDescription, status, systemId, subsystemId, featureId, tags, planRef, workRequestId, completed,
+              type, designRationale, provenanceBlockIndices, needsNewNode, proposedParent, proposedName, placementReason } = req.body;
 
       await client.query('BEGIN');
 
@@ -3976,6 +3977,13 @@ export function createRoutes(pool: Pool): Router {
       if (tags !== undefined) { sets.push(`tags = $${i++}`); vals.push(tags); }
       if (workRequestId !== undefined) { sets.push(`work_request_id = $${i++}`); vals.push(workRequestId); }
       if (completed !== undefined) { sets.push(`completed = $${i++}`); vals.push(completed); }
+      if (type !== undefined) { sets.push(`type = $${i++}`); vals.push(type); }
+      if (designRationale !== undefined) { sets.push(`design_rationale = $${i++}`); vals.push(JSON.stringify(designRationale)); }
+      if (provenanceBlockIndices !== undefined) { sets.push(`provenance_block_indices = $${i++}`); vals.push(JSON.stringify(provenanceBlockIndices)); }
+      if (needsNewNode !== undefined) { sets.push(`needs_new_node = $${i++}`); vals.push(needsNewNode); }
+      if (proposedParent !== undefined) { sets.push(`proposed_parent = $${i++}`); vals.push(proposedParent); }
+      if (proposedName !== undefined) { sets.push(`proposed_name = $${i++}`); vals.push(proposedName); }
+      if (placementReason !== undefined) { sets.push(`placement_reason = $${i++}`); vals.push(placementReason); }
 
       // planRef creates a cross-reference but doesn't update the candidate row;
       // still count it as a "change" to avoid the early no-op return.
@@ -4168,13 +4176,15 @@ export function createRoutes(pool: Pool): Router {
   router.post('/harvest-candidates', async (req: Request, res: Response) => {
     const client = await pool.connect();
     try {
-      const { harvestId, title, intentDescription, implementationNotes, codeSnippets, openQuestions, tags, status, systemId, subsystemId, featureId, planRef } = req.body;
+      const { harvestId, title, intentDescription, implementationNotes, codeSnippets, openQuestions, tags, status, systemId, subsystemId, featureId, planRef,
+              type, designRationale, provenanceBlockIndices, needsNewNode, proposedParent, proposedName, placementReason } = req.body;
       if (!harvestId || !title) return res.status(400).json({ error: 'harvestId and title are required' });
       await client.query('BEGIN');
 
       const { rows: [row] } = await client.query(
-        `INSERT INTO nebula.harvest_candidates (harvest_id, title, intent_description, implementation_notes, code_snippets, open_questions, tags, status, system_id, subsystem_id, feature_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        `INSERT INTO nebula.harvest_candidates (harvest_id, title, intent_description, implementation_notes, code_snippets, open_questions, tags, status, system_id, subsystem_id, feature_id,
+                                               type, design_rationale, provenance_block_indices, needs_new_node, proposed_parent, proposed_name, placement_reason)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING *`,
         [
           harvestId, title,
           intentDescription || null,
@@ -4183,6 +4193,13 @@ export function createRoutes(pool: Pool): Router {
           JSON.stringify(openQuestions || []),
           tags || [], status || null,
           systemId || null, subsystemId || null, featureId || null,
+          type || 'requirement',
+          JSON.stringify(designRationale || []),
+          JSON.stringify(provenanceBlockIndices || []),
+          needsNewNode || false,
+          proposedParent || null,
+          proposedName || null,
+          placementReason || null,
         ]
       );
 
@@ -4292,6 +4309,103 @@ export function createRoutes(pool: Pool): Router {
       }
 
       res.json({ ok: true, linked, candidate_count: candidateIds.length, requirement_count: reqs.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+
+  //  SPECS (flattened agenda_items WHERE included=true — distinct from /api/specifications
+  //  which returns revision snapshots from nebula.active_specifications)
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/specs — paginated list of spec items (flattened agenda_items)
+  router.get('/specs', async (req: Request, res: Response) => {
+    try {
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT
+            id, agenda_id, source_type, source_id, title, body,
+            decisions, open_questions, supporting_refs, included,
+            planner_note, item_created_at, item_updated_at,
+            agenda_title, agenda_status
+          FROM nebula.specs
+          ORDER BY item_created_at DESC
+          LIMIT $1 OFFSET $2`,
+          [pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM nebula.specs'),
+      ]);
+
+      const items = dataResult.rows.map(row => ({
+        id: row.id,
+        agendaId: row.agenda_id,
+        sourceType: row.source_type || null,
+        sourceId: row.source_id || null,
+        title: row.title,
+        body: row.body || null,
+        decisions: row.decisions || null,
+        openQuestions: row.open_questions || null,
+        supportingRefs: row.supporting_refs || null,
+        included: row.included != null ? row.included : null,
+        plannerNote: row.planner_note || null,
+        agendaTitle: row.agenda_title || null,
+        agendaStatus: row.agenda_status || null,
+        createdAt: new Date(row.item_created_at).toISOString(),
+        updatedAt: new Date(row.item_updated_at).toISOString(),
+      }));
+
+      res.json({ items, total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/specs/:id — single spec item
+  router.get('/specs/:id', async (req: Request, res: Response) => {
+    try {
+      const id = req.params.id as string;
+      if (!isUuid(id)) {
+        return res.status(400).json({ error: 'id must be a UUID' });
+      }
+
+      const { rows } = await pool.query(
+        `SELECT
+          id, agenda_id, source_type, source_id, title, body,
+          decisions, open_questions, supporting_refs, included,
+          planner_note, item_created_at, item_updated_at,
+          agenda_title, agenda_status
+        FROM nebula.specs
+        WHERE id = $1`,
+        [id]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Spec item not found' });
+      }
+
+      const row = rows[0];
+      res.json({
+        id: row.id,
+        agendaId: row.agenda_id,
+        sourceType: row.source_type || null,
+        sourceId: row.source_id || null,
+        title: row.title,
+        body: row.body || null,
+        decisions: row.decisions || null,
+        openQuestions: row.open_questions || null,
+        supportingRefs: row.supporting_refs || null,
+        included: row.included != null ? row.included : null,
+        plannerNote: row.planner_note || null,
+        agendaTitle: row.agenda_title || null,
+        agendaStatus: row.agenda_status || null,
+        createdAt: new Date(row.item_created_at).toISOString(),
+        updatedAt: new Date(row.item_updated_at).toISOString(),
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
