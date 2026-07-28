@@ -2,7 +2,85 @@
   class="flex items-center px-4 h-12 border-b border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))]"
 >
   @if ((!isHomeContext() && showAllControls()) || isPlatformManagementContext() || viewMode() === 'service-mesh') {    @if (viewMode() === 'service-mesh') {
-      <!-- Service Mesh — controls moved to service-graph header bar -->
+      <!-- Service Mesh Console Toolbar -->
+      <div class="flex items-center space-x-1">
+        <!-- View Toggle: Console / Graph -->
+        <div class="flex items-center rounded-md bg-[rgb(var(--color-surface))] p-0.5 border border-[rgb(var(--color-border-muted))]">
+          <button
+            (click)="meshSwitchToConsole.emit()"
+            title="Console View"
+            class="px-2.5 py-1 rounded-sm text-xs font-medium transition-colors"
+            [class.bg-[rgb(var(--color-accent-solid-bg))]]="meshViewMode() === 'console'"
+            [class.text-white]="meshViewMode() === 'console'"
+            [class.text-[rgb(var(--color-text-muted))]]="meshViewMode() !== 'console'"
+            [class.hover:bg-[rgb(var(--color-surface-hover))]]="meshViewMode() !== 'console'"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+            Console
+          </button>
+          <button
+            (click)="meshSwitchToGraph.emit()"
+            title="Graph View"
+            class="px-2.5 py-1 rounded-sm text-xs font-medium transition-colors"
+            [class.bg-[rgb(var(--color-accent-solid-bg))]]="meshViewMode() === 'graph'"
+            [class.text-white]="meshViewMode() === 'graph'"
+            [class.text-[rgb(var(--color-text-muted))]]="meshViewMode() !== 'graph'"
+            [class.hover:bg-[rgb(var(--color-surface-hover))]]="meshViewMode() !== 'graph'"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h10M7 12h6m-6 5h10m-7 3a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+            Graph
+          </button>
+        </div>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Service Operations -->
+        <button (click)="meshDeploy.emit()" [disabled]="!meshHasSelection()" title="Deploy Service" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 11l7-7 7 7M12 4v16M5 11v6a2 2 0 002 2h10a2 2 0 002-2v-6" /></svg>
+        </button>
+        <button (click)="meshStart.emit()" [disabled]="!meshHasSelection()" title="Start" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        </button>
+        <button (click)="meshStop.emit()" [disabled]="!meshHasSelection()" title="Stop" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 9h6v6H9z" /></svg>
+        </button>
+        <button (click)="meshRestart.emit()" [disabled]="!meshHasSelection()" title="Restart" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        </button>
+        <button (click)="meshLogs.emit()" [disabled]="!meshHasSelection()" title="View Logs" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+        </button>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- CI/CD Integration (Ballerina-driven) -->
+        <button (click)="meshGithub.emit()" [disabled]="!meshHasSelection()" title="GitHub Integration" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 .5C5.37.5 0 5.78 0 12.292c0 5.211 3.435 9.63 8.205 11.188.6.111.82-.254.82-.567 0-.28-.01-1.022-.015-2.005-3.338.711-4.042-1.582-4.042-1.582-.546-1.361-1.333-1.724-1.333-1.724-1.089-.731.083-.716.083-.716 1.205.083 1.838 1.215 1.838 1.215 1.07 1.8 2.809 1.28 3.495.978.108-.763.417-1.28.76-1.574-2.665-.297-5.467-1.309-5.467-5.827 0-1.287.465-2.339 1.235-3.164-.135-.298-.54-1.497.105-3.121 0 0 1.005-.316 3.3 1.209.96-.262 1.98-.392 3-.397 1.02.005 2.04.135 3 .397 2.28-1.525 3.285-1.209 3.285-1.209.645 1.624.24 2.823.12 3.121.765.825 1.23 1.877 1.23 3.164 0 4.53-2.805 5.527-5.475 5.817.42.354.81 1.077.81 2.182 0 1.578-.015 2.846-.015 3.229 0 .309.21.678.825.563C20.565 21.917 24 17.495 24 12.292 24 5.78 18.627.5 12 .5z" /></svg>
+        </button>
+        <button (click)="meshJenkins.emit()" [disabled]="!meshHasSelection()" title="Jenkins Pipeline" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+        </button>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Container Orchestration -->
+        <button (click)="meshDocker.emit()" [disabled]="!meshHasSelection()" title="Docker" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24"><path d="M13.983 11.078h2.119a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.119a.185.185 0 00-.185.185v1.888c0 .102.083.185.185.185m-2.954-5.43h2.118a.186.186 0 00.186-.186V3.578a.186.186 0 00-.186-.185h-2.118a.185.185 0 00-.185.185v1.884c0 .102.082.185.185.186m0 2.715h2.118a.187.187 0 00.186-.187V6.293a.186.186 0 00-.186-.185h-2.118a.185.185 0 00-.185.185v1.884c0 .102.082.185.185.186m-2.93 0h2.12a.186.186 0 00.184-.186V6.293a.185.185 0 00-.185-.185H8.1a.185.185 0 00-.185.185v1.884c0 .102.083.185.185.186m-2.964 0h2.119a.186.186 0 00.185-.186V6.293a.185.185 0 00-.185-.185H5.136a.186.186 0 00-.186.185v1.884c0 .102.084.185.186.186m5.913 2.715h2.118a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.118a.185.185 0 00-.185.185v1.888c0 .102.082.185.185.185m-2.953 0h2.118a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186H8.1a.185.185 0 00-.185.185v1.888c0 .102.083.185.185.185m-2.964 0h2.119a.185.185 0 00.185-.185V9.006a.185.185 0 00-.184-.186h-2.12a.186.186 0 00-.186.186v1.888c0 .102.084.185.186.185m-2.92 0h2.12a.185.185 0 00.184-.185V9.006a.185.185 0 00-.184-.186h-2.12a.185.185 0 00-.184.185v1.888c0 .102.083.185.185.185M23.763 9.89c-.065-.051-.672-.565-1.673-.565-.225 0-.45.023-.672.068-.193-1.346-1.32-2.005-1.378-2.04l-.262-.154-.174.241c-.348.49-.498 1.04-.45 1.582.039.435.207.82.469 1.122-.18.103-.42.16-.71.16h-15.45a.733.733 0 00-.734.734c0 1.114.219 2.181.617 3.108.394.895 1.018 1.557 1.815 1.93.928.43 2.435.66 4.016.66.706 0 1.42-.057 2.115-.166a8.927 8.927 0 002.555-.827c.75-.376 1.428-.85 2.018-1.412a8.028 8.028 0 001.347-1.745c.108-.184.198-.375.288-.564h.238c1.444 0 2.338-.582 2.83-1.068.328-.317.583-.693.755-1.117l.105-.314-.249-.195Z" /></svg>
+        </button>
+        <button (click)="meshSwarm.emit()" [disabled]="!meshHasSelection()" title="Docker Swarm" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 100-8 4 4 0 000 8z" /></svg>
+        </button>
+        <button (click)="meshK8s.emit()" [disabled]="!meshHasSelection()" title="Kubernetes" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 3a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+        </button>
+
+        <div class="h-6 w-px bg-[rgb(var(--color-border-muted))]"></div>
+
+        <!-- Refresh -->
+        <button (click)="meshRefresh.emit()" title="Refresh Mesh" class="p-2 rounded-md hover:bg-[rgb(var(--color-surface-hover))] text-[rgb(var(--color-text-muted))] transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+        </button>
+      </div>
     } @else {
       <!-- File Explorer Controls -->
       <div class="flex items-center space-x-2">

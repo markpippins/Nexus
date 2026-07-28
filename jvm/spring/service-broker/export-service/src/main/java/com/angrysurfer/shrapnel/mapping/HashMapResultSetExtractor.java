@@ -13,7 +13,7 @@ import java.util.Objects;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.ResultSetExtractor;
 
-import com.angrysurfer.shrapnel.field.FieldTypeEnum;
+import com.aibizarchitect.nexus.shrapnel.field.FieldTypeEnum;
 import com.angrysurfer.shrapnel.model.DBExport;
 
 import lombok.extern.slf4j.Slf4j;

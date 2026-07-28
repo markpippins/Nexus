@@ -28,11 +28,15 @@ import { NodeType } from '../../models/component-config.js';
 import { AtlasService } from '../../services/atlas.service.js';
 import type { ConnectionData } from '../../models/graph-view.model.js';
 import { LoadViewDialogComponent } from '../load-view-dialog/load-view-dialog.component.js';
+import { ComponentCreatorComponent } from '../component-creator/component-creator.component.js';
+import { AddServiceDialogComponent } from '../add-service-dialog/add-service-dialog.component.js';
+import { ComponentCreatorStateService } from '../../services/component-creator-state.service.js';
+import { MinimapComponent } from '../minimap/minimap.component.js';
 import * as THREE from 'three';
 
 @Component({
   selector: 'app-service-graph',
-  imports: [CommonModule, FormsModule, LoadViewDialogComponent],
+  imports: [CommonModule, FormsModule, LoadViewDialogComponent, ComponentCreatorComponent, AddServiceDialogComponent, MinimapComponent],
   templateUrl: './service-graph.component.html',
   styleUrls: ['./service-graph.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -60,9 +64,13 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   private registry = inject(ComponentRegistryService);
   private atlas = inject(AtlasService);
   private cdr = inject(ChangeDetectorRef);
+  private creatorState = inject(ComponentCreatorStateService);
 
   /** Exposed for template — number of multi-selected nodes. */
   multiSelectedCount = this.vizService.multiSelectedCount;
+
+  /** IDs of all current nodes — for the Add Service dialog's existingNodeIds input. */
+  existingNodeIds = computed(() => this.vizService.allNodes().map(n => n.id));
 
   // UI Panels
   isPaletteOpen = signal(true);
@@ -89,6 +97,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Initialization flag
   private isInitialized = signal(false);
 
+  // Guards loadDefaultView to run only once (not every poll cycle)
+  private hasLoadedDefaultView = false;
+
   // Stable per-service key to detect whether service list *or visual style* actually changed (not just reference)
   private lastServiceKey = '';
   private lastRegistryReady = false;
@@ -112,12 +123,14 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
     // Get connection rules for current node type
     const config = this.registry.getConfig(current.type);
+    // Pre-build a Set for O(1) connected-to lookups (was O(n) .includes inside filter)
+    const connectedSet = new Set(current.connectedTo);
 
     return all.filter(n => {
       // Rule 1: Cannot connect to self
       if (n.id === current.id) return false;
       // Rule 2: Cannot connect if already connected
-      if (current.connectedTo.includes(n.id)) return false;
+      if (connectedSet.has(n.id)) return false;
       // Rule 3: Must be in allowed connections list
       if (config.allowedConnections && config.allowedConnections !== 'all' && !config.allowedConnections.includes(n.type)) return false;
 
@@ -179,6 +192,67 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   // Load View Dialog
   showLoadDialog = signal(false);
 
+  // Add Registered Service Dialog
+  showAddServiceDialog = signal(false);
+
+  // --- Enhancement features ---
+  // Search & Highlight
+  searchTerm = signal('');
+  // Export dropdown
+  showExportMenu = signal(false);
+  // Undo/redo availability — arrow functions preserve `this` binding to vizService
+  canUndo = () => this.vizService.canUndo();
+  canRedo = () => this.vizService.canRedo();
+  // Diff mode
+  diffModeActive = this.vizService.diffModeActive;
+  // Auto-detected systems (for the auto-detect popup)
+  detectedSystems = signal<string[][]>([]);
+  showAutoDetectPopup = signal(false);
+  // Edge labels toggle
+  edgeLabelsVisible = signal(false);
+  // Health pulse toggle
+  healthPulseEnabled = this.vizService.healthPulseEnabled;
+  // Minimap toggle
+  showMinimap = signal(false);
+
+  // --- Collapse/Explode: System grouping ---
+  // Maps parent service ID → array of child service IDs, derived from the
+  // services input. A "System" is any service that other services point to
+  // via parentServiceId.
+  childrenMap = computed(() => {
+    const svcs = this.services();
+    const map = new Map<string, string[]>();
+    for (const svc of svcs) {
+      if (svc.parentServiceId != null) {
+        const parentId = String(svc.parentServiceId);
+        const children = map.get(parentId) ?? [];
+        children.push(String(svc.id));
+        map.set(parentId, children);
+      }
+    }
+    return map;
+  });
+
+  /** Whether the context-menu target node has child services (is a System). */
+  targetHasChildren = computed(() => {
+    const targetId = this.contextMenu().targetNodeId;
+    if (!targetId) return false;
+    return (this.childrenMap().get(targetId)?.length ?? 0) > 0;
+  });
+
+  /** Whether the context-menu target node is currently collapsed. */
+  targetIsCollapsed = computed(() => {
+    const targetId = this.contextMenu().targetNodeId;
+    if (!targetId) return false;
+    return this.vizService.isSystemCollapsed(targetId);
+  });
+
+  // --- Drag-to-Connect Direction Popup ---
+  showConnDirectionPopup = signal(false);
+  connPopupPos = signal<{ x: number; y: number }>({ x: 0, y: 0 });
+  pendingConnection = signal<{ sourceId: string; targetId: string } | null>(null);
+  private connPopupTimer: ReturnType<typeof setTimeout> | null = null;
+
   // Delete Confirmation Dialog
   showDeleteConfirm = signal(false);
 
@@ -210,9 +284,11 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       // Key includes per-service visual style so editing a ServiceType's
       // defaultComponentId (or a service's componentOverrideId) triggers a
       // full rebuild that re-resolves the 3D component.
+      // Also includes dependency count so new connections between existing
+      // services are picked up during polling without a manual refresh.
       const key = services
         .map(s => `${s.id}:${s.componentOverrideId ?? ''}:${s.type?.defaultComponentId ?? s.type?.defaultComponent?.id ?? ''}`)
-        .sort().join(',');
+        .sort().join(',') + `|deps:${this.dependencies().length}`;
       if (key === this.lastServiceKey && registryReady === this.lastRegistryReady) {
         // Lightweight update: refresh labels without clearScene
         services.forEach(svc => {
@@ -277,13 +353,33 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         );
       });
 
-      // Handle Dependencies
+      // Handle Dependencies — also wire edge labels (type + criticality)
+      this.vizService.clearEdgeLabels();
       this.dependencies().forEach(dep => {
-        this.vizService.connectNodes(String(dep.sourceServiceId), String(dep.targetServiceId));
+        const fromId = String(dep.sourceServiceId);
+        const toId = String(dep.targetServiceId);
+        this.vizService.connectNodes(fromId, toId);
+        this.vizService.setEdgeLabel(fromId, toId, dep.dependencyType ?? 'REQUIRED', undefined);
       });
 
+      // Restore user-created and DB-loaded connections that clearScene() snapshot
+      // before the rebuild. connectNodes deduplicates, so dependency edges already
+      // wired above are preserved without duplication.
+      this.vizService.restoreSavedConnections();
+
+      // Re-apply collapsed state so collapsed systems survive graph rebuilds
+      // (poll cycles). This re-hides member meshes and re-redirects connections.
+      this.vizService.reapplyCollapsedState();
+
+      // Re-apply drill-down state so the drilled-down view survives rebuilds.
+      // Must run AFTER reapplyCollapsedState so drill-down visibility overrides.
+      this.vizService.reapplyDrillDownState();
+
       // Try to load the default graph view for camera + position overrides
-      this.loadDefaultView();
+      if (!this.hasLoadedDefaultView) {
+        this.hasLoadedDefaultView = true;
+        this.loadDefaultView().catch(err => console.warn('[ServiceGraph] Default view load skipped:', err));
+      }
 
     }, { allowSignalWrites: true });
 
@@ -311,8 +407,14 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       }
     });
 
-    // Listen for Double Click to Focus
-    this.sub.add(this.vizService.nodeDoubleClicked.subscribe(() => {
+    // Listen for Double Click — drill into collapsed systems, or focus label
+    this.sub.add(this.vizService.nodeDoubleClicked.subscribe((id) => {
+      // If the double-clicked node is a collapsed system, drill into it
+      if (this.vizService.isSystemCollapsed(id)) {
+        this.vizService.drillDown(id);
+        return;
+      }
+      // Otherwise, focus the label input for editing
       setTimeout(() => {
         if (this.labelInput) this.labelInput.nativeElement.focus();
       }, 50);
@@ -353,9 +455,34 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
       );
     }, { allowSignalWrites: true });
 
+    // Pause the 3D renderer while the Component Creator sub-view is open
+    effect(() => {
+      this.vizService.setPaused(this.graphSubView() === 'creator');
+    }, { allowSignalWrites: true });
+
     // Auto-save after drag or camera changes (debounced 500ms)
     this.sub.add(this.vizService.nodePositionChanged.subscribe(() => this.scheduleAutoSave()));
     this.sub.add(this.vizService.cameraChanged.subscribe(() => this.scheduleAutoSave()));
+    // Auto-save when edges are added/removed/toggled — connections must persist
+    this.sub.add(this.vizService.connectionsChanged.subscribe(() => this.scheduleAutoSave()));
+
+    // Drag-to-Connect: when a Shift+Drag connection completes, show the direction popup
+    this.sub.add(this.vizService.connectionCreated.subscribe(({ sourceId, targetId, screenX, screenY }) => {
+      this.pendingConnection.set({ sourceId, targetId });
+      // Position the popup near the drop point, clamped to the viewport
+      const padding = 10;
+      const popupW = 180;
+      const popupH = 50;
+      const x = Math.min(screenX + padding, window.innerWidth - popupW - padding);
+      const y = Math.min(screenY + padding, window.innerHeight - popupH - padding);
+      this.connPopupPos.set({ x, y });
+      this.showConnDirectionPopup.set(true);
+      this.cdr.markForCheck();
+
+      // Auto-dismiss after 4 seconds (defaults to bidirectional)
+      if (this.connPopupTimer) clearTimeout(this.connPopupTimer);
+      this.connPopupTimer = setTimeout(() => this.confirmDragConnection('bidirectional'), 4000);
+    }));
   }
 
   ngAfterViewInit() {
@@ -367,6 +494,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy() {
     if (this.autoSaveTimer) clearTimeout(this.autoSaveTimer);
+    if (this.connPopupTimer) clearTimeout(this.connPopupTimer);
     this.vizService.dispose();
     this.sub.unsubscribe();
   }
@@ -414,12 +542,231 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
     } else if (action === 'new' && payload) {
       // Payload is the Type ID
       const pos = menuState.worldPos || { x: 0, y: 0, z: 0 };
+      this.vizService.snapshotForUndo();
       const id = this.vizService.addNode(payload, pos);
       this.vizService.selectNode(id);
       this.setMode('edit'); // Switch to edit so they can fine tune
     }
 
     this.closeContextMenu();
+  }
+
+  /** Collapse a System node — hide its children and redirect their connections. */
+  onCollapseSystem() {
+    const targetId = this.contextMenu().targetNodeId;
+    if (!targetId) return;
+
+    const memberIds = this.childrenMap().get(targetId) ?? [];
+    if (memberIds.length === 0) return;
+
+    this.vizService.snapshotForUndo();
+    this.vizService.collapseSystem(targetId, memberIds);
+    this.closeContextMenu();
+  }
+
+  /** Explode a System node — restore its children and their connections. */
+  onExplodeSystem() {
+    const targetId = this.contextMenu().targetNodeId;
+    if (!targetId) return;
+
+    this.vizService.snapshotForUndo();
+    this.vizService.explodeSystem(targetId);
+    this.closeContextMenu();
+  }
+
+  /** Escape from drill-down mode — return to the parent graph view. */
+  onEscapeDrillDown() {
+    this.vizService.escapeDrillDown();
+    this.closeContextMenu();
+  }
+
+  // --- Enhancement Handlers ---
+
+  /** Search & Highlight — highlight matching nodes, dim non-matching. */
+  onSearchInput(value: string) {
+    this.searchTerm.set(value);
+    this.vizService.searchNodes(value);
+  }
+
+  /** Clear the search and restore normal highlighting. */
+  clearSearch() {
+    this.searchTerm.set('');
+    this.vizService.searchNodes('');
+  }
+
+  /** Apply a layout preset. */
+  onApplyLayout(type: 'radial' | 'grid' | 'hierarchical' | 'force') {
+    this.vizService.snapshotForUndo();
+    this.vizService.applyLayout(type);
+    this.scheduleAutoSave();
+  }
+
+  /** Capture canvas as PNG and trigger download. */
+  onExportPNG() {
+    const dataUrl = this.vizService.captureCanvasPNG();
+    if (!dataUrl) return;
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `service-mesh-${Date.now()}.png`;
+    link.click();
+    this.showExportMenu.set(false);
+  }
+
+  /** Export topology as JSON and trigger download. */
+  onExportJSON() {
+    const json = this.vizService.exportTopologyJSON();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `service-mesh-${Date.now()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    this.showExportMenu.set(false);
+  }
+
+  /** Undo the last graph mutation. */
+  onUndo() {
+    this.vizService.undo();
+    this.scheduleAutoSave();
+  }
+
+  /** Redo the last undone action. */
+  onRedo() {
+    this.vizService.redo();
+    this.scheduleAutoSave();
+  }
+
+  /** Auto-detect system clusters via strongly connected components. */
+  onAutoDetectSystems() {
+    const systems = this.vizService.autoDetectSystems();
+    if (systems.length === 0) {
+      this.showToast('No tightly-connected clusters detected');
+      return;
+    }
+    this.detectedSystems.set(systems);
+    this.showAutoDetectPopup.set(true);
+  }
+
+  /** Collapse a detected cluster (from the auto-detect popup).
+   *  Uses the first node as the "system" ID. */
+  onCollapseDetected(members: string[]) {
+    if (members.length < 2) return;
+    // Use the first member as the system ID for grouping
+    const systemId = members[0];
+    const otherMembers = members.slice(1);
+    this.vizService.snapshotForUndo();
+    this.vizService.collapseSystem(systemId, otherMembers);
+    this.showAutoDetectPopup.set(false);
+  }
+
+  /** Capture current graph as a diff baseline. */
+  onCaptureDiffBaseline() {
+    this.vizService.captureDiffBaseline();
+    this.showToast('Diff baseline captured — new nodes/edges will be highlighted green');
+  }
+
+  /** Clear diff mode. */
+  onClearDiffMode() {
+    this.vizService.clearDiffMode();
+    this.showToast('Diff mode cleared');
+  }
+
+  /** Toggle edge labels (dependency type) visibility. */
+  onToggleEdgeLabels() {
+    const next = !this.edgeLabelsVisible();
+    this.edgeLabelsVisible.set(next);
+    this.vizService.setEdgeLabelsVisible(next);
+  }
+
+  /** Toggle live health pulse animation. */
+  onToggleHealthPulse() {
+    const next = !this.healthPulseEnabled();
+    this.vizService.setHealthPulseEnabled(next);
+    if (next) {
+      // Load health data from deployments
+      const healthEntries = this.deployments()
+        .filter(d => d.service && d.healthStatus)
+        .map(d => ({
+          id: String(d.service.id),
+          status: d.healthStatus as 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED',
+        }));
+      this.vizService.setNodeHealthBatch(healthEntries);
+      this.showToast(`Health pulse enabled — ${healthEntries.length} deployments mapped`);
+    } else {
+      this.showToast('Health pulse disabled');
+    }
+  }
+
+  /** Open the Component Creator in edit mode for the selected node's type. */
+  onEditComponent() {
+    const targetId = this.contextMenu().targetNodeId || this.selectedNodeData()?.id;
+    if (!targetId) return;
+
+    const node = this.vizService.getNode(targetId);
+    if (!node) return;
+
+    const compConfig = this.registry.getConfig(node.type);
+    if (!compConfig) {
+      console.warn(`[edit] No component config found for type '${node.type}'`);
+      return;
+    }
+
+    // selectComponent handles system vs custom:
+    // - System components prompt to create a derived copy (read-only)
+    // - Custom components open directly in edit mode
+    this.creatorState.selectComponent(compConfig);
+
+    // Only switch to the Creator sub-view if a config was actually opened.
+    // For system components, the user may decline the "create derived?" prompt,
+    // in which case activeConfig stays null and we should not switch views.
+    if (this.creatorState.activeConfig()) {
+      this.graphSubViewChange.emit('creator');
+    }
+
+    this.closeContextMenu();
+  }
+
+  /** Open the Add Registered Service dialog. */
+  onAddRegisteredService() {
+    this.showAddServiceDialog.set(true);
+    this.closeContextMenu();
+  }
+
+  /** Handle service selection from the Add Registered Service dialog. */
+  onServiceSelected(service: ServiceInstance) {
+    this.showAddServiceDialog.set(false);
+    this.vizService.snapshotForUndo();
+
+    // Resolve the visual component for this service type
+    let compConfig = this.registry.getConfigById(String(service.componentOverrideId));
+    if (!compConfig && service.type?.defaultComponentId) {
+      compConfig = this.registry.getConfigById(String(service.type.defaultComponentId));
+    }
+    if (!compConfig && service.type?.defaultComponent?.id !== undefined &&
+        service.type.defaultComponent.id !== null) {
+      compConfig = this.registry.getConfigById(String(service.type.defaultComponent.id));
+    }
+
+    const typeSlug = compConfig ? compConfig.type : 'sys-rest';
+
+    // Use the world position from the context menu, or a random position if not available
+    const pos = this.contextMenu().worldPos || { x: 0, y: 0, z: 0 };
+
+    // Add the node with the service's ID as idOverride so we can map back
+    const id = this.vizService.addNode(
+      typeSlug,
+      pos,
+      service.name,
+      service.description || 'No description',
+      undefined,
+      String(service.id)
+    );
+    this.vizService.selectNode(id);
+    this.setMode('edit');
+
+    // Emit the selected service so the parent can update its service list
+    this.selectedNode.emit(service);
   }
 
   // --- Actions ---
@@ -556,6 +903,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   }
 
   clearCanvas() {
+    this.vizService.snapshotForUndo();
     this.vizService.clearScene();
   }
 
@@ -638,6 +986,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   addConnection(direction: 'out' | 'in' | 'bidirectional' = 'out') {
     const current = this.selectedNodeData();
     if (!current || !this.selectedTargetId) return;
+    this.vizService.snapshotForUndo();
 
     let fromId: string, toId: string;
     if (direction === 'in') {
@@ -658,6 +1007,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   removeConnection(targetId: string) {
     const current = this.selectedNodeData();
     if (!current) return;
+    this.vizService.snapshotForUndo();
     // If this is an inbound connection (targetId has current in its connectedTo),
     // disconnect from their side so the visual line is properly removed
     const targetNode = this.vizService.getNode(targetId);
@@ -668,16 +1018,57 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /** Confirm a drag-to-connect connection with the chosen direction.
+   *  Bidirectional is the default (per architect direction 2026-07-27). */
+  confirmDragConnection(direction: 'out' | 'in' | 'bidirectional') {
+    const pending = this.pendingConnection();
+    if (this.connPopupTimer) {
+      clearTimeout(this.connPopupTimer);
+      this.connPopupTimer = null;
+    }
+    this.showConnDirectionPopup.set(false);
+    if (!pending) return;
+
+    this.vizService.snapshotForUndo();
+
+    let fromId: string, toId: string;
+    if (direction === 'in') {
+      fromId = pending.targetId;
+      toId = pending.sourceId;
+    } else {
+      fromId = pending.sourceId;
+      toId = pending.targetId;
+    }
+
+    this.vizService.connectNodes(fromId, toId);
+    if (direction === 'bidirectional') {
+      this.vizService.toggleConnectionDirection(fromId, toId);
+    }
+
+    // Select the source node so the inspector shows the new connection
+    this.vizService.selectNode(pending.sourceId);
+    this.pendingConnection.set(null);
+  }
+
+  /** Cancel the direction popup without creating a connection. */
+  cancelDragConnection() {
+    if (this.connPopupTimer) {
+      clearTimeout(this.connPopupTimer);
+      this.connPopupTimer = null;
+    }
+    this.showConnDirectionPopup.set(false);
+    this.pendingConnection.set(null);
+  }
+
   toggleConnectionDirection(targetId: string, direction: 'out' | 'in' | 'bidirectional') {
     const current = this.selectedNodeData();
     if (!current) return;
+    this.vizService.snapshotForUndo();
 
-    // Determine the actual source/target pair for the underlying edge.
-    // For an inbound connection, the edge is stored as targetId -> current.id.
-    const fromId = direction === 'in' ? targetId : current.id;
-    const toId = direction === 'in' ? current.id : targetId;
-
-    this.vizService.toggleConnectionDirection(fromId, toId);
+    // Use the 3-state cycle: bidirectional → out → in → bidirectional
+    // cycleConnectionDirection takes the "current" node as fromId and the
+    // "other" node as toId, and figures out the current state internally.
+    this.vizService.cycleConnectionDirection(current.id, targetId);
     // Force inspector refresh
     this.vizService.selectNode(current.id);
   }
@@ -686,6 +1077,7 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
   toggleInspector() { this.isInspectorOpen.update(v => !v); }
 
   confirmDelete() {
+    this.vizService.snapshotForUndo();
     this.vizService.deleteSelectedNodes();
     this.showDeleteConfirm.set(false);
   }

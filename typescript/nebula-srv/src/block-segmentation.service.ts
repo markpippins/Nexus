@@ -42,6 +42,10 @@ export interface BlockEntry {
   block_type: string;
   content_md: string;
   content_hash: string;
+  // role distinguishes user vs assistant blocks; added by migration 027
+  // (nexus/typescript/nebula-srv/migrations/027-block-role-column.sql).
+  // Consumers (assembly-ui) group turns by this value, so it must round-trip.
+  role: string | null;
   dom_path: string | null;
   dom_fingerprint: string | null;
   first_line_no: number | null;
@@ -133,6 +137,7 @@ export async function listBlocks(
   const { rows: blocks } = await pool.query(
     `SELECT id, conversation_id, snapshot_id, block_index, parent_turn_id,
             parent_block_id, block_type, content_md, content_hash,
+            role,
             dom_path, dom_fingerprint, first_line_no, last_line_no,
             to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
      FROM nebula.conversation_blocks
@@ -496,6 +501,7 @@ export async function getProjection(
   const { rows: blocks } = await pool.query(
     `SELECT id, conversation_id, snapshot_id, block_index, parent_turn_id,
             parent_block_id, block_type, content_md, content_hash,
+            role,
             dom_path, dom_fingerprint, first_line_no, last_line_no,
             to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
      FROM nebula.conversation_blocks

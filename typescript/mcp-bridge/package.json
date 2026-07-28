@@ -1,0 +1,21 @@
+{
+  "name": "mcp-bridge",
+  "version": "1.0.0",
+  "description": "Generic stdio-to-SSE bridge for MCP servers. Spawns a configured stdio MCP as a subprocess and exposes its tools over the MCP-over-SSE transport.",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3"
+  }
+}

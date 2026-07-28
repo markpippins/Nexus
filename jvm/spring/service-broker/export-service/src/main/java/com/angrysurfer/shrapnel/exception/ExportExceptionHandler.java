@@ -1,6 +1,6 @@
 package com.angrysurfer.shrapnel.exception;
 
-import com.angrysurfer.shrapnel.exception.ShrapnelException;
+import com.aibizarchitect.nexus.shrapnel.exception.ShrapnelException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;

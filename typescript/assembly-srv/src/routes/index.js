@@ -13,7 +13,6 @@ import { openQuestionsRouter } from './open-questions.js';
 import { intentsRouter } from './intents.js';
 import { assessmentsRouter } from './assessments.js';
 import { observationsRouter } from './observations.js';
-import { reportsRouter } from './reports.js';
 import { agentRecordsRouter } from './agent-records.js';
 import { specificationsRouter } from './specifications.js';
 import { usersRouter } from './users.js';
@@ -21,6 +20,7 @@ import { specsRouter } from './specs.js';
 import { countsRouter } from './counts.js';
 import { plansRouter } from './plans.js';
 import { searchRouter } from './search.js';
+import { bridgesRouter } from './bridges.js';
 
 export const routes = Router();
 
@@ -40,9 +40,9 @@ routes.use('/open-questions', openQuestionsRouter);
 routes.use('/intents', intentsRouter);
 routes.use('/assessments', assessmentsRouter);
 routes.use('/observations', observationsRouter);
-routes.use('/reports', reportsRouter);
 routes.use('/agent-records', agentRecordsRouter);
 routes.use('/specifications', specificationsRouter);
 routes.use('/users', usersRouter);
 routes.use('/specs', specsRouter);
 routes.use('/plans', plansRouter);
+routes.use('/bridges', bridgesRouter);

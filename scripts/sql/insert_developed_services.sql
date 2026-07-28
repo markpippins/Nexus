@@ -88,9 +88,5 @@ SELECT 'terrain', 'Infrastructure topology server - central service registry, Sp
 WHERE NOT EXISTS (SELECT 1 FROM nebula.systems WHERE name = 'terrain');
 
 INSERT INTO nebula.systems (name, description)
-SELECT 'vision-srv', 'Vision REST API proxy - TypeScript/Express (port 3103)'
-WHERE NOT EXISTS (SELECT 1 FROM nebula.systems WHERE name = 'vision-srv');
-
-INSERT INTO nebula.systems (name, description)
 SELECT 'vision-srv-py', 'Vision LOSM REST API server - FastAPI over losm-store (port 8003, Python)'
 WHERE NOT EXISTS (SELECT 1 FROM nebula.systems WHERE name = 'vision-srv-py');

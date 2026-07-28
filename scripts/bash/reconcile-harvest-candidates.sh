@@ -65,6 +65,7 @@ APPLY_MODE="false"
 
 # Paths
 ROVER_DIR="/home/codex/dev/nexus/python/rover"
+BIN_DIR="/home/codex/dev/nexus/bin"
 VENV_ACTIVATE="${ROVER_DIR}/.venv/bin/activate"
 OUTPUT_DIR="/tmp"
 
@@ -123,13 +124,13 @@ run_python_script() {
 
     log_info "Running ${script_name} ..."
     if [[ -n "$output_file" ]]; then
-        python3 "${ROVER_DIR}/${script_name}" \
+        python3 "${BIN_DIR}/${script_name}" \
             ${dry_run_flag} \
             ${extra_args} \
             --output "$output_file" \
             2>&1 | tee "${output_file%.json}.log"
     else
-        python3 "${ROVER_DIR}/${script_name}" \
+        python3 "${BIN_DIR}/${script_name}" \
             ${dry_run_flag} \
             ${extra_args} \
             2>&1

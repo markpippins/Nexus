@@ -49,10 +49,12 @@ SPECIFIC_IDS=()
 # ── Paths ───────────────────────────────────────────────────────────────
 
 ROVER_DIR="/home/codex/dev/nexus/python/rover"
+BIN_DIR="/home/codex/dev/nexus/bin"
+TACKLE_DIR="/home/codex/dev/nexus/python/tackle"
 VENV_ACTIVATE="${ROVER_DIR}/.venv/bin/activate"
-CPF_COMPUTE="${ROVER_DIR}/cpf_compute.py"
-CPF_QUERY="${ROVER_DIR}/cpf_query.py"
-PROMOTE="${ROVER_DIR}/candidate_promote.py"
+CPF_COMPUTE="${BIN_DIR}/cpf_compute.py"
+CPF_QUERY="${BIN_DIR}/cpf_query.py"
+PROMOTE="${TACKLE_DIR}/candidate_promote.py"
 
 # ── Parse CLI flags ─────────────────────────────────────────────────────
 

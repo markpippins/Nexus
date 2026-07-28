@@ -4,7 +4,7 @@
 #
 # Monitors Redis liveness. When Redis transitions from DOWN → UP,
 # restarts all services that depend on it (service-registry,
-# role-memory-srv, tackle-mcp, cascade bridges).
+# role-memory-srv, tackle-srv, tackle-mcp, cascade bridges).
 #
 # Designed to be run as a systemd timer (redis-health-monitor.timer)
 # every 30 seconds, or standalone for one-off checks.
@@ -39,6 +39,7 @@ RESTART_WAIT_SECONDS=10
 REDIS_DEPENDENT_SERVICES=(
     "service-registry.service"
     "role-memory-srv.service"
+    "tackle-srv.service"
     "tackle-mcp.service"
     "cascade-event-bridge.service"
     "cascade-pg-bridge.service"

@@ -51,9 +51,10 @@ SPECIFIC_FILES=()           # optional: specific filenames for Stage 1
 # ── Paths ───────────────────────────────────────────────────────────────
 
 ROVER_DIR="/home/codex/dev/nexus/python/rover"
+BIN_DIR="/home/codex/dev/nexus/bin"
 VENV_ACTIVATE="${ROVER_DIR}/.venv/bin/activate"
-STAGE1="${ROVER_DIR}/batch_harvest_to_db.py"
-STAGE2="${ROVER_DIR}/batch_file_candidates.py"
+STAGE1="${BIN_DIR}/batch_harvest_to_db.py"
+STAGE2="${BIN_DIR}/batch_file_candidates.py"
 
 # ── Parse CLI flags ─────────────────────────────────────────────────────
 
@@ -132,12 +133,12 @@ check_prereqs() {
         log_info "  ✓ Nebula API is reachable"
     fi
 
-    if [[ "$APPLY_MODE" == "true" ]] && ! curl -sf http://localhost:3104/ >/dev/null 2>&1; then
-        log_warn "  Assembly MCP at localhost:3104 is not reachable."
-        log_warn "  Forum publishing (--publish) will fail."
-        log_warn "  Ensure assembly-mcp is running with: ASSEMBLY_MCP_PORT=3104 node dist/server.js"
-    elif curl -sf http://localhost:3104/ >/dev/null 2>&1; then
-        log_info "  ✓ Assembly MCP is reachable"
+    if [[ "$APPLY_MODE" == "true" ]] && ! curl -sf http://localhost:3107/health >/dev/null 2>&1; then
+        log_warn "  Assembly SRV at localhost:3107 is not reachable."
+        log_warn "  Forum publishing (--publish) may fail."
+        log_warn "  Ensure assembly-srv is running (port 3107, ASSEMBLY_SRV_PORT env)"
+    elif curl -sf http://localhost:3107/health >/dev/null 2>&1; then
+        log_info "  ✓ Assembly SRV is reachable"
     fi
 
     if [[ ! -f "$VENV_ACTIVATE" ]]; then

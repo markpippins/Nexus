@@ -11,9 +11,9 @@ import org.springframework.stereotype.Component;
 
 import com.angrysurfer.shrapnel.mapping.HashMapResultSetExtractor;
 import com.angrysurfer.shrapnel.model.DBExport;
-import com.angrysurfer.shrapnel.model.db.DBDataSource;
+import com.aibizarchitect.nexus.shrapnel.model.db.DBDataSource;
 import com.angrysurfer.shrapnel.repository.ExportRepository;
-import com.angrysurfer.shrapnel.repository.db.DataSourceRepository;
+import com.aibizarchitect.nexus.shrapnel.repository.db.DataSourceRepository;
 import com.angrysurfer.shrapnel.service.Request;
 import com.angrysurfer.shrapnel.util.FileUtil;
 

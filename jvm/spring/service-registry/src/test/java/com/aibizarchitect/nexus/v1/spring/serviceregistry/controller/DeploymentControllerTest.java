@@ -1,5 +1,7 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -158,5 +160,103 @@ class DeploymentControllerTest {
 
         mockMvc.perform(delete("/api/v1/deployments/1"))
                 .andExpect(status().isNotFound());
+    }
+
+    // ================================================================
+    // ORANGE PATH — expected, handled failure
+    // ================================================================
+
+    @Test
+    void createDeployment_MalformedJson_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/deployments")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{bad json"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getDeployments_InvalidServiceIdType_returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/deployments").param("serviceId", "abc"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createDeployment_EmptyVersionField_handled() throws Exception {
+        when(deploymentRepository.save(any(Deployment.class))).thenReturn(testDeployment);
+
+        mockMvc.perform(post("/api/v1/deployments")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":\"\",\"status\":\"RUNNING\"}"))
+                .andExpect(status().isCreated());
+    }
+
+    // ================================================================
+    // RED PATH — adversarial input the system must survive
+    // ================================================================
+
+    @Test
+    void createDeployment_SqlInjectionInVersion_handled() throws Exception {
+        when(deploymentRepository.save(any(Deployment.class))).thenReturn(testDeployment);
+
+        mockMvc.perform(post("/api/v1/deployments")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"version\":\"'; DROP TABLE deployments; --\",\"status\":\"RUNNING\"}"))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void getDeploymentById_NegativeId_returnsNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/deployments/-1"))
+                .andExpect(status().isNotFound());
+    }
+
+    // ================================================================
+    // SILENT FAILURE — metamorphic/determinism coverage
+    // ================================================================
+
+    @Test
+    void metamorphic_getByIdSameInput_producesSameOutput() throws Exception {
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+
+        String response1 = mockMvc.perform(get("/api/v1/deployments/1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String response2 = mockMvc.perform(get("/api/v1/deployments/1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals(response1, response2, "Same deployment should produce identical JSON");
+    }
+
+    @Test
+    void metamorphic_differentDeployments_produceDifferentOutput() throws Exception {
+        Deployment other = new Deployment();
+        other.setId(2L);
+        other.setVersion("2.0.0");
+
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.of(testDeployment));
+        when(deploymentRepository.findById(2L)).thenReturn(Optional.of(other));
+
+        String response1 = mockMvc.perform(get("/api/v1/deployments/1"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        String response2 = mockMvc.perform(get("/api/v1/deployments/2"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertNotEquals(response1, response2, "Different deployments MUST produce different JSON");
+    }
+
+    @Test
+    void regressionLock_notFound_emptyBody() throws Exception {
+        when(deploymentRepository.findById(1L)).thenReturn(Optional.empty());
+
+        String body = mockMvc.perform(get("/api/v1/deployments/1"))
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals("", body, "404 responses currently empty — regression lock");
     }
 }

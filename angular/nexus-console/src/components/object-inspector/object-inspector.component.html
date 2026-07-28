@@ -59,17 +59,42 @@
         <option [value]="target.id">{{ target.label }}</option>
         }
       </select>
-      <button (click)="addConnection()" [disabled]="!selectedTargetId">+</button>
+      <div class="dir-buttons">
+        <button (click)="newConnectionDirection = 'out'; addConnection()"
+                [disabled]="!selectedTargetId"
+                title="Outbound (→)"
+                [class.active]="newConnectionDirection === 'out'">→</button>
+        <button (click)="newConnectionDirection = 'in'; addConnection()"
+                [disabled]="!selectedTargetId"
+                title="Inbound (←)"
+                [class.active]="newConnectionDirection === 'in'">←</button>
+        <button (click)="newConnectionDirection = 'bidirectional'; addConnection()"
+                [disabled]="!selectedTargetId"
+                title="Bidirectional (↔)"
+                [class.active]="newConnectionDirection === 'bidirectional'">↔</button>
+      </div>
     </div>
 
     <div class="connection-list">
-      @for (conn of currentConnections(); track conn.id) {
+      @for (conn of allConnections(); track conn.nodeId) {
       <div class="connection-item">
-        <span>{{ conn.label }}</span>
-        <button (click)="removeConnection(conn.id)">✕</button>
+        <span class="conn-label">{{ conn.label }}</span>
+        <div class="conn-controls">
+          <span class="conn-dir-badge"
+                [class.dir-out]="conn.direction === 'out'"
+                [class.dir-in]="conn.direction === 'in'"
+                [class.dir-bidir]="conn.direction === 'bidirectional'"
+                (click)="toggleConnectionDirection(conn.nodeId, conn.direction)"
+                title="Click to toggle direction">
+            @if (conn.direction === 'out') { → }
+            @else if (conn.direction === 'in') { ← }
+            @else { ↔ }
+          </span>
+          <button class="conn-remove" (click)="removeConnection(conn.nodeId)" title="Remove">✕</button>
+        </div>
       </div>
-      } @if (currentConnections().length === 0) {
-      <div class="empty-connections">No outbound connections</div>
+      } @if (allConnections().length === 0) {
+      <div class="empty-connections">No connections</div>
       }
     </div>
   </div>

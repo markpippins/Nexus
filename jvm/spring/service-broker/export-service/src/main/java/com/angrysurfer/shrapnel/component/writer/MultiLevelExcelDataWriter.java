@@ -6,8 +6,8 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Row;
 
-import com.angrysurfer.shrapnel.field.IField;
-import com.angrysurfer.shrapnel.field.IValueFormatter;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.field.IValueFormatter;
 
 import lombok.Getter;
 import lombok.Setter;

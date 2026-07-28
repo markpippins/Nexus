@@ -151,7 +151,12 @@ export type ReceiptType =
   | "CRITIQUE"
   | "CRITIQUE_PASS"
   | "CRITIQUE_REJECT"
-  | "PLAN_BLOCK";
+  | "PLAN_BLOCK"
+  | "ABANDONED"
+  | "CANCELLED"
+  | "CCNF_EXECUTION"
+  | "REQUEUED"
+  | "API_LIMIT";
 
 export interface IssueReceiptInput {
   plan_id: string; // required: plan number e.g. "0053"

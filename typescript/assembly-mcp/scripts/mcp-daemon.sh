@@ -9,7 +9,8 @@
 #   ./scripts/mcp-daemon.sh status
 #
 # Configurable via environment:
-#   ASSEMBLY_MCP_PORT — port to listen on (default 3107)
+#   ASSEMBLY_MCP_PORT — port to listen on (default 3113, avoids collision
+#                      with assembly-srv on 3107)
 #   MCP_LOG           — log file (default /tmp/assembly-mcp-daemon.log)
 #   MCP_PID_FILE      — pid file (default /tmp/assembly-mcp-daemon.pid)
 # ──────────────────────────────────────────────────────────────────────
@@ -18,7 +19,7 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-export ASSEMBLY_MCP_PORT="${ASSEMBLY_MCP_PORT:-3107}"
+export ASSEMBLY_MCP_PORT="${ASSEMBLY_MCP_PORT:-3113}"
 export MCP_LOG="${MCP_LOG:-/tmp/assembly-mcp-daemon.log}"
 export MCP_PID_FILE="${MCP_PID_FILE:-/tmp/assembly-mcp-daemon.pid}"
 export MCP_RESTART_DELAY="${MCP_RESTART_DELAY:-3}"

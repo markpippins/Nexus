@@ -49,9 +49,10 @@ OUTPUT_MODE=""              # "--json" or "--count" or ""
 # ── Paths ───────────────────────────────────────────────────────────────
 
 ROVER_DIR="/home/codex/dev/nexus/python/rover"
+BIN_DIR="/home/codex/dev/nexus/bin"
 VENV_ACTIVATE="${ROVER_DIR}/.venv/bin/activate"
-CPF_COMPUTE="${ROVER_DIR}/cpf_compute.py"
-CPF_QUERY="${ROVER_DIR}/cpf_query.py"
+CPF_COMPUTE="${BIN_DIR}/cpf_compute.py"
+CPF_QUERY="${BIN_DIR}/cpf_query.py"
 
 # ── Parse CLI flags ─────────────────────────────────────────────────────
 

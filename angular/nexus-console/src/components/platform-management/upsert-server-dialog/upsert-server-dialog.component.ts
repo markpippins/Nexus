@@ -9,45 +9,45 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
     @if (isOpen()) {
-    <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" (window:keydown.escape)="onCancel()">
-       <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-xl rounded-lg w-full max-w-2xl flex flex-col max-h-[90vh]">
-          <div class="p-4 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
-            <h2 class="text-lg font-semibold text-[rgb(var(--color-text-base))]">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" (window:keydown.escape)="onCancel()">
+       <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-2xl rounded-xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
+            <h2 class="text-base font-semibold text-[rgb(var(--color-text-prominent))]">
               {{ server() ? 'Edit' : 'Add' }} Server
             </h2>
-            <button (click)="onCancel()" class="text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))]">
+            <button (click)="onCancel()" class="p-1 rounded-md text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors">
               <span class="material-icons">close</span>
             </button>
           </div>
           
-          <div class="p-6 overflow-y-auto flex-1">
-             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+          <div class="px-5 py-4 overflow-y-auto flex-1">
+             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-3.5">
                  <!-- Hostname & IP -->
                  <div class="grid grid-cols-2 gap-4">
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Hostname *</label>
-                        <input type="text" formControlName="hostname" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="server-01">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Hostname *</label>
+                        <input type="text" formControlName="hostname" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="server-01">
                      </div>
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">IP Address *</label>
-                         <input type="text" formControlName="ipAddress" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="192.168.1.10">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">IP Address *</label>
+                         <input type="text" formControlName="ipAddress" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="192.168.1.10">
                      </div>
                  </div>
 
                  <!-- Server Type & Env -->
                  <div class="grid grid-cols-2 gap-4">
-                     <div class="flex flex-col gap-1">
-                         <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Server Type *</label>
-                        <select formControlName="serverTypeId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                         <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Server Type *</label>
+                        <select formControlName="serverTypeId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                              <option [value]="null">Select Type</option>
                             @for (t of serverTypes(); track t.id) {
                                 <option [value]="t.id">{{ t.name }}</option>
                             }
                         </select>
                      </div>
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Environment *</label>
-                        <select formControlName="environmentTypeId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Environment *</label>
+                        <select formControlName="environmentTypeId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Env</option>
                             @for (e of environmentTypes(); track e.id) {
                                 <option [value]="e.id">{{ e.name }}</option>
@@ -58,18 +58,18 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
 
                  <!-- OS & Status -->
                  <div class="grid grid-cols-2 gap-4">
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Operating System *</label>
-                        <select formControlName="operatingSystemId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Operating System *</label>
+                        <select formControlName="operatingSystemId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select OS</option>
                             @for (os of operatingSystems(); track os.id) {
                                 <option [value]="os.id">{{ os.name }}{{ os.version ? ' ' + os.version : '' }}{{ os.ltsFlag ? ' (LTS)' : '' }}</option>
                             }
                         </select>
                      </div>
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Status</label>
-                         <select formControlName="status" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Status</label>
+                         <select formControlName="status" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option value="ACTIVE">ACTIVE</option>
                             <option value="INACTIVE">INACTIVE</option>
                             <option value="MAINTENANCE">MAINTENANCE</option>
@@ -80,43 +80,43 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
 
                  <!-- Specs -->
                  <div class="grid grid-cols-3 gap-4">
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">CPU Cores</label>
-                        <input type="number" formControlName="cpuCores" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="4">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">CPU Cores</label>
+                        <input type="number" formControlName="cpuCores" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="4">
                      </div>
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Memory</label>
-                        <input type="text" formControlName="memory" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="16GB">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Memory</label>
+                        <input type="text" formControlName="memory" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="16GB">
                      </div>
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Disk</label>
-                        <input type="text" formControlName="disk" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="500GB">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Disk</label>
+                        <input type="text" formControlName="disk" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="500GB">
                      </div>
                  </div>
                  
                  <!-- Cloud -->
                  <div class="grid grid-cols-2 gap-4">
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Cloud Provider</label>
-                        <input type="text" formControlName="cloudProvider" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="AWS">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Cloud Provider</label>
+                        <input type="text" formControlName="cloudProvider" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="AWS">
                      </div>
-                     <div class="flex flex-col gap-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Region</label>
-                        <input type="text" formControlName="region" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="us-east-1">
+                     <div class="flex flex-col gap-1.5">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Region</label>
+                        <input type="text" formControlName="region" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="us-east-1">
                      </div>
                  </div>
 
                  <!-- Description -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Description</label>
-                     <textarea formControlName="description" rows="2" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="Server description"></textarea>
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
+                     <textarea formControlName="description" rows="2" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="Server description"></textarea>
                  </div>
              </form>
           </div>
 
-          <div class="p-4 border-t border-[rgb(var(--color-border-base))] flex justify-end gap-3 bg-[rgb(var(--color-surface-sidebar))] rounded-b-lg">
-             <button type="button" (click)="onCancel()" class="px-4 py-2 rounded text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]">Cancel</button>
-             <button type="button" (click)="onSubmit()" [disabled]="form.invalid || isSaving()" class="px-4 py-2 rounded bg-[rgb(var(--color-accent-ring))] text-white hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2">
+          <div class="px-5 py-3.5 border-t border-[rgb(var(--color-border-base))] flex justify-end gap-2.5 bg-[rgb(var(--color-surface-muted))]">
+             <button type="button" (click)="onCancel()" class="px-3.5 py-1.5 text-sm font-medium rounded-md text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))] transition-colors">Cancel</button>
+             <button type="button" (click)="onSubmit()" [disabled]="form.invalid || isSaving()" class="px-4 py-1.5 text-sm font-semibold rounded-md bg-[rgb(var(--color-accent-ring))] text-white hover:bg-[rgb(var(--color-accent-ring))]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors">
                 @if (isSaving()) {
                     <span class="material-icons text-sm animate-spin">refresh</span>
                 }

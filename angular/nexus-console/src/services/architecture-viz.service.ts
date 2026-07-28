@@ -69,6 +69,33 @@ export class ArchitectureVizService {
     // Persistent position store — survives clearScene() and component lifecycle
     private readonly savedPositions = new Map<string, { x: number; y: number; z: number }>();
 
+    // Persistent connection store — survives clearScene() so user-created and
+    // DB-loaded edges aren't lost when the services effect rebuilds the graph
+    // (e.g. on poll cycles). Mirrors the savedPositions pattern.
+    private savedConnections: ConnectionData[] = [];
+
+    // --- Collapse/Explode State ---
+    // Tracks which System nodes are collapsed and stores the original member
+    // connections so they can be restored on Explode. Survives clearScene()
+    // so collapsed state persists across graph rebuilds (poll cycles).
+    public readonly collapsedSystemIds: WritableSignal<Set<string>> = signal(new Set());
+    private collapsedState = new Map<string, { memberIds: string[]; savedConnections: ConnectionData[] }>();
+
+    // --- Drill-Down State ---
+    // When the user drills into a collapsed System, only its members are shown.
+    // The system node itself is hidden, and all non-member nodes are hidden too.
+    // Escape returns to the parent graph view. Survives clearScene() so the
+    // drill-down view persists across graph rebuilds.
+    public readonly drilledDownSystemId: WritableSignal<string | null> = signal(null);
+    // Member IDs visible in the current drill-down (stored so we can re-apply
+    // after rebuilds without needing to re-derive from childrenMap)
+    private drillDownMemberIds: string[] = [];
+
+    // Suppress connectionsChanged emissions during drillDown/escapeDrillDown
+    // transitions so auto-save doesn't persist the intermediate (exploded)
+    // topology. The final state after escapeDrillDown is emitted once.
+    private suppressConnectionsChanged = false;
+
     // Selection & Interaction
     private selectionBox!: THREE.BoxHelper;
     private selectedNodeId: string | null = null;
@@ -93,6 +120,15 @@ export class ArchitectureVizService {
     private dragStartPositions = new Map<string, THREE.Vector3>();
     private draggedNodeId: string | null = null;
 
+    // Connection Drag State (Shift+Drag to create edges)
+    private isConnectionDragging = false;
+    private connectionDragSourceId: string | null = null;
+    private connectionDragLine: THREE.Line | null = null;
+    private connectionDragTargetId: string | null = null;
+    private connectionDragValid = false;
+    private connectionDragHighlight: THREE.BoxHelper | null = null;
+    private connectionSourceHighlight: THREE.BoxHelper | null = null;
+
     // Lasso State
     private isLassoing = false;
     private lassoStart = new THREE.Vector2();
@@ -112,6 +148,18 @@ export class ArchitectureVizService {
     public nodeDoubleClicked = new Subject<string>();
     public nodePositionChanged = new Subject<string>(); // emits node ID when position changes (drag end or updateNode)
     public cameraChanged = new Subject<void>(); // emits when orbit controls stop moving
+    public connectionsChanged = new Subject<void>(); // emits when edges are added/removed/toggled (triggers auto-save)
+    /** Emits { sourceId, targetId, screenX, screenY } when a Shift+Drag connection is completed.
+     *  The component shows a direction popup at screenX/screenY. */
+    public connectionCreated = new Subject<{ sourceId: string; targetId: string; screenX: number; screenY: number }>();
+
+    /** Gated emission — skips connectionsChanged when suppressed (during
+     *  drillDown/escapeDrillDown transitions) so auto-save doesn't persist
+     *  the intermediate exploded topology. */
+    private emitConnChanged(): void {
+        if (this.suppressConnectionsChanged) return;
+        this.connectionsChanged.next();
+    }
     public modeSignal: WritableSignal<'camera' | 'edit'> = signal('camera');
     public webglError: WritableSignal<string | null> = signal(null);
 
@@ -153,6 +201,13 @@ export class ArchitectureVizService {
     private canvasFocusHandler = this.onCanvasFocus.bind(this);
 
     initialize(container: HTMLElement) {
+        // Guard against double-initialization: if initialize() is called again
+        // (e.g. component recreated after tab switch), dispose the old renderer
+        // first to prevent "Canvas has an existing context of a different type".
+        if (this.scene) {
+            this.dispose();
+        }
+
         this.container = container;
 
         // 1. Setup Scene
@@ -491,6 +546,16 @@ export class ArchitectureVizService {
         return new THREE.Vector3(0, 15, 0);
     }
 
+    /** Set camera target to plain world coordinates (no THREE.Vector3 needed).
+     *  Convenience for external callers (e.g. minimap click-to-navigate). */
+    public setCameraTarget(x: number, y: number, z: number): void {
+        if (!this.camera || !this.controls) return;
+        (this.controls as any).target.set(x, y, z);
+        this.camera.lookAt(this.controls.target);
+        this.controls.update();
+        this.cameraChanged.next();
+    }
+
     /** Set camera position + target immediately (no animation). */
     public setCameraState(pos: THREE.Vector3, target: THREE.Vector3): void {
         if (!this.camera || !this.controls) return;
@@ -724,6 +789,11 @@ export class ArchitectureVizService {
         if (!this.scene) {
             return;
         }
+        // Snapshot connections BEFORE any clearing so user-created and DB-loaded
+        // edges can be re-applied after the graph is rebuilt from service data.
+        // This MUST run before nodes.clear() and bidirectionalEdges.clear() —
+        // getAllConnections() reads both. Mirrors the savedPositions pattern.
+        this.savedConnections = this.getAllConnections();
         this.nodes.forEach(node => {
             this.scene.remove(node.mesh);
             if (node.labelObj) node.mesh.remove(node.labelObj);
@@ -737,7 +807,15 @@ export class ArchitectureVizService {
         });
         this.connectionLines.clear();
         this.bidirectionalEdges.clear();
+        // Clean up edge label CSS2DObjects
+        this.edgeLabelObjects.forEach((labelObj) => {
+            this.scene.remove(labelObj);
+        });
+        this.edgeLabelObjects.clear();
         this.deselect();
+        // Cancel any in-progress connection drag so temp line/highlights
+        // don't persist as orphaned objects after a graph rebuild.
+        this.cancelConnectionDrag();
         this.cleanupParticles();
         this.allNodes.set([]);
         // NOTE: Do NOT clear this.savedPositions — they must survive rebuilds
@@ -925,6 +1003,936 @@ export class ArchitectureVizService {
             }
         }
         this.updateAllNodesSignal();
+        // Deleting a node removes its outbound edges (via removeVisualConnection
+        // above) and inbound edges (via disconnectNodes). disconnectNodes already
+        // emits connectionsChanged, but the outbound-only removal path does not,
+        // so emit here to guarantee edge deletions trigger auto-save.
+        this.emitConnChanged();
+    }
+
+    // --- Collapse / Explode System Components ---
+
+    /**
+     * Collapse a System node: hide all its member nodes and redirect their
+     * external connections to the System node itself.
+     *
+     * @param systemId  ID of the System (parent) node to collapse.
+     * @param memberIds IDs of child nodes to hide (services with parentServiceId === systemId).
+     */
+    public collapseSystem(systemId: string, memberIds: string[]): void {
+        if (!this.scene) return;
+        if (this.collapsedSystemIds().has(systemId)) return; // already collapsed
+        if (memberIds.length === 0) return;
+
+        // Snapshot all connections BEFORE we start modifying, so we can
+        // restore the exact original topology on Explode.
+        const allConns = this.getAllConnections();
+        const memberSet = new Set(memberIds);
+
+        // Filter to connections involving at least one member node
+        const savedConns = allConns.filter(c =>
+            memberSet.has(c.sourceNodeId) || memberSet.has(c.targetNodeId)
+        );
+
+        // Store state for later restoration
+        this.collapsedState.set(systemId, {
+            memberIds: [...memberIds],
+            savedConnections: savedConns,
+        });
+
+        // --- Redirect external connections ---
+        // For each saved connection, if exactly one endpoint is a member,
+        // rewire the other endpoint to the System node. Connections between
+        // two members are purely internal and dropped (not shown).
+        for (const conn of savedConns) {
+            const srcIsMember = memberSet.has(conn.sourceNodeId);
+            const tgtIsMember = memberSet.has(conn.targetNodeId);
+
+            if (srcIsMember && tgtIsMember) {
+                // Internal connection — just remove it
+                this.disconnectNodes(conn.sourceNodeId, conn.targetNodeId);
+            } else if (srcIsMember && !tgtIsMember) {
+                // Member → External: redirect to System → External
+                this.disconnectNodes(conn.sourceNodeId, conn.targetNodeId);
+                this.connectNodes(systemId, conn.targetNodeId);
+                if (conn.direction === 'BIDIRECTIONAL') {
+                    this.toggleConnectionDirection(systemId, conn.targetNodeId);
+                }
+            } else if (!srcIsMember && tgtIsMember) {
+                // External → Member: redirect to External → System
+                this.disconnectNodes(conn.sourceNodeId, conn.targetNodeId);
+                this.connectNodes(conn.sourceNodeId, systemId);
+                if (conn.direction === 'BIDIRECTIONAL') {
+                    this.toggleConnectionDirection(conn.sourceNodeId, systemId);
+                }
+            }
+        }
+
+        // --- Hide member meshes ---
+        for (const memberId of memberIds) {
+            const node = this.nodes.get(memberId);
+            if (node) {
+                node.mesh.visible = false;
+            }
+        }
+
+        // Mark as collapsed
+        const next = new Set(this.collapsedSystemIds());
+        next.add(systemId);
+        this.collapsedSystemIds.set(next);
+
+        this.updateAllNodesSignal();
+        this.emitConnChanged();
+    }
+
+    /**
+     * Explode a System node: restore all its member nodes and their original
+     * connections, then remove the redirected connections to the System.
+     *
+     * @param systemId  ID of the System (parent) node to explode.
+     */
+    public explodeSystem(systemId: string): void {
+        if (!this.scene) return;
+        const state = this.collapsedState.get(systemId);
+        if (!state) return; // not collapsed
+
+        const memberSet = new Set(state.memberIds);
+
+        // --- Remove redirected connections to the System node ---
+        // These are connections that were redirected from members to the System
+        // during collapse. We remove all connections where the System node is
+        // an endpoint and the other endpoint is NOT a member (i.e. external).
+        const systemNode = this.nodes.get(systemId);
+        if (systemNode) {
+            const externalConns = [...systemNode.data.connectedTo];
+            for (const extId of externalConns) {
+                if (!memberSet.has(extId)) {
+                    this.disconnectNodes(systemId, extId);
+                }
+            }
+            // Also remove inbound external connections
+            this.nodes.forEach((otherNode) => {
+                if (memberSet.has(otherNode.data.id)) return;
+                if (otherNode.data.connectedTo.includes(systemId)) {
+                    this.disconnectNodes(otherNode.data.id, systemId);
+                }
+            });
+        }
+
+        // --- Show member meshes ---
+        for (const memberId of state.memberIds) {
+            const node = this.nodes.get(memberId);
+            if (node) {
+                node.mesh.visible = true;
+            }
+        }
+
+        // --- Restore original member connections ---
+        // Re-create the saved connections. connectNodes deduplicates so this
+        // is safe even if some connections still exist.
+        this.restoreConnections(state.savedConnections);
+
+        // Clear collapsed state
+        this.collapsedState.delete(systemId);
+        const next = new Set(this.collapsedSystemIds());
+        next.delete(systemId);
+        this.collapsedSystemIds.set(next);
+
+        this.updateAllNodesSignal();
+        this.emitConnChanged();
+    }
+
+    /**
+     * Re-apply collapsed state after a graph rebuild (e.g. clearScene +
+     * services effect re-adds all nodes). After a rebuild the graph has the
+     * ORIGINAL topology (members visible, member→external connections exist),
+     * so we must re-run the full collapse logic: snapshot current connections,
+     * redirect them to the System node, and hide member meshes.
+     *
+     * Called by ServiceGraphComponent after the services effect finishes
+     * rebuilding the graph.
+     */
+    public reapplyCollapsedState(): void {
+        const collapsed = this.collapsedSystemIds();
+        if (collapsed.size === 0) return;
+
+        // Collect systems that still have their nodes in the graph
+        const toReCollapse: { systemId: string; memberIds: string[] }[] = [];
+        for (const [systemId, state] of this.collapsedState) {
+            if (!this.nodes.has(systemId)) {
+                // System node was removed — clear its collapsed state
+                this.collapsedState.delete(systemId);
+                const next = new Set(this.collapsedSystemIds());
+                next.delete(systemId);
+                this.collapsedSystemIds.set(next);
+                continue;
+            }
+            // Filter to members that still exist in the graph
+            const existingMembers = state.memberIds.filter(id => this.nodes.has(id));
+            if (existingMembers.length > 0) {
+                toReCollapse.push({ systemId, memberIds: existingMembers });
+            }
+        }
+
+        // Temporarily clear collapsed state so collapseSystem doesn't skip
+        // (it early-returns if already in the set). We'll re-add via collapseSystem.
+        this.collapsedState.clear();
+        this.collapsedSystemIds.set(new Set());
+
+        // Re-collapse each system with the current (fresh) connection topology
+        for (const { systemId, memberIds } of toReCollapse) {
+            this.collapseSystem(systemId, memberIds);
+        }
+
+        this.updateAllNodesSignal();
+    }
+
+    /** Check if a system node is currently collapsed. */
+    public isSystemCollapsed(systemId: string): boolean {
+        return this.collapsedSystemIds().has(systemId);
+    }
+
+    /** Get the member IDs for a collapsed system (empty if not collapsed). */
+    public getCollapsedMembers(systemId: string): string[] {
+        return this.collapsedState.get(systemId)?.memberIds ?? [];
+    }
+
+    // --- Drill-Down into Collapsed Systems ---
+
+    /**
+     * Drill down into a collapsed System: show only its member nodes (with
+     * their original connections) and hide everything else. The System node
+     * itself is also hidden. Use escapeDrillDown() to return.
+     *
+     * @param systemId  ID of the collapsed System to drill into.
+     */
+    public drillDown(systemId: string): void {
+        if (!this.scene) return;
+        const state = this.collapsedState.get(systemId);
+        if (!state) return; // not collapsed — nothing to drill into
+
+        // Suppress auto-save during the transition — the intermediate
+        // exploded topology should NOT be persisted. Auto-save fires on
+        // connectionsChanged, which we gate via emitConnChanged().
+        this.suppressConnectionsChanged = true;
+        try {
+          this._drillDownImpl(systemId, state);
+        } finally {
+          this.suppressConnectionsChanged = false;
+        }
+    }
+
+    private _drillDownImpl(systemId: string, state: { memberIds: string[]; savedConnections: ConnectionData[] }): void {
+        // Temporarily explode the system so members are visible with their
+        // original connections, but DON'T clear collapsedState — we need it
+        // to restore the collapsed view on escape.
+        const memberSet = new Set(state.memberIds);
+
+        // Remove redirected external connections to the System node
+        const systemNode = this.nodes.get(systemId);
+        if (systemNode) {
+            const externalConns = [...systemNode.data.connectedTo];
+            for (const extId of externalConns) {
+                if (!memberSet.has(extId)) {
+                    this.disconnectNodes(systemId, extId);
+                }
+            }
+            this.nodes.forEach((otherNode) => {
+                if (memberSet.has(otherNode.data.id)) return;
+                if (otherNode.data.connectedTo.includes(systemId)) {
+                    this.disconnectNodes(otherNode.data.id, systemId);
+                }
+            });
+        }
+
+        // Show member meshes
+        for (const memberId of state.memberIds) {
+            const node = this.nodes.get(memberId);
+            if (node) {
+                node.mesh.visible = true;
+            }
+        }
+
+        // Restore original member connections
+        this.restoreConnections(state.savedConnections);
+
+        // Hide the System node and all non-member nodes
+        if (systemNode) systemNode.mesh.visible = false;
+        this.nodes.forEach((node) => {
+            if (!memberSet.has(node.data.id) && node.data.id !== systemId) {
+                node.mesh.visible = false;
+            }
+        });
+
+        // Set drill-down state
+        this.drillDownMemberIds = [...state.memberIds];
+        this.drilledDownSystemId.set(systemId);
+
+        this.updateAllNodesSignal();
+    }
+
+    /**
+     * Escape from drill-down mode: re-collapse the system and show the
+     * parent graph view (all non-member nodes visible again, members hidden).
+     */
+    public escapeDrillDown(): void {
+        const systemId = this.drilledDownSystemId();
+        if (!systemId) return;
+
+        // Suppress auto-save during the re-collapse transition — the
+        // intermediate state (members visible, connections being removed)
+        // should NOT be persisted. We emit once at the end after the
+        // collapsed topology is fully restored.
+        this.suppressConnectionsChanged = true;
+        try {
+          this._escapeDrillDownImpl(systemId);
+        } finally {
+          this.suppressConnectionsChanged = false;
+        }
+        // Emit once now that the collapsed parent topology is restored
+        this.connectionsChanged.next();
+    }
+
+    private _escapeDrillDownImpl(systemId: string): void {
+        const state = this.collapsedState.get(systemId);
+        if (!state) {
+            // System was removed — just clear drill-down and show all
+            this.drilledDownSystemId.set(null);
+            this.drillDownMemberIds = [];
+            this.nodes.forEach((node) => { node.mesh.visible = true; });
+            // Re-apply collapsed state for other systems
+            this.reapplyCollapsedState();
+            this.updateAllNodesSignal();
+            return;
+        }
+
+        const memberSet = new Set(state.memberIds);
+
+        // Hide member meshes again
+        for (const memberId of state.memberIds) {
+            const node = this.nodes.get(memberId);
+            if (node) node.mesh.visible = false;
+        }
+
+        // Remove member connections (they were restored during drillDown)
+        for (const conn of state.savedConnections) {
+            this.disconnectNodes(conn.sourceNodeId, conn.targetNodeId);
+        }
+
+        // Show the System node and all non-member nodes
+        const systemNode = this.nodes.get(systemId);
+        if (systemNode) systemNode.mesh.visible = true;
+        this.nodes.forEach((node) => {
+            if (!memberSet.has(node.data.id)) {
+                node.mesh.visible = true;
+            }
+        });
+
+        // Re-redirect external connections to the System node (re-collapse)
+        for (const conn of state.savedConnections) {
+            const srcIsMember = memberSet.has(conn.sourceNodeId);
+            const tgtIsMember = memberSet.has(conn.targetNodeId);
+            if (srcIsMember && !tgtIsMember) {
+                this.connectNodes(systemId, conn.targetNodeId);
+                if (conn.direction === 'BIDIRECTIONAL') {
+                    this.toggleConnectionDirection(systemId, conn.targetNodeId);
+                }
+            } else if (!srcIsMember && tgtIsMember) {
+                this.connectNodes(conn.sourceNodeId, systemId);
+                if (conn.direction === 'BIDIRECTIONAL') {
+                    this.toggleConnectionDirection(conn.sourceNodeId, systemId);
+                }
+            }
+        }
+
+        // Clear drill-down state
+        this.drilledDownSystemId.set(null);
+        this.drillDownMemberIds = [];
+
+        this.updateAllNodesSignal();
+        this.emitConnChanged();
+    }
+
+    /** Check if we're currently in drill-down mode. */
+    public isDrilledDown(): boolean {
+        return this.drilledDownSystemId() !== null;
+    }
+
+    // --- Search & Highlight ---
+
+    /** Highlight nodes matching the search term, dim non-matching ones.
+     *  Pass empty string or null to clear the search. */
+    public searchNodes(query: string): void {
+        if (!this.scene) return;
+        const term = query.toLowerCase().trim();
+        this.nodes.forEach((vn) => {
+            const data = vn.data;
+            if (!term) {
+                // Clear — restore full opacity and default emissive
+                (vn.mesh.material as THREE.MeshPhongMaterial).opacity = 1;
+                (vn.mesh.material as THREE.MeshPhongMaterial).transparent = false;
+                (vn.mesh.material as THREE.MeshPhongMaterial).emissiveIntensity = 0.8;
+                if (vn.labelObj) vn.labelObj.element.style.opacity = '1';
+                if (vn.wireframe) (vn.wireframe.material as THREE.LineBasicMaterial).opacity = 0.1;
+                return;
+            }
+            const matches = data.label.toLowerCase().includes(term) ||
+                (data.description && data.description.toLowerCase().includes(term)) ||
+                data.type.toLowerCase().includes(term);
+            if (matches) {
+                (vn.mesh.material as THREE.MeshPhongMaterial).opacity = 1;
+                (vn.mesh.material as THREE.MeshPhongMaterial).transparent = false;
+                (vn.mesh.material as THREE.MeshPhongMaterial).emissiveIntensity = 1.5;
+                if (vn.labelObj) vn.labelObj.element.style.opacity = '1';
+                if (vn.wireframe) (vn.wireframe.material as THREE.LineBasicMaterial).opacity = 0.3;
+            } else {
+                (vn.mesh.material as THREE.MeshPhongMaterial).opacity = 0.15;
+                (vn.mesh.material as THREE.MeshPhongMaterial).transparent = true;
+                (vn.mesh.material as THREE.MeshPhongMaterial).emissiveIntensity = 0.2;
+                if (vn.labelObj) vn.labelObj.element.style.opacity = '0.2';
+                if (vn.wireframe) (vn.wireframe.material as THREE.LineBasicMaterial).opacity = 0.02;
+            }
+        });
+    }
+
+    // --- Layout Presets ---
+
+    /** Apply a layout algorithm to reposition all visible nodes.
+     *  Preserves connections — only moves meshes. */
+    public applyLayout(type: 'radial' | 'grid' | 'hierarchical' | 'force'): void {
+        if (!this.scene) return;
+        const visibleNodes = Array.from(this.nodes.values()).filter(n => n.mesh.visible);
+        if (visibleNodes.length === 0) return;
+
+        const drillId = this.drilledDownSystemId();
+        const collapsed = this.collapsedSystemIds();
+        // Get IDs of nodes that should participate in the layout
+        const hiddenIds = (collapsed.size > 0 || drillId) ? this.getHiddenNodeIds(collapsed, drillId) : null;
+        const layoutNodes = hiddenIds
+            ? visibleNodes.filter(n => !hiddenIds.has(n.data.id))
+            : visibleNodes;
+
+        switch (type) {
+            case 'radial': {
+                const count = layoutNodes.length;
+                const radius = Math.max(10, count * 2);
+                layoutNodes.forEach((vn, i) => {
+                    const angle = (i / count) * Math.PI * 2;
+                    const pos = { x: Math.cos(angle) * radius, y: 0, z: Math.sin(angle) * radius };
+                    this.setNodePosition(vn.data.id, pos.x, pos.y, pos.z);
+                });
+                break;
+            }
+            case 'grid': {
+                const cols = Math.ceil(Math.sqrt(layoutNodes.length));
+                const spacing = 8;
+                layoutNodes.forEach((vn, i) => {
+                    const row = Math.floor(i / cols);
+                    const col = i % cols;
+                    const pos = {
+                        x: (col - cols / 2) * spacing,
+                        y: 0,
+                        z: (row - cols / 2) * spacing,
+                    };
+                    this.setNodePosition(vn.data.id, pos.x, pos.y, pos.z);
+                });
+                break;
+            }
+            case 'hierarchical': {
+                // Topological-ish: nodes with no inbound connections at top,
+                // then by dependency depth
+                const depthMap = new Map<string, number>();
+                const computeDepth = (id: string, visited: Set<string>): number => {
+                    if (depthMap.has(id)) return depthMap.get(id)!;
+                    if (visited.has(id)) return 0;
+                    visited.add(id);
+                    const node = this.nodes.get(id);
+                    if (!node) return 0;
+                    // Find inbound: who points to this node?
+                    let maxDepth = 0;
+                    this.nodes.forEach((other) => {
+                        if (other.data.connectedTo.includes(id)) {
+                            maxDepth = Math.max(maxDepth, computeDepth(other.data.id, visited) + 1);
+                        }
+                    });
+                    depthMap.set(id, maxDepth);
+                    return maxDepth;
+                };
+                layoutNodes.forEach(vn => computeDepth(vn.data.id, new Set()));
+                // Group by depth
+                const byDepth = new Map<number, string[]>();
+                layoutNodes.forEach(vn => {
+                    const d = depthMap.get(vn.data.id) ?? 0;
+                    const arr = byDepth.get(d) ?? [];
+                    arr.push(vn.data.id);
+                    byDepth.set(d, arr);
+                });
+                const maxDepth = Math.max(...byDepth.keys(), 0);
+                const layerSpacing = 15;
+ const colSpacing = 8;
+                byDepth.forEach((ids, depth) => {
+                    const offset = (ids.length - 1) * colSpacing / 2;
+                    ids.forEach((id, i) => {
+                        const pos = {
+                            x: (i * colSpacing) - offset,
+                            y: (maxDepth - depth) * layerSpacing,
+                            z: 0,
+                        };
+                        this.setNodePosition(id, pos.x, pos.y, pos.z);
+                    });
+                });
+                break;
+            }
+            case 'force': {
+                // Simple force-directed: repulsion between nodes + attraction along edges
+                // Run 50 iterations for convergence
+                const positions = new Map<string, { x: number; y: number; z: number }>();
+                layoutNodes.forEach(vn => {
+                    positions.set(vn.data.id, { ...vn.data.position });
+                });
+                const repulsion = 50;
+                const attraction = 0.05;
+                const damping = 0.85;
+                for (let iter = 0; iter < 50; iter++) {
+                    const forces = new Map<string, { x: number; y: number; z: number }>();
+                    layoutNodes.forEach(vn => {
+                        forces.set(vn.data.id, { x: 0, y: 0, z: 0 });
+                    });
+                    // Repulsion (all pairs)
+                    for (let i = 0; i < layoutNodes.length; i++) {
+                        for (let j = i + 1; j < layoutNodes.length; j++) {
+                            const a = positions.get(layoutNodes[i].data.id)!;
+                            const b = positions.get(layoutNodes[j].data.id)!;
+                            const dx = b.x - a.x;
+                            const dz = b.z - a.z;
+                            const dist = Math.sqrt(dx * dx + dz * dz) || 0.01;
+                            const force = repulsion / (dist * dist);
+                            const fx = (dx / dist) * force;
+                            const fz = (dz / dist) * force;
+                            const fa = forces.get(layoutNodes[i].data.id)!;
+                            const fb = forces.get(layoutNodes[j].data.id)!;
+                            fa.x -= fx; fa.z -= fz;
+                            fb.x += fx; fb.z += fz;
+                        }
+                    }
+                    // Attraction (connected pairs)
+                    layoutNodes.forEach(vn => {
+                        for (const targetId of vn.data.connectedTo) {
+                            if (!positions.has(targetId)) continue;
+                            const a = positions.get(vn.data.id)!;
+                            const b = positions.get(targetId)!;
+                            const dx = b.x - a.x;
+                            const dz = b.z - a.z;
+                            const dist = Math.sqrt(dx * dx + dz * dz) || 0.01;
+                            const fa = forces.get(vn.data.id)!;
+                            const fb = forces.get(targetId)!;
+                            fa.x += dx * attraction; fa.z += dz * attraction;
+                            fb.x -= dx * attraction; fb.z -= dz * attraction;
+                        }
+                    });
+                    // Apply forces
+                    positions.forEach((pos, id) => {
+                        const f = forces.get(id);
+                        if (!f) return;
+                        pos.x += f.x * damping;
+                        pos.z += f.z * damping;
+                    });
+                }
+                // Apply final positions
+                positions.forEach((pos, id) => {
+                    this.setNodePosition(id, pos.x, 0, pos.z);
+                });
+                break;
+            }
+        }
+        this.updateAllNodesSignal();
+        this.cameraChanged.next();
+    }
+
+    // --- Edge Labels & Criticality ---
+
+    /** Dependency type labels for edges (from ServiceDependency.dependencyType). */
+    private edgeLabels = new Map<string, { type: string; criticality?: string }>();
+
+    /** Get the label for an edge, or null. */
+    public getEdgeLabel(fromId: string, toId: string): { type: string; criticality?: string } | null {
+        return this.edgeLabels.get(`${fromId}::${toId}`) ?? null;
+    }
+
+    /** Clear all edge labels and remove their visual objects. */
+    public clearEdgeLabels(): void {
+        this.edgeLabels.clear();
+        // Remove all edge label CSS2DObjects from the scene
+        this.edgeLabelObjects.forEach((labelObj) => {
+            this.scene.remove(labelObj);
+        });
+        this.edgeLabelObjects.clear();
+    }
+
+    // --- Live Health Pulse ---
+
+    /** Health status per node ID (HEALTHY/UNHEALTHY/DEGRADED). Nodes not in
+     *  the map default to UNKNOWN (no pulse). */
+    private nodeHealth = new Map<string, 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED'>();
+    public readonly healthPulseEnabled = signal(false);
+
+    /** Set the health status for a node. */
+    public setNodeHealth(nodeId: string, status: 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED'): void {
+        this.nodeHealth.set(nodeId, status);
+    }
+
+    /** Set health for multiple nodes at once (from deployment data). */
+    public setNodeHealthBatch(entries: { id: string; status: 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' }[]): void {
+        for (const e of entries) {
+            this.nodeHealth.set(e.id, e.status);
+        }
+    }
+
+    /** Enable/disable the health pulse animation. */
+    public setHealthPulseEnabled(enabled: boolean): void {
+        this.healthPulseEnabled.set(enabled);
+        if (!enabled) {
+            // Restore default emissive color + intensity for all nodes
+            this.nodes.forEach((vn) => {
+                if (vn.mesh.visible) {
+                    const mat = vn.mesh.material as THREE.MeshPhongMaterial;
+                    const colorHex = parseInt(vn.data.color.replace('#', ''), 16);
+                    mat.emissive.setHex(colorHex);
+                    mat.emissiveIntensity = 0.8;
+                }
+            });
+        }
+    }
+
+    /** Aggregate health for a collapsed system's members.
+     *  Returns the worst status among members. */
+    public getAggregatedHealth(memberIds: string[]): 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' | 'UNKNOWN' {
+        if (memberIds.length === 0) return 'UNKNOWN';
+        let worst: 'HEALTHY' | 'UNHEALTHY' | 'DEGRADED' | 'UNKNOWN' = 'HEALTHY';
+        for (const id of memberIds) {
+            const status = this.nodeHealth.get(id);
+            if (!status) continue;
+            if (status === 'UNHEALTHY') return 'UNHEALTHY';
+            if (status === 'DEGRADED') worst = 'DEGRADED';
+        }
+        return worst;
+    }
+
+    /** Update health pulse animation — called from the animate loop. */
+    private updateHealthPulse(elapsed: number): void {
+        if (!this.healthPulseEnabled()) return;
+        const pulse = (Math.sin(elapsed * 3) + 1) / 2; // 0..1 oscillation
+        this.nodes.forEach((vn) => {
+            if (!vn.mesh.visible) return;
+            const status = this.nodeHealth.get(vn.data.id);
+            if (!status) return;
+            const mat = vn.mesh.material as THREE.MeshPhongMaterial;
+            switch (status) {
+                case 'HEALTHY':
+                    mat.emissive.setHex(0x22c55e);
+                    mat.emissiveIntensity = 0.6 + pulse * 0.4;
+                    break;
+                case 'DEGRADED':
+                    mat.emissive.setHex(0xf59e0b);
+                    mat.emissiveIntensity = 0.5 + pulse * 0.5;
+                    break;
+                case 'UNHEALTHY':
+                    mat.emissive.setHex(0xef4444);
+                    mat.emissiveIntensity = 0.4 + pulse * 0.6;
+                    break;
+            }
+        });
+        // Also pulse collapsed system nodes with aggregated health
+        for (const [systemId, state] of this.collapsedState) {
+            const sysNode = this.nodes.get(systemId);
+            if (!sysNode || !sysNode.mesh.visible) continue;
+            const aggHealth = this.getAggregatedHealth(state.memberIds);
+            if (aggHealth === 'UNKNOWN') continue;
+            const mat = sysNode.mesh.material as THREE.MeshPhongMaterial;
+            switch (aggHealth) {
+                case 'HEALTHY':
+                    mat.emissive.setHex(0x22c55e);
+                    mat.emissiveIntensity = 0.6 + pulse * 0.4;
+                    break;
+                case 'DEGRADED':
+                    mat.emissive.setHex(0xf59e0b);
+                    mat.emissiveIntensity = 0.5 + pulse * 0.5;
+                    break;
+                case 'UNHEALTHY':
+                    mat.emissive.setHex(0xef4444);
+                    mat.emissiveIntensity = 0.4 + pulse * 0.6;
+                    break;
+            }
+        }
+    }
+
+    // --- Export ---
+
+    /** Capture the canvas as a PNG data URL.
+     *  Uses a temporary canvas to avoid preserveDrawingBuffer requirements. */
+    public captureCanvasPNG(): string | null {
+        if (!this.renderer || !this.composer) return null;
+        // Force a render to populate the WebGL buffer
+        this.composer.render();
+        // Create a temp canvas and draw the WebGL canvas onto it.
+        // This works even without preserveDrawingBuffer because we render
+        // and copy in the same synchronous call.
+        const canvas = this.renderer.domElement;
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        const ctx = tempCanvas.getContext('2d');
+        if (!ctx) return null;
+        ctx.drawImage(canvas, 0, 0);
+        return tempCanvas.toDataURL('image/png');
+    }
+
+    /** Export the current graph topology as JSON. */
+    public exportTopologyJSON(): string {
+        const nodes = Array.from(this.nodes.values())
+            .filter(n => n.mesh.visible)
+            .map(n => ({
+                id: n.data.id,
+                label: n.data.label,
+                type: n.data.type,
+                description: n.data.description,
+                position: n.data.position,
+                color: n.data.color,
+            }));
+        const edges = this.getAllConnections().map(c => ({
+            source: c.sourceNodeId,
+            target: c.targetNodeId,
+            direction: c.direction,
+            ...this.getEdgeLabel(c.sourceNodeId, c.targetNodeId),
+        }));
+        return JSON.stringify({ nodes, edges, exportedAt: new Date().toISOString() }, null, 2);
+    }
+
+    // --- Undo/Redo Stack ---
+
+    private undoStack: { nodes: NodeData[]; connections: ConnectionData[] }[] = [];
+    private redoStack: { nodes: NodeData[]; connections: ConnectionData[] }[] = [];
+
+    /** Snapshot the current graph state for undo. Call BEFORE mutations. */
+    public snapshotForUndo(): void {
+        this.undoStack.push({
+            nodes: Array.from(this.nodes.values()).filter(n => n.mesh.visible).map(n => ({ ...n.data, connectedTo: [...n.data.connectedTo] })),
+            connections: this.getAllConnections(),
+        });
+        // Clear redo stack on new action
+        this.redoStack = [];
+        // Limit stack size
+        if (this.undoStack.length > 50) this.undoStack.shift();
+    }
+
+    /** Undo the last graph mutation. */
+    public undo(): boolean {
+        if (this.undoStack.length === 0) return false;
+        // Push current state to redo stack
+        this.redoStack.push({
+            nodes: Array.from(this.nodes.values()).filter(n => n.mesh.visible).map(n => ({ ...n.data, connectedTo: [...n.data.connectedTo] })),
+            connections: this.getAllConnections(),
+        });
+        const prev = this.undoStack.pop()!;
+        this.restoreSnapshot(prev);
+        return true;
+    }
+
+    /** Redo the last undone action. */
+    public redo(): boolean {
+        if (this.redoStack.length === 0) return false;
+        this.undoStack.push({
+            nodes: Array.from(this.nodes.values()).filter(n => n.mesh.visible).map(n => ({ ...n.data, connectedTo: [...n.data.connectedTo] })),
+            connections: this.getAllConnections(),
+        });
+        const next = this.redoStack.pop()!;
+        this.restoreSnapshot(next);
+        return true;
+    }
+
+    /** Can undo? */
+    public canUndo(): boolean { return this.undoStack.length > 0; }
+    /** Can redo? */
+    public canRedo(): boolean { return this.redoStack.length > 0; }
+
+    private restoreSnapshot(snap: { nodes: NodeData[]; connections: ConnectionData[] }): void {
+        // Clear and rebuild from snapshot
+        this.clearScene();
+        for (const nd of snap.nodes) {
+            this.addNode(nd.type, nd.position, nd.label, nd.description, nd.color, nd.id);
+        }
+        this.restoreConnections(snap.connections);
+        this.emitConnChanged();
+    }
+
+    // --- System Auto-Detection (strongly connected components) ---
+
+    /** Auto-detect clusters of tightly-connected nodes and suggest collapse.
+     *  Returns groups of node IDs that form strongly connected components
+     *  with more than one member. Uses an iterative Tarjan's algorithm to
+     *  avoid stack overflow on large graphs. */
+    public autoDetectSystems(): string[][] {
+        const nodeIds = Array.from(this.nodes.keys()).filter(id => this.nodes.get(id)!.mesh.visible);
+        const idSet = new Set(nodeIds);
+        // Build adjacency list
+        const adj = new Map<string, string[]>();
+        nodeIds.forEach(id => { adj.set(id, []); });
+        this.nodes.forEach((vn) => {
+            if (!idSet.has(vn.data.id)) return;
+            for (const target of vn.data.connectedTo) {
+                if (idSet.has(target)) {
+                    adj.get(vn.data.id)!.push(target);
+                }
+            }
+        });
+        // Iterative Tarjan's algorithm for SCCs (avoids stack overflow)
+        let index = 0;
+        const stack: string[] = [];
+        const onStack = new Set<string>();
+        const indices = new Map<string, number>();
+        const lowlinks = new Map<string, number>();
+        const sccs: string[][] = [];
+
+        // Work stack: [node, neighborIndex]
+        const workStack: [string, number][] = [];
+
+        for (const start of nodeIds) {
+            if (indices.has(start)) continue;
+            workStack.push([start, 0]);
+
+            while (workStack.length > 0) {
+                const [v, i] = workStack[workStack.length - 1];
+                const neighbors = adj.get(v) ?? [];
+
+                if (i === 0) {
+                    // First visit to v
+                    indices.set(v, index);
+                    lowlinks.set(v, index);
+                    index++;
+                    stack.push(v);
+                    onStack.add(v);
+                }
+
+                if (i < neighbors.length) {
+                    const w = neighbors[i];
+                    // Advance the neighbor index for v
+                    workStack[workStack.length - 1][1] = i + 1;
+
+                    if (!indices.has(w)) {
+                        // Recurse into w
+                        workStack.push([w, 0]);
+                    } else if (onStack.has(w)) {
+                        lowlinks.set(v, Math.min(lowlinks.get(v)!, indices.get(w)!));
+                    }
+                } else {
+                    // All neighbors processed — check if v is a root of an SCC
+                    workStack.pop();
+                    if (workStack.length > 0) {
+                        const parent = workStack[workStack.length - 1][0];
+                        lowlinks.set(parent, Math.min(lowlinks.get(parent)!, lowlinks.get(v)!));
+                    }
+                    if (lowlinks.get(v) === indices.get(v)) {
+                        const scc: string[] = [];
+                        let w: string;
+                        do {
+                            w = stack.pop()!;
+                            onStack.delete(w);
+                            scc.push(w);
+                        } while (w !== v);
+                        if (scc.length > 1) sccs.push(scc);
+                    }
+                }
+            }
+        }
+        return sccs;
+    }
+
+    // --- Diff Mode ---
+
+    private diffBaseline: { nodes: { id: string; label: string; type: string }[]; connections: ConnectionData[] } | null = null;
+    public readonly diffModeActive = signal(false);
+
+    /** Capture current graph as a baseline for diff comparison. */
+    public captureDiffBaseline(): void {
+        this.diffBaseline = {
+            nodes: Array.from(this.nodes.values())
+                .filter(n => n.mesh.visible)
+                .map(n => ({ id: n.data.id, label: n.data.label, type: n.data.type })),
+            connections: this.getAllConnections(),
+        };
+        this.diffModeActive.set(true);
+        this.applyDiffHighlighting();
+    }
+
+    /** Clear diff mode and restore normal highlighting. */
+    public clearDiffMode(): void {
+        this.diffBaseline = null;
+        this.diffModeActive.set(false);
+        // Restore normal node appearance
+        this.nodes.forEach((vn) => {
+            (vn.mesh.material as THREE.MeshPhongMaterial).emissiveIntensity = 0.8;
+        });
+        // Restore normal connection colors
+        this.connectionLines.forEach((line) => {
+            const { fromId, toId } = line.userData;
+            const isBidir = this.bidirectionalEdges.has(ArchitectureVizService.edgeKey(fromId, toId));
+            (line.material as THREE.LineBasicMaterial).color.setHex(isBidir ? 0xf59e0b : 0x4aa8d8);
+            (line.material as THREE.LineBasicMaterial).opacity = isBidir ? 0.7 : 0.4;
+        });
+    }
+
+    /** Apply highlighting to show changes vs the baseline. */
+    private applyDiffHighlighting(): void {
+        if (!this.diffBaseline) return;
+        const baselineNodeIds = new Set(this.diffBaseline.nodes.map(n => n.id));
+        const baselineConnKeys = new Set(this.diffBaseline.connections.map(c =>
+            [c.sourceNodeId, c.targetNodeId].sort().join('::')));
+
+        // Highlight new nodes (green glow) and missing nodes (dimmed)
+        this.nodes.forEach((vn) => {
+            if (!vn.mesh.visible) return;
+            if (!baselineNodeIds.has(vn.data.id)) {
+                // New node — green glow
+                (vn.mesh.material as THREE.MeshPhongMaterial).emissiveIntensity = 2.0;
+            } else {
+                (vn.mesh.material as THREE.MeshPhongMaterial).emissiveIntensity = 0.8;
+            }
+        });
+
+        // Highlight new connections (green) vs existing (normal)
+        this.connectionLines.forEach((line) => {
+            const { fromId, toId } = line.userData;
+            const key = [fromId, toId].sort().join('::');
+            if (!baselineConnKeys.has(key)) {
+                (line.material as THREE.LineBasicMaterial).color.setHex(0x22c55e);
+                (line.material as THREE.LineBasicMaterial).opacity = 0.8;
+            }
+        });
+    }
+
+    /**
+     * Re-apply drill-down state after a graph rebuild (clearScene +
+     * services effect re-adds all nodes). Since reapplyCollapsedState()
+     * already re-collapsed the system (redirecting connections to the
+     * system node), we simply re-run drillDown() which explodes the system,
+     * restores member connections, and hides non-members.
+     */
+    public reapplyDrillDownState(): void {
+        const systemId = this.drilledDownSystemId();
+        if (!systemId) return;
+
+        // If the system's collapsed state was lost (system removed), clear drill-down
+        if (!this.collapsedState.has(systemId)) {
+            this.drilledDownSystemId.set(null);
+            this.drillDownMemberIds = [];
+            return;
+        }
+
+        // Re-run the full drillDown — it will remove redirected connections,
+        // restore member connections, show members, and hide non-members.
+        // The drilledDownSystemId signal is already set, but drillDown resets
+        // it anyway. Safe to call.
+        this.drillDown(systemId);
     }
 
     public getNode(id: string): NodeData | undefined {
@@ -988,10 +1996,83 @@ export class ArchitectureVizService {
                 this.updateConnectionColor(conn.sourceNodeId, conn.targetNodeId);
             }
         }
+        this.emitConnChanged();
         this.updateAllNodesSignal();
     }
 
-    /** Toggle a connection between OUTBOUND and BIDIRECTIONAL. */
+    /** Re-apply connections captured by the last clearScene() so user-created and
+     *  DB-loaded edges survive graph rebuilds (e.g. service poll cycles). Safe to
+     *  call when nodes already have dependency edges — connectNodes deduplicates. */
+    public restoreSavedConnections(): void {
+        if (this.savedConnections.length === 0) return;
+        // connectNodes deduplicates (early-returns if already connected), so
+        // re-applying dependency edges that the services effect already wired
+        // is a no-op. Bidirectional flags are restored via restoreConnections.
+        this.restoreConnections(this.savedConnections);
+    }
+
+    /** Cycle a connection's direction through 3 states: bidirectional → out → in → bidirectional.
+     *  Bidirectional is the default (per architect direction 2026-07-27) since one-way
+     *  communication is currently rare. The cycle lets users downgrade to one-way when needed.
+     *  @param fromId  The "current" node (the one the user is inspecting).
+     *  @param toId    The "other" node (the connection partner).
+     *  @returns The new direction relative to fromId ('out', 'bidirectional', or 'in'). */
+    public cycleConnectionDirection(fromId: string, toId: string): 'out' | 'bidirectional' | 'in' {
+        const fromNode = this.nodes.get(fromId);
+        const toNode = this.nodes.get(toId);
+        if (!fromNode || !toNode) return 'bidirectional';
+
+        const key = ArchitectureVizService.edgeKey(fromId, toId);
+        const isBidir = this.bidirectionalEdges.has(key);
+        const hasOutbound = fromNode.data.connectedTo.includes(toId);
+        const hasInbound = toNode.data.connectedTo.includes(fromId);
+
+        let newDirection: 'out' | 'bidirectional' | 'in';
+
+        if (isBidir) {
+            // bidirectional → out: remove reverse edge (toId→fromId), keep fromId→toId, remove bidirectional flag
+            this.bidirectionalEdges.delete(key);
+            toNode.data.connectedTo = toNode.data.connectedTo.filter(id => id !== fromId);
+            this.updateConnectionColor(fromId, toId);
+            newDirection = 'out';
+        } else if (hasOutbound && !hasInbound) {
+            // out → in: remove fromId's outbound, add toId's outbound, swap visual line
+            fromNode.data.connectedTo = fromNode.data.connectedTo.filter(id => id !== toId);
+            if (!toNode.data.connectedTo.includes(fromId)) {
+                toNode.data.connectedTo.push(fromId);
+            }
+            // Remove both keys to be safe (matches the established pattern) —
+            // in the pure "out" state only fromId::toId exists, but a stale
+            // duplicate shouldn't survive even in edge cases.
+            this.removeVisualConnection(fromId, toId);
+            this.removeVisualConnection(toId, fromId);
+            this.createVisualConnection(toId, fromId);
+            newDirection = 'in';
+        } else if (hasInbound && !hasOutbound) {
+            // in → bidirectional: add fromId's outbound, set bidirectional flag
+            if (!fromNode.data.connectedTo.includes(toId)) {
+                fromNode.data.connectedTo.push(toId);
+            }
+            this.bidirectionalEdges.add(key);
+            this.updateConnectionColor(toId, fromId);
+            newDirection = 'bidirectional';
+        } else if (hasOutbound && hasInbound) {
+            // Edge case: both directions exist but not flagged as bidirectional (inconsistent state)
+            // Fix it by adding the bidirectional flag, then cycle will proceed normally next click
+            this.bidirectionalEdges.add(key);
+            this.updateConnectionColor(fromId, toId);
+            newDirection = 'bidirectional';
+        } else {
+            // No connection exists in either direction — nothing to cycle
+            return 'bidirectional';
+        }
+
+        this.emitConnChanged();
+        this.updateAllNodesSignal();
+        return newDirection;
+    }
+
+    /** Toggle a connection between OUTBOUND and BIDIRECTIONAL (2-state, used by collapse/expand). */
     public toggleConnectionDirection(fromId: string, toId: string): void {
         const key = ArchitectureVizService.edgeKey(fromId, toId);
         if (this.bidirectionalEdges.has(key)) {
@@ -1010,7 +2091,169 @@ export class ArchitectureVizService {
             }
         }
         this.updateConnectionColor(fromId, toId);
+        this.emitConnChanged();
         this.updateAllNodesSignal();
+    }
+
+    // --- Drag-to-Connect (Shift+Drag) ---
+
+    /** Check if a connection from fromId to toId would be valid.
+     *  Validates: not self, allowedConnections config, no duplicate edge,
+     *  and target is visible (not hidden by collapse/drill-down). */
+    public canConnect(fromId: string, toId: string): boolean {
+        if (fromId === toId) return false;
+        const fromNode = this.nodes.get(fromId);
+        const toNode = this.nodes.get(toId);
+        if (!fromNode || !toNode) return false;
+        // Hidden nodes can't be targets
+        if (!toNode.mesh.visible) return false;
+        // Config rules
+        const fromConfig = this.registry.getConfig(fromNode.data.type);
+        if (fromConfig.allowedConnections && fromConfig.allowedConnections !== 'all' &&
+            !fromConfig.allowedConnections.includes(toNode.data.type)) return false;
+        // No duplicate (either direction)
+        if (fromNode.data.connectedTo.includes(toId)) return false;
+        if (toNode.data.connectedTo.includes(fromId)) return false;
+        return true;
+    }
+
+    /** Start a connection drag from the given source node.
+     *  Creates a dashed temp line from the source to the current mouse position. */
+    public startConnectionDrag(sourceId: string): void {
+        if (!this.scene) return;
+        const sourceNode = this.nodes.get(sourceId);
+        if (!sourceNode) return;
+
+        this.isConnectionDragging = true;
+        this.connectionDragSourceId = sourceId;
+        this.connectionDragTargetId = null;
+        this.connectionDragValid = false;
+
+        // Create temp dashed line from source to source (updated on move)
+        const points = [sourceNode.mesh.position.clone(), sourceNode.mesh.position.clone()];
+        const geo = new THREE.BufferGeometry().setFromPoints(points);
+        const mat = new THREE.LineDashedMaterial({
+            color: 0x06b6d4,
+            dashSize: 1.5,
+            gapSize: 0.8,
+            transparent: true,
+            opacity: 0.6,
+        });
+        this.connectionDragLine = new THREE.Line(geo, mat);
+        this.connectionDragLine.computeLineDistances();
+        this.scene.add(this.connectionDragLine);
+
+        // Highlight the source node with a pulsing box
+        this.connectionSourceHighlight = new THREE.BoxHelper(sourceNode.mesh, 0x06b6d4);
+        this.connectionSourceHighlight.visible = true;
+        this.scene.add(this.connectionSourceHighlight);
+
+        this.renderer.domElement.style.cursor = 'crosshair';
+    }
+
+    /** Update the connection drag: move the temp line endpoint and raycast for a target.
+     *  @param worldPoint  Current mouse position in world space.
+     *  @param event       The pointer event (for raycasting to find target node). */
+    public updateConnectionDrag(worldPoint: THREE.Vector3, event: PointerEvent): void {
+        if (!this.isConnectionDragging || !this.connectionDragLine) return;
+
+        // Update temp line endpoint
+        const pos = this.connectionDragLine.geometry.attributes['position'] as THREE.BufferAttribute;
+        pos.setXYZ(1, worldPoint.x, worldPoint.y, worldPoint.z);
+        pos.needsUpdate = true;
+        this.connectionDragLine.geometry.computeBoundingSphere();
+        // Recompute line distances so dashed material renders correctly as endpoint moves
+        this.connectionDragLine.computeLineDistances();
+
+        // Raycast for a target node
+        const intersects = this.raycast(event);
+        const sourceId = this.connectionDragSourceId!;
+
+        // Remove previous target highlight
+        if (this.connectionDragHighlight) {
+            this.scene.remove(this.connectionDragHighlight);
+            this.connectionDragHighlight = null;
+        }
+
+        if (intersects.length > 0) {
+            const targetId = intersects[0].object.userData['id'];
+            if (targetId && targetId !== sourceId) {
+                const valid = this.canConnect(sourceId, targetId);
+                this.connectionDragTargetId = targetId;
+                this.connectionDragValid = valid;
+
+                // Highlight target: green if valid, red if invalid
+                const targetMesh = intersects[0].object as THREE.Mesh;
+                this.connectionDragHighlight = new THREE.BoxHelper(targetMesh, valid ? 0x22c55e : 0xef4444);
+                this.connectionDragHighlight.visible = true;
+                this.scene.add(this.connectionDragHighlight);
+
+                // Update line color to match validity
+                (this.connectionDragLine.material as THREE.LineDashedMaterial).color.setHex(valid ? 0x22c55e : 0xef4444);
+            } else {
+                this.connectionDragTargetId = null;
+                this.connectionDragValid = false;
+                (this.connectionDragLine.material as THREE.LineDashedMaterial).color.setHex(0x06b6d4);
+            }
+        } else {
+            this.connectionDragTargetId = null;
+            this.connectionDragValid = false;
+            (this.connectionDragLine.material as THREE.LineDashedMaterial).color.setHex(0x06b6d4);
+        }
+    }
+
+    /** End the connection drag. If a valid target was found, emit connectionCreated.
+     *  @param screenX  Screen X of the drop point (for popup positioning).
+     *  @param screenY  Screen Y of the drop point (for popup positioning).
+     *  @returns True if a valid connection was made (popup should show). */
+    public endConnectionDrag(screenX: number, screenY: number): boolean {
+        if (!this.isConnectionDragging) return false;
+
+        const sourceId = this.connectionDragSourceId;
+        const targetId = this.connectionDragTargetId;
+        const valid = this.connectionDragValid;
+
+        // Clean up temp line
+        if (this.connectionDragLine) {
+            this.scene.remove(this.connectionDragLine);
+            this.connectionDragLine.geometry.dispose();
+            (this.connectionDragLine.material as THREE.Material).dispose();
+            this.connectionDragLine = null;
+        }
+        // Clean up highlights (dispose geometry/material to prevent leaks)
+        if (this.connectionDragHighlight) {
+            this.scene.remove(this.connectionDragHighlight);
+            this.connectionDragHighlight.geometry.dispose();
+            (this.connectionDragHighlight.material as THREE.Material).dispose();
+            this.connectionDragHighlight = null;
+        }
+        if (this.connectionSourceHighlight) {
+            this.scene.remove(this.connectionSourceHighlight);
+            this.connectionSourceHighlight.geometry.dispose();
+            (this.connectionSourceHighlight.material as THREE.Material).dispose();
+            this.connectionSourceHighlight = null;
+        }
+
+        this.isConnectionDragging = false;
+        this.connectionDragSourceId = null;
+        this.connectionDragTargetId = null;
+        this.connectionDragValid = false;
+        this.renderer.domElement.style.cursor = 'default';
+
+        if (valid && sourceId && targetId) {
+            this.connectionCreated.next({ sourceId, targetId, screenX, screenY });
+            return true;
+        }
+        return false;
+    }
+
+    /** Cancel an in-progress connection drag (e.g. on Escape). */
+    public cancelConnectionDrag(): void {
+        if (!this.isConnectionDragging) return;
+        // Reuse endConnectionDrag with invalid state — it cleans up everything
+        this.connectionDragValid = false;
+        this.connectionDragTargetId = null;
+        this.endConnectionDrag(0, 0);
     }
 
     public connectNodes(fromId: string, toId: string) {
@@ -1037,6 +2280,7 @@ export class ArchitectureVizService {
                 fromNode.data.connectedTo.push(toId);
             }
             if (this.selectedNodeId === fromId) this.selectedNodeData.set(fromNode.data);
+            this.emitConnChanged();
             this.updateAllNodesSignal();
             return;
         }
@@ -1045,6 +2289,7 @@ export class ArchitectureVizService {
         fromNode.data.connectedTo.push(toId);
         this.createVisualConnection(fromId, toId);
         if (this.selectedNodeId === fromId) this.selectedNodeData.set(fromNode.data);
+        this.emitConnChanged();
         this.updateAllNodesSignal();
     }
 
@@ -1059,6 +2304,7 @@ export class ArchitectureVizService {
         fromNode.data.connectedTo = fromNode.data.connectedTo.filter(id => id !== toId);
         this.removeVisualConnection(fromId, toId);
         if (this.selectedNodeId === fromId) this.selectedNodeData.set(fromNode.data);
+        this.emitConnChanged();
         this.updateAllNodesSignal();
     }
 
@@ -1085,6 +2331,64 @@ export class ArchitectureVizService {
 
         this.scene.add(line);
         this.connectionLines.set(key, line);
+
+        // Add edge label (dependency type) if one exists
+        const label = this.edgeLabels.get(key);
+        if (label) {
+            this.createEdgeLabel(fromId, toId, label.type, label.criticality);
+        }
+    }
+
+    /** Create a CSS2D label at the midpoint of an edge showing its type. */
+    private createEdgeLabel(fromId: string, toId: string, type: string, criticality?: string): void {
+        const key = `label::${fromId}::${toId}`;
+        // Remove existing label if any
+        const existing = this.edgeLabelObjects.get(key);
+        if (existing) {
+            this.scene.remove(existing);
+            this.edgeLabelObjects.delete(key);
+        }
+        const fromNode = this.nodes.get(fromId);
+        const toNode = this.nodes.get(toId);
+        if (!fromNode || !toNode) return;
+
+        const div = document.createElement('div');
+        div.className = 'edge-label';
+        div.textContent = type;
+        if (criticality) div.textContent += ` · ${criticality}`;
+        const isRequired = type === 'REQUIRED';
+        div.style.color = isRequired ? '#f87171' : '#fbbf24';
+        // Respect current visibility setting
+        div.style.display = this.edgeLabelsVisible() ? '' : 'none';
+
+        const labelObj = new CSS2DObject(div);
+        labelObj.position.copy(fromNode.mesh.position).lerp(toNode.mesh.position, 0.5);
+        this.scene.add(labelObj);
+        this.edgeLabelObjects.set(key, labelObj);
+    }
+
+    /** Map of edge label CSS2D objects (key: label::fromId::toId). */
+    private edgeLabelObjects = new Map<string, CSS2DObject>();
+
+    /** Toggle edge label visibility. */
+    public edgeLabelsVisible = signal(false);
+
+    /** Show or hide all edge labels. */
+    public setEdgeLabelsVisible(visible: boolean): void {
+        this.edgeLabelsVisible.set(visible);
+        this.edgeLabelObjects.forEach((labelObj) => {
+            labelObj.element.style.display = visible ? '' : 'none';
+        });
+    }
+
+    /** Override setEdgeLabel to also create the visual label if lines exist. */
+    public setEdgeLabel(fromId: string, toId: string, type: string, criticality?: string): void {
+        const key = `${fromId}::${toId}`;
+        this.edgeLabels.set(key, { type, criticality });
+        // If the connection line already exists, create/update the label
+        if (this.connectionLines.has(key)) {
+            this.createEdgeLabel(fromId, toId, type, criticality);
+        }
     }
 
     /** Update a connection line's color/opacity to reflect its directionality. */
@@ -1107,6 +2411,13 @@ export class ArchitectureVizService {
             this.scene.remove(line);
             line.geometry.dispose();
             this.connectionLines.delete(key);
+        }
+        // Also remove the edge label if it exists
+        const labelKey = `label::${fromId}::${toId}`;
+        const labelObj = this.edgeLabelObjects.get(labelKey);
+        if (labelObj) {
+            this.scene.remove(labelObj);
+            this.edgeLabelObjects.delete(labelKey);
         }
     }
 
@@ -1144,11 +2455,23 @@ export class ArchitectureVizService {
 
         const intersects = this.raycast(event);
         const ctrl = event.ctrlKey || event.metaKey;
+        const shift = event.shiftKey;
 
         if (intersects.length > 0) {
             // Hit a node
             const object = intersects[0].object;
             const id = object.userData['id'];
+
+            // Shift+Drag on a node in edit mode = connection drag (not node move)
+            if (shift && this.interactionMode === 'edit') {
+                // Select the source node so the inspector shows it
+                if (!this.multiSelectedNodeIds.has(id)) {
+                    this.clearMultiSelection();
+                    this.selectNode(id);
+                }
+                this.startConnectionDrag(id);
+                return; // Don't start node dragging
+            }
 
             if (ctrl) {
                 // Ctrl+Click: toggle node in multi-selection
@@ -1212,6 +2535,28 @@ export class ArchitectureVizService {
     }
 
     private onPointerMove(event: PointerEvent) {
+        // --- Connection Drag (Shift+Drag) ---
+        if (this.isConnectionDragging) {
+            // Compute world point on a plane facing the camera through the source node
+            const sourceNode = this.connectionDragSourceId ? this.nodes.get(this.connectionDragSourceId) : null;
+            if (sourceNode) {
+                const rect = this.renderer.domElement.getBoundingClientRect();
+                this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                this.raycaster.setFromCamera(this.mouse, this.camera);
+                const plane = new THREE.Plane();
+                const normal = new THREE.Vector3();
+                this.camera.getWorldDirection(normal);
+                normal.negate();
+                plane.setFromNormalAndCoplanarPoint(normal, sourceNode.mesh.position);
+                const worldPoint = new THREE.Vector3();
+                if (this.raycaster.ray.intersectPlane(plane, worldPoint)) {
+                    this.updateConnectionDrag(worldPoint, event);
+                }
+            }
+            return;
+        }
+
         if (this.isLassoing) {
             const rect = this.renderer.domElement.getBoundingClientRect();
             const cx = event.clientX - rect.left;
@@ -1272,6 +2617,12 @@ export class ArchitectureVizService {
     }
 
     private onPointerUp(event: PointerEvent) {
+        // --- Connection Drag (Shift+Drag) ---
+        if (this.isConnectionDragging) {
+            this.endConnectionDrag(event.clientX, event.clientY);
+            return;
+        }
+
         if (this.isLassoing) {
             this.isLassoing = false;
             if (this.lassoDiv) this.lassoDiv.style.display = 'none';
@@ -1327,9 +2678,16 @@ export class ArchitectureVizService {
         this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
         this.raycaster.setFromCamera(this.mouse, this.camera);
-        // Intersect the Meshes
+        // Intersect the Meshes — skip hidden nodes (collapsed members +
+        // non-drill-down nodes when in drill-down mode)
+        const collapsed = this.collapsedSystemIds();
+        const drillId = this.drilledDownSystemId();
+        const hiddenIds = (collapsed.size > 0 || drillId) ? this.getHiddenNodeIds(collapsed, drillId) : null;
+        const meshes = Array.from(this.nodes.values())
+            .filter(n => !hiddenIds || !hiddenIds.has(n.data.id))
+            .map(n => n.mesh);
         return this.raycaster.intersectObjects(
-            Array.from(this.nodes.values()).map(n => n.mesh),
+            meshes,
             false // Not recursive, we only want the main mesh
         );
     }
@@ -1402,10 +2760,23 @@ export class ArchitectureVizService {
             return;
         }
 
+        // Escape cancels an in-progress connection drag first (highest priority)
+        if (event.key === 'Escape' && this.isConnectionDragging) {
+            event.preventDefault();
+            event.stopPropagation();
+            this.cancelConnectionDrag();
+            return;
+        }
+
         if (event.key === 'Escape') {
             event.preventDefault();
             event.stopPropagation();
-            this.deselect();
+            // Escape drill-down mode first (if active), otherwise deselect
+            if (this.drilledDownSystemId()) {
+                this.escapeDrillDown();
+            } else {
+                this.deselect();
+            }
             return;
         }
 
@@ -1613,13 +2984,69 @@ export class ArchitectureVizService {
     // --- Update ---
 
     private updateAllNodesSignal() {
-        this.allNodes.set(Array.from(this.nodes.values()).map(n => n.data));
+        // Filter out hidden nodes (collapsed members + non-drill-down nodes)
+        // so the UI (inspector, connection list, etc.) only shows visible nodes.
+        const collapsed = this.collapsedSystemIds();
+        const drillId = this.drilledDownSystemId();
+        if (collapsed.size === 0 && !drillId) {
+            this.allNodes.set(Array.from(this.nodes.values()).map(n => n.data));
+            return;
+        }
+        const hiddenIds = this.getHiddenNodeIds(collapsed, drillId);
+        this.allNodes.set(
+            Array.from(this.nodes.values())
+                .filter(n => !hiddenIds.has(n.data.id))
+                .map(n => n.data)
+        );
+    }
+
+    /** Collect all node IDs that should be hidden (collapsed members +
+     *  non-drill-down nodes when in drill-down mode). */
+    private getHiddenNodeIds(collapsed: Set<string>, drillId: string | null): Set<string> {
+        const hidden = new Set<string>();
+        // Members of collapsed systems are hidden (unless we're drilled into
+        // that system — then they're the visible ones)
+        for (const state of this.collapsedState.values()) {
+            for (const memberId of state.memberIds) {
+                hidden.add(memberId);
+            }
+        }
+        // In drill-down mode, hide everything EXCEPT the drill-down members
+        if (drillId) {
+            const visibleMembers = new Set(this.drillDownMemberIds);
+            this.nodes.forEach((node) => {
+                if (!visibleMembers.has(node.data.id)) {
+                    hidden.add(node.data.id);
+                }
+            });
+        }
+        return hidden;
     }
 
     // --- Animation & Config ---
 
+    private paused = false;
+
+    public setPaused(value: boolean): void {
+        if (this.paused === value) return;
+        this.paused = value;
+
+        if (this.paused) {
+            if (this.animationId !== null) {
+                cancelAnimationFrame(this.animationId);
+                this.animationId = null;
+            }
+        } else if (this.animationId === null) {
+            this.animate();
+        }
+    }
+
     private animate() {
         this.animationId = requestAnimationFrame(() => this.animate());
+
+        if (this.paused) {
+            return;
+        }
 
         // Handle Auto-Orbit if Simulation Active
         if (this.isSimulationActive()) {
@@ -1680,6 +3107,9 @@ export class ArchitectureVizService {
 
         // Keep connections in sync with floating nodes
         this.updateAllConnections();
+
+        // Update health pulse animation for nodes with health status
+        this.updateHealthPulse(performance.now() / 1000);
 
         this.composer.render();
         this.labelRenderer.render(this.scene, this.camera);
@@ -1759,16 +3189,39 @@ export class ArchitectureVizService {
         this.labelRenderer.setSize(width, height);
     }
 
+    /** Clear all collapsed + drill-down state (called on dispose). */
+    private clearCollapsedState(): void {
+        this.collapsedState.clear();
+        this.collapsedSystemIds.set(new Set());
+        this.drilledDownSystemId.set(null);
+        this.drillDownMemberIds = [];
+    }
+
     public dispose() {
         if (this.animationId) cancelAnimationFrame(this.animationId);
+        this.animationId = null;
         if (this.resizeObserver) this.resizeObserver.disconnect();
+        this.resizeObserver = null;
         if (this.composer) this.composer.dispose();
-        if (this.renderer) this.renderer.dispose();
-        if (this.lassoDiv) { this.lassoDiv.remove(); this.lassoDiv = null; }
-        document.removeEventListener('keydown', this.keyDownHandler);
         if (this.renderer) {
             this.renderer.domElement.removeEventListener('pointerdown', this.canvasFocusHandler);
+            this.renderer.dispose();
+            // Remove the WebGL canvas + label renderer DOM from the container
+            // so a fresh initialize() doesn't hit "existing context of a different type".
+            if (this.renderer.domElement.parentNode) {
+                this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
+            }
         }
+        if (this.labelRenderer && this.labelRenderer.domElement.parentNode) {
+            this.labelRenderer.domElement.parentNode.removeChild(this.labelRenderer.domElement);
+        }
+        if (this.lassoDiv) { this.lassoDiv.remove(); this.lassoDiv = null; }
+        document.removeEventListener('keydown', this.keyDownHandler);
+        this.clearCollapsedState();
+        // Cancel any in-progress connection drag on dispose
+        this.cancelConnectionDrag();
+        // Clear scene reference so initialize() knows it needs a fresh setup
+        this.scene = null as any;
     }
 
     // --- Import / Export ---

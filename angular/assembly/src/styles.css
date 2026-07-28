@@ -2,6 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme CSS Variables ────────────────────────────────────────────── */
+/*
+ * Light (default) — values match the original hardcoded steel palette.
+ * The :root values are also the fallbacks in tailwind.config.js.
+ */
+:root {
+  --steel-50: 248 250 252;
+  --steel-100: 241 245 249;
+  --steel-200: 226 232 240;
+  --steel-300: 203 213 225;
+  --steel-400: 148 163 184;
+  --steel-500: 100 116 139;
+  --steel-600: 71 85 105;
+  --steel-700: 51 65 85;
+  --steel-800: 30 41 59;
+  --steel-900: 15 23 42;
+}
+
+/*
+ * Steel theme — modeled after nexus-console's "theme-steel":
+ *   bg: gray-900, surface: gray-800, text: gray-100/300, border: gray-700/600.
+ * The .steel class is paired with .dark to activate Tailwind's dark: variants.
+ */
+/*
+ * Steel theme — dark blue-gray background with white/very-light text.
+ * The .steel class is paired with .dark to activate Tailwind's dark: variants.
+ */
+html.steel {
+  --steel-50: 255 255 255;
+  --steel-100: 250 251 252;
+  --steel-200: 255 255 255;
+  --steel-300: 248 250 252;
+  --steel-400: 241 245 249;
+  --steel-500: 203 213 225;
+  --steel-600: 75 85 99;
+  --steel-700: 55 65 81;
+  --steel-800: 31 41 55;
+  --steel-900: 17 24 39;
+}
+
+/*
+ * True-dark theme — near-black backgrounds, white/very-light text.
+ */
+html.dark {
+  --steel-50: 255 255 255;
+  --steel-100: 250 251 252;
+  --steel-200: 255 255 255;
+  --steel-300: 248 250 252;
+  --steel-400: 241 245 249;
+  --steel-500: 203 213 225;
+  --steel-600: 56 56 56;
+  --steel-700: 43 43 43;
+  --steel-800: 19 19 19;
+  --steel-900: 0 0 0;
+}
+
+/* When steel is active it pairs with .dark — give steel overrides priority */
+html.steel.dark {
+  --steel-50: 255 255 255;
+  --steel-100: 250 251 252;
+  --steel-200: 255 255 255;
+  --steel-300: 248 250 252;
+  --steel-400: 241 245 249;
+  --steel-500: 203 213 225;
+  --steel-600: 75 85 99;
+  --steel-700: 55 65 81;
+  --steel-800: 31 41 55;
+  --steel-900: 17 24 39;
+}
+
+/* ── Base Styles ────────────────────────────────────────────────────── */
+
 * {
   box-sizing: border-box;
 }
@@ -18,9 +90,12 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Pin body background/text to the correct dark colors when in dark/steel mode.
+   CSS vars for --steel-50 are white in dark modes (for text use), but the
+   body background should stay dark — the root <div>'s dark:bg-steel-900 covers
+   the viewport, but this prevents white flash before styles settle. */
 html.dark,
 html.dark body {
-  color: theme('colors.steel.200');
   background-color: theme('colors.steel.900');
 }
 
@@ -67,6 +142,18 @@ html.dark ::-webkit-scrollbar-thumb {
 
 html.dark ::-webkit-scrollbar-thumb:hover {
   background: theme('colors.steel.500');
+}
+
+/* ── Dark/Steel Mode: Force all text to white ────────────────────── */
+/* Many view templates use explicit text-steel-* / text-gray-* classes
+   without dark: variants. Rather than patching each one individually,
+   we override all text color classes to white in dark/steel modes.
+   Non-text classes (bg-, border-) are not affected. */
+html.dark [class*="text-steel-"],
+html.dark [class*="text-gray-"],
+html.steel [class*="text-steel-"],
+html.steel [class*="text-gray-"] {
+  color: #fff;
 }
 
 @layer components {

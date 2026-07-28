@@ -27,7 +27,8 @@ ALL_SERVICES=(
     "service-registry.service"  # port 8085 — service discovery
     "broker-gateway.service"    # port 8081 — service broker gateway
     "terrain.service"          # port 8084 — topology registry
-    "file-system-server.service" # port 4040 — file system operations
+    "file-system-server.service"        # port 4042 — file system operations (edit-ui)
+    "secure-file-system-server.service" # port 4041 — secure file system operations (service-broker)
     "ui-event-bus.service"     # port 3200 — cross-app UI event bus (SSE)
     "peb-kernel.service"       # port 8080 — engineering brain
     "kernel-srv.service"       # port 8100 — Semantic Kernel REST API (wraps sys_transition, sys_issue_receipt, v_* views; SSE over pg_notify)
@@ -47,18 +48,45 @@ ALL_SERVICES=(
     "address-tts.service"      # port 8600 — speech synthesis
     "address-tts-mcp.service"  # port 3105 — TTS MCP
 
+    # Assembly — forums, threads, users
+    "assembly-srv.service"     # port 3107 — Assembly REST API
+    "assembly-mcp.service"     # port 3113 — Assembly MCP
+
     # Operator + MCP servers
     "operator-svc.service"     # port 3018 — Operator host personality
     "conduit-mcp.service"      # port 3100 — work request orchestration
+    "conduit-srv.service"      # port 3104 — conduit REST API (extracted from conduit-mcp)
     "pty-srv.service"          # port 3120 — WebSocket PTY bridge for xterm.js
     "nebula-mcp-sse.service"   # port 3102 — Nebula MCP SSE
     "nebula-mcp.service"       # stdio  — Nebula MCP (on-demand; clients spawn independently)
     "terrain-mcp.service"      # stdio  — Terrain topology MCP (on-demand; clients spawn independently)
-    "tackle-mcp.service"       # port 3400 — AI config registry
+    "tackle-srv.service"      # port 3410 — tackle AI config & memory REST API
+    "tackle-mcp.service"       # port 3400 — AI config registry MCP (→ tackle-srv)    "knowledge-srv.service"    # port 3109 — knowledge REST API (graph_entities, graph_edges, xrefs, migrations)
+    "peb-srv.service"          # port 3111 — PEB observability REST API
     "cpf-api.service"          # port 3108 — CPF funnel data API
     "atlas.service"            # port 8090 — graph views persistence
     "execution-srv.service"    # port 3110 — execution observability REST API
-    "peb-srv.service"          # port 3111 — PEB observability REST API
+    "mcp-bridge.service"       # ports 3131-3134 — generic stdio-to-SSE bridge (knowledge/vision/peb/terrain MCPs)
+    "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator
+    "service-broker-mcp.service" # port 3112 — service-broker MCP over SSE (auth/token tools)
+    "substance.service"        # port 3115 — Segment Sets API (FastAPI)
+
+    # API servers (non-UI services)
+    "wind-srv.service"         # port 3300 — Wind IDE workflow API
+
+    # UI dev servers (Angular/Vite — managed via systemd, not tmux)
+    "nebula-ui.service"         # port 3000 — Nebula RMS UI
+    "duality-ui.service"        # port 3002 — Duality UI
+    "view-architect.service"    # port 3003 — View Architect UI
+    "plurality-ui.service"      # port 3004 — Plurality UI
+    "nexus-console.service"     # port 4200 — Nexus Console
+    "conduit-ui.service"        # port 4201 — Conduit UI
+    "tackle-ui.service"         # port 4202 — Tackle UI
+    "cascade-ui.service"        # port 4203 — Cascade UI
+    "angular-assembly.service"  # port 4204 — Assembly UI
+    "execution-ui.service"      # port 4205 — Execution UI
+    "peb-ui.service"            # port 4206 — PEB UI
+    "semantic-kernel-ui.service" # port 4207 — Semantic Kernel UI
 )
 
 # ── Service metadata for health checks ─────────────────────────────────
@@ -70,7 +98,8 @@ SERVICE_PORTS=(
     ["service-registry.service"]="8085"
     ["broker-gateway.service"]="8081"
     ["terrain.service"]="8084"
-    ["file-system-server.service"]="4040"
+    ["file-system-server.service"]="4042"
+    ["secure-file-system-server.service"]="4041"
     ["ui-event-bus.service"]="3200"
     ["peb-kernel.service"]="8080"
     ["kernel-srv.service"]="8100"
@@ -83,17 +112,59 @@ SERVICE_PORTS=(
     # image-server — no HTTP health endpoint
     ["address-tts.service"]="8600"
     ["address-tts-mcp.service"]="3105"
+    ["assembly-srv.service"]="3107"
+    ["assembly-mcp.service"]="3113"
     ["conduit-mcp.service"]="3100"
+    ["conduit-srv.service"]="3104"
     ["nebula-mcp-sse.service"]="3102"
     # nebula-mcp.service — stdio, on-demand (no port)
     # terrain-mcp.service — stdio, on-demand (no port)
+    ["tackle-srv.service"]="3410"
     ["tackle-mcp.service"]="3400"
+    ["knowledge-srv.service"]="3109"
+    ["peb-srv.service"]="3111"
     ["operator-svc.service"]="3018"
     ["pty-srv.service"]="3121"
-    ["cpf-api.service"]="3108"
+["cpf-api.service"]="3108"
     ["atlas.service"]="8090"
     ["execution-srv.service"]="3110"
-    ["peb-srv.service"]="3111"
+    ["mcp-bridge.service"]="3131"     # one of ports 3131-3134 — any bridge target's /health works
+    ["tools-aggregator.service"]="3210"
+    ["service-broker-mcp.service"]="3112"
+    ["wind-srv.service"]="3300"
+    ["substance.service"]="3115"
+    ["nebula-ui.service"]="3000"
+    ["duality-ui.service"]="3002"
+    ["view-architect.service"]="3003"
+    ["plurality-ui.service"]="3004"
+    ["nexus-console.service"]="4200"
+    ["conduit-ui.service"]="4201"
+    ["tackle-ui.service"]="4202"
+    ["cascade-ui.service"]="4203"
+    ["angular-assembly.service"]="4204"
+    ["execution-ui.service"]="4205"
+    ["peb-ui.service"]="4206"
+    ["semantic-kernel-ui.service"]="4207"
+)
+
+# ── Custom health check paths (for services that don't serve /health) ──
+declare -A SERVICE_HEALTH_PATHS
+SERVICE_HEALTH_PATHS=(
+    # UI dev servers serve Angular/Vite HTML on /, not /health
+    ["nebula-ui.service"]="/"
+    ["duality-ui.service"]="/"
+    ["view-architect.service"]="/"
+    ["plurality-ui.service"]="/"
+    ["nexus-console.service"]="/"
+    ["conduit-ui.service"]="/"
+    ["tackle-ui.service"]="/"
+    ["cascade-ui.service"]="/"
+    ["angular-assembly.service"]="/"
+    ["execution-ui.service"]="/"
+    ["peb-ui.service"]="/"
+    ["semantic-kernel-ui.service"]="/"
+    # Other services with non-standard health paths
+    ["terrain.service"]="/api/v1/platform/health"
 )
 
 # Docker-based services (verified via docker ps instead of port check)
@@ -281,7 +352,8 @@ cmd_health() {
             continue
         fi
 
-        if _http_healthy "$port"; then
+        local health_path="${SERVICE_HEALTH_PATHS[$svc]:-/health}"
+        if _http_healthy "$port" "$health_path"; then
             printf "%-35s %-8s %s\n" "$svc" "$port" "✓ OK"
         else
             printf "%-35s %-8s %s\n" "$svc" "$port" "✗ DOWN"

@@ -28,7 +28,7 @@ export class ToolbarComponent {    private elementRef = inject(ElementRef);
   isColorPickerOpen = signal(false);
 
   // View mode inputs
-  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms'>('file-explorer');
+  viewMode = input<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui'>('file-explorer');
   meshViewMode = input<'console' | 'graph'>('console');
 
   // Inputs for button states (file explorer)
@@ -78,6 +78,7 @@ export class ToolbarComponent {    private elementRef = inject(ElementRef);
   graphInteractionMode = input<'camera' | 'edit'>('camera');
   isSimulationActive = input(false);
   backgroundColor = input('#000510');
+  meshHasSelection = input(false);
 
   // Outputs for events (file explorer)
   newFolderClick = output<void>();
@@ -123,6 +124,21 @@ export class ToolbarComponent {    private elementRef = inject(ElementRef);
   rotateRight = output<void>();
   resetCamera = output<void>();
   clearGraph = output<void>();
+
+  // Service Mesh console actions
+  meshSwitchToConsole = output<void>();
+  meshSwitchToGraph = output<void>();
+  meshRefresh = output<void>();
+  meshDeploy = output<void>();
+  meshStart = output<void>();
+  meshStop = output<void>();
+  meshRestart = output<void>();
+  meshLogs = output<void>();
+  meshGithub = output<void>();
+  meshJenkins = output<void>();
+  meshDocker = output<void>();
+  meshSwarm = output<void>();
+  meshK8s = output<void>();
 
   // Import capability
   canImport = input(false);

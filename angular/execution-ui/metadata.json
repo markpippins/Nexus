@@ -1,0 +1,6 @@
+{
+  "name": "Execution Observatory",
+  "description": "IDE suite component for PostgreSQL execution schema observability, lease integrity, lineage tracking, and pathology scanning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

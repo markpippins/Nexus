@@ -298,6 +298,8 @@ _API_LIMIT_PATTERNS = [
 
 def _detect_api_limit_error(exit_code: int, output: str) -> bool:
     output_lower = output.lower()
+    if exit_code == 0:
+        return False
     for pattern in _API_LIMIT_PATTERNS:
         if pattern in output_lower:
             return True
@@ -345,7 +347,7 @@ _SUCCESS_RECEIPTS = {
     "builder": "IMPLEMENTATION",
     "reviewer": "REVIEW_PASS",
     "planner": "PLAN_CREATE",
-    "critic": "CRITIQUE",
+    "critic": "CRITIQUE_PASS",
 }
 _FAIL_RECEIPTS = {
     "builder": "BLOCK",
@@ -538,7 +540,7 @@ def _dispatch_one(
 
     # ── Claim the Ticket (Invariant 1: no work without a Ticket) ──
     ticket_id = db.claim_ticket(plan_id, role, session_id)
-    if not ticket_id:
+    if ticket_id is None:
         print(f"  Ticket for {role} on plan {plan_id} was already claimed. Skipping.")
         db.close_session(session_id, 1)
         return

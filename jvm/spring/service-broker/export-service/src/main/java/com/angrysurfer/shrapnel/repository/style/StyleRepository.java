@@ -1,6 +1,6 @@
 package com.angrysurfer.shrapnel.repository.style;
 
-import com.angrysurfer.shrapnel.model.db.DBField;
+import com.aibizarchitect.nexus.shrapnel.model.db.DBField;
 import com.angrysurfer.shrapnel.model.style.Style;
 
 import org.springframework.data.jpa.repository.JpaRepository;

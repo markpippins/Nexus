@@ -1,61 +1,289 @@
 <div class="service-mesh-container">
-  <!-- Header with summary and controls -->
-
-  <!--<div class="title-bar">
-      <h2>Atomic Service Mesh</h2>
-    </div>-->
-
   <!-- Summary cards (shown in console mode) -->
   @if (viewMode() === 'console') {
-  <div class="header">
+  <div class="mesh-header">
     <div class="summary-cards">
       <div class="summary-card">
-        <div class="card-value">{{ summary().totalServices }}</div>
-        <div class="card-label">Total Services</div>
+        <div class="card-icon"><span class="material-icons">dns</span></div>
+        <div class="card-body">
+          <div class="card-value">{{ summary().totalServices }}</div>
+          <div class="card-label">Services</div>
+        </div>
       </div>
       <div class="summary-card">
-        <div class="card-value">{{ summary().activeServices }}</div>
-        <div class="card-label">Active Services</div>
+        <div class="card-icon card-icon-green"><span class="material-icons">check_circle</span></div>
+        <div class="card-body">
+          <div class="card-value">{{ summary().healthyDeployments }}</div>
+          <div class="card-label">Healthy</div>
+        </div>
       </div>
       <div class="summary-card">
-        <div class="card-value">{{ summary().healthyDeployments }}</div>
-        <div class="card-label">Healthy Deployments</div>
+        <div class="card-icon card-icon-red"><span class="material-icons">error</span></div>
+        <div class="card-body">
+          <div class="card-value">{{ summary().unhealthyDeployments }}</div>
+          <div class="card-label">Unhealthy</div>
+        </div>
       </div>
       <div class="summary-card">
-        <div class="card-value">{{ summary().unhealthyDeployments }}</div>
-        <div class="card-label">Unhealthy Deployments</div>
+        <div class="card-icon card-icon-blue"><span class="material-icons">computer</span></div>
+        <div class="card-body">
+          <div class="card-value">{{ summary().totalHosts }}</div>
+          <div class="card-label">Hosts</div>
+        </div>
       </div>
-      <div class="summary-card">
-        <div class="card-value">{{ summary().totalHosts }}</div>
-        <div class="card-label">Total Hosts</div>
+      <div class="summary-card health-ring-card">
+        <div class="health-ring" [style.--pct]="healthPercentage()">
+          <span class="ring-value">{{ healthPercentage() }}%</span>
+        </div>
+        <div class="card-body">
+          <div class="card-label">Mesh Health</div>
+        </div>
       </div>
     </div>
   </div>
   }
+
   <!-- Main content area -->
   <div class="content-area">
-    <!-- Console View - Service details and management -->
+    <!-- Console View -->
     @if (viewMode() === 'console') {
     <div class="console-container">
+
       @if (selectedService(); as service) {
-      <div class="service-details-wrapper">
-        <app-service-details
-          [service]="service"
-          [deployments]="deployments()"
-          [configurations]="selectedServiceConfigurations()"
-        ></app-service-details>
-      </div>
+      <!-- Two-column layout: service details (left) + observability panels (right) -->
+      <div class="console-split">
+
+        <!-- Left: Live service details -->
+        <div class="service-details-wrapper">
+          <app-service-details
+            [service]="service"
+            [deployments]="deployments()"
+            [configurations]="selectedServiceConfigurations()"
+          ></app-service-details>
+        </div>
+
+        <!-- Right: Observability panels with sub-tabs -->
+        <div class="observability-panel">
+          <!-- Sub-tab bar -->
+          <div class="obs-tabs">
+            <button class="obs-tab" [class.active]="activeObsTab() === 'overview'" (click)="activeObsTab.set('overview')">
+              <span class="material-icons">dashboard</span> Overview
+            </button>
+            <button class="obs-tab" [class.active]="activeObsTab() === 'metrics'" (click)="activeObsTab.set('metrics')">
+              <span class="material-icons">show_chart</span> Metrics
+            </button>
+            <button class="obs-tab" [class.active]="activeObsTab() === 'pipeline'" (click)="activeObsTab.set('pipeline')">
+              <span class="material-icons">account_tree</span> Pipeline
+            </button>
+            <button class="obs-tab" [class.active]="activeObsTab() === 'containers'" (click)="activeObsTab.set('containers')">
+              <span class="material-icons">view_in_ar</span> Containers
+            </button>
+            <button class="obs-tab" [class.active]="activeObsTab() === 'events'" (click)="activeObsTab.set('events')">
+              <span class="material-icons">list_alt</span> Events
+            </button>
+          </div>
+
+          <div class="obs-content">
+
+            <!-- Overview Tab -->
+            @if (activeObsTab() === 'overview') {
+            <div class="obs-scroll">
+              <!-- Quick metrics strip -->
+              <div class="metric-strip">
+                @for (m of mockMetrics(); track m.label) {
+                <div class="metric-chip">
+                  <div class="metric-chip-value">{{ m.value }}<span class="metric-unit">{{ m.unit }}</span></div>
+                  <div class="metric-chip-label">{{ m.label }}</div>
+                  <div class="metric-chip-trend" [style.color]="getTrendColor(m.trend)">
+                    <span class="material-icons">{{ getTrendIcon(m.trend) }}</span>
+                    {{ m.trendValue }}%
+                  </div>
+                </div>
+                }
+              </div>
+
+              <!-- Pipeline snapshot -->
+              <div class="panel-section">
+                <div class="panel-section-header">
+                  <span class="material-icons">account_tree</span>
+                  <h4>CI/CD Pipeline</h4>
+                  <span class="panel-badge panel-badge-running">1 running</span>
+                </div>
+                <div class="pipeline-strip">
+                  @for (stage of mockPipeline(); track stage.name; let last = $last) {
+                  <div class="pipeline-node" [class]="'pipeline-' + stage.status">
+                    <span class="material-icons pipeline-icon">{{ getPipelineStatusIcon(stage.status) }}</span>
+                    <span class="pipeline-name">{{ stage.name }}</span>
+                    <span class="pipeline-duration">{{ stage.duration }}</span>
+                  </div>
+                  @if (!last) {
+                  <div class="pipeline-connector" [class.pipeline-connector-done]="stage.status === 'success'"></div>
+                  }
+                  }
+                </div>
+              </div>
+
+              <!-- Recent events -->
+              <div class="panel-section">
+                <div class="panel-section-header">
+                  <span class="material-icons">list_alt</span>
+                  <h4>Recent Events</h4>
+                </div>
+                <div class="event-log-mini">
+                  @for (evt of mockEvents().slice(0, 4); track evt.id) {
+                  <div class="event-row">
+                    <span class="event-dot" [style.backgroundColor]="getEventLevelColor(evt.level)"></span>
+                    <span class="event-time">{{ evt.timestamp }}</span>
+                    <span class="event-source">{{ evt.source }}</span>
+                    <span class="event-msg">{{ evt.message }}</span>
+                  </div>
+                  }
+                </div>
+              </div>
+            </div>
+            }
+
+            <!-- Metrics Tab -->
+            @if (activeObsTab() === 'metrics') {
+            <div class="obs-scroll">
+              <div class="metrics-grid">
+                @for (m of mockMetrics(); track m.label) {
+                <div class="metric-card">
+                  <div class="metric-card-header">
+                    <span class="metric-card-label">{{ m.label }}</span>
+                    <span class="material-icons metric-card-trend" [style.color]="getTrendColor(m.trend)">{{ getTrendIcon(m.trend) }}</span>
+                  </div>
+                  <div class="metric-card-value">{{ m.value }}<span class="metric-unit">{{ m.unit }}</span></div>
+                  <div class="metric-card-bar">
+                    <div class="metric-card-bar-fill" [style.width.%]="clampPercent(m.value)"></div>
+                  </div>
+                  <div class="metric-card-delta" [style.color]="getTrendColor(m.trend)">{{ m.trendValue }}% vs baseline</div>
+                </div>
+                }
+              </div>
+
+              <!-- Sparkline placeholder -->
+              <div class="panel-section">
+                <div class="panel-section-header">
+                  <span class="material-icons">show_chart</span>
+                  <h4>Throughput (24h)</h4>
+                </div>
+                <div class="sparkline-placeholder">
+                  <svg viewBox="0 0 300 80" preserveAspectRatio="none" class="sparkline-svg">
+                    <polyline points="0,60 30,45 60,52 90,30 120,38 150,20 180,35 210,25 240,40 270,18 300,22"
+                      fill="none" stroke="rgb(var(--color-accent-ring))" stroke-width="2" />
+                    <polyline points="0,60 30,45 60,52 90,30 120,38 150,20 180,35 210,25 240,40 270,18 300,22 300,80 0,80"
+                      fill="rgb(var(--color-accent-ring))" fill-opacity="0.1" stroke="none" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            }
+
+            <!-- Pipeline Tab -->
+            @if (activeObsTab() === 'pipeline') {
+            <div class="obs-scroll">
+              <div class="panel-section">
+                <div class="panel-section-header">
+                  <span class="material-icons">account_tree</span>
+                  <h4>CI/CD Pipeline Stages</h4>
+                </div>
+                <div class="pipeline-vertical">
+                  @for (stage of mockPipeline(); track stage.name) {
+                  <div class="pipeline-v-row" [class]="'pipeline-' + stage.status">
+                    <div class="pipeline-v-icon">
+                      <span class="material-icons">{{ getPipelineStatusIcon(stage.status) }}</span>
+                    </div>
+                    <div class="pipeline-v-body">
+                      <div class="pipeline-v-name">{{ stage.name }}</div>
+                      <div class="pipeline-v-duration">{{ stage.duration }}</div>
+                    </div>
+                    <div class="pipeline-v-status">{{ stage.status }}</div>
+                  </div>
+                  @if (!$last) {
+                  <div class="pipeline-v-connector" [class.pipeline-v-connector-done]="stage.status === 'success'"></div>
+                  }
+                  }
+                </div>
+              </div>
+            </div>
+            }
+
+            <!-- Containers Tab -->
+            @if (activeObsTab() === 'containers') {
+            <div class="obs-scroll">
+              <div class="panel-section">
+                <div class="panel-section-header">
+                  <span class="material-icons">view_in_ar</span>
+                  <h4>Container Fleet</h4>
+                  <span class="panel-badge panel-badge-info">{{ runningContainerCount() }} running</span>
+                </div>
+                <div class="container-list">
+                  @for (c of mockContainers(); track c.id) {
+                  <div class="container-row">
+                    <div class="container-status-dot" [style.backgroundColor]="getContainerStatusColor(c.status)"></div>
+                    <div class="container-name">{{ c.name }}</div>
+                    <div class="container-image">{{ c.image }}</div>
+                    <div class="container-meta">
+                      <span class="container-cpu">{{ c.cpu }}% CPU</span>
+                      <span class="container-mem">{{ c.memory }}</span>
+                      <span class="container-uptime">{{ c.uptime }}</span>
+                    </div>
+                    <div class="container-status-text" [style.color]="getContainerStatusColor(c.status)">{{ c.status }}</div>
+                  </div>
+                  }
+                </div>
+              </div>
+            </div>
+            }
+
+            <!-- Events Tab -->
+            @if (activeObsTab() === 'events') {
+            <div class="obs-scroll">
+              <div class="panel-section">
+                <div class="panel-section-header">
+                  <span class="material-icons">list_alt</span>
+                  <h4>Event Log</h4>
+                </div>
+                <div class="event-log-full">
+                  @for (evt of mockEvents(); track evt.id) {
+                  <div class="event-row event-row-full">
+                    <span class="event-dot" [style.backgroundColor]="getEventLevelColor(evt.level)"></span>
+                    <span class="event-time">{{ evt.timestamp }}</span>
+                    <span class="event-source" [style.color]="getEventLevelColor(evt.level)">{{ evt.source }}</span>
+                    <span class="event-msg">{{ evt.message }}</span>
+                  </div>
+                  }
+                </div>
+              </div>
+            </div>
+            }
+
+          </div><!-- /obs-content -->
+        </div><!-- /observability-panel -->
+
+      </div><!-- /console-split -->
       } @else {
+      <!-- No service selected -->
       <div class="no-selection">
-        <mat-icon class="large-icon">touch_app</mat-icon>
-        <p>Select a service from the sidebar to view details</p>
+        <div class="no-selection-icon"><span class="material-icons">hub</span></div>
+        <h3>Service Observation Console</h3>
+        <p>Select a service from the sidebar to view live details, deployment status, metrics, CI/CD pipelines, and container fleet.</p>
+        <div class="no-selection-hints">
+          <div class="hint-chip"><span class="material-icons">dashboard</span> Overview</div>
+          <div class="hint-chip"><span class="material-icons">show_chart</span> Metrics</div>
+          <div class="hint-chip"><span class="material-icons">account_tree</span> Pipeline</div>
+          <div class="hint-chip"><span class="material-icons">view_in_ar</span> Containers</div>
+          <div class="hint-chip"><span class="material-icons">list_alt</span> Events</div>
+        </div>
       </div>
       }
+
     </div>
     }
 
     <!-- Graph View -->
-    @if (viewMode() === 'graph') { @if (graphSubView() === 'canvas') {
+    @if (viewMode() === 'graph') {
     <div class="service-graph-container">
       <app-service-graph
         [services]="services()"
@@ -70,10 +298,6 @@
         (refreshServices)="refreshServices.emit()"
       ></app-service-graph>
     </div>
-    } @else {
-    <div class="component-creator-container h-full">
-      <app-component-creator></app-component-creator>
-    </div>
-    } }
+    }
   </div>
 </div>

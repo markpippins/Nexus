@@ -19,5 +19,12 @@
             <groupId>com.aibizarchitect.nexus</groupId>
             <artifactId>broker-service-api</artifactId>
         </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

@@ -1,5 +1,6 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -173,5 +174,87 @@ class FrameworkControllerTest {
 
         mockMvc.perform(delete("/api/v1/frameworks/1"))
                 .andExpect(status().isNotFound());
+    }
+
+    // ================================================================
+    // ORANGE PATH — expected, handled failure
+    // ================================================================
+
+    @Test
+    void createFramework_MalformedJson_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/frameworks")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{bad json"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getFrameworks_InvalidBrokerCompatible_handled() throws Exception {
+        mockMvc.perform(get("/api/v1/frameworks").param("brokerCompatible", "notaboolean"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateFramework_DuplicateName_returns400() throws Exception {
+        Framework existing = new Framework();
+        existing.setId(1L);
+        existing.setName("Old Framework");
+
+        Framework otherFramework = new Framework();
+        otherFramework.setId(2L);
+        otherFramework.setName("Existing Framework");
+
+        when(frameworkRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(frameworkRepository.findByName("Existing Framework")).thenReturn(Optional.of(otherFramework));
+
+        mockMvc.perform(put("/api/v1/frameworks/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Existing Framework\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ================================================================
+    // RED PATH — adversarial input the system must survive
+    // ================================================================
+
+    @Test
+    void getFrameworks_SqlInjectionInName_returnsOk() throws Exception {
+        when(frameworkRepository.findByName("'; DROP TABLE frameworks; --")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/frameworks").param("name", "'; DROP TABLE frameworks; --"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getFrameworkById_NegativeId_returnsNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/frameworks/-1"))
+                .andExpect(status().isNotFound());
+    }
+
+    // ================================================================
+    // SILENT FAILURE — metamorphic/determinism coverage
+    // ================================================================
+
+    @Test
+    void metamorphic_sameInput_sameOutput() throws Exception {
+        when(frameworkRepository.findById(1L)).thenReturn(Optional.of(testFramework));
+
+        String r1 = mockMvc.perform(get("/api/v1/frameworks/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String r2 = mockMvc.perform(get("/api/v1/frameworks/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals(r1, r2, "Same framework should produce identical JSON");
+    }
+
+    @Test
+    void regressionLock_notFound_emptyBody() throws Exception {
+        when(frameworkRepository.findById(1L)).thenReturn(Optional.empty());
+
+        String body = mockMvc.perform(get("/api/v1/frameworks/1"))
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals("", body, "404 responses currently empty — regression lock");
     }
 }

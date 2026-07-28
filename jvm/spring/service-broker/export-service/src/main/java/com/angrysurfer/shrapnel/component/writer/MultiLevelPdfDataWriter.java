@@ -3,8 +3,8 @@ package com.angrysurfer.shrapnel.component.writer;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.angrysurfer.shrapnel.field.IField;
-import com.angrysurfer.shrapnel.field.IValueFormatter;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.field.IValueFormatter;
 import com.itextpdf.layout.element.Cell;
 
 import lombok.Getter;

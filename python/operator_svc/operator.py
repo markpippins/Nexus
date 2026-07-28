@@ -17,6 +17,8 @@ import time
 from collections import deque
 from typing import Any, Dict, List, Optional, Set
 
+import httpx
+
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _TACKLE_PARENT = os.path.dirname(_SCRIPT_DIR)  # nexus/python/
 if _TACKLE_PARENT not in sys.path:
@@ -24,6 +26,7 @@ if _TACKLE_PARENT not in sys.path:
 
 from tackle.inference import call_llm
 from tackle.db import get_role_config
+from tackle.tools_aggregator_client import SyncToolsAggregatorClient, ToolDefinition
 
 from operator_svc.api_proxy import proxy_request
 from operator_svc.chat_store import log_prompt_response, save_queue, load_queue
@@ -35,19 +38,217 @@ CONTINUITY_QUEUE_MAX = 10
 ENTITY_INDEX_MAX = 100  # max items across all entities
 SHORT_EXCHANGE_THRESHOLD = 200  # chars — skip LLM compaction below this
 
+# ── Tools Aggregator Client ─────────────────────────────────────────
+#
+# The Operator no longer hard-codes its tool list. Instead it discovers
+# them at chat-request time from the running `tools-aggregator.service`
+# (port 3210, see nexus/typescript/tools-aggregator/). The aggregator
+# composes tool registries from every available MCP — conduit-mcp,
+# tackle-mcp, and (when brought online) knowledge-mcp, vision-mcp,
+# service-broker-mcp — so the Operator gains access to all of them
+# without each one needing its own xpath in this file.
+#
+# Tool-list discovery is TTL-bounded (DISCOVERED_TOOLS_TTL seconds).
+# If the aggregator is unreachable at startup, we degrade to an empty
+# tool list and surface the failure in logs — the LLM gets a clear
+# "no tools currently available" system prompt section and the user
+# sees a verbose reply rather than silent false-positive tool calls.
+
+_TOOLS_AGGREGATOR_URL = os.environ.get("TOOLS_AGGREGATOR_URL", "http://localhost:3210")
+_tools_client: Optional[SyncToolsAggregatorClient] = None
+_tools_client_lock = threading.Lock()
+_discovered_tools_cache: List[ToolDefinition] = []
+_discovered_tools_timestamp: float = 0.0
+DISCOVERED_TOOLS_TTL = 300  # 5 min
+
+
+def _get_tools_client() -> SyncToolsAggregatorClient:
+    """Lazy singleton for the synchronous tools-aggregator client."""
+    global _tools_client
+    if _tools_client is None:
+        with _tools_client_lock:
+            if _tools_client is None:
+                c = SyncToolsAggregatorClient(_TOOLS_AGGREGATOR_URL)
+                c.init()
+                _tools_client = c
+                _log.info(
+                    "tools-aggregator client init'd at %s — %d tools available",
+                    _TOOLS_AGGREGATOR_URL,
+                    len(c.list_tools()),
+                )
+    return _tools_client
+
+
+def _refresh_discovered_tools() -> List[ToolDefinition]:
+    """TTL-bounded refresh from tools-aggregator.
+
+    Returns the cached list if TTL hasn't expired. Otherwise re-inits the
+    sync client (which triggers aggregator-side re-discovery + cache pop)
+    and updates the local copy. On failure, falls back to the last good
+    cache (possibly empty) and logs the failure.
+    """
+    global _discovered_tools_cache, _discovered_tools_timestamp, _tools_client
+    if _discovered_tools_cache and (time.time() - _discovered_tools_timestamp) <= DISCOVERED_TOOLS_TTL:
+        return _discovered_tools_cache
+
+    try:
+        client = _get_tools_client()
+        client.init()  # forces aggregator-side re-discovery + local cache refresh
+        tools = client.list_tools()
+        _discovered_tools_cache = list(tools)
+        _discovered_tools_timestamp = time.time()
+        _log.info("Discovered %d tools from aggregator", len(_discovered_tools_cache))
+    except Exception as e:
+        _log.warning("tools-aggregator refresh failed at %s: %s — "
+                     "using stale cache (%d tools)",
+                     _TOOLS_AGGREGATOR_URL, e, len(_discovered_tools_cache))
+        # Refresh the client next time around — a singleton stuck on a dead
+        # socket doesn't help anyone.
+        with _tools_client_lock:
+            try:
+                if _tools_client:
+                    _tools_client.close()
+            except Exception:
+                pass
+            _tools_client = None
+
+    return _discovered_tools_cache
+
+
+def _format_tools_for_prompt(tools: List[ToolDefinition]) -> str:
+    """Format the discovered tool list for the LLM system prompt."""
+    if not tools:
+        return "  (no tools currently available — tools-aggregator unreachable or zero tools discovered)"
+    lines = []
+    by_service: Dict[str, List[ToolDefinition]] = {}
+    for t in tools:
+        by_service.setdefault(t.service, []).append(t)
+    for svc in sorted(by_service):
+        svctools = by_service[svc]
+        lines.append(f"## {svc} ({len(svctools)} tools)")
+        for t in svctools:
+            lines.append(f"- {t.name}: {t.description}")
+    return "\n".join(lines)
+
+
+# ── Procedure Cards (role-memory-srv) ──────────────────────────────
+#
+# The Operator's procedure-card index is fetched from role-memory-srv
+# (port 3500, see nexus/typescript/role-memory-srv/). Cards codify
+# *judgment* — which tool to dispatch for which question shape — in
+# the same Redis-backed Procedure Registry that other roles consume
+# via tackle-mcp's `memory_get_procedures` tool. The Operator does
+# not have access to tackle-mcp's MCP tools directly (it is itself
+# downstream of the aggregator that aggregates tackle-mcp), so we
+# read the role-memory-srv REST endpoint directly: the same PG source
+# of truth that tackle-mcp reads from.
+#
+# We surface only the trigger list + collapsed card summaries in the
+# system prompt (not full `body_md` — that would bloat every request
+# with ~6KB of static procedure prose). The LLM is told the
+# card-lookup pathway exists; when its triggers fire it can call the
+# `memory_get_procedure` tool through the aggregator to read the full
+# card on demand.
+#
+# Same TTL-bounded-cache + degrade-on-failure pattern as
+# `_refresh_discovered_tools()`: if role-memory-srv is unreachable,
+# the prompt falls back to the tool catalog alone with a clear note
+# that card-based guidance is unavailable.
+
+_ROLE_MEMORY_SRV_URL = os.environ.get(
+    "ROLE_MEMORY_SRV_URL", "http://localhost:3500"
+)
+_operator_card_cache: List[Dict[str, Any]] = []
+_operator_card_cache_timestamp: float = 0.0
+_operator_card_cache_lock = threading.Lock()
+OPERATOR_CARD_TTL = 300  # 5 min — same as DISCOVERED_TOOLS_TTL
+
+
+def _refresh_operator_cards() -> List[Dict[str, Any]]:
+    """TTL-bounded refresh of the operator's procedure-card index.
+
+    Returns the cached list if TTL hasn't expired. Otherwise fetches
+    `GET /procedures/operator` from role-memory-srv and caches the
+    result. On failure, falls back to the last good cache (possibly
+    empty) and logs the failure — never throws.
+    """
+    global _operator_card_cache, _operator_card_cache_timestamp
+    if _operator_card_cache and (
+        time.time() - _operator_card_cache_timestamp
+    ) <= OPERATOR_CARD_TTL:
+        return _operator_card_cache
+
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            r = client.get(f"{_ROLE_MEMORY_SRV_URL}/procedures/operator")
+            r.raise_for_status()
+            cards = r.json()
+        if not isinstance(cards, list):
+            cards = []
+        with _operator_card_cache_lock:
+            _operator_card_cache = list(cards)
+            _operator_card_cache_timestamp = time.time()
+        _log.info(
+            "operator procedure-card index fetched — %d cards",
+            len(_operator_card_cache),
+        )
+    except Exception as e:
+        _log.warning(
+            "operator procedure-card refresh failed at %s: %s — "
+            "using stale cache (%d cards)",
+            _ROLE_MEMORY_SRV_URL,
+            e,
+            len(_operator_card_cache),
+        )
+    return _operator_card_cache
+
+
+def _format_procedure_cards_for_prompt(cards: List[Dict[str, Any]]) -> str:
+    """Format the operator's procedure-card index for the system prompt.
+
+    Emits a short header explaining the pathway, then one collapsed
+    line per card listing slug + summary + triggers. The LLM is told
+    the full card is available via the `memory_get_procedure` tool.
+    """
+    if not cards:
+        return (
+            "  (no procedure cards currently available — "
+            "role-memory-srv unreachable or zero cards for role='operator')"
+        )
+    lines = [
+        f"{len(cards)} procedure cards available for the operator role. "
+        f"These codify *which tool to dispatch for which question shape*. "
+        f"When a card's triggers match the user's question, fetch the full "
+        f"card via the `memory_get_procedure` tool (arguments: "
+        f'{{ "slug": "<slug>" }}) and follow its procedure before '
+        f"dispatching any tool."
+    ]
+    for c in cards:
+        slug = c.get("slug", "")
+        summary = c.get("summary", "").rstrip()
+        triggers = c.get("triggers", []) or []
+        trigger_str = (
+            ", ".join(f'"{t}"' for t in triggers)
+            if triggers
+            else "(no triggers — always applicable)"
+        )
+        lines.append(f"- `{slug}` — {summary}  triggers: {trigger_str}")
+    return "\n".join(lines)
+
+
 # ── Per-Session State ─────────────────────────────────────────────
 
 _session_queues: Dict[str, deque] = {}
 _session_entity_indexes: Dict[str, Dict[str, List[Dict]]] = {}
 _session_topic_maps: Dict[str, Dict[str, List[Dict]]] = {}
-_session_locks: Dict[str, threading.Lock] = {}
+_session_locks: Dict[str, threading.RLock] = {}
 _global_lock = threading.Lock()
 
 
-def _get_session_lock(session_id: str) -> threading.Lock:
+def _get_session_lock(session_id: str) -> threading.RLock:
     with _global_lock:
         if session_id not in _session_locks:
-            _session_locks[session_id] = threading.Lock()
+            _session_locks[session_id] = threading.RLock()
         return _session_locks[session_id]
 
 
@@ -127,7 +328,7 @@ KNOWN_SERVICES = {
     "image-server", "mongodb", "nebula-srv", "nebula-mcp", "nebula-ui",
     "nexus-console", "ollama", "operator-svc", "peb-kernel", "plurality-ui",
     "redis", "role-memory-srv", "service-registry", "tackle-ui", "terrain",
-    "ui-event-bus", "vision-srv", "vision-srv-3104", "vision-srv-py",
+    "ui-event-bus", "vision-srv-py",
     "wrp-bridge-daemon",
 }
 
@@ -340,8 +541,26 @@ def _find_relevant_context(session_id: str, user_message: str) -> List[Dict[str,
 
 
 # ── Tool Definitions ──────────────────────────────────────────────
+#
+# Historically this was a hard-coded `TOOLS` array of three named tools
+# (query_nebula / query_conduit / query_terrain) — each with a fixed
+# list of REST paths to be hit through `_execute_tool_call` → `api_proxy`.
+#
+# As of 2026-07-22 the Operator no longer hard-codes the tool catalog.
+# It pulls them at runtime from `tools-aggregator.service` (port 3210)
+# via the `_refresh_discovered_tools()` helper above. The aggregator
+# composes registries from every live MCP. To preserve the legacy
+# `service:/method:/path:/body:` block grammar (and the matching
+# `_execute_tool_call` REST-proxy dispatch through `api_proxy.py`),
+# we ALSO accept service-shaped blocks in `_parse_tool_call` so that
+# existing UI clients invoking `POST /api/proxy/<service>` directly
+# keep working unchanged. New MCP tool calls use the `tool:/arguments:`
+# block shape below.
 
-TOOLS = [
+# Legacy catalog retained as a documentation / fallback reference ONLY —
+# it is NOT emitted to the LLM. That honor goes to whatever the
+# aggregator reports from `_refresh_discovered_tools()`.
+TOOLS_LEGACY_REST_PROXY = [
     {
         "name": "query_nebula",
         "description": "Query the Nebula agent records service. Use for: agent records, requirements, harvests, reports, analyses, open questions.",
@@ -379,10 +598,19 @@ TOOLS = [
     },
 ]
 
+# Backward-compat alias — any external importer of `TOOLS` from this module
+# gets the legacy reference list (for documentation purposes; it is NOT used
+# by Operator's own LLM-tool-call flow anymore).
+TOOLS = TOOLS_LEGACY_REST_PROXY
 
-# ── Operator System Prompt ────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are Operator, the host personality for the Nexus system.
+# ── Operator System Prompt Builder ─────────────────────────────────
+
+# Static base — never modified. The dynamic tool-list section is appended
+# at chat-request time by `_build_system_prompt()`. Keeping the base static
+# means a chat request with zero discovered tools still produces a valid,
+# usable operator prompt (the LLM just won't have any tools to call).
+_OPERATOR_SYSTEM_PROMPT_BASE = """You are Operator, the host personality for the Nexus system.
 
 You are the friendly, knowledgeable interface between the user and the Nexus
 infrastructure. You can answer questions about pipeline state, requirements,
@@ -393,12 +621,14 @@ implementation plans, service status, and architecture.
 You have access to Nexus backend services via tool calls. To use a tool,
 output EXACTLY this format (one call at a time):
 
-<tool_call>
-service: <query_nebula|query_conduit|query_terrain>
-method: <GET|POST>
-path: <API path>
-body: <JSON object or omit for GET>
-</tool_call>
+[
+tool: <tool name from the list below>
+arguments: <JSON object of arguments for this tool>
+]
+
+Tool names come from the catalog at the bottom of this prompt. Pass arguments
+as a single JSON object on the "arguments:" line — for tools taking no
+arguments, pass an empty object: `arguments: {}`.
 
 After you make a tool call, you will receive the ACTUAL data from the service.
 CRITICAL: You MUST use the actual data in your response. Do NOT generate, fabricate,
@@ -406,21 +636,61 @@ or invent data. If the tool returns JSON, summarize what it contains. If it retu
 an error, report the error. Never make up agent records, plans, requirements, or
 any other data — only report what the tool actually returned.
 
-Available tools:
-- query_nebula: agent records, requirements, harvests, reports, open questions
-  Paths: /api/agent-records, /api/requirements, /api/harvests, /api/open-questions
-- query_conduit: plans, tickets, sessions, work requests, pipeline status
-  Paths: /state, /wr, /wr/:id, /health
-- query_terrain: service status, infrastructure state
-  Paths: /api/v1/runnable-services, /api/v1/service-types, /api/v1/servers, /api/v1/platform/health
-
 ## Behavior
 
 - Be concise, helpful, and direct.
 - When you need data to answer a question, make a tool call first.
 - When you receive tool results, report what they actually contain.
 - When you don't know something, say so. Don't make up data.
-- Stay in character as the Nexus operator."""
+- Stay in character as the Nexus operator.
+
+## Available tools (discovered from the tools-aggregator at request time)
+
+"""
+
+_OPERATOR_SYSTEM_PROMPT_TAIL = """
+
+## Notes
+
+- A "tool call" only needs a tool name and arguments object — the underlying
+  service (conduit-mcp, tackle-mcp, knowledge-mcp, etc.) is routed by the
+  aggregator, not by you.
+- If you cannot find a fitting tool for a user's question, say so plainly
+  — do not invent a tool name and do not emit a tool call with placeholder
+  data."""
+
+
+def _build_system_prompt() -> str:
+    """Assemble the Operator system prompt with the live tool catalog.
+
+    Layout:
+        _BASE  + tool-catalog + card-index + _TAIL
+
+    The card index is fetched from role-memory-srv (Redis-backed
+    cache populated by syncAll). On fetch failure the section
+    collapses to a clear "(unavailable)" note and the prompt is still
+    valid — the tool catalog alone remains a working dispatch
+    surface. The card section sits *between* the tool catalog and the
+    tail so the notes in the tail still apply to whatever preceded.
+    """
+    tools = _refresh_discovered_tools()
+    body = _format_tools_for_prompt(tools)
+    cards = _refresh_operator_cards()
+    card_body = _format_procedure_cards_for_prompt(cards)
+    return (
+        _OPERATOR_SYSTEM_PROMPT_BASE
+        + body
+        + "\n\n## Procedure cards (role-memory-srv, role='operator')\n\n"
+        + card_body
+        + "\n"
+        + _OPERATOR_SYSTEM_PROMPT_TAIL
+    )
+
+
+# Backward-compat alias — `SYSTEM_PROMPT` is now a function call away,
+# but anyone importing the constant gets a useful (if degraded) base prompt
+# that lists zero tools. The runtime chat flow always uses `_build_system_prompt()`.
+SYSTEM_PROMPT = _build_system_prompt()
 
 
 def _push_to_queue(session_id: str, user_message: str, model_response: str) -> None:
@@ -496,37 +766,126 @@ def build_prompt(user_message: str, session_id: str) -> str:
 
 
 # ── Tool Call Parsing & Execution ─────────────────────────────────
+#
+# Two block-grammar shapes are accepted from the LLM:
+#
+#   NEW (preferred — routes through tools-aggregator → underlying MCP):
+#
+#     [tool: <tool name>
+#     arguments: <JSON object>]
+#
+#   LEGACY (backward compat — routes through api_proxy.py → REST service):
+#
+#     [service: <query_nebula|query_conduit|query_terrain>
+#     method: <GET|POST>
+#     path: <API path>
+#     body: <JSON object>]
+#
+# The kind is selected by which top-level key the LLM emits in the block.
+# tool: → kind="tool", dispatch via tools-aggregator's /tools/call.
+# service: → kind="rest", dispatch via the existing api_proxy path.
 
-def _parse_tool_call(text: str) -> Optional[Dict[str, str]]:
-    """Parse a <tool_call>...</tool_call> block from LLM output."""
-    match = re.search(r"<tool_call>(.*?)</tool_call>", text, re.DOTALL)
+def _parse_tool_call(text: str) -> Optional[Dict[str, Any]]:
+    """Parse a fenced block from LLM output. Accepts both new (tool:) and
+    legacy (service:) shapes."""
+    match = re.search(r"\[(.*?)\]", text, re.DOTALL)
     if not match:
-        match = re.search(r"<tool_call>(.*)", text, re.DOTALL)
+        match = re.search(r"\[(.*)", text, re.DOTALL)
     if not match:
         return None
 
     block = match.group(1)
-    call: Dict[str, str] = {}
+    raw: Dict[str, str] = {}
     for line in block.strip().splitlines():
         line = line.strip()
         if ":" in line:
             key, _, value = line.partition(":")
             key = key.strip().lower()
             value = value.strip()
-            if key in ("service", "method", "path", "body"):
-                call[key] = value
+            if key in ("tool", "arguments", "service", "method", "path", "body"):
+                raw[key] = value
 
-    if "service" not in call or "path" not in call:
-        return None
+    # Dispatch on the emitted key.
+    if "tool" in raw:
+        # New shape (MCP tool call via tools-aggregator)
+        args: Dict[str, Any] = {}
+        args_str = raw.get("arguments", "{}")
+        if args_str:
+            try:
+                args = json.loads(args_str)
+                if not isinstance(args, dict):
+                    args = {"_value": args}
+            except json.JSONDecodeError:
+                # Empty/non-JSON arguments are not a hard error; pass an empty
+                # object so the tool itself can decide what to do.
+                _log.warning("tool call arguments not valid JSON (%r); defaulting to {}", args_str[:80])
+                args = {}
+        return {
+            "kind": "tool",
+            "tool": raw["tool"],
+            "arguments": args,
+        }
 
-    if "method" not in call:
-        call["method"] = "GET"
+    if "service" in raw and "path" in raw:
+        # Legacy shape (REST proxy)
+        return {
+            "kind": "rest",
+            "service": raw["service"],
+            "method": raw.get("method", "GET"),
+            "path": raw["path"],
+            "body": raw.get("body"),
+        }
 
-    return call
+    return None
 
 
-def _execute_tool_call(call: Dict[str, str]) -> str:
-    """Execute a tool call via the API proxy with caching."""
+def _execute_tool_call(call: Dict[str, Any]) -> str:
+    """Execute a parsed tool call. Dispatches by `kind`:
+       "tool" → tools-aggregator /tools/call (the new MCP path)
+       "rest" → api_proxy.proxy_request (the legacy REST proxy path)
+    """
+    kind = call.get("kind", "rest")  # default rest for shape backward compat
+
+    if kind == "tool":
+        return _execute_mcp_tool_call(call)
+    return _execute_rest_tool_call(call)
+
+
+def _execute_mcp_tool_call(call: Dict[str, Any]) -> str:
+    """Dispatch through the tools-aggregator's POST /tools/call."""
+    tool_name = call["tool"]
+    args = call.get("arguments", {}) or {}
+
+    # Cache check — same `_tool_cache` shared with rest path, just keyed by
+    # tool_name + json-stable args. Reuse the same cache helpers by encoding
+    # the tool-call row as a fake rest triple (service/ method / path).
+    cache_service = f"tool:{tool_name}"
+    cache_method = "call"
+    cache_path = ""
+    cached = _get_cached(cache_service, cache_method, cache_path, args)
+    if cached is not None:
+        return cached
+
+    try:
+        client = _get_tools_client()
+        result = client.call_tool(tool_name, args)
+    except Exception as e:
+        _log.error("tool %s call failed: %s", tool_name, e)
+        return f"Error calling tool {tool_name}: {e}"
+
+    # The aggregator returns the unwrapped MCP result already (the index.ts
+    # callRemoteToolJsonRpc unwraps content[0].text into parsed JSON when
+    # possible). Treat the result uniformly.
+    text = json.dumps(result, indent=2, default=str) if not isinstance(result, str) else result
+    if len(text) > 8000:
+        text = text[:8000] + "\n... (truncated)"
+
+    _set_cached(cache_service, cache_method, cache_path, args, text)
+    return text
+
+
+def _execute_rest_tool_call(call: Dict[str, str]) -> str:
+    """Legacy REST path (api_proxy → nebula-srv / conduit-mcp / terrain)."""
     service = call["service"]
     method = call["method"]
     path = call["path"]
@@ -581,6 +940,9 @@ def respond(
     # Build prompt from continuity queue + entity/topic index
     prompt = build_prompt(user_message, session_id)
 
+    # Build system prompt with the live discovered tool catalog
+    system_prompt = _build_system_prompt()
+
     # Tool-calling loop
     response_text = ""
     for round_num in range(MAX_TOOL_ROUNDS):
@@ -588,9 +950,13 @@ def respond(
             response_text = call_llm(
                 prompt=prompt,
                 role=role,
-                system_prompt=SYSTEM_PROMPT,
+                system_prompt=system_prompt,
                 fallback=True,
             )
+            if response_text is None:
+                _log.error("LLM call failed: All models exhausted for role=%s (check tackle-mcp role config for this role)", role)
+                response_text = "[Operator] I'm sorry — all models for this role are currently unavailable. Please try again in a moment."
+                break
         except Exception as e:
             _log.error("LLM call failed: %s", e)
             response_text = f"[Operator] I encountered an error: {e}"
@@ -600,7 +966,8 @@ def respond(
         if tool_call is None:
             break
 
-        _log.info("Tool call: %s %s %s", tool_call["method"], tool_call["service"], tool_call["path"])
+        _log.info("Tool call: kind=%s %s", tool_call.get("kind", "rest"),
+                  json.dumps({k: v for k, v in tool_call.items() if k != "kind"}, default=str))
         tool_result = _execute_tool_call(tool_call)
 
         prompt += (

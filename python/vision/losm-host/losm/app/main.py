@@ -1,8 +1,17 @@
 from fastapi import FastAPI, WebSocket
+from fastapi.middleware.cors import CORSMiddleware
 
 from losm.config.settings import ENABLE_CRITIC, ENABLE_TEMPLATES
 
 app = FastAPI(title="LOSM Host", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 from losm.api.receipts import router as receipts_router
 from losm.api.work_requests import router as work_requests_router

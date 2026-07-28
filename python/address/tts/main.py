@@ -113,11 +113,18 @@ def _get_pg_conn():
 
 
 def _get_pending_plan_count(pg_conn) -> int:
-    """Count work requests not yet consumed by execution layer."""
+    """Count pipeline plans with PLAN_CREATE or CRITIQUE_PASS derived status.
+
+    NOTE: This queries nebula.plan_status (the conduit-mcp canonical view),
+    NOT nebula.work_requests. The work_requests table accumulates cancelled
+    test artifacts that were previously misreported as "pending" alerts.
+    """
     try:
         with pg_conn.cursor() as cur:
             cur.execute(
-                "SELECT COUNT(*) FROM nebula.work_requests WHERE consumed_at IS NULL"
+                "SELECT COUNT(*) FROM nebula.plan_status "
+                "WHERE derived_status IN ('PLAN_CREATE', 'CRITIQUE_PASS') "
+                "AND deleted = 0"
             )
             row = cur.fetchone()
             return row[0] if row else 0
@@ -141,11 +148,18 @@ def _get_active_builder_count(pg_conn) -> int:
 
 
 def _get_blocked_plan_count(pg_conn) -> int:
-    """Count cancelled work requests (proxy for blocked)."""
+    """Count pipeline plans with BLOCK or PLAN_BLOCK derived status.
+
+    NOTE: This queries nebula.plan_status (the conduit-mcp canonical view),
+    NOT nebula.work_requests. The work_requests table was reporting
+    cancelled test artifacts as "blocked" alerts.
+    """
     try:
         with pg_conn.cursor() as cur:
             cur.execute(
-                "SELECT COUNT(*) FROM nebula.work_requests WHERE business_status = 'CANCELLED'"
+                "SELECT COUNT(*) FROM nebula.plan_status "
+                "WHERE derived_status IN ('BLOCK', 'PLAN_BLOCK') "
+                "AND deleted = 0"
             )
             row = cur.fetchone()
             return row[0] if row else 0
@@ -163,18 +177,23 @@ async def _periodic_health_check(pg_conn) -> None:
             pending = _get_pending_plan_count(pg_conn)
             active = _get_active_builder_count(pg_conn)
             blocked = _get_blocked_plan_count(pg_conn)
+            _log(
+                "Health check: %s pending, %s active, %s blocked",
+                pending,
+                active,
+                blocked,
+            )
+            # Only announce when there is something actionable to surface.
+            # Idle pipeline (0 pending, 0 blocked) is the expected steady state
+            # and should not generate a speech utterance every cycle.
+            if pending == 0 and blocked == 0:
+                continue
             health = project_health_check(
                 pending_plans=pending,
                 active_builders=active,
                 blocked_plans=blocked,
             )
             _queue.enqueue(health)
-            _log(
-                "Health check enqueued: %s pending, %s active, %s blocked",
-                pending,
-                active,
-                blocked,
-            )
         except Exception as e:
             _log("Health check error: %s", e)
 

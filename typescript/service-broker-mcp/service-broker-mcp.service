@@ -1,0 +1,41 @@
+[Unit]
+Description=Service Broker MCP — Auth + token-validation surface via SSE transport (port 3112)
+Documentation=https://github.com/nexus/typescript/service-broker-mcp
+After=network.target broker-gateway.service service-registry.service
+Wants=broker-gateway.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/service-broker-mcp
+
+# ── Environment ────────────────────────────────────────────────────────
+# SSE-transport variants default port is 3108 in src/sse.ts, but that's
+# already occupied by cpf-api.service. Override to 3112.
+Environment=SERVICE_BROKER_MCP_PORT=3112
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# Service-broker-mcp forwards calls to broker-gateway (port 8081) via
+# /api/v1/broker/submitRequest. The broker URL is already the default in
+# the source. Leave it commented here unless redirecting externally.
+# Environment=BROKER_URL=http://localhost:8081/api/v1/broker/submitRequest
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/npx tsx src/sse.ts
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/typescript/service-broker-mcp
+
+[Install]
+WantedBy=default.target

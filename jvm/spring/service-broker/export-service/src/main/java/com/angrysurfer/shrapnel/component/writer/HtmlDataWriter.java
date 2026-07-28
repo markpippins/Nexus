@@ -1,12 +1,12 @@
 package com.angrysurfer.shrapnel.component.writer;
 
-import com.angrysurfer.shrapnel.writer.IDataWriter;
-import com.angrysurfer.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.writer.IDataWriter;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
 import com.angrysurfer.shrapnel.util.FileUtil;
-import com.angrysurfer.shrapnel.property.IPropertyAccessor;
-import com.angrysurfer.shrapnel.property.PropertyUtilsPropertyAccessor;
-import com.angrysurfer.shrapnel.filter.DataFilters;
-import com.angrysurfer.shrapnel.filter.IDataFilters;
+import com.aibizarchitect.nexus.shrapnel.property.IPropertyAccessor;
+import com.aibizarchitect.nexus.shrapnel.property.PropertyUtilsPropertyAccessor;
+import com.aibizarchitect.nexus.shrapnel.filter.DataFilters;
+import com.aibizarchitect.nexus.shrapnel.filter.IDataFilters;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;

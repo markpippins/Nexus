@@ -187,6 +187,20 @@ CANDIDATES: tuple[Candidate, ...] = (
         workspace_path="nexus/python/vision/vision-srv",
     ),
     Candidate(
+        name="tackle-srv",
+        port=3410,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3410/health",
+        description=(
+            "Tackle REST API — AI configuration registry and role memory "
+            "procedure server. Backs tackle-mcp with canonical PostgreSQL + "
+            "Redis access. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start tackle-srv.service",
+        workspace_path="nexus/typescript/tackle-srv",
+    ),
+    Candidate(
         name="tackle-mcp",
         port=3400,
         kind="mcp_server",
@@ -366,7 +380,7 @@ CANDIDATES: tuple[Candidate, ...] = (
         health_cmd="docker exec atomic-redis-dev redis-cli ping | grep -q PONG",
         description=(
             "Redis in-memory cache via Docker (atomic-redis-dev). "
-            "Used by role-memory-srv and tackle-mcp. Systemd-managed "
+            "Used by role-memory-srv, tackle-srv, and tackle-mcp. Systemd-managed "
             "(oneshot). Auto-prunes old Docker artifacts before start."
         ),
         startup="systemd: systemctl --user start redis.service",
@@ -403,19 +417,18 @@ CANDIDATES: tuple[Candidate, ...] = (
     ),
     Candidate(
         name="assembly-mcp",
-        port=3107,
+        port=3113,
         kind="mcp_server",
         transport_type="streamable-http",
-        health_url="http://localhost:3107/health",
+        health_url="http://localhost:3113/health",
         description=(
             "MCP server for the assembly (social/deliberation) schema - "
             "agent short-route to forums, threads, posts, and bridge "
             "tables to nebula artifacts. Express + JSON-RPC over POST / on "
-            "ASSEMBLY_MCP_PORT (default 3107). Talks to Postgres directly; "
-            "no dependency on nebula-srv at the network layer. "
-            "Note: 3107 chosen to avoid collision with nebula-mcp-sse@3102."
+            "ASSEMBLY_MCP_PORT (now 3113; 3112 is taken by service-broker-mcp). "
+            "Systemd-managed. Delegates to assembly-srv REST API."
         ),
-        startup="cd typescript/assembly-mcp && bash scripts/mcp-daemon.sh start",
+        startup="systemd: systemctl --user start assembly-mcp.service",
         workspace_path="nexus/typescript/assembly-mcp",
     ),
     Candidate(
@@ -431,6 +444,51 @@ CANDIDATES: tuple[Candidate, ...] = (
         ),
         startup="systemd: systemctl --user start timeclock.service",
         workspace_path="nexus/python/timeclock",
+    ),
+    Candidate(
+        name="wind-srv",
+        port=3300,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3300/health",
+        description=(
+            "Wind IDE workflow API server. Express.js CRUD for offices, "
+            "titles, tasks, outcomes, workflows, nodes, edges, instances, "
+            "tickets, receipts, v-roles. Used by wind-ui and conduit-ui "
+            "legacy. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start wind-srv.service",
+        workspace_path="nexus/typescript/wind-srv",
+    ),
+    Candidate(
+        name="conduit-ui-legacy",
+        port=4015,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:4015/",
+        description=(
+            "Conduit Legacy UI — production build of the Angular conduit-ui "
+            "dashboard served via Express. Proxies API calls to conduit-mcp "
+            "(port 3100). Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start conduit-ui-legacy.service",
+        workspace_path="nexus/angular/conduit-ui-legacy",
+    ),
+    Candidate(
+        name="conduit-srv",
+        port=3104,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3104/health",
+        description=(
+            "Conduit REST API — standalone Express service extracted from "
+            "conduit-mcp per the 'No SQL in MCP Servers' architectural "
+            "directive. Serves 16 pure-DB REST routes (workflows, tickets, "
+            "tokens, config, governance, vision, session-log) with direct "
+            "PostgreSQL access via the conduit schema. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start conduit-srv.service",
+        workspace_path="nexus/typescript/conduit-srv",
     ),
 )
 
@@ -458,15 +516,18 @@ DEPENDENCIES: tuple[tuple[str, str, str, str], ...] = (
     ("mcp_server", "terrain-mcp", "runnable_service", "nebula-srv"),
     ("mcp_server", "nebula-mcp", "runnable_service", "nebula-srv"),
     ("mcp_server", "conduit-mcp", "runnable_service", "nebula-srv"),
+    ("mcp_server", "tackle-mcp", "runnable_service", "tackle-srv"),
     ("mcp_server", "tackle-mcp", "runnable_service", "nebula-srv"),
     ("mcp_server", "tackle-mcp", "runnable_service", "redis"),
     ("mcp_server", "terrain-mcp", "runnable_service", "terrain"),
     ("runnable_service", "broker-gateway", "runnable_service", "nebula-srv"),
-    ("runnable_service", "vision-srv", "runnable_service", "nebula-srv"),
     ("runnable_service", "vision-srv-py", "runnable_service", "nebula-srv"),
     ("runnable_service", "role-memory-srv", "runnable_service", "redis"),
     ("runnable_service", "wrp-bridge-daemon", "runnable_service", "nebula-srv"),
     ("mcp_server", "timeclock-mcp", "runnable_service", "nebula-srv"),
+    ("runnable_service", "wind-srv", "runnable_service", "nebula-srv"),
+    ("runnable_service", "conduit-ui-legacy", "mcp_server", "conduit-mcp"),
+    ("runnable_service", "conduit-srv", "runnable_service", "nebula-srv"),
 )
 
 

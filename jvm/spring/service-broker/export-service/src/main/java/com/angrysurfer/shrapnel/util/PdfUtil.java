@@ -9,7 +9,7 @@ import java.util.Map;
 
 import com.angrysurfer.shrapnel.IExport;
 import com.angrysurfer.shrapnel.component.writer.PdfDataWriter;
-import com.angrysurfer.shrapnel.exception.ShrapnelException;
+import com.aibizarchitect.nexus.shrapnel.exception.ShrapnelException;
 import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfVersion;

@@ -1,0 +1,22 @@
+{
+  "name": "tackle-prompt-bridge",
+  "version": "1.0.0",
+  "description": "MCP server that exposes per-role prompt templates from tackle.prompts (via tackle-prompt-sync-srv Redis cache) as MCP prompt resources. Lets live .opencode/agents read their persona from tackle instead of static .md files.",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ioredis": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3"
+  }
+}

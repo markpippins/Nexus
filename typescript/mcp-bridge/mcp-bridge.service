@@ -1,0 +1,75 @@
+[Unit]
+Description=MCP Bridge — Generic stdio to SSE bridge for stdio-only MCPs (knowledge/vision/peb/terrain on ports 3131-3134, tackle-prompt-bridge on 3135)
+Documentation=https://github.com/nexus/typescript/mcp-bridge
+After=network.target postgresql.service redis.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=codex
+Group=codex
+WorkingDirectory=/home/codex/dev/nexus/typescript/mcp-bridge
+
+# ── Environment ────────────────────────────────────────────────────────
+Environment=NODE_ENV=production
+Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin
+
+# ── Bridge targets ───────────────────────────────────────────────────
+# One block per served stdio MCP. The bridge spawns each as a child
+# process and re-exposes its tools over the MCP-over-SSE transport on the
+# declared port. The tools-aggregator reads these ports from DEFAULT_SERVICES
+# and reaches them as protocol='sse' MCPs.
+
+# knowledge-mcp: knowledge.graph_* Postgres tools. Port 3131.
+Environment=MCP_BRIDGE_KNOWLEDGE_PORT=3131
+Environment=MCP_BRIDGE_KNOWLEDGE_CMD=node
+Environment=MCP_BRIDGE_KNOWLEDGE_ARGS=dist/index.js
+Environment=MCP_BRIDGE_KNOWLEDGE_CWD=/home/codex/dev/nexus/typescript/knowledge-mcp
+
+# vision-mcp: vision descriptors proxied to vision-srv-py. Port 3132.
+Environment=MCP_BRIDGE_VISION_PORT=3132
+Environment=MCP_BRIDGE_VISION_CMD=node
+Environment=MCP_BRIDGE_VISION_ARGS=dist/index.js
+Environment=MCP_BRIDGE_VISION_CWD=/home/codex/dev/nexus/typescript/vision-mcp
+
+# peb-mcp: PEB governance tools, resources over stdio today. Port 3133.
+Environment=MCP_BRIDGE_PEB_PORT=3133
+Environment=MCP_BRIDGE_PEB_CMD=node
+Environment=MCP_BRIDGE_PEB_ARGS=dist/index.js
+Environment=MCP_BRIDGE_PEB_CWD=/home/codex/dev/nexus/typescript/peb-mcp
+
+# terrain-mcp: terrain topology Postgres queries. Port 3134.
+Environment=MCP_BRIDGE_TERRAIN_PORT=3134
+Environment=MCP_BRIDGE_TERRAIN_CMD=node
+Environment=MCP_BRIDGE_TERRAIN_ARGS=dist/index.js
+Environment=MCP_BRIDGE_TERRAIN_CWD=/home/codex/dev/nexus/typescript/terrain-mcp
+
+# tackle-prompt-bridge: per-role prompt templates from tackle.prompts,
+# re-exposed as MCP prompt resources (NOT tools). Port 3135. Consumed by
+# the .opencode/agents/<role>.md pointer files at agent-launch time via
+# prompts/get "{role}/opencode-persona". Uses tsx (no compile step) so the
+# spawned child runs from src/ directly — keeps the dep surface minimal
+# for this stdio MCP.
+Environment=MCP_BRIDGE_PROMPT_PORT=3135
+Environment=MCP_BRIDGE_PROMPT_CMD=npx
+Environment=MCP_BRIDGE_PROMPT_ARGS=tsx;src/index.ts
+Environment=MCP_BRIDGE_PROMPT_CWD=/home/codex/dev/nexus/typescript/tackle-prompt-bridge
+Environment=MCP_BRIDGE_PROMPT_ENV_PROMPT_REDIS_URL=redis://localhost:6379
+
+# ── Executable ─────────────────────────────────────────────────────────
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node dist/index.js
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ── Restart behavior ───────────────────────────────────────────────────
+Restart=on-failure
+RestartSec=3
+
+# ── Hardening ──────────────────────────────────────────────────────────
+NoNewPrivileges=true
+ProtectSystem=strict
+PrivateTmp=true
+ProtectHome=read-only
+ReadWritePaths=/home/codex/dev/nexus/typescript/mcp-bridge
+
+[Install]
+WantedBy=default.target

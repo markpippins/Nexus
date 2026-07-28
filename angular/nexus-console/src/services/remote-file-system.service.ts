@@ -71,9 +71,12 @@ export class RemoteFileSystemService implements FileSystemProvider {
     const nodes: FileSystemNode[] = visibleItems.map(item => {
       const itemType = (item.type || '').toLowerCase();
       const isFolder = itemType === 'folder' || itemType === 'directory';
+      // Preserve the 'symlink' type so the UI can request a distinct icon
+      // from the image server for symlinks (rather than rendering them as files).
+      const type: FileSystemNode['type'] = itemType === 'symlink' ? 'symlink' : (isFolder ? 'folder' : 'file');
       return {
         name: item.name,
-        type: isFolder ? 'folder' : 'file',
+        type,
         modified: item.modified,
         content: item.content,
       };

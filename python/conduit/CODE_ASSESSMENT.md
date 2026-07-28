@@ -4,7 +4,7 @@ Date: 2026-06-09 (updated 2026-06-10)
 
 ## Scope
 
-This assessment covers the Python orchestration service in `nexus/legacy/python/conduit/`.
+This assessment covers the Python orchestration service in `nexus/python/conduit/`.
 The review focused on:
 
 - plan/ticket/receipt lifecycle handling
@@ -144,28 +144,13 @@ Recommendation:
 - Apply the same pattern anywhere model output or DCO-provided paths are read or
   written.
 
-### 5. Chat API has no authentication or concurrency limit
+### 5. Chat API removed
 
-Severity: Medium
+Severity: Resolved (2026-07)
 
-`agent_chat.py` accepts arbitrary local HTTP `POST /chat` requests, starts a
-background thread, and launches a harness subprocess:
-
-- `agent_chat.py:309-348`
-
-Impact:
-
-- Any process that can reach the chat server can launch planner, builder,
-  reviewer, or critic agents.
-- There is no per-role lock, queue limit, or single-writer guard in this chat
-  path.
-
-Recommendation:
-
-- Restrict the server bind address where possible.
-- Add a shared token or local-only trust boundary check if exposed through a
-  proxy.
-- Enforce a single running builder session and a small global session limit.
+`agent_chat.py` has been removed from the codebase. The chat server
+functionality is no longer part of Conduit. Agent launching is now handled
+by `agent_scheduler_runner.py` via `tackle.agent_scheduler`.
 
 ### 6. Coverage does not exercise the critical lifecycle path
 
@@ -189,7 +174,7 @@ Recommendation:
 Commands run from `/home/codex/dev`:
 
 ```bash
-cd nexus/legacy/python/conduit && python3 -m pytest -q
+cd nexus/python/conduit && python3 -m pytest -q
 ```
 
 Result:
@@ -222,4 +207,5 @@ Result:
 1. Builder success path now emits `IMPLEMENTATION` (fixed from earlier `REVIEW_PASS`
    issue) — this is by design, but review semantics remain the same as assessed.
 2. No integration test for `_dispatch_one()` retry loop yet.
-3. Chat server (`agent_chat.py`) still has no authentication or concurrency limit.
+3. Chat server (`agent_chat.py`) has been removed. Agent launching is now
+   handled by `agent_scheduler_runner.py` via `tackle.agent_scheduler`.

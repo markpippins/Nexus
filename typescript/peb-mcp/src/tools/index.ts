@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { PebApiClient } from "../api/apiClient.js";
+import * as decisions from "../api/decisionsClient.js";
 
 /**
  * Registers all PEB Governance Tools.
@@ -149,6 +150,128 @@ export function registerTools(server: McpServer) {
     {},
     async () => {
       const res = await PebApiClient.getResource("hash");
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  // ── Decision CRUD (peb-srv) ────────────────────────────────────────
+
+  // 10. peb_list_decisions
+  server.tool(
+    "peb_list_decisions",
+    "List architecture decisions from peb.decisions. Filterable by status, author, affected key.",
+    {
+      status: z.string().optional().describe("Filter by status (accepted, proposed, superseded, deprecated)"),
+      author_id: z.string().optional().describe("Filter by author role or name"),
+      adr_number: z.string().optional().describe("Filter by exact ADR number (e.g. ADR-001)"),
+      affected_key: z.string().optional().describe("Filter by affected key (array overlap)"),
+      limit: z.number().optional().describe("Max results (default 100, max 500)"),
+      offset: z.number().optional().describe("Offset for pagination"),
+    },
+    async (args) => {
+      const res = await decisions.listDecisions(args);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  // 11. peb_get_decision
+  server.tool(
+    "peb_get_decision",
+    "Get a single architecture decision by ID or ADR number.",
+    {
+      id: z.string().describe("Decision UUID or ADR number (e.g. ADR-001)"),
+    },
+    async (args) => {
+      // If it looks like an ADR number, search by that.
+      if (/^ADR-\d{3}$/i.test(args.id)) {
+        const res = await decisions.listDecisions({ adr_number: args.id.toUpperCase() });
+        const found = res.decisions?.[0];
+        if (!found) return { content: [{ type: "text", text: `No decision found for ${args.id}` }] };
+        return { content: [{ type: "text", text: JSON.stringify(found, null, 2) }] };
+      }
+      const res = await decisions.getDecision(args.id);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  // 12. peb_create_decision
+  server.tool(
+    "peb_create_decision",
+    "Create a new architecture decision record in peb.decisions. ADR number is auto-assigned if omitted.",
+    {
+      title: z.string().describe("Decision title"),
+      author_id: z.string().describe("Author role or identifier"),
+      summary: z.any().optional().describe("Structured summary: { context, decision, consequences }"),
+      affected_keys: z.array(z.string()).optional().describe("Policy keys this decision constrains"),
+      entropy_class: z.enum(["structural", "corrective", "policy"]).optional().describe("Change classification"),
+      status: z.enum(["proposed", "accepted"]).optional().describe("Initial status (default: proposed)"),
+      adr_number: z.string().optional().describe("Explicit ADR number (auto-assigned if omitted)"),
+      parent_decision_id: z.string().optional().describe("UUID of parent decision (for supersession chain)"),
+    },
+    async (args) => {
+      const res = await decisions.createDecision(args);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  // 13. peb_update_decision
+  server.tool(
+    "peb_update_decision",
+    "Update an existing decision's status, summary, or affected keys.",
+    {
+      id: z.string().describe("Decision UUID"),
+      title: z.string().optional().describe("New title"),
+      status: z.enum(["proposed", "accepted", "superseded", "deprecated"]).optional().describe("New status"),
+      summary: z.any().optional().describe("Updated structured summary"),
+      affected_keys: z.array(z.string()).optional().describe("Updated affected keys"),
+      entropy_class: z.string().optional().describe("Updated entropy class"),
+    },
+    async (args) => {
+      const { id, ...opts } = args;
+      const res = await decisions.updateDecision(id, opts);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  // 14. peb_supersede_decision
+  server.tool(
+    "peb_supersede_decision",
+    "Supersede an existing decision. Creates a new ADR that replaces the old one, marking the old as 'superseded'.",
+    {
+      id: z.string().describe("UUID of the decision to supersede"),
+      summary: z.any().describe("New decision summary explaining what changed and why"),
+      author_id: z.string().describe("Author of the superseding decision"),
+      title: z.string().optional().describe("Title for the new decision (default: auto-generated)"),
+      affected_keys: z.array(z.string()).optional().describe("Affected keys (default: inherit from superseded)"),
+    },
+    async (args) => {
+      const { id, ...opts } = args;
+      const res = await decisions.supersedeDecision(id, opts);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  // 15. peb_get_decision_chain
+  server.tool(
+    "peb_get_decision_chain",
+    "Walk the decision ancestry or rollback chain from a given decision.",
+    {
+      id: z.string().describe("Starting decision UUID"),
+      direction: z.enum(["ancestry", "rollback"]).optional().describe("Walk direction (default: ancestry)"),
+    },
+    async (args) => {
+      const res = await decisions.getDecisionChain(args.id, args.direction || 'ancestry');
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    }
+  );
+
+  // 16. peb_next_adr_number
+  server.tool(
+    "peb_next_adr_number",
+    "Get the next available ADR number.",
+    {},
+    async () => {
+      const res = await decisions.getNextAdrNumber();
       return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
     }
   );

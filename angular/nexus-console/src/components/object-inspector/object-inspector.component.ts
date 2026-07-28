@@ -40,7 +40,11 @@ export class ObjectInspectorComponent {
     // Connection Form
     selectedTargetId = '';
 
-    // Computed list of nodes we can connect to
+    // Default direction is bidirectional (per architect direction 2026-07-27):
+    // one-way communication is currently rare, so bidirectional is the sensible default.
+    newConnectionDirection: 'out' | 'in' | 'bidirectional' = 'bidirectional';
+
+    // Computed list of nodes we can connect to (excludes already-connected in either direction)
     availableTargets = computed(() => {
         const current = this.selectedNodeData();
         const all = this.allNodes();
@@ -48,23 +52,62 @@ export class ObjectInspectorComponent {
 
         const config = this.registry.getConfig(current.type);
 
+        // Build a set of nodes already connected in either direction
+        const connectedIds = new Set<string>(current.connectedTo);
+        // Also exclude nodes that point TO current (inbound)
+        for (const n of all) {
+            if (n.connectedTo.includes(current.id)) {
+                connectedIds.add(n.id);
+            }
+        }
+
         return all.filter(n => {
             if (n.id === current.id) return false;
-            if (current.connectedTo.includes(n.id)) return false;
+            if (connectedIds.has(n.id)) return false;
             if (config.allowedConnections && config.allowedConnections !== 'all' && !config.allowedConnections.includes(n.type)) return false;
             return true;
         }).sort((a, b) => a.label.localeCompare(b.label));
     });
 
-    // Derived list of current connections
-    currentConnections = computed(() => {
+    /** All connections involving the selected node (outbound, inbound, bidirectional).
+     *  Each entry includes the direction relative to the selected node. */
+    allConnections = computed(() => {
         const current = this.selectedNodeData();
         const all = this.allNodes();
         if (!current) return [];
-        return current.connectedTo.map(targetId => {
+
+        const result: { nodeId: string; label: string; direction: 'out' | 'in' | 'bidirectional' }[] = [];
+        const seen = new Set<string>();
+
+        // Outbound + bidirectional from current
+        for (const targetId of current.connectedTo) {
+            const key = [current.id, targetId].sort().join('::');
+            if (seen.has(key)) continue;
+            seen.add(key);
             const target = all.find(n => n.id === targetId);
-            return target ? { id: targetId, label: target.label } : { id: targetId, label: 'Unknown' };
-        });
+            const bidir = this.vizService.isBidirectional(current.id, targetId);
+            result.push({
+                nodeId: targetId,
+                label: target?.label ?? targetId,
+                direction: bidir ? 'bidirectional' : 'out'
+            });
+        }
+
+        // Incoming (other nodes point to current, not already covered)
+        for (const n of all) {
+            if (n.id === current.id) continue;
+            if (n.connectedTo.includes(current.id)) {
+                const key = [current.id, n.id].sort().join('::');
+                if (seen.has(key)) continue;
+                seen.add(key);
+                result.push({
+                    nodeId: n.id,
+                    label: n.label,
+                    direction: 'in'
+                });
+            }
+        }
+        return result;
     });
 
     constructor() {
@@ -105,16 +148,52 @@ export class ObjectInspectorComponent {
 
     addConnection(): void {
         const current = this.selectedNodeData();
-        if (current && this.selectedTargetId) {
-            this.vizService.connectNodes(current.id, this.selectedTargetId);
-            this.selectedTargetId = '';
+        if (!current || !this.selectedTargetId) return;
+        this.vizService.snapshotForUndo();
+
+        let fromId: string, toId: string;
+        if (this.newConnectionDirection === 'in') {
+            fromId = this.selectedTargetId;
+            toId = current.id;
+        } else {
+            fromId = current.id;
+            toId = this.selectedTargetId;
         }
+
+        this.vizService.connectNodes(fromId, toId);
+        if (this.newConnectionDirection === 'bidirectional') {
+            this.vizService.toggleConnectionDirection(fromId, toId);
+        }
+        this.selectedTargetId = '';
     }
 
     removeConnection(targetId: string): void {
         const current = this.selectedNodeData();
-        if (current) {
+        if (!current) return;
+        this.vizService.snapshotForUndo();
+        // If this is an inbound connection (targetId has current in its connectedTo),
+        // disconnect from their side so the visual line is properly removed
+        const targetNode = this.vizService.getNode(targetId);
+        if (targetNode?.connectedTo.includes(current.id)) {
+            this.vizService.disconnectNodes(targetId, current.id);
+        } else {
             this.vizService.disconnectNodes(current.id, targetId);
         }
+    }
+
+    /** Cycle a connection's direction through 3 states: bidirectional → out → in → bidirectional.
+     *  Bidirectional is the default. The direction parameter indicates the CURRENT direction
+     *  relative to the selected node (for badge display). The cycle is handled by the viz service. */
+    toggleConnectionDirection(targetId: string, direction: 'out' | 'in' | 'bidirectional'): void {
+        const current = this.selectedNodeData();
+        if (!current) return;
+        this.vizService.snapshotForUndo();
+
+        // Use the 3-state cycle: cycleConnectionDirection takes the "current"
+        // node as fromId and the "other" node as toId, and figures out the
+        // current state internally.
+        this.vizService.cycleConnectionDirection(current.id, targetId);
+        // Force inspector refresh so the direction badge updates
+        this.vizService.selectNode(current.id);
     }
 }

@@ -2,7 +2,8 @@ import {
   createError,
   createSuccess,
 } from "./errors";
-import * as db from "./db";
+import * as api from "./assembly-client";
+import { fetchHarvest, fetchHarvestCandidates, NebulaHarvest, NebulaHarvestCandidate } from "./nebula-proxy";
 
 // ── Type definitions ────────────────────────────────────────────────
 
@@ -154,12 +155,13 @@ export const toolDefinitions: MCPToolDefinition[] = [
       type: "object",
       properties: {
         title: { type: "string", description: "Thread title" },
-        text: { type: "string", description: "Body content (optional)" },
+        body: { type: "string", description: "Body content (markdown)" },
+        text: { type: "string", description: "Alias for body (deprecated — prefer body)" },
         user_id: { type: "string", description: "Author user UUID" },
         forum_id: { type: "string", description: "Forum UUID" },
         source_url: { type: "string", description: "Optional source URL" },
       },
-      required: ["title", "user_id", "forum_id"],
+      required: ["title", "user_id", "forum_id", "body"],
     },
   },
   {
@@ -328,12 +330,12 @@ export const toolDefinitions: MCPToolDefinition[] = [
 // ── Markdown formatter for harvest transcripts ───────────────────────
 
 function formatHarvestPostBody(
-  harvest: db.HarvestRow,
-  candidates: db.HarvestCandidateRow[],
+  harvest: NebulaHarvest,
+  candidates: NebulaHarvestCandidate[],
 ): string {
   const lines: string[] = [];
 
-  const title = harvest.docklang?.meta?.title || harvest.source_filename;
+  const title = (harvest as any).docklang?.meta?.title || harvest.source_filename;
   lines.push(`# ${title}`);
   lines.push("");
 
@@ -342,10 +344,10 @@ function formatHarvestPostBody(
   lines.push("|-------|-------|");
   lines.push(`| Source | \`${harvest.source_path}\` |`);
   lines.push(`| Model | ${harvest.model} |`);
-  if (harvest.docklang?.stats) {
-    const s = harvest.docklang.stats;
-    lines.push(`| Turns | ${s.total_units ?? "?"} |`);
-    lines.push(`| Blocks | ${s.total_blocks ?? "?"} |`);
+  const stats = (harvest as any).docklang?.stats;
+  if (stats) {
+    lines.push(`| Turns | ${stats.total_units ?? "?"} |`);
+    lines.push(`| Blocks | ${stats.total_blocks ?? "?"} |`);
   }
   lines.push(`| Harvested | ${new Date(harvest.created_at).toISOString().slice(0, 10)} |`);
   lines.push("");
@@ -397,14 +399,14 @@ function formatHarvestPostBody(
 const handlers: Record<string, ToolHandler> = {
   // ── Forums ──────────────────────────────────────────────────────
   assembly_list_forums: async () => {
-    const forums = await db.listForums();
+    const forums = await api.listForums();
     return createSuccess(forums);
   },
 
   assembly_get_forum: async (args) => {
     const { slug } = args;
     if (!slug) return createError("INVALID_ARGUMENTS", "slug is required");
-    const forum = await db.getForumBySlug(slug);
+    const forum = await api.getForumBySlug(slug);
     if (!forum) return createError("FORUM_NOT_FOUND", `Forum not found: ${slug}`);
     return createSuccess(forum);
   },
@@ -413,10 +415,10 @@ const handlers: Record<string, ToolHandler> = {
     const { name, slug, description } = args;
     if (!name) return createError("INVALID_ARGUMENTS", "name is required");
     try {
-      const forum = await db.createForum(name, slug, description);
+      const forum = await api.createForum(name, slug, description);
       return createSuccess(forum);
     } catch (err: any) {
-      if (err.code === "23505") return createError("DUPLICATE", `Forum already exists: ${err.message}`);
+      if (err.message?.includes("23505")) return createError("DUPLICATE", `Forum already exists: ${err.message}`);
       throw err;
     }
   },
@@ -425,72 +427,83 @@ const handlers: Record<string, ToolHandler> = {
   assembly_expire_forum: async (args) => {
     const { forum_id } = args;
     if (!forum_id) return createError("INVALID_ARGUMENTS", "forum_id is required");
-    const forum = await db.getForumById(forum_id);
-    if (!forum) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
-    const ok = await db.expireForum(forum_id);
-    if (!ok) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
-    return createSuccess({ expired: true, forum_id, name: forum.name });
+    try {
+      const result = await api.expireForum(forum_id);
+      if (!result) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
+      return createSuccess(result);
+    } catch (err: any) {
+      if (err.message?.includes("404")) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
+      throw err;
+    }
   },
 
   assembly_move_thread: async (args) => {
     const { post_id, forum_id } = args;
     if (!post_id || !forum_id) return createError("INVALID_ARGUMENTS", "post_id and forum_id are required");
-    const post = await db.getPostById(post_id);
-    if (!post) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
-    const moved = await db.moveThread(post_id, forum_id);
-    if (!moved) return createError("FORUM_NOT_FOUND", `Destination forum not found: ${forum_id}`);
-    return createSuccess({
-      moved: true,
-      post_id,
-      title: post.title,
-      from_forum_id: post.forum_uuid,
-      to_forum_id: forum_id,
-    });
+    try {
+      const moved = await api.moveThread(post_id, forum_id);
+      if (!moved) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
+      return createSuccess({
+        moved: true,
+        post_id,
+        title: moved.title,
+        from_forum_id: moved.forum_uuid,
+        to_forum_id: forum_id,
+      });
+    } catch (err: any) {
+      if (err.message?.includes("404")) return createError("FORUM_NOT_FOUND", `Destination forum not found: ${forum_id}`);
+      throw err;
+    }
   },
 
   assembly_find_forum_by_name: async (args) => {
     const { name } = args;
     if (!name) return createError("INVALID_ARGUMENTS", "name is required");
-    const forums = await db.findForumsByName(name);
+    const forums = await api.findForumsByName(name);
     return createSuccess(forums);
   },
 
   assembly_find_thread_by_title: async (args) => {
     const { title } = args;
     if (!title) return createError("INVALID_ARGUMENTS", "title is required");
-    const threads = await db.findThreadsByTitle(title);
+    const threads = await api.findThreadsByTitle(title);
     return createSuccess(threads);
   },
 
   // ── Users ────────────────────────────────────────────────────────
   assembly_list_users: async () => {
-    const users = await db.listUsers();
+    const users = await api.listUsers();
     return createSuccess(users);
   },
 
   assembly_get_user: async (args) => {
     const { alias, id } = args;
-    if (id) {
-      const user = await db.getUserById(id);
-      if (!user) return createError("USER_NOT_FOUND", `User not found: ${id}`);
-      return createSuccess(user);
+    try {
+      if (id) {
+        const user = await api.getUserById(id);
+        if (!user) return createError("USER_NOT_FOUND", `User not found: ${id}`);
+        return createSuccess(user);
+      }
+      if (alias) {
+        const user = await api.getUserByAlias(alias);
+        if (!user) return createError("USER_NOT_FOUND", `User not found: ${alias}`);
+        return createSuccess(user);
+      }
+      return createError("INVALID_ARGUMENTS", "Provide either alias or id");
+    } catch (err: any) {
+      if (err.message?.includes("404")) return createError("USER_NOT_FOUND", "User not found");
+      throw err;
     }
-    if (alias) {
-      const user = await db.getUserByAlias(alias);
-      if (!user) return createError("USER_NOT_FOUND", `User not found: ${alias}`);
-      return createSuccess(user);
-    }
-    return createError("INVALID_ARGUMENTS", "Provide either alias or id");
   },
 
   assembly_create_user: async (args) => {
     const { alias, email, password, avatar_url } = args;
     if (!alias || !email) return createError("INVALID_ARGUMENTS", "alias and email are required");
     try {
-      const user = await db.createUser(alias, email, password, avatar_url);
+      const user = await api.createUser(alias, email, password, avatar_url);
       return createSuccess(user);
     } catch (err: any) {
-      if (err.code === "23505") return createError("DUPLICATE", `User already exists: ${err.message}`);
+      if (err.message?.includes("23505")) return createError("DUPLICATE", `User already exists: ${err.message}`);
       throw err;
     }
   },
@@ -499,41 +512,57 @@ const handlers: Record<string, ToolHandler> = {
   assembly_list_threads: async (args) => {
     const { forum_id } = args;
     if (!forum_id) return createError("INVALID_ARGUMENTS", "forum_id is required");
-    const forum = await db.getForumById(forum_id);
-    if (!forum) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
-    const posts = await db.listPostsInForum(forum_id);
-    return createSuccess(posts);
+    try {
+      const threads = await api.listThreadsInForumById(forum_id);
+      return createSuccess(threads);
+    } catch (err: any) {
+      if (err.message?.includes("404")) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
+      throw err;
+    }
   },
 
   assembly_get_thread: async (args) => {
     const { post_id } = args;
     if (!post_id) return createError("INVALID_ARGUMENTS", "post_id is required");
-    const post = await db.getPostById(post_id);
-    if (!post) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
-    const comments = await db.listCommentsByPost(post_id);
-    const artifactRefs = await db.listArtifactRefsByPost(post_id);
-    return createSuccess({ post, comments, artifactRefs });
+    try {
+      const data = await api.getThreadById(post_id);
+      if (!data) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
+      const artifactRefs = await api.listArtifactRefsByPost(post_id).catch(() => []);
+      return createSuccess({ post: data.thread, comments: data.comments, artifactRefs });
+    } catch (err: any) {
+      if (err.message?.includes("404")) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
+      throw err;
+    }
   },
 
   assembly_create_thread: async (args) => {
-    const { title, text, user_id, forum_id, source_url } = args;
+    const { title, text, body, user_id, forum_id, source_url } = args;
+    const threadBody = body || text || "";
     if (!title || !user_id || !forum_id) {
       return createError("INVALID_ARGUMENTS", "title, user_id, and forum_id are required");
     }
-    const user = await db.getUserById(user_id);
-    if (!user) return createError("USER_NOT_FOUND", `User not found: ${user_id}`);
-    const forum = await db.getForumById(forum_id);
-    if (!forum) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
-    const post = await db.createPost(title, text || null, user_id, forum_id, source_url);
-    return createSuccess(post);
+    if (!threadBody) {
+      return createError("INVALID_ARGUMENTS", "body (or text) is required");
+    }
+    try {
+      const post = await api.createThreadById(forum_id, title, threadBody, user_id, source_url);
+      return createSuccess(post);
+    } catch (err: any) {
+      if (err.message?.includes("404")) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
+      throw err;
+    }
   },
 
   assembly_delete_thread: async (args) => {
     const { post_id } = args;
     if (!post_id) return createError("INVALID_ARGUMENTS", "post_id is required");
-    const ok = await db.deletePost(post_id);
-    if (!ok) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
-    return createSuccess({ deleted: true });
+    try {
+      await api.deleteThread(post_id);
+      return createSuccess({ deleted: true });
+    } catch (err: any) {
+      if (err.message?.includes("404")) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
+      throw err;
+    }
   },
 
   // ── Comments ────────────────────────────────────────────────────
@@ -542,40 +571,41 @@ const handlers: Record<string, ToolHandler> = {
     if (!text || !user_id || !post_id) {
       return createError("INVALID_ARGUMENTS", "text, user_id, and post_id are required");
     }
-    const user = await db.getUserById(user_id);
-    if (!user) return createError("USER_NOT_FOUND", `User not found: ${user_id}`);
-    const post = await db.getPostById(post_id);
-    if (!post) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
-    const comment = await db.createComment(text, user_id, post_id, parent_id);
-    return createSuccess(comment);
+    try {
+      const comment = await api.createComment(post_id, text, user_id, parent_id);
+      return createSuccess(comment);
+    } catch (err: any) {
+      if (err.message?.includes("404")) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
+      throw err;
+    }
   },
 
   // ── Bridge: forum ↔ agenda ──────────────────────────────────────
   assembly_link_forum_agenda: async (args) => {
     const { forum_id, agenda_id, label } = args;
     if (!forum_id || !agenda_id) return createError("INVALID_ARGUMENTS", "forum_id and agenda_id are required");
-    const link = await db.linkForumAgenda(forum_id, agenda_id, label);
+    const link = await api.linkForumAgenda(forum_id, agenda_id, label);
     return createSuccess(link);
   },
 
   assembly_unlink_forum_agenda: async (args) => {
     const { forum_id, agenda_id } = args;
     if (!forum_id || !agenda_id) return createError("INVALID_ARGUMENTS", "forum_id and agenda_id are required");
-    await db.unlinkForumAgenda(forum_id, agenda_id);
+    await api.unlinkForumAgenda(forum_id, agenda_id);
     return createSuccess({ unlinked: true });
   },
 
   assembly_list_forums_by_agenda: async (args) => {
     const { agenda_id } = args;
     if (!agenda_id) return createError("INVALID_ARGUMENTS", "agenda_id is required");
-    const forums = await db.listForumsByAgenda(agenda_id);
+    const forums = await api.listForumsByAgenda(agenda_id);
     return createSuccess(forums);
   },
 
   assembly_list_agendas_by_forum: async (args) => {
     const { forum_id } = args;
     if (!forum_id) return createError("INVALID_ARGUMENTS", "forum_id is required");
-    const agendas = await db.listAgendasByForum(forum_id);
+    const agendas = await api.listAgendasByForum(forum_id);
     return createSuccess(agendas);
   },
 
@@ -589,7 +619,7 @@ const handlers: Record<string, ToolHandler> = {
     if (!validTypes.includes(artifact_type)) {
       return createError("VALIDATION_ERROR", `artifact_type must be one of: ${validTypes.join(", ")}`);
     }
-    const link = await db.linkPostArtifact(post_id, artifact_type, artifact_id, label);
+    const link = await api.linkPostArtifact(post_id, artifact_type, artifact_id, label);
     return createSuccess(link);
   },
 
@@ -598,7 +628,7 @@ const handlers: Record<string, ToolHandler> = {
     if (!post_id || !artifact_type || !artifact_id) {
       return createError("INVALID_ARGUMENTS", "post_id, artifact_type, and artifact_id are required");
     }
-    await db.unlinkPostArtifact(post_id, artifact_type, artifact_id);
+    await api.unlinkPostArtifact(post_id, artifact_type, artifact_id);
     return createSuccess({ unlinked: true });
   },
 
@@ -607,14 +637,14 @@ const handlers: Record<string, ToolHandler> = {
     if (!artifact_type || !artifact_id) {
       return createError("INVALID_ARGUMENTS", "artifact_type and artifact_id are required");
     }
-    const posts = await db.listArtifactThreads(artifact_type, artifact_id);
+    const posts = await api.listArtifactThreads(artifact_type, artifact_id);
     return createSuccess(posts);
   },
 
   assembly_list_artifact_refs_by_post: async (args) => {
     const { post_id } = args;
     if (!post_id) return createError("INVALID_ARGUMENTS", "post_id is required");
-    const refs = await db.listArtifactRefsByPost(post_id);
+    const refs = await api.listArtifactRefsByPost(post_id);
     return createSuccess(refs);
   },
 
@@ -623,59 +653,42 @@ const handlers: Record<string, ToolHandler> = {
     const { harvest_id } = args;
     if (!harvest_id) return createError("INVALID_ARGUMENTS", "harvest_id is required");
 
-    // 1. Fetch harvest + its candidates
-    const harvest = await db.getHarvestById(harvest_id);
+    // 1. Fetch harvest + its candidates from nebula-srv (already REST-based)
+    const harvest = await fetchHarvest(harvest_id);
     if (!harvest) return createError("NOT_FOUND", `Harvest not found: ${harvest_id}`);
 
-    const candidates = await db.getHarvestCandidatesByHarvestId(harvest_id);
+    const candidates = await fetchHarvestCandidates(harvest_id);
 
-    // 2. Resolve forum + author
-    const forum = await db.getForumBySlug("harvest-candidates");
+    // 2. Resolve forum + author via assembly-srv
+    const forum = await api.getForumBySlug("harvest-candidates");
     if (!forum) return createError("FORUM_NOT_FOUND", "Harvest Candidates forum not found — run migration first");
 
-    const rover = await db.getUserByAlias("Rover");
+    const rover = await api.getUserByAlias("Rover");
     if (!rover) return createError("USER_NOT_FOUND", "Rover user not found — run migration first");
 
-    // 3. Format the post body (candidate-forward summary)
-    const title = harvest.docklang?.meta?.title || harvest.source_filename;
+    // 3. Format the post body
+    const title = (harvest as any).docklang?.meta?.title || harvest.source_filename;
     const body = formatHarvestPostBody(harvest, candidates);
 
-    // 4. Create post in Harvest Candidates forum
-    const post = await db.createPost(title, body, rover.id, forum.id, harvest.source_path);
+    // 4. Create post via assembly-srv
+    const postResult = await api.createThread(forum.slug, title, body, rover.id, harvest.source_path);
+    const postId = postResult.id;
 
     // 5. Link post → harvest artifact
-    await db.linkPostArtifact(post.id, "harvest", harvest.id, "source");
+    await api.linkPostArtifact(postId, "harvest", harvest.id, "source");
 
     // 6. Link post → each candidate
     for (const c of candidates) {
-      await db.linkPostArtifact(post.id, "harvest_candidate", c.id, undefined);
+      await api.linkPostArtifact(postId, "harvest_candidate", c.id, undefined);
     }
 
     // 7. Add supporting refs
-    // 7a. Transcript viewer URL (frontend)
-    await db.addPostSupportingRef(
-      post.id,
-      "source_url",
-      `/harvests/${harvest.id}`,
-      { harvest_id: harvest.id, label: "transcript_viewer" },
-    );
-    // 7b. Raw transcript API URL (for programmatic access)
-    await db.addPostSupportingRef(
-      post.id,
-      "source_url",
-      `http://localhost:3101/api/harvests/${harvest.id}/transcript`,
-      { harvest_id: harvest.id, label: "transcript_api" },
-    );
-    // 7c. Original chat file path
-    await db.addPostSupportingRef(
-      post.id,
-      "source_url",
-      `/chats/${encodeURIComponent(harvest.source_path)}`,
-      { harvest_id: harvest.id, source_filename: harvest.source_filename, label: "original_chat" },
-    );
+    await api.addPostSupportingRef(postId, "source_url", `/harvests/${harvest.id}`, { harvest_id: harvest.id, label: "transcript_viewer" });
+    await api.addPostSupportingRef(postId, "source_url", `http://localhost:3101/api/harvests/${harvest.id}/transcript`, { harvest_id: harvest.id, label: "transcript_api" });
+    await api.addPostSupportingRef(postId, "source_url", `/chats/${encodeURIComponent(harvest.source_path)}`, { harvest_id: harvest.id, source_filename: harvest.source_filename, label: "original_chat" });
 
     return createSuccess({
-      post_id: post.id,
+      post_id: postId,
       forum_id: forum.id,
       candidate_count: candidates.length,
     });
@@ -691,9 +704,9 @@ const handlers: Record<string, ToolHandler> = {
       return createError("INVALID_ARGUMENTS", "ref_type and ref_value are required");
     }
     if (post_id) {
-      await db.addPostSupportingRef(post_id, ref_type, ref_value, metadata);
+      await api.addPostSupportingRef(post_id, ref_type, ref_value, metadata);
     } else {
-      await db.addCommentSupportingRef(comment_id, ref_type, ref_value, metadata);
+      await api.addCommentSupportingRef(comment_id, ref_type, ref_value, metadata);
     }
     return createSuccess({ added: true });
   },

@@ -1,5 +1,8 @@
 package com.aibizarchitect.nexus.v1.spring.broker.gateway.service;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
@@ -29,6 +32,12 @@ public class ExternalServiceInvokerImpl implements ExternalServiceInvoker {
 
     @Override
     public InvocationResult invokeOperation(String operation, Object requestBody) {
+        // Null/blank guard — prevents NPE in URL encoding and downstream calls
+        if (operation == null || operation.isBlank()) {
+            log.warn("invokeOperation called with null or blank operation");
+            return new InvocationResultImpl(false, 404, null, "Operation name is required");
+        }
+
         log.info("Invoking operation: {} on external service", operation);
 
         // Find service that can handle this operation
@@ -51,8 +60,18 @@ public class ExternalServiceInvokerImpl implements ExternalServiceInvoker {
         ServiceDetails details = detailsOpt.get();
         String endpoint = details.getEndpoint();
 
+        // Guard against null endpoint (was NPE before this fix)
+        if (endpoint == null || endpoint.isBlank()) {
+            log.error("Service {} has no endpoint configured", serviceName);
+            return new InvocationResultImpl(false, 500, null,
+                    "Service has no endpoint configured: " + serviceName);
+        }
+
+        // URL-encode the operation name to prevent injection
+        String encodedOperation = URLEncoder.encode(operation, StandardCharsets.UTF_8);
+
         // Build the full URL for the operation
-        String operationUrl = endpoint.endsWith("/") ? endpoint + operation : endpoint + "/" + operation;
+        String operationUrl = endpoint.endsWith("/") ? endpoint + encodedOperation : endpoint + "/" + encodedOperation;
 
         log.debug("Invoking operation at: {}", operationUrl);
 
@@ -95,6 +114,11 @@ public class ExternalServiceInvokerImpl implements ExternalServiceInvoker {
 
         ServiceDetails details = detailsOpt.get();
         String healthCheckUrl = details.getEndpoint();
+        // Guard against null endpoint
+        if (healthCheckUrl == null) {
+            log.warn("Service {} has no endpoint for health check", serviceName);
+            return false;
+        }
         if (details.getHealthCheck() != null && !details.getHealthCheck().isEmpty()) {
             healthCheckUrl = details.getEndpoint().endsWith("/") ? details.getEndpoint() + details.getHealthCheck()
                     : details.getEndpoint() + "/" + details.getHealthCheck();

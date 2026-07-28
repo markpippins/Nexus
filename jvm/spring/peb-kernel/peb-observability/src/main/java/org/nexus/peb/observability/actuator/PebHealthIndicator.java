@@ -24,10 +24,11 @@ public class PebHealthIndicator implements HealthIndicator {
     public Health health() {
         try (Connection conn = dataSource.getConnection()) {
             if (conn.isValid(3)) {
+                String catalog = conn.getCatalog();
                 return Health.up()
                         .withDetail("database", "reachable")
                         .withDetail("schema", "peb")
-                        .withDetail("catalog", conn.getCatalog())
+                        .withDetail("catalog", catalog != null ? catalog : "unknown")
                         .build();
             } else {
                 return Health.down()

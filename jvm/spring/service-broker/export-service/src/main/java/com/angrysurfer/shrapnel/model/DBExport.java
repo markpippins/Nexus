@@ -10,9 +10,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.angrysurfer.shrapnel.PropertyConfig;
-import com.angrysurfer.shrapnel.field.IField;
-import com.angrysurfer.shrapnel.model.db.DBDataSource;
-import com.angrysurfer.shrapnel.model.db.DBField;
+import com.aibizarchitect.nexus.shrapnel.field.IField;
+import com.aibizarchitect.nexus.shrapnel.model.db.DBDataSource;
+import com.aibizarchitect.nexus.shrapnel.model.db.DBField;
 import com.angrysurfer.shrapnel.model.style.PdfPageSize;
 import com.angrysurfer.shrapnel.model.style.Style;
 import com.angrysurfer.shrapnel.model.style.StyleTypeEnum;

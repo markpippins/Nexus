@@ -1,5 +1,6 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -184,5 +185,87 @@ class LibraryControllerTest {
 
         mockMvc.perform(delete("/api/v1/libraries/1"))
                 .andExpect(status().isNotFound());
+    }
+
+    // ================================================================
+    // ORANGE PATH — expected, handled failure
+    // ================================================================
+
+    @Test
+    void createLibrary_MalformedJson_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/libraries")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{bad json"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getLibraries_InvalidCategoryId_returns400() throws Exception {
+        mockMvc.perform(get("/api/v1/libraries").param("categoryId", "abc"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateLibrary_DuplicateName_returns400() throws Exception {
+        Library existing = new Library();
+        existing.setId(1L);
+        existing.setName("Old Library");
+
+        Library other = new Library();
+        other.setId(2L);
+        other.setName("Existing Library");
+
+        when(libraryRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(libraryRepository.findByName("Existing Library")).thenReturn(Optional.of(other));
+
+        mockMvc.perform(put("/api/v1/libraries/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Existing Library\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ================================================================
+    // RED PATH — adversarial input the system must survive
+    // ================================================================
+
+    @Test
+    void getLibraries_SqlInjectionInName_returnsOk() throws Exception {
+        when(libraryRepository.findByName("'; DROP TABLE libraries; --")).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/v1/libraries").param("name", "'; DROP TABLE libraries; --"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getLibraryById_NegativeId_returnsNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/libraries/-1"))
+                .andExpect(status().isNotFound());
+    }
+
+    // ================================================================
+    // SILENT FAILURE — metamorphic/determinism coverage
+    // ================================================================
+
+    @Test
+    void metamorphic_sameInput_sameOutput() throws Exception {
+        when(libraryRepository.findById(1L)).thenReturn(Optional.of(testLibrary));
+
+        String r1 = mockMvc.perform(get("/api/v1/libraries/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String r2 = mockMvc.perform(get("/api/v1/libraries/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals(r1, r2, "Same library should produce identical JSON");
+    }
+
+    @Test
+    void regressionLock_notFound_emptyBody() throws Exception {
+        when(libraryRepository.findById(1L)).thenReturn(Optional.empty());
+
+        String body = mockMvc.perform(get("/api/v1/libraries/1"))
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals("", body, "404 responses currently empty — regression lock");
     }
 }

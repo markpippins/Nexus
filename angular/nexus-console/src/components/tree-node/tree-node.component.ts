@@ -100,13 +100,25 @@ export class TreeNodeComponent {
       .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
   });
 
+  /** Tracks the last currentPath we auto-expanded for, so we only re-expand when the user
+   *  navigates — not on every tree rebuild (which creates new component instances / path refs). */
+  private lastAutoExpandedPath: string | null = null;
+
   constructor() {
-    // Effect for auto-expanding ancestor of current path. Emits toggleExpand to persist to external set.
+    // Effect for auto-expanding ancestor of current path. Only fires when the currentPath
+    // string actually changes — NOT on tree rebuilds that produce equivalent path arrays.
+    // Without this guard, tree rebuilds (from loadFolderTree polling) would silently undo
+    // user-initiated collapses of ancestor nodes.
     effect(() => {
       const currentStr = this.currentPath().join('/');
       const myPathStr = this.path().join('/');
       if (currentStr.startsWith(myPathStr) && currentStr !== myPathStr) {
-        this.expandProgrammatically();
+        // Only auto-expand if this is a genuine navigation change, not a tree rebuild
+        // that re-creates this component with the same currentPath.
+        if (this.lastAutoExpandedPath !== currentStr) {
+          this.lastAutoExpandedPath = currentStr;
+          this.expandProgrammatically();
+        }
       }
     });
 
@@ -174,9 +186,17 @@ export class TreeNodeComponent {
       return;
     }
 
-    this.toggleExpand.emit({ path: this.path(), expanded: !this.isExpanded() });
+    // Capture the state BEFORE toggling — isExpanded() will reflect the new state
+    // after toggleExpand.emit() updates the external expandedPaths signal.
+    const wasExpanded = this.isExpanded();
+    const willExpand = !wasExpanded;
 
-    if (!this.isExpanded() && !node.childrenLoaded) {
+    this.toggleExpand.emit({ path: this.path(), expanded: willExpand });
+
+    // Load children lazily when expanding a node whose children haven't been fetched.
+    // (Previously this checked !this.isExpanded() which was already the post-toggle value,
+    //  so children were never loaded on manual expand — only on auto-expand.)
+    if (willExpand && !node.childrenLoaded) {
       this.loadChildren.emit(this.path());
     }
   }

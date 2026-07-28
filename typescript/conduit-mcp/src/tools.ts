@@ -5,17 +5,13 @@ import { createError, createSuccess } from "./errors";
 import { validate } from "./validate";
 import { validateReceipt } from "./receipts";
 import {
-  insertReceipt,
   createTicketIfMissing,
   getPlan,
   getPlanById,
-  getLatestReceiptType,
-  getPlanReceipts,
   upsertPlan,
   softDeletePlan,
   checkpointWal,
   cancelTicketsByPlan,
-  deleteReceiptsByPlanAndType,
   undeletePlan,
   hardDeletePlan,
   updateSessionHeartbeat,
@@ -26,6 +22,7 @@ import {
   selectNextRunnable,
   listWorkRequestStates,
 } from "./db";
+import * as api from "./conduit-client";
 import {
   validateCompilerOutput,
   compilerOutputToEvent,
@@ -165,7 +162,8 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "create_plan",
     description:
-      "Create a new implementation_plan record (writes to nebula.implementation_plans). "
+      "[DEPRECATED — use nebula_create_plan instead] "
+      + "Create a new implementation_plan record (writes to nebula.implementation_plans). "
       + "Issues a PLAN_CREATE receipt and bootstraps a builder ticket. "
       + "Note: for the new pipeline flow, prefer runtime_submit_work_request instead.",
     inputSchema: {
@@ -694,110 +692,13 @@ export function registerToolHandlers(
     query_analytics: async (_args: any) => {
       return watcher.computeAnalytics();
     },
-    create_plan: async (args: {
-      title: string;
-      project?: string;
-      goal?: string;
-      filesAffected?: string[];
-      acceptanceCriteria?: string[];
-      dependencies?: string[];
-      promptRef?: string;
-    }) => {
-      const errs = validate(args, [
-        { field: "title", type: "string", required: true },
-        { field: "filesAffected", type: "array" },
-        { field: "acceptanceCriteria", type: "array" },
-        { field: "dependencies", type: "array" },
-      ]);
-      if (errs.length > 0)
-        throw createError("INVALID_ARGUMENTS", "Validation failed", errs);
-      const result = await watcher.createPlan({
-        title: args.title,
-        project: args.project || "conduit-ui",
-        goal: args.goal || "",
-        filesAffected: args.filesAffected || [],
-        acceptanceCriteria: args.acceptanceCriteria || [],
-        dependencies: args.dependencies || [],
-        promptRef: args.promptRef,
-      });
-
-      // Upsert plan into DB immediately so the FK constraint on receipts is satisfied
-      const now = new Date().toISOString();
-      await upsertPlan({
-        id: result.planNumber,
-        file_name: result.fileName,
-        title: args.title,
-        project: args.project || "conduit-ui",
-        goal: args.goal || "",
-        content: "",
-        files_affected: JSON.stringify(args.filesAffected || []),
-        acceptance_criteria: JSON.stringify(args.acceptanceCriteria || []),
-        dependencies: JSON.stringify(args.dependencies || []),
-        prompt_ref: args.promptRef || "",
-        notes: "",
-        priority: 0,
-        created_at: now,
-        updated_at: now,
-      });
-
-      // Bootstrap initial builder ticket so the conduit can pick this up
-      // PLAN_CREATE means the plan is ready for execution, not planning.
-      const receiptId = crypto.randomUUID();
-      const ticketId = await createTicketIfMissing(
-        result.planNumber,
-        "builder",
-        receiptId,
-        now,
-        args.title,
-        "",
-        "builder",
+    create_plan: async (_args: any) => {
+      throw createError(
+        "TOOL_NOT_FOUND",
+        "create_plan has been removed from conduit-mcp. Use nebula_create_plan instead (available via nebula-mcp). " +
+        "The new tool creates plans in nebula.implementation_plans; receipts and tickets are handled downstream by conduit.",
+        null,
       );
-      if (ticketId) {
-        console.log(
-          `[${now}] Bootstrapped builder ticket ${ticketId} for plan ${result.planNumber}`,
-        );
-      }
-
-      // Issue PLAN_CREATE receipt with ticket reference
-      await insertReceipt({
-        id: receiptId,
-        plan_id: result.planNumber,
-        type: "PLAN_CREATE",
-        agent_role: "planner",
-        session_id: "",
-        ticket_id: ticketId, // link receipt to the bootstrap ticket
-        artifact_path: null,
-        summary: `Created: ${args.title}`,
-        metadata_json: JSON.stringify(
-          args.promptRef ? { promptRef: args.promptRef } : {},
-        ),
-        tokens_used: 0,
-        created_at: now,
-      });
-
-      checkpointWal(); // durable across abrupt restarts
-
-      if (emitter) {
-        emitter({
-          type: "plan_state_changed",
-          data: {
-            planNumber: result.planNumber,
-            planTitle: result.fileName,
-            receiptType: "PLAN_CREATE",
-            agentRole: "planner",
-            newDerivedStatus: "PLAN_CREATE",
-            timestamp: now,
-          },
-        });
-      }
-
-      return {
-        created: true,
-        planNumber: result.planNumber,
-        fileName: result.fileName,
-        status: "pending",
-        timestamp: now,
-      };
     },
     update_plan: async (args: {
       planNumber: string;
@@ -891,7 +792,7 @@ export function registerToolHandlers(
       }
 
       // Insert receipt (references the bootstrap ticket if PLAN_CREATE)
-      await insertReceipt({
+      await api.insertReceipt({
         id: receiptId,
         plan_id: args.plan_id,
         type: args.type,
@@ -923,7 +824,7 @@ export function registerToolHandlers(
               planTitle: plan.title,
               receiptType: args.type,
               agentRole: args.agent_role,
-              newDerivedStatus: await getLatestReceiptType(args.plan_id),
+              newDerivedStatus: await api.getLatestReceiptType(args.plan_id),
               timestamp: now,
             },
           });
@@ -937,12 +838,13 @@ export function registerToolHandlers(
         receipt_id: receiptId,
         plan_id: args.plan_id,
         type: args.type,
-        new_derived_status: await getLatestReceiptType(args.plan_id),
+        new_derived_status: await api.getLatestReceiptType(args.plan_id),
         timestamp: now,
       };
     },
     get_plan_receipts: async (args: { plan_id: string }) => {
-      const receipts = await getPlanReceipts(args.plan_id);
+      const result = await api.getPlanReceipts(args.plan_id);
+      const receipts = result?.receipts || [];
       return {
         plan_id: args.plan_id,
         count: receipts.length,
@@ -1024,8 +926,13 @@ export function registerToolHandlers(
       });
 
       // Issue PLANNING receipt (no ticket_id — this is a revision, not a bootstrap)
+      // Validate receipt transition before inserting (C-2 fix)
+      const reviseValidation = await validateReceipt(revised.planNumber, "PLANNING");
+      if (!reviseValidation.valid) {
+        throw createError("INVALID_ARGUMENTS", `Cannot issue PLANNING receipt for revision: ${reviseValidation.error}`, null);
+      }
       const receiptId = crypto.randomUUID();
-      await insertReceipt({
+      await api.insertReceipt({
         id: receiptId,
         plan_id: revised.planNumber,
         type: "PLANNING",
@@ -1237,7 +1144,7 @@ export function registerToolHandlers(
       }
 
       // Determine if the plan is blocked (check derived status)
-      const derivedStatus = await getLatestReceiptType(args.planNumber);
+      const derivedStatus = await api.getLatestReceiptType(args.planNumber);
       const isBlocked =
         derivedStatus === "BLOCK" || derivedStatus === "PLAN_BLOCK";
 
@@ -1782,7 +1689,7 @@ export function registerToolHandlers(
       }
 
       // Delete all BLOCK / PLAN_BLOCK receipts
-      const deleted = await deleteReceiptsByPlanAndType(args.planNumber, [
+      const deleted = await api.deleteReceiptsByPlanAndType(args.planNumber, [
         "BLOCK",
         "PLAN_BLOCK",
         "CANCELLED",
@@ -1821,7 +1728,12 @@ export function registerToolHandlers(
           `[${now}] unblock_plan: bootstrapped builder ticket ${ticketId} for plan ${args.planNumber}`,
         );
       }
-      await insertReceipt({
+      // Validate receipt transition before inserting (C-2 fix)
+      const unblockValidation = await validateReceipt(args.planNumber, "PLAN_CREATE");
+      if (!unblockValidation.valid) {
+        throw createError("INVALID_ARGUMENTS", `Cannot issue PLAN_CREATE receipt for unblock: ${unblockValidation.error}`, null);
+      }
+      await api.insertReceipt({
         id: receiptId,
         plan_id: args.planNumber,
         type: "PLAN_CREATE",

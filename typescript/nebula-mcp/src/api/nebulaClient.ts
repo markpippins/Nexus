@@ -642,4 +642,19 @@ export const NebulaClient = {
   /** POST /api/open-questions/:id/answers */
   addQuestionAnswer: (questionId: string, body: { answer: string; role: string; confidence?: string; reasoning?: string }) =>
     httpRequest("POST", `/api/open-questions/${encodeURIComponent(questionId)}/answers`, body),
+
+  // ════════════════════════════════════════════════════════════════
+  //  IMPLEMENTATION PLANS (Plan 040)
+  // ════════════════════════════════════════════════════════════════
+
+  /** POST /api/plans */
+  createPlan: (body: {
+    title: string;
+    project?: string;
+    goal?: string;
+    filesAffected?: string[];
+    acceptanceCriteria?: string[];
+    dependencies?: string[];
+    promptRef?: string;
+  }) => httpRequest("POST", "/api/plans", body),
 };

@@ -1,3 +1,63 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  AUDIT NOTE — "No SQL in MCP Servers" (Assembly thread 02c7bb2b-...)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Status (R1 record 6f5af6f8-da7c-43cd-ac3c-cb2a208cc1d8):
+//   This file is INTENTIONALLY NOT split into a sibling `conduit-srv` this
+//   session. See the Assembly `to-do` thread "No SQL in MCP Servers" for the
+//   rationale. A real split is a multi-epoch architectural refactor and
+//   requires an Architect decision before any implementation.
+//
+// Why this file is unusual:
+//
+//   1. SCOPE. ~2,500+ LoC including:
+//      - initDb() / createSchema() / runMigrations()  — schema bootstrap
+//      - translateSQL() SQLite→PostgreSQL dialect translator
+//      - withTransaction() + helpers used by every receipt write
+//      - 17 inline migrations (versions 1..21) covering the
+//        conduit / vision / peb / tackle schema family
+//      - Vision receipt-integrity invariants (migrations v20, v21)
+//      - Runtime Kernel event-store foundation (migration v18)
+//
+//   2. CROSS-SYSTEM OWNERSHIP. This file bootstraps the global
+//        conduit / vision / peb / tackle schemas used by nebula-srv,
+//        tackle-mcp, execution-srv, peb-srv and several others on
+//        startup. Moving initDb() into a new conduit-srv would reorder
+//        Nexus initialization — nebula-srv and execution-srv currently
+//        assume those schemas exist when they start, and would race
+//        against the new conduit-srv.
+//
+//   3. DIALECT + RECEIPT INTEGRITY. The translateSQL() function and
+//      the receipts / work_request_events invariants are deeply woven
+//      into pipeline-manager semantics. A naive REST split risks
+//      silently corrupting receipt sequence numbers, weakening
+//      vision.is_terminal_receipt_type() integrity, or losing the
+//      SQLite-dialect parity that executor_cloud.py relies on.
+//
+// Decision for this engineering epoch: AUDIT ONLY.
+//
+//   - knowledge-mcp → full split into knowledge-srv (port 3109) ✅
+//   - terrain-mcp   → repointed to Spring Boot terrain (:8084/api/v1/) ✅
+//   - conduit-mcp   → THIS FILE — header audit block only. NO SQL
+//                       moved into a sibling server this session.
+//                       Blocked on schema-bootstrap-ownership decision
+//                       (Architect).
+//
+// When the Architect is ready to lift this, the work splits naturally
+// into three sub-epochs:
+//   (a) Move DDL/migration ownership into a dedicated bootstrap step
+//       (separate from MCP server start).
+//   (b) Extract all receipt/session/cost_logs reads & writes into
+//       conduit-srv's REST surface.
+//   (c) Replace inline `await q(...)` calls in `tools.ts` and
+//       `runtime-kernel.ts` with `fetch` against (b). Verify
+//       vision.is_terminal_receipt_type() and receipt sequence
+//       invariants still pass after the cutover.
+//
+// Until then, this file will continue to own its SQL — there is no
+// hidden risk because it is named-and-claimed in the audit thread.
+// ════════════════════════════════════════════════════════════════════════════
+
 import crypto from "node:crypto";
 import { Pool, PoolClient, types } from "pg";
 
@@ -11,6 +71,14 @@ types.setTypeParser(types.builtins.TIMESTAMP, (val: string) => val);
 // ── Connection ──────────────────────────────────────────────────────
 
 const PG_SCHEMA = process.env.CONDUIT_PG_SCHEMA || "conduit";
+// SECURITY: validate env-var-derived schema name before DDL interpolation.
+// DDL (SET search_path, CREATE SCHEMA) doesn't support parameterized
+// identifiers, so we validate against the safe-identifier regex at startup.
+if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(PG_SCHEMA)) {
+  throw new Error(
+    `Invalid CONDUIT_PG_SCHEMA="${PG_SCHEMA}": must match /^[a-zA-Z_][a-zA-Z0-9_]*$/`
+  );
+}
 const TACKLE_SCHEMA = "tackle";
 const VISION_SCHEMA = "vision";
 const PEB_SCHEMA = "peb";
@@ -205,6 +273,92 @@ export async function qAll(sql: string, params: Record<string, any> = {}): Promi
   const r = await q(sql, params); return r.rows;
 }
 
+// ── Kernel transition event recording ───────────────────────────────
+// ADR-016: Every state change must INSERT INTO kernel.transition_event
+// so the trg_authorize_transition trigger enforces policy rules.
+
+const KERNEL_SCHEMA = "kernel";
+
+/**
+ * Record a state transition in kernel.transition_event.
+ * The trg_authorize_transition trigger fires BEFORE INSERT and enforces:
+ * - actor required
+ * - aggregate_type required
+ * - aggregate_id required
+ * - no future timestamps
+ * - all enabled policy_rule predicates for this event_type
+ *
+ * If the trigger rejects, this INSERT raises an exception which rolls
+ * back the caller's transaction — the state change is blocked.
+ */
+export async function recordTransition(opts: {
+  aggregateType: string;    // e.g. "work_request", "ticket", "implementation_plan"
+  aggregateId: string;      // e.g. work_request UUID, ticket ID, plan number
+  eventType: string;        // kernel.event_type enum value
+  actor: string;            // who initiated the transition
+  authority?: string;       // role authority (required by authority.required policy)
+  payload?: Record<string, any>;  // from_status, to_status, reason, etc.
+  receipt?: string;         // receipt hash if applicable
+  causationId?: string;     // UUID of the event that caused this transition
+  correlationId?: string;   // UUID for grouping related transitions
+  client?: PoolClient;      // ADR-016: pass when inside withTransaction() for atomicity
+}): Promise<void> {
+  const eventId = crypto.randomUUID();
+  const {
+    aggregateType, aggregateId, eventType, actor,
+    authority, payload = {}, receipt, causationId, correlationId,
+    client,
+  } = opts;
+
+  // ADR-016: Use the transactional client when provided, pool otherwise.
+  // Inside withTransaction(), the INSERT participates in the same TX as the
+  // caller's UPDATE — if the trigger rejects, both are rolled back atomically.
+  const queryFn = client
+    ? (sql: string, params: Record<string, any>) => _rawQuery(client, sql, params)
+    : q;
+
+  await queryFn(
+    `INSERT INTO ${KERNEL_SCHEMA}.transition_event
+       (event_id, event_type, aggregate_type, aggregate_id, actor,
+        authority, payload, receipt, causation_id, correlation_id)
+     VALUES (@eventId::uuid, @eventType, @aggregateType, @aggregateId,
+             @actor, @authority, @payload::jsonb, @receipt,
+             @causationId::uuid, @correlationId::uuid)`,
+    {
+      eventId, eventType, aggregateType, aggregateId, actor,
+      authority: authority || actor,
+      payload: JSON.stringify(payload),
+      receipt: receipt || null,
+      causationId: causationId || null,
+      correlationId: correlationId || null,
+    },
+  );
+}
+
+/**
+ * Get the current status of a work_request before a transition.
+ * Used to capture from_status for the kernel transition event.
+ */
+export async function getWorkRequestStatus(wrId: string): Promise<string | undefined> {
+  const uuid = await resolveWrUuid(wrId);
+  const r = await qOne(
+    `SELECT status FROM ${VISION_SCHEMA}.work_requests WHERE work_request_uuid = @uuid`,
+    { uuid },
+  );
+  return r?.status;
+}
+
+/**
+ * Get the current status of a ticket before a transition.
+ */
+export async function getTicketStatus(ticketId: string): Promise<string | undefined> {
+  const r = await qOne(
+    `SELECT status FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
+    { ticketId },
+  );
+  return r?.status;
+}
+
 // Transaction-aware helpers — used inside withTransaction()
 async function tQuery(client: PoolClient, sql: string, params: Record<string, any> = {}): Promise<QueryResult> {
   return _rawQuery(client, sql, params);
@@ -214,6 +368,9 @@ async function tRun(client: PoolClient, sql: string, params: Record<string, any>
 }
 async function tAll(client: PoolClient, sql: string, params: Record<string, any> = {}): Promise<any[]> {
   const r = await _rawQuery(client, sql, params); return r.rows;
+}
+async function tOne(client: PoolClient, sql: string, params: Record<string, any> = {}): Promise<any | undefined> {
+  const r = await _rawQuery(client, sql, params); return r.rows[0];
 }
 
 /** Transaction wrapper. */
@@ -567,81 +724,9 @@ async function createSchema(
 
     DROP VIEW IF EXISTS ${PG_SCHEMA}.plans_by_status CASCADE;
     DROP VIEW IF EXISTS ${PG_SCHEMA}.plan_status CASCADE;
-    CREATE VIEW ${PG_SCHEMA}.plan_status AS
-    SELECT 
-      p.*,
-      CASE
-        -- HOLD: highest priority — if the latest receipt is HOLD, show it regardless
-        WHEN EXISTS (
-          SELECT 1 FROM ${VISION_SCHEMA}.receipts r WHERE r.plan_id = p.id AND r.type = 'HOLD'
-          AND NOT EXISTS (
-            SELECT 1 FROM ${VISION_SCHEMA}.receipts r2
-            WHERE r2.plan_id = p.id
-            AND r2.type IN ('CANCELLED', 'ABANDONED')
-            AND r2.created_at > r.created_at
-          )
-        ) THEN 'HOLD'
-        -- REQUEUED: circuit breaker reset — checked early so it can override even
-        -- REVIEW_PASS (e.g. plan was completed, then manually requeued for retry).
-        WHEN (
-          SELECT r.type FROM ${VISION_SCHEMA}.receipts r
-          WHERE r.plan_id = p.id
-          AND r.type NOT IN ('PLANNING', 'HOLD')
-          ORDER BY r.created_at DESC LIMIT 1
-        ) = 'REQUEUED' THEN 'PLAN_CREATE'
-        -- REVIEW_PASS — terminal success, unless overridden by later BLOCK/PLAN_BLOCK
-        WHEN EXISTS (
-          SELECT 1 FROM ${VISION_SCHEMA}.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_PASS'
-          AND NOT EXISTS (
-            SELECT 1 FROM ${VISION_SCHEMA}.receipts r2
-            WHERE r2.plan_id = p.id
-            AND r2.type IN ('BLOCK', 'PLAN_BLOCK', 'CANCELLED', 'ABANDONED')
-            AND r2.created_at > r.created_at
-          )
-        ) THEN 'REVIEW_PASS'
-        -- REVIEW_REJECT — show latest non-BLOCK receipt or fallback to PLAN_CREATE
-        WHEN EXISTS (
-          SELECT 1 FROM ${VISION_SCHEMA}.receipts r WHERE r.plan_id = p.id AND r.type = 'REVIEW_REJECT'
-        ) THEN COALESCE(
-          (SELECT r.type FROM ${VISION_SCHEMA}.receipts r 
-           WHERE r.plan_id = p.id 
-           AND r.type != 'BLOCK'
-           ORDER BY r.created_at DESC LIMIT 1),
-          'PLAN_CREATE'
-        )
-        ELSE COALESCE(
-          (SELECT r.type FROM ${VISION_SCHEMA}.receipts r 
-           WHERE r.plan_id = p.id 
-           AND r.type NOT IN ('PLANNING', 'HOLD')
-           ORDER BY r.created_at DESC LIMIT 1),
-          (SELECT r.type FROM ${VISION_SCHEMA}.receipts r 
-           WHERE r.plan_id = p.id 
-           ORDER BY r.created_at DESC LIMIT 1),
-          NULL
-        )
-      END AS derived_status
-    FROM nebula.plans p
-    WHERE p.deleted = 0;
-
-    CREATE VIEW ${PG_SCHEMA}.plans_by_status AS
-    SELECT
-      ps.id,
-      ps.file_name,
-      ps.title,
-      ps.project,
-      ps.goal,
-      ps.content,
-      ps.files_affected,
-      ps.acceptance_criteria,
-      ps.dependencies,
-      ps.prompt_ref,
-      ps.notes,
-      ps.priority,
-      ps.deleted,
-      ps.created_at,
-      ps.updated_at,
-      ps.derived_status AS status
-    FROM ${PG_SCHEMA}.plan_status ps;
+    -- plan_status and plans_by_status are now owned by nebula-srv (migration 040).
+    -- conduit-mcp no longer creates these views; they live in nebula schema.
+    -- All runtime queries use nebula.plan_status explicitly.
   `);
 
   console.log(`Schema initialized in PG ${PG_SCHEMA} schema.`);
@@ -2677,6 +2762,28 @@ const migrations: Migration[] = [
       console.log(`[migrations] v34: Migrated vision.receipts → execution.receipts (${row?.execution_count || 0} of ${row?.vision_count || 0}, ${row?.request_count || 0} legacy requests)`);
     },
   },
+  // ── v35: Add missing PRIMARY KEY to vision.tickets ──
+  {
+    version: 35,
+    description: "Add missing PRIMARY KEY to vision.tickets (lost when table was created externally without PK)",
+    up: async (exec) => {
+      // Check if PK already exists
+      const check = await exec(`
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'vision.tickets'::regclass
+        AND contype = 'p'
+        LIMIT 1
+      `);
+      if (check?.rows?.length > 0) {
+        console.log('[migrations] v35: Skipping — vision.tickets PRIMARY KEY already exists');
+        return;
+      }
+
+      console.log('[migrations] v35: Adding PRIMARY KEY to vision.tickets...');
+      await exec(`ALTER TABLE vision.tickets ADD PRIMARY KEY (id)`);
+      console.log('[migrations] v35: PRIMARY KEY added to vision.tickets');
+    },
+  },
 ];
 
 /**
@@ -2828,20 +2935,20 @@ export function checkpointWal(): void {
 
 export async function getPlan(id: string): Promise<PlanRow | undefined> {
   return qOne(
-    "SELECT * FROM plan_status WHERE id = @id",
+    "SELECT * FROM nebula.plan_status WHERE id = @id",
     { id }
   );
 }
 
 export async function getPlansByStatus(status: string): Promise<PlanRow[]> {
   return qAll(
-    "SELECT * FROM plan_status WHERE derived_status = @status",
+    "SELECT * FROM nebula.plan_status WHERE derived_status = @status",
     { status }
   );
 }
 
 export async function getAllPlans(): Promise<PlanRow[]> {
-  return qAll("SELECT * FROM plan_status");
+  return qAll("SELECT * FROM nebula.plan_status");
 }
 
 export async function getPlanById(id: string): Promise<PlanRow | undefined> {
@@ -3000,7 +3107,7 @@ export interface PlansByStatus {
 }
 
 export async function getPlansGroupedByStatus(): Promise<PlansByStatus> {
-  const all = await qAll("SELECT * FROM plan_status") as PlanRow[];
+  const all = await qAll("SELECT * FROM nebula.plan_status") as PlanRow[];
 
   const result: PlansByStatus = {
     pending: [], active: [], completed: [], blocked: [],
@@ -3490,22 +3597,64 @@ export async function createTicketIfMissing(
 }
 
 export async function releaseSessionTickets(sessionId: string): Promise<number> {
-  const now = new Date().toISOString();
-  return qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', session_id = NULL,
-      claimed_at = NULL, last_activity = @now
-    WHERE session_id = @sessionId AND status = 'claimed'`,
-    { sessionId, now }
-  );
+  // ADR-016: Wrap UPDATE + recordTransition in single transaction for atomicity.
+  // If the trigger rejects a transition, the UPDATE is rolled back too.
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const affected = await tAll(
+      client,
+      `SELECT id FROM ${VISION_SCHEMA}.tickets WHERE session_id = @sessionId AND status = 'claimed'`,
+      { sessionId },
+    );
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', session_id = NULL,
+        claimed_at = NULL, last_activity = @now
+      WHERE session_id = @sessionId AND status = 'claimed'`,
+      { sessionId, now }
+    );
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.committed",
+        actor: "conduit-mcp",
+        authority: "system",
+        payload: { from_status: "claimed", to_status: "open", reason: "session_released", session_id: sessionId },
+      });
+    }
+    return count;
+  });
 }
 
 export async function resetAbandonedTickets(): Promise<number> {
-  const now = new Date().toISOString();
-  return qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', closed_at = NULL, last_activity = @now
-    WHERE status = 'abandoned'`,
-    { now }
-  );
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const affected = await tAll(
+      client,
+      `SELECT id FROM ${VISION_SCHEMA}.tickets WHERE status = 'abandoned'`,
+      {},
+    );
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'open', closed_at = NULL, last_activity = @now
+      WHERE status = 'abandoned'`,
+      { now }
+    );
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.committed",
+        actor: "conduit-mcp",
+        authority: "system",
+        payload: { from_status: "abandoned", to_status: "open", reason: "abandoned_reset" },
+      });
+    }
+    return count;
+  });
 }
 
 // ── Stale / expired detection ───────────────────────────────────────
@@ -3513,21 +3662,63 @@ export async function resetAbandonedTickets(): Promise<number> {
 const DEFAULT_STALE_SECONDS = 6 * 3600;
 
 export async function detectStaleTickets(): Promise<number> {
-  const threshold = new Date(Date.now() - DEFAULT_STALE_SECONDS * 1000).toISOString();
-  return qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'stale'
-    WHERE status = 'claimed' AND last_activity IS NOT NULL AND last_activity < @threshold`,
-    { threshold }
-  );
+  return withTransaction(async (client) => {
+    const threshold = new Date(Date.now() - DEFAULT_STALE_SECONDS * 1000).toISOString();
+    const affected = await tAll(
+      client,
+      `SELECT id FROM ${VISION_SCHEMA}.tickets
+      WHERE status = 'claimed' AND last_activity IS NOT NULL AND last_activity < @threshold`,
+      { threshold },
+    );
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'stale'
+      WHERE status = 'claimed' AND last_activity IS NOT NULL AND last_activity < @threshold`,
+      { threshold }
+    );
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.requested",
+        actor: "conduit-mcp",
+        authority: "system",
+        payload: { from_status: "claimed", to_status: "stale", reason: "stale_detection" },
+      });
+    }
+    return count;
+  });
 }
 
 export async function detectExpiredTickets(): Promise<number> {
-  const now = new Date().toISOString();
-  return qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'expired'
-    WHERE status IN ('open', 'claimed', 'stale') AND expires_at IS NOT NULL AND expires_at < @now`,
-    { now }
-  );
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const affected = await tAll(
+      client,
+      `SELECT id, status FROM ${VISION_SCHEMA}.tickets
+      WHERE status IN ('open', 'claimed', 'stale') AND expires_at IS NOT NULL AND expires_at < @now`,
+      { now },
+    );
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'expired'
+      WHERE status IN ('open', 'claimed', 'stale') AND expires_at IS NOT NULL AND expires_at < @now`,
+      { now }
+    );
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.rejected",
+        actor: "conduit-mcp",
+        authority: "system",
+        payload: { from_status: t.status, to_status: "expired", reason: "expiry_detection" },
+      });
+    }
+    return count;
+  });
 }
 
 // ── Supersede / cancel ──────────────────────────────────────────────
@@ -3539,68 +3730,103 @@ export async function supersedeTicket(
   oldTicket?: { plan_id: string; role: string; objective: string | null; owner: string };
   replacementId?: string;
 }> {
-  const now = new Date().toISOString();
-  const old = await qOne(
-    `SELECT plan_id, role, objective, owner FROM ${VISION_SCHEMA}.tickets
-     WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
-    { ticketId }
-  );
-  if (!old) return { superseded: false };
-
-  await qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'superseded', closed_at = @now,
-      last_activity = @now, closure_reason = @reason
-    WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
-    { ticketId, now, reason }
-  );
-
-  let replacementId: string | undefined;
-  if (replace) {
-    const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
-    replacementId = `ticket-${old.plan_id}-${old.role}-${Date.now()}`;
-    await qRun(
-      `INSERT INTO ${VISION_SCHEMA}.tickets
-        (id, plan_id, role, status, created_at,
-         objective, owner,
-         spawn_reason, last_activity, expires_at, replacement_of)
-      VALUES (@id, @plan_id, @role, 'open', @created_at,
-              @objective, @owner,
-              @spawn_reason, @last_activity, @expires_at, @replacement_of)`,
-      {
-        id: replacementId, plan_id: old.plan_id, role: old.role,
-        created_at: now, objective: old.objective || "",
-        owner: old.owner || old.role, spawn_reason: "replacement after supersede",
-        last_activity: now, expires_at: expiresAt, replacement_of: ticketId,
-      }
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
+    const old = await tOne(
+      client,
+      `SELECT plan_id, role, objective, owner FROM ${VISION_SCHEMA}.tickets
+       WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
+      { ticketId }
     );
-  }
+    if (!old) return { superseded: false };
 
-  return { superseded: true, oldTicket: old, replacementId };
+    const fromStatus = (await tOne(
+      client,
+      `SELECT status FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
+      { ticketId },
+    ))?.status || "unknown";
+
+    await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'superseded', closed_at = @now,
+        last_activity = @now, closure_reason = @reason
+      WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
+      { ticketId, now, reason }
+    );
+
+    await recordTransition({
+      client,
+      aggregateType: "ticket",
+      aggregateId: ticketId,
+      eventType: "transition.rejected",
+      actor: "conduit-mcp",
+      authority: "builder",
+      payload: { from_status: fromStatus, to_status: "superseded", reason },
+    });
+
+    let replacementId: string | undefined;
+    if (replace) {
+      const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+      replacementId = `ticket-${old.plan_id}-${old.role}-${Date.now()}`;
+      await tRun(
+        client,
+        `INSERT INTO ${VISION_SCHEMA}.tickets
+          (id, plan_id, role, status, created_at,
+           objective, owner,
+           spawn_reason, last_activity, expires_at, replacement_of)
+        VALUES (@id, @plan_id, @role, 'open', @created_at,
+                @objective, @owner,
+                @spawn_reason, @last_activity, @expires_at, @replacement_of)`,
+        {
+          id: replacementId, plan_id: old.plan_id, role: old.role,
+          created_at: now, objective: old.objective || "",
+          owner: old.owner || old.role, spawn_reason: "replacement after supersede",
+          last_activity: now, expires_at: expiresAt, replacement_of: ticketId,
+        }
+      );
+    }
+
+    return { superseded: true, oldTicket: old, replacementId };
+  });
 }
 
 export async function cancelTicket(ticketId: string, reason: string): Promise<number> {
-  const now = new Date().toISOString();
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
 
-  // Look up the plan_id so we can cascade to work_requests/sessions
-  const ticket = await qOne(
-    `SELECT plan_id FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
-    { ticketId }
-  );
+    const ticket = await tOne(
+      client,
+      `SELECT plan_id, status FROM ${VISION_SCHEMA}.tickets WHERE id = @ticketId`,
+      { ticketId }
+    );
+    const fromStatus = ticket?.status || "unknown";
 
-  const cancelled = await qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
-      last_activity = @now, closure_reason = @reason
-    WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
-    { ticketId, now, reason }
-  );
+    const cancelled = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
+        last_activity = @now, closure_reason = @reason
+      WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
+      { ticketId, now, reason }
+    );
 
-  // Cascade: if we cancelled the ticket, clean up work_requests and
-  // sessions for the plan to prevent orphaned state.
-  if (cancelled > 0 && ticket) {
-    await _cancelWorkRequestsAndSessions(ticket.plan_id, now);
-  }
+    if (cancelled > 0) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: ticketId,
+        eventType: "transition.rejected",
+        actor: "conduit-mcp",
+        authority: "builder",
+        payload: { from_status: fromStatus, to_status: "cancelled", reason },
+      });
+    }
 
-  return cancelled;
+    if (cancelled > 0 && ticket) {
+      await _cancelWorkRequestsAndSessions(ticket.plan_id, now, client);
+    }
+
+    return cancelled;
+  });
 }
 
 /**
@@ -3610,9 +3836,29 @@ export async function cancelTicket(ticketId: string, reason: string): Promise<nu
  * Work requests reference sessions via dco_json.metadata.session_id.
  * When tickets are cancelled, the corresponding work requests and
  * harness sessions become orphans unless explicitly cleaned up here.
+ *
+ * ADR-016: Accepts optional client to participate in caller's transaction.
  */
-async function _cancelWorkRequestsAndSessions(planId: string, now: string): Promise<void> {
-  const wrCancelled = await qRun(
+async function _cancelWorkRequestsAndSessions(
+  planId: string, now: string, client?: PoolClient,
+): Promise<void> {
+  const queryFn = client
+    ? (sql: string, params: Record<string, any>) => _rawQuery(client, sql, params)
+    : q;
+  const runFn = client
+    ? (sql: string, params: Record<string, any>) => queryFn(sql, params).then(r => r.changes)
+    : qRun;
+  const allFn = client
+    ? (sql: string, params: Record<string, any>) => queryFn(sql, params).then(r => r.rows)
+    : qAll;
+
+  const affectedWRs = await allFn(
+    `SELECT work_request_uuid, status FROM ${VISION_SCHEMA}.work_requests
+     WHERE context->>'plan_id' = @planId AND status = 'pending'`,
+    { planId },
+  );
+
+  const wrCancelled = await runFn(
     `UPDATE ${VISION_SCHEMA}.work_requests SET status = 'cancelled', recorded_until_dt = NOW()
      WHERE context->>'plan_id' = @planId AND status = 'pending'`,
     { planId, now }
@@ -3621,10 +3867,20 @@ async function _cancelWorkRequestsAndSessions(planId: string, now: string): Prom
     console.log(
       `[${now}] cancelled ${wrCancelled} pending work_request(s) for plan ${planId}`,
     );
+    for (const wr of affectedWRs) {
+      await recordTransition({
+        client,
+        aggregateType: "work_request",
+        aggregateId: wr.work_request_uuid,
+        eventType: "work_request.failed",
+        actor: "conduit-mcp",
+        authority: "builder",
+        payload: { from_status: wr.status, to_status: "cancelled", reason: "ticket_cancelled_cascade", plan_id: planId },
+      });
+    }
   }
 
-  // Note: sessions stay in conduit — not being migrated
-  const sessionsClosed = await qRun(
+  const sessionsClosed = await runFn(
     `UPDATE ${PG_SCHEMA}.sessions SET is_running = 0, end_iso = @now
      WHERE is_running = 1 AND id IN (
        SELECT context->>'session_id'
@@ -3642,19 +3898,40 @@ async function _cancelWorkRequestsAndSessions(planId: string, now: string): Prom
 }
 
 export async function cancelTicketsByPlan(planId: string, reason: string): Promise<number> {
-  const now = new Date().toISOString();
+  return withTransaction(async (client) => {
+    const now = new Date().toISOString();
 
-  // Cascade: cancel pending work_requests and close linked running sessions.
-  // Without this, cancelled tickets leave orphaned work_requests (stuck in
-  // 'pending') and sessions (stuck with is_running=1).
-  await _cancelWorkRequestsAndSessions(planId, now);
+    await _cancelWorkRequestsAndSessions(planId, now, client);
 
-  return qRun(
-    `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
-      last_activity = @now, closure_reason = @reason
-    WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
-    { planId, now, reason }
-  );
+    const affected = await tAll(
+      client,
+      `SELECT id, status FROM ${VISION_SCHEMA}.tickets
+      WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
+      { planId },
+    );
+
+    const count = await tRun(
+      client,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
+        last_activity = @now, closure_reason = @reason
+      WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
+      { planId, now, reason }
+    );
+
+    for (const t of affected) {
+      await recordTransition({
+        client,
+        aggregateType: "ticket",
+        aggregateId: t.id,
+        eventType: "transition.rejected",
+        actor: "conduit-mcp",
+        authority: "builder",
+        payload: { from_status: t.status, to_status: "cancelled", reason, plan_id: planId },
+      });
+    }
+
+    return count;
+  });
 }
 
 // ── Work Request CRUD (vision schema) ───────────────────────────────
@@ -3769,37 +4046,77 @@ export async function appendEvent(
   eventType: string,
   payload: Record<string, unknown> = {},
 ): Promise<void> {
-  const uuid = await resolveWrUuid(wrId);
-  const eventId = crypto.randomUUID();
-  await q(
-    `INSERT INTO ${PG_SCHEMA}.work_request_events
-       (event_id, work_request_id, event_type, payload, actor_type, actor_id)
-     VALUES (@eventId::uuid, @uuid::uuid, @eventType, @payload::jsonb, 'system', '')`,
-    { eventId, uuid, eventType, payload: JSON.stringify(payload) },
-  );
+  return withTransaction(async (client) => {
+    const uuid = await resolveWrUuid(wrId);
 
-  const statusMap: Record<string, string> = {
-    WR_SUBMITTED: "validated",
-    WR_VALIDATED: "queued",
-    WR_QUEUED: "claimed",
-    WR_CLAIMED: "acked",
-    WR_ACKED: "settled",
-    WR_SETTLED: "settled",
-    WR_REJECTED: "rejected",
-    WR_FAILED: "failed",
-    WR_NOOP: "noop",
-    WR_DEFERRED: "deferred",
-    "WORKREQUEST.CREATED": "proposed",
-    "STATE.TRANSITION_COMMITTED": (payload.new_state as string)?.toLowerCase() || "pending",
-    "EXECUTION.STARTED": "implementing",
-    "EXECUTION.COMPLETED": "completed",
-    "EXECUTION.FAILED": "failed",
-  };
-  const newStatus = statusMap[eventType] || "pending";
-  await q(
-    `UPDATE ${VISION_SCHEMA}.work_requests SET status = @newStatus WHERE work_request_uuid = @uuid`,
-    { newStatus, uuid },
-  );
+    const currentRow = await tOne(
+      client,
+      `SELECT status FROM ${VISION_SCHEMA}.work_requests WHERE work_request_uuid = @uuid`,
+      { uuid },
+    );
+    const fromStatus = currentRow?.status || "unknown";
+
+    const eventId = crypto.randomUUID();
+    await tQuery(
+      client,
+      `INSERT INTO ${PG_SCHEMA}.work_request_events
+         (event_id, work_request_id, event_type, payload, actor_type, actor_id)
+       VALUES (@eventId::uuid, @uuid::uuid, @eventType, @payload::jsonb, 'system', '')`,
+      { eventId, uuid, eventType, payload: JSON.stringify(payload) },
+    );
+
+    const statusMap: Record<string, string> = {
+      WR_SUBMITTED: "validated",
+      WR_VALIDATED: "queued",
+      WR_QUEUED: "claimed",
+      WR_CLAIMED: "acked",
+      WR_ACKED: "settled",
+      WR_SETTLED: "settled",
+      WR_REJECTED: "rejected",
+      WR_FAILED: "failed",
+      WR_NOOP: "noop",
+      WR_DEFERRED: "deferred",
+      "WORKREQUEST.CREATED": "proposed",
+      "STATE.TRANSITION_COMMITTED": (payload.new_state as string)?.toLowerCase() || "pending",
+      "EXECUTION.STARTED": "implementing",
+      "EXECUTION.COMPLETED": "completed",
+      "EXECUTION.FAILED": "failed",
+    };
+    const newStatus = statusMap[eventType] || "pending";
+    await tQuery(
+      client,
+      `UPDATE ${VISION_SCHEMA}.work_requests SET status = @newStatus WHERE work_request_uuid = @uuid`,
+      { newStatus, uuid },
+    );
+
+    const kernelEventTypeMap: Record<string, string> = {
+      WR_SUBMITTED: "work_request.created",
+      WR_VALIDATED: "work_request.dispatched",
+      WR_QUEUED: "transition.committed",
+      WR_CLAIMED: "work_request.dispatched",
+      WR_ACKED: "transition.committed",
+      WR_SETTLED: "work_request.completed",
+      WR_REJECTED: "work_request.failed",
+      WR_FAILED: "work_request.failed",
+      WR_NOOP: "transition.committed",
+      WR_DEFERRED: "transition.requested",
+      "WORKREQUEST.CREATED": "work_request.created",
+      "STATE.TRANSITION_COMMITTED": "transition.committed",
+      "EXECUTION.STARTED": "work_request.dispatched",
+      "EXECUTION.COMPLETED": "work_request.completed",
+      "EXECUTION.FAILED": "work_request.failed",
+    };
+    await recordTransition({
+      client,
+      aggregateType: "work_request",
+      aggregateId: uuid,
+      eventType: kernelEventTypeMap[eventType] || "transition.committed",
+      actor: "conduit-mcp",
+      authority: "builder",
+      payload: { from_status: fromStatus, to_status: newStatus, conduit_event_type: eventType, event_id: eventId },
+      causationId: eventId,
+    });
+  });
 }
 
 export async function appendLedgerEvent(

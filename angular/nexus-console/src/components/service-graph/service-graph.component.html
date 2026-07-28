@@ -19,148 +19,219 @@
       </button>
     </div>
 
-    <div class="mode-switcher">
-      <button (click)="setMode('edit')" [class.active]="viewMode() === 'edit'" title="Edit Mode">✋</button>
+    @if (graphSubView() !== 'creator') {
+    <div class="graph-controls">
+      <div class="mode-switcher">
+        <button (click)="setMode('edit')" [class.active]="viewMode() === 'edit'" title="Edit Mode">✋</button>
+        <button
+          (click)="setMode('camera')"
+          [class.active]="viewMode() === 'camera' && !isSimulationActive()"
+          title="Camera Mode"
+        >
+          🎥
+        </button>
+      </div>
+
+      <!-- Active Camera Toggle: switch between two saved viewpoints -->
       <button
-        (click)="setMode('camera')"
-        [class.active]="viewMode() === 'camera' && !isSimulationActive()"
-        title="Camera Mode"
+        (click)="switchCamera()"
+        [class.active]="activeCamera() === 2"
+        title="Switch Camera ({{ activeCamera() === 1 ? '1 → 2' : '2 → 1' }})"
+        class="camera-toggle-btn"
       >
-        🎥
+        📷{{ activeCamera() }}
       </button>
-    </div>
 
-    <!-- Active Camera Toggle: switch between two saved viewpoints -->
-    <button
-      (click)="switchCamera()"
-      [class.active]="activeCamera() === 2"
-      title="Switch Camera ({{ activeCamera() === 1 ? '1 → 2' : '2 → 1' }})"
-      class="camera-toggle-btn"
-    >
-      📷{{ activeCamera() }}
-    </button>
+      <button (click)="toggleSimulation()" [class.active]="isSimulationActive()" class="sim-btn" title="{{ isSimulationActive() ? 'Stop Simulation' : 'Start Simulation' }}">
+        ⚡
+      </button>
 
-    <button (click)="toggleSimulation()" [class.active]="isSimulationActive()" class="sim-btn" title="{{ isSimulationActive() ? 'Stop Simulation' : 'Start Simulation' }}">
-      ⚡
-    </button>
+      <div class="file-ops">
+        <button (click)="saveToAtlas()" title="Save a copy of the current layout with a new name">💾</button>
+        <button (click)="openLoadDialog()" title="Load a saved view">📂</button>
+      </div>
 
-    <div class="file-ops">
-      <button (click)="saveToAtlas()" title="Save a copy of the current layout with a new name">💾</button>
-      <button (click)="openLoadDialog()" title="Load a saved view">📂</button>
-    </div>
-
-    <!-- Refresh Services -->
-    <button (click)="refreshServices.emit()" title="Refresh Services" class="icon-btn">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10.899 12.101A7.002 7.002 0 012.399 8.567a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101z" clip-rule="evenodd" />
-      </svg>
-    </button>
-
-    <!-- Show Running Only Toggle -->
-    <button
-      (click)="showRunningOnly.set(!showRunningOnly())"
-      [title]="showRunningOnly() ? 'Show All Services' : 'Show Running Only'"
-      class="icon-btn"
-      [class.active]="showRunningOnly()"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-      </svg>
-    </button>
-
-    <div class="camera-controls">
-      <input
-        type="color"
-        [ngModel]="bgColor"
-        (ngModelChange)="updateBgColor($event)"
-        title="Background Color"
-      />
-      <button (click)="zoomOut()" title="Zoom Out">-</button>
-      <button (click)="zoomIn()" title="Zoom In">+</button>
-      <button (click)="rotateLeft()" title="Rotate Left">↺</button>
-      <button (click)="rotateRight()" title="Rotate Right">↻</button>
-    </div>
-
-    <button
-      (click)="vizService.toggleFloor()"
-      [class.active]="vizService.floorVisible()"
-      class="icon-btn"
-      title="Toggle Floor Grid"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v10H5V5zm2 2v2h2V7H7zm4 0v2h2V7h-2zm-4 4v2h2v-2H7zm4 0v2h2v-2h-2z" clip-rule="evenodd" />
-      </svg>
-    </button>
-
-    <!-- Bloom Controls -->
-    <div class="bloom-controls" title="Bloom Post-Processing">
-      <button
-        (click)="vizService.toggleBloom()"
-        [class.active]="vizService.bloomEnabled()"
-        class="icon-btn"
-        [title]="vizService.bloomEnabled() ? 'Disable Bloom' : 'Enable Bloom'"
-      >
+      <!-- Refresh Services -->
+      <button (click)="refreshServices.emit()" title="Refresh Services" class="icon-btn">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 10-2 0 1 1 0 002 0zm-5 4a1 1 0 10-2 0 1 1 0 002 0zm-9.95.05a1 1 0 00.707.707l.707-.707a1 1 0 00-1.414-1.414l-.707.707a1 1 0 00-.293.707zM3 11a1 1 0 100 2 1 1 0 000-2zm.05-5.95a1 1 0 00-.707.707l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-.707-.293z" clip-rule="evenodd" />
+          <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10.899 12.101A7.002 7.002 0 012.399 8.567a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101z" clip-rule="evenodd" />
         </svg>
       </button>
-      <span class="bloom-label">Bloom</span>
-      <div class="bloom-slider">
-        <label>Strength {{ vizService.bloomStrength().toFixed(2) }}</label>
+
+      <!-- Show Running Only Toggle -->
+      <button
+        (click)="showRunningOnly.set(!showRunningOnly())"
+        [title]="showRunningOnly() ? 'Show All Services' : 'Show Running Only'"
+        class="icon-btn"
+        [class.active]="showRunningOnly()"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+        </svg>
+      </button>
+
+      <div class="camera-controls">
         <input
-          type="range"
-          min="0"
-          max="3"
-          step="0.05"
-          [ngModel]="vizService.bloomStrength()"
-          (ngModelChange)="vizService.setBloomStrength($event)"
+          type="color"
+          [ngModel]="bgColor"
+          (ngModelChange)="updateBgColor($event)"
+          title="Background Color"
         />
+        <button (click)="zoomOut()" title="Zoom Out">-</button>
+        <button (click)="zoomIn()" title="Zoom In">+</button>
+        <button (click)="rotateLeft()" title="Rotate Left">↺</button>
+        <button (click)="rotateRight()" title="Rotate Right">↻</button>
       </div>
-      <div class="bloom-slider">
-        <label>Radius {{ vizService.bloomRadius().toFixed(2) }}</label>
+
+      <button
+        (click)="vizService.toggleFloor()"
+        [class.active]="vizService.floorVisible()"
+        class="icon-btn"
+        title="Toggle Floor Grid"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5zm0 2h10v10H5V5zm2 2v2h2V7H7zm4 0v2h2V7h-2zm-4 4v2h2v-2H7zm4 0v2h2v-2h-2z" clip-rule="evenodd" />
+        </svg>
+      </button>
+
+      <!-- Bloom Controls -->
+      <div class="bloom-controls" title="Bloom Post-Processing">
+        <button
+          (click)="vizService.toggleBloom()"
+          [class.active]="vizService.bloomEnabled()"
+          class="icon-btn"
+          [title]="vizService.bloomEnabled() ? 'Disable Bloom' : 'Enable Bloom'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 10-2 0 1 1 0 002 0zm-5 4a1 1 0 10-2 0 1 1 0 002 0zm-9.95.05a1 1 0 00.707.707l.707-.707a1 1 0 00-1.414-1.414l-.707.707a1 1 0 00-.293.707zM3 11a1 1 0 100 2 1 1 0 000-2zm.05-5.95a1 1 0 00-.707.707l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-.707-.293z" clip-rule="evenodd" />
+          </svg>
+        </button>
+        <span class="bloom-label">Bloom</span>
+        <div class="bloom-slider">
+          <label>Strength {{ vizService.bloomStrength().toFixed(2) }}</label>
+          <input
+            type="range"
+            min="0"
+            max="3"
+            step="0.05"
+            [ngModel]="vizService.bloomStrength()"
+            (ngModelChange)="vizService.setBloomStrength($event)"
+          />
+        </div>
+        <div class="bloom-slider">
+          <label>Radius {{ vizService.bloomRadius().toFixed(2) }}</label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            [ngModel]="vizService.bloomRadius()"
+            (ngModelChange)="vizService.setBloomRadius($event)"
+          />
+        </div>
+        <div class="bloom-slider">
+          <label>Threshold {{ vizService.bloomThreshold().toFixed(2) }}</label>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            [ngModel]="vizService.bloomThreshold()"
+            (ngModelChange)="vizService.setBloomThreshold($event)"
+          />
+        </div>
+      </div>
+
+      <div class="scene-ops">
+        <button (click)="resetDemo()">Reset</button>
+        <button (click)="clearCanvas()" class="danger">Clear</button>
+      </div>
+
+      <!-- Search & Highlight -->
+      <div class="search-box">
         <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.05"
-          [ngModel]="vizService.bloomRadius()"
-          (ngModelChange)="vizService.setBloomRadius($event)"
+          type="text"
+          [ngModel]="searchTerm()"
+          (ngModelChange)="onSearchInput($event)"
+          placeholder="Search nodes..."
+          class="search-input"
         />
+        @if (searchTerm()) {
+        <button (click)="clearSearch()" class="search-clear" title="Clear search">✕</button>
+        }
       </div>
-      <div class="bloom-slider">
-        <label>Threshold {{ vizService.bloomThreshold().toFixed(2) }}</label>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.05"
-          [ngModel]="vizService.bloomThreshold()"
-          (ngModelChange)="vizService.setBloomThreshold($event)"
-        />
+
+      <!-- Layout Presets -->
+      <div class="layout-presets">
+        <button (click)="onApplyLayout('radial')" title="Radial layout" class="icon-btn">◎</button>
+        <button (click)="onApplyLayout('grid')" title="Grid layout" class="icon-btn">▦</button>
+        <button (click)="onApplyLayout('hierarchical')" title="Hierarchical layout" class="icon-btn">☰</button>
+        <button (click)="onApplyLayout('force')" title="Force-directed layout" class="icon-btn">✦</button>
       </div>
+
+      <!-- Undo/Redo -->
+      <div class="undo-redo">
+        <button (click)="onUndo()" [disabled]="!canUndo()" title="Undo (Ctrl+Z)" class="icon-btn">↶</button>
+        <button (click)="onRedo()" [disabled]="!canRedo()" title="Redo (Ctrl+Y)" class="icon-btn">↷</button>
+      </div>
+
+      <div class="toolbar-separator"></div>
+
+      <!-- Edge Labels Toggle -->
+      <button (click)="onToggleEdgeLabels()" [class.active]="edgeLabelsVisible()" title="Toggle edge labels (dependency type)" class="icon-btn">🏷</button>
+
+      <!-- Health Pulse Toggle -->
+      <button (click)="onToggleHealthPulse()" [class.active]="healthPulseEnabled()" title="Toggle live health pulse" class="icon-btn">❤</button>
+
+      <!-- Minimap Toggle -->
+      <button (click)="showMinimap.set(!showMinimap())" [class.active]="showMinimap()" title="Toggle mini-map" class="icon-btn">🗺</button>
+
+      <!-- Auto-Detect Systems -->
+      <button (click)="onAutoDetectSystems()" title="Auto-detect tightly-connected clusters" class="icon-btn">
+        <span style="font-size: 14px;">⊕</span>
+      </button>
+
+      <!-- Diff Mode -->
+      @if (!diffModeActive()) {
+      <button (click)="onCaptureDiffBaseline()" title="Capture diff baseline" class="icon-btn">≅</button>
+      } @else {
+      <button (click)="onClearDiffMode()" title="Clear diff mode" class="icon-btn active">≅</button>
+      }
+
+      <!-- Export -->
+      <div class="export-menu">
+        <button (click)="showExportMenu.set(!showExportMenu())" title="Export" class="icon-btn">⤓</button>
+        @if (showExportMenu()) {
+        <div class="export-dropdown">
+          <button (click)="onExportPNG()">📸 PNG Screenshot</button>
+          <button (click)="onExportJSON()">📄 JSON Topology</button>
+        </div>
+        }
+      </div>
+
+      <button
+        (click)="showDeleteConfirm.set(true)"
+        [disabled]="!selectedNodeData() && multiSelectedCount() === 0"
+        class="icon-btn danger"
+        title="Delete selected components"
+      >
+        🗑️
+      </button>
     </div>
-
-    <div class="scene-ops">
-      <button (click)="resetDemo()">Reset</button>
-      <button (click)="clearCanvas()" class="danger">Clear</button>
-    </div>
-
-    <div class="toolbar-separator"></div>
-
-    <button
-      (click)="showDeleteConfirm.set(true)"
-      [disabled]="!selectedNodeData() && multiSelectedCount() === 0"
-      class="icon-btn danger"
-      title="Delete selected components"
-    >
-      🗑️
-    </button>
+    }
   </div>
 
   <!-- Main Content Area -->
   <div class="content-area" (contextmenu)="onContextMenu($event)">
     <!-- 3D Canvas -->
     <div #canvasContainer class="canvas-container" tabindex="0"></div>
+
+    <!-- Component Creator sub-view (overlays the canvas) -->
+    @if (graphSubView() === 'creator') {
+    <div class="creator-overlay">
+      <app-component-creator></app-component-creator>
+    </div>
+    }
 
     <!-- Context Menu -->
     @if (contextMenu().visible) {
@@ -182,8 +253,48 @@
         </div>
       </div>
 
+      <!-- Add Registered Service — only when no node is targeted -->
+      @if (!contextMenu().targetNodeId) {
+      <button (click)="onAddRegisteredService()" class="menu-item-add-service">
+        <span class="add-service-icon">⊕</span>
+        Add Registered Service...
+      </button>
+      }
+
+      <!-- Escape — shown when in drill-down mode (right-click anywhere) -->
+      @if (vizService.isDrilledDown()) {
+      <button (click)="onEscapeDrillDown()" class="menu-item-escape">
+        <span class="escape-icon">⤫</span>
+        Escape
+      </button>
+      }
+
       <div class="menu-separator"></div>
-      <button disabled>Edit...</button>
+
+      <!-- Collapse — shown when target is a System (has children) and NOT already collapsed -->
+      @if (targetHasChildren() && !targetIsCollapsed()) {
+      <button (click)="onCollapseSystem()" class="menu-item-collapse">
+        <span class="collapse-icon">⤵</span>
+        Collapse
+      </button>
+      }
+
+      <!-- Explode — shown when target is a System and IS currently collapsed -->
+      @if (targetIsCollapsed()) {
+      <button (click)="onExplodeSystem()" class="menu-item-explode">
+        <span class="explode-icon">✸</span>
+        Explode
+      </button>
+      }
+
+      <button
+        (click)="onEditComponent()"
+        [disabled]="!contextMenu().targetNodeId"
+        class="menu-item-edit"
+      >
+        <span class="edit-icon">✏️</span>
+        Edit...
+      </button>
       <button
         (click)="onContextAction('delete')"
         [disabled]="!contextMenu().targetNodeId"
@@ -200,6 +311,74 @@
       (close)="closeLoadDialog()"
       (viewSelected)="onSelectLoadView($event)"
     ></app-load-view-dialog>
+
+    <!-- Add Registered Service Dialog -->
+    <app-add-service-dialog
+      [isOpen]="showAddServiceDialog()"
+      [existingNodeIds]="existingNodeIds()"
+      (close)="showAddServiceDialog.set(false)"
+      (serviceSelected)="onServiceSelected($event)"
+    ></app-add-service-dialog>
+
+    <!-- Mini-map -->
+    <app-minimap [isOpen]="showMinimap()"></app-minimap>
+
+    <!-- Drag-to-Connect Direction Popup -->
+    @if (showConnDirectionPopup()) {
+    <div class="conn-direction-popup-overlay" (click)="cancelDragConnection()">
+      <div
+        class="conn-direction-popup"
+        [style.left.px]="connPopupPos().x"
+        [style.top.px]="connPopupPos().y"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="conn-popup-label">Connection Direction</div>
+        <div class="conn-popup-buttons">
+          <button (click)="confirmDragConnection('bidirectional')" class="conn-dir-btn conn-dir-bidir active" title="Bidirectional (default)">
+            ↔
+          </button>
+          <button (click)="confirmDragConnection('out')" class="conn-dir-btn conn-dir-out" title="Outbound (→)">
+            →
+          </button>
+          <button (click)="confirmDragConnection('in')" class="conn-dir-btn conn-dir-in" title="Inbound (←)">
+            ←
+          </button>
+        </div>
+        <div class="conn-popup-hint">↔ Bidirectional (default) · auto-apply in 4s</div>
+      </div>
+    </div>
+    }
+
+    <!-- Auto-Detect Systems Popup -->
+    @if (showAutoDetectPopup()) {
+    <div class="dialog-overlay" (click)="showAutoDetectPopup.set(false)">
+      <div class="dialog-panel" (click)="$event.stopPropagation()">
+        <div class="dialog-header">
+          <h3>Auto-Detected Clusters</h3>
+          <button (click)="showAutoDetectPopup.set(false)" class="dialog-close">✕</button>
+        </div>
+        <div class="dialog-body">
+          <p class="hint">{{ detectedSystems().length }} tightly-connected cluster(s) detected via strongly connected components analysis.</p>
+          @for (cluster of detectedSystems(); track $index) {
+          <div class="detected-cluster">
+            <div class="cluster-info">
+              <strong>Cluster {{ $index + 1 }}</strong>
+              <span class="cluster-count">{{ cluster.length }} nodes</span>
+            </div>
+            <div class="cluster-members">
+              @for (memberId of cluster; track memberId) {
+              <span class="cluster-member">{{ vizService.getNode(memberId)?.label ?? memberId }}</span>
+              }
+            </div>
+            <button (click)="onCollapseDetected(cluster)" class="cluster-collapse-btn">
+              ⤵ Collapse
+            </button>
+          </div>
+          }
+        </div>
+      </div>
+    </div>
+    }
 
     <!-- Delete Confirmation Dialog -->
     @if (showDeleteConfirm()) {
@@ -226,7 +405,7 @@
     }
 
     <!-- Left Sidebar: Palette -->
-    @if (showInternalPanels()) {
+    @if (showInternalPanels() && graphSubView() !== 'creator') {
     <div class="sidebar left" [class.collapsed]="!isPaletteOpen()">
       <button (click)="togglePalette()" class="sidebar-toggle">
         {{ isPaletteOpen() ? '◀' : '▶' }}
@@ -256,7 +435,7 @@
     }
 
     <!-- Right Sidebar: Inspector -->
-    @if (showInternalPanels()) {
+    @if (showInternalPanels() && graphSubView() !== 'creator') {
     <div class="sidebar right" [class.collapsed]="!isInspectorOpen()">
       <button (click)="toggleInspector()" class="sidebar-toggle">
         {{ isInspectorOpen() ? '▶' : '◀' }}

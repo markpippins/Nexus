@@ -40,20 +40,34 @@ from losm_ir.work_request import WorkRequestDCO
 
 _log = logging.getLogger("tackle.vision_bridge")
 
-# ── Conduit-MCP server URL ────────────────────────────────────────────
+# ── Conduit server URLs ───────────────────────────────────────────────
+# conduit-mcp (3100) retains MCP-native endpoints (POST /tools/call) and
+# routes with runtime-kernel/validation dependencies (POST /vision/receipts).
+# conduit-srv (3104) serves the pure-DB REST routes extracted per the
+# "No SQL in MCP Servers" architectural directive.
 
 CONDUIT_MCP_URL = os.environ.get(
     "CONDUIT_MCP_URL",
     "http://localhost:3100",
 ).rstrip("/")
 
+CONDUIT_SRV_URL = os.environ.get(
+    "CONDUIT_SRV_URL",
+    "http://localhost:3104",
+).rstrip("/")
+
 
 # ── HTTP helpers (same pattern as tackle.db) ──────────────────────────
 
 
-def _api_post(path: str, body: dict) -> Optional[Dict[str, Any]]:
-    """Fire a JSON POST to conduit-mcp and return parsed response."""
-    url = f"{CONDUIT_MCP_URL}{path}"
+def _api_post(path: str, body: dict, base_url: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Fire a JSON POST and return parsed response.
+
+    Defaults to conduit-mcp (3100) for MCP-native and validation-dependent
+    routes. Pass base_url=CONDUIT_SRV_URL for pure-DB REST routes.
+    """
+    base = base_url or CONDUIT_MCP_URL
+    url = f"{base}{path}"
     data = json.dumps(body).encode("utf-8")
     try:
         req = urllib.request.Request(url, data=data, method="POST")
@@ -69,9 +83,14 @@ def _api_post(path: str, body: dict) -> Optional[Dict[str, Any]]:
         return {"ok": False, "error": str(e)}
 
 
-def _api_get(path: str) -> Optional[Dict[str, Any]]:
-    """Fire a GET to conduit-mcp and return parsed JSON."""
-    url = f"{CONDUIT_MCP_URL}{path}"
+def _api_get(path: str, base_url: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Fire a GET and return parsed JSON.
+
+    Defaults to conduit-mcp (3100) for MCP-native and validation-dependent
+    routes. Pass base_url=CONDUIT_SRV_URL for pure-DB REST routes.
+    """
+    base = base_url or CONDUIT_MCP_URL
+    url = f"{base}{path}"
     try:
         req = urllib.request.Request(url, method="GET")
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -146,7 +165,7 @@ def create_work_request(
         },
     }
 
-    result = _api_post("/vision/work-requests", payload)
+    result = _api_post("/vision/work-requests", payload, base_url=CONDUIT_SRV_URL)
     if result and result.get("ok"):
         _log.info("Created work_request %s (uuid=%s)", wr_id, wr_uuid)
     else:
@@ -156,7 +175,7 @@ def create_work_request(
 
 def get_work_request(work_request_id: str) -> Optional[Dict[str, Any]]:
     """Fetch a work request from vision by ID."""
-    return _api_get(f"/vision/work-requests/{work_request_id}")
+    return _api_get(f"/vision/work-requests/{work_request_id}", base_url=CONDUIT_SRV_URL)
 
 
 def list_work_requests(
@@ -171,7 +190,7 @@ def list_work_requests(
         query["planId"] = plan_id
     if status:
         query["status"] = status
-    result = _api_get(f"/vision/work-requests?{urlencode(query)}")
+    result = _api_get(f"/vision/work-requests?{urlencode(query)}", base_url=CONDUIT_SRV_URL)
     if result and result.get("ok"):
         return result.get("work_requests", [])
     return []
@@ -303,7 +322,7 @@ def get_receipts(plan_id: str, as_of: Optional[str] = None) -> List[Dict[str, An
     query = {"planId": plan_id}
     if as_of:
         query["asOf"] = as_of
-    result = _api_get(f"/vision/receipts?{urlencode(query)}")
+    result = _api_get(f"/vision/receipts?{urlencode(query)}", base_url=CONDUIT_SRV_URL)
     if result and result.get("ok"):
         return result.get("receipts", [])
     return []
@@ -314,7 +333,7 @@ def get_receipts(plan_id: str, as_of: Optional[str] = None) -> List[Dict[str, An
 
 def replay_governance_events() -> Dict[str, Any]:
     """Trigger replay of missed governance events."""
-    return _api_post("/governance/replay", {}) or {}
+    return _api_post("/governance/replay", {}, base_url=CONDUIT_SRV_URL) or {}
 
 
 def list_governance_events(
@@ -339,7 +358,7 @@ def list_governance_events(
         query["eventType"] = event_type
     if as_of:
         query["asOf"] = as_of
-    result = _api_get(f"/governance/events?{urlencode(query)}")
+    result = _api_get(f"/governance/events?{urlencode(query)}", base_url=CONDUIT_SRV_URL)
     if result and result.get("ok"):
         return result.get("events", [])
     return []

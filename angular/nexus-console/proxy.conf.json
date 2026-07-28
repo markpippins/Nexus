@@ -9,5 +9,10 @@
     "secure": false,
     "changeOrigin": true,
     "ws": true
+  },
+  "/chat": {
+    "target": "http://localhost:3018",
+    "secure": false,
+    "changeOrigin": true
   }
 }

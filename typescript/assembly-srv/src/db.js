@@ -1,10 +1,15 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config({ path: '../../.env' });
 dotenv.config({ path: '.env' });
 
 const { Pool } = pg;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const dsn = process.env.ASSEMBLY_PG_DSN || 'postgresql://pguser:pgpass@localhost:5432/nexus';
 
@@ -22,6 +27,34 @@ export async function query(text, params) {
   const client = await pool.connect();
   try {
     return await client.query(text, params);
+  } finally {
+    client.release();
+  }
+}
+
+// ── Migration runner (migrated from assembly-mcp db.ts) ────────────
+
+export async function runMigration() {
+  const client = await pool.connect();
+  try {
+    const migrationPath = path.resolve(__dirname, '..', 'assembly-migration.sql');
+    if (fs.existsSync(migrationPath)) {
+      const sql = fs.readFileSync(migrationPath, 'utf-8');
+      const statements = sql
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && !s.startsWith('--'));
+      for (const stmt of statements) {
+        await client.query(stmt);
+      }
+      console.log(`[assembly-srv] Migration applied from ${migrationPath}`);
+    } else {
+      console.warn(`[assembly-srv] Migration file not found: ${migrationPath}`);
+    }
+  } catch (err) {
+    if (!err.message?.includes('already exists')) {
+      console.error('[assembly-srv] Migration error:', err.message);
+    }
   } finally {
     client.release();
   }

@@ -26,17 +26,43 @@ export interface MCPToolDefinition {
 
 // ── Service Registration ────────────────────────────────────────────
 
+/**
+ * Protocol the underlying MCP service speaks for tool-discovery and tool-calls.
+ *
+ * - `rest`:    GET /tools returns { tools: [...] }; POST /tools/call with
+ *              { name, arguments } invokes a tool. Used by conduit-mcp.
+ * - `jsonrpc`: POST / with { "jsonrpc":"2.0","method":"tools/list" } returns
+ *              { result: { tools: [...] } }; POST / with
+ *              { "method":"tools/call","params":{ "name","arguments" } } invokes.
+ *              Used by tackle-mcp.
+ * - `sse`:     MCP-over-SSE transport (long-lived `GET /sse` stream + separate
+ *              `POST /messages?sessionId=<id>` channel for inbound JSON-RPC).
+ *              Responses arrive asynchronously on the open SSE stream as
+ *              `event: message / data: {jsonrpc envelope}`. Used by
+ *              nebula-mcp-sse (:3102) and service-broker-mcp (:3112) today,
+ *              and by the generic stdio→SSE `mcp-bridge` wrapper that fronts
+ *              knowledge-mcp / vision-mcp / peb-mcp / terrain-mcp.
+ * - `auto`:    Try `rest` first; on 404 or non-JSON response, fall back to
+ *              `jsonrpc`. The default; keeps startup resilient when an MCP
+ *              migrates protocols under us. Note: `sse` is never tried under
+ *              `auto` — it requires explicit opt-in because its persistent
+ *              connection cost differs from the stateless REST/JSON-RPC path.
+ */
+export type MCPProtocol = "rest" | "jsonrpc" | "sse" | "auto";
+
 export interface MCPServiceConfig {
   /** Service name (e.g., "conduit-mcp") */
   name: string;
   /** Service base URL (e.g., "http://localhost:3100") */
   baseUrl: string;
-  /** Endpoint to fetch tool list (default: "/tools") */
+  /** Endpoint to fetch tool list (default: "/tools") — used for `rest` protocol */
   toolsEndpoint?: string;
-  /** Endpoint to call a tool (default: "/tools/call") */
+  /** Endpoint to call a tool (default: "/tools/call") — used for `rest` protocol */
   callEndpoint?: string;
   /** Whether this service is required */
   required?: boolean;
+  /** Discovery/call protocol this MCP speaks (default: "auto") */
+  protocol?: MCPProtocol;
 }
 
 // ── Tool Discovery Response ─────────────────────────────────────────
@@ -52,6 +78,13 @@ export interface AggregatedTool extends MCPToolDefinition {
   service: string;
   /** Service URL for routing tool calls */
   serviceUrl: string;
+  /**
+   * Discovery protocol that worked for this service.
+   * Stored per-tool so callRemoteTool can route to the same protocol the
+   * tool was discovered through, avoiding cross-protocol mismatches if an
+   * MCP ever exposed both endpoints.
+   */
+  protocol: Extract<MCPProtocol, "rest" | "jsonrpc" | "sse">;
 }
 
 // ── Tool Registry ───────────────────────────────────────────────────
@@ -79,5 +112,48 @@ export interface ToolCallResponse {
   result?: any;
   error?: string;
   service?: string;
+  tool?: string;
+  requestId?: string;
   timestamp?: number;
+}
+
+// ── JSON-RPC envelope types (for `jsonrpc` protocol MCPs) ───────────
+
+/**
+ * JSON-RPC 2.0 request envelope. Used by the `jsonrpc` protocol adapter
+ * when talking to MCPs like tackle-mcp, knowledge-mcp, vision-mcp.
+ *
+ *   method = "tools/list"  → params = {}                                   → returns { result: { tools: [...] } }
+ *   method = "tools/call"  → params = { name, arguments }                  → returns { result: { content: [{ type, text }] } }
+ */
+export interface JsonRpcRequest {
+  jsonrpc: "2.0";
+  id: number | string;
+  method: string;
+  params?: Record<string, any>;
+}
+
+export interface JsonRpcResponse<T = any> {
+  jsonrpc: "2.0";
+  id?: number | string;
+  result?: T;
+  error?: { code: number; message: string; data?: any };
+}
+
+/**
+ * MCP tool-list result envelope. Returned inside JsonRpcResponse.result.
+ */
+export interface McpToolsListResult {
+  tools: MCPToolDefinition[];
+}
+
+/**
+ * MCP tool-call result envelope. The server's result wraps an array of
+ * `content` blocks; for textual tools the first block is `{ type:"text", text: <string> }`.
+ * We surface that text up to the aggregator's REST API so callers don't
+ * need to know JSON-RPC was used end-to-end.
+ */
+export interface McpToolCallResult {
+  content: Array<{ type: string; text?: string; [k: string]: any }>;
+  isError?: boolean;
 }

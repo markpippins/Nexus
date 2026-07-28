@@ -1,9 +1,12 @@
 """Unit tests for _CursorProxy — verifying dict_fetchone/dict_fetchall behavior
 after the _Row class was removed and replaced with plain tuples."""
 
+import os
+import sys
 import unittest
 from unittest.mock import MagicMock
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from db_adapter import _CursorProxy
 
 

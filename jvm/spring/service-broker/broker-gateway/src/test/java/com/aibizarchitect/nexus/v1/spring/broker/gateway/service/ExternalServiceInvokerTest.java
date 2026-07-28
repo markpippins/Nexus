@@ -214,4 +214,195 @@ class ExternalServiceInvokerTest {
         // Then
         assertFalse(result);
     }
+
+    // ================================================================
+    // ORANGE PATH — expected, handled failure
+    // ================================================================
+
+    @Test
+    void invokeOperation_WithNullOperation_guarded() {
+        var result = serviceInvoker.invokeOperation(null, new Object());
+
+        assertFalse(result.isSuccess());
+        assertEquals(404, result.getStatusCode());
+        assertEquals("Operation name is required", result.getErrorMessage());
+    }
+
+    @Test
+    void invokeOperation_WithBlankOperation_guarded() {
+        var result = serviceInvoker.invokeOperation(" ", new Object());
+
+        assertFalse(result.isSuccess());
+        assertEquals(404, result.getStatusCode());
+        assertEquals("Operation name is required", result.getErrorMessage());
+    }
+
+    @Test
+    void invokeOperation_WithNullRequestBody_succeeds() {
+        String operation = "testOperation";
+        ServiceDiscoveryClientImpl.ServiceInfoImpl serviceInfo = new ServiceDiscoveryClientImpl.ServiceInfoImpl();
+        serviceInfo.setName("testService");
+        ServiceDiscoveryClientImpl.ServiceDetailsImpl serviceDetails = new ServiceDiscoveryClientImpl.ServiceDetailsImpl();
+        serviceDetails.setEndpoint("http://test-service:8080");
+
+        when(discoveryClient.findServiceByOperation(operation)).thenReturn(Optional.of(serviceInfo));
+        when(discoveryClient.getServiceDetails("testService")).thenReturn(Optional.of(serviceDetails));
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("success"));
+
+        var result = serviceInvoker.invokeOperation(operation, null);
+
+        assertTrue(result.isSuccess());
+    }
+
+    @Test
+    void healthCheck_WithNullServiceName_returnsFalse() {
+        // GAP: null serviceName not guarded — relies on discoveryClient
+        when(discoveryClient.getServiceDetails(null)).thenReturn(Optional.empty());
+
+        boolean result = serviceInvoker.healthCheck(null);
+
+        assertFalse(result);
+    }
+
+    // ================================================================
+    // RED PATH — adversarial input the system must survive
+    // ================================================================
+
+    @Test
+    void invokeOperation_WithXssInOperation_handled() {
+        String xss = "<script>alert(1)</script>";
+        when(discoveryClient.findServiceByOperation(xss)).thenReturn(Optional.empty());
+
+        var result = serviceInvoker.invokeOperation(xss, new Object());
+
+        assertFalse(result.isSuccess());
+        assertEquals(404, result.getStatusCode());
+    }
+
+    @Test
+    void invokeOperation_WithSqlInjectionInOperation_handled() {
+        String sql = "'; DROP TABLE services; --";
+        when(discoveryClient.findServiceByOperation(sql)).thenReturn(Optional.empty());
+
+        var result = serviceInvoker.invokeOperation(sql, new Object());
+
+        assertFalse(result.isSuccess());
+    }
+
+    @Test
+    void invokeOperation_WithNullEndpoint_returns500() {
+        String operation = "testOperation";
+        ServiceDiscoveryClientImpl.ServiceInfoImpl serviceInfo = new ServiceDiscoveryClientImpl.ServiceInfoImpl();
+        serviceInfo.setName("testService");
+        ServiceDiscoveryClientImpl.ServiceDetailsImpl serviceDetails = new ServiceDiscoveryClientImpl.ServiceDetailsImpl();
+        serviceDetails.setEndpoint(null);
+
+        when(discoveryClient.findServiceByOperation(operation)).thenReturn(Optional.of(serviceInfo));
+        when(discoveryClient.getServiceDetails("testService")).thenReturn(Optional.of(serviceDetails));
+
+        var result = serviceInvoker.invokeOperation(operation, new Object());
+
+        assertFalse(result.isSuccess());
+        assertEquals(500, result.getStatusCode());
+        assertTrue(result.getErrorMessage().contains("no endpoint configured"));
+    }
+
+    @Test
+    void healthCheck_WithEndpointWithoutTrailingSlash_appendsHealthCheck() {
+        String serviceName = "testService";
+        ServiceDiscoveryClientImpl.ServiceDetailsImpl serviceDetails = new ServiceDiscoveryClientImpl.ServiceDetailsImpl();
+        serviceDetails.setEndpoint("http://test-service:8080");
+        serviceDetails.setHealthCheck("actuator/health");
+
+        when(discoveryClient.getServiceDetails(serviceName)).thenReturn(Optional.of(serviceDetails));
+        when(restTemplate.getForEntity("http://test-service:8080/actuator/health", String.class))
+                .thenReturn(ResponseEntity.ok("healthy"));
+
+        boolean result = serviceInvoker.healthCheck(serviceName);
+
+        assertTrue(result);
+    }
+
+    @Test
+    void healthCheck_WithEndpointWithTrailingSlash_appendsHealthCheck() {
+        String serviceName = "testService";
+        ServiceDiscoveryClientImpl.ServiceDetailsImpl serviceDetails = new ServiceDiscoveryClientImpl.ServiceDetailsImpl();
+        serviceDetails.setEndpoint("http://test-service:8080/");
+        serviceDetails.setHealthCheck("health");
+
+        when(discoveryClient.getServiceDetails(serviceName)).thenReturn(Optional.of(serviceDetails));
+        when(restTemplate.getForEntity("http://test-service:8080/health", String.class))
+                .thenReturn(ResponseEntity.ok("healthy"));
+
+        boolean result = serviceInvoker.healthCheck(serviceName);
+
+        assertTrue(result);
+    }
+
+    // ================================================================
+    // SILENT FAILURE — metamorphic/determinism, regression locks
+    // ================================================================
+
+    @Test
+    void metamorphic_invokeOperation_sameInput_sameOutput() {
+        String operation = "testOperation";
+        ServiceDiscoveryClientImpl.ServiceInfoImpl serviceInfo = new ServiceDiscoveryClientImpl.ServiceInfoImpl();
+        serviceInfo.setName("testService");
+        ServiceDiscoveryClientImpl.ServiceDetailsImpl serviceDetails = new ServiceDiscoveryClientImpl.ServiceDetailsImpl();
+        serviceDetails.setEndpoint("http://test-service:8080");
+
+        when(discoveryClient.findServiceByOperation(operation)).thenReturn(Optional.of(serviceInfo));
+        when(discoveryClient.getServiceDetails("testService")).thenReturn(Optional.of(serviceDetails));
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("success"));
+
+        var result1 = serviceInvoker.invokeOperation(operation, "body");
+        var result2 = serviceInvoker.invokeOperation(operation, "body");
+
+        assertEquals(result1.isSuccess(), result2.isSuccess());
+        assertEquals(result1.getStatusCode(), result2.getStatusCode());
+    }
+
+    @Test
+    void regressionLock_notFound_errorMessageFormat() {
+        String operation = "nonexistent";
+        when(discoveryClient.findServiceByOperation(operation)).thenReturn(Optional.empty());
+
+        var result = serviceInvoker.invokeOperation(operation, new Object());
+
+        assertEquals("No service found for operation: nonexistent", result.getErrorMessage(),
+            "REGRESSION LOCK: not-found error message format");
+    }
+
+    @Test
+    void regressionLock_noDetails_errorMessageFormat() {
+        String operation = "testOperation";
+        ServiceDiscoveryClientImpl.ServiceInfoImpl serviceInfo = new ServiceDiscoveryClientImpl.ServiceInfoImpl();
+        serviceInfo.setName("testService");
+
+        when(discoveryClient.findServiceByOperation(operation)).thenReturn(Optional.of(serviceInfo));
+        when(discoveryClient.getServiceDetails("testService")).thenReturn(Optional.empty());
+
+        var result = serviceInvoker.invokeOperation(operation, new Object());
+
+        assertTrue(result.getErrorMessage().startsWith("Could not get details for service"),
+            "REGRESSION LOCK: no-details error message prefix");
+    }
+
+    @Test
+    void metamorphic_healthCheck_nullEndpoint_appendsCorrectly() {
+        String serviceName = "testService";
+        ServiceDiscoveryClientImpl.ServiceDetailsImpl serviceDetails = new ServiceDiscoveryClientImpl.ServiceDetailsImpl();
+        serviceDetails.setEndpoint("http://test-service:8080");
+        serviceDetails.setHealthCheck(null);
+
+        when(discoveryClient.getServiceDetails(serviceName)).thenReturn(Optional.of(serviceDetails));
+        when(restTemplate.getForEntity("http://test-service:8080", String.class))
+                .thenReturn(ResponseEntity.ok("healthy"));
+
+        boolean result = serviceInvoker.healthCheck(serviceName);
+
+        assertTrue(result, "Null healthCheck should fall back to endpoint-only URL");
+    }
 }

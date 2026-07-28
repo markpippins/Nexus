@@ -67,6 +67,16 @@ app-nav-toolbar {
   opacity: 0.6;
 }
 
+.nav-toolbar-separator {
+  width: 28px;
+  height: 1px;
+  background: rgb(var(--color-border-base));
+  margin: 6px 0;
+  flex-shrink: 0;
+  border-radius: 1px;
+  opacity: 0.35;
+}
+
 .nav-toolbar-spacer {
   flex: 1;
   min-height: 0;

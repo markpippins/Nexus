@@ -1,4 +1,10 @@
 export class AppError extends Error {
+  /** @type {string | undefined} */
+  code;
+
+  /** @type {string | undefined} */
+  constraint;
+
   constructor(message, statusCode = 500) {
     super(message);
     this.statusCode = statusCode;

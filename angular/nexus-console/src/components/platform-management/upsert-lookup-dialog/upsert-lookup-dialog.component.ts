@@ -10,60 +10,60 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
     imports: [CommonModule, ReactiveFormsModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-    <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" *ngIf="isOpen()" (window:keydown.escape)="onCancel()">
-       <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-xl rounded-lg w-full max-w-md flex flex-col">
-          <div class="p-4 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
-            <h2 class="text-lg font-semibold text-[rgb(var(--color-text-base))] capitalize">
+    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" *ngIf="isOpen()" (window:keydown.escape)="onCancel()">
+       <div class="bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] shadow-2xl rounded-xl w-full max-w-md flex flex-col overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-[rgb(var(--color-border-base))] flex justify-between items-center">
+            <h2 class="text-base font-semibold text-[rgb(var(--color-text-prominent))] capitalize">
               {{ item() ? 'Edit' : 'Add' }} {{ displayType() }}
             </h2>
-            <button (click)="onCancel()" class="text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))]">
+            <button (click)="onCancel()" class="p-1 rounded-md text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] transition-colors">
               <span class="material-icons">close</span>
             </button>
           </div>
           
-          <div class="p-6">
-             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
+          <div class="px-5 py-4">
+             <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-3.5">
                  <!-- Name -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Name *</label>
-                    <input type="text" formControlName="name" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="Name">
-                    <span class="text-xs text-red-500" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">Name is required</span>
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Name *</label>
+                    <input type="text" formControlName="name" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="Name">
+                    <span class="text-xs text-red-400" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">Name is required</span>
                  </div>
 
                  <!-- Description -->
-                 <div class="flex flex-col gap-1">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Description</label>
-                    <textarea formControlName="description" rows="3" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="Description"></textarea>
+                 <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
+                    <textarea formControlName="description" rows="3" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="Description"></textarea>
                  </div>
 
                  <!-- URL (Vendors, Languages) -->
-                 <div class="flex flex-col gap-1" *ngIf="isVendorOrLanguage()">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">URL</label>
-                    <input type="url" formControlName="url" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="https://...">
+                 <div class="flex flex-col gap-1.5" *ngIf="isVendorOrLanguage()">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">URL</label>
+                    <input type="url" formControlName="url" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="https://...">
                  </div>
 
                  <!-- Versioning (Languages) -->
                  <div class="flex gap-4" *ngIf="isLanguage()">
                      <div class="flex flex-col gap-1 flex-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Current Version</label>
-                        <input type="text" formControlName="currentVersion" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="e.g. 21">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Current Version</label>
+                        <input type="text" formControlName="currentVersion" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="e.g. 21">
                      </div>
                      <div class="flex flex-col gap-1 flex-1">
-                        <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">LTS Version</label>
-                        <input type="text" formControlName="ltsVersion" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]" placeholder="e.g. 21">
+                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">LTS Version</label>
+                        <input type="text" formControlName="ltsVersion" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="e.g. 21">
                      </div>
                  </div>
 
                  <!-- Active Flag -->
                  <div class="flex items-center gap-2 mt-2">
                     <input type="checkbox" formControlName="activeFlag" id="activeFlag" class="rounded border-[rgb(var(--color-border-muted))] text-[rgb(var(--color-accent-ring))] focus:ring-[rgb(var(--color-accent-ring))]">
-                    <label for="activeFlag" class="text-sm font-medium text-[rgb(var(--color-text-base))]">Active</label>
+                    <label for="activeFlag" class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Active</label>
                  </div>
 
                  <!-- Default Visual Component (Service Types only) -->
-                 <div class="flex flex-col gap-1" *ngIf="isServiceType()">
-                    <label class="text-sm font-medium text-[rgb(var(--color-text-base))]">Default Visual Style</label>
-                    <select formControlName="defaultComponentId" class="p-2 rounded border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] focus:border-[rgb(var(--color-accent-ring))]">
+                 <div class="flex flex-col gap-1.5" *ngIf="isServiceType()">
+                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Default Visual Style</label>
+                    <select formControlName="defaultComponentId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                         <option [ngValue]="null">-- None --</option>
                         <option *ngFor="let comp of registry.allComponents()" [ngValue]="comp.id">
                             {{ comp.name }} ({{ comp.geometry }})
@@ -73,9 +73,9 @@ import { ComponentRegistryService } from '../../../services/component-registry.s
              </form>
           </div>
 
-          <div class="p-4 border-t border-[rgb(var(--color-border-base))] flex justify-end gap-3 bg-[rgb(var(--color-surface-sidebar))] rounded-b-lg">
-             <button type="button" (click)="onCancel()" class="px-4 py-2 rounded text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]">Cancel</button>
-             <button type="button" (click)="onSubmit()" [disabled]="form.invalid || isSaving()" class="px-4 py-2 rounded bg-[rgb(var(--color-accent-ring))] text-white hover:bg-opacity-90 disabled:opacity-50 flex items-center gap-2">
+          <div class="px-5 py-3.5 border-t border-[rgb(var(--color-border-base))] flex justify-end gap-2.5 bg-[rgb(var(--color-surface-muted))]">
+             <button type="button" (click)="onCancel()" class="px-3.5 py-1.5 text-sm font-medium rounded-md text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))] transition-colors">Cancel</button>
+             <button type="button" (click)="onSubmit()" [disabled]="form.invalid || isSaving()" class="px-4 py-1.5 text-sm font-semibold rounded-md bg-[rgb(var(--color-accent-ring))] text-white hover:bg-[rgb(var(--color-accent-ring))]/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors">
                 <span *ngIf="isSaving()" class="material-icons text-sm animate-spin">refresh</span>
                 Save
              </button>

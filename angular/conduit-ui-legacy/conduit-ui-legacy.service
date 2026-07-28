@@ -1,0 +1,15 @@
+[Unit]
+Description=Conduit Legacy UI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/codex/dev/nexus/angular/conduit-ui-legacy
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node /home/codex/dev/nexus/angular/conduit-ui-legacy/server.js
+Environment=PORT=4015
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

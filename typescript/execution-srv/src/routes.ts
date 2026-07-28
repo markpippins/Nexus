@@ -2,6 +2,12 @@
 //
 // Endpoints (see `REST API.md` at the project root):
 //
+//   0. Paginated list endpoints
+//        GET /api/execution/requests  ?status=&search=&limit=20&offset=0
+//        GET /api/execution/leases    ?status=&search=&limit=20&offset=0
+//        GET /api/execution/attempts  ?status=&search=&limit=20&offset=0
+//        GET /api/execution/receipts  ?type=&search=&limit=20&offset=0
+//
 //   1. Lifecycle state (per request — natural aggregate root)
 //        GET /api/execution/requests/{id}/state
 //
@@ -73,8 +79,110 @@ function sendError(res: Response, err: unknown): void {
   res.status(500).json({ error: message });
 }
 
+// ── Paginated List Helper ──────────────────────────────────────────
+// Shared by all four list endpoints. Each table differs only in its
+// filter column name, searchable columns, and sort column.
+
+interface PaginatedListConfig {
+  table: string;
+  filterColumn: string;       // DB column for the eq filter ('status' or 'type')
+  filterParam: string;        // query-string param name ('status' or 'type')
+  searchColumns: string[];    // DB columns/expressions for ILIKE search
+  orderBy: string;            // sort clause (column + direction)
+}
+
+function paginatedListHandler(pool: Pool, cfg: PaginatedListConfig) {
+  return async (req: Request, res: Response) => {
+    try {
+      const filterVal = (req.query[cfg.filterParam] as string | undefined)?.trim();
+      const search = (req.query.search as string | undefined)?.trim();
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
+      const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+
+      const conditions: string[] = [];
+      const values: any[] = [];
+      let p = 1;
+
+      if (filterVal) {
+        conditions.push(`${cfg.filterColumn} = $${p++}`);
+        values.push(filterVal);
+      }
+      if (search) {
+        conditions.push(
+          `(${cfg.searchColumns.map(c => `${c} ILIKE $${p}`).join(' OR ')})`
+        );
+        values.push(`%${search}%`);
+        p++;
+      }
+
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const sql = `
+        SELECT *, COUNT(*) OVER() AS full_count
+        FROM ${cfg.table}
+        ${where}
+        ORDER BY ${cfg.orderBy}
+        LIMIT $${p++} OFFSET $${p}
+      `;
+      values.push(limit, offset);
+
+      const { rows } = await pool.query(sql, values);
+      const total = rows.length > 0 ? parseInt(rows[0].full_count, 10) : 0;
+      const items = rows.map(({ full_count: _fc, ...rest }) => rest);
+
+      res.json({ total, limit, offset, items });
+    } catch (err) {
+      sendError(res, err);
+    }
+  };
+}
+
 export function createRoutes(pool: Pool): Router {
   const router = Router();
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 0. PAGINATED LIST ENDPOINTS
+  //
+  //    GET /api/execution/requests  ?status=&search=&limit=20&offset=0
+  //    GET /api/execution/leases    ?status=&search=&limit=20&offset=0
+  //    GET /api/execution/attempts  ?status=&search=&limit=20&offset=0
+  //    GET /api/execution/receipts  ?type=&search=&limit=20&offset=0
+  //
+  //    Each returns { total, limit, offset, items: [...] } with DB-native
+  //    column shapes. See DRIFT.md in execution-ui for field-name
+  //    differences from the UI's expected TypeScript types.
+  // ═══════════════════════════════════════════════════════════════════
+
+  router.get('/requests', paginatedListHandler(pool, {
+    table: 'requests',
+    filterColumn: 'status',
+    filterParam: 'status',
+    searchColumns: ['business_key', 'title', 'objective', 'id::text', 'inputs::text'],
+    orderBy: 'created_at DESC',
+  }));
+
+  router.get('/leases', paginatedListHandler(pool, {
+    table: 'leases',
+    filterColumn: 'status',
+    filterParam: 'status',
+    searchColumns: ['executor_id', 'request_id::text', 'id::text'],
+    orderBy: 'created_at DESC',
+  }));
+
+  router.get('/attempts', paginatedListHandler(pool, {
+    table: 'attempts',
+    filterColumn: 'status',
+    filterParam: 'status',
+    searchColumns: ['executor_id', 'error', 'request_id::text', 'lease_id::text', 'id::text'],
+    orderBy: 'created_at DESC',
+  }));
+
+  router.get('/receipts', paginatedListHandler(pool, {
+    table: 'receipts',
+    filterColumn: 'type',
+    filterParam: 'type',
+    searchColumns: ['agent_role', 'summary', 'request_id::text', 'attempt_id::text', 'id::text'],
+    orderBy: 'issued_at DESC',
+  }));
 
   // ═══════════════════════════════════════════════════════════════════
   // 1. LIFECYCLE STATE — the natural aggregate root

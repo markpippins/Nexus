@@ -24,13 +24,14 @@ export class AppComponent implements OnInit, OnDestroy {
       saved = localStorage.getItem('assembly-theme');
     } catch {}
     if (saved) return;
-    this.isDark.set(e.matches);
+    // System dark preference maps to 'dark' theme
+    this.currentTheme.set(e.matches ? 'dark' : 'light');
   };
 
   counts = signal<Counts | null>(null);
   sidebarCollapsed = signal(false);
   sidebarOpenMobile = signal(false);
-  isDark = signal(false);
+  currentTheme = signal<'light' | 'steel' | 'dark'>('light');
   currentRouteLabel = signal('Feed');
 
   ngOnInit() {
@@ -57,10 +58,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   toggleTheme() {
-    this.isDark.update(v => {
-      const next = !v;
+    this.currentTheme.update(t => {
+      // cycle: light → steel → dark → light
+      const next = t === 'light' ? 'steel' : t === 'steel' ? 'dark' : 'light';
       try {
-        localStorage.setItem('assembly-theme', next ? 'dark' : 'light');
+        localStorage.setItem('assembly-theme', next);
       } catch {}
       return next;
     });
@@ -71,23 +73,32 @@ export class AppComponent implements OnInit, OnDestroy {
     try {
       saved = localStorage.getItem('assembly-theme');
     } catch {}
-    const prefersDark = this.mediaQuery.matches;
-    this.isDark.set(saved ? saved === 'dark' : prefersDark);
-    this.applyDarkClass();
+    if (saved && ['light', 'steel', 'dark'].includes(saved)) {
+      this.currentTheme.set(saved as 'light' | 'steel' | 'dark');
+    } else {
+      const prefersDark = this.mediaQuery.matches;
+      this.currentTheme.set(prefersDark ? 'dark' : 'light');
+    }
+    this.applyThemeClasses();
 
     this.mediaQuery.addEventListener('change', this.themeChangeHandler);
 
     effect(() => {
-      this.applyDarkClass();
+      this.applyThemeClasses();
     });
   }
 
-  private applyDarkClass() {
-    if (this.isDark()) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+  private applyThemeClasses() {
+    const el = document.documentElement;
+    const theme = this.currentTheme();
+    // Remove all theme classes
+    el.classList.remove('dark', 'steel');
+    if (theme === 'steel') {
+      el.classList.add('dark', 'steel');
+    } else if (theme === 'dark') {
+      el.classList.add('dark');
     }
+    // light: no classes
   }
 
   ngOnDestroy() {

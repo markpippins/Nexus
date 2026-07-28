@@ -44,7 +44,7 @@ import {
   upsertRole,
   deleteRole,
 } from "./db";
-import { initRedis, closeRedis } from "./memory";
+import { initRedis, closeRedis, getRoleCheckpoints } from "./memory";
 import { registerToolHandlers, toolDefinitions } from "./tools";
 import { getDueSchedulerEntries, updateSchedulerEntry, listSchedulerEntries, createSchedulerEntry, deleteSchedulerEntry } from "./db";
 
@@ -129,8 +129,23 @@ app.get("/health", async (_req, res) => {
     status: "ok",
     port: PORT,
     pid: process.pid,
-    timestamp: new Date().toISOString(),
+    timestamp: new Date().toISOString()
   });
+});
+
+// ── MCP Memory Updates ─────────────────────────────────────────────
+
+app.get("/api/mcp/memory/role-updates", async (_req, res) => {
+  try {
+    const roles = await getRoleCheckpoints();
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      checkpoints: roles
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── AI Configuration Registry ─────────────────────────────────────

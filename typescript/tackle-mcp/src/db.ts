@@ -2338,9 +2338,10 @@ export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
     WHERE enabled = 1
       AND (
         last_run_at IS NULL
+        OR last_run_at = ''
         OR (
           schedule_type = 'interval'
-          AND EXTRACT(EPOCH FROM NOW() - last_run_at) >= schedule_value
+          AND EXTRACT(EPOCH FROM NOW() - last_run_at::timestamp) >= schedule_value
         )
       )
     ORDER BY last_run_at ASC NULLS FIRST

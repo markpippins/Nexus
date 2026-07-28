@@ -1,5 +1,6 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -129,5 +130,46 @@ class OperatingSystemControllerTest {
 
         mockMvc.perform(delete("/api/v1/operating-systems/1"))
                 .andExpect(status().isNotFound());
+    }
+
+    // ================================================================
+    // ORANGE / RED / SILENT FAILURE — deepened coverage
+    // ================================================================
+
+    @Test
+    void create_MalformedJson_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/operating-systems")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{bad json"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getById_NegativeId_returnsNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/operating-systems/-1"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void metamorphic_sameInput_sameOutput() throws Exception {
+        when(repository.findById(1L)).thenReturn(Optional.of(testOS));
+
+        String r1 = mockMvc.perform(get("/api/v1/operating-systems/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String r2 = mockMvc.perform(get("/api/v1/operating-systems/1")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals(r1, r2, "Same OS should produce identical JSON");
+    }
+
+    @Test
+    void regressionLock_notFound_emptyBody() throws Exception {
+        when(repository.findById(1L)).thenReturn(Optional.empty());
+
+        String body = mockMvc.perform(get("/api/v1/operating-systems/1"))
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+
+        assertEquals("", body, "404 responses currently empty — regression lock");
     }
 }

@@ -15,9 +15,11 @@ this test verifies the DBAdapter creates manager-owned tables in PG mode.
 """
 
 import os
+import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from db_adapter import DBAdapter, _ConnectionProxy, _get_schema
 
 

@@ -27,7 +27,7 @@ from typing import Dict, Set
 # APPROVED → QUEUED → EXECUTING → COMPLETED → ARCHIVED + FAILED
 
 WRP_ADJACENCY_MATRIX: Dict[str, Set[str]] = {
-    "CREATED":       {"INTAKE", "FAILED"},
+    "CREATED":       {"INTAKE"},           # FAILED not reachable from CREATED per TS canonical
     "INTAKE":        {"PLANNING", "FAILED"},
     "PLANNING":      {"CRITIQUE", "FAILED"},
     "CRITIQUE":      {"PLANNING", "SPECIFICATION", "FAILED"},
@@ -54,7 +54,6 @@ def is_valid_transition(from_state: str, to_state: str) -> bool:
 # Maps each Conduit receipt type to the WRP state it represents.
 
 RECEIPT_TO_WRP_STATE: Dict[str, str] = {
-    "PROPOSED":       "CREATED",
     "PLANNING":       "INTAKE",
     "PLAN_CREATE":    "PLANNING",
     "CRITIQUE":       "CRITIQUE",

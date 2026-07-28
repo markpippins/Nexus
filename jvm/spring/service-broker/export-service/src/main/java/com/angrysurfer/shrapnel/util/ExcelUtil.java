@@ -2,7 +2,7 @@ package com.angrysurfer.shrapnel.util;
 
 import com.angrysurfer.shrapnel.IExport;
 import com.angrysurfer.shrapnel.component.writer.ExcelDataWriter;
-import com.angrysurfer.shrapnel.exception.ShrapnelException;
+import com.aibizarchitect.nexus.shrapnel.exception.ShrapnelException;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;

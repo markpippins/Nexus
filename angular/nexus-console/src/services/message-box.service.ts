@@ -17,14 +17,15 @@ export interface MessageBoxMessage {
   content: string;
 }
 
-const VALID_ROLES = ["planner", "builder", "reviewer", "critic"] as const;
+const VALID_ROLES = ["operator", "planner", "builder", "reviewer", "critic"] as const;
 type AgentRole = typeof VALID_ROLES[number];
-const DEFAULT_ROLE: AgentRole = "planner";
+const DEFAULT_ROLE: AgentRole = "operator";
 
 export interface MessageBoxInstance {
   id: string;
   title: string;
   agentRole: AgentRole | null;
+  sessionId: string | null;  // Operator session continuity
   minimized: boolean;
   left: number;
   width: number;
@@ -68,6 +69,7 @@ export class MessageBoxService {
       id,
       title,
       agentRole: null,
+      sessionId: null,
       minimized: false,
       left: this.defaultLeft(width),
       width,
@@ -136,7 +138,7 @@ export class MessageBoxService {
     }
 
     // Parse @role mention from the message.
-    const roleMatch = rawText.match(/@(planner|builder|reviewer|critic)\b/i);
+    const roleMatch = rawText.match(/@(operator|planner|builder|reviewer|critic)\b/i);
     const agentRole: AgentRole = roleMatch
       ? (roleMatch[1].toLowerCase() as AgentRole)
       : DEFAULT_ROLE;
@@ -160,6 +162,10 @@ export class MessageBoxService {
     try {
       const chatUrl = await this.getChatUrl();
 
+      // Get session_id for continuity (stored from first response)
+      let currentSessionId: string | null = null;
+      this.patch(id, (b) => { currentSessionId = b.sessionId; return b; });
+
       // Send the message directly to the operator service.
       const chatRes = await fetch(`${chatUrl}/chat`, {
         method: "POST",
@@ -167,6 +173,7 @@ export class MessageBoxService {
         body: JSON.stringify({
           role: agentRole,
           message: messageText,
+          session_id: currentSessionId,
           log_level: "ERROR",
         }),
       });
@@ -174,6 +181,11 @@ export class MessageBoxService {
         throw new Error(`Chat server returned ${chatRes.status}`);
       }
       const chatData = await chatRes.json();
+
+      // Save session_id for continuity on subsequent messages
+      if (chatData.session_id) {
+        this.patch(id, (b) => ({ ...b, sessionId: chatData.session_id }));
+      }
 
       // POST now waits for the LLM response and returns it directly.
       const responseText: string = chatData.response || "";
@@ -256,7 +268,7 @@ export class MessageBoxService {
     this.patch(id, b => ({ ...b, draft: '' }));
     switch (command) {
       case '/clear':
-        this.patch(id, b => ({ ...b, messages: [] }));
+        this.patch(id, b => ({ ...b, messages: [], sessionId: null }));
         break;
       case '/help':
         console.log('[message-box] /help — keyboard shortcuts not yet wired');

@@ -330,6 +330,7 @@ class TestE2EPipeline(unittest.TestCase):
         plans = self.db.get_eligible_plans("planner")
         self.assertEqual(len(plans), 1)
         self.assertEqual(plans[0]["id"], "0001")
+        self.assertEqual(plans[0]["derived_status"], "PROPOSED")
 
     def test_planner_eligible_with_planning_and_ticket(self):
         """Planner is eligible when plan has PLANNING receipt + open planner ticket."""
@@ -338,6 +339,7 @@ class TestE2EPipeline(unittest.TestCase):
         self._seed_open_ticket("planner")
         plans = self.db.get_eligible_plans("planner")
         self.assertEqual(len(plans), 1)
+        self.assertEqual(plans[0]["derived_status"], "PLANNING")
 
     def test_planner_not_eligible_without_ticket(self):
         """Plan with PROPOSED but no open planner ticket is NOT eligible for planner."""
@@ -369,6 +371,7 @@ class TestE2EPipeline(unittest.TestCase):
         plans = self.db.get_eligible_plans("builder")
         self.assertEqual(len(plans), 1)
         self.assertEqual(plans[0]["id"], "0001")
+        self.assertEqual(plans[0]["derived_status"], "PLAN_CREATE")
 
     def test_critic_eligible_after_planner_completes(self):
         """Critic is eligible after planner completes (PLAN_CREATE + open ticket)."""
@@ -376,7 +379,7 @@ class TestE2EPipeline(unittest.TestCase):
         self.db.create_next_tickets("0001", "planner", "completed")
         plans = self.db.get_eligible_plans("critic")
         self.assertEqual(len(plans), 1)
-        self.assertEqual(plans[0]["id"], "0001")
+        self.assertEqual(plans[0]["derived_status"], "PLAN_CREATE")
 
     # ── Full _dispatch_one flow ─────────────────────────────────
     # Superseded by Temporal PlanExecutionWorkflow.

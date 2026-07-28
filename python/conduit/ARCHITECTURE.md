@@ -8,7 +8,7 @@
 The WorkRequest type and the WorkRequestFactory are shared concepts.
 
 This document is the single reference for the Conduit system spanning
-three projects (`nexus/legacy/python/conduit/`, `nexus/typescript/conduit-mcp/`, `nexus/angular/conduit-ui/`) and a
+three projects (`nexus/python/conduit/`, `nexus/typescript/conduit-mcp/`, `nexus/angular/conduit-ui/`) and a
 shared PostgreSQL database. An agent (or developer) arriving fresh should find
 everything needed here to understand how work flows from cron →
 discovery → DCO → executor → audit trail.
@@ -69,12 +69,12 @@ The pipeline follows a deterministic state machine with exactly one LLM step
 
 | Stage | Name            | LLM? | Description                                                                 |
 |-------|-----------------|------|-----------------------------------------------------------------------------|
-| S0    | Cron trigger    | No   | `*/3 * * * * pipeline-manager --all` fires `main.py`                        |
+| S0    | Cron trigger    | No   | `*/3 * * * * python3 main.py --all` fires `main.py`                        |
 | S1    | Lock            | No   | `fcntl.flock` on `/tmp/pipeline-manager.lock` — only one instance at a time |
 | S2    | Discover        | No   | SQL query on `plan_status.derived_status` for each role's eligibility       |
 | S3    | Normalize       | No   | `WorkRequestFactory.create_from_plan()` — plan metadata → DCO (JSON)        |
 | S4    | Dispatch loop   | No   | Iterate over eligible plans, call `_dispatch_one()` for each                 |
-| S5    | Resolve         | No   | `resolve_executor(registry, harness)` — look up executor from registry.json |
+| S5    | Resolve         | No   | `resolve_executor(registry, harness)` — look up executor from the registry config |
 | S6    | Execute         | YES  | `subprocess` → `executor_cloud.py` → opencode (the **only** LLM call)       |
 | S7    | Commit          | No   | Write receipt + WorkResultEvent, update `work_requests` status               |
 | S8    | Cursor advance  | No   | `db.advance_cursor(role, plan_id, wr_id)` — monotonic, never rewinds        |
@@ -102,9 +102,9 @@ main.py --all
     │
     ├─ S1: acquire_lock() ─── fcntl on /tmp/pipeline-manager.lock
     │
-    ├─ for role in [builder, reviewer, planner, critic]:
+    ├─ for role in [reviewer, planner, builder, critic]:
     │     │
-    │     ├─ S1b: check stale sessions (watchdog, 30 min timeout)
+    │     ├─ S1b: check stale sessions (watchdog, 25 min timeout)
     │     │
     │     ├─ S2: db.get_eligible_plans(role)
     │     │       SELECT * FROM plan_status WHERE derived_status IN (...)
@@ -168,8 +168,8 @@ the ticket is closed as `failed` and a retry ticket is created via
   (via `db.add_session_work_time()`), NOT waiting/retry sleep time
 - The watchdog checks `total_work_seconds` against `WATCHDOG_STALE_SECONDS`,
   so waiting time does not count toward staleness
-- 5 retries × 300s = 25 minutes of possible waiting, safely under the
-  30-minute stale threshold
+- 5 retries × 300s = 25 minutes of possible waiting, at the
+  25-minute stale threshold (PIPELINE_WATCHDOG_STALE=1500s)
 - The circuit breaker is NOT tripped on API_LIMIT — the pipeline keeps
   running, this plan just takes longer
 - `_detect_api_limit_error()` checks output text regardless of exit code
@@ -180,18 +180,25 @@ the ticket is closed as `failed` and a retry ticket is created via
 
 ## 3. Component Map
 
-### 3.1 `nexus/legacy/python/conduit/` — Cron Orchestrator (Python)
+### 3.1 `nexus/python/conduit/` — Cron Orchestrator (Python)
 
 | File                       | Purpose                                                                                     |
 |----------------------------|---------------------------------------------------------------------------------------------|
-| `main.py`                  | Entry point. Lock, discover, dispatch loop with rate-limit retry, cursor. `--status`, `--run`, `--all`, `--clean-test-artifacts`, `--plan`, `--supersede`, `--cancel` flags. |
-| `db_adapter.py`            | PostgreSQL adapter. Sessions, receipts, work_requests, `pipeline_cursor`, tickets, circuit breaker, `add_session_work_time()`, `create_next_tickets()`, `detect_stale/expired_tickets()`. |
+| `main.py`                  | Entry point. Lock, discover, dispatch with model chain + retry loop, cursor. All CLI flags. |
+| `db_adapter.py`            | PostgreSQL adapter. Tickets, receipts, work_requests, `pipeline_cursor`, circuit breaker, sessions, leases, attempts, execution receipts, agent budgets. |
 | `executor_cloud.py`        | Worker process. Parses DCO, builds structured prompt, invokes opencode, writes `result.json`. |
 | `executor_registry.py`     | Pydantic models for registry config. `load_registry()`, `resolve_executor()`.                |
 | `work_request.py`          | Canonical WorkRequest DCO and WorkResultEvent Pydantic models.                               |
 | `work_request_factory.py`  | `create_from_plan()` — converts plan DB row into a full WorkRequestDCO.                      |
-| `registry.json`            | Model config (default/fallback harness+model) + executor catalogue.                          |
-| `agent_chat.py`            | Local HTTP chat server (`POST /chat`) for launching agents ad-hoc.                           |
+| `token_estimator.py`       | Token estimation (tiktoken) and cost estimation from pricing tables.                         |
+| `env_config.py`            | Shared `.env` loader (no `python-dotenv` dependency).                                        |
+| `agent_scheduler_runner.py`| Launches due agents from `tackle.agent_scheduler` on cron.                                   |
+| `cli_executor.py`          | Standalone executor proving the Execution Authority abstraction.                             |
+| `ccnf_bridge.py`           | CCNF conformance bridge for deterministic canonicalization and execution receipts.            |
+| `bridge/`                  | Conduit → WRP Kernel bridge. Polls `vision.receipts`, maps to KernelDeltas.                  |
+| `wrp_kernel/`              | Deterministic, replayable WRP Kernel Runtime (engine, identity, graph, lineage, snapshots).   |
+| `app/`                     | FastAPI Kernel Runtime API server (port 3103).                                                |
+| `schema.sql`               | Reference SQL schema (MCP server is the schema authority).                                   |
 
 ### 3.2 `nexus/typescript/conduit-mcp/` — MCP Server (TypeScript, port 3100)
 
@@ -509,6 +516,10 @@ python3 main.py --run planner
 # Run all roles sequentially
 python3 main.py --all
 
+# Sync receipts to WRP Kernel Runtime
+python3 main.py --kernel-sync          # one-shot
+python3 main.py --kernel-sync-daemon   # continuous poll loop
+
 # Dispatch a single plan (bypasses cursor/pause checks)
 python3 main.py --plan 0075 [--force]
 
@@ -537,7 +548,7 @@ so every entry-point uses the same logic without any external dependency.
 Copy `.env.example` to `.env` and adjust paths for your machine:
 
 ```bash
-cp .env.example .env          # in nexus/legacy/python/conduit/
+cp .env.example .env          # in nexus/python/conduit/
 cp .env.example .env          # in nexus/typescript/conduit-mcp/
 ```
 
@@ -548,16 +559,19 @@ cp .env.example .env          # in nexus/typescript/conduit-mcp/
 | `CONDUIT_PG_DSN`              | `host=localhost port=5432 user=pguser password=pgpass dbname=nexus`  | PostgreSQL connection string (required) |
 | `CONDUIT_PG_SCHEMA`           | `conduit`                                                             | PostgreSQL schema name                 |
 | `CONDUIT_DATA_DIR`            | `/home/codex/dev/nexus/.conduit-data`                                | Conduit data directory (logs, artifacts)|
+| `CONDUIT_LOG_PATH`           | `$CONDUIT_DATA_DIR/conduit.log`                            | Structured log file path               |
+| `CONDUIT_LOG_LEVEL`          | `INFO`                                                     | Log level (DEBUG, INFO, WARNING, ERROR)|
 | `PIPELINE_LOCK_PATH`          | `/tmp/pipeline-manager.lock`                               | Lock file (prevents concurrent runs)   |
 | `PIPELINE_DCO_DIR`            | `/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS`                   | Where WorkRequest DCOs are written     |
 | `PIPELINE_ROOT`               | `/home/codex/dev`                                          | Project root for executor artifacts    |
 | `OPENCODE_BIN`                | `/home/codex/.opencode/bin/opencode`                       | Path to the opencode binary            |
 | `PIPELINE_EXECUTOR_TIMEOUT`   | `1800`                                                     | Subprocess timeout in seconds          |
-| `PIPELINE_WATCHDOG_STALE`     | `1800`                                                     | Max cumulative work seconds before stale kill (v090: checks total_work_seconds, not wall-clock) |
+| `PIPELINE_WATCHDOG_STALE`     | `1500`                                                     | Max cumulative work seconds before stale kill (v090: checks total_work_seconds, not wall-clock) |
 | `PIPELINE_LOCK_STALE`         | `3600`                                                     | Lock staleness threshold               |
 | `API_LIMIT_RETRY_DELAY`       | `300` (5 min)                                              | Sleep between rate-limit retries        |
 | `API_LIMIT_MAX_RETRIES`       | `5`                                                        | Max retry attempts per plan-role        |
 | `MCP_BASE_URL`               | `http://localhost:3100`                                    | MCP server URL for plan sync            |
+| `PIPELINE_MODEL`             | *(optional)*                                               | Fallback model when tackle-mcp unavailable |
 
 #### `.env` (loaded by `src/env.ts`)
 
@@ -573,7 +587,11 @@ precedence over `.env`).
 ### 8.2 Crontab
 
 ```
-*/3 * * * * cd /home/codex/dev/nexus/legacy/python/conduit && python3 main.py --all >> /tmp/pipeline-manager.log 2>&1
+# Pipeline orchestrator (every 3 min)
+*/3 * * * * cd /home/codex/dev/nexus/python/conduit && python3 main.py --all >> /tmp/pipeline-manager.log 2>&1
+
+# Agent scheduler (every minute)
+* * * * * cd /home/codex/dev/nexus/python/conduit && python3 agent_scheduler_runner.py >> /tmp/agent-scheduler.log 2>&1
 ```
 
 ### 8.3 MCP Server
@@ -608,7 +626,7 @@ ng serve                # port 4400
 curl -s http://localhost:3100/state | python3 -m json.tool | head -20
 
 # Check pipeline status
-cd /home/codex/dev/nexus/legacy/python/conduit && python3 main.py --status
+cd /home/codex/dev/nexus/python/conduit && python3 main.py --status
 
 # Clean stale lock
 rm -f /tmp/pipeline-manager.lock

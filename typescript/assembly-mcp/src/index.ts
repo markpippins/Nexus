@@ -1,13 +1,15 @@
 import express from "express";
 import cors from "cors";
 import { loadEnv } from "./env";
-import { initDb } from "./db";
 import { toolDefinitions, handleToolCall } from "./tools";
+import { listForums } from "./assembly-client";
 
 // ── Load .env ───────────────────────────────────────────────────────
 loadEnv();
 
-const PORT = parseInt(process.env.ASSEMBLY_MCP_PORT || "3107", 10);
+// Note: assembly-mcp uses port 3113 (set via .env or ASSEMBLY_MCP_PORT env).
+// Port 3112 is taken by service-broker-mcp. assembly-srv runs on 3107.
+const PORT = parseInt(process.env.ASSEMBLY_MCP_PORT || "3113", 10);
 
 const app = express();
 app.use(cors());
@@ -54,17 +56,15 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok", port: PORT });
 });
 
+// ── State endpoint — delegates to assembly-srv REST API ─────────────
 app.get("/state", async (_req, res) => {
   try {
-    const { getDb } = await import("./db");
-    const pool = getDb();
-    const { rows } = await pool.query(
-      `SELECT COUNT(*) as forum_count FROM assembly.forums WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt > now()`
-    );
+    const forums = await listForums();
     res.json({
       status: "ok",
       port: PORT,
-      forums: parseInt(rows[0]?.forum_count || "0", 10),
+      forums: Array.isArray(forums) ? forums.length : 0,
+      backend: "assembly-srv (REST)",
     });
   } catch (err: any) {
     res.status(503).json({ status: "error", message: err.message });
@@ -73,10 +73,7 @@ app.get("/state", async (_req, res) => {
 
 // ── Start ───────────────────────────────────────────────────────────
 async function main() {
-  console.log("[assembly-mcp] Initialising database...");
-  await initDb();
-  console.log("[assembly-mcp] Database ready.");
-
+  console.log(`[assembly-mcp] Starting (no SQL dependency — delegates to assembly-srv at port 3107)...`);
   app.listen(PORT, () => {
     console.log(`[assembly-mcp] Server running on http://localhost:${PORT}`);
     console.log(`[assembly-mcp] MCP endpoint: POST http://localhost:${PORT}/`);
