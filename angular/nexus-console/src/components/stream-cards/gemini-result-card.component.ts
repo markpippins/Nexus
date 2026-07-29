@@ -31,4 +31,10 @@ export class GeminiResultCardComponent {
   onToggleBookmark(): void {
     this.bookmarkToggled.emit(this.result());
   }
+
+  onMagnetClick(event: MouseEvent, path: string[]): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.navigateToMagnet.emit(path);
+  }
 }
