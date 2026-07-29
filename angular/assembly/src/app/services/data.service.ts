@@ -580,11 +580,11 @@ export class DataService {
   }
 
   getSpecs(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
-    return this.http.get<Paged<SpecItem>>(`${this.base}/specs?page=${page}&pageSize=${pageSize}`);
+    return this.http.get<Paged<SpecItem>>(`${this.nebula}/specs?page=${page}&pageSize=${pageSize}`);
   }
 
   getSpecItem(id: string) {
-    return this.http.get<SpecItem>(`${this.base}/specs/${id}`);
+    return this.http.get<SpecItem>(`${this.nebula}/specs/${id}`);
   }
 
   getAgendaItems(agendaId: string) {

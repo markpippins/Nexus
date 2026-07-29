@@ -1,20 +1,22 @@
-import { Component, ChangeDetectionStrategy, input, output, ViewEncapsulation, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, ViewEncapsulation, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { EXTERNAL_SITES } from '../components/external-site-selector/external-site-selector.component.js';
 import { MessageBoxService } from '../services/message-box.service.js';
+import { LinkService } from '../services/link.service.js';
+import { LinkEditorDialogComponent } from '../components/link-editor-dialog/link-editor-dialog.component.js';
 
-export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui' | 'nebula-cp' | 'monaco-judge' | 'conduit-legacy-ui';
+export type ViewMode = 'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui' | 'nebula-cp' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui';
 
 @Component({
   selector: 'app-bottom-bar',
   templateUrl: './bottom-bar.component.html',
   styleUrls: ['./bottom-bar.component.scss'],
-  imports: [CommonModule],
+  imports: [CommonModule, LinkEditorDialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
 })
 export class BottomBarComponent {
   private mbox = inject(MessageBoxService);
+  readonly linkService = inject(LinkService);
 
   /** Status text shown on the left side of the bar */
   statusInfo = input<string>('Ready');
@@ -26,7 +28,13 @@ export class BottomBarComponent {
   /** Emitted when the AI config button is clicked */
   aiconfigClick = output<void>();
 
-  readonly externalSites = EXTERNAL_SITES;
+  /** Whether the link editor dialog is visible */
+  showLinkEditor = signal(false);
+  /** Whether the hamburger menu is open */
+  menuOpen = signal(false);
+
+  /** Reactive links from the API */
+  readonly externalSites = computed(() => this.linkService.links());
 
   openExternal(url: string): void {
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -49,6 +57,28 @@ export class BottomBarComponent {
     // Normalize the same way ImageService.getIconUrl does: lowercase, spaces→dashes
     const normalized = shortName.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-');
     return `${base}/${encodeURIComponent(normalized)}`;
+  }
+
+  /** Toggle the hamburger menu */
+  toggleMenu(): void {
+    this.menuOpen.update(v => !v);
+    if (this.menuOpen()) {
+      setTimeout(() => {
+        const handler = () => { this.menuOpen.set(false); document.removeEventListener('click', handler); };
+        document.addEventListener('click', handler, { once: true });
+      }, 0);
+    }
+  }
+
+  /** Close the hamburger menu */
+  closeMenu(): void {
+    this.menuOpen.set(false);
+  }
+
+  /** Open the link editor dialog */
+  openLinkEditor(): void {
+    this.menuOpen.set(false);
+    this.showLinkEditor.set(true);
   }
 
   /** Hide the image inside a button when it fails to load (image not found on server). */

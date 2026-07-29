@@ -117,3 +117,63 @@ app-bottom-bar {
   height: 16px;
   object-fit: contain;
 }
+
+/* ── Separator between link groups ── */
+.external-separator {
+  width: 1px;
+  height: 18px;
+  background: rgb(var(--color-border-muted));
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* ── Hamburger menu ── */
+.hamburger-menu {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.hamburger-btn {
+  color: rgb(var(--color-text-muted));
+}
+
+.hamburger-btn:hover {
+  color: rgb(var(--color-text-base));
+}
+
+.hamburger-dropdown {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 4px;
+  background: rgb(var(--color-surface));
+  border: 1px solid rgb(var(--color-border-base));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  min-width: 160px;
+  z-index: 999;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: rgb(var(--color-text-base));
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: background 150ms;
+  text-align: left;
+}
+
+.menu-item:hover {
+  background: rgb(var(--color-surface-hover));
+}

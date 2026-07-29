@@ -45,22 +45,53 @@
       </div>
     </div>
 
-    @for (site of externalSites; track site.url) {
-      <button
-        class="external-btn"
-        [title]="site.url"
-        (click)="openExternal(site.url)"
-      >
-        @if (imageBaseUrl(); as baseUrl) {
-          <img
-            [src]="getSiteIconUrl(site.shortName)"
-            [alt]="site.name"
-            class="external-btn-img"
-            loading="lazy"
-            (error)="onImageError($event)"
-          />
-        }
-      </button>
+    @for (site of externalSites(); track site.id) {
+      @if (site.type === 'separator') {
+        <div class="external-separator"></div>
+      } @else {
+        <button
+          class="external-btn"
+          [title]="site.text || site.address"
+          (click)="openExternal(site.address)"
+        >
+          @if (imageBaseUrl(); as baseUrl) {
+            <img
+              [src]="getSiteIconUrl(site.imagename)"
+              [alt]="site.text || site.imagename"
+              class="external-btn-img"
+              loading="lazy"
+              (error)="onImageError($event)"
+            />
+          }
+        </button>
+      }
     }
+
+    <!-- Hamburger menu -->
+    <div class="hamburger-menu">
+      <button
+        class="external-btn hamburger-btn"
+        title="Menu"
+        (click)="$event.stopPropagation(); toggleMenu()"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="4" y1="6" x2="20" y2="6"></line>
+          <line x1="4" y1="12" x2="20" y2="12"></line>
+          <line x1="4" y1="18" x2="20" y2="18"></line>
+        </svg>
+      </button>
+      @if (menuOpen()) {
+        <div class="hamburger-dropdown">
+          <button class="menu-item" (click)="openLinkEditor()">
+            ✏️ Edit Links...
+          </button>
+        </div>
+      }
+    </div>
   </div>
 </div>
+
+<!-- Link Editor Dialog -->
+@if (showLinkEditor()) {
+  <app-link-editor-dialog (close)="showLinkEditor.set(false)" />
+}

@@ -54,6 +54,40 @@ const server = app.listen(PORT, () => {
   console.log(`nebula-srv listening on http://localhost:${PORT}`);
 });
 
+// Handle listen-time errors (e.g. EADDRINUSE) cleanly so a port conflict
+// produces a one-line log line + non-zero exit instead of an unhandled
+// 'error' event that crashes the process with a stack trace. This also
+// lets systemd's Restart=on-failure behave predictably: a taken port is
+// a fatal-but-clean condition, not a crash.
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`nebula-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('nebula-srv: listen error:', err.message);
+  }
+  process.exit(1);
+});
+
+// ── Process-level safety net ─────────────────────────────────────
+// Prevent unhandled errors from crashing the process.
+// Redis connection errors, EPIPE on stale sockets, and other async
+// I/O errors can fire after responses are sent; log them instead of
+// killing the server. This is the last-resort safety net — route
+// handlers should still use their own try/catch for granular errors.
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  // EADDRINUSE is a startup fatal — exit cleanly.
+  if (err.code === 'EADDRINUSE') {
+    console.error(`nebula-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  // EPIPE, ECONNRESET, ETIMEDOUT are connection-level noise — log and continue.
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[process] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[process] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 // ── Graceful shutdown ──────────────────────────────────────────────
 process.on('SIGTERM', async () => {
   console.log('[server] SIGTERM received, shutting down...');

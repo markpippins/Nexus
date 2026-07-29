@@ -1,8 +1,11 @@
 package com.aibizarchitect.nexus.v1.spring.serviceregistry.controller;
 
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,8 +20,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.aibizarchitect.nexus.v1.dto.ExternalServiceRegistration;
 import com.aibizarchitect.nexus.v1.dto.HeartbeatPayload;
 
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Deployment;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Server;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Service;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.entity.Systems;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.DeploymentRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServerRepository;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.repository.ServiceRepository;
+import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.DomainSystemService;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.ExternalServiceRegistrationService;
 import com.aibizarchitect.nexus.v1.spring.serviceregistry.service.ServiceStatusCacheService;
 
@@ -31,13 +40,22 @@ public class RegistryController {
     private final ExternalServiceRegistrationService registrationService;
     private final ServiceStatusCacheService cacheService;
     private final ServiceRepository serviceRepository;
+    private final ServerRepository serverRepository;
+    private final DeploymentRepository deploymentRepository;
+    private final DomainSystemService domainSystemService;
 
     public RegistryController(ExternalServiceRegistrationService registrationService,
                               ServiceStatusCacheService cacheService,
-                              ServiceRepository serviceRepository) {
+                              ServiceRepository serviceRepository,
+                              ServerRepository serverRepository,
+                              DeploymentRepository deploymentRepository,
+                              DomainSystemService domainSystemService) {
         this.registrationService = registrationService;
         this.cacheService = cacheService;
         this.serviceRepository = serviceRepository;
+        this.serverRepository = serverRepository;
+        this.deploymentRepository = deploymentRepository;
+        this.domainSystemService = domainSystemService;
     }
 
     /**
@@ -181,6 +199,228 @@ public class RegistryController {
                 "message", "Service gracefully deregistered",
                 "serviceName", serviceName,
                 "removed", String.valueOf(removed)));
+    }
+
+    /**
+     * Aggregate platform state — returns total counts, health breakdown,
+     * and topology graph nodes/edges for the platform operations dashboard.
+     *
+     * GET /api/v1/registry/aggregate
+     */
+    @GetMapping("/aggregate")
+    public ResponseEntity<Map<String, Object>> getAggregate() {
+        List<Service> allServices = serviceRepository.findAll();
+        List<Server> allServers = serverRepository.findAll();
+        List<Deployment> allDeployments = deploymentRepository.findAll();
+        List<Systems> allSystems = domainSystemService.getAllSystems();
+
+        // --- Health counts across services + servers ---
+        long healthyCount = 0;
+        long degradedCount = 0;
+        long criticalCount = 0;
+        long offlineCount = 0;
+
+        for (Service svc : allServices) {
+            String s = svc.getStatus();
+            if (s == null) {
+                offlineCount++;
+                continue;
+            }
+            switch (s.toUpperCase()) {
+                case "ACTIVE":
+                case "HEALTHY":
+                case "RUNNING":
+                    healthyCount++; break;
+                case "DEGRADED":
+                case "DEPRECATED":
+                    degradedCount++; break;
+                case "UNHEALTHY":
+                case "CRITICAL":
+                case "FAILED":
+                    criticalCount++; break;
+                default:
+                    offlineCount++; break;
+            }
+        }
+
+        for (Server srv : allServers) {
+            String s = srv.getStatus();
+            if (s == null) continue;
+            switch (s.toUpperCase()) {
+                case "ACTIVE":
+                    healthyCount++; break;
+                case "MAINTENANCE":
+                case "DEGRADED":
+                    degradedCount++; break;
+                case "INACTIVE":
+                default:
+                    offlineCount++; break;
+            }
+        }
+
+        long totalEntities = allServices.size() + allServers.size();
+        long overallHealthPercent = totalEntities > 0
+                ? Math.round((healthyCount * 100.0) / totalEntities)
+                : 100;
+
+        // --- Build topology nodes ---
+        List<Map<String, Object>> nodes = new ArrayList<>();
+
+        // System nodes
+        for (Systems sys : allSystems) {
+            Map<String, Object> node = new HashMap<>();
+            node.put("id", "sys-" + sys.getId());
+            node.put("label", sys.getName());
+            node.put("type", "system");
+            node.put("status", "healthy");
+            node.put("systemName", sys.getName());
+            node.put("metricsSummary", sys.getSystemType() != null ? sys.getSystemType().getName() : "");
+            nodes.add(node);
+        }
+
+        // Service nodes
+        for (Service svc : allServices) {
+            Map<String, Object> node = new HashMap<>();
+            node.put("id", "svc-" + svc.getId());
+            node.put("label", svc.getName());
+            node.put("type", "service");
+            node.put("status", svc.getStatus() != null ? svc.getStatus().toLowerCase() : "unknown");
+            node.put("systemName", svc.getFramework() != null ? svc.getFramework().getName() : "");
+            node.put("metricsSummary", (svc.getDefaultPort() != null ? "port " + svc.getDefaultPort() : ""));
+            nodes.add(node);
+        }
+
+        // Server nodes
+        for (Server srv : allServers) {
+            Map<String, Object> node = new HashMap<>();
+            node.put("id", "srv-" + srv.getId());
+            node.put("label", srv.getHostname());
+            node.put("type", "server");
+            node.put("status", srv.getStatus() != null ? srv.getStatus().toLowerCase() : "unknown");
+            node.put("systemName", srv.getRegion() != null ? srv.getRegion() : "");
+            String metrics = "";
+            if (srv.getCpuCores() != null) metrics += "CPU " + srv.getCpuCores() + "c ";
+            if (srv.getMemory() != null) metrics += "RAM " + srv.getMemory();
+            node.put("metricsSummary", metrics.trim());
+            nodes.add(node);
+        }
+
+        // --- Build topology edges ---
+        List<Map<String, Object>> edges = new ArrayList<>();
+
+        // Deployment edges: service → server (hosted-on)
+        for (Deployment dep : allDeployments) {
+            if (dep.getService() != null && dep.getServer() != null) {
+                Map<String, Object> edge = new HashMap<>();
+                edge.put("id", "e-dep-" + dep.getId());
+                edge.put("source", "svc-" + dep.getService().getId());
+                edge.put("target", "srv-" + dep.getServer().getId());
+                edge.put("label", "deployed-on");
+                edge.put("status", dep.getHealthStatus() != null ? dep.getHealthStatus().toLowerCase() : "unknown");
+                edges.add(edge);
+            }
+        }
+
+        // --- Build response ---
+        Map<String, Object> response = new HashMap<>();
+        response.put("totalSystems", allSystems.size());
+        response.put("totalServices", allServices.size());
+        response.put("totalServers", allServers.size());
+        response.put("totalDeployments", allDeployments.size());
+        response.put("healthyCount", healthyCount);
+        response.put("degradedCount", degradedCount);
+        response.put("criticalCount", criticalCount);
+        response.put("offlineCount", offlineCount);
+        response.put("overallHealthPercent", overallHealthPercent);
+        response.put("avgLatencyMs", 0);   // runtime metric — not available at entity level
+        response.put("totalRps", 0);        // runtime metric — not available at entity level
+        response.put("activeIncidentsCount", degradedCount + criticalCount);
+        response.put("nodes", nodes);
+        response.put("edges", edges);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Simulated log stream for a given entity (service, server, etc.).
+     * Returns 30 synthetic log entries with varying levels and messages.
+     *
+     * GET /api/v1/registry/logs/{entityType}/{entityId}
+     */
+    @GetMapping("/logs/{entityType}/{entityId}")
+    public ResponseEntity<Map<String, Object>> getLogs(
+            @PathVariable String entityType,
+            @PathVariable String entityId) {
+
+        String[] levels = {"info", "info", "info", "warn", "error", "debug"};
+        String[] messages = {
+            "Received HTTP GET /v1/healthcheck 200 OK - 2ms",
+            "Database connection pool active: 12 connections",
+            "Processing batch payload (248 records) from queue",
+            "Cache hit ratio: 94.2% on Redis key namespace",
+            "Slow query detected: SELECT * FROM transaction_ledger WHERE status = 'pending' (124ms)",
+            "Failed to authenticate JWT token: Expired signature from 10.128.0.14",
+            "Heartbeat ping broadcast acknowledged by registry server",
+            "GC pause duration: 18ms (young generation collection)",
+            "Rate limiter bucket consumed: 12 tokens remaining for key ip_35.210",
+            "Outbound HTTP call to Stripe API completed with status 200 (42ms)"
+        };
+
+        List<Map<String, Object>> logEntries = new ArrayList<>();
+        long nowMs = Instant.now().toEpochMilli();
+
+        for (int i = 0; i < 30; i++) {
+            long time = nowMs - (30L - i) * 3000L;
+            String level = levels[ThreadLocalRandom.current().nextInt(levels.length)];
+            String msg = messages[ThreadLocalRandom.current().nextInt(messages.length)];
+
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("id", "log-" + i + "-" + Instant.now().toEpochMilli());
+            entry.put("timestamp", Instant.ofEpochMilli(time).toString());
+            entry.put("level", level);
+            entry.put("message", "[" + entityType.toUpperCase() + ":" + entityId + "] " + msg);
+            entry.put("serviceName", entityId);
+            entry.put("traceId", "tr-" + Integer.toHexString(ThreadLocalRandom.current().nextInt(0x1000000)));
+            logEntries.add(entry);
+        }
+
+        return ResponseEntity.ok(Map.of("logs", logEntries));
+    }
+
+    /**
+     * Simulated metrics time-series for a given entity.
+     * Returns 16 data points (15-minute window) with CPU, memory, latency, error rate, and RPS.
+     *
+     * GET /api/v1/registry/metrics/{entityType}/{entityId}
+     */
+    @GetMapping("/metrics/{entityType}/{entityId}")
+    public ResponseEntity<Map<String, Object>> getMetrics(
+            @PathVariable String entityType,
+            @PathVariable String entityId) {
+
+        List<Map<String, Object>> points = new ArrayList<>();
+        long nowMs = Instant.now().toEpochMilli();
+
+        log.debug("Generating simulated metrics for {}:{}", entityType, entityId);
+
+        for (int i = 15; i >= 0; i--) {
+            long time = nowMs - (long) i * 60_000L;
+            Instant t = Instant.ofEpochMilli(time);
+            java.time.LocalTime localTime = t.atZone(java.time.ZoneId.systemDefault()).toLocalTime();
+            ThreadLocalRandom rng = ThreadLocalRandom.current();
+
+            Map<String, Object> point = new HashMap<>();
+            point.put("timestamp", t.toString());
+            point.put("timeLabel", String.format("%02d:%02d", localTime.getHour(), localTime.getMinute()));
+            point.put("cpu", Math.min(100, Math.max(10, 40 + (int) (Math.sin(i) * 20) + rng.nextInt(15))));
+            point.put("memory", Math.min(100, Math.max(20, 60 + (int) (Math.cos(i) * 15) + rng.nextInt(10))));
+            point.put("latency", Math.max(5, 20 + (int) (Math.sin(i * 0.5) * 15) + rng.nextInt(25)));
+            point.put("errorRate", Math.round(rng.nextDouble() * 0.5 * 100.0) / 100.0);
+            point.put("rps", 1200 + (int) (Math.sin(i) * 400) + rng.nextInt(200));
+            points.add(point);
+        }
+
+        return ResponseEntity.ok(Map.of("metrics", points));
     }
 
     /**

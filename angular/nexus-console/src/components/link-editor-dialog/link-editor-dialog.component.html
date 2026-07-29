@@ -1,0 +1,118 @@
+<div class="dialog-overlay" (click)="onOverlayClick($event)">
+  <div class="dialog-container">
+    <!-- Header -->
+    <div class="dialog-header">
+      <h2 class="dialog-title">Edit Links</h2>
+      <button class="dialog-close-btn" (click)="close.emit()" title="Close">✕</button>
+    </div>
+
+    <!-- Error banner -->
+    @if (error(); as err) {
+      <div class="error-banner">{{ err }}</div>
+    }
+
+    <!-- Loading -->
+    @if (loading()) {
+      <div class="loading-spinner">Loading...</div>
+    }
+
+    <!-- Links list -->
+    <div class="links-list">
+      @for (link of links(); track link.id; let idx = $index) {
+        <div class="link-row" [class.editing]="editing() === link.id" [class.is-separator]="link.type === 'separator' && editing() !== link.id">
+          @if (editing() === link.id) {
+            <!-- Edit mode -->
+            <div class="edit-form">
+              <div class="form-row">
+                <label>Type</label>
+                <select [(ngModel)]="editForm().type" class="form-input">
+                  <option value="link">🔗 Link</option>
+                  <option value="separator">➖ Separator</option>
+                </select>
+              </div>
+              @if (editForm().type === 'link') {
+                <div class="form-row">
+                  <label>URL</label>
+                  <input type="text" [(ngModel)]="editForm().address" placeholder="https://..." class="form-input" />
+                </div>
+                <div class="form-row-inline">
+                  <div class="form-row">
+                    <label>Image</label>
+                    <input type="text" [(ngModel)]="editForm().imagename" placeholder="short-name" class="form-input" />
+                  </div>
+                  <div class="form-row">
+                    <label>Text (optional)</label>
+                    <input type="text" [(ngModel)]="editForm().text" placeholder="Display text" class="form-input" />
+                  </div>
+                </div>
+              }
+              <div class="edit-actions">
+                <button class="btn btn-save" (click)="onSaveEdit(link.id)" [disabled]="saving()">💾 Save</button>
+                <button class="btn btn-cancel" (click)="cancelEdit()">Cancel</button>
+              </div>
+            </div>
+          } @else if (link.type === 'separator') {
+            <!-- Separator display mode -->
+            <div class="link-info separator-info">
+              <span class="separator-label">━━━ Separator ━━━</span>
+            </div>
+            <div class="link-actions">
+              <button class="btn-icon" (click)="onMoveUp(link.id)" title="Move Up" [disabled]="idx === 0">⬆️</button>
+              <button class="btn-icon" (click)="onMoveDown(link.id)" title="Move Down" [disabled]="idx === links().length - 1">⬇️</button>
+              <button class="btn-icon" (click)="startEdit(link)" title="Edit">✏️</button>
+              <button class="btn-icon btn-danger" (click)="onDelete(link.id)" title="Delete">🗑️</button>
+            </div>
+          } @else {
+            <!-- Link display mode -->
+            <div class="link-info">
+              <span class="link-imagename">{{ link.imagename }}</span>
+              <span class="link-address">{{ link.address }}</span>
+              @if (link.text) {
+                <span class="link-text">{{ link.text }}</span>
+              }
+            </div>
+            <div class="link-actions">
+              <button class="btn-icon" (click)="onMoveUp(link.id)" title="Move Up" [disabled]="idx === 0">⬆️</button>
+              <button class="btn-icon" (click)="onMoveDown(link.id)" title="Move Down" [disabled]="idx === links().length - 1">⬇️</button>
+              <button class="btn-icon" (click)="startEdit(link)" title="Edit">✏️</button>
+              <button class="btn-icon btn-danger" (click)="onDelete(link.id)" title="Delete">🗑️</button>
+            </div>
+          }
+        </div>
+      } @empty {
+        <div class="empty-state">No links yet. Add one below.</div>
+      }
+    </div>
+
+    <!-- Add new -->
+    <div class="add-section">
+      <h3>Add</h3>
+      <div class="form-row">
+        <label>Type</label>
+        <select [(ngModel)]="newType()" class="form-input">
+          <option value="link">🔗 Link</option>
+          <option value="separator">➖ Separator</option>
+        </select>
+      </div>
+      @if (newType() === 'link') {
+        <div class="form-row">
+          <label>URL</label>
+          <input type="text" [(ngModel)]="newLink().address" placeholder="https://..." class="form-input" />
+        </div>
+        <div class="form-row-inline">
+          <div class="form-row">
+            <label>Image Name</label>
+            <input type="text" [(ngModel)]="newLink().imagename" placeholder="short-name" class="form-input" />
+          </div>
+          <div class="form-row">
+            <label>Text (optional)</label>
+            <input type="text" [(ngModel)]="newLink().text" placeholder="Display text" class="form-input" />
+          </div>
+        </div>
+      }
+      <button class="btn btn-add" (click)="onAdd()" [disabled]="saving() || (newType() === 'link' && (!newLink().address || !newLink().imagename))">
+        ➕ Add {{ newType() === 'separator' ? 'Separator' : 'Link' }}
+      </button>
+    </div>
+  </div>
+</div>

@@ -30,11 +30,13 @@ class ClockInRequest(BaseModel):
 
 class ClockOutRequest(BaseModel):
     role: str = Field(..., description="Agent role")
+    model: Optional[str] = Field(None, description="Model being used — disambiguates concurrent duty holders of the same role. When omitted, the most recent active session for the role is closed.")
     session_id: Optional[str] = Field(None, description="Session ID to clock out")
 
 
 class HeartbeatRequest(BaseModel):
     role: str = Field(..., description="Agent role")
+    model: Optional[str] = Field(None, description="Model being used — disambiguates concurrent duty holders of the same role")
     session_id: Optional[str] = Field(None, description="Session ID to update")
 
 
@@ -58,7 +60,31 @@ class SessionLogResponse(BaseModel):
 
 @router.post("/clock-in", response_model=TimeclockResponse)
 def clock_in(req: ClockInRequest, db: Session = Depends(get_db)):
-    """Clock in an agent session."""
+    """Clock in an agent session.
+
+    Multiple duty holders of the same role can be active simultaneously when
+    they differ by model or session_id. Before inserting a fresh row we
+    supersede any existing ACTIVE row for the SAME identity (role, model,
+    AND session_id) so a crashed / restarted session doesn't leak a second
+    active row. Rows for OTHER models / session_ids are left untouched —
+    those are genuine concurrent duty holders.
+    """
+    # Supersede any prior active row for the same (role, model, session_id).
+    # session_id is nullable; match on (session_id IS NOT DISTINCT FROM ...)
+    # so NULL session_ids are treated as equal to each other (i.e. a second
+    # clock-in with role+model and no session_id closes the previous one).
+    now = datetime.now(timezone.utc)
+    db.execute(
+        update(AgentTimeclock)
+        .where(
+            AgentTimeclock.role == req.role,
+            AgentTimeclock.model == req.model,
+            AgentTimeclock.session_id.is_not_distinct_from(req.session_id),
+            AgentTimeclock.status == "active",
+        )
+        .values(status="closed", clock_out=now, valid_until=now)
+    )
+
     record = AgentTimeclock(
         role=req.role,
         model=req.model,
@@ -76,48 +102,85 @@ def clock_in(req: ClockInRequest, db: Session = Depends(get_db)):
 
 @router.post("/clock-out", response_model=TimeclockResponse)
 def clock_out(req: ClockOutRequest, db: Session = Depends(get_db)):
-    """Clock out an agent session."""
-    query = select(AgentTimeclock).where(
-        AgentTimeclock.role == req.role,
-        AgentTimeclock.status == "active",
-    )
-    if req.session_id:
-        query = query.where(AgentTimeclock.session_id == req.session_id)
+    """Clock out an agent session.
 
-    record = db.execute(query).scalar_one_or_none()
+    Identity is `(role, model?, session_id?)`. When model and/or session_id
+    are supplied the query narrows to that identity; when omitted, the most
+    recent active row for the role is closed. We use ORDER BY clock_in DESC
+    LIMIT 1 instead of scalar_one_or_none so multiple concurrent duty
+    holders of the same role (different models) coexist without raising
+    MultipleResultsFound.
+    """
+    query = (
+        select(AgentTimeclock)
+        .where(
+            AgentTimeclock.role == req.role,
+            AgentTimeclock.status == "active",
+        )
+        .order_by(AgentTimeclock.clock_in.desc())
+    )
+    if req.model:
+        query = query.where(AgentTimeclock.model == req.model)
+    if req.session_id:
+        query = query.where(AgentTimeclock.session_id.is_not_distinct_from(req.session_id))
+
+    record = db.execute(query.limit(1)).scalar_one_or_none()
 
     if not record:
-        raise HTTPException(status_code=404, detail=f"No active session found for role={req.role}")
+        detail = f"No active session found for role={req.role}"
+        if req.model:
+            detail += f" model={req.model}"
+        if req.session_id:
+            detail += f" session_id={req.session_id}"
+        raise HTTPException(status_code=404, detail=detail)
 
-    record.clock_out = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    record.clock_out = now
     record.status = "closed"
-    record.recorded_until_dt = datetime.now(timezone.utc)
+    record.valid_until = now
     db.commit()
     db.refresh(record)
 
-    _log.info("Clocked out: role=%s session=%s duration=%.1fs",
-              req.role, req.session_id, record.to_dict()["duration_seconds"])
+    _log.info("Clocked out: role=%s model=%s session=%s duration=%.1fs",
+              req.role, req.model, req.session_id, record.to_dict()["duration_seconds"])
     return TimeclockResponse(success=True, record=record.to_dict(), message="Clocked out")
 
 
 @router.post("/heartbeat", response_model=TimeclockResponse)
 def heartbeat(req: HeartbeatRequest, db: Session = Depends(get_db)):
-    """Update heartbeat for an active session."""
-    query = select(AgentTimeclock).where(
-        AgentTimeclock.role == req.role,
-        AgentTimeclock.status == "active",
-    )
-    if req.session_id:
-        query = query.where(AgentTimeclock.session_id == req.session_id)
+    """Update heartbeat for an active session.
 
-    record = db.execute(query).scalar_one_or_none()
+    Identity is `(role, model?, session_id?)` — same narrowing as clock_out.
+    ORDER BY clock_in DESC LIMIT 1 so concurrent duty holders coexist without
+    raising MultipleResultsFound.
+    """
+    query = (
+        select(AgentTimeclock)
+        .where(
+            AgentTimeclock.role == req.role,
+            AgentTimeclock.status == "active",
+        )
+        .order_by(AgentTimeclock.clock_in.desc())
+    )
+    if req.model:
+        query = query.where(AgentTimeclock.model == req.model)
+    if req.session_id:
+        query = query.where(AgentTimeclock.session_id.is_not_distinct_from(req.session_id))
+
+    record = db.execute(query.limit(1)).scalar_one_or_none()
 
     if not record:
-        raise HTTPException(status_code=404, detail=f"No active session found for role={req.role}")
+        detail = f"No active session found for role={req.role}"
+        if req.model:
+            detail += f" model={req.model}"
+        if req.session_id:
+            detail += f" session_id={req.session_id}"
+        raise HTTPException(status_code=404, detail=detail)
 
     # Touch valid_until to extend the session
-    record.valid_until = datetime.now(timezone.utc)
-    record.recorded_on_dt = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    record.valid_until = now
+    record.recorded_on_dt = now
     db.commit()
     db.refresh(record)
 
@@ -222,7 +285,7 @@ def timeout_cleanup(
         .values(
             status="timeout",
             clock_out=now,
-            recorded_until_dt=now,
+            valid_until=now,
         )
     )
 
