@@ -50,12 +50,57 @@ process.on('uncaughtException', (err) => {
   console.error('[wind-srv] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
 });
 
+// ── Shutdown coordinator ────────────────────────────────────────
+const cleanupHandlers = [];
+
+function registerCleanup(fn) {
+  cleanupHandlers.push(fn);
+}
+
+async function shutdown(signal) {
+  console.log(`[wind-srv] ${signal} received — shutting down background services`);
+  for (const fn of cleanupHandlers) {
+    try { fn(); } catch (_) { /* best-effort */ }
+  }
+  process.exit(0);
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+
 // ── Start ─────────────────────────────────────────────────────────
 const server = app.listen(PORT, () => {
   console.log(`[wind-srv] listening on http://localhost:${PORT}`);
   console.log(`[wind-srv] endpoints: /api/offices, /api/titles, /api/tasks, /api/outcomes,`);
   console.log(`  /api/workflows, /api/versions, /api/nodes, /api/edges,`);
-  console.log(`  /api/instances, /api/tickets, /api/receipts, /api/validate, /api/v-roles`);
+  console.log(`  /api/instances, /api/tickets, /api/receipts, /api/validate, /api/v-roles,`);
+  console.log(`  /api/events, /api/event-types`);
+
+  // ── Background Services ──────────────────────────────────────
+
+  // Start the event processor (polls unconsumed events every 5s)
+  import('./event-processor.js').then(({ startEventProcessor }) => {
+    registerCleanup(startEventProcessor());
+    console.log('[wind-srv] Event processor started');
+  }).catch(err => {
+    console.error('[wind-srv] Failed to start event processor:', err.message);
+  });
+
+  // Start the Rover scheduler (fires immediately, then every 30 min)
+  import('./scheduler.js').then(({ startRoverScheduler }) => {
+    registerCleanup(startRoverScheduler());
+    console.log('[wind-srv] Rover scheduler started');
+  }).catch(err => {
+    console.error('[wind-srv] Failed to start Rover scheduler:', err.message);
+  });
+
+  // Start the NATS listener (real-time event subscription)
+  import('./nats-listener.js').then(async ({ startNatsListener }) => {
+    registerCleanup(await startNatsListener());
+    console.log('[wind-srv] NATS listener started');
+  }).catch(err => {
+    console.error('[wind-srv] Failed to start NATS listener:', err.message);
+  });
 });
 
 // Handle listen-time errors (e.g. EADDRINUSE) cleanly.
