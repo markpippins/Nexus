@@ -22,6 +22,7 @@ export interface McpServer {
   description: string;
   repositoryUrl: string;
   activeFlag: boolean;
+  isInternal: boolean;
 }
 
 export interface RunnableService {
@@ -37,6 +38,7 @@ export interface RunnableService {
   description: string;
   repositoryUrl: string;
   activeFlag: boolean;
+  isInternal: boolean;
 }
 
 export interface TerrainServer {
