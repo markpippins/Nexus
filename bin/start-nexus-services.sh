@@ -70,6 +70,9 @@ ALL_SERVICES=(
     "tools-aggregator.service" # port 3210 — unified MCP tool-discovery aggregator
     "service-broker-mcp.service" # port 3112 — service-broker MCP over SSE (auth/token tools)
     "substance.service"        # port 3115 — Segment Sets API (FastAPI)
+    "moleculer-search.service"  # port 4050 — Moleculer Search API (Google, registry)
+    "ui-tools.service"          # port 3125 — UI Tools CRUD API (statusbar links)
+    "ui-tools-mcp.service"       # port 3136 — UI Tools MCP (agent-facing link management)
 
     # API servers (non-UI services)
     "wind-srv.service"         # port 3300 — Wind IDE workflow API
@@ -133,6 +136,9 @@ SERVICE_PORTS=(
     ["service-broker-mcp.service"]="3112"
     ["wind-srv.service"]="3300"
     ["substance.service"]="3115"
+    ["moleculer-search.service"]="4050"
+    ["ui-tools.service"]="3125"
+    ["ui-tools-mcp.service"]="3136"
     ["nebula-ui.service"]="3000"
     ["duality-ui.service"]="3002"
     ["view-architect.service"]="3003"

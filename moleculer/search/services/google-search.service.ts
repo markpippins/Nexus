@@ -29,7 +29,6 @@ export default class GoogleSearchService extends Service {
 
     this.parseServiceSchema({
       name: "google-search",
-      version: 1,
 
       settings: {
         apiKey: process.env.GOOGLE_API_KEY || "",
@@ -101,6 +100,10 @@ export default class GoogleSearchService extends Service {
       };
     } catch (error: any) {
       this.logger.error("Google Search API error:", error.message);
+      if (error.response) {
+        this.logger.error("Google API response status:", error.response.status);
+        this.logger.error("Google API response data:", JSON.stringify(error.response.data));
+      }
       throw new Error(`Failed to perform search: ${error.message}`);
     }
   }

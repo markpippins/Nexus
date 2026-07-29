@@ -13,7 +13,10 @@ export const EXTERNAL_SITES: ExternalSite[] = [
   { name: 'GitHub',          url: 'https://github.com',                   shortName: 'github' },
   { name: 'ChatGPT',         url: 'https://chatgpt.com',                  shortName: 'chatgpt' },
   { name: 'Copilot',         url: 'https://copilot.microsoft.com',        shortName: 'copilot' },
+  { name: 'Claude',           url: 'https://claude.ai',                   shortName: 'claude' },
+  { name: 'AI Studio',        url: 'https://aistudio.google.com',         shortName: 'aistudio' },
   { name: 'Gemini',          url: 'https://gemini.google.com',            shortName: 'gemini' },
+  { name: 'Google Cloud Console', url: 'https://console.cloud.google.com', shortName: 'google-cloud-console' },
 ];
 
 @Component({
