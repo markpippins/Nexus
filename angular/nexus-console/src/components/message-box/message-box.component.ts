@@ -124,7 +124,7 @@ type ResizeEdge = 'n' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
     </div>
   `,
   styles: [
-    `.message-box{position:fixed;bottom:30px;display:flex;flex-direction:column;background:rgb(var(--color-surface));border:1px solid rgb(var(--color-border-base));border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -2px 24px rgba(0,0,0,.25);overflow:hidden}`,
+    `.message-box{position:fixed;bottom:30px;display:flex;flex-direction:column;background:rgb(var(--color-surface));border:1px solid rgb(var(--color-border-base));border-bottom:none;border-radius:10px 10px 0 0;box-shadow:0 -2px 24px rgba(0,0,0,.25);overflow:hidden;z-index:900}`,
     `.message-box.minimized{height:auto!important;min-height:0}`,
     `.message-box.active{box-shadow:0 -4px 28px rgba(0,0,0,.35),0 0 0 1px rgb(var(--color-accent-ring))}`,
     `.mbox-header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgb(var(--color-surface-muted));border-bottom:1px solid rgb(var(--color-border-muted));cursor:grab;user-select:none;flex-shrink:0}`,
