@@ -3,6 +3,7 @@ import cors from 'cors';
 import { Pool } from 'pg';
 import { createRoutes } from './routes';
 import { startNotifyListener, isNotifyAlive, subscribe, stopNotifyListener } from './notify';
+import { startHeartbeat } from 'heartbeat-client';
 
 // ── PostgreSQL Connection ──────────────────────────────────────────
 // Same convention as nebula-srv. We do NOT set search_path here so
@@ -84,6 +85,13 @@ app.get('/api/health', healthHandler);
 // ── Start ─────────────────────────────────────────────────────────
 const server = app.listen(PORT, () => {
   console.log(`kernel-srv listening on http://localhost:${PORT}`);
+
+  startHeartbeat({
+    serviceId: 113,
+    serviceName: 'kernel-srv',
+    interval: 30,
+    log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat kernel-srv]', ...args),
+  });
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

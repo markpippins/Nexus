@@ -10,6 +10,7 @@ import {
   TASK_IDX_KEY,
 } from "./redis";
 import { syncAll } from "./sync";
+import { startHeartbeat } from "heartbeat-client";
 
 const PORT = parseInt(process.env.PROMPT_SRV_PORT || "3501", 10);
 
@@ -160,6 +161,13 @@ async function main() {
 
   const server = app.listen(PORT, () => {
     console.log(`[tackle-prompt-sync-srv] Listening on port ${PORT}`);
+
+    startHeartbeat({
+      serviceId: 118,
+      serviceName: 'tackle-prompt-sync-srv',
+      interval: 30,
+      log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat tackle-prompt-sync-srv]', ...args),
+    });
   });
 
   server.on('error', (err: NodeJS.ErrnoException) => {

@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { routes } from './routes/index.js';
 import { errorHandler } from './error-handler.js';
+import { startHeartbeat } from 'heartbeat-client';
 import { runMigration } from './db.js';
 
 dotenv.config({ path: '../../.env' });
@@ -37,6 +38,13 @@ async function main() {
   await runMigration();
   const server = app.listen(PORT, () => {
     console.log(`assembly-srv listening on http://localhost:${PORT}`);
+
+    startHeartbeat({
+      serviceId: 110,
+      serviceName: 'assembly-srv',
+      interval: 30,
+      log: (...args) => console.log(new Date().toISOString(), '[heartbeat assembly-srv]', ...args),
+    });
   });
 
   server.on('error', (err) => {

@@ -9,6 +9,7 @@ import { schedulerRouter } from "./routes/scheduler";
 import { memoryRouter } from "./routes/memory";
 import { failureRecoveryRouter } from "./routes/failure-recovery";
 import { tasksRouter } from "./routes/tasks";
+import { startHeartbeat } from "heartbeat-client";
 
 const PORT = parseInt(process.env.TACKLE_SRV_PORT || "3410", 10);
 
@@ -75,6 +76,13 @@ async function start() {
     console.log(`Tackle REST server listening on http://localhost:${PORT}`);
     console.log(`Health: http://localhost:${PORT}/health`);
     console.log(`AI Config: http://localhost:${PORT}/config/ai`);
+
+    startHeartbeat({
+      serviceId: 119,
+      serviceName: 'tackle-srv',
+      interval: 30,
+      log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat tackle-srv]', ...args),
+    });
   });
 
   server.on('error', (err: NodeJS.ErrnoException) => {

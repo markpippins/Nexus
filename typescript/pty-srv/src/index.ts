@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from 'node-pty';
 import * as http from 'http';
+import { startHeartbeat } from 'heartbeat-client';
 
 const PORT = parseInt(process.env.PTY_SRV_PORT || '3120');
 
@@ -73,4 +74,11 @@ const healthServer = http.createServer((_req, res) => {
 
 healthServer.listen(PORT + 1, '127.0.0.1', () => {
   console.log(`pty-srv health check on http://localhost:${PORT + 1}/`);
+
+  startHeartbeat({
+    serviceId: 115,
+    serviceName: 'pty-srv',
+    interval: 30,
+    log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat pty-srv]', ...args),
+  });
 });

@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { routes } from './routes/index.js';
 import { errorHandler } from './error-handler.js';
+import { startHeartbeat } from 'heartbeat-client';
 
 dotenv.config({ path: '../../.env' });
 dotenv.config({ path: '.env' });
@@ -75,6 +76,13 @@ const server = app.listen(PORT, () => {
   console.log(`  /api/workflows, /api/versions, /api/nodes, /api/edges,`);
   console.log(`  /api/instances, /api/tickets, /api/receipts, /api/validate, /api/v-roles,`);
   console.log(`  /api/events, /api/event-types`);
+
+  startHeartbeat({
+    serviceId: 122,
+    serviceName: 'wind-srv',
+    interval: 30,
+    log: (...args) => console.log(new Date().toISOString(), '[heartbeat wind-srv]', ...args),
+  });
 
   // ── Background Services ──────────────────────────────────────
 

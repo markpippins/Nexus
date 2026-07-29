@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { routes } from './routes/index.js';
 import { errorHandler, notFoundHandler } from './error-handler.js';
 import { dsnInfo } from './db.js';
+import { startHeartbeat } from 'heartbeat-client';
 
 dotenv.config({ path: '../../.env' });
 dotenv.config({ path: '.env' });
@@ -36,6 +37,13 @@ app.use(errorHandler);
 
 const server = app.listen(PORT, () => {
   console.log(`peb-srv listening on http://localhost:${PORT}  (dsn: ${dsnInfo})`);
+
+  startHeartbeat({
+    serviceId: 114,
+    serviceName: 'peb-srv',
+    interval: 30,
+    log: (...args) => console.log(new Date().toISOString(), '[heartbeat peb-srv]', ...args),
+  });
 });
 
 server.on('error', (err) => {

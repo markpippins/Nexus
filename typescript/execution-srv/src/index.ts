@@ -12,6 +12,7 @@ import express from 'express';
 import cors from 'cors';
 import { Pool } from 'pg';
 import { createRoutes } from './routes';
+import { startHeartbeat } from 'heartbeat-client';
 
 // ── PostgreSQL Connection ──────────────────────────────────────────
 // The execution schema lives in the same `nexus` database as the rest of
@@ -89,6 +90,13 @@ const server = app.listen(PORT, () => {
   console.log(`execution-srv listening on http://localhost:${PORT}`);
   console.log(`  health:  http://localhost:${PORT}/health`);
   console.log(`  routes:  http://localhost:${PORT}/api/execution/...`);
+
+  startHeartbeat({
+    serviceId: 112,
+    serviceName: 'execution-srv',
+    interval: 30,
+    log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat execution-srv]', ...args),
+  });
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

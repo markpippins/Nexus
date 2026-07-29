@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { routes } from './routes/index.js';
 import { errorHandler, notFoundHandler } from './error-handler.js';
 import { dsnInfo } from './db.js';
+import { startHeartbeat } from 'heartbeat-client';
 
 dotenv.config({ path: '../../.env' });
 dotenv.config({ path: '.env' });
@@ -36,6 +37,13 @@ app.use(errorHandler);
 
 const server = app.listen(PORT, () => {
   console.log(`shrapnel-srv listening on http://localhost:${PORT}  (dsn: ${dsnInfo})`);
+
+  startHeartbeat({
+    serviceId: 117,
+    serviceName: 'shrapnel',
+    interval: 30,
+    log: (...args) => console.log(new Date().toISOString(), '[heartbeat shrapnel]', ...args),
+  });
 });
 
 server.on('error', (err) => {

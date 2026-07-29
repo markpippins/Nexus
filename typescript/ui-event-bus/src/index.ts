@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { randomUUID } from 'crypto';
+import { startHeartbeat } from 'heartbeat-client';
 
 // ── Types ─────────────────────────────────────────────────────────
 interface UiEvent {
@@ -138,6 +139,13 @@ const server = app.listen(PORT, () => {
   console.log(`  GET  /api/events/stream    — SSE subscription (?sender=xxx)`);
   console.log(`  GET  /api/events/clients   — list connected clients`);
   console.log(`  GET  /health               — health check`);
+
+  startHeartbeat({
+    serviceId: 120,
+    serviceName: 'ui-event-bus',
+    interval: 30,
+    log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat ui-event-bus]', ...args),
+  });
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

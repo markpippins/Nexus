@@ -6,6 +6,8 @@ import {
   RegistryStatusEvent,
   HealthState,
 } from '../../services/registry-status.service.js';
+import { TerrainService, TerrainServiceStatus } from '../../services/terrain.service.js';
+import { LocalConfigService } from '../../services/local-config.service.js';
 
 type SortField = 'name' | 'status' | 'heartbeat' | 'responseTime';
 type FilterType = 'all' | HealthState;
@@ -184,6 +186,28 @@ type FilterType = 'all' | HealthState;
                         [class.animate-pulse]="svc.healthState === 'UNHEALTHY' || svc.healthState === 'OFFLINE'"
                       ></span>
                       <span class="font-medium text-sm text-[rgb(var(--color-text-base))] truncate">{{ svc.serviceName }}</span>
+                      <!-- Terrain live probe status -->
+                      @if (terrainProbeStatuses().get(svc.serviceName); as probeStatus) {
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium"
+                          [class.bg-green-500/10]="probeStatus === 'ON'"
+                          [class.text-green-600]="probeStatus === 'ON'"
+                          [class.bg-red-500/10]="probeStatus === 'OFFLINE'"
+                          [class.text-red-500]="probeStatus === 'OFFLINE'"
+                          [class.bg-yellow-500/10]="probeStatus === 'DEGRADED'"
+                          [class.text-yellow-600]="probeStatus === 'DEGRADED'"
+                          [class.bg-gray-500/10]="probeStatus !== 'ON' && probeStatus !== 'OFFLINE' && probeStatus !== 'DEGRADED'"
+                          [class.text-gray-500]="probeStatus !== 'ON' && probeStatus !== 'OFFLINE' && probeStatus !== 'DEGRADED'"
+                          title="Terrain probe: {{ probeStatus }}"
+                        >
+                          <span class="w-1.5 h-1.5 rounded-full"
+                            [class.bg-green-500]="probeStatus === 'ON'"
+                            [class.bg-red-500]="probeStatus === 'OFFLINE'"
+                            [class.bg-yellow-500]="probeStatus === 'DEGRADED'"
+                            [class.bg-gray-400]="probeStatus !== 'ON' && probeStatus !== 'OFFLINE' && probeStatus !== 'DEGRADED'"
+                          ></span>
+                          probe:{{ probeStatus }}
+                        </span>
+                      }
                     </div>
                     @if (svc.version) {
                       <span class="ml-4 text-[10px] text-[rgb(var(--color-text-muted))] font-mono">v{{ svc.version }}</span>
@@ -365,6 +389,8 @@ type FilterType = 'all' | HealthState;
 })
 export class SystemHealthComponent implements OnDestroy {
   private statusService = inject(RegistryStatusService);
+  private terrainService = inject(TerrainService);
+  private localConfigService = inject(LocalConfigService);
 
   /** Base URL of the service-registry (e.g. http://localhost:8085) */
   baseUrl = input.required<string>();
@@ -398,6 +424,9 @@ export class SystemHealthComponent implements OnDestroy {
     const select = event.target as HTMLSelectElement;
     this.sortField.set(select.value as SortField);
   }
+
+  /** Live probe statuses from terrain, keyed by service name */
+  terrainProbeStatuses = signal<Map<string, TerrainServiceStatus>>(new Map());
 
   /** Currently expanded service (shows history) */
   expandedService = signal<string | null>(null);
@@ -465,6 +494,8 @@ export class SystemHealthComponent implements OnDestroy {
       const url = this.baseUrl();
       if (url) {
         this.connect(url);
+        this.fetchTerrainProbes();
+        this.startProbePolling();
       }
     });
   }
@@ -484,6 +515,7 @@ export class SystemHealthComponent implements OnDestroy {
     const url = this.baseUrl();
     if (url) {
       this.connect(url);
+      this.fetchTerrainProbes();
     }
   }
 
@@ -519,7 +551,42 @@ export class SystemHealthComponent implements OnDestroy {
     return count;
   }
 
+  /** Fetch live probe results from terrain and match by service name. */
+  private async fetchTerrainProbes(): Promise<void> {
+    const terrainUrl = this.localConfigService.terrainServerUrl();
+    if (!terrainUrl) return;
+    try {
+      const summary = await this.terrainService.getHealthSummary(terrainUrl);
+      const probeMap = new Map<string, TerrainServiceStatus>();
+      for (const srv of summary.mcpServers) {
+        if (srv.liveStatus) probeMap.set(srv.name, srv.liveStatus);
+      }
+      for (const srv of summary.runnableServices) {
+        if (srv.liveStatus) probeMap.set(srv.name, srv.liveStatus);
+      }
+      this.terrainProbeStatuses.set(probeMap);
+    } catch {
+      // Silently ignore terrain probe fetch failures
+    }
+  }
+
+  /** Periodic terrain probe poll (30s) */
+  private probeInterval: ReturnType<typeof setInterval> | null = null;
+
+  private startProbePolling(): void {
+    this.stopProbePolling();
+    this.probeInterval = setInterval(() => this.fetchTerrainProbes(), 30_000);
+  }
+
+  private stopProbePolling(): void {
+    if (this.probeInterval) {
+      clearInterval(this.probeInterval);
+      this.probeInterval = null;
+    }
+  }
+
   ngOnDestroy(): void {
     this.statusService.disconnect();
+    this.stopProbePolling();
   }
 }

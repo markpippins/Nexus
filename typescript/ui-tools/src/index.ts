@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { Pool } from 'pg';
 import { createRoutes } from './routes';
+import { startHeartbeat } from 'heartbeat-client';
 
 // ── PostgreSQL Connection ──────────────────────────────────────────
 const pool = new Pool({
@@ -38,6 +39,13 @@ app.get('/health', async (_req, res) => {
 // ── Start ─────────────────────────────────────────────────────────
 const server = app.listen(PORT, () => {
   console.log(`ui-tools listening on http://localhost:${PORT}`);
+
+  startHeartbeat({
+    serviceId: 121,
+    serviceName: 'ui-tools',
+    interval: 30,
+    log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat ui-tools]', ...args),
+  });
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {
