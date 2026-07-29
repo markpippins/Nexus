@@ -23,7 +23,12 @@ export class YoutubeResultCardComponent {
 
   openLink(event: MouseEvent): void {
     event.preventDefault();
-    const embedUrl = `https://www.youtube.com/embed/${this.result().videoId}`;
+    const videoId = this.result().videoId;
+    if (!videoId) {
+      console.warn('YoutubeResultCard: no videoId to open for', this.result().title);
+      return;
+    }
+    const embedUrl = `https://www.youtube.com/embed/${videoId}`;
     this.webviewService.open(embedUrl, this.result().title);
   }
 }

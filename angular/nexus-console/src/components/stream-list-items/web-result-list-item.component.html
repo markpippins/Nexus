@@ -5,7 +5,7 @@
     </svg>
   </div>
   <div class="flex-grow min-w-0 mx-3">
-    <a href="#" (click)="openLink($event)" class="font-semibold text-sm truncate text-[rgb(var(--color-text-base))] hover:underline hover:text-[rgb(var(--color-accent-text))]">{{ result().title }}</a>
+    <a [attr.href]="result().link || null" target="_blank" rel="noopener noreferrer" (click)="openLink($event)" class="font-semibold text-sm truncate text-[rgb(var(--color-text-base))] hover:underline hover:text-[rgb(var(--color-accent-text))]" [class.pointer-events-none]="!result().link">{{ result().title }}</a>
     <p class="text-xs text-[rgb(var(--color-text-muted))] truncate">{{ result().snippet }}</p>
   </div>
   <button 

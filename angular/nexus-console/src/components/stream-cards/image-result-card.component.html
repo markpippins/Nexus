@@ -1,7 +1,7 @@
 <div 
   class="w-40 h-40 group relative rounded-lg shadow-md overflow-hidden"
   [title]="result().description + '\nby ' + result().photographer">
-  <a href="#" (click)="openLink($event)">
+  <a [attr.href]="result().url || null" target="_blank" rel="noopener noreferrer" (click)="openLink($event)" [class.pointer-events-none]="!result().url">
     <img [src]="result().thumbnailUrl" [alt]="result().description" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
   </a>
   <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent pointer-events-none"></div>

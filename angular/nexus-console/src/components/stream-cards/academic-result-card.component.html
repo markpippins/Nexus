@@ -2,7 +2,7 @@
   class="w-40 h-40 flex flex-col bg-[rgb(var(--color-surface))] border border-[rgb(var(--color-border-base))] rounded-lg shadow-md p-3 group relative hover:shadow-xl transition-shadow duration-300"
   [title]="result().title + '\n' + result().authors.join(', ') + '\n\n' + result().snippet">
   <div class="flex-grow flex flex-col overflow-hidden">
-    <a href="#" (click)="openLink($event)">
+    <a [attr.href]="result().link || null" target="_blank" rel="noopener noreferrer" (click)="openLink($event)" [class.pointer-events-none]="!result().link">
       <h3 class="font-semibold text-blue-700 dark:text-blue-400 text-sm hover:underline line-clamp-3">{{ result().title }}</h3>
       <p class="text-xs text-green-700 dark:text-green-400 mt-1 truncate">{{ result().authors.join(', ') }}</p>
     </a>

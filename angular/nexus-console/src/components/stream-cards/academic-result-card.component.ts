@@ -1,7 +1,6 @@
-import { Component, ChangeDetectionStrategy, input, output, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AcademicSearchResult } from '../../models/academic-search-result.model.js';
-import { WebviewService } from '../../services/webview.service.js';
 
 @Component({
   selector: 'app-academic-result-card',
@@ -15,14 +14,15 @@ export class AcademicResultCardComponent {
   isBookmarked = input(false);
   bookmarkToggled = output<AcademicSearchResult>();
 
-  private webviewService = inject(WebviewService);
-
   onToggleBookmark(): void {
     this.bookmarkToggled.emit(this.result());
   }
 
   openLink(event: MouseEvent): void {
-    event.preventDefault();
-    this.webviewService.open(this.result().link, this.result().title);
+    if (!this.result().link) {
+      event.preventDefault();
+      console.warn('AcademicResultCard: no link to open for', this.result().title);
+    }
+    // else: browser handles native navigation via target="_blank"
   }
 }
