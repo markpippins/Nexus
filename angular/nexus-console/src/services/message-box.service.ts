@@ -36,7 +36,7 @@ export interface MessageBoxInstance {
 }
 
 const DEFAULT_WIDTH = 263;
-const DEFAULT_HEIGHT = 225;
+    const DEFAULT_HEIGHT = 300;  // Increased from 225
 const MIN_WIDTH = 280;
 const MIN_HEIGHT = 160;
 const MARGIN = 16;
