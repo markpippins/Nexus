@@ -2865,6 +2865,17 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.openGeminiSearchDialog();
   }
 
+  /** Navigate to the magnet folder that generated a stream result. */
+  onNavigateToMagnet(magnetPath: string[]): void {
+    const rootName = this.activeRootName();
+    const fullPath = [rootName, ...magnetPath];
+    const activeId = this.activePaneId();
+    this.panePaths.update(paths => {
+      const otherPanes = paths.filter(p => p.id !== activeId);
+      return [...otherPanes, { id: activeId, path: fullPath }];
+    });
+  }
+
   // Auto-uncollapse the stream pane when navigating to a visible context
   // Use untracked to avoid re-triggering when user manually toggles collapse
   private autoUncollapseStream = effect(() => {

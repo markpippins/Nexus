@@ -288,19 +288,19 @@
           @for (item of results; track getStreamItemLink(item)) {
             @switch (item.type) {
               @case ('web') {
-                <app-web-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-web-result-card>
+                <app-web-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-web-result-card>
               }
               @case ('image') {
-                <app-image-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-image-result-card>
+                <app-image-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-image-result-card>
               }
               @case ('youtube') {
-                <app-youtube-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-youtube-result-card>
+                <app-youtube-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-youtube-result-card>
               }
               @case ('academic') {
-                <app-academic-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-academic-result-card>
+                <app-academic-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-academic-result-card>
               }
               @case ('gemini') {
-                <app-gemini-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-gemini-result-card>
+                <app-gemini-result-card [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-gemini-result-card>
               }
             }
           }
@@ -310,23 +310,33 @@
           @for (item of results; track getStreamItemLink(item)) {
             @switch (item.type) {
               @case ('web') {
-                <app-web-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-web-result-list-item>
+                <app-web-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-web-result-list-item>
               }
               @case ('image') {
-                <app-image-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-image-result-list-item>
+                <app-image-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-image-result-list-item>
               }
               @case ('youtube') {
-                <app-youtube-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-youtube-result-list-item>
+                <app-youtube-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-youtube-result-list-item>
               }
               @case ('academic') {
-                <app-academic-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-academic-result-list-item>
+                <app-academic-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-academic-result-list-item>
               }
               @case ('gemini') {
-                <app-gemini-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" (bookmarkToggled)="onBookmarkToggled(item)"></app-gemini-result-list-item>
+                <app-gemini-result-list-item [result]="item" [isBookmarked]="bookmarkedLinks().has(getStreamItemLink(item))" [sourceMagnetPath]="item.sourceMagnetPath || undefined" (bookmarkToggled)="onBookmarkToggled(item)" (navigateToMagnet)="onMagnetPathClick($event)"></app-gemini-result-list-item>
               }
             }
           }
         </div>
+
+        <!-- Pagination: Show more button -->
+        @if (showMoreCount(); as remaining) {
+          <div class="flex justify-center py-3">
+            <button
+              (click)="onShowMore()"
+              class="px-4 py-1.5 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-accent-text))] hover:border-[rgb(var(--color-accent-ring))] hover:bg-[rgb(var(--color-accent-bg))] transition-colors"
+            >Show more ({{ remaining }} remaining)</button>
+          </div>
+        }
       </div>
     } @else {
       <div class="h-full flex items-center justify-center text-center text-sm text-[rgb(var(--color-text-subtle))] p-4">

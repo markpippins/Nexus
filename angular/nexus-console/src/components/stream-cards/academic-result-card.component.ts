@@ -10,12 +10,20 @@ import { AcademicSearchResult } from '../../models/academic-search-result.model.
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AcademicResultCardComponent {
-  result = input.required<AcademicSearchResult>();
+  result = input.required<AcademicSearchResult & { sourceMagnetPath?: string[] }>();
   isBookmarked = input(false);
+  sourceMagnetPath = input<string[]>();
   bookmarkToggled = output<AcademicSearchResult>();
+  navigateToMagnet = output<string[]>();
 
   onToggleBookmark(): void {
     this.bookmarkToggled.emit(this.result());
+  }
+
+  onMagnetClick(event: MouseEvent, path: string[]): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.navigateToMagnet.emit(path);
   }
 
   openLink(event: MouseEvent): void {

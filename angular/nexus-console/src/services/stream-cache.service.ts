@@ -13,9 +13,18 @@ export type CachedStreamItem =
   | (AcademicSearchResult & { type: 'academic' })
   | (GeminiResult & { type: 'gemini' });
 
+/** A cache entry tagged with the magnet folder that produced it. */
+export interface CacheEntryMeta {
+  key: string;          // "service:query"
+  results: CachedStreamItem[];
+  magnetPath: string[]; // full path to the .magnet folder
+  ts: number;
+}
+
 interface CacheEntry {
   results: CachedStreamItem[];
   ts: number;
+  magnetPath?: string[];
 }
 
 /**
@@ -51,7 +60,7 @@ export class StreamCacheService {
   }
 
   /** Store results for a service/query pair. */
-  set(service: string, query: string, results: CachedStreamItem[]): void {
+  set(service: string, query: string, results: CachedStreamItem[], magnetPath?: string[]): void {
     if (!query || results.length === 0) return;
 
     const key = this.makeKey(service, query);
@@ -62,7 +71,7 @@ export class StreamCacheService {
       if (oldest) this.store.delete(oldest[0]);
     }
 
-    this.store.set(key, { results, ts: Date.now() });
+    this.store.set(key, { results, ts: Date.now(), magnetPath });
   }
 
   /** Invalidate a specific service/query entry. Used on force-refresh. */
@@ -80,9 +89,49 @@ export class StreamCacheService {
     return this.store.size;
   }
 
+  /**
+   * Return all non-expired cache entries with their metadata.
+   * Used by the idea-stream to aggregate results across all magnets.
+   */
+  getAllEntries(): CacheEntryMeta[] {
+    const now = Date.now();
+    const entries: CacheEntryMeta[] = [];
+
+    for (const [key, entry] of this.store.entries()) {
+      if (now - entry.ts > StreamCacheService.DEFAULT_TTL_MS) {
+        this.store.delete(key);
+        continue;
+      }
+      entries.push({
+        key,
+        results: entry.results,
+        magnetPath: entry.magnetPath ?? [],
+        ts: entry.ts,
+      });
+    }
+
+    return entries;
+  }
+
+  /** Return deduplicated set of all magnet paths in the cache. */
+  getAllMagnetPaths(): string[][] {
+    const seen = new Set<string>();
+    const paths: string[][] = [];
+
+    for (const entry of this.getAllEntries()) {
+      const pathKey = entry.magnetPath.join('/');
+      if (pathKey && !seen.has(pathKey)) {
+        seen.add(pathKey);
+        paths.push(entry.magnetPath);
+      }
+    }
+
+    return paths;
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────
 
-  private makeKey(service: string, query: string): string {
+  makeKey(service: string, query: string): string {
     return `${service}:${query}`;
   }
 }

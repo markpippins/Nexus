@@ -11,14 +11,22 @@ import { WebviewService } from '../../services/webview.service.js';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ImageResultListItemComponent {
-  result = input.required<ImageSearchResult>();
+  result = input.required<ImageSearchResult & { sourceMagnetPath?: string[] }>();
   isBookmarked = input(false);
+  sourceMagnetPath = input<string[]>();
   bookmarkToggled = output<ImageSearchResult>();
+  navigateToMagnet = output<string[]>();
 
   private webviewService = inject(WebviewService);
 
   onToggleBookmark(): void {
     this.bookmarkToggled.emit(this.result());
+  }
+
+  onMagnetClick(event: MouseEvent, path: string[]): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.navigateToMagnet.emit(path);
   }
 
   openLink(event: MouseEvent): void {

@@ -1,4 +1,12 @@
 <div class="flex items-center p-2 rounded-md group hover:bg-[rgb(var(--color-surface))] transition-colors duration-150">
+  <!-- Source magnet column -->
+  @if (sourceMagnetPath(); as magnetSegment) {
+    <button
+      (click)="onMagnetClick($event, magnetSegment)"
+      title="Navigate to magnet: {{ magnetSegment.join(' › ') }}"
+      class="flex-shrink-0 w-24 text-xs truncate px-2 py-0.5 mr-2 rounded-sm text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-accent-text))] hover:bg-[rgb(var(--color-accent-bg))] border border-[rgb(var(--color-border-muted))] transition-colors"
+    >{{ magnetSegment[magnetSegment.length - 1] }}</button>
+  }
   <div class="flex-shrink-0 w-12 h-8 rounded-md overflow-hidden relative bg-[rgb(var(--color-surface-muted))]">
     <a href="#" (click)="openLink($event)">
       <img [src]="result().thumbnailUrl" [alt]="result().title" class="w-full h-full object-cover">

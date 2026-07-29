@@ -10,12 +10,20 @@ import { GoogleSearchResult } from '../../models/google-search-result.model.js';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class WebResultListItemComponent {
-  result = input.required<GoogleSearchResult>();
+  result = input.required<GoogleSearchResult & { sourceMagnetPath?: string[] }>();
   isBookmarked = input(false);
+  sourceMagnetPath = input<string[]>();
   bookmarkToggled = output<GoogleSearchResult>();
+  navigateToMagnet = output<string[]>();
 
   onToggleBookmark(): void {
     this.bookmarkToggled.emit(this.result());
+  }
+
+  onMagnetClick(event: MouseEvent, path: string[]): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.navigateToMagnet.emit(path);
   }
 
   openLink(event: MouseEvent): void {
