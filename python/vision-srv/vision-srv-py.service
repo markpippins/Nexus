@@ -1,6 +1,6 @@
 [Unit]
 Description=Vision Python API Server — FastAPI/uvicorn LOSM backend (port 8003)
-Documentation=https://github.com/nexus/python/vision/vision-srv
+Documentation=https://github.com/nexus/python/vision-srv
 After=network.target postgresql.service
 Wants=postgresql.service
 
@@ -8,7 +8,7 @@ Wants=postgresql.service
 Type=simple
 User=codex
 Group=codex
-WorkingDirectory=/home/codex/dev/nexus/python/vision/vision-srv
+WorkingDirectory=/home/codex/dev/nexus/python/vision-srv
 
 # ── Environment ────────────────────────────────────────────────────────
 Environment=PYTHONUNBUFFERED=1
@@ -28,7 +28,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 PrivateTmp=true
 ProtectHome=read-only
-ReadWritePaths=/home/codex/dev/nexus/python/vision/vision-srv
+ReadWritePaths=/home/codex/dev/nexus/python/vision-srv
 
 [Install]
 WantedBy=default.target
