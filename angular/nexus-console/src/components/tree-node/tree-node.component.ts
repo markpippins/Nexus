@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, input, output, signal, computed, effect, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, input, output, signal, computed, effect, inject, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FileSystemNode } from '../../models/file-system.model.js';
 import { ImageService } from '../../services/image.service.js';
@@ -141,6 +141,19 @@ export class TreeNodeComponent {
       this.iconUrl(); // Establish dependency on the computed signal
       this.imageIsLoaded.set(false);
       this.imageHasError.set(false);
+    });
+
+    // When the tree is completely rebuilt (e.g., after a gateway connection),
+    // new component instances are created. If this node restores its expanded
+    // state from expandedPaths but the new tree object lacks its children,
+    // automatically re-fetch them so the tree doesn't appear collapsed.
+    effect(() => {
+      const node = this.node();
+      if (this.isExpanded() && this.isExpandable() && !node.childrenLoaded) {
+        if (!(node.isServerRoot && !node.connected)) {
+          untracked(() => this.loadChildren.emit(this.path()));
+        }
+      }
     });
 
     // Ensure root node is expanded by default if not already in expandedPaths

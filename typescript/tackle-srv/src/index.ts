@@ -12,6 +12,19 @@ import { tasksRouter } from "./routes/tasks";
 
 const PORT = parseInt(process.env.TACKLE_SRV_PORT || "3410", 10);
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`tackle-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[tackle-srv] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[tackle-srv] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -58,10 +71,19 @@ async function start() {
   initRedis();
   console.log("[tackle-srv] Redis client initialized (lazy connect)");
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Tackle REST server listening on http://localhost:${PORT}`);
     console.log(`Health: http://localhost:${PORT}/health`);
     console.log(`AI Config: http://localhost:${PORT}/config/ai`);
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`tackle-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    } else {
+      console.error('tackle-srv: listen error:', err.message);
+    }
+    process.exit(1);
   });
 }
 

@@ -7,6 +7,19 @@ import { ToolCallRequest, ToolCallResponse, AggregatedTool, JsonRpcRequest, Json
 const PORT = process.env.TOOLS_AGGREGATOR_PORT || 3210;
 const HOST = process.env.TOOLS_AGGREGATOR_HOST || "127.0.0.1";
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`tools-aggregator: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[tools-aggregator] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[tools-aggregator] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -416,9 +429,18 @@ async function start() {
     // Continue anyway - will retry on /init or on-demand
   }
 
-  app.listen(Number(PORT), HOST, () => {
+  const server = app.listen(Number(PORT), HOST, () => {
     console.error(`[Tools Aggregator] Server running at http://${HOST}:${PORT}`);
     console.error(`[Tools Aggregator] Tools discovered: ${discovery.getRegistry().totalTools}`);
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`tools-aggregator: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    } else {
+      console.error('tools-aggregator: listen error:', err.message);
+    }
+    process.exit(1);
   });
 }
 

@@ -1,36 +1,92 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { ImageSearchResult } from '../models/image-search-result.model.js';
-import { timer, firstValueFrom } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { BrokerService } from './broker.service.js';
+
+export interface ImageSearchParams {
+  brokerUrl: string;
+  token: string;
+  query: string;
+}
+
+// Response item shape from the Spring broker's unsplashSearchService.searchImages
+interface SearchResultItem {
+  kind: string;
+  title: string;
+  description: string;
+  regularImageUrl: string;
+  smallImageUrl: string;
+  thumbImageUrl: string;
+  fullImageUrl: string;
+  photographerName: string;
+  photographerUsername: string;
+  photographerPortfolioUrl: string;
+  width: number;
+  height: number;
+  createdAt: string;
+  timestamp: string;
+}
+
+interface SearchResult {
+  items: SearchResultItem[];
+}
 
 @Injectable({
   providedIn: 'root',
 })
 export class UnsplashService {
-  search(query: string): Promise<ImageSearchResult[]> {
-    console.log(`Simulating Unsplash (image) search for: ${query}`);
+  private brokerService = inject(BrokerService);
 
-    // Simple hashing function to get a somewhat consistent "random" seed from the query
-    const seed = query.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
+  private constructBrokerUrl(baseUrl: string): string {
+    let fullUrl = baseUrl.trim();
+    if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
+      fullUrl = `http://${fullUrl}`;
+    }
+    if (fullUrl.endsWith('/')) {
+      fullUrl = fullUrl.slice(0, -1);
+    }
+    fullUrl += '/api/v1/broker/submitRequest';
+    return fullUrl;
+  }
 
-    const results$ = timer(500).pipe(
-      map(() =>
-        Array.from({ length: 12 }).map((_, i) => {
-          const id = `${seed}_${i}`;
-          const width = 200 + (i % 4) * 50;
-          const height = 200 + (i % 3) * 50;
-          return {
-            id: id,
-            url: `https://picsum.photos/seed/${id}/1024/768`,
-            thumbnailUrl: `https://picsum.photos/seed/${id}/${width}/${height}`,
-            description: `A descriptive caption for an image related to ${query}.`,
-            photographer: 'Mock Photographer',
-            source: 'picsum.photos',
-            publishedAt: new Date(Date.now() - i * 1000 * 60 * 60 * 24 * 3).toISOString(),
-          };
-        })
-      )
-    );
-    return firstValueFrom(results$);
+  async search(params: ImageSearchParams): Promise<ImageSearchResult[]> {
+    if (!params.brokerUrl) {
+      console.warn('UnsplashService: No brokerUrl provided. Returning empty results.');
+      return [];
+    }
+    if (!params.token) {
+      console.warn('UnsplashService: No token provided. Returning empty results.');
+      return [];
+    }
+    if (!params.query || params.query.trim() === '') {
+      return [];
+    }
+
+    try {
+      const brokerParams = { token: params.token, query: params.query };
+
+      const result = await this.brokerService.submitRequest<SearchResult>(
+        this.constructBrokerUrl(params.brokerUrl),
+        'unsplashSearchService',
+        'searchImages',
+        brokerParams,
+      );
+
+      if (result && Array.isArray(result.items)) {
+        return result.items.map((item) => ({
+          id: item.kind,
+          url: item.regularImageUrl,
+          thumbnailUrl: item.thumbImageUrl,
+          description: item.title || item.description,
+          photographer: item.photographerName,
+          source: 'Unsplash',
+          publishedAt: item.createdAt || item.timestamp || new Date().toISOString(),
+        }));
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Unsplash image search via broker failed:', error);
+      return [];
+    }
   }
 }

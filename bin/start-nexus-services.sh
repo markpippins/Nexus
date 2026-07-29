@@ -25,7 +25,8 @@ ALL_SERVICES=(
 
     # Core backends
     "service-registry.service"  # port 8085 — service discovery
-    "broker-gateway.service"    # port 8081 — service broker gateway
+    "broker-gateway.service"    # port 8081 — service broker gateway (Spring Boot)
+    "quarkus-broker-gateway.service"  # port 8091 — service broker gateway (Quarkus)
     "terrain.service"          # port 8084 — topology registry
     "file-system-server.service"        # port 4042 — file system operations (edit-ui)
     "secure-file-system-server.service" # port 4041 — secure file system operations (service-broker)
@@ -100,6 +101,7 @@ SERVICE_PORTS=(
     ["mongodb.service"]="27017"
     ["service-registry.service"]="8085"
     ["broker-gateway.service"]="8081"
+    ["quarkus-broker-gateway.service"]="8091"
     ["terrain.service"]="8084"
     ["file-system-server.service"]="4042"
     ["secure-file-system-server.service"]="4041"
@@ -171,6 +173,7 @@ SERVICE_HEALTH_PATHS=(
     ["semantic-kernel-ui.service"]="/"
     # Other services with non-standard health paths
     ["terrain.service"]="/api/v1/platform/health"
+    ["quarkus-broker-gateway.service"]="/api/health"
 )
 
 # Docker-based services (verified via docker ps instead of port check)

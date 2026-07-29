@@ -39,6 +39,19 @@ dotenv.config();
 
 const PORT = process.env.IMAGE_SERVER_PORT || 9081;
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`image-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[image-server] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[image-server] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 // --- NEW: Allow command-line override for image root directory ---
 // Usage: node serv/image-serv.js [imageRootDir]
 const cliRootArg = process.argv[2];
@@ -320,4 +333,13 @@ server.listen(PORT, () => {
     totalSearchLocations: FOLDER_LOCATIONS.length,
     preferredExtensions: PREFERRED_EXTENSIONS
   });
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.error(`image-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    logger.error('image-server: listen error:', err.message);
+  }
+  process.exit(1);
 });

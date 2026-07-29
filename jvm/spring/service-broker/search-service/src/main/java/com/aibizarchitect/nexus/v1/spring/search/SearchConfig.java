@@ -1,12 +1,24 @@
 package com.aibizarchitect.nexus.v1.spring.search;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
 public class SearchConfig {
+
+    /**
+     * Configure MongoDB to replace dots in map keys with underscores.
+     * Google API responses contain keys like "ibm.com.search.appid"
+     * which MongoDB rejects because dots are reserved in document keys.
+     */
+    @Autowired(required = false)
+    public void configureMongoMapping(MappingMongoConverter mappingMongoConverter) {
+        mappingMongoConverter.setMapKeyDotReplacement("_");
+    }
 
     @Bean
     @org.springframework.context.annotation.Primary

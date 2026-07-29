@@ -11,6 +11,19 @@ dotenv.config({ path: '.env' });
 const app = express();
 const PORT = process.env.PEB_SRV_PORT || 3111;
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`peb-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[peb-srv] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[peb-srv] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 
@@ -23,6 +36,15 @@ app.use(errorHandler);
 
 const server = app.listen(PORT, () => {
   console.log(`peb-srv listening on http://localhost:${PORT}  (dsn: ${dsnInfo})`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`peb-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('peb-srv: listen error:', err.message);
+  }
+  process.exit(1);
 });
 
 process.on('SIGINT', () => {

@@ -145,9 +145,11 @@ export class SidebarComponent implements OnDestroy {
               found = false;
               break;
             }
-            // If this child has childrenLoaded === false, its children haven't been
+            // If this child has childrenLoaded not truthy, its children haven't been
             // fetched yet. The path is still valid — stop walking and keep it.
-            if (child.childrenLoaded === false && segment !== segments[segments.length - 1]) {
+            // Use a falsy check (not === false) so undefined (e.g., a gateway node
+            // mid-connection) also preserves the expanded path.
+            if (!child.childrenLoaded && segment !== segments[segments.length - 1]) {
               break; // path is valid up to this lazy-loaded node; keep it
             }
             currentNode = child;

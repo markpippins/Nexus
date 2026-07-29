@@ -1,0 +1,15 @@
+[Unit]
+Description=Barbie UI - Platform Operations Dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/codex/dev/nexus/angular/barbie
+ExecStart=/home/codex/.nvm/versions/node/v24.15.0/bin/node /home/codex/dev/nexus/angular/barbie/dist/server.cjs
+Environment=PORT=3010
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

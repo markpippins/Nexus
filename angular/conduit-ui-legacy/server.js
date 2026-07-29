@@ -29,6 +29,7 @@ const API_PREFIXES = [
 // Checked BEFORE API_PREFIXES so specific paths like /tickets/detect win over /tickets.
 const SRV_PREFIXES = [
   '/config', '/log', '/tokens',
+  '/workflows', '/governance', '/vision',
   '/tickets/detect', '/tickets/lineage',
 ];
 

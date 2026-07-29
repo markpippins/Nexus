@@ -1,0 +1,6 @@
+{
+  "name": "Platform Operations Dashboard",
+  "description": "Enterprise platform operations dashboard with service registry, server metrics, live health aggregate visualization, log inspection, CRUD operations, and multi-theme support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

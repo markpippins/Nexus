@@ -66,16 +66,34 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
 
   // ── Control planes & dashboards ───────────────────────────────
   {
+    type: 'item', key: 'throttler-ui',
+    label: 'Throttler',
+    title: 'Throttler File Manager',
+    iconPath: 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z',
+  },
+  {
     type: 'item', key: 'nebula-cp',
     label: 'Nebula Control Plane',
     title: 'Nebula Control Plane',
     iconPath: 'M9.75 17.25v-.75a2.25 2.25 0 012.25-2.25h.75a2.25 2.25 0 012.25 2.25v.75M12 12a3 3 0 100-6 3 3 0 000 6zM3 5.25a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 5.25v9a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 14.25v-9z',
   },
   {
+    type: 'item', key: 'barbie',
+    label: 'Barbie',
+    title: 'Platform Operations Dashboard',
+    iconPath: 'M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z',
+  },
+  {
     type: 'item', key: 'wind-ui',
     label: 'Wind Dashboard',
     title: 'Wind Dashboard',
     iconPath: 'M9.59 4.59A2 2 0 1111 8H2m10.59 11.41A2 2 0 1014 16H2m15.73-8.27A2.5 2.5 0 1119.5 12H2',
+  },
+  {
+    type: 'item', key: 'conduit-ui',
+    label: 'Conduit',
+    title: 'Conduit Control Plane',
+    iconPath: 'M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182',
   },
   {
     type: 'item', key: 'execution-ui',

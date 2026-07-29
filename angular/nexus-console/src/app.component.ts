@@ -185,7 +185,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui' | 'nebula-cp' | 'monaco-judge' | 'conduit-legacy-ui'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui' | 'nebula-cp' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -210,6 +210,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'edit-ui': 'http://localhost:4223',
     'wind-ui': 'http://localhost:4209',
     'nebula-cp': 'http://localhost:4014',
+    'throttler-ui': 'http://localhost:4211',
+    'barbie': 'http://localhost:3010',
     'monaco-judge': 'http://localhost:4016',
     'conduit-legacy-ui': 'http://localhost:4015',
   };
@@ -229,6 +231,8 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentViewMode() === 'edit-ui' ||
     this.currentViewMode() === 'wind-ui' ||
     this.currentViewMode() === 'nebula-cp' ||
+    this.currentViewMode() === 'throttler-ui' ||
+    this.currentViewMode() === 'barbie' ||
     this.currentViewMode() === 'monaco-judge' ||
     this.currentViewMode() === 'conduit-legacy-ui'
   );
@@ -2692,7 +2696,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
         let newStreamHeight = initialStreamHeight + dy;
 
         const minHeight = 100;
-        const consoleHeight = this.isConsoleCollapsed() ? 28 : (this.consolePaneHeight() / 100 * containerRect.height);
+        const consoleHeight = this.isConsoleCollapsed() ? 28 : this.consolePaneHeight(); // already in pixels
         const maxHeight = containerRect.height - 100 - consoleHeight;
 
         if (newStreamHeight < minHeight) newStreamHeight = minHeight;

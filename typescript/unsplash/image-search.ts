@@ -19,6 +19,19 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const PORT = process.env.UNSPLASH_SERVER_PORT || 8083;
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`unsplash-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[unsplash-server] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[unsplash-server] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 const server = http.createServer((req, res) => {
     // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -112,4 +125,13 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
     console.log(`Unsplash mock server listening on http://localhost:${PORT}`);
+});
+
+server.on('error', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`unsplash-server: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('unsplash-server: listen error:', err.message);
+  }
+  process.exit(1);
 });

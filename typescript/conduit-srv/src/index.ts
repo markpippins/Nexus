@@ -43,6 +43,19 @@ import sessionLogRouter from "./routes/session-log.js";
 
 const PORT = parseInt(process.env.CONDUIT_SRV_PORT || "3104", 10);
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`conduit-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[conduit-srv] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[conduit-srv] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 const app = express();
 
 app.use(cors());
@@ -108,7 +121,7 @@ app.get("/health", async (_req, res) => {
 
 // ── Start ───────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[conduit-srv] listening on http://localhost:${PORT}`);
   console.log(`  Workflows:     http://localhost:${PORT}/workflows`);
   console.log(`  Tickets:       http://localhost:${PORT}/tickets`);
@@ -127,4 +140,13 @@ app.listen(PORT, () => {
     interval: 30,
     log: (...args: any[]) => console.log(new Date().toISOString(), "[heartbeat conduit-srv]", ...args),
   });
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`conduit-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('conduit-srv: listen error:', err.message);
+  }
+  process.exit(1);
 });

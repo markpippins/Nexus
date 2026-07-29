@@ -29,6 +29,19 @@ const PORT = parseInt(process.env.HARNESS_PORT || "3420");
 const WORK_DIR = process.env.HARNESS_WORK_DIR || "/home/codex/dev";
 const PROMPT_DIR = join(WORK_DIR, ".harness", "prompts");
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`harness-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[harness-srv] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[harness-srv] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 // ── POST /run ───────────────────────────────────────────────────────
 
 /**
@@ -453,8 +466,17 @@ function parseOutcome(
 
 // ── Start ───────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[harness-srv] listening on port ${PORT}`);
   console.log(`[harness-srv] work dir: ${WORK_DIR}`);
   console.log(`[harness-srv] prompt dir: ${PROMPT_DIR}`);
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`harness-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('harness-srv: listen error:', err.message);
+  }
+  process.exit(1);
 });

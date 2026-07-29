@@ -101,6 +101,13 @@ const server = app.listen(PORT, () => {
   }).catch(err => {
     console.error('[wind-srv] Failed to start NATS listener:', err.message);
   });
+
+  // Start the PG notification listener (bridges trigger→NATS for WRP events)
+  import('./pg-notify-listener.js').then(async ({ startPgNotifyListener }) => {
+    registerCleanup(await startPgNotifyListener());
+  }).catch(err => {
+    console.error('[wind-srv] Failed to start PG notify listener:', err.message);
+  });
 });
 
 // Handle listen-time errors (e.g. EADDRINUSE) cleanly.

@@ -34,6 +34,19 @@ const pool = new Pool({
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3110;
 
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`execution-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[execution-srv] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[execution-srv] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
@@ -72,10 +85,19 @@ app.use((_req, res) => {
 });
 
 // ── Start ──────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`execution-srv listening on http://localhost:${PORT}`);
   console.log(`  health:  http://localhost:${PORT}/health`);
   console.log(`  routes:  http://localhost:${PORT}/api/execution/...`);
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`execution-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+  } else {
+    console.error('execution-srv: listen error:', err.message);
+  }
+  process.exit(1);
 });
 
 // ── Graceful shutdown ──────────────────────────────────────────────

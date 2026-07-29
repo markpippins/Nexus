@@ -12,6 +12,20 @@ import {
 import { syncAll } from "./sync";
 
 const PORT = parseInt(process.env.PROMPT_SRV_PORT || "3501", 10);
+
+// ── Process-level safety net ─────────────────────────────────────
+process.on('uncaughtException', (err: Error & { code?: string }) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`tackle-prompt-sync-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    process.exit(1);
+  }
+  if (err.code === 'EPIPE' || err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT') {
+    console.warn('[tackle-prompt-sync-srv] uncaughtException (connection noise):', err.code, err.message);
+    return;
+  }
+  console.error('[tackle-prompt-sync-srv] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
+});
+
 const app = express();
 app.use(express.json());
 
@@ -144,8 +158,17 @@ async function main() {
     );
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[tackle-prompt-sync-srv] Listening on port ${PORT}`);
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`tackle-prompt-sync-srv: port ${PORT} already in use, exiting (code EADDRINUSE)`);
+    } else {
+      console.error('tackle-prompt-sync-srv: listen error:', err.message);
+    }
+    process.exit(1);
   });
 }
 

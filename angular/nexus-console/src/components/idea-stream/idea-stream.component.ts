@@ -258,17 +258,53 @@ export class IdeaStreamComponent {
         );
 
         promises.push(
-          this.geminiService.search(query)
-            .then(text => [{ query, text, publishedAt: new Date().toISOString(), type: 'gemini' as const, paneId: id }])
-        );
-      } else {
-        promises.push(
-          this.unsplashService.search(query)
+          this.unsplashService.search({
+            brokerUrl: safeBrokerUrl,
+            token: token,
+            query: query
+          })
             .then((results: any[]) => results.map(r => ({ ...r, type: 'image' as const, paneId: id })))
         );
 
         promises.push(
-          this.youtubeSearchService.search(query)
+          this.youtubeSearchService.search({
+            brokerUrl: safeBrokerUrl,
+            token: token,
+            query: query
+          })
+            .then((results: any[]) => results.map(r => ({ ...r, type: 'youtube' as const, paneId: id })))
+        );
+
+        promises.push(
+          this.geminiService.search(query)
+            .then(text => [{ query, text, publishedAt: new Date().toISOString(), type: 'gemini' as const, paneId: id }])
+        );
+      } else {
+        // No gateway profile/token — still try real Google search via default broker
+        // (the broker doesn't validate tokens for search, so any value works)
+        promises.push(
+          this.googleSearchService.search({
+            brokerUrl: 'http://localhost:8081',
+            token: 'idea-stream',
+            query: simpleSearchQuery
+          }).then((results: any[]) => results.map(r => ({ ...r, type: 'web' as const, paneId: id })))
+        );
+
+        promises.push(
+          this.unsplashService.search({
+            brokerUrl: 'http://localhost:8081',
+            token: 'idea-stream',
+            query: query
+          })
+            .then((results: any[]) => results.map(r => ({ ...r, type: 'image' as const, paneId: id })))
+        );
+
+        promises.push(
+          this.youtubeSearchService.search({
+            brokerUrl: 'http://localhost:8081',
+            token: 'idea-stream',
+            query: query
+          })
             .then((results: any[]) => results.map(r => ({ ...r, type: 'youtube' as const, paneId: id })))
         );
 
