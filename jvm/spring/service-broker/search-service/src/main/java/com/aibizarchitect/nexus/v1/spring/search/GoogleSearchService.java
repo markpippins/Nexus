@@ -23,8 +23,8 @@ public class GoogleSearchService {
     private static final Logger log = LoggerFactory.getLogger(GoogleSearchService.class);
 
     private final RestTemplate restTemplate;
-
     private final SearchResultsCacheRepository cacheRepository;
+    private final SearchRateLimiter rateLimiter;
 
     @Value("${google.search.api.key:#{null}}")
     private String googleApiKey;
@@ -32,34 +32,55 @@ public class GoogleSearchService {
     @Value("${google.search.engine.id:#{null}}")
     private String searchEngineId;
 
-    // Cache TTL in minutes (default 30 minutes)
+    // Cache TTL in minutes (default 30 minutes) — for freshness, separate from rate-limit cooldown
     private static final long CACHE_TTL_MINUTES = 30;
 
-    public GoogleSearchService(RestTemplate restTemplate, SearchResultsCacheRepository cacheRepository) {
+    private static final String SERVICE_KEY = "google";
+
+    public GoogleSearchService(RestTemplate restTemplate,
+                               SearchResultsCacheRepository cacheRepository,
+                               SearchRateLimiter rateLimiter) {
         this.restTemplate = restTemplate;
         this.cacheRepository = cacheRepository;
-        log.info("GoogleSearchService initialized with MongoDB cache");
+        this.rateLimiter = rateLimiter;
+        log.info("GoogleSearchService initialized with MongoDB cache + Redis rate limiter");
     }
 
     @BrokerOperation("simpleSearch")
     public SearchResult simpleSearch(@BrokerParam("token") String token, @BrokerParam("query") String query) {
-        log.info("Query Received: {}", query);
+        return simpleSearch(token, query, false);
+    }
 
-        // First, check if we have a cached result for this query in MongoDB
-        SearchResultsCacheEntry cachedEntry = findValidCacheEntry(query);
-        if (cachedEntry != null) {
-            log.info("Returning cached result from MongoDB for query: {}", query);
-            SearchResult result = new SearchResult();
-            result.setItems(cachedEntry.getItems());
-            result.setRawResponse(cachedEntry.getItems().get(0).getPagemap()); // Simplified for demo
-            return result;
+    @BrokerOperation("forceSearch")
+    public SearchResult forceSearch(@BrokerParam("token") String token, @BrokerParam("query") String query) {
+        return simpleSearch(token, query, true);
+    }
+
+    private SearchResult simpleSearch(String token, String query, boolean forceRefresh) {
+        log.info("Query Received: {} (forceRefresh={})", query, forceRefresh);
+
+        // ── Rate-limit check (skip if force-refresh) ─────────────────
+        if (!forceRefresh && rateLimiter.isRateLimited(SERVICE_KEY, query)) {
+            // Within cooldown — serve from MongoDB even if cache TTL has expired
+            SearchResultsCacheEntry cachedEntry = findAnyCacheEntry(query);
+            if (cachedEntry != null) {
+                log.info("Rate-limited — returning MongoDB-cached result for query: {}", query);
+                return buildResult(cachedEntry);
+            }
+            // No cached entry at all; must proceed with fresh search
+            log.info("Rate-limited but no MongoDB cache entry — falling through to fresh search");
         }
 
-        // Validate configuration
+        // ── Fresh cache check ────────────────────────────────────────
+        SearchResultsCacheEntry cachedEntry = findValidCacheEntry(query);
+        if (cachedEntry != null) {
+            log.info("Returning fresh MongoDB-cached result for query: {}", query);
+            rateLimiter.markSearched(SERVICE_KEY, query);
+            return buildResult(cachedEntry);
+        }
+
         if (googleApiKey == null || googleApiKey.isEmpty()) {
             log.warn("Google API Key is not configured. Search functionality will fail.");
-            // Return an empty result instead of throwing an exception to satisfy test
-            // expectations
             SearchResult result = new SearchResult();
             result.setItems(null);
             result.setRawResponse(null);
@@ -68,8 +89,6 @@ public class GoogleSearchService {
 
         if (searchEngineId == null || searchEngineId.isEmpty()) {
             log.warn("Search Engine ID is not configured. Search functionality will fail.");
-            // Return an empty result instead of throwing an exception to satisfy test
-            // expectations
             SearchResult result = new SearchResult();
             result.setItems(null);
             result.setRawResponse(null);
@@ -131,6 +150,9 @@ public class GoogleSearchService {
                 cacheRepository.save(newCacheEntry);
                 log.info("Cached result in MongoDB for query: {}", query);
 
+                // Record rate-limit timestamp
+                rateLimiter.markSearched(SERVICE_KEY, query);
+
                 return result;
             } else {
                 log.error("Google search API returned error: {}", response.getStatusCode());
@@ -161,7 +183,21 @@ public class GoogleSearchService {
     }
 
     /**
-     * Find a valid cache entry (not expired) for the given query
+     * Find any MongoDB cache entry for the query — even if expired.
+     * Used during rate-limited cooldown to serve stale-but-valid results.
+     */
+    private SearchResultsCacheEntry findAnyCacheEntry(String query) {
+        try {
+            var optionalEntry = cacheRepository.findByQuery(query);
+            return optionalEntry.orElse(null);
+        } catch (Exception e) {
+            log.warn("Error accessing cache for query {}: {}", query, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Find a valid (non-expired) cache entry. Deletes expired entries.
      */
     private SearchResultsCacheEntry findValidCacheEntry(String query) {
         try {
@@ -171,7 +207,6 @@ public class GoogleSearchService {
                 if (!entry.isExpired()) {
                     return entry;
                 } else {
-                    // Entry is expired, remove it
                     cacheRepository.deleteById(entry.getId());
                     log.info("Removed expired cache entry for query: {}", query);
                 }
@@ -179,7 +214,19 @@ public class GoogleSearchService {
             return null;
         } catch (Exception e) {
             log.warn("Error accessing cache for query {}: {}", query, e.getMessage());
-            return null; // Return null to proceed with fresh search
+            return null;
         }
+    }
+
+    /**
+     * Wrap a cache entry into a SearchResult.
+     */
+    private SearchResult buildResult(SearchResultsCacheEntry entry) {
+        SearchResult result = new SearchResult();
+        result.setItems(entry.getItems());
+        if (entry.getItems() != null && !entry.getItems().isEmpty()) {
+            result.setRawResponse(entry.getItems().get(0).getPagemap());
+        }
+        return result;
     }
 }

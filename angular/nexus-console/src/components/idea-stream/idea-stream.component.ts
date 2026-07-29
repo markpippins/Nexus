@@ -1,9 +1,10 @@
-import { Component, ChangeDetectionStrategy, signal, computed, inject, effect, input, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, signal, computed, inject, effect, input, output, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { UiPreferencesService } from '../../services/ui-preferences.service.js';
 import { LocalConfigService } from '../../services/local-config.service.js';
 import { BookmarkService } from '../../services/bookmark.service.js';
 import { ToastService } from '../../services/toast.service.js';
+import { StreamCacheService, CachedStreamItem } from '../../services/stream-cache.service.js';
 import { GoogleSearchService, GoogleSearchParams } from '../../services/google-search.service.js';
 import { UnsplashService } from '../../services/unsplash.service.js';
 import { GeminiService } from '../../services/gemini.service.js';
@@ -73,6 +74,7 @@ export class IdeaStreamComponent {
   private localConfigService = inject(LocalConfigService);
   private bookmarkService = inject(BookmarkService);
   private toastService = inject(ToastService);
+  private streamCache = inject(StreamCacheService);
   private googleSearchService = inject(GoogleSearchService);
   private unsplashService = inject(UnsplashService);
   private geminiService = inject(GeminiService);
@@ -204,6 +206,12 @@ export class IdeaStreamComponent {
     return root === sessionName || root === 'File Systems';
   });
 
+  // --- Refresh trigger ---
+  // Incremented by the Refresh button to re-run searches with forceRefresh=true.
+  // The effect depends on this signal; when it changes, it passes forceRefresh
+  // to all search services and resets via untracked to avoid a second run.
+  private refreshTrigger = signal(0);
+
   private loadStreamResultsForPanes = effect(async () => {
     const contexts: ({ id: number } & PaneContext)[] = [];
 
@@ -215,25 +223,48 @@ export class IdeaStreamComponent {
       contexts.push({ id: activeId, ...(activeId === 1 ? this.pane1Context() : this.pane2Context()) });
     }
 
+    // Read refreshTrigger — when > 0, we're doing a force-refresh run.  Resolve
+    // once before the loop so all panes in split view get the same forceRefresh value.
+    const forceRefresh = this.refreshTrigger() > 0;
+    if (forceRefresh) {
+      untracked(() => this.refreshTrigger.set(0));
+    }
+
     for (const context of contexts) {
       const { id, path, profile, token } = context;
 
       let isMagnetFolder = false;
+      let provider: FileSystemProvider | undefined;
+      let providerPath: string[] = [];
       if (path.length > 0) {
-        const provider = this.getProvider()(path);
+        provider = this.getProvider()(path);
         // For remote paths ["File Systems", gateway, ...] strip first 2 segments;
         // for local/other paths strip only 1.
         const isRemote = path[0] === 'File Systems' && path.length > 2;
-        const providerPath = isRemote ? path.slice(2) : path.slice(1);
+        providerPath = isRemote ? path.slice(2) : path.slice(1);
         isMagnetFolder = await provider.hasFile(providerPath, '.magnet');
       }
 
-      if (!isMagnetFolder || !this.isStreamActiveSearchEnabled()) {
-        if (id === 1) {
-          this.streamResultsForPane1.set([]);
-        } else {
-          this.streamResultsForPane2.set([]);
+      if (!isMagnetFolder) {
+        // Not a magnet folder itself — but may have child magnet sub-folders.
+        // Aggregate cached results from children without hitting APIs.
+        if (this.isStreamActiveSearchEnabled() && provider) {
+          try {
+            const childResults = await this.collectChildMagnetResults(id, path, provider, providerPath);
+            if (id === 1) {
+              this.streamResultsForPane1.set(childResults);
+            } else {
+              this.streamResultsForPane2.set(childResults);
+            }
+          } catch {
+            // Silently keep previous results on error
+          }
         }
+        // Don't clear — keep previous magnet results visible across navigation
+        continue;
+      }
+
+      if (!this.isStreamActiveSearchEnabled()) {
         continue;
       }
 
@@ -243,7 +274,7 @@ export class IdeaStreamComponent {
       const query = relativePath.length > 0 ? relativePath[relativePath.length - 1] : rootName;
       const simpleSearchQuery = relativePath.join(', ');
 
-      const promises: Promise<StreamItem[]>[] = [];
+      const promises: Promise<CachedStreamItem[]>[] = [];
 
       if (profile && token) {
         const safeBrokerUrl = profile.brokerUrl || '';
@@ -253,75 +284,91 @@ export class IdeaStreamComponent {
           query: simpleSearchQuery
         };
         promises.push(
-          this.googleSearchService.search(searchParams)
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'web' as const, paneId: id })))
+          this.cachedOrFetch('google', simpleSearchQuery, forceRefresh, id,
+            () => this.googleSearchService.search(searchParams, forceRefresh)
+              .then(results => results.map(r => ({ ...r, type: 'web' as const, paneId: id })))
+          )
         );
 
         promises.push(
-          this.unsplashService.search({
-            brokerUrl: safeBrokerUrl,
-            token: token,
-            query: query
-          })
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'image' as const, paneId: id })))
+          this.cachedOrFetch('unsplash', query, forceRefresh, id,
+            () => this.unsplashService.search({
+              brokerUrl: safeBrokerUrl,
+              token: token,
+              query: query
+            }, forceRefresh)
+              .then(results => results.map(r => ({ ...r, type: 'image' as const, paneId: id })))
+          )
         );
 
         promises.push(
-          this.youtubeSearchService.search({
-            brokerUrl: safeBrokerUrl,
-            token: token,
-            query: query
-          })
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'youtube' as const, paneId: id })))
+          this.cachedOrFetch('youtube', query, forceRefresh, id,
+            () => this.youtubeSearchService.search({
+              brokerUrl: safeBrokerUrl,
+              token: token,
+              query: query
+            }, forceRefresh)
+              .then(results => results.map(r => ({ ...r, type: 'youtube' as const, paneId: id })))
+          )
         );
 
         promises.push(
-          this.geminiService.search(query)
-            .then(text => [{ query, text, publishedAt: new Date().toISOString(), type: 'gemini' as const, paneId: id }])
+          this.cachedOrFetch('gemini', query, forceRefresh, id,
+            () => this.geminiService.search(query)
+              .then(text => [{ query, text, publishedAt: new Date().toISOString(), type: 'gemini' as const, paneId: id }])
+          )
         );
       } else {
         // No gateway profile/token — still try real Google search via default broker
         // (the broker doesn't validate tokens for search, so any value works)
         promises.push(
-          this.googleSearchService.search({
-            brokerUrl: 'http://localhost:8081',
-            token: 'idea-stream',
-            query: simpleSearchQuery
-          }).then((results: any[]) => results.map(r => ({ ...r, type: 'web' as const, paneId: id })))
+          this.cachedOrFetch('google', simpleSearchQuery, forceRefresh, id,
+            () => this.googleSearchService.search({
+              brokerUrl: 'http://localhost:8081',
+              token: 'idea-stream',
+              query: simpleSearchQuery
+            }, forceRefresh).then(results => results.map(r => ({ ...r, type: 'web' as const, paneId: id })))
+          )
         );
 
         promises.push(
-          this.unsplashService.search({
-            brokerUrl: 'http://localhost:8081',
-            token: 'idea-stream',
-            query: query
-          })
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'image' as const, paneId: id })))
+          this.cachedOrFetch('unsplash', query, forceRefresh, id,
+            () => this.unsplashService.search({
+              brokerUrl: 'http://localhost:8081',
+              token: 'idea-stream',
+              query: query
+            }, forceRefresh).then(results => results.map(r => ({ ...r, type: 'image' as const, paneId: id })))
+          )
         );
 
         promises.push(
-          this.youtubeSearchService.search({
-            brokerUrl: 'http://localhost:8081',
-            token: 'idea-stream',
-            query: query
-          })
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'youtube' as const, paneId: id })))
+          this.cachedOrFetch('youtube', query, forceRefresh, id,
+            () => this.youtubeSearchService.search({
+              brokerUrl: 'http://localhost:8081',
+              token: 'idea-stream',
+              query: query
+            }, forceRefresh).then(results => results.map(r => ({ ...r, type: 'youtube' as const, paneId: id })))
+          )
         );
 
         promises.push(
-          this.academicSearchService.search(query)
-            .then((results: any[]) => results.map(r => ({ ...r, type: 'academic' as const, paneId: id })))
+          this.cachedOrFetch('academic', query, forceRefresh, id,
+            () => this.academicSearchService.search(query)
+              .then(results => results.map(r => ({ ...r, type: 'academic' as const, paneId: id })))
+          )
         );
 
         promises.push(
-          this.geminiService.search(query)
-            .then(text => [{ query, text, publishedAt: new Date().toISOString(), type: 'gemini' as const, paneId: id }])
+          this.cachedOrFetch('gemini', query, forceRefresh, id,
+            () => this.geminiService.search(query)
+              .then(text => [{ query, text, publishedAt: new Date().toISOString(), type: 'gemini' as const, paneId: id }])
+          )
         );
       }
 
       try {
         const results = await Promise.all(promises);
-        const flattenedResults = results.flat();
+        const flattenedResults = results.flat() as StreamItem[];
 
         if (id === 1) {
           this.streamResultsForPane1.set(flattenedResults);
@@ -341,6 +388,82 @@ export class IdeaStreamComponent {
 
   onStreamSearchChange(event: Event): void {
     this.streamSearchQuery.set((event.target as HTMLInputElement).value);
+  }
+
+  /** Trigger a force-refresh of all active stream searches. */
+  onRefreshStream(): void {
+    // Per-query invalidation happens in cachedOrFetch when forceRefresh is true;
+    // no need for blanket invalidateAll here.
+    this.refreshTrigger.update(v => v + 1);
+  }
+
+  // ── Search cache helpers ──────────────────────────────────────────
+
+  /**
+   * Check the stream cache before calling the search function.
+   * On cache hit, returns the cached results immediately.
+   * On cache miss, calls fetchFn, caches the results, and returns them.
+   * On forceRefresh, invalidates the cache entry before fetching.
+   */
+  private async cachedOrFetch(
+    service: string,
+    query: string,
+    forceRefresh: boolean,
+    paneId: number,
+    fetchFn: () => Promise<CachedStreamItem[]>,
+  ): Promise<CachedStreamItem[]> {
+    if (!forceRefresh) {
+      const cached = this.streamCache.get(service, query);
+      if (cached) {
+        // Tag each cached item with the current pane ID
+        return cached.map(item => ({ ...item, paneId })) as CachedStreamItem[];
+      }
+    } else {
+      this.streamCache.invalidate(service, query);
+    }
+
+    const results = await fetchFn();
+    this.streamCache.set(service, query, results);
+    return results;
+  }
+
+  /**
+   * When navigating to a non-magnet folder, scan its children for magnet
+   * sub-folders and aggregate their cached search results across all services.
+   */
+  private async collectChildMagnetResults(
+    paneId: number,
+    path: string[],
+    provider: FileSystemProvider,
+    providerPath: string[],
+  ): Promise<CachedStreamItem[]> {
+    const children = await provider.getContents(providerPath);
+    const services = ['google', 'youtube', 'unsplash', 'academic', 'gemini'];
+    const results: CachedStreamItem[] = [];
+
+    for (const child of children) {
+      if (child.type !== 'folder' && child.type !== 'symlink') continue;
+
+      const childName = child.name;
+      const isMagnet = child.isMagnet ?? await provider.hasFile([...providerPath, childName], '.magnet');
+      if (!isMagnet) continue;
+
+      // Construct the queries the same way the main magnet flow would
+      const childQuery = childName;
+      const childSimpleQuery = [...path.slice(1), childName].join(', ');
+
+      for (const svc of services) {
+        const query = svc === 'google' ? childSimpleQuery : childQuery;
+        const cached = this.streamCache.get(svc, query);
+        if (cached) {
+          for (const item of cached) {
+            results.push({ ...item, paneId } as any);
+          }
+        }
+      }
+    }
+
+    return results;
   }
 
   toggleStreamFilter(type: StreamItemType): void {

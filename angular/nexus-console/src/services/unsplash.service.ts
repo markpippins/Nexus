@@ -48,7 +48,7 @@ export class UnsplashService {
     return fullUrl;
   }
 
-  async search(params: ImageSearchParams): Promise<ImageSearchResult[]> {
+  async search(params: ImageSearchParams, forceRefresh = false): Promise<ImageSearchResult[]> {
     if (!params.brokerUrl) {
       console.warn('UnsplashService: No brokerUrl provided. Returning empty results.');
       return [];
@@ -67,7 +67,7 @@ export class UnsplashService {
       const result = await this.brokerService.submitRequest<SearchResult>(
         this.constructBrokerUrl(params.brokerUrl),
         'unsplashSearchService',
-        'searchImages',
+        forceRefresh ? 'forceSearchImages' : 'searchImages',
         brokerParams,
       );
 

@@ -42,7 +42,7 @@ export class YoutubeSearchService {
     return fullUrl;
   }
 
-  async search(params: YoutubeSearchParams): Promise<YoutubeSearchResult[]> {
+  async search(params: YoutubeSearchParams, forceRefresh = false): Promise<YoutubeSearchResult[]> {
     if (!params.brokerUrl) {
       console.warn('YoutubeSearchService: No brokerUrl provided. Returning empty results.');
       return [];
@@ -61,7 +61,7 @@ export class YoutubeSearchService {
       const result = await this.brokerService.submitRequest<SearchResult>(
         this.constructBrokerUrl(params.brokerUrl),
         'youtubeSearchService',
-        'searchVideos',
+        forceRefresh ? 'forceSearchVideos' : 'searchVideos',
         brokerParams,
       );
 

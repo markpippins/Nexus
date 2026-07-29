@@ -39,7 +39,7 @@ export class GoogleSearchService {
     return fullUrl;
   }
 
-  async search(params: GoogleSearchParams): Promise<GoogleSearchResult[]> {
+  async search(params: GoogleSearchParams, forceRefresh = false): Promise<GoogleSearchResult[]> {
     if (!params.brokerUrl) {
       console.warn('GoogleSearchService: No brokerUrl provided. Returning empty results.');
       return Promise.resolve([]);
@@ -64,7 +64,7 @@ export class GoogleSearchService {
       const result = await this.brokerService.submitRequest<SearchResult>(
         this.constructBrokerUrl(params.brokerUrl), 
         'googleSearchService', 
-        'simpleSearch', 
+        forceRefresh ? 'forceSearch' : 'simpleSearch',
         brokerParams
       );
 

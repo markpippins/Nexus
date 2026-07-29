@@ -27,6 +27,7 @@ ALL_SERVICES=(
     "service-registry.service"  # port 8085 — service discovery
     "broker-gateway.service"    # port 8081 — service broker gateway (Spring Boot)
     "quarkus-broker-gateway.service"  # port 8091 — service broker gateway (Quarkus)
+    "helidon-user-access-service.service"  # port 9093 — user access control (Helidon MP)
     "terrain.service"          # port 8084 — topology registry
     "file-system-server.service"        # port 4042 — file system operations (edit-ui)
     "secure-file-system-server.service" # port 4041 — secure file system operations (service-broker)
@@ -102,6 +103,7 @@ SERVICE_PORTS=(
     ["service-registry.service"]="8085"
     ["broker-gateway.service"]="8081"
     ["quarkus-broker-gateway.service"]="8091"
+    ["helidon-user-access-service.service"]="9093"
     ["terrain.service"]="8084"
     ["file-system-server.service"]="4042"
     ["secure-file-system-server.service"]="4041"
