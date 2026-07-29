@@ -103,6 +103,7 @@ public class PlatformHealthController {
             m.put("description", s.getDescription());
             m.put("repositoryUrl", s.getRepositoryUrl());
             m.put("activeFlag", s.getActiveFlag());
+            m.put("isInternal", s.getIsInternal());
             // Start with UNKNOWN; probe will overwrite if healthCheckUrl is set
             m.put("liveStatus", "UNKNOWN");
 
@@ -131,6 +132,7 @@ public class PlatformHealthController {
             m.put("description", s.getDescription());
             m.put("repositoryUrl", s.getRepositoryUrl());
             m.put("activeFlag", s.getActiveFlag());
+            m.put("isInternal", s.getIsInternal());
             m.put("liveStatus", "UNKNOWN");
 
             String healthCheckUrl = s.getHealthCheckUrl();
