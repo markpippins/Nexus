@@ -429,48 +429,7 @@ def create_candidate(harvest_id: str, candidate: dict) -> str | None:
     return result.get("id")
 
 
-ASSEMBLY_MCP_URL = "http://localhost:3112"
-
-
-def assembly_mcp_call(method: str, params: dict) -> dict:
-    """Call an MCP tool on the assembly-mcp server via JSON-RPC over HTTP."""
-    import urllib.request, urllib.error
-    payload = json.dumps({
-        "jsonrpc": "2.0",
-        "id": "1",
-        "method": method,
-        "params": params,
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        ASSEMBLY_MCP_URL,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        body_text = e.read().decode() if e.fp else "(no body)"
-        log.error("  Assembly MCP %s: %s", method, body_text[:500])
-        return {"error": True, "status": e.code, "body": body_text[:500]}
-    except Exception as e:
-        log.error("  Assembly MCP call failed: %s", e)
-        return {"error": True}
-
-
-def publish_harvest_to_forum(harvest_id: str) -> bool:
-    """Call assembly_publish_harvest MCP tool to create a forum post."""
-    result = assembly_mcp_call("tools/call", {
-        "name": "assembly_publish_harvest",
-        "arguments": {"harvest_id": harvest_id},
-    })
-    if isinstance(result, dict) and result.get("error"):
-        return False
-    # Successful response looks like: {"jsonrpc":"2.0","id":"1","result":{"content":[{"text":"..."}]}}
-    content = result.get("result", {}).get("content", [])
-    if content:
-        log.info("  Forum post result: %s", content[0].get("text", "")[:200])
-    return True
+from assembly_publish import publish_harvest_to_forum
 
 
 def main():

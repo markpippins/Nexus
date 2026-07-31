@@ -4,13 +4,20 @@ Manual inference filing — Buffy's own analysis mapped to Nebula hierarchy.
 Creates candidates for the remaining 11 unfiled harvests.
 """
 
-import json, logging, sys, subprocess
+import json, logging, sys, os, subprocess
 import urllib.request, urllib.error
+
+# Add rover source dir so `nebula_utils` and `assembly_publish` are importable
+# without PYTHONPATH (matches the pattern in analyst_answer_questions.py /
+# architect_process_todo.py).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python", "rover"))
+
+from nebula_utils import unwrap_systems_response
+from assembly_publish import publish_harvest_to_forum
 
 log = logging.getLogger("manual_file")
 
 NEBULA_API = "http://localhost:3101/api"
-ASSEMBLY_MCP_URL = "http://localhost:3112"
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", stream=sys.stderr)
@@ -31,43 +38,9 @@ def nebula_post(path, body):
         log.error("  API error %s: %s", e.code, body_text[:300])
         return {"error": True, "status": e.code}
 
-def assembly_mcp_call(method: str, params: dict):
-    """Call an MCP tool on the assembly-mcp server via JSON-RPC over HTTP."""
-    payload = json.dumps({
-        "jsonrpc": "2.0",
-        "id": "1",
-        "method": method,
-        "params": params,
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        ASSEMBLY_MCP_URL,
-        data=payload,
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            return json.loads(r.read().decode())
-    except urllib.error.HTTPError as e:
-        body_text = e.read().decode() if e.fp else "(no body)"
-        log.error("  Assembly MCP %s: %s", method, body_text[:500])
-        return {"error": True, "status": e.code, "body": body_text[:500]}
-    except Exception as e:
-        log.error("  Assembly MCP call failed: %s", e)
-        return {"error": True}
-
-
-def publish_harvest_to_forum(harvest_id: str) -> bool:
-    """Call assembly_publish_harvest MCP tool to create a forum post."""
-    result = assembly_mcp_call("tools/call", {
-        "name": "assembly_publish_harvest",
-        "arguments": {"harvest_id": harvest_id},
-    })
-    if isinstance(result, dict) and result.get("error"):
-        return False
-    content = result.get("result", {}).get("content", [])
-    if content:
-        log.info("  Forum post result: %s", content[0].get("text", "")[:200])
-    return True
+# publish_harvest_to_forum is imported from assembly_publish (rover dir).
+# It targets assembly-srv REST on port 3107 directly — the old MCP path
+# (ASSEMBLY_MCP_URL=3112 service-broker) was broken; see agent record 0a932f14.
 
 
 def nebula_get(path):
@@ -77,7 +50,11 @@ def nebula_get(path):
 
 # Get the hierarchy for ID resolution
 log.info("Fetching hierarchy...")
-systems = nebula_get("/systems")
+raw = nebula_get("/systems?pageSize=100")
+systems = unwrap_systems_response(raw)
+if systems is None:
+    log.error("Unexpected /systems response: %s", type(raw).__name__)
+    sys.exit(1)
 log.info("Got %d systems", len(systems))
 
 # Build lookup maps
