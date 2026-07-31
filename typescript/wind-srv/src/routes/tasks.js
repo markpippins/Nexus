@@ -9,7 +9,7 @@ tasksRouter.get('/', async (req, res, next) => {
   try {
     const { office_id } = req.query;
     let sql = `
-      SELECT t.id, t.office_id, t.title_id, t.name, t.description, t.input_spec, t.created_at,
+      SELECT t.id, t.office_id, t.title_id, t.tackle_task_id, t.name, t.description, t.input_spec, t.created_at,
              o.name AS office_name, ti.display_name AS title_name
       FROM wind.tasks t
       JOIN wind.offices o ON t.office_id = o.id
@@ -30,7 +30,7 @@ tasksRouter.get('/', async (req, res, next) => {
 tasksRouter.get('/:id', async (req, res, next) => {
   try {
     const taskResult = await query(`
-      SELECT t.id, t.office_id, t.title_id, t.name, t.description, t.input_spec, t.created_at,
+      SELECT t.id, t.office_id, t.title_id, t.tackle_task_id, t.name, t.description, t.input_spec, t.created_at,
              o.name AS office_name, ti.display_name AS title_name
       FROM wind.tasks t
       JOIN wind.offices o ON t.office_id = o.id
@@ -54,15 +54,15 @@ tasksRouter.get('/:id', async (req, res, next) => {
 // Create task
 tasksRouter.post('/', async (req, res, next) => {
   try {
-    const { office_id, title_id, name, description, input_spec } = req.body;
+    const { office_id, title_id, tackle_task_id, name, description, input_spec } = req.body;
     if (!office_id || !title_id || !name) {
       throw new BadRequestError('office_id, title_id, and name are required');
     }
     const result = await query(
-      `INSERT INTO wind.tasks (office_id, title_id, name, description, input_spec)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, office_id, title_id, name, description, input_spec, created_at`,
-      [office_id, title_id, name, description || null, input_spec || {}]
+      `INSERT INTO wind.tasks (office_id, title_id, tackle_task_id, name, description, input_spec)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, office_id, title_id, tackle_task_id, name, description, input_spec, created_at`,
+      [office_id, title_id, tackle_task_id || null, name, description || null, input_spec || {}]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { next(err); }
@@ -71,21 +71,22 @@ tasksRouter.post('/', async (req, res, next) => {
 // Update task
 tasksRouter.put('/:id', async (req, res, next) => {
   try {
-    const { name, description, input_spec } = req.body;
+    const { name, description, input_spec, tackle_task_id } = req.body;
     const sets = [];
     const params = [];
     let idx = 1;
     if (name !== undefined) { sets.push(`name = $${idx++}`); params.push(name); }
     if (description !== undefined) { sets.push(`description = $${idx++}`); params.push(description); }
     if (input_spec !== undefined) { sets.push(`input_spec = $${idx++}`); params.push(input_spec); }
+    if (tackle_task_id !== undefined) { sets.push(`tackle_task_id = $${idx++}`); params.push(tackle_task_id); }
     if (sets.length === 0) {
-      const r = await query('SELECT id, name, description, input_spec, created_at FROM wind.tasks WHERE id = $1', [req.params.id]);
+      const r = await query('SELECT id, name, description, input_spec, tackle_task_id, created_at FROM wind.tasks WHERE id = $1', [req.params.id]);
       if (r.rows.length === 0) throw new NotFoundError('Task not found');
       return res.json(r.rows[0]);
     }
     params.push(req.params.id);
     const result = await query(
-      `UPDATE wind.tasks SET ${sets.join(', ')} WHERE id = $${idx} RETURNING id, office_id, title_id, name, description, input_spec, created_at`,
+      `UPDATE wind.tasks SET ${sets.join(', ')} WHERE id = $${idx} RETURNING id, office_id, title_id, tackle_task_id, name, description, input_spec, created_at`,
       params
     );
     if (result.rows.length === 0) throw new NotFoundError('Task not found');
