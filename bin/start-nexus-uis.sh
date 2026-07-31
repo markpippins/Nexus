@@ -22,12 +22,12 @@ NEXUS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 declare -A UI_PORTS
 
 UI_NAMES=(
-    "nebula-ui"          # 3000
+    "nebula-ui"          # 4210
     "duality-ui"         # 3002
     "view-architect"     # 3003
     "plurality-ui"       # 3004
     "nexus-console"      # 4200
-    "conduit-ui"         # 4201
+    "conduit-ui"         # 3000 (mock) / 4201 (live)
     "tackle-ui"          # 4202
     "cascade-ui"         # 4203
     "angular-assembly"   # 4204
@@ -40,14 +40,15 @@ UI_NAMES=(
     "nebula-control-plane" # 4014
     "monaco-judge"        # 4016
     "conduit-ui-legacy"  # 4015
+    "data-explorer-ui"     # 4212
 )
 
-UI_PORTS[nebula-ui]=3000
+UI_PORTS[nebula-ui]=4210
 UI_PORTS[duality-ui]=3002
 UI_PORTS[view-architect]=3003
 UI_PORTS[plurality-ui]=3004
 UI_PORTS[nexus-console]=4200
-UI_PORTS[conduit-ui]=4201
+UI_PORTS[conduit-ui]=3000  # mock; 4201 in live mode
 UI_PORTS[tackle-ui]=4202
 UI_PORTS[cascade-ui]=4203
 UI_PORTS[angular-assembly]=4204
@@ -60,6 +61,7 @@ UI_PORTS[throttler-ui]=4211
 UI_PORTS[nebula-control-plane]=4014
 UI_PORTS[monaco-judge]=4016
 UI_PORTS[conduit-ui-legacy]=4015
+UI_PORTS[data-explorer-ui]=4212
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 

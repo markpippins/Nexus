@@ -1,63 +1,96 @@
 import {
-  HTMLHarvest,
-  CandidateItem,
-  IntentRecord,
-  RequirementSpec,
-  SystemCanonicalSpec,
-  DeliberationAgenda,
-  ImplementationPlan,
-  WorkRequestDCO,
-  WRPKernelDelta,
-  SystemNode,
-  ModelChainConfig,
+  ServiceRootResponse,
+  HealthzResponse,
+  ReadyzResponse,
   SystemStatus,
-  PlanLifecycleStatus,
-  AgentRole,
+  KernelDeltaInput,
+  DeltaIngestResponse,
+  DeltaStateSummary,
+  KernelStateSummary,
+  KernelIdentity,
+  ReceiptItem,
+  PlanDetailResponse,
+  CrossPlanGraphResponse,
+  LineageEventItem,
+  ReplayStateResponse,
+  ReplayCompareResponse,
+  AdminIdentitiesResponse,
+  EngineConsistencyResponse,
+  KernelSession,
+  BreakerStateResponse,
+  FailureRecoveryConfig,
+  ModelChainConfig,
+  WorkflowListResponse,
+  TicketDetectionResponse,
+  TicketLineageResponse,
+  TokenPlanUsageResponse,
+  TokenRoleUsageResponse,
+  TokenTicketUsageResponse,
+  CronConfigResponse,
+  GovernanceReplayResponse,
+  GovernanceEventsResponse,
+  VisionWorkRequestsResponse,
+  VisionWorkRequestSingleResponse,
+  VisionWorkRequestInput,
+  VisionWorkRequestUpsertResponse,
+  VisionReceiptsResponse,
 } from '../types/conduit';
 
 import {
   INITIAL_SYSTEM_STATUS,
-  INITIAL_HARVESTS,
-  INITIAL_CANDIDATES,
-  INITIAL_INTENTS,
-  INITIAL_REQUIREMENTS,
-  INITIAL_CANONICAL_SPECS,
-  INITIAL_AGENDAS,
   INITIAL_PLANS,
-  INITIAL_WORK_REQUESTS,
-  INITIAL_KERNEL_DELTAS,
-  INITIAL_SYSTEM_NODES,
   INITIAL_MODEL_CHAINS,
 } from './mockData';
 
-// Storage keys
 const STORAGE_KEYS = {
   STATUS: 'nexus_system_status_v1',
-  HARVESTS: 'nexus_harvests_v1',
-  CANDIDATES: 'nexus_candidates_v1',
-  INTENTS: 'nexus_intents_v1',
-  REQUIREMENTS: 'nexus_requirements_v1',
-  CANONICAL_SPECS: 'nexus_canonical_specs_v1',
-  AGENDAS: 'nexus_agendas_v1',
-  PLANS: 'nexus_plans_v1',
-  WORK_REQUESTS: 'nexus_work_requests_v1',
-  KERNEL_DELTAS: 'nexus_kernel_deltas_v1',
-  SYSTEM_NODES: 'nexus_system_nodes_v1',
-  MODEL_CHAINS: 'nexus_model_chains_v1',
+  DELTAS: 'nexus_kernel_deltas_v2',
+  RECEIPTS: 'nexus_receipts_v2',
+  SESSIONS: 'nexus_sessions_v2',
+  BREAKER: 'nexus_breaker_v2',
+  LINEAGE: 'nexus_lineage_v2',
+  IDENTITIES: 'nexus_identities_v2',
   USE_MOCK: 'nexus_use_mock_api_v1',
 };
 
 class ApiService {
   private useMock: boolean = true;
+  private liveModeDetected: boolean | null = null; // null = not yet checked
 
   constructor() {
     const storedMock = localStorage.getItem(STORAGE_KEYS.USE_MOCK);
     if (storedMock !== null) {
       this.useMock = storedMock === 'true';
     } else {
-      this.useMock = true; // Default to mock for standalone preview
+      this.useMock = true;
     }
     this.initLocalStorage();
+  }
+
+  /**
+   * Check the server's /api/status endpoint to determine if the server
+   * is running in live mode (proxying to real backends). If so, disable
+   * mock mode so the client fetches real data.
+   *
+   * Call this once on app mount, before any data refresh.
+   */
+  public async initializeMode(): Promise<boolean> {
+    try {
+      const res = await fetch('/api/status');
+      if (res.ok) {
+        const status = await res.json();
+        if (status.liveMode === true) {
+          this.useMock = false;
+          this.liveModeDetected = true;
+          localStorage.setItem(STORAGE_KEYS.USE_MOCK, 'false');
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not reach /api/status to detect live mode — using mock', e);
+    }
+    this.liveModeDetected = false;
+    return false;
   }
 
   public isMockMode(): boolean {
@@ -70,485 +103,1128 @@ class ApiService {
   }
 
   private initLocalStorage(): void {
-    if (!localStorage.getItem(STORAGE_KEYS.HARVESTS)) {
-      localStorage.setItem(STORAGE_KEYS.HARVESTS, JSON.stringify(INITIAL_HARVESTS));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.CANDIDATES)) {
-      localStorage.setItem(STORAGE_KEYS.CANDIDATES, JSON.stringify(INITIAL_CANDIDATES));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.INTENTS)) {
-      localStorage.setItem(STORAGE_KEYS.INTENTS, JSON.stringify(INITIAL_INTENTS));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.REQUIREMENTS)) {
-      localStorage.setItem(STORAGE_KEYS.REQUIREMENTS, JSON.stringify(INITIAL_REQUIREMENTS));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.CANONICAL_SPECS)) {
-      localStorage.setItem(STORAGE_KEYS.CANONICAL_SPECS, JSON.stringify(INITIAL_CANONICAL_SPECS));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.AGENDAS)) {
-      localStorage.setItem(STORAGE_KEYS.AGENDAS, JSON.stringify(INITIAL_AGENDAS));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.PLANS)) {
-      localStorage.setItem(STORAGE_KEYS.PLANS, JSON.stringify(INITIAL_PLANS));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.WORK_REQUESTS)) {
-      localStorage.setItem(STORAGE_KEYS.WORK_REQUESTS, JSON.stringify(INITIAL_WORK_REQUESTS));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.KERNEL_DELTAS)) {
-      localStorage.setItem(STORAGE_KEYS.KERNEL_DELTAS, JSON.stringify(INITIAL_KERNEL_DELTAS));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.SYSTEM_NODES)) {
-      localStorage.setItem(STORAGE_KEYS.SYSTEM_NODES, JSON.stringify(INITIAL_SYSTEM_NODES));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.MODEL_CHAINS)) {
-      localStorage.setItem(STORAGE_KEYS.MODEL_CHAINS, JSON.stringify(INITIAL_MODEL_CHAINS));
-    }
     if (!localStorage.getItem(STORAGE_KEYS.STATUS)) {
       localStorage.setItem(STORAGE_KEYS.STATUS, JSON.stringify(INITIAL_SYSTEM_STATUS));
+    }
+    if (!localStorage.getItem(STORAGE_KEYS.RECEIPTS)) {
+      const initialReceipts: ReceiptItem[] = [
+        {
+          id: 'RCP-PLAN-0053-1',
+          plan_id: 'plan_0053',
+          type: 'PROPOSED',
+          agent_role: 'planner',
+          session_id: 'sess-1001',
+          ticket_id: 'TCK-2026-0053',
+          artifact_path: 'IMPLEMENTATION_PLANS/pending/auth-module.md',
+          summary: 'Initial proposal for Auth Module',
+          metadata_json: '{"initiator": "planner_agent"}',
+          tokens_used: 1200,
+          created_at: new Date(Date.now() - 3600000).toISOString(),
+        },
+        {
+          id: 'RCP-PLAN-0053-2',
+          plan_id: 'plan_0053',
+          type: 'PLAN_CREATE',
+          agent_role: 'planner',
+          session_id: 'sess-1001',
+          ticket_id: 'TCK-2026-0053',
+          artifact_path: 'IMPLEMENTATION_PLANS/active/auth-module.md',
+          summary: 'Plan created and validated',
+          metadata_json: '{"consensus": 95}',
+          tokens_used: 2400,
+          created_at: new Date(Date.now() - 1800000).toISOString(),
+        },
+      ];
+      localStorage.setItem(STORAGE_KEYS.RECEIPTS, JSON.stringify(initialReceipts));
+    }
+
+    if (!localStorage.getItem(STORAGE_KEYS.SESSIONS)) {
+      const initialSessions: KernelSession[] = [
+        {
+          id: 'sess-1001',
+          role: 'planner',
+          state: 'running',
+          detail: 'Decomposing plan_0053 requirements',
+          pid: 14201,
+          cost_usd: 1.25,
+          started_at: new Date(Date.now() - 3600000).toISOString(),
+          last_heartbeat: new Date().toISOString(),
+        },
+        {
+          id: 'sess-1002',
+          role: 'builder',
+          state: 'running',
+          detail: 'Executing test harness for plan_0054',
+          pid: 14205,
+          cost_usd: 3.50,
+          started_at: new Date(Date.now() - 1800000).toISOString(),
+          last_heartbeat: new Date().toISOString(),
+        },
+        {
+          id: 'sess-1003',
+          role: 'reviewer',
+          state: 'stale',
+          detail: 'Awaiting signature validation',
+          pid: 13900,
+          cost_usd: 0.45,
+          started_at: new Date(Date.now() - 7200000).toISOString(),
+          last_heartbeat: new Date(Date.now() - 4000000).toISOString(),
+        },
+      ];
+      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(initialSessions));
+    }
+
+    if (!localStorage.getItem(STORAGE_KEYS.BREAKER)) {
+      const initialBreaker: BreakerStateResponse = {
+        tripped: false,
+        paused: false,
+        retry_after: 1800,
+        source: '',
+        error: '',
+        detail: '',
+        tripped_at: null,
+        max_retries_per_model: 3,
+        retry_delay_seconds: 120,
+        max_fallbacks: 3,
+        push_back_to_pending: true,
+      };
+      localStorage.setItem(STORAGE_KEYS.BREAKER, JSON.stringify(initialBreaker));
+    }
+
+    if (!localStorage.getItem(STORAGE_KEYS.IDENTITIES)) {
+      const initialIdentities = [
+        {
+          id: 'iden::plan_0053',
+          aliases: ['plan_0053', '0053', 'auth-module-v2'],
+          label: 'Plan 0053 — Auth Module',
+          node_ids: ['plan_0053'],
+        },
+        {
+          id: 'iden::plan_0054',
+          aliases: ['plan_0054', '0054'],
+          label: 'Plan 0054 — Storage Engine',
+          node_ids: ['plan_0054'],
+        },
+      ];
+      localStorage.setItem(STORAGE_KEYS.IDENTITIES, JSON.stringify(initialIdentities));
+    }
+
+    if (!localStorage.getItem(STORAGE_KEYS.LINEAGE)) {
+      const initialLineage: LineageEventItem[] = [
+        {
+          id: 1,
+          version: 41,
+          delta_id: 'delta-2026-07-24-080',
+          step: 'reduce',
+          event_type: 'apply',
+          affected_plans: ['plan_0053'],
+          detail: 'OK: 1 receipts reduced',
+        },
+        {
+          id: 2,
+          version: 42,
+          delta_id: 'delta-2026-07-25-001',
+          step: 'snapshot',
+          event_type: 'checkpoint',
+          affected_plans: ['plan_0053', 'plan_0054'],
+          detail: 'Engine snapshot version 42 persisted',
+        },
+      ];
+      localStorage.setItem(STORAGE_KEYS.LINEAGE, JSON.stringify(initialLineage));
     }
   }
 
   public resetToDefaults(): void {
-    localStorage.setItem(STORAGE_KEYS.HARVESTS, JSON.stringify(INITIAL_HARVESTS));
-    localStorage.setItem(STORAGE_KEYS.CANDIDATES, JSON.stringify(INITIAL_CANDIDATES));
-    localStorage.setItem(STORAGE_KEYS.INTENTS, JSON.stringify(INITIAL_INTENTS));
-    localStorage.setItem(STORAGE_KEYS.REQUIREMENTS, JSON.stringify(INITIAL_REQUIREMENTS));
-    localStorage.setItem(STORAGE_KEYS.CANONICAL_SPECS, JSON.stringify(INITIAL_CANONICAL_SPECS));
-    localStorage.setItem(STORAGE_KEYS.AGENDAS, JSON.stringify(INITIAL_AGENDAS));
-    localStorage.setItem(STORAGE_KEYS.PLANS, JSON.stringify(INITIAL_PLANS));
-    localStorage.setItem(STORAGE_KEYS.WORK_REQUESTS, JSON.stringify(INITIAL_WORK_REQUESTS));
-    localStorage.setItem(STORAGE_KEYS.KERNEL_DELTAS, JSON.stringify(INITIAL_KERNEL_DELTAS));
-    localStorage.setItem(STORAGE_KEYS.SYSTEM_NODES, JSON.stringify(INITIAL_SYSTEM_NODES));
-    localStorage.setItem(STORAGE_KEYS.MODEL_CHAINS, JSON.stringify(INITIAL_MODEL_CHAINS));
-    localStorage.setItem(STORAGE_KEYS.STATUS, JSON.stringify(INITIAL_SYSTEM_STATUS));
+    localStorage.removeItem(STORAGE_KEYS.RECEIPTS);
+    localStorage.removeItem(STORAGE_KEYS.SESSIONS);
+    localStorage.removeItem(STORAGE_KEYS.BREAKER);
+    localStorage.removeItem(STORAGE_KEYS.IDENTITIES);
+    localStorage.removeItem(STORAGE_KEYS.LINEAGE);
+    localStorage.removeItem(STORAGE_KEYS.DELTAS);
+    this.initLocalStorage();
   }
 
-  // System Status
+  // System
+  public async getServiceRoot(): Promise<ServiceRootResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('Backend offline, fallback to mock root', e);
+      }
+    }
+    return { service: 'WRP Kernel Runtime (Mock)', version: '0.1.0', docs: '/docs' };
+  }
+
+  public async getHealthz(): Promise<HealthzResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/healthz');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('Healthz offline', e);
+      }
+    }
+    return { status: 'alive' };
+  }
+
+  public async getReadyz(): Promise<ReadyzResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/readyz');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('Readyz offline', e);
+      }
+    }
+    return { status: 'ready', kernel_version: 42 };
+  }
+
+  public async getMetrics(): Promise<string> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/metrics');
+        if (res.ok) return await res.text();
+      } catch (e) {
+        console.warn('Metrics offline', e);
+      }
+    }
+    return `# HELP kernel_requests_total Total HTTP requests\nkernel_requests_total 128\n# HELP kernel_version Current version\nkernel_version 42`;
+  }
+
   public async getSystemStatus(): Promise<SystemStatus> {
     if (!this.useMock) {
       try {
         const res = await fetch('/api/status');
         if (res.ok) return await res.json();
       } catch (e) {
-        console.warn('Backend /api/status offline, fallback to mock state', e);
+        console.warn('Status endpoint offline', e);
       }
     }
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.STATUS) || JSON.stringify(INITIAL_SYSTEM_STATUS));
   }
 
-  // Harvest Transcripts
-  public async getHarvests(): Promise<HTMLHarvest[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.HARVESTS) || '[]');
-  }
-
-  public async addHarvest(harvestData: Omit<HTMLHarvest, 'id' | 'ingestedAt' | 'candidateCount'>): Promise<HTMLHarvest> {
-    const harvests = await this.getHarvests();
-    const newHarvest: HTMLHarvest = {
-      ...harvestData,
-      id: `HARVEST-2026-${String(harvests.length + 1).padStart(3, '0')}`,
-      ingestedAt: new Date().toISOString(),
-      candidateCount: 0,
-    };
-    harvests.unshift(newHarvest);
-    localStorage.setItem(STORAGE_KEYS.HARVESTS, JSON.stringify(harvests));
-    return newHarvest;
-  }
-
-  // Candidates
-  public async getCandidates(): Promise<CandidateItem[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.CANDIDATES) || '[]');
-  }
-
-  public async addCandidate(candidate: Omit<CandidateItem, 'id' | 'createdAt' | 'status'>): Promise<CandidateItem> {
-    const candidates = await this.getCandidates();
-    const newCand: CandidateItem = {
-      ...candidate,
-      id: `CND-${800 + candidates.length + 1}`,
-      status: 'unassigned',
-      createdAt: new Date().toISOString(),
-    };
-    candidates.unshift(newCand);
-    localStorage.setItem(STORAGE_KEYS.CANDIDATES, JSON.stringify(candidates));
-
-    // Update harvest candidate count
-    const harvests = await this.getHarvests();
-    const targetHarvest = harvests.find(h => h.id === candidate.harvestId);
-    if (targetHarvest) {
-      targetHarvest.candidateCount += 1;
-      localStorage.setItem(STORAGE_KEYS.HARVESTS, JSON.stringify(harvests));
-    }
-
-    return newCand;
-  }
-
-  // Promote Candidate -> Intent
-  public async promoteCandidateToIntent(candidateId: string, intentData: { systemId: string; subsystemId: string; summary: string; targetOutcome: string }): Promise<IntentRecord> {
-    const candidates = await this.getCandidates();
-    const cand = candidates.find(c => c.id === candidateId);
-    if (cand) {
-      cand.status = 'converted_to_intent';
-      localStorage.setItem(STORAGE_KEYS.CANDIDATES, JSON.stringify(candidates));
-    }
-
-    const intents = await this.getIntents();
-    const newIntent: IntentRecord = {
-      id: `INT-${300 + intents.length + 1}`,
-      candidateId,
-      systemId: intentData.systemId,
-      subsystemId: intentData.subsystemId,
-      summary: intentData.summary,
-      intentScope: cand ? cand.description : 'Extracted scope from candidate decomposition.',
-      impactScore: cand?.severity === 'CRITICAL' ? 10 : cand?.severity === 'HIGH' ? 8 : 6,
-      status: 'draft',
-      createdAt: new Date().toISOString(),
-      targetOutcome: intentData.targetOutcome,
-    };
-
-    intents.unshift(newIntent);
-    localStorage.setItem(STORAGE_KEYS.INTENTS, JSON.stringify(intents));
-    return newIntent;
-  }
-
-  // Intents
-  public async getIntents(): Promise<IntentRecord[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.INTENTS) || '[]');
-  }
-
-  // Promote Intent -> Requirement
-  public async promoteIntentToRequirement(intentId: string, title: string, codeName: string, acceptanceCriteria: string[]): Promise<RequirementSpec> {
-    const intents = await this.getIntents();
-    const intent = intents.find(i => i.id === intentId);
-    if (intent) {
-      intent.status = 'promoted_to_requirement';
-      localStorage.setItem(STORAGE_KEYS.INTENTS, JSON.stringify(intents));
-    }
-
-    const requirements = await this.getRequirements();
-    const newReq: RequirementSpec = {
-      id: `REQ-${codeName.toUpperCase().replace(/\s+/g, '-')}`,
-      intentId,
-      codeName,
-      title,
-      acceptanceCriteria,
-      priority: intent && intent.impactScore >= 9 ? 'P0' : 'P1',
-      status: 'draft',
-      estimatedComplexity: 'M',
-      createdAt: new Date().toISOString(),
-    };
-
-    requirements.unshift(newReq);
-    localStorage.setItem(STORAGE_KEYS.REQUIREMENTS, JSON.stringify(requirements));
-    return newReq;
-  }
-
-  // Requirements
-  public async getRequirements(): Promise<RequirementSpec[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.REQUIREMENTS) || '[]');
-  }
-
-  // Canonical Specs
-  public async getCanonicalSpecs(): Promise<SystemCanonicalSpec[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.CANONICAL_SPECS) || '[]');
-  }
-
-  public async canonicalizeRequirement(reqId: string, specData: { systemName: string; subsystemName: string; architectureSummary: string; apiContracts: string[] }): Promise<SystemCanonicalSpec> {
-    const reqs = await this.getRequirements();
-    const req = reqs.find(r => r.id === reqId);
-    if (req) {
-      req.status = 'canonicalized';
-      localStorage.setItem(STORAGE_KEYS.REQUIREMENTS, JSON.stringify(reqs));
-    }
-
-    const specs = await this.getCanonicalSpecs();
-    const newSpec: SystemCanonicalSpec = {
-      id: `SPEC-${specData.systemName.replace(/[^a-zA-Z0-9]/g, '-').toUpperCase()}-${specs.length + 1}`,
-      requirementId: reqId,
-      systemName: specData.systemName,
-      subsystemName: specData.subsystemName,
-      specVersion: '1.0.0-CANONICAL',
-      architectureSummary: specData.architectureSummary,
-      apiContracts: specData.apiContracts,
-      moduleBoundaries: ['main.py', 'schema.sql', 'db_adapter.py'],
-      status: 'canonical',
-      updatedAt: new Date().toISOString(),
-    };
-
-    specs.unshift(newSpec);
-    localStorage.setItem(STORAGE_KEYS.CANONICAL_SPECS, JSON.stringify(specs));
-    return newSpec;
-  }
-
-  // Deliberation Agendas
-  public async getDeliberationAgendas(): Promise<DeliberationAgenda[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.AGENDAS) || '[]');
-  }
-
-  public async createDeliberationAgenda(specId: string, title: string, proposedByRole: AgentRole): Promise<DeliberationAgenda> {
-    const agendas = await this.getDeliberationAgendas();
-    const newAgenda: DeliberationAgenda = {
-      id: `AGENDA-2026-${String(77 + agendas.length).padStart(3, '0')}`,
-      specId,
-      title,
-      proposedByRole,
-      createdAt: new Date().toISOString(),
-      status: 'IN_DELIBERATION',
-      feasibilityConsensusScore: 75,
-      participants: [
-        { agentId: 'agent-planner-01', name: 'Planner Agent AI', role: 'planner', model: 'gemini-1.5-pro' },
-        { agentId: 'agent-builder-04', name: 'Builder Agent Core', role: 'builder', model: 'claude-3-5-sonnet' },
-        { agentId: 'agent-reviewer-02', name: 'Reviewer Authority', role: 'reviewer', model: 'gpt-4o' },
-        { agentId: 'agent-kernel-01', name: 'Kernel Guard', role: 'kernel', model: 'wrp-kernel-validator' },
-      ],
-      discussionTranscript: [
-        {
-          timestamp: new Date().toISOString(),
-          agentId: 'agent-planner-01',
-          agentName: 'Planner Agent AI',
-          role: 'planner',
-          text: `Opened feasibility deliberation round for artifact specification ${specId}: "${title}".`,
-        },
-      ],
-    };
-
-    agendas.unshift(newAgenda);
-    localStorage.setItem(STORAGE_KEYS.AGENDAS, JSON.stringify(agendas));
-    return newAgenda;
-  }
-
-  public async addDeliberationVote(agendaId: string, agentId: string, vote: 'APPROVE' | 'REJECT' | 'NEUTRAL', comments: string, feasibilityScore: number): Promise<DeliberationAgenda> {
-    const agendas = await this.getDeliberationAgendas();
-    const agenda = agendas.find(a => a.id === agendaId);
-    if (!agenda) throw new Error('Agenda not found');
-
-    const participant = agenda.participants.find(p => p.agentId === agentId);
-    if (participant) {
-      participant.vote = vote;
-      participant.comments = comments;
-      participant.feasibilityScore = feasibilityScore;
-    }
-
-    agenda.discussionTranscript.push({
-      timestamp: new Date().toISOString(),
-      agentId,
-      agentName: participant?.name || 'Agent',
-      role: participant?.role || 'planner',
-      text: `Voted [${vote}] (Feasibility: ${feasibilityScore}%): ${comments}`,
-    });
-
-    // Recalculate average feasibility
-    const votedParts = agenda.participants.filter(p => p.feasibilityScore !== undefined);
-    if (votedParts.length > 0) {
-      const avg = Math.round(votedParts.reduce((acc, p) => acc + (p.feasibilityScore || 0), 0) / votedParts.length);
-      agenda.feasibilityConsensusScore = avg;
-      if (votedParts.length === agenda.participants.length) {
-        agenda.status = avg >= 70 ? 'CONSENSUS_REACHED' : 'REJECTED';
-        agenda.summaryOutput = avg >= 70 ? `Feasibility consensus reached (${avg}%). Ready for Plan Promotion.` : `Proposal rejected due to low consensus score (${avg}%).`;
+  // 1. Delta Ingestion
+  public async postDelta(payload: KernelDeltaInput): Promise<DeltaIngestResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/delta', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /delta offline', e);
       }
     }
 
-    localStorage.setItem(STORAGE_KEYS.AGENDAS, JSON.stringify(agendas));
-    return agenda;
+    const receipts = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    payload.receipts.forEach(r => {
+      receipts.push({
+        id: r.id || `RCP-${Date.now()}`,
+        plan_id: r.plan_id || 'plan_0053',
+        type: r.type || 'PLAN_CREATE',
+        agent_role: r.agent_role || 'planner',
+        session_id: 'sess-1001',
+        ticket_id: r.ticket_id || 'TCK-AUTO',
+        artifact_path: 'IMPLEMENTATION_PLANS/pending/auto.md',
+        summary: r.summary || 'Ingested delta',
+        metadata_json: r.metadata_json || '{}',
+        tokens_used: r.tokens_used || 500,
+        created_at: r.created_at || new Date().toISOString(),
+      });
+    });
+    localStorage.setItem(STORAGE_KEYS.RECEIPTS, JSON.stringify(receipts));
+
+    return {
+      success: true,
+      version: 43,
+      delta_id: payload.delta_id,
+      plan_count: 12,
+      receipt_count: receipts.length,
+      error: null,
+    };
   }
 
-  // Promote Deliberation -> Implementation Plan
-  public async promoteAgendaToPlan(agendaId: string): Promise<ImplementationPlan> {
-    const agendas = await this.getDeliberationAgendas();
-    const agenda = agendas.find(a => a.id === agendaId);
-    if (!agenda) throw new Error('Agenda not found');
+  public async getDeltaState(): Promise<DeltaStateSummary> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/delta/state');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /delta/state offline', e);
+      }
+    }
+    const receipts = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    const identities = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
+    return {
+      version: 42,
+      plan_count: 12,
+      receipt_count: receipts.length,
+      identity_count: identities.length,
+      graph_edge_count: 34,
+      lineage_event_count: 87,
+    };
+  }
 
-    agenda.status = 'CONSENSUS_REACHED';
-    localStorage.setItem(STORAGE_KEYS.AGENDAS, JSON.stringify(agendas));
+  // 2. State Inspection
+  public async getStateSummary(view: 'summary' | 'full' = 'summary'): Promise<KernelStateSummary> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/state?view=${view}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /state offline', e);
+      }
+    }
+    const receipts = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    const identities = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
+    return {
+      kernel_version: 42,
+      plan_count: 12,
+      receipt_count: receipts.length,
+      identity_count: identities.length,
+      graph_edge_count: 34,
+      lineage_event_count: 87,
+      delta_log_count: 42,
+    };
+  }
 
-    const plans = await this.getPlans();
-    const newPlanId = `plan_00${77 + plans.length}`;
-    const newTicketId = `TCK-2026-00${77 + plans.length}`;
+  public async getIdentity(identityId: string): Promise<KernelIdentity> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/state/identity/${encodeURIComponent(identityId)}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /state/identity offline', e);
+      }
+    }
+    const identities: any[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
+    const found = identities.find(i => i.id === identityId || i.id === `iden::${identityId}` || i.aliases.includes(identityId));
+    if (found) {
+      return {
+        ...found,
+        edges_outgoing: [{ target: 'iden::plan_0052', relation: 'wrp:depends_on', metadata: {} }],
+        edges_incoming: [{ source: 'iden::plan_0054', relation: 'wrp:impacts_system', metadata: {} }],
+      };
+    }
+    throw new Error(`Identity not found: ${identityId}`);
+  }
 
-    const newPlan: ImplementationPlan = {
-      id: newPlanId,
-      ticketId: newTicketId,
-      title: agenda.title,
-      description: agenda.summaryOutput || 'Promoted from Deliberation Agenda consensus round.',
-      specId: agenda.specId,
-      status: 'PROPOSED',
-      currentRole: 'planner',
-      modelChain: ['claude-3-5-sonnet', 'gemini-1.5-pro', 'gpt-4o-mini'],
-      activeModel: 'claude-3-5-sonnet',
-      costUsd: 0.0,
-      tokenCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      retryAttempts: 0,
-      receipts: [
+  public async getReceipt(receiptId: string): Promise<{ id: string; receipt: ReceiptItem }> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/state/receipt/${encodeURIComponent(receiptId)}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /state/receipt offline', e);
+      }
+    }
+    const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    const found = receipts.find(r => r.id === receiptId);
+    if (!found) throw new Error(`Receipt not found: ${receiptId}`);
+    return { id: found.id, receipt: found };
+  }
+
+  public async getReceiptsByPlan(planNum: string): Promise<{ plan_num: string; receipts: ReceiptItem[]; count: number }> {
+    const formatted = planNum.startsWith('plan_') ? planNum : `plan_${planNum}`;
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/state/receipts-by-plan/${formatted}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /state/receipts-by-plan offline', e);
+      }
+    }
+    const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    const matches = receipts.filter(r => r.plan_id === formatted);
+    return { plan_num: formatted, receipts: matches, count: matches.length };
+  }
+
+  public async getCrossPlanGraph(cursor: string = '', limit: number = 200): Promise<CrossPlanGraphResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/state/graph?cursor=${encodeURIComponent(cursor)}&limit=${limit}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /state/graph offline', e);
+      }
+    }
+    const identities: any[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
+    return {
+      nodes: identities.map(i => ({ id: i.id, aliases: i.aliases, label: i.label })),
+      edges: [
         {
-          id: `RCP-${newPlanId}-1`,
-          ticketId: newTicketId,
-          receiptType: 'PROPOSED',
-          issuedAt: new Date().toISOString(),
-          payload: { promotedFromAgenda: agendaId, consensusScore: agenda.feasibilityConsensusScore },
-          hash: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+          source: 'iden::plan_0053',
+          source_label: 'Plan 0053 — Auth Module',
+          target: 'iden::plan_0054',
+          target_label: 'Plan 0054 — Storage Engine',
+          relation: 'wrp:depends_on',
+          metadata: { priority: 'high' },
+        },
+        {
+          source: 'iden::plan_0054',
+          source_label: 'Plan 0054 — Storage Engine',
+          target: 'iden::plan_0052',
+          target_label: 'Plan 0052 — Core DB',
+          relation: 'wrp:impacts_system',
+          metadata: {},
+        },
+      ],
+      total_edges: 2,
+      cursor: identities.length > 0 ? identities[identities.length - 1].id : '',
+      limit,
+    };
+  }
+
+  public async getPlanDetail(planNum: string): Promise<PlanDetailResponse> {
+    const formatted = planNum.startsWith('plan_') ? planNum : `plan_${planNum}`;
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/state/plan/${formatted}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /state/plan offline', e);
+      }
+    }
+    const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    const matches = receipts.filter(r => r.plan_id === formatted);
+    return {
+      plan_num: formatted,
+      identity_id: `iden::${formatted}`,
+      aliases: [formatted, formatted.replace('plan_', '')],
+      label: `Plan ${formatted.replace('plan_', '')}`,
+      receipt_count: matches.length,
+      current_wrp_state: 'EXECUTING',
+      valid_transitions: ['COMPLETED', 'BLOCKED', 'CANCELLED', 'ARCHIVED'],
+      receipts: matches,
+      edges_outgoing: [{ target: 'iden::plan_0052', relation: 'wrp:depends_on', metadata: {} }],
+      edges_incoming: [],
+    };
+  }
+
+  public async getLineageEvents(version?: number, limit: number = 100): Promise<{ events: LineageEventItem[]; count: number }> {
+    if (!this.useMock) {
+      try {
+        const url = version !== undefined ? `/state/lineage?version=${version}&limit=${limit}` : `/state/lineage?limit=${limit}`;
+        const res = await fetch(url);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /state/lineage offline', e);
+      }
+    }
+    const events: LineageEventItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.LINEAGE) || '[]');
+    return { events, count: events.length };
+  }
+
+  // 3. Replay
+  public async getReplayState(version?: number): Promise<ReplayStateResponse> {
+    if (!this.useMock) {
+      try {
+        const url = version !== undefined ? `/replay?version=${version}` : '/replay';
+        const res = await fetch(url);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /replay offline', e);
+      }
+    }
+    const v = version ?? 42;
+    const receipts = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    return {
+      version: v,
+      plan_count: 12,
+      receipt_count: receipts.length,
+      identity_count: 15,
+      graph_edge_count: 34,
+      lineage_event_count: 87,
+      reconstructed_from_version: v,
+    };
+  }
+
+  public async compareReplay(version: number): Promise<ReplayCompareResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/replay/compare?version=${version}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /replay/compare offline', e);
+      }
+    }
+    const match = version === 42;
+    const receipts = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    return {
+      match,
+      live_version: 42,
+      replay_version: version,
+      live_plan_count: 12,
+      replay_plan_count: match ? 12 : 11,
+      live_receipt_count: receipts.length,
+      replay_receipt_count: match ? receipts.length : receipts.length - 1,
+      live_identity_count: 15,
+      replay_identity_count: 15,
+      live_edge_count: 34,
+      replay_edge_count: 34,
+      diffs: match ? [] : [`Discrepancy at reconstructed version ${version}: state hash mismatch`],
+    };
+  }
+
+  // 4. Admin
+  public async getAdminIdentities(cursor: string = '', limit: number = 50): Promise<AdminIdentitiesResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/admin/identities?cursor=${encodeURIComponent(cursor)}&limit=${limit}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /admin/identities offline', e);
+      }
+    }
+    const identities = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
+    return {
+      identities,
+      total: identities.length,
+      cursor: identities.length > 0 ? identities[identities.length - 1].id : '',
+      limit,
+    };
+  }
+
+  public async updateIdentity(identityId: string, data: { label?: string; aliases?: string[] }): Promise<{ id: string; label: string; aliases: string[]; updated: boolean }> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/admin/identities/${encodeURIComponent(identityId)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('PATCH /admin/identities offline', e);
+      }
+    }
+    const identities: any[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
+    const iden = identities.find(i => i.id === identityId || i.id === `iden::${identityId}`);
+    if (iden) {
+      if (data.label) iden.label = data.label;
+      if (data.aliases) iden.aliases = data.aliases;
+      localStorage.setItem(STORAGE_KEYS.IDENTITIES, JSON.stringify(identities));
+      return { id: iden.id, label: iden.label, aliases: iden.aliases, updated: true };
+    }
+    throw new Error(`Identity not found: ${identityId}`);
+  }
+
+  public async deleteIdentity(identityId: string): Promise<{ ok: boolean; identity_id: string }> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/admin/identities/${encodeURIComponent(identityId)}`, { method: 'DELETE' });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('DELETE /admin/identities offline', e);
+      }
+    }
+    let identities: any[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
+    identities = identities.filter(i => i.id !== identityId && i.id !== `iden::${identityId}`);
+    localStorage.setItem(STORAGE_KEYS.IDENTITIES, JSON.stringify(identities));
+    return { ok: true, identity_id: identityId };
+  }
+
+  public async getEngineConsistency(): Promise<EngineConsistencyResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/admin/consistency');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /admin/consistency offline', e);
+      }
+    }
+    return {
+      aligned: true,
+      engine_version: 42,
+      delta_log_version: 42,
+      engine_plan_count: 12,
+      delta_log_count: 42,
+      details: [
+        'Version aligned: engine=42 == delta_log=42',
+        'Plans tracked: 12',
+        'Delta log entries: 42',
+      ],
+    };
+  }
+
+  // 5. Sessions
+  public async getSessions(runningOnly: boolean = false): Promise<KernelSession[]> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(runningOnly ? '/api/sessions?running_only=true' : '/api/sessions');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /api/sessions offline', e);
+      }
+    }
+    const sessions: KernelSession[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]');
+    return runningOnly ? sessions.filter(s => s.state === 'running') : sessions;
+  }
+
+  public async getStaleSessions(thresholdSeconds: number = 3600): Promise<KernelSession[]> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/api/sessions/stale?threshold_seconds=${thresholdSeconds}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /api/sessions/stale offline', e);
+      }
+    }
+    const sessions: KernelSession[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]');
+    return sessions.filter(s => s.state === 'stale');
+  }
+
+  public async updateSessionCost(sessionId: string, costUsd: number): Promise<KernelSession> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/cost`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cost_usd: costUsd }),
+        });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('PATCH /api/sessions/cost offline', e);
+      }
+    }
+    const sessions: KernelSession[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]');
+    const sess = sessions.find(s => s.id === sessionId);
+    if (sess) {
+      sess.cost_usd = costUsd;
+      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+      return sess;
+    }
+    throw new Error(`Session not found: ${sessionId}`);
+  }
+
+  public async killSession(sessionId: string): Promise<{ killed: boolean; sessionId: string; pids: number[]; errors: string[]; timestamp: string }> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/kill`, { method: 'POST' });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /api/sessions/kill offline', e);
+      }
+    }
+    const sessions: KernelSession[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]');
+    const sess = sessions.find(s => s.id === sessionId);
+    if (sess) {
+      sess.state = 'failed';
+      sess.detail = 'Force-killed via UI';
+      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+    }
+    return {
+      killed: true,
+      sessionId,
+      pids: sess ? [sess.pid] : [12345],
+      errors: [],
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // 6. Circuit Breaker
+  public async getBreakerState(): Promise<BreakerStateResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/api/breaker');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /api/breaker offline', e);
+      }
+    }
+    return JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
+  }
+
+  public async tripBreaker(data?: { reason?: string; detail?: string; retryAfter?: number }): Promise<BreakerStateResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/api/breaker/trip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data || {}),
+        });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /api/breaker/trip offline', e);
+      }
+    }
+    const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
+    breaker.tripped = true;
+    breaker.source = data?.reason || 'MANUAL_TRIP';
+    breaker.error = data?.reason || 'Manual circuit breaker trip';
+    breaker.detail = data?.detail || 'Tripped by user';
+    breaker.tripped_at = new Date().toISOString();
+    if (data?.retryAfter) breaker.retry_after = data.retryAfter;
+    localStorage.setItem(STORAGE_KEYS.BREAKER, JSON.stringify(breaker));
+    return breaker;
+  }
+
+  public async resetBreaker(): Promise<BreakerStateResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/api/breaker/reset', { method: 'POST' });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /api/breaker/reset offline', e);
+      }
+    }
+    const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
+    breaker.tripped = false;
+    breaker.source = '';
+    breaker.error = '';
+    breaker.detail = '';
+    breaker.tripped_at = null;
+    localStorage.setItem(STORAGE_KEYS.BREAKER, JSON.stringify(breaker));
+    return breaker;
+  }
+
+  public async pauseOrchestration(): Promise<BreakerStateResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/api/breaker/pause', { method: 'POST' });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /api/breaker/pause offline', e);
+      }
+    }
+    const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
+    breaker.paused = true;
+    localStorage.setItem(STORAGE_KEYS.BREAKER, JSON.stringify(breaker));
+    return breaker;
+  }
+
+  public async resumeOrchestration(): Promise<BreakerStateResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/api/breaker/resume', { method: 'POST' });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /api/breaker/resume offline', e);
+      }
+    }
+    const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
+    breaker.paused = false;
+    localStorage.setItem(STORAGE_KEYS.BREAKER, JSON.stringify(breaker));
+    return breaker;
+  }
+
+  public async getFailureRecoveryConfig(): Promise<FailureRecoveryConfig> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/api/breaker/failure-recovery');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /api/breaker/failure-recovery offline', e);
+      }
+    }
+    const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
+    return {
+      max_retries_per_model: breaker.max_retries_per_model || 3,
+      retry_delay_seconds: breaker.retry_delay_seconds || 120,
+      max_fallbacks: breaker.max_fallbacks || 3,
+      push_back_to_pending: breaker.push_back_to_pending ?? true,
+      circuit_breaker_retry_after: breaker.retry_after || 1800,
+    };
+  }
+
+  public async saveFailureRecoveryConfig(config: Partial<FailureRecoveryConfig>): Promise<FailureRecoveryConfig> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/api/breaker/failure-recovery', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /api/breaker/failure-recovery offline', e);
+      }
+    }
+    const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
+    if (config.max_retries_per_model !== undefined) breaker.max_retries_per_model = config.max_retries_per_model;
+    if (config.retry_delay_seconds !== undefined) breaker.retry_delay_seconds = config.retry_delay_seconds;
+    if (config.max_fallbacks !== undefined) breaker.max_fallbacks = config.max_fallbacks;
+    if (config.push_back_to_pending !== undefined) breaker.push_back_to_pending = config.push_back_to_pending;
+    if (config.circuit_breaker_retry_after !== undefined) breaker.retry_after = config.circuit_breaker_retry_after;
+    localStorage.setItem(STORAGE_KEYS.BREAKER, JSON.stringify(breaker));
+
+    return {
+      max_retries_per_model: breaker.max_retries_per_model,
+      retry_delay_seconds: breaker.retry_delay_seconds,
+      max_fallbacks: breaker.max_fallbacks,
+      push_back_to_pending: breaker.push_back_to_pending,
+      circuit_breaker_retry_after: breaker.retry_after,
+    };
+  }
+
+  // 7. Receipts
+  public async getFormattedReceipts(planId: string): Promise<Array<ReceiptItem & { parsed_metadata: any }>> {
+    const formatted = planId.startsWith('plan_') ? planId : `plan_${planId}`;
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/api/receipts/${formatted}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /api/receipts offline', e);
+      }
+    }
+    const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    return receipts
+      .filter(r => r.plan_id === formatted)
+      .map(r => ({
+        ...r,
+        parsed_metadata: JSON.parse(r.metadata_json || '{}'),
+      }));
+  }
+
+  public async insertReceipt(receipt: Partial<ReceiptItem>): Promise<{ ok: boolean; id: string; plan_id: string }> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/api/receipts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(receipt),
+        });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /api/receipts offline', e);
+      }
+    }
+    const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    const newRc: ReceiptItem = {
+      id: receipt.id || `RCP-${Date.now()}`,
+      plan_id: receipt.plan_id || 'plan_0053',
+      type: receipt.type || 'PLAN_CREATE',
+      agent_role: receipt.agent_role || 'planner',
+      session_id: receipt.session_id || 'sess-1001',
+      ticket_id: receipt.ticket_id || 'TCK-2026-0053',
+      artifact_path: receipt.artifact_path || 'IMPLEMENTATION_PLANS/pending/manual.md',
+      summary: receipt.summary || 'Inserted receipt',
+      metadata_json: receipt.metadata_json || '{}',
+      tokens_used: receipt.tokens_used || 1000,
+      created_at: receipt.created_at || new Date().toISOString(),
+    };
+    receipts.push(newRc);
+    localStorage.setItem(STORAGE_KEYS.RECEIPTS, JSON.stringify(receipts));
+    return { ok: true, id: newRc.id, plan_id: newRc.plan_id };
+  }
+
+  public async deleteReceipts(planId: string, types: string[]): Promise<{ deleted: number; plan_id: string; types: string[] }> {
+    const formatted = planId.startsWith('plan_') ? planId : `plan_${planId}`;
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/api/receipts/${formatted}?types=${encodeURIComponent(types.join(','))}`, { method: 'DELETE' });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('DELETE /api/receipts offline', e);
+      }
+    }
+    let receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
+    const countBefore = receipts.length;
+    receipts = receipts.filter(r => !(r.plan_id === formatted && (types.length === 0 || types.includes(r.type))));
+    localStorage.setItem(STORAGE_KEYS.RECEIPTS, JSON.stringify(receipts));
+    return { deleted: countBefore - receipts.length, plan_id: formatted, types };
+  }
+
+  // 8. TypeScript conduit-srv (:3104) Methods
+
+  public async getConduitSrvHealth(): Promise<{ status: string; port: number; db: string; timestamp: string }> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/health');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /health offline', e);
+      }
+    }
+    return { status: 'ok', port: 3104, db: 'up', timestamp: new Date().toISOString() };
+  }
+
+  public async getWorkflows(): Promise<WorkflowListResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/workflows');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /workflows offline', e);
+      }
+    }
+    const sessions = await this.getSessions(true);
+    return {
+      connected: true,
+      counts: { running: sessions.length, completed: 0, failed: 0, cancelled: 0, total: sessions.length },
+      workflows: sessions.map(s => ({
+        workflowId: `plan-plan_0053-${s.role}`,
+        runId: s.id,
+        status: s.state,
+        startTime: s.started_at,
+        closeTime: null,
+        planId: 'plan_0053',
+        role: s.role,
+        pid: s.pid,
+      })),
+    };
+  }
+
+  public async detectTickets(): Promise<TicketDetectionResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/tickets/detect', { method: 'POST' });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /tickets/detect offline', e);
+      }
+    }
+    return { detected: true, stale: 1, expired: 0, timestamp: new Date().toISOString() };
+  }
+
+  public async getTicketLineage(planId: string): Promise<TicketLineageResponse> {
+    const formatted = planId.startsWith('plan_') ? planId : `plan_${planId}`;
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/tickets/lineage/${formatted}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /tickets/lineage offline', e);
+      }
+    }
+    return {
+      plan_id: formatted,
+      tickets: [
+        {
+          id: 'TCK-2026-0053',
+          role: 'planner',
+          status: 'claimed',
+          tokens_used: 3600,
+          parent_ticket_id: null,
+          spawn_reason: null,
+          replacement_of: null,
+          closure_reason: null,
+          created_at: new Date(Date.now() - 7200000).toISOString(),
+          closed_at: null,
         },
       ],
     };
-
-    plans.unshift(newPlan);
-    localStorage.setItem(STORAGE_KEYS.PLANS, JSON.stringify(plans));
-
-    // Log Kernel Delta
-    await this.addKernelDelta({
-      receiptId: newPlan.receipts[0].id,
-      planId: newPlanId,
-      action: 'PROMOTE_AGENDA_TO_PROPOSED_PLAN',
-      deltaType: 'STATE_MUTATION',
-    });
-
-    return newPlan;
   }
 
-  // Implementation Plans
-  public async getPlans(): Promise<ImplementationPlan[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.PLANS) || '[]');
-  }
-
-  public async updatePlanStatus(planId: string, newStatus: PlanLifecycleStatus, nextRole?: AgentRole): Promise<ImplementationPlan> {
-    const plans = await this.getPlans();
-    const plan = plans.find(p => p.id === planId);
-    if (!plan) throw new Error('Plan not found');
-
-    plan.status = newStatus;
-    plan.updatedAt = new Date().toISOString();
-    if (nextRole) plan.currentRole = nextRole;
-
-    // Issue new receipt depending on status transition
-    const receiptTypeMap: Record<PlanLifecycleStatus, 'PROPOSED' | 'PLANNING' | 'PLAN_CREATE' | 'IMPLEMENTATION' | 'REVIEW_PASS' | 'BLOCK'> = {
-      PROPOSED: 'PROPOSED',
-      PLANNING: 'PLANNING',
-      PENDING: 'PLAN_CREATE',
-      ACTIVE: 'IMPLEMENTATION',
-      COMPLETED: 'REVIEW_PASS',
-      BLOCKED: 'BLOCK',
-    };
-
-    const newReceiptType = receiptTypeMap[newStatus];
-    const prevHash = plan.receipts.length > 0 ? plan.receipts[plan.receipts.length - 1].hash : undefined;
-    const newHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-
-    const newReceipt = {
-      id: `RCP-${plan.id}-${plan.receipts.length + 1}`,
-      ticketId: plan.ticketId,
-      receiptType: newReceiptType,
-      issuedAt: new Date().toISOString(),
-      payload: { transitionTo: newStatus, role: plan.currentRole, activeModel: plan.activeModel },
-      hash: newHash,
-      previousHash: prevHash,
-    };
-
-    plan.receipts.push(newReceipt);
-    localStorage.setItem(STORAGE_KEYS.PLANS, JSON.stringify(plans));
-
-    // Append Kernel Delta
-    await this.addKernelDelta({
-      receiptId: newReceipt.id,
-      planId: plan.id,
-      action: `TRANSITION_${newStatus}`,
-      deltaType: newStatus === 'COMPLETED' ? 'SNAPSHOT_POINT' : 'STATE_MUTATION',
-    });
-
-    return plan;
-  }
-
-  // Work Requests (ADR-006 Execution Authority)
-  public async getWorkRequests(): Promise<WorkRequestDCO[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.WORK_REQUESTS) || '[]');
-  }
-
-  public async dispatchWorkRequest(planId: string, role: AgentRole, model: string): Promise<WorkRequestDCO> {
-    const requests = await this.getWorkRequests();
-    const newWrId = `WR-2026-${String(90 + requests.length).padStart(3, '0')}`;
-    const newLeaseId = `LSE-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newAttemptId = `ATT-2026-${Math.floor(500 + Math.random() * 500)}`;
-
-    const newWr: WorkRequestDCO = {
-      id: newWrId,
-      planId,
-      role,
-      leaseId: newLeaseId,
-      leaseOwner: 'executor-cloud-node-01',
-      leaseExpiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-      attemptId: newAttemptId,
-      attemptStatus: 'IN_PROGRESS',
-      primaryModel: model,
-      inputPayload: JSON.stringify(
-        {
-          dcoVersion: '1.2.0',
-          planId,
-          role,
-          dispatchTimestamp: new Date().toISOString(),
-          instructions: `Execute ADR-006 authority for role ${role} using model ${model}`,
-        },
-        null,
-        2
-      ),
-      costEstimateUsd: 1.50,
-      createdAt: new Date().toISOString(),
-    };
-
-    requests.unshift(newWr);
-    localStorage.setItem(STORAGE_KEYS.WORK_REQUESTS, JSON.stringify(requests));
-    return newWr;
-  }
-
-  public async completeWorkRequest(wrId: string, output: string, success: boolean): Promise<WorkRequestDCO> {
-    const requests = await this.getWorkRequests();
-    const wr = requests.find(r => r.id === wrId);
-    if (!wr) throw new Error('Work request not found');
-
-    wr.attemptStatus = success ? 'SUCCEEDED' : 'FAILED';
-    wr.completedAt = new Date().toISOString();
-    wr.outputResult = output;
-    wr.executionReceiptHash = Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-
-    localStorage.setItem(STORAGE_KEYS.WORK_REQUESTS, JSON.stringify(requests));
-    return wr;
-  }
-
-  // WRP Kernel Deltas
-  public async getKernelDeltas(): Promise<WRPKernelDelta[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.KERNEL_DELTAS) || '[]');
-  }
-
-  public async addKernelDelta(deltaData: Omit<WRPKernelDelta, 'sequenceId' | 'timestamp' | 'engineSignature' | 'stateHash'>): Promise<WRPKernelDelta> {
-    const deltas = await this.getKernelDeltas();
-    const newDelta: WRPKernelDelta = {
-      ...deltaData,
-      sequenceId: 1046 + deltas.length,
-      timestamp: new Date().toISOString(),
-      engineSignature: 'WRP-ENGINE-v1.8.2',
-      stateHash: '0x' + Math.floor(Math.random() * 0xffffffffffff).toString(16),
-    };
-
-    deltas.push(newDelta);
-    localStorage.setItem(STORAGE_KEYS.KERNEL_DELTAS, JSON.stringify(deltas));
-    return newDelta;
-  }
-
-  // System Nodes
-  public async getSystemNodes(): Promise<SystemNode[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_NODES) || '[]');
-  }
-
-  // Model Chains
-  public async getModelChains(): Promise<ModelChainConfig[]> {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.MODEL_CHAINS) || '[]');
-  }
-
-  public async updateModelChain(config: ModelChainConfig): Promise<ModelChainConfig[]> {
-    const chains = await this.getModelChains();
-    const idx = chains.findIndex(c => c.role === config.role);
-    if (idx !== -1) {
-      chains[idx] = config;
-      localStorage.setItem(STORAGE_KEYS.MODEL_CHAINS, JSON.stringify(chains));
+  public async getTokensByPlan(planId: string): Promise<TokenPlanUsageResponse> {
+    const formatted = planId.startsWith('plan_') ? planId : `plan_${planId}`;
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/tokens/plan/${formatted}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /tokens/plan offline', e);
+      }
     }
-    return chains;
+    return { plan_id: formatted, total_tokens: 3600, receipts: 2 };
+  }
+
+  public async getTokensByRole(role: string): Promise<TokenRoleUsageResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/tokens/role/${encodeURIComponent(role)}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /tokens/role offline', e);
+      }
+    }
+    return { role, total_tokens: 4200, receipts: 3 };
+  }
+
+  public async getTokensByTicket(ticketId: string): Promise<TokenTicketUsageResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/tokens/ticket/${encodeURIComponent(ticketId)}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /tokens/ticket offline', e);
+      }
+    }
+    return { ticket_id: ticketId, tokens_used: 1500 };
+  }
+
+  public async getCronConfig(): Promise<CronConfigResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/config/cron');
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /config/cron offline', e);
+      }
+    }
+    return { cron: '*/3 * * * *', intervalMinutes: 3, description: 'Pipeline cron interval', timestamp: new Date().toISOString() };
+  }
+
+  public async replayGovernance(): Promise<GovernanceReplayResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/governance/replay', { method: 'POST' });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /governance/replay offline', e);
+      }
+    }
+    return { ok: true, replayed: 2 };
+  }
+
+  public async getGovernanceEvents(planId?: string, eventType?: string): Promise<GovernanceEventsResponse> {
+    if (!this.useMock) {
+      try {
+        const queryParams = new URLSearchParams();
+        if (planId) queryParams.set('planId', planId);
+        if (eventType) queryParams.set('eventType', eventType);
+        const res = await fetch(`/governance/events?${queryParams.toString()}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /governance/events offline', e);
+      }
+    }
+    return {
+      ok: true,
+      events: [
+        {
+          id: 1,
+          receipt_id: 'RCP-PLAN-0053-1',
+          event_type: 'receipt:PROPOSED',
+          work_request_id: 'wr-uuid-0053',
+          plan_id: 'plan_0053',
+          agent_role: 'planner',
+          payload: { session_id: 'sess-1001', artifact_path: 'IMPLEMENTATION_PLANS/pending/auth-module.md', summary: 'Initial proposal' },
+          created_at: new Date(Date.now() - 7200000).toISOString(),
+          replayed_at: new Date().toISOString(),
+        },
+      ],
+    };
+  }
+
+  public async getVisionWorkRequests(status?: string): Promise<VisionWorkRequestsResponse> {
+    if (!this.useMock) {
+      try {
+        const url = status ? `/vision/work-requests?status=${encodeURIComponent(status)}` : '/vision/work-requests';
+        const res = await fetch(url);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /vision/work-requests offline', e);
+      }
+    }
+    return {
+      ok: true,
+      work_requests: [
+        {
+          id: 1,
+          wr_id: 'plan_0053',
+          work_request_uuid: 'wr-uuid-0053',
+          dco_json: '{"lease_owner_pid":"14201","cost_limit_usd":5.00}',
+          context: { system: 'Auth Module', subsystem: 'OAuth Bridges' },
+          status: 'pending',
+          title: 'Auth Module V2 Implementation Plan',
+          recorded_on_dt: new Date(Date.now() - 7200000).toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: 2,
+          wr_id: 'plan_0054',
+          work_request_uuid: 'wr-uuid-0054',
+          dco_json: '{"lease_owner_pid":"14205","cost_limit_usd":10.00}',
+          context: { system: 'Storage Engine', subsystem: 'PostgreSQL Buffer' },
+          status: 'in_progress',
+          title: 'Storage Engine Buffer Cache Optimization',
+          recorded_on_dt: new Date(Date.now() - 3600000).toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    };
+  }
+
+  public async getVisionWorkRequestById(id: string): Promise<VisionWorkRequestSingleResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/vision/work-requests/${encodeURIComponent(id)}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /vision/work-requests/:id offline', e);
+      }
+    }
+    return {
+      ok: true,
+      work_request: {
+        id: 1,
+        wr_id: id.startsWith('plan_') ? id : `plan_${id}`,
+        work_request_uuid: 'wr-uuid-0053',
+        dco_json: '{"lease_owner_pid":"14201","cost_limit_usd":5.00}',
+        context: { system: 'Auth Module', subsystem: 'OAuth Bridges' },
+        status: 'pending',
+        title: 'Auth Module V2 Implementation Plan',
+        recorded_on_dt: new Date(Date.now() - 7200000).toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    };
+  }
+
+  public async upsertVisionWorkRequest(payload: VisionWorkRequestInput): Promise<VisionWorkRequestUpsertResponse> {
+    if (!this.useMock) {
+      try {
+        const res = await fetch('/vision/work-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('POST /vision/work-requests offline', e);
+      }
+    }
+    const wrId = payload.id.startsWith('plan_') ? payload.id : `plan_${payload.id}`;
+    return {
+      ok: true,
+      id: wrId,
+      work_request_uuid: payload.work_request_uuid || `uuid-${Date.now()}`,
+      action: 'created',
+    };
+  }
+
+  public async getVisionReceipts(planId: string): Promise<VisionReceiptsResponse> {
+    const formatted = planId.startsWith('plan_') ? planId : `plan_${planId}`;
+    if (!this.useMock) {
+      try {
+        const res = await fetch(`/vision/receipts?planId=${encodeURIComponent(formatted)}`);
+        if (res.ok) return await res.json();
+      } catch (e) {
+        console.warn('GET /vision/receipts offline', e);
+      }
+    }
+    const receipts = await this.getFormattedReceipts(formatted);
+    return {
+      ok: true,
+      receipts: receipts.map((r, idx) => ({
+        id: r.id,
+        plan_id: r.plan_id,
+        type: r.type,
+        agent_role: r.agent_role,
+        session_id: r.session_id || 'sess-1001',
+        ticket_id: r.ticket_id || 'TCK-2026-0053',
+        artifact_path: r.artifact_path || 'IMPLEMENTATION_PLANS/active/auth.md',
+        summary: r.summary,
+        metadata_json: r.metadata_json || '{}',
+        tokens_used: r.tokens_used || 1000,
+        created_at: r.created_at,
+        sequence: idx + 1,
+      })),
+    };
+  }
+
+  public getSessionLogSseUrl(sessionId: string): string {
+    return `/log/${encodeURIComponent(sessionId)}`;
+  }
+
+  // Model Chains Helper
+  public async getModelChains(): Promise<ModelChainConfig[]> {
+    return INITIAL_MODEL_CHAINS;
   }
 }
 
