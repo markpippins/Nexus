@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """Classify all unmapped pending candidates into the Nebula hierarchy."""
 
-import json, logging, sys, subprocess, time
+import json, logging, sys, os, subprocess, time
 import urllib.request, urllib.error
 
+# Add rover source dir so `event_emitter` and `nebula_utils` are importable
+# without PYTHONPATH (matches the pattern in analyst_answer_questions.py /
+# architect_process_todo.py).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python", "rover"))
+
 from event_emitter import emit_candidate_classified
+from nebula_utils import unwrap_systems_response
 
 log = logging.getLogger("classify")
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
@@ -33,7 +39,11 @@ def nebula_post(path, body):
 
 # Fetch hierarchy
 log.info("Fetching hierarchy...")
-systems = nebula_get("/systems")
+raw = nebula_get("/systems?pageSize=100")
+systems = unwrap_systems_response(raw)
+if systems is None:
+    log.error("Unexpected /systems response: %s", type(raw).__name__)
+    sys.exit(1)
 
 sys_by_name = {}
 sub_by_qname = {}

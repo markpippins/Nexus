@@ -24,9 +24,16 @@ import logging
 import subprocess
 import sys
 import time
+import os
 import urllib.request
 import urllib.error
 from pathlib import Path
+
+# Add rover source dir so `event_emitter` is importable without PYTHONPATH
+# (matches the pattern in analyst_answer_questions.py /
+# architect_process_todo.py). `tackle.*` is resolved by the rover venv's
+# nexus_python.pth which adds nexus/python/ to sys.path.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python", "rover"))
 
 from event_emitter import emit_candidate_completed
 from collections import defaultdict

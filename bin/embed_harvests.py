@@ -17,11 +17,17 @@ import json
 import logging
 import subprocess
 import sys
+import os
 import tempfile
 import time
 from pathlib import Path
 
 import httpx
+
+# Add rover source dir so `event_emitter` is importable without PYTHONPATH
+# (matches the pattern in analyst_answer_questions.py /
+# architect_process_todo.py).
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python", "rover"))
 
 from event_emitter import emit_embedding_created
 

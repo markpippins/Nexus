@@ -18,10 +18,18 @@ import logging
 import subprocess
 import sys
 import time
+import os
 from pathlib import Path
+
+# Add rover source dir so `event_emitter` and `nebula_utils` are importable
+# without PYTHONPATH (matches the pattern in analyst_answer_questions.py /
+# architect_process_todo.py). `tackle.*` is resolved by the rover venv's
+# nexus_python.pth which adds nexus/python/ to sys.path.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "python", "rover"))
 
 from tackle.inference import call_llm
 from event_emitter import emit_candidate_discovered
+from nebula_utils import unwrap_systems_response
 
 log = logging.getLogger("batch_file_candidates")
 
@@ -119,17 +127,25 @@ def check_filename_dedup(filenames: list[str]) -> dict[str, str]:
 
 
 def fetch_hierarchy() -> list[dict]:
-    systems = nebula_get("/systems")
-    if not systems:
-        log.error("Failed to fetch Nebula hierarchy")
+    # FIXME: paginate if total > pageSize — nebula-srv caps at 100, so >100 systems would be silently truncated
+    raw = nebula_get("/systems?pageSize=100")
+    systems = unwrap_systems_response(raw)
+    if systems is None:
+        log.error("Failed to fetch Nebula hierarchy: unexpected response type %s", type(raw).__name__)
         return []
-    log.info("Fetched hierarchy: %d systems", len(systems))
+    if not systems:
+        log.error("No systems returned from Nebula hierarchy")
+        return []
+    log.info("Fetched hierarchy: %d systems (total=%s)",
+             len(systems), raw.get("total", "?") if isinstance(raw, dict) else "?")
     return systems
 
 
 def build_hierarchy_text(systems: list[dict]) -> str:
     lines = ["Systems:"]
     for s in systems:
+        if not isinstance(s, dict):
+            continue  # defensive: skip non-dict entries from API regressions
         sid = s["id"][:8]
         subsystems = s.get("subsystems", [])
         if not subsystems:
@@ -137,6 +153,8 @@ def build_hierarchy_text(systems: list[dict]) -> str:
         else:
             lines.append(f"  [{sid}] {s['name']}")
             for sub in subsystems:
+                if not isinstance(sub, dict):
+                    continue  # defensive: skip non-dict subsystem entries
                 subid = sub["id"][:8]
                 features = sub.get("features", [])
                 if not features:
@@ -144,6 +162,8 @@ def build_hierarchy_text(systems: list[dict]) -> str:
                 else:
                     lines.append(f"    [{subid}] {sub['name']}")
                     for f in features:
+                        if not isinstance(f, dict):
+                            continue  # defensive: skip non-dict feature entries
                         lines.append(f"      [{f['id'][:8]}] {f['name']}")
     return "\n".join(lines)
 
@@ -345,19 +365,27 @@ def resolve_hierarchy_ids(candidates: list[dict], systems: list[dict]) -> list[d
     feat_by_name = {}
     
     for s in systems:
+        if not isinstance(s, dict):
+            continue  # defensive: skip non-dict entries from API regressions
         sname_lower = s["name"].lower()
         sys_by_name[sname_lower] = s["id"]
         for sub in s.get("subsystems", []):
+            if not isinstance(sub, dict):
+                continue  # defensive: skip non-dict subsystem entries
             subname_lower = sub["name"].lower()
             sub_by_name[f"{sname_lower}::{subname_lower}"] = sub["id"]
             sub_by_name[subname_lower] = sub["id"]
             for f in sub.get("features", []):
+                if not isinstance(f, dict):
+                    continue  # defensive: skip non-dict feature entries
                 fname_lower = f["name"].lower()
                 feat_by_name[f"{subname_lower}::{fname_lower}"] = f["id"]
                 feat_by_name[f"{sname_lower}::{subname_lower}::{fname_lower}"] = f["id"]
 
     resolved = []
     for c in candidates:
+        if not isinstance(c, dict):
+            continue  # defensive: skip non-dict LLM output entries
         r = {
             "title": c.get("title", "Untitled"),
             "intentDescription": c.get("intentDescription", ""),
