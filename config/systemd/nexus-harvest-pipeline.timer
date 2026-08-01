@@ -1,0 +1,11 @@
+[Unit]
+Description=Harvest Ingestion Pipeline (every 4 hours)
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=4h
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

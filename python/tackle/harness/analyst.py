@@ -82,17 +82,18 @@ Your goal is to give the Planner enough information to make a decision without h
 # ── Context Building ──────────────────────────────────────────────────
 
 def fetch_unanswered_questions(conn, limit: int = 5) -> list[dict]:
-    """Fetch OPEN questions with no answer (answered_by IS NULL)."""
+    """Fetch questions the analyst has not yet answered this cycle.
+
+    Delegates to nebula.get_unanswered_by_role() which enforces
+    bitemporal validity filtering (valid_until > now()).  The
+    procedure handles the NOT EXISTS subquery internally.
+    See architect note 492e167b and bitemporality discussion ac914057.
+    """
     cur = conn.cursor()
-    cur.execute("""
-        SELECT
-            id, title, description, category, blocking,
-            requirement_id, candidate_id, created_by
-        FROM nebula.open_questions
-        WHERE status = 'OPEN' AND answered_by IS NULL
-        ORDER BY blocking DESC, created_at ASC
-        LIMIT %s
-    """, (limit,))
+    cur.execute(
+        "SELECT * FROM nebula.get_unanswered_by_role(%s, %s)",
+        ('analyst', limit)
+    )
     cols = [d.name for d in cur.description]
     rows = [dict(zip(cols, r)) for r in cur.fetchall()]
     cur.close()

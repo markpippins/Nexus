@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import close_pool, init_pool
+from .listener import listen_segment_expirations
 from .routers import links, segment_sets
 
 SERVICE_NAME = "substance"
@@ -36,9 +37,12 @@ async def _heartbeat_loop():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_pool()
-    task = asyncio.create_task(_heartbeat_loop())
+    heartbeat_task = asyncio.create_task(_heartbeat_loop())
+    listener_task = asyncio.create_task(listen_segment_expirations())
     yield
-    task.cancel()
+    heartbeat_task.cancel()
+    listener_task.cancel()
+    await asyncio.gather(heartbeat_task, listener_task, return_exceptions=True)
     await close_pool()
 
 

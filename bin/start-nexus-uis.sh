@@ -27,7 +27,7 @@ UI_NAMES=(
     "view-architect"     # 3003
     "plurality-ui"       # 3004
     "nexus-console"      # 4200
-    "conduit-ui"         # 3000 (mock) / 4201 (live)
+    "conduit-ui"         # 4201 (live; mock was :3000, unbound in live mode)
     "tackle-ui"          # 4202
     "cascade-ui"         # 4203
     "angular-assembly"   # 4204
@@ -48,7 +48,7 @@ UI_PORTS[duality-ui]=3002
 UI_PORTS[view-architect]=3003
 UI_PORTS[plurality-ui]=3004
 UI_PORTS[nexus-console]=4200
-UI_PORTS[conduit-ui]=3000  # mock; 4201 in live mode
+UI_PORTS[conduit-ui]=4201  # live mode (mock was :3000, intentionally unbound in live mode)
 UI_PORTS[tackle-ui]=4202
 UI_PORTS[cascade-ui]=4203
 UI_PORTS[angular-assembly]=4204

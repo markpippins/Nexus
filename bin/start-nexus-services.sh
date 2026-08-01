@@ -80,6 +80,8 @@ ALL_SERVICES=(
     # API servers (non-UI services)
     "wind-srv.service"         # port 3300 — Wind IDE workflow API
     "mildred-dam-api.service"   # port 3140 — Mildred Digital Asset Management
+    "voyager-srv.service"       # port 3114 — Voyager REST API (filesystem acquisition queries)
+    "voyager.service"           # no port — Filesystem acquisition layer (NATS-backed)
 
     # UI dev servers (Angular/Vite — managed via systemd, not tmux)
     "nebula-ui.service"         # port 4210 — Nebula RMS UI
@@ -143,6 +145,8 @@ SERVICE_PORTS=(
     ["service-broker-mcp.service"]="3112"
     ["wind-srv.service"]="3300"
     ["mildred-dam-api.service"]="3140"
+    ["voyager-srv.service"]="3114"
+    # voyager.service — no HTTP health endpoint (NATS-based)
     ["substance.service"]="3115"
     ["moleculer-search.service"]="4050"
     ["ui-tools.service"]="3125"
@@ -181,6 +185,7 @@ SERVICE_HEALTH_PATHS=(
     ["terrain.service"]="/api/v1/platform/health"
     ["quarkus-broker-gateway.service"]="/api/health"
     ["mildred-dam-api.service"]="/api/health"
+    ["voyager-srv.service"]="/api/health"
 )
 
 # Docker-based services (verified via docker ps instead of port check)

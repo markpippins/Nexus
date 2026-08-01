@@ -503,15 +503,21 @@ export class DataService {
     if (requirementId) {
       url += `&requirementId=${requirementId}`;
     }
-    return this.http.get<Paged<OpenQuestion>>(url);
+    return this.http.get<{ questions: OpenQuestion[]; count: number }>(url).pipe(
+      map(res => ({ items: res.questions, total: res.count, page, pageSize }))
+    );
   }
 
   getResolvedQuestions(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
-    return this.http.get<Paged<OpenQuestion>>(`${this.base}/open-questions?page=${page}&pageSize=${pageSize}&resolved=true`);
+    return this.http.get<{ questions: OpenQuestion[]; count: number }>(`${this.base}/open-questions?page=${page}&pageSize=${pageSize}&resolved=true`).pipe(
+      map(res => ({ items: res.questions, total: res.count, page, pageSize }))
+    );
   }
 
   getOpenQuestionsForEntity(entityType: string, entityId: string, page = 1, pageSize = DEFAULT_PAGE_SIZE) {
-    return this.http.get<Paged<OpenQuestion>>(`${this.base}/open-questions?entityType=${entityType}&entityId=${entityId}&page=${page}&pageSize=${pageSize}`);
+    return this.http.get<{ questions: OpenQuestion[]; count: number }>(`${this.base}/open-questions?entityType=${entityType}&entityId=${entityId}&page=${page}&pageSize=${pageSize}`).pipe(
+      map(res => ({ items: res.questions, total: res.count, page, pageSize }))
+    );
   }
 
   getOpenQuestion(id: string) {
