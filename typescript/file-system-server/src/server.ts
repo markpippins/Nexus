@@ -1,6 +1,7 @@
 import * as http from 'http';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { startHeartbeat } from 'heartbeat-client';
 import { createRestFsService } from './fs-service-impl.js';
 import { createRestFsServiceRouter } from '../../tsp-output/server/js/src/generated/http/router.js';
 
@@ -91,6 +92,13 @@ server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
   console.log(`File system root is ${FS_ROOT_DIR}`);
   console.log(`TypeSpec routes: /list, /cd, /mkdir, /rmdir, /touch, /rm, /rename, /rename-item, /copy, /move, /move-items, /has-file, /has-folder`);
+
+  startHeartbeat({
+    serviceId: 115,
+    serviceName: 'file-system-server',
+    interval: 30,
+    log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat file-system-server]', ...args),
+  });
 });
 
 server.on('error', (err: any) => {

@@ -14,13 +14,14 @@ forumsRouter.get('/', async (_req, res, next) => {
         f.name,
         f.slug,
         f.description,
+        f.sort_order,
         (SELECT COUNT(*) FROM assembly.posts p WHERE p.forum_uuid = f.id) AS thread_count,
         (SELECT COUNT(*) FROM assembly.comments c
           JOIN assembly.posts p ON p.id = c.post_id
           WHERE p.forum_uuid = f.id) AS comment_count
       FROM assembly.forums f
       WHERE f.expiration_dt = 'infinity'::timestamptz OR f.expiration_dt > now()
-      ORDER BY f.name ASC
+      ORDER BY COALESCE(f.sort_order, 0) ASC, f.name ASC
     `);
 
     const forums = result.rows.map(row => ({
@@ -28,6 +29,7 @@ forumsRouter.get('/', async (_req, res, next) => {
       slug: row.slug,
       name: row.name,
       description: row.description || '',
+      sortOrder: row.sort_order ?? 0,
       threadCount: parseInt(row.thread_count, 10),
       postCount: parseInt(row.comment_count, 10) + parseInt(row.thread_count, 10),
     }));
@@ -335,9 +337,12 @@ forumsRouter.post('/', async (req, res, next) => {
     const { name, slug, description } = req.body;
     if (!name) throw new BadRequestError('name is required');
     const genSlug = slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    // Assign sort_order to the end of the list
+    const maxResult = await pool.query("SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM assembly.forums WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt > now()");
+    const nextOrder = maxResult.rows[0]?.next_order ?? 0;
     const result = await pool.query(
-      'INSERT INTO assembly.forums (id, name, slug, description) VALUES (gen_random_uuid(), $1, $2, $3) RETURNING id, name, slug, description',
-      [name, genSlug, description || null]
+      'INSERT INTO assembly.forums (id, name, slug, description, sort_order) VALUES (gen_random_uuid(), $1, $2, $3, $4) RETURNING id, name, slug, description, sort_order',
+      [name, genSlug, description || null, nextOrder]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) { next(err); }
@@ -375,6 +380,33 @@ forumsRouter.delete('/:id', async (req, res, next) => {
     );
     if (result.rows.length === 0) throw new NotFoundError('Forum not found');
     res.json({ expired: true, forum_id: req.params.id, name: result.rows[0].name });
+  } catch (err) { next(err); }
+});
+
+// ── Reorder ───────────────────────────────────────────────────────────
+
+forumsRouter.put('/reorder', async (req, res, next) => {
+  try {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds) || orderedIds.length === 0) {
+      throw new BadRequestError('orderedIds array is required');
+    }
+    const values = [];
+    const params = [];
+    const placeholders = [];
+    for (let i = 0; i < orderedIds.length; i++) {
+      const idx = i * 2;
+      params.push(orderedIds[i], i);
+      placeholders.push(`($${idx + 1}::uuid, $${idx + 2}::integer)`);
+    }
+    await pool.query(
+      `UPDATE assembly.forums AS f
+       SET sort_order = v.sort_order
+       FROM (VALUES ${placeholders.join(', ')}) AS v(id, sort_order)
+       WHERE f.id = v.id::uuid`,
+      params
+    );
+    res.json({ reordered: true, count: orderedIds.length });
   } catch (err) { next(err); }
 });
 

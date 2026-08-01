@@ -6,6 +6,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import * as winston from 'winston';
+import { startHeartbeat } from 'heartbeat-client';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -506,6 +507,13 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
     logger.info(`Server listening on port ${PORT}`, { port: PORT });
     logger.info(`File system root is ${FS_ROOT_DIR}`, { fsRootDir: FS_ROOT_DIR });
+
+    startHeartbeat({
+      serviceId: 115,
+      serviceName: 'file-system-server',
+      interval: 30,
+      log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat file-system-server]', ...args),
+    });
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

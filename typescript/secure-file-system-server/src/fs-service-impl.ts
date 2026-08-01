@@ -19,7 +19,7 @@ const logger = winston.createLogger({
     winston.format.splat(),
     winston.format.json()
   ),
-  defaultMeta: { service: 'file-system-server' },
+  defaultMeta: { service: 'secure-file-system-server' },
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(

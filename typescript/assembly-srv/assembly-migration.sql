@@ -77,6 +77,19 @@ ALTER TABLE assembly.post_artifact_refs ADD CONSTRAINT post_artifact_refs_artifa
     'harvest', 'harvest_candidate'
   ));
 
+-- 8. Add sort_order to assembly.forums for drag-to-reorder support
+ALTER TABLE assembly.forums ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+-- Backfill sort_order based on current name ordering for existing rows
+UPDATE assembly.forums
+SET sort_order = t.new_order
+FROM (
+  SELECT id, row_number() OVER (ORDER BY name ASC) - 1 AS new_order
+  FROM assembly.forums
+  WHERE expiration_dt = 'infinity'::timestamptz OR expiration_dt > now()
+) t
+WHERE forums.id = t.id AND forums.sort_order IS DISTINCT FROM t.new_order;
+
 -- 7. Seed Harvest Candidates forum (idempotent)
 INSERT INTO assembly.forums (id, name, slug, description)
 VALUES (gen_random_uuid(), 'Harvest Candidates', 'harvest-candidates',

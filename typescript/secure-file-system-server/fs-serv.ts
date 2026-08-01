@@ -19,7 +19,7 @@ const logger = winston.createLogger({
     winston.format.splat(),
     winston.format.json()
   ),
-  defaultMeta: { service: 'file-system-server' },
+  defaultMeta: { service: 'secure-file-system-server' },
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(
@@ -119,7 +119,7 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 status: 'UP',
-                service: 'file-system-server',
+                service: 'secure-file-system-server',
                 timestamp: new Date().toISOString(),
                 details: {
                     fsRootDir: FS_ROOT_DIR,
@@ -132,7 +132,7 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(503, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 status: 'DOWN',
-                service: 'file-system-server',
+                service: 'secure-file-system-server',
                 timestamp: new Date().toISOString(),
                 error: 'File system root directory not accessible'
             }));

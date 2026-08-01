@@ -88,6 +88,24 @@ process.on('uncaughtException', (err: Error & { code?: string }) => {
   console.error('[process] uncaughtException:', err.message, err.stack?.split('\n').slice(0, 3).join('\n'));
 });
 
+// ── Unhandled rejection safety net ───────────────────────────────
+// In Node.js v24, unhandled promise rejections exit the process.
+// This handler catches them before the default behaviour fires so
+// a single bad async path doesn't kill the server.
+process.on('unhandledRejection', (reason: any) => {
+  // PG pool connection errors come through as unhandled rejections
+  // when a client 'error' event fires after release.
+  const code = reason?.code;
+  if (code === 'EPIPE' || code === 'ECONNRESET' || code === 'ETIMEDOUT' || code === 'ECONNREFUSED') {
+    console.warn('[process] unhandledRejection (connection noise):', code, reason?.message ?? '');
+    return;
+  }
+  console.error('[process] unhandledRejection:', reason?.message ?? require('util').inspect(reason, { depth: 2 }));
+  if (reason?.stack) {
+    console.error('[process]   stack:', reason.stack.split('\n').slice(0, 4).join('\n'));
+  }
+});
+
 // ── Graceful shutdown ──────────────────────────────────────────────
 process.on('SIGTERM', async () => {
   console.log('[server] SIGTERM received, shutting down...');
