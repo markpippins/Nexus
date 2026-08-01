@@ -6,9 +6,9 @@ Re-clusters all intent_records through the embedding-based agenda_matcher in
 chronological order. Each intent_record is matched to an existing agenda or
 starts a new one.
 
-NOTE: Run after archiving old agendas and deleting old agenda_items:
+NOTE: Run after archiving old agendas and expiring old agenda_items:
     UPDATE nebula.agendas SET status = 'archived' WHERE status = 'draft';
-    DELETE FROM nebula.agenda_items;
+    UPDATE nebula.agenda_items SET valid_until = now() WHERE valid_until > now();
 
 Usage:
     source /home/codex/dev/nexus/python/rover/.venv/bin/activate

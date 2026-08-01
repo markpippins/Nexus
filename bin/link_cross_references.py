@@ -42,7 +42,7 @@ def get_conn():
 def link_kg_rules_to_decisions(cur):
     """Rules that govern decisions — via existing governed_by edges."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT
             'knowledge_entity' AS source_type,
             e.source_section || '/' || e.source_id AS source_id,
@@ -68,7 +68,7 @@ def link_kg_rules_to_decisions(cur):
 def link_kg_references(cur):
     """KG entities that reference other KG entities."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT
             'knowledge_entity' AS source_type,
             e.source_section || '/' || e.source_id AS source_id,
@@ -94,7 +94,7 @@ def link_kg_references(cur):
 def link_kg_produces_consumes(cur):
     """KG entities that produce or consume other KG entities."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT
             'knowledge_entity' AS source_type,
             e.source_section || '/' || e.source_id AS source_id,
@@ -122,7 +122,7 @@ def link_kg_produces_consumes(cur):
 def link_records_to_plans(cur):
     """Agent records that reference implementation plans."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT
             'agent_record' AS source_type,
             ar.id::text AS source_id,
@@ -144,7 +144,7 @@ def link_records_to_plans(cur):
 def link_responses_to_prompts(cur):
     """Response records linked to their originating prompt records via title substring matching."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT DISTINCT
             'agent_record' AS source_type,
             resp.id::text AS source_id,
@@ -175,7 +175,7 @@ def link_responses_to_prompts(cur):
 def link_records_by_role_same_day(cur):
     """Records that reference the same plan — architecturally related via shared plan_ref."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT
             'agent_record' AS source_type,
             a.id::text AS source_id,
@@ -204,7 +204,7 @@ def link_records_by_role_same_day(cur):
 def link_architecture_notes_to_kg_decisions(cur):
     """Architecture notes that mention KG decision entity names."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT DISTINCT
             'agent_record' AS source_type,
             ar.id::text AS source_id,
@@ -235,7 +235,7 @@ def link_architecture_notes_to_kg_decisions(cur):
 def link_assessments_to_kg_gaps(cur):
     """Assessment records that map to KG gaps_and_blockers."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT DISTINCT
             'agent_record' AS source_type,
             ar.id::text AS source_id,
@@ -266,7 +266,7 @@ def link_assessments_to_kg_gaps(cur):
 def link_harvests_to_kg_entities(cur):
     """Harvests that inform KG entities (bypassing the harvest_candidate middleman)."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT DISTINCT
             'harvest' AS source_type,
             h.id::text AS source_id,
@@ -294,7 +294,7 @@ def link_harvests_to_kg_entities(cur):
 def link_plans_to_kg_plans(cur):
     """Implementation plans that correspond to KG plan entities."""
     cur.execute("""
-        INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
         SELECT DISTINCT
             'plan' AS source_type,
             ip.id::text AS source_id,

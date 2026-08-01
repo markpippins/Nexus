@@ -78,7 +78,7 @@ def fetch_ready(threshold: float = 0.7, all_candidates: bool = False,
                 hc.tags,
                 COALESCE(sys.name, '(none)') AS system_name,
                 COALESCE(sub.name, '(none)') AS subsystem_name,
-                (SELECT count(*) FROM nebula.candidate_dependencies cd WHERE cd.candidate_id = hc.id) AS dep_count
+                (SELECT count(*) FROM nebula.candidate_dependencies cd WHERE cd.candidate_id = hc.id AND cd.valid_until > now()) AS dep_count
             FROM nebula.harvest_candidates hc
             LEFT JOIN nebula.systems sys ON sys.id = hc.system_id
             LEFT JOIN nebula.subsystems sub ON sub.id = hc.subsystem_id

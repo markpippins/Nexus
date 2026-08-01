@@ -658,16 +658,20 @@ def create_cross_reference(req_id: str, target_id: str, rel_type: str = "compile
     now = datetime.utcnow().isoformat() + "Z"
     xref_id = str(uuidlib.uuid4())
     sql = f"""
-        INSERT INTO nebula.cross_references
+        INSERT INTO nebula.cross_references_history
             (id, source_type, source_id, target_type, target_id, rel_type, metadata, created_at)
         SELECT '{xref_id}'::uuid, 'requirement', '{req_id}', 'implementation_plan', '{target_id}',
                '{rel_type}', '{{}}'::jsonb, '{now}'
         WHERE NOT EXISTS (
-            SELECT 1 FROM nebula.cross_references
+            SELECT 1 FROM nebula.cross_references_history
             WHERE source_type = 'requirement' AND source_id = '{req_id}'
               AND target_type = 'implementation_plan' AND target_id = '{target_id}'
               AND rel_type = '{rel_type}'
-        );
+              AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
+        )
+        ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+          WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+        DO NOTHING;
     """
     rc, _ = psql(sql)
     if rc == 0:

@@ -54,16 +54,20 @@ async function createSpawnsPlanCrossRef(
   if (!hasPlanRef(planRef)) return null;
   const planRefStr = String(planRef).trim();
   const { rows: [xref] } = await client.query(
-    `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+    `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
      SELECT 'harvest_candidate', $1, 'plan', $2, 'spawns_plan', $3
      WHERE NOT EXISTS (
-       SELECT 1 FROM nebula.cross_references
+       SELECT 1 FROM nebula.cross_references_history
        WHERE source_type = 'harvest_candidate'
          AND source_id = $1
          AND target_type = 'plan'
          AND target_id = $2
          AND rel_type = 'spawns_plan'
+         AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
      )
+     ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+       WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+     DO NOTHING
      RETURNING *`,
     [candidateId, planRefStr, JSON.stringify(extraMetadata || {})]
   );
@@ -746,16 +750,20 @@ export function createRoutes(pool: Pool): Router {
 
       // Idempotent insert (WHERE NOT EXISTS)
       const { rows: [xref] } = await pool.query(
-        `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+        `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
          SELECT 'requirement', $1, 'requirement', $2, $3, '{}'
          WHERE NOT EXISTS (
-           SELECT 1 FROM nebula.cross_references
+           SELECT 1 FROM nebula.cross_references_history
            WHERE source_type = 'requirement'
              AND source_id = $1
              AND target_type = 'requirement'
              AND target_id = $2
              AND rel_type = $3
+             AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
          )
+         ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+           WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+         DO NOTHING
          RETURNING *`,
         [id, targetId, relType]
       );
@@ -771,16 +779,18 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id, depId } = req.params;
       const { rowCount } = await pool.query(
-        `DELETE FROM nebula.cross_references
+        `UPDATE nebula.cross_references
+         SET valid_until = now()
          WHERE id = $1
            AND source_type = 'requirement'
            AND target_type = 'requirement'
            AND rel_type IN ('req:blocks', 'req:depends_on')
-           AND (source_id = $2 OR target_id = $2)`,
+           AND (source_id = $2 OR target_id = $2)
+           AND valid_until > now()`,
         [depId, id]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Dependency not found' });
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -1196,13 +1206,17 @@ export function createRoutes(pool: Pool): Router {
             planNumber = planResult.planNumber;
             // Create cross-reference: requirement → plan (matches existing pattern — let DB defaults handle id/created_at)
             await pool.query(
-              `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+              `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
                SELECT 'requirement', $1, 'plan', $2, 'compiles_to', '{}'::jsonb
                WHERE NOT EXISTS (
-                 SELECT 1 FROM nebula.cross_references
+                 SELECT 1 FROM nebula.cross_references_history
                  WHERE source_type = 'requirement' AND source_id = $1
                    AND target_type = 'plan' AND target_id = $2 AND rel_type = 'compiles_to'
-               )`,
+                   AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
+               )
+               ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+                 WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+               DO NOTHING`,
               [id, planNumber]
             );
           }
@@ -3492,7 +3506,7 @@ export function createRoutes(pool: Pool): Router {
       const sourceId = req.query.sourceId as string;
       if (!sourceId) return res.status(400).json({ error: 'sourceId query parameter is required' });
       const { rowCount } = await pool.query(
-        `DELETE FROM nebula.agenda_items WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT id FROM nebula.intent_records WHERE candidate_id = $2))`,
+        `UPDATE nebula.agenda_items SET valid_until = now() WHERE agenda_id = $1 AND (source_id = $2 OR source_id IN (SELECT id FROM nebula.intent_records WHERE candidate_id = $2)) AND valid_until > now()`,
         [id, sourceId]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Agenda item not found' });
@@ -4001,6 +4015,68 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
+  // ── /candidates alias — mirrors /harvest-candidates for Assembly UI ──────
+
+  router.get('/candidates', async (req: Request, res: Response) => {
+    try {
+      const { harvestId, systemId, subsystemId, featureId } = req.query;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const clauses: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (harvestId) { clauses.push(`hc.harvest_id = $${i++}`); vals.push(harvestId); }
+      if (systemId) { clauses.push(`hc.system_id = $${i++}`); vals.push(systemId); }
+      if (subsystemId) { clauses.push(`hc.subsystem_id = $${i++}`); vals.push(subsystemId); }
+      if (featureId) { clauses.push(`hc.feature_id = $${i++}`); vals.push(featureId); }
+
+      const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          `SELECT hc.id, hc.harvest_id, hc.title, hc.intent_description, hc.status, hc.tags,
+                  hc.system_id, hc.subsystem_id, hc.feature_id,
+                  hc.work_request_id, hc.completed,
+                  hc.valid_from, hc.valid_until, hc.created_at, hc.updated_at,
+                  h.source_filename AS harvest_source
+           FROM nebula.harvest_candidates hc
+           LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+           ${where}
+           ORDER BY hc.created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+          [...vals, pageSize, offset]
+        ),
+        pool.query(
+          `SELECT COUNT(*)::int AS total
+           FROM nebula.harvest_candidates hc
+           LEFT JOIN nebula.harvests h ON h.id = hc.harvest_id
+           ${where}`,
+          vals
+        ),
+      ]);
+
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
+      res.json({ items, total, page, pageSize });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/candidates/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { rows: [row] } = await pool.query(
+        'SELECT * FROM nebula.harvest_candidates WHERE id = $1', [id]
+      );
+      if (!row) return res.status(404).json({ error: 'Candidate not found' });
+      res.json(row);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // PATCH /api/harvest-candidates/:id — update candidate (primarily for linking to hierarchy)
   // When systemId is set, auto-upserts the candidate's intent into a harvest_context info tab.
   router.patch('/harvest-candidates/:id', async (req: Request, res: Response) => {
@@ -4167,16 +4243,20 @@ export function createRoutes(pool: Pool): Router {
       if (hasPlanRef(planRef)) {
         const planRefStr = String(planRef).trim();
         const { rows: [rcr] } = await client.query(
-          `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+          `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
            SELECT 'requirement', $1, 'plan', $2, 'req:spawns_plan', $3
            WHERE NOT EXISTS (
-             SELECT 1 FROM nebula.cross_references
+             SELECT 1 FROM nebula.cross_references_history
              WHERE source_type = 'requirement'
                AND source_id = $1
                AND target_type = 'plan'
                AND target_id = $2
                AND rel_type = 'req:spawns_plan'
+               AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
            )
+           ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+             WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+           DO NOTHING
            RETURNING *`,
           [requirement.id, planRefStr, JSON.stringify({
             candidateId: candidate.id,
@@ -4333,16 +4413,20 @@ export function createRoutes(pool: Pool): Router {
         await client.query('BEGIN');
         for (const req of reqs) {
           const { rowCount } = await client.query(
-          `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
+          `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
            SELECT 'specification', $1, 'requirement', $2, 'spec:defines_req', '{}'::jsonb
            WHERE NOT EXISTS (
-             SELECT 1 FROM nebula.cross_references
+             SELECT 1 FROM nebula.cross_references_history
              WHERE source_type = 'specification'
                AND source_id = $1
                AND target_type = 'requirement'
                AND target_id = $2
                AND rel_type = 'spec:defines_req'
-           )`,
+               AND valid_until = '9999-12-31 00:00:00+00'::timestamptz
+           )
+           ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+             WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+           DO NOTHING`,
           [id, req.id]
         );
         linked += rowCount ?? 0;
@@ -5118,10 +5202,15 @@ export function createRoutes(pool: Pool): Router {
       }
 
       const { rows: [row] } = await pool.query(
-        `INSERT INTO nebula.cross_references (source_type, source_id, target_type, target_id, rel_type, metadata)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+        `INSERT INTO nebula.cross_references_history (source_type, source_id, target_type, target_id, rel_type, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (source_type, source_id, target_type, target_id, rel_type)
+           WHERE valid_until = '9999-12-31 00:00:00+00'::timestamptz
+         DO NOTHING
+         RETURNING *`,
         [sourceType, sourceId, targetType, targetId, relType, JSON.stringify(metadata || {})]
       );
+      if (!row) return res.status(409).json({ error: 'Cross-reference already exists' });
       res.status(201).json(toEpochMs(row, 'created_at'));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -6031,7 +6120,7 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       const now = new Date().toISOString();
       const { rows: [row] } = await pool.query(
-        'UPDATE nebula.op_registry SET deleted_at = $2, updated_at = $2 WHERE id = $1 AND deleted_at IS NULL RETURNING *',
+        'UPDATE nebula.op_registry SET deleted_at = $2, updated_at = $2, valid_until = $2 WHERE id = $1 AND deleted_at IS NULL RETURNING *',
         [id, now]
       );
       if (!row) return res.status(404).json({ error: `Registry entry ${id} not found` });
@@ -6920,15 +7009,19 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // GET /api/open-questions/:id/answers — list all answers for a question
+  // GET /api/open-questions/:id/answers — list only currently-valid answers
+  // Queries the open_question_answers VIEW (which enforces bitemporal
+  // filtering). Excludes temporal housekeeping columns from the response.
   router.get('/open-questions/:id/answers', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { rows } = await pool.query(
-        `SELECT id, question_id, role, answer, confidence, reasoning, answered_at
+        `SELECT id, question_id, role, answer, confidence, reasoning,
+                version, answered_at
          FROM nebula.open_question_answers
          WHERE question_id = $1
-         ORDER BY answered_at ASC`, [id]
+         ORDER BY version DESC, answered_at DESC`,
+        [id]
       );
       res.json({ answers: rows, count: rows.length });
     } catch (err: any) {
@@ -6936,7 +7029,9 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // POST /api/open-questions/:id/answers — add a new answer to a question
+  // POST /api/open-questions/:id/answers — record answer via stored procedure
+  // The procedure handles: expire old answer, version increment, INSERT,
+  // answered_by pointer update, and pg_notify('open_question_answered').
   router.post('/open-questions/:id/answers', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
@@ -6953,15 +7048,14 @@ export function createRoutes(pool: Pool): Router {
         res.status(404).json({ error: 'Question not found' });
         return;
       }
-      // Insert answer
+
       const { rows } = await pool.query(
-        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, question_id, role, answer, confidence, reasoning, answered_at`,
+        `SELECT out_id AS id, out_question_id AS question_id, out_role AS role,
+                out_answer AS answer, out_confidence AS confidence, out_reasoning AS reasoning,
+                out_version AS version, out_answered_at AS answered_at
+         FROM nebula.record_answer($1, $2, $3, $4, $5)`,
         [id, role, answer, confidence || 'MEDIUM', reasoning || null]
       );
-      // Note: legacy single-answer columns (resolution, answered_by, answered_at)
-      // have been removed from the schema. Answers live in open_question_answers only.
       res.status(201).json(rows[0]);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -7038,19 +7132,21 @@ export function createRoutes(pool: Pool): Router {
         res.status(400).json({ error: 'answer and answeredBy are required' });
         return;
       }
-      // Insert into answers table (upsert: one answer per role per question)
-      await pool.query(
-        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning)
-         VALUES ($1, $2, $3, 'MEDIUM', NULL)
-         ON CONFLICT (question_id, role) DO UPDATE
-         SET answer = EXCLUDED.answer,
-             confidence = EXCLUDED.confidence,
-             reasoning = EXCLUDED.reasoning,
-             answered_at = now()`,
-        [id, answeredBy, answer]
+      // Insert into answers table — append-only, versioned (AGENTS.md I4)
+      const versionResult = await pool.query(
+        `SELECT COALESCE(MAX(version), 0) + 1 AS next_version
+         FROM nebula.open_question_answers
+         WHERE question_id = $1 AND role = $2`,
+        [id, answeredBy]
       );
-      // Open questions no longer store single-answer columns (resolution, answered_by, answered_at).
-      // The update now only sets updated_at. Answers are tracked in open_question_answers.
+      const nextVersion = versionResult.rows[0].next_version;
+
+      await pool.query(
+        `INSERT INTO nebula.open_question_answers (question_id, role, answer, confidence, reasoning, version)
+         VALUES ($1, $2, $3, 'MEDIUM', NULL, $4)`,
+        [id, answeredBy, answer, nextVersion]
+      );
+      // The AFTER INSERT trigger updates open_questions.answered_by automatically.
       const { rows } = await pool.query(
         `UPDATE nebula.open_questions
          SET updated_at = now()
@@ -7427,7 +7523,7 @@ export function createRoutes(pool: Pool): Router {
                ELSE qe.entity_id::text
              END AS entity_title
            FROM nebula.open_question_entities qe
-           WHERE qe.open_question_id = oq.id
+           WHERE qe.open_question_id = oq.id AND qe.valid_until > now()
            ORDER BY qe.entity_type
            LIMIT 1
          ) link ON true
@@ -7521,7 +7617,7 @@ export function createRoutes(pool: Pool): Router {
       const { rows } = await pool.query(
         `SELECT id, open_question_id, role, participated_at, contribution
          FROM nebula.deliberation_participants
-         WHERE open_question_id = $1
+         WHERE open_question_id = $1 AND valid_until > now()
          ORDER BY participated_at ASC`,
         [req.params.id]
       );
@@ -7575,7 +7671,7 @@ export function createRoutes(pool: Pool): Router {
       const { rows } = await pool.query(
         `SELECT id, candidate_id, depends_on_id, created_at
          FROM nebula.candidate_dependencies
-         WHERE candidate_id = $1
+         WHERE candidate_id = $1 AND valid_until > now()
          ORDER BY created_at ASC`,
         [req.params.id]
       );
@@ -7861,7 +7957,7 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id } = req.params;
       const { rowCount } = await pool.query(
-        'DELETE FROM nebula.architect_specs WHERE id = $1',
+        'UPDATE nebula.architect_specs SET valid_until = now() WHERE id = $1 AND valid_until > now()',
         [id]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Architect spec not found' });
@@ -7957,11 +8053,11 @@ export function createRoutes(pool: Pool): Router {
     try {
       const { id } = req.params;
       const { rowCount } = await pool.query(
-        'DELETE FROM nebula.artifact_provenance WHERE id = $1',
+        'UPDATE nebula.artifact_provenance SET valid_until = now() WHERE id = $1 AND valid_until > now()',
         [id]
       );
       if (rowCount === 0) return res.status(404).json({ error: 'Provenance record not found' });
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -8038,7 +8134,7 @@ export function createRoutes(pool: Pool): Router {
                 hc.compilation_readiness, hc.completed, hc.tags,
                 COALESCE(sys.name, '(none)') AS system_name,
                 COALESCE(sub.name, '(none)') AS subsystem_name,
-                (SELECT count(*)::int FROM nebula.candidate_dependencies cd WHERE cd.candidate_id = hc.id) AS dep_count
+                (SELECT count(*)::int FROM nebula.candidate_dependencies cd WHERE cd.candidate_id = hc.id AND cd.valid_until > now()) AS dep_count
          FROM nebula.harvest_candidates hc
          LEFT JOIN nebula.systems sys ON sys.id = hc.system_id
          LEFT JOIN nebula.subsystems sub ON sub.id = hc.subsystem_id

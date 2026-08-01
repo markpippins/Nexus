@@ -2978,10 +2978,10 @@ export async function undeletePlan(planId: string): Promise<boolean> {
   return changes > 0;
 }
 
-// ── Hard delete ────────────────────────────────────────────────────
+// ── Expire (soft-delete) ────────────────────────────────────────────
 
 export async function hardDeletePlan(planId: string): Promise<{
-  deleted: boolean;
+  expired: boolean;
   ticketsDeleted: number;
   receiptsDeleted: number;
 }> {
@@ -2994,11 +2994,11 @@ export async function hardDeletePlan(planId: string): Promise<{
     );
     const changes = await tRun(
       client,
-      "DELETE FROM nebula.implementation_plans WHERE plan_number = @planId",
+      "UPDATE nebula.implementation_plans SET valid_until = now() WHERE plan_number = @planId AND valid_until > now()",
       { planId },
     );
     return {
-      deleted: changes > 0,
+      expired: changes > 0,
       ticketsDeleted,
       receiptsDeleted,
     };
