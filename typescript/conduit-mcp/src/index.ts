@@ -137,6 +137,62 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Live REST passthrough: /api/*, /admin/*, /delta, /replay → Python kernel ──
+// conduit-ui's live-mode proxy (MCP_PREFIXES) routes these prefixes to us.
+// The Python conduit FastAPI (:3103) owns these routes — sessions, breaker,
+// receipts, admin identities, delta, replay (see nexus/python/conduit/app/main.py).
+// conduit-mcp is the documented thin MCP-to-REST proxy (conduit-client.ts →
+// CONDUIT_API_URL), so forward verbatim and relay the upstream response
+// (status, headers, body) so backend error envelopes surface to the UI.
+const KERNEL_API_URL = process.env.CONDUIT_API_URL || "http://localhost:3103";
+const KERNEL_PROXY_PREFIXES = ["/api", "/admin", "/delta", "/replay"];
+
+app.use(async (req, res, next) => {
+  const hit = KERNEL_PROXY_PREFIXES.find(
+    (p) => req.path === p || req.path.startsWith(p + "/"),
+  );
+  if (!hit) {
+    next();
+    return;
+  }
+
+  const qs = req.originalUrl.includes("?")
+    ? req.originalUrl.substring(req.originalUrl.indexOf("?"))
+    : "";
+  const target = `${KERNEL_API_URL}${req.path}${qs}`;
+  const headers: Record<string, string> = {};
+  if (req.headers["content-type"]) {
+    headers["content-type"] = String(req.headers["content-type"]);
+  }
+  if (req.headers.accept) {
+    headers.accept = String(req.headers.accept);
+  }
+
+  try {
+    const opts: RequestInit = { method: req.method, headers };
+    const hasBody =
+      !["GET", "HEAD"].includes(req.method) &&
+      req.body &&
+      typeof req.body === "object" &&
+      Object.keys(req.body).length > 0;
+    if (hasBody) {
+      if (!headers["content-type"]) headers["content-type"] = "application/json";
+      opts.body = JSON.stringify(req.body);
+    }
+    const upstream = await fetch(target, opts);
+    const body = await upstream.text();
+    res.status(upstream.status);
+    const ct = upstream.headers.get("content-type");
+    if (ct) res.set("content-type", ct);
+    res.send(body);
+  } catch (e: any) {
+    console.error(`[kernel-proxy] ${req.method} ${req.path} → ${e.message}`);
+    res.status(502).json({
+      error: `Kernel API unreachable (${KERNEL_API_URL}): ${e.message}`,
+    });
+  }
+});
+
 // SSE clients
 interface SSEClient {
   id: number;
@@ -250,6 +306,53 @@ app.get("/health", async (_req, res) => {
     pid: process.pid,
     timestamp: new Date().toISOString(),
   });
+});
+
+// Liveness probe — always 200 while the process is up.
+// conduit-ui's live-mode proxy routes /healthz here.
+app.get("/healthz", async (_req, res) => {
+  res.json({
+    status: "alive",
+    port: PORT,
+    pid: process.pid,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Readiness probe — 200 once the pipeline watcher can produce state, else 503.
+app.get("/readyz", async (_req, res) => {
+  try {
+    await watcher.getState();
+    res.json({
+      status: "ready",
+      port: PORT,
+      pid: process.pid,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(503).json({
+      status: "not_ready",
+      error: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Prometheus-style metrics (text/plain)
+app.get("/metrics", async (_req, res) => {
+  res.type("text/plain").send(
+    [
+      "# HELP conduit_mcp_up Whether conduit-mcp is up (1)",
+      "# TYPE conduit_mcp_up gauge",
+      "conduit_mcp_up 1",
+      "# HELP conduit_mcp_uptime_seconds Process uptime in seconds",
+      "# TYPE conduit_mcp_uptime_seconds gauge",
+      `conduit_mcp_uptime_seconds ${Math.round(process.uptime())}`,
+      "# HELP conduit_mcp_port Listening port",
+      "# TYPE conduit_mcp_port gauge",
+      `conduit_mcp_port ${PORT}`,
+    ].join("\n"),
+  );
 });
 
 // ── Routes below extracted to conduit-srv (port 3104) per Architect decision ──
