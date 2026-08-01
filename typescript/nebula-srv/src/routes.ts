@@ -1975,10 +1975,11 @@ export function createRoutes(pool: Pool): Router {
 
   // ── Helper: upsert audit files into DB (bulk, with stale cleanup) ──
   async function syncAuditFilesToDb(): Promise<{ id: string; filePath: string; content: string; sizeBytes: number; recordedOn: string }[]> {
-    const scanned = scanAuditDir(AUDIT_ROOT, AUDIT_ROOT);
-    const scannedPaths = new Set(scanned.map(f => f.filePath));
-    const client = await pool.connect();
+    let client: import('pg').PoolClient | undefined;
     try {
+      const scanned = scanAuditDir(AUDIT_ROOT, AUDIT_ROOT);
+      const scannedPaths = new Set(scanned.map(f => f.filePath));
+      client = await pool.connect();
       await client.query('BEGIN');
 
       // Remove stale entries (files deleted from disk)
@@ -2026,10 +2027,12 @@ export function createRoutes(pool: Pool): Router {
       await client.query('COMMIT');
       return results;
     } catch (err) {
-      try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
+      if (client) {
+        try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
+      }
       throw err;
     } finally {
-      client.release();
+      if (client) client.release();
     }
   }
 
@@ -2138,7 +2141,10 @@ export function createRoutes(pool: Pool): Router {
         count: files.length,
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      // Guard against non-Error objects (e.g. PG internal state, symbol-keyed dumps)
+      const message = err?.message ?? String(err ?? 'unknown error');
+      console.error('[audit/sync] failed:', message);
+      res.status(500).json({ error: message });
     }
   });
 
@@ -2540,10 +2546,10 @@ export function createRoutes(pool: Pool): Router {
         block_density:    "CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0 THEN (h.docklang #>> '{stats,total_blocks}')::numeric / jsonb_array_length(h.docklang -> 'discourse_units') ELSE 0 END",
         collaboration:    "(SELECT count(*) FROM jsonb_array_elements(h.docklang -> 'discourse_units') du WHERE du #>> '{heading}' ILIKE '%— user%' OR du #>> '{heading}' ILIKE '%- user%')",
         created_at:       'h.created_at',
-        tag_frequency:    `(SELECT COALESCE(sum(freq), 0) FROM (
-           SELECT count(*) AS freq FROM nebula.harvests h2,
-           unnest(h2.tags) AS t WHERE t = ANY(h.tags) GROUP BY t
-         ) sub)`,
+        tag_frequency:    `(SELECT COALESCE(sum(f.tc), 0)
+           FROM unnest(h.tags) tg
+           JOIN (SELECT t AS tag, count(*) AS tc FROM nebula.harvests h2, unnest(h2.tags) AS t GROUP BY t) f
+             ON f.tag = tg)`,
         keyword_hits:     `(SELECT count(*) FROM jsonb_array_elements(h.docklang -> 'discourse_units') du
             WHERE du #>> '{body}' ILIKE '%' || $1 || '%')`,
       };
@@ -2556,44 +2562,65 @@ export function createRoutes(pool: Pool): Router {
       }
 
       const clauses: string[] = [];
+      const filterParams: any[] = [];
       const params: any[] = [];
       let pi = 1;
       if (sort === 'keyword_hits' && keyword) { params.push(keyword); pi++; }  // keyword is $1
-      if (model) { clauses.push(`h.model = $${pi++}`); params.push(model); }
-      if (version) { clauses.push(`h.version = $${pi++}`); params.push(parseInt(version)); }
-      if (sourceHash) { clauses.push(`h.source_hash = $${pi++}`); params.push(sourceHash); }
-      if (level) { clauses.push(`h.level = $${pi++}`); params.push(parseInt(level)); }
-      if (visibilityScope) { clauses.push(`h.visibility_scope = $${pi++}`); params.push(visibilityScope); }
-      if (tag) { clauses.push(`$${pi++} = ANY(h.tags)`); params.push(tag); }
+      if (model) { clauses.push(`h.model = $${pi++}`); params.push(model); filterParams.push(model); }
+      if (version) { clauses.push(`h.version = $${pi++}`); params.push(parseInt(version)); filterParams.push(parseInt(version)); }
+      if (sourceHash) { clauses.push(`h.source_hash = $${pi++}`); params.push(sourceHash); filterParams.push(sourceHash); }
+      if (level) { clauses.push(`h.level = $${pi++}`); params.push(parseInt(level)); filterParams.push(parseInt(level)); }
+      if (visibilityScope) { clauses.push(`h.visibility_scope = $${pi++}`); params.push(visibilityScope); filterParams.push(visibilityScope); }
+      if (tag) { clauses.push(`$${pi++} = ANY(h.tags)`); params.push(tag); filterParams.push(tag); }
       const where = clauses.length > 0 ? 'WHERE ' + clauses.join(' AND ') : '';
 
-      const dataQuery = `
-        SELECT h.id, h.source_path, h.source_filename, h.model,
-               h.total_candidates, h.tags, h.metadata, h.created_at,
-               h.level, h.visibility_scope,
-               h.source_hash, h.file_size, h.version, h.run_metadata,
-               COALESCE((h.docklang #>> '{stats,by_type,code}')::int, 0) AS code_blocks,
-               COALESCE(jsonb_array_length(h.docklang -> 'discourse_units'), 0) AS turns,
-               CASE WHEN jsonb_array_length(h.docklang -> 'discourse_units') > 0
-                    THEN (h.docklang #>> '{stats,total_blocks}')::numeric / jsonb_array_length(h.docklang -> 'discourse_units')
-                    ELSE 0 END AS blocks_per_turn,
-               (SELECT count(*) FROM jsonb_array_elements(h.docklang -> 'discourse_units') du
-                WHERE du #>> '{heading}' ILIKE '%— user%' OR du #>> '{heading}' ILIKE '%- user%') AS user_turns,
-               ${sort === 'keyword_hits' ? sortExpr.keyword_hits + ' AS keyword_hits' : '0::bigint AS keyword_hits'},
-               ${sort === 'tag_frequency' ? sortExpr.tag_frequency + ' AS tag_frequency' : '0::bigint AS tag_frequency'}
-        FROM nebula.harvests h
-        ${where}
-        ORDER BY ${sortExpr[sort]} DESC NULLS LAST
-        LIMIT $${pi} OFFSET $${pi + 1}`;
+      // Count-query WHERE: renumber clause placeholders to start at $1 (each clause has
+      // exactly one placeholder) so the count statement matches filterParams ordering.
+      const countWhere = clauses.length > 0
+        ? 'WHERE ' + clauses.map((c, i) => c.replace(/\$\d+/, `$${i + 1}`)).join(' AND ')
+        : '';
 
-      // Parallel count query with same filters (no sort expression needed)
-      const countParams = params.slice(0, pi - 1); // exclude pagination params since they're not yet pushed
-      const countQuery = `SELECT COUNT(*)::int AS total FROM nebula.harvests h ${where}`;
+      // NOTE (2026-07-31): restructured to inner-select + LIMIT first, then compute the
+      // expensive docklang analytics only on the returned page. Previously the per-row
+      // JSONB subqueries (user_turns etc.) ran across ALL harvests before LIMIT applied,
+      // making /api/harvests take ~22s and time out in the Nebula UI.
+      const dataQuery = `
+        SELECT s.id, s.source_path, s.source_filename, s.model,
+               s.total_candidates, s.tags, s.metadata, s.created_at,
+               s.level, s.visibility_scope,
+               s.source_hash, s.file_size, s.version, s.run_metadata,
+               COALESCE((s.docklang #>> '{stats,by_type,code}')::int, 0) AS code_blocks,
+               COALESCE(jsonb_array_length(s.docklang -> 'discourse_units'), 0) AS turns,
+               CASE WHEN jsonb_array_length(s.docklang -> 'discourse_units') > 0
+                    THEN (s.docklang #>> '{stats,total_blocks}')::numeric / jsonb_array_length(s.docklang -> 'discourse_units')
+                    ELSE 0 END AS blocks_per_turn,
+               (SELECT count(*) FROM jsonb_array_elements(s.docklang -> 'discourse_units') du
+                WHERE du #>> '{heading}' ILIKE '%— user%' OR du #>> '{heading}' ILIKE '%- user%') AS user_turns,
+               ${sort === 'keyword_hits' ? "(SELECT count(*) FROM jsonb_array_elements(s.docklang -> 'discourse_units') du WHERE du #>> '{body}' ILIKE '%' || $1 || '%') AS keyword_hits" : '0::bigint AS keyword_hits'},
+               ${sort === 'tag_frequency' ? "(SELECT COALESCE(sum(freq), 0) FROM (SELECT count(*) AS freq FROM nebula.harvests h2, unnest(h2.tags) AS t WHERE t = ANY(s.tags) GROUP BY t) sub) AS tag_frequency" : '0::bigint AS tag_frequency'}
+        FROM (
+          SELECT h.id, h.source_path, h.source_filename, h.model,
+                 h.total_candidates, h.tags, h.metadata, h.created_at,
+                 h.level, h.visibility_scope,
+                 h.source_hash, h.file_size, h.version, h.run_metadata,
+                 h.docklang
+          FROM nebula.harvests h
+          ${where}
+          ORDER BY ${sortExpr[sort]} DESC NULLS LAST
+          LIMIT $${pi} OFFSET $${pi + 1}
+        ) s`;
+
+      // Parallel count query with same filters (no sort expression needed).
+      // NOTE (2026-07-31): countParams must contain ONLY the WHERE-clause params — the
+      // sort-only keyword param ($1) used for keyword_hits caused a bind mismatch
+      // ("supplies 1 parameters, but prepared statement requires 0") whenever the
+      // keyword filter was absent.
+      const countQuery = `SELECT COUNT(*)::int AS total FROM nebula.harvests h ${countWhere}`;
 
       params.push(pageSize, (page - 1) * pageSize);
       const [dataResult, countResult] = await Promise.all([
         pool.query(dataQuery, params),
-        pool.query(countQuery, countParams),
+        pool.query(countQuery, filterParams),
       ]);
 
       const items = dataResult.rows.map(camelCaseRow);
@@ -2978,7 +3005,9 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ systemId: id, items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
+      res.json({ systemId: id, items, candidates: items, total, count: total, page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3015,7 +3044,9 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ subsystemId: id, items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
+      res.json({ subsystemId: id, items, candidates: items, total, count: total, page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3052,7 +3083,9 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
-      res.json({ featureId: id, items: dataResult.rows.map(camelCaseRow), total: parseInt(countResult.rows[0].total, 10), page, pageSize });
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
+      res.json({ featureId: id, items, candidates: items, total, count: total, page, pageSize });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -3935,9 +3968,13 @@ export function createRoutes(pool: Pool): Router {
         ),
       ]);
 
+      const items = dataResult.rows.map(camelCaseRow);
+      const total = parseInt(countResult.rows[0].total, 10);
       res.json({
-        items: dataResult.rows.map(camelCaseRow),
-        total: parseInt(countResult.rows[0].total, 10),
+        items,
+        candidates: items,
+        total,
+        count: total,
         page,
         pageSize,
       });
