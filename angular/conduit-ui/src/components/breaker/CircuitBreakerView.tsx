@@ -34,7 +34,7 @@ export const CircuitBreakerView: React.FC = () => {
       await apiService.tripBreaker({ reason: tripReason, detail: 'Manual trip by operator' });
       await loadBreaker();
     } catch (e) {
-      console.error(e);
+      alert(`Error tripping breaker: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -43,7 +43,7 @@ export const CircuitBreakerView: React.FC = () => {
       await apiService.resetBreaker();
       await loadBreaker();
     } catch (e) {
-      console.error(e);
+      alert(`Error resetting breaker: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -52,7 +52,7 @@ export const CircuitBreakerView: React.FC = () => {
       await apiService.pauseOrchestration();
       await loadBreaker();
     } catch (e) {
-      console.error(e);
+      alert(`Error pausing orchestration: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -61,7 +61,7 @@ export const CircuitBreakerView: React.FC = () => {
       await apiService.resumeOrchestration();
       await loadBreaker();
     } catch (e) {
-      console.error(e);
+      alert(`Error resuming orchestration: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -73,7 +73,7 @@ export const CircuitBreakerView: React.FC = () => {
       setRecoveryConfig(updated);
       alert('Failure recovery config updated successfully!');
     } catch (e) {
-      console.error(e);
+      alert(`Error saving recovery config: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 

@@ -1,26 +1,23 @@
 import React from 'react';
 import {
   LayoutDashboard,
-  Kanban,
-  GitBranch,
-  MessageSquareCode,
-  Layers,
-  ShieldCheck,
+  Zap,
+  Network,
+  RotateCcw,
+  Receipt,
   Cpu,
-  FileCode2,
-  Sliders,
-  Database,
+  ShieldAlert,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
   onSelectTab: (tabId: string) => void;
   counts: {
-    harvests: number;
-    candidates: number;
-    plans: number;
-    agendas: number;
-    workRequests: number;
+    receipts: number;
+    sessions: number;
+    identities: number;
+    events: number;
   };
 }
 
@@ -32,56 +29,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     {
       id: 'dashboard',
-      label: 'Control Plane Overview',
+      label: 'Kernel Control Plane',
       icon: LayoutDashboard,
       badge: null,
-      category: 'OVERVIEW',
+      category: 'SYSTEM & STATUS',
     },
     {
-      id: 'artifact_pipeline',
-      label: 'Artifact Pipeline & Decomposition',
-      icon: GitBranch,
-      badge: counts.harvests + counts.candidates,
-      category: 'PROCESS & ARTIFACTS',
-    },
-    {
-      id: 'kanban_boards',
-      label: 'Process & Plan Kanban Boards',
-      icon: Kanban,
-      badge: counts.plans,
-      category: 'PROCESS & ARTIFACTS',
-    },
-    {
-      id: 'deliberation',
-      label: 'Review & Deliberation Surface',
-      icon: MessageSquareCode,
-      badge: counts.agendas,
-      category: 'DELIBERATION & FEASIBILITY',
-    },
-    {
-      id: 'architecture',
-      label: 'Hierarchical System Architecture',
-      icon: Layers,
+      id: 'delta_ingestion',
+      label: 'Delta Ingestion Pipeline',
+      icon: Zap,
       badge: null,
-      category: 'DELIBERATION & FEASIBILITY',
+      category: 'DELTA & REDUCE',
     },
     {
-      id: 'execution_authority',
-      label: 'Execution Authority & Receipts (ADR-006)',
-      icon: ShieldCheck,
-      badge: counts.workRequests,
-      category: 'EXECUTION & KERNEL',
+      id: 'state_inspection',
+      label: 'State & Cross-Plan Graph',
+      icon: Network,
+      badge: counts.identities,
+      category: 'STATE & LINEAGE',
     },
     {
-      id: 'model_chain',
-      label: 'Model Chain Resilience & Budget',
+      id: 'replay_engine',
+      label: 'KSRA Replay & Compare',
+      icon: RotateCcw,
+      badge: counts.events,
+      category: 'STATE & LINEAGE',
+    },
+    {
+      id: 'receipts_ledger',
+      label: 'Receipts Ledger & Audit',
+      icon: Receipt,
+      badge: counts.receipts,
+      category: 'RECEIPTS & SESSIONS',
+    },
+    {
+      id: 'agent_sessions',
+      label: 'Agent Sessions & PIDs',
       icon: Cpu,
+      badge: counts.sessions,
+      category: 'RECEIPTS & SESSIONS',
+    },
+    {
+      id: 'circuit_breaker',
+      label: 'Circuit Breaker & Recovery',
+      icon: ShieldAlert,
       badge: null,
-      category: 'EXECUTION & KERNEL',
+      category: 'GOVERNANCE & ADMIN',
+    },
+    {
+      id: 'admin_catalog',
+      label: 'Admin Catalog & Alignment',
+      icon: SlidersHorizontal,
+      badge: counts.identities,
+      category: 'GOVERNANCE & ADMIN',
     },
   ];
 
-  // Group nav items by category
   const categories = Array.from(new Set(navItems.map((item) => item.category)));
 
   return (
@@ -90,14 +93,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 border-b border-zinc-800 flex items-center justify-between bg-[#141416]">
         <div className="flex items-center gap-2.5">
           <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center font-bold text-xs text-white">
-            C
+            W
           </div>
           <span className="text-xs font-mono font-bold tracking-tight text-zinc-100 uppercase">
-            CONDUIT NEXUS
+            WRP KERNEL RUNTIME
           </span>
         </div>
-        <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700">
-          v2.4
+        <span className="text-[10px] font-mono text-blue-400 bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-800/80">
+          v0.1.0
         </span>
       </div>
 
@@ -124,14 +127,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
-                      {isActive ? (
-                        <span className="w-2 h-2 bg-blue-400 rounded-full shrink-0 shadow-[0_0_8px_rgba(96,165,250,0.6)]" />
-                      ) : (
-                        <span className="w-1.5 h-1.5 border border-zinc-600 rounded-full shrink-0" />
-                      )}
+                      <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-blue-400' : 'text-zinc-500'}`} />
                       <span className="truncate">{item.label}</span>
                     </div>
-                    {item.badge !== null && (
+                    {item.badge !== null && item.badge !== undefined && (
                       <span
                         className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold shrink-0 ${
                           isActive
@@ -153,14 +152,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Footer Context */}
       <div className="p-3 border-t border-zinc-800 bg-[#141416]/50 text-[11px] font-mono text-zinc-400 space-y-1">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500 uppercase">Tenant</span>
-          <span className="text-zinc-200 font-semibold">org_agentic_se</span>
+          <span className="text-[10px] text-zinc-500 uppercase">Port</span>
+          <span className="text-zinc-200 font-semibold">3103 (FastAPI)</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-zinc-500 uppercase">WRP Daemon</span>
+          <span className="text-[10px] text-zinc-500 uppercase">Status</span>
           <span className="text-emerald-400 font-semibold flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            RUNNING
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            READY (v42)
           </span>
         </div>
       </div>

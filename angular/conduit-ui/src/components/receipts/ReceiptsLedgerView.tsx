@@ -58,7 +58,7 @@ export const ReceiptsLedgerView: React.FC = () => {
       setShowAddModal(false);
       await loadReceipts(selectedPlanId);
     } catch (err) {
-      console.error(err);
+      alert(`Error inserting receipt: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -69,7 +69,7 @@ export const ReceiptsLedgerView: React.FC = () => {
       await apiService.deleteReceipts(selectedPlanId, types);
       await loadReceipts(selectedPlanId);
     } catch (err) {
-      console.error(err);
+      alert(`Error deleting receipts: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 

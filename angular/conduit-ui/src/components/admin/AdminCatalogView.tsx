@@ -34,7 +34,7 @@ export const AdminCatalogView: React.FC = () => {
       setEditingId(null);
       await loadData();
     } catch (e) {
-      console.error(e);
+      alert(`Error updating identity: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -44,7 +44,7 @@ export const AdminCatalogView: React.FC = () => {
       await apiService.deleteIdentity(identityId);
       await loadData();
     } catch (e) {
-      console.error(e);
+      alert(`Error deleting identity: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 

@@ -1,3 +1,5 @@
+import { friendlyFetchError } from '../utils/network-errors';
+import { unwrapErrorMessage } from '../utils/response';
 import {
   ServiceRootResponse,
   HealthzResponse,
@@ -100,6 +102,34 @@ class ApiService {
   public setMockMode(enabled: boolean): void {
     this.useMock = enabled;
     localStorage.setItem(STORAGE_KEYS.USE_MOCK, String(enabled));
+  }
+
+  /**
+   * Live-mode request helper for mutations. Throws on any HTTP error (with
+   * the backend's error message when available) instead of silently falling
+   * through to the mock path — so a failed save/delete surfaces the real
+   * error to the caller (which alerts it) rather than faking mock success.
+   * Mirrors tackle-ui's requestOrThrow pattern for cross-UI consistency.
+   */
+  private async requestOrThrow(url: string, options: RequestInit = {}): Promise<Response> {
+    let res: Response;
+    try {
+      res = await fetch(url, options);
+    } catch (e) {
+      // Map known fetch network-failure messages (shared util) to a friendlier
+      // message so alerts don't show a cryptic string when the backend is
+      // unreachable. Other errors pass through unchanged (non-Errors are
+      // wrapped in an Error so the caller always receives an Error).
+      throw friendlyFetchError(e);
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      // Backends differ: tackle-srv returns { error: "string" }; the Python
+      // kernel returns a nested envelope { error: { code, message } }. Unwrap
+      // both (shared util) so alerts show the real message, never "[object Object]".
+      throw new Error(unwrapErrorMessage(err, `Request failed (HTTP ${res.status})`));
+    }
+    return res;
   }
 
   private initLocalStorage(): void {
@@ -308,16 +338,12 @@ class ApiService {
   // 1. Delta Ingestion
   public async postDelta(payload: KernelDeltaInput): Promise<DeltaIngestResponse> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/delta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /delta offline', e);
-      }
+      const res = await this.requestOrThrow('/delta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
     }
 
     const receipts = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
@@ -591,16 +617,12 @@ class ApiService {
 
   public async updateIdentity(identityId: string, data: { label?: string; aliases?: string[] }): Promise<{ id: string; label: string; aliases: string[]; updated: boolean }> {
     if (!this.useMock) {
-      try {
-        const res = await fetch(`/admin/identities/${encodeURIComponent(identityId)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('PATCH /admin/identities offline', e);
-      }
+      const res = await this.requestOrThrow(`/admin/identities/${encodeURIComponent(identityId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
     }
     const identities: any[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
     const iden = identities.find(i => i.id === identityId || i.id === `iden::${identityId}`);
@@ -615,12 +637,8 @@ class ApiService {
 
   public async deleteIdentity(identityId: string): Promise<{ ok: boolean; identity_id: string }> {
     if (!this.useMock) {
-      try {
-        const res = await fetch(`/admin/identities/${encodeURIComponent(identityId)}`, { method: 'DELETE' });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('DELETE /admin/identities offline', e);
-      }
+      const res = await this.requestOrThrow(`/admin/identities/${encodeURIComponent(identityId)}`, { method: 'DELETE' });
+      return await res.json();
     }
     let identities: any[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.IDENTITIES) || '[]');
     identities = identities.filter(i => i.id !== identityId && i.id !== `iden::${identityId}`);
@@ -680,16 +698,12 @@ class ApiService {
 
   public async updateSessionCost(sessionId: string, costUsd: number): Promise<KernelSession> {
     if (!this.useMock) {
-      try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/cost`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cost_usd: costUsd }),
-        });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('PATCH /api/sessions/cost offline', e);
-      }
+      const res = await this.requestOrThrow(`/api/sessions/${encodeURIComponent(sessionId)}/cost`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cost_usd: costUsd }),
+      });
+      return await res.json();
     }
     const sessions: KernelSession[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]');
     const sess = sessions.find(s => s.id === sessionId);
@@ -703,12 +717,8 @@ class ApiService {
 
   public async killSession(sessionId: string): Promise<{ killed: boolean; sessionId: string; pids: number[]; errors: string[]; timestamp: string }> {
     if (!this.useMock) {
-      try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/kill`, { method: 'POST' });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /api/sessions/kill offline', e);
-      }
+      const res = await this.requestOrThrow(`/api/sessions/${encodeURIComponent(sessionId)}/kill`, { method: 'POST' });
+      return await res.json();
     }
     const sessions: KernelSession[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.SESSIONS) || '[]');
     const sess = sessions.find(s => s.id === sessionId);
@@ -741,16 +751,12 @@ class ApiService {
 
   public async tripBreaker(data?: { reason?: string; detail?: string; retryAfter?: number }): Promise<BreakerStateResponse> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/api/breaker/trip', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data || {}),
-        });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /api/breaker/trip offline', e);
-      }
+      const res = await this.requestOrThrow('/api/breaker/trip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data || {}),
+      });
+      return await res.json();
     }
     const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
     breaker.tripped = true;
@@ -765,12 +771,8 @@ class ApiService {
 
   public async resetBreaker(): Promise<BreakerStateResponse> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/api/breaker/reset', { method: 'POST' });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /api/breaker/reset offline', e);
-      }
+      const res = await this.requestOrThrow('/api/breaker/reset', { method: 'POST' });
+      return await res.json();
     }
     const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
     breaker.tripped = false;
@@ -784,12 +786,8 @@ class ApiService {
 
   public async pauseOrchestration(): Promise<BreakerStateResponse> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/api/breaker/pause', { method: 'POST' });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /api/breaker/pause offline', e);
-      }
+      const res = await this.requestOrThrow('/api/breaker/pause', { method: 'POST' });
+      return await res.json();
     }
     const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
     breaker.paused = true;
@@ -799,12 +797,8 @@ class ApiService {
 
   public async resumeOrchestration(): Promise<BreakerStateResponse> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/api/breaker/resume', { method: 'POST' });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /api/breaker/resume offline', e);
-      }
+      const res = await this.requestOrThrow('/api/breaker/resume', { method: 'POST' });
+      return await res.json();
     }
     const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
     breaker.paused = false;
@@ -833,16 +827,12 @@ class ApiService {
 
   public async saveFailureRecoveryConfig(config: Partial<FailureRecoveryConfig>): Promise<FailureRecoveryConfig> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/api/breaker/failure-recovery', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config),
-        });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /api/breaker/failure-recovery offline', e);
-      }
+      const res = await this.requestOrThrow('/api/breaker/failure-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      });
+      return await res.json();
     }
     const breaker: BreakerStateResponse = JSON.parse(localStorage.getItem(STORAGE_KEYS.BREAKER) || '{}');
     if (config.max_retries_per_model !== undefined) breaker.max_retries_per_model = config.max_retries_per_model;
@@ -883,16 +873,12 @@ class ApiService {
 
   public async insertReceipt(receipt: Partial<ReceiptItem>): Promise<{ ok: boolean; id: string; plan_id: string }> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/api/receipts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(receipt),
-        });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /api/receipts offline', e);
-      }
+      const res = await this.requestOrThrow('/api/receipts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(receipt),
+      });
+      return await res.json();
     }
     const receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
     const newRc: ReceiptItem = {
@@ -916,12 +902,8 @@ class ApiService {
   public async deleteReceipts(planId: string, types: string[]): Promise<{ deleted: number; plan_id: string; types: string[] }> {
     const formatted = planId.startsWith('plan_') ? planId : `plan_${planId}`;
     if (!this.useMock) {
-      try {
-        const res = await fetch(`/api/receipts/${formatted}?types=${encodeURIComponent(types.join(','))}`, { method: 'DELETE' });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('DELETE /api/receipts offline', e);
-      }
+      const res = await this.requestOrThrow(`/api/receipts/${formatted}?types=${encodeURIComponent(types.join(','))}`, { method: 'DELETE' });
+      return await res.json();
     }
     let receipts: ReceiptItem[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.RECEIPTS) || '[]');
     const countBefore = receipts.length;
@@ -972,12 +954,8 @@ class ApiService {
 
   public async detectTickets(): Promise<TicketDetectionResponse> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/tickets/detect', { method: 'POST' });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /tickets/detect offline', e);
-      }
+      const res = await this.requestOrThrow('/tickets/detect', { method: 'POST' });
+      return await res.json();
     }
     return { detected: true, stale: 1, expired: 0, timestamp: new Date().toISOString() };
   }
@@ -1062,12 +1040,8 @@ class ApiService {
 
   public async replayGovernance(): Promise<GovernanceReplayResponse> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/governance/replay', { method: 'POST' });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /governance/replay offline', e);
-      }
+      const res = await this.requestOrThrow('/governance/replay', { method: 'POST' });
+      return await res.json();
     }
     return { ok: true, replayed: 2 };
   }
@@ -1168,16 +1142,12 @@ class ApiService {
 
   public async upsertVisionWorkRequest(payload: VisionWorkRequestInput): Promise<VisionWorkRequestUpsertResponse> {
     if (!this.useMock) {
-      try {
-        const res = await fetch('/vision/work-requests', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn('POST /vision/work-requests offline', e);
-      }
+      const res = await this.requestOrThrow('/vision/work-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
     }
     const wrId = payload.id.startsWith('plan_') ? payload.id : `plan_${payload.id}`;
     return {

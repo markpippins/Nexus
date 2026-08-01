@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Activity,
   Zap,
@@ -12,6 +12,8 @@ import {
   Play,
   FileCode,
   Layers,
+  Search,
+  X,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -30,6 +32,10 @@ import {
   ModelChainConfig,
   SystemStatus,
 } from '../../types/conduit';
+import { PlanGanttChart } from './PlanGanttChart';
+import { PerformanceMetricsCard } from './PerformanceMetricsCard';
+import { RecentActivityWidget } from './RecentActivityWidget';
+import { TokenSparkline } from './TokenSparkline';
 
 interface MainDashboardProps {
   plans: ImplementationPlan[];
@@ -58,6 +64,60 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   onNavigateTab,
   onSelectPlan,
 }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+
+  // Available status chips with counts
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      ALL: plans.length,
+      ACTIVE: 0,
+      PLANNING: 0,
+      COMPLETED: 0,
+      BLOCKED: 0,
+    };
+    plans.forEach((p) => {
+      const st = p.status ? p.status.toUpperCase() : 'OTHER';
+      if (counts[st] !== undefined) {
+        counts[st] += 1;
+      } else if (st === 'PENDING' || st === 'PROPOSED') {
+        counts['PLANNING'] = (counts['PLANNING'] || 0) + 1;
+      } else {
+        counts[st] = (counts[st] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [plans]);
+
+  // Real-time filtered plans by status chip and title/status/ID/ticket query
+  const filteredPlans = useMemo(() => {
+    return plans.filter((p) => {
+      // Status Filter
+      if (selectedStatus !== 'ALL') {
+        const st = p.status ? p.status.toUpperCase() : '';
+        if (selectedStatus === 'PLANNING') {
+          if (st !== 'PLANNING' && st !== 'PENDING' && st !== 'PROPOSED') return false;
+        } else if (st !== selectedStatus) {
+          return false;
+        }
+      }
+
+      // Search Query Filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const matchesQuery =
+          p.title.toLowerCase().includes(query) ||
+          p.status.toLowerCase().includes(query) ||
+          p.id.toLowerCase().includes(query) ||
+          p.ticketId.toLowerCase().includes(query) ||
+          p.description.toLowerCase().includes(query);
+        if (!matchesQuery) return false;
+      }
+
+      return true;
+    });
+  }, [plans, selectedStatus, searchQuery]);
+
   // Compute key stats
   const activePlansCount = plans.filter((p) => p.status === 'ACTIVE').length;
   const totalCostUsd = plans.reduce((acc, p) => acc + p.costUsd, 0);
@@ -67,7 +127,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto text-zinc-100">
-      {/* Top Welcome / Status Headline Banner */}
+      {/* Top Welcome / Status Headline Banner with Real-time Search */}
       <div className="bg-[#141416] border border-zinc-800 rounded-lg p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-lg">
         <div>
           <div className="flex items-center gap-2.5">
@@ -84,7 +144,28 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          {/* Real-time Search Input Field */}
+          <div className="relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search title or status..."
+              className="bg-zinc-900 border border-zinc-700/80 rounded pl-8 pr-7 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 font-mono focus:outline-none focus:border-blue-500 w-52 sm:w-64 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 text-zinc-400 hover:text-zinc-200"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
           <button
             onClick={() => onNavigateTab('kanban_boards')}
             className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded transition-colors shadow-sm flex items-center gap-1.5"
@@ -99,6 +180,55 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             <FileCode className="w-3.5 h-3.5 text-blue-400" />
             <span>Deliberation Surface</span>
           </button>
+        </div>
+      </div>
+
+      {/* Status Chips Filter Bar */}
+      <div className="flex items-center justify-between bg-[#141416] border border-zinc-800 rounded-lg p-2.5 px-4 font-mono text-xs flex-wrap gap-2 shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider mr-1">Status Filter:</span>
+          {[
+            { key: 'ALL', label: 'ALL' },
+            { key: 'ACTIVE', label: 'ACTIVE' },
+            { key: 'PLANNING', label: 'PLANNING' },
+            { key: 'COMPLETED', label: 'COMPLETED' },
+            { key: 'BLOCKED', label: 'BLOCKED' },
+          ].map((chip) => {
+            const count = statusCounts[chip.key] || 0;
+            const isSelected = selectedStatus === chip.key;
+
+            let activeStyle = 'bg-blue-600 text-white border-blue-500 shadow-sm';
+            if (chip.key === 'ACTIVE') activeStyle = 'bg-blue-600 text-white border-blue-400 shadow-sm';
+            if (chip.key === 'PLANNING') activeStyle = 'bg-amber-600 text-white border-amber-400 shadow-sm';
+            if (chip.key === 'COMPLETED') activeStyle = 'bg-emerald-600 text-white border-emerald-400 shadow-sm';
+            if (chip.key === 'BLOCKED') activeStyle = 'bg-rose-600 text-white border-rose-400 shadow-sm';
+
+            return (
+              <button
+                key={chip.key}
+                onClick={() => setSelectedStatus(chip.key)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                  isSelected
+                    ? activeStyle
+                    : 'bg-zinc-900/90 text-zinc-400 border-zinc-800 hover:text-zinc-200 hover:border-zinc-700'
+                }`}
+              >
+                <span>{chip.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                    isSelected ? 'bg-black/30 text-white' : 'bg-zinc-800 text-zinc-400'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="text-[11px] text-zinc-400 font-mono">
+          Showing <strong className="text-white">{filteredPlans.length}</strong> of{' '}
+          <strong className="text-zinc-400">{plans.length}</strong> plans
         </div>
       </div>
 
@@ -299,13 +429,31 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
       </div>
 
+      {/* Performance Metrics Card */}
+      <PerformanceMetricsCard plans={filteredPlans} />
+
+      {/* Recent Activity Stream Widget */}
+      <RecentActivityWidget
+        plans={filteredPlans}
+        workRequests={workRequests}
+        onSelectPlan={onSelectPlan}
+      />
+
+      {/* Gantt Timeline & Token Density Visualization */}
+      <PlanGanttChart plans={filteredPlans} onSelectPlan={onSelectPlan} />
+
       {/* Active Implementation Plans High Contrast Table */}
       <div className="bg-[#141416] border border-zinc-800 rounded-lg overflow-hidden shadow-sm">
         <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-[#0c0c0e]">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-blue-400" />
-            <h2 className="text-xs font-mono font-bold text-zinc-200 uppercase tracking-wide">
-              Active Implementation Plans & Receipt Chain State
+            <h2 className="text-xs font-mono font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
+              <span>Active Implementation Plans & Receipt Chain State</span>
+              {searchQuery && (
+                <span className="text-[10px] font-normal text-cyan-300 bg-cyan-950/60 border border-cyan-800/50 px-2 py-0.5 rounded font-mono">
+                  {filteredPlans.length} of {plans.length} match "{searchQuery}"
+                </span>
+              )}
             </h2>
           </div>
           <button
@@ -325,70 +473,93 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 <th className="py-2.5 px-4 font-semibold">Role</th>
                 <th className="py-2.5 px-4 font-semibold">Active Model</th>
                 <th className="py-2.5 px-4 font-semibold">Status</th>
+                <th className="py-2.5 px-4 font-semibold">Token Usage Trend (5 Updates)</th>
                 <th className="py-2.5 px-4 font-semibold">Cost (USD)</th>
                 <th className="py-2.5 px-4 font-semibold text-right">Receipt Hash</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800/80 text-xs">
-              {plans.map((plan) => {
-                const latestReceipt = plan.receipts[plan.receipts.length - 1];
-                return (
-                  <tr
-                    key={plan.id}
-                    onClick={() => onSelectPlan(plan.id)}
-                    className="hover:bg-zinc-800/40 cursor-pointer transition-colors"
-                  >
-                    <td className="py-3 px-4 font-mono text-zinc-300 font-bold whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <span className="text-blue-400">{plan.id}</span>
-                        <span className="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700 font-mono">
-                          {plan.ticketId}
+              {filteredPlans.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-zinc-500 font-mono text-xs">
+                    No implementation plans match your search query "{searchQuery}".
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="ml-2 text-blue-400 hover:underline"
+                    >
+                      Clear search
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                filteredPlans.map((plan) => {
+                  const latestReceipt = plan.receipts[plan.receipts.length - 1];
+                  return (
+                    <tr
+                      key={plan.id}
+                      onClick={() => onSelectPlan(plan.id)}
+                      className="hover:bg-zinc-800/40 cursor-pointer transition-colors"
+                    >
+                      <td className="py-3 px-4 font-mono text-zinc-300 font-bold whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-400">{plan.id}</span>
+                          <span className="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded border border-zinc-700 font-mono">
+                            {plan.ticketId}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 max-w-md">
+                        <div className="font-semibold text-zinc-100 truncate">{plan.title}</div>
+                        <div className="text-[11px] text-zinc-400 truncate">{plan.description}</div>
+                      </td>
+                      <td className="py-3 px-4 font-mono capitalize">
+                        <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded border border-zinc-700 text-[11px]">
+                          {plan.currentRole}
                         </span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 max-w-md">
-                      <div className="font-semibold text-zinc-100 truncate">{plan.title}</div>
-                      <div className="text-[11px] text-zinc-400 truncate">{plan.description}</div>
-                    </td>
-                    <td className="py-3 px-4 font-mono capitalize">
-                      <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded border border-zinc-700 text-[11px]">
-                        {plan.currentRole}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-cyan-300">{plan.activeModel}</td>
-                    <td className="py-3 px-4 font-mono">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold border ${
-                          plan.status === 'ACTIVE'
-                            ? 'bg-blue-950/80 text-blue-300 border-blue-600/50'
-                            : plan.status === 'COMPLETED'
-                            ? 'bg-emerald-950/80 text-emerald-300 border-emerald-600/50'
-                            : plan.status === 'BLOCKED'
-                            ? 'bg-rose-950/80 text-rose-300 border-rose-600/50'
-                            : 'bg-zinc-800 text-zinc-300 border-zinc-700'
-                        }`}
-                      >
-                        {plan.status === 'ACTIVE' && <Activity className="w-3 h-3 text-blue-400 animate-pulse" />}
-                        {plan.status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
-                        {plan.status === 'BLOCKED' && <AlertTriangle className="w-3 h-3 text-rose-400" />}
-                        {plan.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-zinc-200">
-                      ${plan.costUsd.toFixed(2)}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-right text-zinc-500 text-[11px]">
-                      {latestReceipt ? (
-                        <span title={latestReceipt.hash}>
-                          {latestReceipt.hash.substring(0, 12)}...
+                      </td>
+                      <td className="py-3 px-4 font-mono text-cyan-300">{plan.activeModel}</td>
+                      <td className="py-3 px-4 font-mono">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-bold border ${
+                            plan.status === 'ACTIVE'
+                              ? 'bg-blue-950/80 text-blue-300 border-blue-500/60 shadow-sm'
+                              : plan.status === 'COMPLETED'
+                              ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60 shadow-sm'
+                              : plan.status === 'PLANNING' || plan.status === 'PENDING' || plan.status === 'PROPOSED'
+                              ? 'bg-amber-950/80 text-amber-300 border-amber-500/60 shadow-sm'
+                              : plan.status === 'BLOCKED'
+                              ? 'bg-rose-950/80 text-rose-300 border-rose-500/60 shadow-sm'
+                              : 'bg-zinc-800 text-zinc-300 border-zinc-700'
+                          }`}
+                        >
+                          {plan.status === 'ACTIVE' && <Activity className="w-3 h-3 text-blue-400 animate-pulse" />}
+                          {plan.status === 'COMPLETED' && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
+                          {(plan.status === 'PLANNING' || plan.status === 'PENDING' || plan.status === 'PROPOSED') && (
+                            <Clock className="w-3 h-3 text-amber-400" />
+                          )}
+                          {plan.status === 'BLOCKED' && <AlertTriangle className="w-3 h-3 text-rose-400" />}
+                          {plan.status}
                         </span>
-                      ) : (
-                        '--'
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="py-3 px-4 font-mono">
+                        <TokenSparkline plan={plan} />
+                      </td>
+                      <td className="py-3 px-4 font-mono text-zinc-200">
+                        ${plan.costUsd.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-right text-zinc-500 text-[11px]">
+                        {latestReceipt ? (
+                          <span title={latestReceipt.hash}>
+                            {latestReceipt.hash.substring(0, 12)}...
+                          </span>
+                        ) : (
+                          '--'
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

@@ -4,11 +4,11 @@ set -e
 # ==============================================================================
 # AUDITOR SUITE CONFIGURATION
 # ==============================================================================
-APP_NAME="Nebula"
-SCHEMA_FILE="src/types/nebula.ts"
+APP_NAME="Conduit UI"
+SCHEMA_FILE="src/types/conduit.ts"
 FRONTEND_DIR="src/components"
 PORT_FILE="server.ts"
-TARGET_PORT="5000"
+TARGET_PORT="4201"
 
 # Where your custom protocol or OpenCode expects the payload
 AUDITOR_PAYLOAD="gais_auditor_payload.md" 

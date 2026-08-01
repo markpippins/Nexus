@@ -19,10 +19,21 @@ async function startServer() {
   const MCP_PREFIXES = ['/state', '/delta', '/replay', '/admin', '/api/sessions', '/api/breaker', '/api/receipts'];
   const SRV_PREFIXES = ['/health', '/workflows', '/tickets', '/tokens', '/config', '/governance', '/vision', '/log'];
 
+  /** Response headers never forwarded from backend to the SPA (hop-by-hop + security). */
+  const STRIPPED_RESPONSE_HEADERS = [
+    'transfer-encoding',
+    'connection',
+    'keep-alive',
+    'content-security-policy',
+    'content-security-policy-report-only',
+  ];
+
   function getBackendForPath(p: string): string | null {
     if (MCP_PREFIXES.some(pref => p === pref || p.startsWith(pref + '/'))) return MCP_URL;
     if (SRV_PREFIXES.some(pref => p === pref || p.startsWith(pref + '/'))) return SRV_URL;
-    if (['/healthz', '/readyz', '/metrics', '/'].includes(p)) return MCP_URL;
+    if (['/healthz', '/readyz', '/metrics'].includes(p)) return MCP_URL;
+    // NOTE: '/' must NOT be proxied — conduit-mcp returns 404 + CSP 'default-src none',
+    // which would poison the SPA page. Vite serves the root. Keep it out of the lists above.
     return null;
   }
 
@@ -54,7 +65,11 @@ async function startServer() {
       const fetchRes = await fetch(url, opts);
       res.status(fetchRes.status);
       fetchRes.headers.forEach((v, k) => {
-        if (!['transfer-encoding', 'connection', 'keep-alive'].includes(k.toLowerCase())) {
+        const kLower = k.toLowerCase();
+        // Never forward backend CSP headers — the SPA is the only source of its CSP.
+        // Backend 404/error pages (e.g. conduit-mcp's 'default-src none') would otherwise
+        // poison the page and block legitimate browser requests.
+        if (!STRIPPED_RESPONSE_HEADERS.includes(kLower)) {
           res.set(k, v);
         }
       });
@@ -1080,8 +1095,15 @@ async function startServer() {
     };
 
     const proxyReq = http.request(options, (proxyRes) => {
-      // Forward status and headers from the backend, then pipe the stream
-      res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+      // Forward status and headers from the backend, then pipe the stream.
+      // Strip backend CSP headers (consistent with proxyToBackend) so error-page
+      // policies never leak into responses served to the SPA.
+      // Node lowercases incoming header names, so the shared lowercase list matches directly.
+      const headers: Record<string, any> = { ...proxyRes.headers };
+      for (const h of STRIPPED_RESPONSE_HEADERS) {
+        delete headers[h];
+      }
+      res.writeHead(proxyRes.statusCode || 200, headers);
       proxyRes.pipe(res);
 
       // If the backend connection drops mid-stream, clean up

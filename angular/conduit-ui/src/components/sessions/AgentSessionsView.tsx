@@ -40,7 +40,7 @@ export const AgentSessionsView: React.FC = () => {
       await apiService.killSession(sessId);
       await loadSessions();
     } catch (e) {
-      console.error(e);
+      alert(`Error killing session: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -52,7 +52,7 @@ export const AgentSessionsView: React.FC = () => {
       setEditingCostId(null);
       await loadSessions();
     } catch (e) {
-      console.error(e);
+      alert(`Error updating session cost: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
