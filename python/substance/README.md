@@ -14,7 +14,7 @@ pip install -r requirements.txt
 psql "$NEBULA_PG_DSN" -f migrations/001_segment_sets.sql
 
 # 2. Configure env vars (defaults shown)
-export NEBULA_PG_DSN="postgresql://pguser:pguser@localhost:5432/nebula"
+export NEBULA_PG_DSN="postgresql://pguser:pgpass@localhost:5432/nexus"
 export NEBULA_REDIS_URL="redis://localhost:6379/0"
 export NEBULA_SEGSET_CACHE_TTL=3600   # safety-net TTL in seconds
 
