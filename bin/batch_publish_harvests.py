@@ -23,6 +23,7 @@ import os
 import time
 import urllib.request
 import urllib.error
+from pathlib import Path
 
 # Add rover source dir so `assembly_publish` is importable without PYTHONPATH
 # (matches the pattern in analyst_answer_questions.py /
@@ -35,10 +36,16 @@ log = logging.getLogger("batch_publish")
 
 DOCKER_PSQL = ["docker", "exec", "-i", "pgvector_db", "psql", "-U", "pguser", "-d", "nexus"]
 
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "batch_publish_harvests.log"),
+    ],
 )
 
 
