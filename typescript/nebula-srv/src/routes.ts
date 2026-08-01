@@ -5269,13 +5269,16 @@ export function createRoutes(pool: Pool): Router {
     }
   });
 
-  // DELETE /api/cross-references/:id
+  // DELETE /api/cross-references/:id — soft-delete (expire)
   router.delete('/cross-references/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rowCount } = await pool.query('DELETE FROM nebula.cross_references WHERE id = $1', [id]);
+      const { rowCount } = await pool.query(
+        'UPDATE nebula.cross_references SET valid_until = now() WHERE id = $1 AND valid_until > now()',
+        [id]
+      );
       if (rowCount === 0) return res.status(404).json({ error: 'Cross-reference not found' });
-      res.status(204).send();
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
