@@ -9,6 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "heartbeat-client": "file:../heartbeat-client",
     "cors": "^2.8.5",
     "express": "^4.21.0"
   },

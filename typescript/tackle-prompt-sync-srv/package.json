@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "heartbeat-client": "file:../heartbeat-client",
     "express": "^4.21.0",
     "ioredis": "^5.4.0",
     "pg": "^8.21.0"

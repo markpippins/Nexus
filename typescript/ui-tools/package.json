@@ -1,13 +1,14 @@
 {
   "name": "ui-tools",
   "version": "1.0.0",
-  "description": "UI Tools CRUD API — manages statusbar links and other UI-config data",
+  "description": "UI Tools CRUD API \u2014 manages statusbar links and other UI-config data",
   "main": "dist/index.js",
   "scripts": {
     "start": "npx tsx src/index.ts",
     "build": "tsc"
   },
   "dependencies": {
+    "heartbeat-client": "file:../heartbeat-client",
     "cors": "^2.8.5",
     "express": "^4.21.0",
     "pg": "^8.13.0"
