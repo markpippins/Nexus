@@ -5,10 +5,10 @@ After=network.target redis.service
 Wants=redis.service
 
 [Timer]
-OnBootSec=10s
-OnUnitActiveSec=30s
+OnBootSec=1min
+OnUnitActiveSec=5min
 Persistent=true
-RandomizedDelaySec=5s
+RandomizedDelaySec=30s
 
 [Install]
 WantedBy=timers.target
