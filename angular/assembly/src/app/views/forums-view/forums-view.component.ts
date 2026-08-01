@@ -9,12 +9,11 @@ import { SkeletonComponent } from '../../components/skeleton/skeleton.component'
 import { EmptyStateComponent } from '../../components/empty-state/empty-state.component';
 import { ErrorStateComponent } from '../../components/error-state/error-state.component';
 import { AvatarComponent } from '../../components/avatar/avatar.component';
-import { RaiseQuestionComponent } from '../../components/raise-question/raise-question.component';
 
 @Component({
   selector: 'app-forums-view',
   standalone: true,
-  imports: [CommonModule, RouterLink, PageHeaderComponent, SkeletonComponent, EmptyStateComponent, ErrorStateComponent, AvatarComponent, RaiseQuestionComponent],
+  imports: [CommonModule, RouterLink, PageHeaderComponent, SkeletonComponent, EmptyStateComponent, ErrorStateComponent, AvatarComponent],
   templateUrl: './forums-view.component.html',
 })
 export class ForumsViewComponent implements OnInit {

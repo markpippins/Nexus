@@ -93,11 +93,12 @@ export class EntityDetailViewComponent implements OnInit {
     });
   }
 
-  /** Extracts sourceText from harvest entity */
+  /** Extracts sourceText from harvest entity (camelCase or snake_case) */
   harvestSourceText = computed<string>(() => {
     const entity = this.entity();
     if (!entity || this.entityType() !== 'harvests') return '';
-    const text = entity['sourceText'];
+    const text = entity['sourceText'] as string | undefined
+             || entity['source_text'] as string | undefined;
     return typeof text === 'string' ? text : '';
   });
 
@@ -122,8 +123,8 @@ export class EntityDetailViewComponent implements OnInit {
     if (stats) {
       parts.push('---');
       parts.push('');
-      const totalBlocks = stats['total_blocks'] || stats['totalBlocks'] || '?';
-      const totalUnits = stats['total_units'] || stats['totalUnits'] || (docklang['discourse_units'] as Array<any> | undefined)?.length || '?';
+      const totalBlocks = stats['total_blocks'] ?? stats['totalBlocks'] ?? '?';
+      const totalUnits = stats['total_units'] ?? stats['totalUnits'] ?? (docklang['discourse_units'] as Array<any> | undefined)?.length ?? '?';
       parts.push(`> **Stats:** ${totalUnits} turns, ${totalBlocks} blocks`);
       const byTypeRaw = stats['by_type'] || stats['byType'];
       if (byTypeRaw && typeof byTypeRaw === 'object') {
@@ -135,35 +136,70 @@ export class EntityDetailViewComponent implements OnInit {
     }
 
     // Discourse units (turns with blocks)
-    const units = docklang['discourse_units'] as Array<any> | undefined;
+    const units = (docklang['discourse_units'] || docklang['discourseUnits']) as Array<any> | undefined;
     if (units && Array.isArray(units)) {
       for (const unit of units) {
-        if (unit.heading) parts.push(`## ${unit.heading}`);
+        if (unit.heading) {
+          parts.push(`## ${unit.heading}`);
+        } else if (unit.provenance?.role) {
+          const role = String(unit.provenance.role);
+          parts.push(`## ${role.charAt(0).toUpperCase() + role.slice(1)}`);
+        }
+
         const blocks = unit.blocks as Array<any> | undefined;
-        if (blocks && Array.isArray(blocks)) {
+        if (blocks && Array.isArray(blocks) && blocks.length > 0) {
           for (const block of blocks) {
-            if (block.type === 'code') {
-              const lang = block.content?.language || '';
-              const code = block.content?.code || block.content?.text || '';
+            const blockType = block.type || 'paragraph';
+
+            let textContent = '';
+            if (typeof block.content === 'string') {
+              textContent = block.content;
+            } else if (block.content && typeof block.content === 'object') {
+              textContent = block.content.text || block.content.code || block.content.content || '';
+            } else if (typeof block.body === 'string') {
+              textContent = block.body;
+            } else if (typeof block.text === 'string') {
+              textContent = block.text;
+            }
+
+            if (blockType === 'code') {
+              const lang = block.language || (typeof block.content === 'object' ? block.content?.language : '') || '';
               parts.push('');
-              parts.push(`\`\`\`${lang}\n${code}\n\`\`\``);
+              parts.push(`\`\`\`${lang}\n${textContent}\n\`\`\``);
               parts.push('');
-            } else if (block.type === 'paragraph') {
-              parts.push((block.content?.text || '') + '\n');
-            } else if (block.content?.text) {
-              parts.push(block.content.text + '\n');
+            } else if (blockType === 'diagram') {
+              const fmt = block.format || 'mermaid';
+              parts.push('');
+              parts.push(`\`\`\`${fmt}\n${textContent}\n\`\`\``);
+              parts.push('');
+            } else if (blockType === 'quote') {
+              const quoted = textContent.split('\n').map((line: string) => `> ${line}`).join('\n');
+              parts.push(quoted + '\n');
+            } else if (blockType === 'separator') {
+              parts.push('---\n');
+            } else if (blockType === 'list') {
+              if (textContent) {
+                parts.push(textContent + '\n');
+              } else if (Array.isArray(block.items)) {
+                parts.push(block.items.map((it: any) => `- ${it}`).join('\n') + '\n');
+              }
+            } else {
+              if (textContent) {
+                parts.push(textContent + '\n');
+              }
             }
           }
+        } else if (unit.body && typeof unit.body === 'string') {
+          parts.push(unit.body + '\n');
         }
         parts.push('');
       }
-    }      // Raw content fallback — if no structured content was generated above,
-      // render whatever text-ish content we can extract from other keys
+    }
+
     if (parts.length === 0) {
-      // Try to get the full docklang as a readable summary
       const allKeys = Object.keys(docklang);
       for (const key of allKeys) {
-        if (['meta', 'stats', 'discourse_units'].includes(key)) continue;
+        if (['meta', 'stats', 'discourse_units', 'discourseUnits'].includes(key)) continue;
         const val = docklang[key];
         if (typeof val === 'string') {
           parts.push(`## ${key}`);
@@ -196,12 +232,24 @@ export class EntityDetailViewComponent implements OnInit {
     if (!entity || this.entityType() !== 'harvests') return '';
 
     const docklang = entity['docklang'];
-    const sourceText = entity['sourceText'];
+    const sourceText = entity['sourceText'] || entity['source_text'];
 
     // Primary: convert docklang object to markdown
     if (docklang) {
-      const md = this.docklangToMarkdown(docklang as Record<string, unknown> | null);
-      if (md) return md;
+      if (typeof docklang === 'object' && docklang !== null) {
+        const md = this.docklangToMarkdown(docklang as Record<string, unknown>);
+        if (md) return md;
+      } else if (typeof docklang === 'string' && docklang.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(docklang);
+          if (parsed && typeof parsed === 'object') {
+            const md = this.docklangToMarkdown(parsed as Record<string, unknown>);
+            if (md) return md;
+          }
+        } catch {
+          // not valid json
+        }
+      }
     }
 
     // Fallback: try to parse sourceText as docklang JSON (some imports store
@@ -266,7 +314,10 @@ export class EntityDetailViewComponent implements OnInit {
       const roleLabel = block.role
         ? block.role.charAt(0).toUpperCase() + block.role.slice(1)
         : 'Unknown';
-      const content = block.contentMd || '';
+      // Handle both camelCase (contentMd) and snake_case (content_md) from backend
+      const content = (block as unknown as Record<string, unknown>)['contentMd'] as string | undefined
+                   || (block as unknown as Record<string, unknown>)['content_md'] as string | undefined
+                   || '';
 
       const lastTurn = turns[turns.length - 1];
       if (lastTurn && lastTurn.role === roleLabel) {
@@ -326,8 +377,17 @@ export class EntityDetailViewComponent implements OnInit {
     this.answers.set([]);
 
     if (type === 'agendas') {
+      const entity = this.entity();
+      if (entity && Array.isArray(entity['items'])) {
+        this.agendaItems.set(entity['items'] as AgendaItem[]);
+      }
       this.dataService.getAgendaItems(id).subscribe({
-        next: items => this.agendaItems.set(items),
+        next: (res: any) => {
+          const list = Array.isArray(res) ? res : (res?.items || []);
+          if (list.length > 0) {
+            this.agendaItems.set(list);
+          }
+        },
         error: err => console.error('[entity-detail] failed to load agenda items:', err.message),
       });
     } else if (type === 'conversations') {
@@ -353,6 +413,26 @@ export class EntityDetailViewComponent implements OnInit {
         }
       });
     }
+  }
+
+  getItemTitle(item: AgendaItem | Record<string, unknown>): string {
+    const obj = item as Record<string, unknown>;
+    return String(obj['title'] || obj['name'] || obj['topic'] || 'Untitled Item');
+  }
+
+  getItemSourceType(item: AgendaItem | Record<string, unknown>): string {
+    const obj = item as Record<string, unknown>;
+    return String(obj['sourceType'] || obj['source_type'] || '');
+  }
+
+  getItemSourceId(item: AgendaItem | Record<string, unknown>): string {
+    const obj = item as Record<string, unknown>;
+    return String(obj['sourceId'] || obj['source_id'] || '');
+  }
+
+  getItemBody(item: AgendaItem | Record<string, unknown>): string {
+    const obj = item as Record<string, unknown>;
+    return String(obj['body'] || obj['description'] || obj['summary'] || '');
   }
 
   loadEntity(type: string, id: string) {
@@ -435,14 +515,88 @@ export class EntityDetailViewComponent implements OnInit {
     'candidates',    // raw JSON — not useful in metadata table
     'metadata',      // raw JSON — shows docklingVersion etc.
     'runMetadata',   // raw JSON — empty or opaque
+    'items',         // agenda items array — rendered in dedicated Agenda Items panel
   ]);
 
-  get metadataEntries(): { key: string; value: unknown }[] {
+  get metadataEntries(): { key: string; rawKey: string; value: unknown; formattedValue: string; route: string[] | null }[] {
     const entity = this.entity();
     if (!entity) return [];
     return Object.entries(entity)
       .filter(([key]) => !this.METADATA_EXCLUDED_KEYS.has(key))
-      .map(([key, value]) => ({ key: this.formatKey(key), value }));
+      .map(([key, value]) => ({
+        key: this.formatKey(key),
+        rawKey: key,
+        value,
+        formattedValue: this.formatValue(value),
+        route: this.resolveEntityRoute(key, value)
+      }));
+  }
+
+  resolveEntityRoute(rawKey: string, value: unknown): string[] | null {
+    if (!value || typeof value !== 'string' || !value.trim()) return null;
+    const val = value.trim();
+    const entity = this.entity();
+    const currentType = this.entityType();
+
+    if ((rawKey === 'sourceId' || rawKey === 'source_id') && entity) {
+      const sourceType = (entity['sourceType'] || entity['source_type']) as string | undefined;
+      if (sourceType) {
+        const route = entityRouteForType(sourceType);
+        if (route) return ['/', route, val];
+      }
+    }
+
+    let stem = '';
+    if (rawKey.endsWith('Id')) {
+      stem = rawKey.slice(0, -2);
+    } else if (rawKey.endsWith('_id')) {
+      stem = rawKey.slice(0, -3);
+    } else if (rawKey.endsWith('Ref')) {
+      stem = rawKey.slice(0, -3);
+    }
+
+    if (stem) {
+      let targetType = stem;
+      if (targetType.startsWith('source') && targetType.length > 6) {
+        targetType = targetType.slice(6);
+        targetType = targetType.charAt(0).toLowerCase() + targetType.slice(1);
+      } else if (targetType.startsWith('target') && targetType.length > 6) {
+        targetType = targetType.slice(6);
+        targetType = targetType.charAt(0).toLowerCase() + targetType.slice(1);
+      }
+
+      const normalized = targetType.replace(/([A-Z])/g, '_$1').toLowerCase();
+
+      if ((normalized === 'parent' || normalized === 'parent_id') && currentType) {
+        const parentRoute = entityRouteForType(currentType);
+        if (parentRoute) return ['/', parentRoute, val];
+      }
+
+      const route = entityRouteForType(normalized);
+      if (route) return ['/', route, val];
+    }
+
+    return null;
+  }
+
+  getItemRoute(item: AgendaItem | Record<string, unknown>): string[] | null {
+    const obj = item as Record<string, unknown>;
+    const sourceId = (obj['sourceId'] || obj['source_id']) as string | undefined;
+    const sourceType = (obj['sourceType'] || obj['source_type']) as string | undefined;
+    if (sourceId && sourceType) {
+      const route = entityRouteForType(sourceType);
+      if (route) return ['/', route, sourceId];
+    }
+    for (const key of Object.keys(obj)) {
+      if (key.endsWith('Id') || key.endsWith('_id') || key.endsWith('Ref')) {
+        const val = obj[key];
+        if (typeof val === 'string' && val.trim()) {
+          const r = this.resolveEntityRoute(key, val);
+          if (r) return r;
+        }
+      }
+    }
+    return null;
   }
 
   formatValue(value: unknown): string {
@@ -451,7 +605,17 @@ export class EntityDetailViewComponent implements OnInit {
     if (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}T/)) {
       return new Date(value).toLocaleString();
     }
-    if (Array.isArray(value)) return value.length ? value.join(', ') : '—';
+    if (Array.isArray(value)) {
+      if (!value.length) return '—';
+      const formatted = value.map(item => {
+        if (typeof item === 'object' && item !== null) {
+          const obj = item as Record<string, unknown>;
+          return String(obj['title'] || obj['name'] || obj['label'] || obj['id'] || JSON.stringify(item));
+        }
+        return String(item);
+      });
+      return formatted.join(', ');
+    }
     if (typeof value === 'object') return JSON.stringify(value, null, 2);
     return String(value);
   }
