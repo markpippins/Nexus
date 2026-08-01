@@ -84,10 +84,13 @@ class _ConnectionProxy:
     def __init__(self, conn, schema: str = "conduit"):
         self._conn = conn
         self.total_changes = 0
-        if "'" in schema:
+        # SECURITY: validate schema is a safe PostgreSQL identifier before
+        # DDL interpolation (SET search_path doesn't support parameterized ids).
+        if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', schema):
             raise ValueError(
-                f"Invalid schema name '{schema}': single-quote characters are not "
-                f"allowed."
+                f"Invalid schema name '{schema}': must match "
+                f"/^[a-zA-Z_][a-zA-Z0-9_]*$/. Only unquoted PostgreSQL "
+                f"identifiers are allowed."
             )
         try:
             cur = conn.cursor()

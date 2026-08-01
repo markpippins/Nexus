@@ -324,7 +324,7 @@ def _set_cached(service: str, method: str, path: str, body: Any, result: str) ->
 # Known service names from terrain
 KNOWN_SERVICES = {
     "nats", "postgresql", "address-tts", "broker-gateway", "cascade",
-    "conduit-ui", "conduit-mcp", "duality-ui", "file-system-server",
+    "conduit-ui", "conduit-mcp", "duality-ui",    "file-system-server", "secure-file-system-server",
     "image-server", "mongodb", "nebula-srv", "nebula-mcp", "nebula-ui",
     "nexus-console", "ollama", "operator-svc", "peb-kernel", "plurality-ui",
     "redis", "role-memory-srv", "service-registry", "tackle-ui", "terrain",
