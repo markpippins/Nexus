@@ -18,10 +18,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "backfill_docklang.log"),
+    ],
 )
 log = logging.getLogger("backfill_docklang")
 

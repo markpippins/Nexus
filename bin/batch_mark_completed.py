@@ -48,10 +48,16 @@ WORK_REQUESTS_DIR = Path("/home/codex/dev/nexus/.conduit-data/WORK_REQUESTS")
 # Model config resolved via tackle-mcp (role: Rover)
 # See tackle/inference.py and config bundles at POST /config/ai/bundles/:role
 
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "batch_mark_completed.log"),
+    ],
 )
 
 

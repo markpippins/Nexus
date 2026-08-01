@@ -18,6 +18,7 @@ import sys
 import time
 import urllib.request
 import urllib.error
+from pathlib import Path
 
 log = logging.getLogger("heartbeat-sidecar")
 
@@ -60,9 +61,16 @@ def main():
     parser.add_argument("--timeout", type=int, default=5, help="HTTP timeout in seconds")
     args = parser.parse_args()
 
+    LOG_DIR = Path("/home/codex/dev/nexus/logs")
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+        handlers=[
+            logging.StreamHandler(sys.stderr),
+            logging.FileHandler(LOG_DIR / "heartbeat-sidecar.log"),
+        ],
     )
 
     stop = False

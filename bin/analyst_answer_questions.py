@@ -26,6 +26,10 @@ import json
 import logging
 import sys
 import os
+from pathlib import Path
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Add parent directory to path so tackle.harness is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -39,7 +43,10 @@ log = logging.getLogger("analyst")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "analyst_answer_questions.log"),
+    ],
 )
 
 PG_DSN = "postgresql://pguser:pgpass@localhost:5432/nexus"

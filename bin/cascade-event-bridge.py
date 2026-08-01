@@ -19,6 +19,7 @@ import sys
 import time
 import urllib.request
 import urllib.error
+from pathlib import Path
 
 log = logging.getLogger("cascade-event-bridge")
 
@@ -101,9 +102,16 @@ def main():
                         help="Seconds to wait before reconnecting")
     args = parser.parse_args()
 
+    LOG_DIR = Path("/home/codex/dev/nexus/logs")
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+        handlers=[
+            logging.StreamHandler(sys.stderr),
+            logging.FileHandler(LOG_DIR / "cascade-event-bridge.log"),
+        ],
     )
 
     stop = False

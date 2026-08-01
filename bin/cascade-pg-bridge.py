@@ -23,6 +23,7 @@ import socket
 import sys
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import psycopg2
 
@@ -101,9 +102,16 @@ def main():
     parser.add_argument("--redis-port", type=int, default=6379, help="Redis port")
     args = parser.parse_args()
 
+    LOG_DIR = Path("/home/codex/dev/nexus/logs")
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+        handlers=[
+            logging.StreamHandler(sys.stderr),
+            logging.FileHandler(LOG_DIR / "cascade-pg-bridge.log"),
+        ],
     )
 
     stop = False

@@ -27,6 +27,10 @@ import json
 import logging
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 from agenda_matcher import (
     add_item_to_agenda,
@@ -43,7 +47,10 @@ log = logging.getLogger("recluster_intents")
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "recluster_intents.log"),
+    ],
 )
 
 PROGRESS_INTERVAL = 50
