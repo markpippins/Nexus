@@ -185,7 +185,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedDetailItem = signal<FileSystemNode | null>(null);
   connectionStatus = signal<ConnectionStatus>('disconnected');
   refreshPanes = signal(0);
-  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui' | 'nebula-cp' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui'>('file-explorer');  // Default to file explorer
+  currentViewMode = signal<'file-explorer' | 'service-mesh' | 'conduit-ui' | 'duality' | 'plurality' | 'assembly' | 'nebula-rms' | 'peb-ui' | 'kernel-ui' | 'tackle-ui' | 'kanban' | 'cascade-ui' | 'execution-ui' | 'vision-ui' | 'edit-ui' | 'wind-ui' | 'nebula-cp' | 'throttler-ui' | 'barbie' | 'monaco-judge' | 'conduit-legacy-ui' | 'data-explorer'>('file-explorer');  // Default to file explorer
   meshViewMode = signal<'console' | 'graph'>('console');  // Sub-mode when in service-mesh
   graphBackgroundColor = signal('#000510');  // Graph background color
   graphSubView = signal<'canvas' | 'creator'>('canvas');  // Sub-view when in graph mode (canvas vs creator)
@@ -200,7 +200,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'duality': 'http://localhost:3002',
     'plurality': 'http://localhost:3004',
     'assembly': 'http://localhost:4204',
-    'nebula-rms': 'http://localhost:3000',
+    'nebula-rms': 'http://localhost:4210',
     'peb-ui': 'http://localhost:4206',
     'kernel-ui': 'http://localhost:4207',
     'tackle-ui': 'http://localhost:4202',
@@ -214,6 +214,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'barbie': 'http://localhost:3010',
     'monaco-judge': 'http://localhost:4016',
     'conduit-legacy-ui': 'http://localhost:4015',
+    'data-explorer': 'http://localhost:4212',
   };
 
   isIframeMode = computed(() =>
@@ -234,10 +235,40 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     this.currentViewMode() === 'throttler-ui' ||
     this.currentViewMode() === 'barbie' ||
     this.currentViewMode() === 'monaco-judge' ||
-    this.currentViewMode() === 'conduit-legacy-ui'
+    this.currentViewMode() === 'conduit-legacy-ui' ||
+    this.currentViewMode() === 'data-explorer'
   );
 
   isKanbanMode = computed(() => this.currentViewMode() === 'kanban');
+
+  /** View modes after the first separator in the nav toolbar that should show the address bar. */
+  private readonly SHOW_BAR_VIEW_MODES = new Set([
+    // Previously-configured exceptions (before first separator, but explicitly needed)
+    'conduit-legacy-ui',
+    'cascade-ui',
+    'tackle-ui',
+    // All views after the first separator
+    'throttler-ui',
+    'nebula-cp',
+    'barbie',
+    'wind-ui',
+    'conduit-ui',
+    'execution-ui',
+    'peb-ui',
+    'vision-ui',
+    'kernel-ui',
+    'data-explorer',
+    'duality',
+    'plurality',
+    'edit-ui',
+    'monaco-judge',
+    'assembly',
+  ]);
+
+  /** Whether the address bar and branding box should be visible for the current view. */
+  showAddressBar = computed(() =>
+    !this.isIframeMode() || this.SHOW_BAR_VIEW_MODES.has(this.currentViewMode())
+  );
 
   isFullScreenMode = computed(() =>
     this.isIframeMode() || this.currentViewMode() === 'kanban'

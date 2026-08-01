@@ -123,6 +123,17 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
   // ── Separator ─────────────────────────────────────────────────
   { type: 'separator' },
 
+  // ── Database tools ────────────────────────────────────────────
+  {
+    type: 'item', key: 'data-explorer',
+    label: 'Data Explorer',
+    title: 'Data Explorer - SQL database tool',
+    iconPath: 'M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125v-3.75',
+  },
+
+  // ── Separator ─────────────────────────────────────────────────
+  { type: 'separator' },
+
   // ── Cognitive tools ───────────────────────────────────────────
   {
     type: 'item', key: 'duality',

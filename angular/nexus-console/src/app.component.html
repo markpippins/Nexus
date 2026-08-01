@@ -52,7 +52,7 @@
     <div class="flex-1 flex flex-row overflow-hidden min-w-0">
       <!-- Main content area (address bar, toolbar, file explorer, etc.) -->
       <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-        @if (!isIframeMode() && currentViewMode() !== 'kanban') {
+        @if (showAddressBar()) {
         <!-- Address Bar -->
         <div
           class="h-12 px-4 border-b border-[rgb(var(--color-border-base))] flex items-center space-x-2 flex-shrink-0 bg-[rgb(var(--color-surface-muted))]"

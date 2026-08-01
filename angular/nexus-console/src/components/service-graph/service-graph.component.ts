@@ -391,9 +391,9 @@ export class ServiceGraphComponent implements AfterViewInit, OnDestroy {
         this.formLabel = node.label;
         this.formDesc = node.description;
         this.formColor = node.color;
-        this.formX = Number(node.position.x.toFixed(2));
-        this.formY = Number(node.position.y.toFixed(2));
-        this.formZ = Number(node.position.z.toFixed(2));
+        this.formX = Number(node.position?.x?.toFixed(2) || "0");
+        this.formY = Number(node.position?.y?.toFixed(2) || "0");
+        this.formZ = Number(node.position?.z?.toFixed(2) || "0");
 
         this.isInspectorOpen.set(true);
         this.selectedTargetId = '';

@@ -11,7 +11,7 @@ import { LookupItem, TYPE_LABELS, FILTER_TYPES, getCategoryEndpointType } from '
     <div class="flex flex-col h-full">
         <!-- Type Filter Toolbar (hidden when filteredType is provided) -->
         @if (!hideFilterBar()) {
-            <div class="flex flex-wrap gap-2 mb-4 pb-3 border-b border-[rgb(var(--color-border-base))]">
+            <div class="flex flex-wrap gap-2 mb-4 pb-3 border-b border-[rgb(var(--color-border-base))] items-center">
                 @for (t of filterTypes; track t) {
                     <button
                         (click)="selectedType.set(t)"

@@ -247,7 +247,7 @@
               class="tool-icon"
               [style.background-color]="'#' + tool.defaultColor.toString(16).padStart(6, '0')"
             ></div>
-            {{ tool.label }}
+            {{ tool.name }}
           </button>
           }
         </div>
@@ -423,7 +423,7 @@
               [style.background-color]="'#' + tool.defaultColor.toString(16).padStart(6, '0')"
             ></div>
             <div class="item-info">
-              <div class="item-label">{{ tool.label }}</div>
+              <div class="item-label">{{ tool.name }}</div>
               <div class="item-category">{{ tool.category || 'Standard' }}</div>
             </div>
             <div class="item-add">+</div>
