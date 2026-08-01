@@ -7,8 +7,13 @@ import { sessionsRouter } from "./routes/sessions";
 import { rolesRouter } from "./routes/roles";
 import { schedulerRouter } from "./routes/scheduler";
 import { memoryRouter } from "./routes/memory";
+import { promptsRouter } from "./routes/prompts";
+import { toolAccessRouter } from "./routes/tool-access";
 import { failureRecoveryRouter } from "./routes/failure-recovery";
 import { tasksRouter } from "./routes/tasks";
+import { logsRouter } from "./routes/logs";
+import { healthRouter } from "./routes/health";
+import { insertLog } from "./db";
 import { startHeartbeat } from "heartbeat-client";
 
 const PORT = parseInt(process.env.TACKLE_SRV_PORT || "3410", 10);
@@ -30,13 +35,23 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Request logging middleware
+// Request logging middleware — fire-and-forget async DB writes
 app.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
+    const duration = Date.now() - start;
+    const level = res.statusCode >= 400 ? 'ERROR' : 'INFO';
     console.log(
-      `[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`,
+      `[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`,
     );
+    // Fire-and-forget: never block the response on log writes
+    insertLog({
+      level,
+      category: 'API_ROUTER',
+      message: `${req.method} ${req.path} → ${res.statusCode}`,
+      source: `tackle-srv :${PORT}`,
+      details: { duration_ms: duration, query: Object.keys(req.query).length ? req.query : undefined },
+    }).catch(e => console.error('[tackle-srv] log write failed:', e.message));
   });
   next();
 });
@@ -59,8 +74,12 @@ app.use("/sessions", sessionsRouter);
 app.use("/roles", rolesRouter);
 app.use("/scheduler", schedulerRouter);
 app.use("/memory", memoryRouter);
+app.use("/prompts", promptsRouter);
+app.use("/config/ai/tool-access", toolAccessRouter);
 app.use("/config/failure-recovery", failureRecoveryRouter);
 app.use("/tasks", tasksRouter);
+app.use("/logs", logsRouter);
+app.use("/health", healthRouter);
 
 // ── Start ─────────────────────────────────────────────────────────
 

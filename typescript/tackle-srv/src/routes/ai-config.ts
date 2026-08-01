@@ -323,17 +323,20 @@ aiConfigRouter.post("/bundle", async (req, res) => {
     const { id, name, role, model_id, provider_id, harness_id, priority,
             invocation_mode, command, endpoint_url, timeout_ms,
             valid_from, valid_to, is_active, metadata } = req.body || {};
-    if (!id || !name || !role || !model_id) {
-      res.status(400).json({ error: "id, name, role, and model_id are required" });
+    if (!name || !role || !model_id) {
+      res.status(400).json({ error: "name, role, and model_id are required" });
       return;
     }
+    // Auto-generate id for new bundles (mock-mode parity: the UI does not
+    // send an id when creating). Editing bundles carries an id → upsert.
+    const bundleId = id || `bundle-${Date.now().toString(36)}`;
     await upsertConfigBundle({
-      id, name, role, model_id,
+      id: bundleId, name, role, model_id,
       provider_id, harness_id, priority,
       invocation_mode, command, endpoint_url, timeout_ms,
       valid_from, valid_to, is_active, metadata,
     });
-    res.json({ saved: true, id });
+    res.json({ saved: true, id: bundleId });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
