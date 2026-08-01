@@ -43,10 +43,16 @@ DOCKER_PSQL = [
     "psql", "-U", "pguser", "-d", "nexus",
 ]
 
+LOG_DIR = Path("/home/codex/dev/nexus/logs")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    stream=sys.stderr,
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+        logging.FileHandler(LOG_DIR / "batch_harvest_to_db.log"),
+    ],
 )
 
 
@@ -193,11 +199,15 @@ def process_transcript(html_path: Path) -> bool:
         return False
 
     # Cascade event: harvest.captured
+    # NOTE: emit_harvest_captured(harvest_id, title, source, **kwargs) forwards
+    # **kwargs to emit_event(), whose signature does NOT accept `source_file`
+    # or `total_candidates`. Passing them raised TypeError, which the try/except
+    # below swallowed silently — every harvest.captured event was failing since
+    # 2026-07-14 (commit 6649d25f). Drop both stray kwargs; the event still
+    # fires correctly with harvest_id (→ aggregate_id) + source.
     try:
         emit_harvest_captured(
             harvest_id=harvest_id,
-            source_file=html_path.name,
-            total_candidates=0,
             source="rover.batch_harvest_to_db",
         )
     except Exception as e:
