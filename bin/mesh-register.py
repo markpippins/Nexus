@@ -184,7 +184,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "validation. vision-mcp proxies to this service."
         ),
         startup="systemd: systemctl --user start vision-srv-py.service",
-        workspace_path="nexus/python/vision/vision-srv",
+        workspace_path="nexus/python/vision-srv",
     ),
     Candidate(
         name="tackle-srv",
@@ -340,7 +340,7 @@ CANDIDATES: tuple[Candidate, ...] = (
             "vision services on port 8003. Systemd-managed."
         ),
         startup="systemd: systemctl --user start vision-srv-py.service",
-        workspace_path="nexus/python/vision/vision-srv",
+        workspace_path="nexus/python/vision-srv",
     ),
     Candidate(
         name="role-memory-srv",

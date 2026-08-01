@@ -56,6 +56,7 @@ ALL_SERVICES=(
 
     # Operator + MCP servers
     "operator-svc.service"     # port 3018 — Operator host personality
+    "conduit-kernel.service"   # port 3103 — WRP kernel FastAPI (sessions/breaker/receipts/admin/delta/replay)
     "conduit-mcp.service"      # port 3100 — work request orchestration
     "conduit-srv.service"      # port 3104 — conduit REST API (extracted from conduit-mcp)
     "pty-srv.service"          # port 3120 — WebSocket PTY bridge for xterm.js
@@ -80,7 +81,7 @@ ALL_SERVICES=(
     "wind-srv.service"         # port 3300 — Wind IDE workflow API
 
     # UI dev servers (Angular/Vite — managed via systemd, not tmux)
-    "nebula-ui.service"         # port 3000 — Nebula RMS UI
+    "nebula-ui.service"         # port 4210 — Nebula RMS UI
     "duality-ui.service"        # port 3002 — Duality UI
     "view-architect.service"    # port 3003 — View Architect UI
     "plurality-ui.service"      # port 3004 — Plurality UI
@@ -121,6 +122,7 @@ SERVICE_PORTS=(
     ["address-tts-mcp.service"]="3105"
     ["assembly-srv.service"]="3107"
     ["assembly-mcp.service"]="3113"
+    ["conduit-kernel.service"]="3103"
     ["conduit-mcp.service"]="3100"
     ["conduit-srv.service"]="3104"
     ["nebula-mcp-sse.service"]="3102"
@@ -143,7 +145,7 @@ SERVICE_PORTS=(
     ["moleculer-search.service"]="4050"
     ["ui-tools.service"]="3125"
     ["ui-tools-mcp.service"]="3136"
-    ["nebula-ui.service"]="3000"
+    ["nebula-ui.service"]="4210"
     ["duality-ui.service"]="3002"
     ["view-architect.service"]="3003"
     ["plurality-ui.service"]="3004"

@@ -52,9 +52,19 @@ SPECIFIC_FILES=()           # optional: specific filenames for Stage 1
 
 ROVER_DIR="/home/codex/dev/nexus/python/rover"
 BIN_DIR="/home/codex/dev/nexus/bin"
+LOG_DIR="/home/codex/dev/nexus/logs"
 VENV_ACTIVATE="${ROVER_DIR}/.venv/bin/activate"
 STAGE1="${BIN_DIR}/batch_harvest_to_db.py"
 STAGE2="${BIN_DIR}/batch_file_candidates.py"
+
+# ── Log files (rotated: timestamped per run) ────────────────────────────
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+STAGE1_LOG="${LOG_DIR}/harvest-pipeline-stage1-${TIMESTAMP}.log"
+STAGE2_LOG="${LOG_DIR}/harvest-pipeline-stage2-${TIMESTAMP}.log"
+PIPELINE_LOG="${LOG_DIR}/harvest-pipeline-${TIMESTAMP}.log"
+
+# Ensure log directory exists (idempotent — mkdir -p is safe if it already exists or is missing)
+mkdir -p "$LOG_DIR"
 
 # ── Parse CLI flags ─────────────────────────────────────────────────────
 
@@ -163,6 +173,10 @@ check_prereqs() {
 # ── Main ────────────────────────────────────────────────────────────────
 
 main() {
+    # Redirect all output (stdout+stderr) to both terminal and the pipeline log.
+    # Python subprocess output is already tee'd to per-stage logs.
+    exec > >(tee "$PIPELINE_LOG") 2>&1
+
     separator
     log_info "Harvest Pipeline — Stage 1 + Stage 2"
     log_info "APPLY_MODE = ${APPLY_MODE}"
@@ -194,11 +208,11 @@ main() {
         for f in "${SPECIFIC_FILES[@]}"; do
             log_info "  • $f"
         done
-        python3 "$STAGE1" "${STAGE1_ARGS[@]}" "${SPECIFIC_FILES[@]}" 2>&1
+        python3 "$STAGE1" "${STAGE1_ARGS[@]}" "${SPECIFIC_FILES[@]}" 2>&1 | tee "$STAGE1_LOG"
     else
         # Discover and process unharvested by recency
         log_info "Discovering unharvested HTML files (limit: ${STAGE1_LIMIT}) ..."
-        python3 "$STAGE1" "${STAGE1_ARGS[@]}" --limit "${STAGE1_LIMIT}" 2>&1
+        python3 "$STAGE1" "${STAGE1_ARGS[@]}" --limit "${STAGE1_LIMIT}" 2>&1 | tee "$STAGE1_LOG"
     fi
 
     local stage1_exit=$?
@@ -229,7 +243,7 @@ main() {
         log_info "  Publishing harvests to Assembly forum (--publish)"
     fi
 
-    python3 "$STAGE2" "${STAGE2_ARGS[@]}" 2>&1
+    python3 "$STAGE2" "${STAGE2_ARGS[@]}" 2>&1 | tee "$STAGE2_LOG"
 
     local stage2_exit=$?
     echo ""
