@@ -10,6 +10,7 @@ import {
   listTackleTasks,
   getTackleTask,
   getInspectorDispatch,
+  upsertTackleTask,
 } from "../db";
 
 export const tasksRouter = Router();
@@ -87,6 +88,20 @@ tasksRouter.get("/:task_slug", async (req, res) => {
       return;
     }
     res.json(task);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+tasksRouter.post("/", async (req, res) => {
+  try {
+    const { id, role, task_slug, scope, acceptance_criteria, prompt_id, active } = req.body || {};
+    if (!role || !task_slug || !prompt_id) {
+      res.status(400).json({ error: "role, task_slug, and prompt_id are required" });
+      return;
+    }
+    const task = await upsertTackleTask({ id, role, task_slug, scope, acceptance_criteria, prompt_id, active });
+    res.json({ saved: true, task });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

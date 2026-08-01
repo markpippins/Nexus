@@ -584,6 +584,36 @@ const migrations: Migration[] = [
       console.log("[tackle-migrations] v9: Added DEFAULT NOW() to tackle.roles.created_at and updated_at");
     },
   },
+  {
+    version: 10,
+    description: "Create tackle.system_logs for operational log persistence (GET/POST/DELETE /logs endpoints)",
+    up: async (exec) => {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.system_logs (
+          id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+          timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          level       TEXT NOT NULL CHECK (level IN ('INFO','WARN','ERROR','DEBUG')),
+          category    TEXT NOT NULL,
+          message     TEXT NOT NULL,
+          source      TEXT,
+          details     JSONB
+        )
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_system_logs_level
+          ON ${TACKLE_SCHEMA}.system_logs (level)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_system_logs_category
+          ON ${TACKLE_SCHEMA}.system_logs (category)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_system_logs_timestamp
+          ON ${TACKLE_SCHEMA}.system_logs (timestamp DESC)
+      `);
+      console.log("[tackle-migrations] v10: Created tackle.system_logs table with indexes");
+    },
+  },
 ];
 
 /**
@@ -2449,6 +2479,144 @@ export async function getInspectorDispatch(): Promise<{
   return { tasks: enriched };
 }
 
+// ── Prompts (tackle.prompts) ───────────────────────────────────────
+
+export async function listPrompts(
+  role?: string
+): Promise<any[]> {
+  const params: Record<string, any> = {};
+  let where = "";
+  if (role) { params.role = role; where = "WHERE role = @role"; }
+  return qAll(
+    `SELECT id, role, slug, version, title, body_md, parameter_schema, tags, created_at, updated_at
+     FROM prompts ${where} ORDER BY role, slug, version DESC`,
+    params
+  );
+}
+
+export async function getPromptByRoleSlug(
+  role: string,
+  slug: string
+): Promise<any | undefined> {
+  return qOne(
+    `SELECT id, role, slug, version, title, body_md, parameter_schema, tags, created_at, updated_at
+     FROM prompts WHERE role = @role AND slug = @slug
+     ORDER BY version DESC LIMIT 1`,
+    { role, slug }
+  );
+}
+
+export async function upsertPrompt(data: {
+  id?: string;
+  role: string;
+  slug: string;
+  version?: number;
+  title: string;
+  body_md: string;
+  parameter_schema?: Record<string, any>;
+  tags?: string[];
+}): Promise<any> {
+  const latest = await qOne(
+    "SELECT version FROM prompts WHERE role = @role AND slug = @slug ORDER BY version DESC LIMIT 1",
+    { role: data.role, slug: data.slug }
+  );
+  const version = data.version || (latest ? latest.version + 1 : 1);
+
+  if (data.id) {
+    const rows = await qRun(
+      `UPDATE prompts SET role = @role, slug = @slug, version = @version,
+       title = @title, body_md = @body_md,
+       parameter_schema = @ps::jsonb, tags = @tags, updated_at = NOW()
+       WHERE id = @id`,
+      { id: data.id, role: data.role, slug: data.slug, version,
+        title: data.title, body_md: data.body_md,
+        ps: JSON.stringify(data.parameter_schema || {}),
+        tags: data.tags || [] }
+    );
+    if (rows > 0) {
+      return { id: data.id, role: data.role, slug: data.slug, version };
+    }
+    // ID not found — fall through to insert
+  }
+
+  const result = await q(
+    `INSERT INTO prompts (role, slug, version, title, body_md, parameter_schema, tags)
+     VALUES (@role, @slug, @version, @title, @body_md, @ps::jsonb, @tags)
+     ON CONFLICT (role, slug, version) DO UPDATE
+     SET title = EXCLUDED.title, body_md = EXCLUDED.body_md,
+         parameter_schema = EXCLUDED.parameter_schema, tags = EXCLUDED.tags,
+         updated_at = NOW()
+     RETURNING id`,
+    { role: data.role, slug: data.slug, version,
+      title: data.title, body_md: data.body_md,
+      ps: JSON.stringify(data.parameter_schema || {}),
+      tags: data.tags || [] }
+  );
+  return { id: result.rows[0].id, role: data.role, slug: data.slug, version };
+}
+
+// ── Tool Access (tackle.role_tool_access) ───────────────────────────
+
+export async function listToolAccess(role?: string): Promise<any[]> {
+  const params: Record<string, any> = {};
+  let where = "";
+  if (role) { params.role = role; where = "WHERE role = @role"; }
+  return qAll(
+    `SELECT id, role, mcp_id, tool_slug, created_at
+     FROM role_tool_access ${where} ORDER BY role, tool_slug`,
+    params
+  );
+}
+
+export async function updateToolAccess(
+  id: string,
+  data: { allowed: boolean }
+): Promise<any | undefined> {
+  if (data.allowed === false) {
+    await qRun("DELETE FROM role_tool_access WHERE id = @id", { id });
+    return { id, deleted: true };
+  }
+  return qOne("SELECT id, role, mcp_id, tool_slug FROM role_tool_access WHERE id = @id", { id });
+}
+
+// ── Tasks (extend) ──────────────────────────────────────────────────
+
+export async function upsertTackleTask(data: {
+  id?: string;
+  role: string;
+  task_slug: string;
+  scope?: string;
+  acceptance_criteria?: string[];
+  prompt_id: string;
+  active?: boolean;
+}): Promise<any> {
+  return qOne(
+    `INSERT INTO tasks (role, task_slug, scope, acceptance_criteria, prompt_id, active)
+     VALUES (@role, @slug, @scope, @ac, @pid, @active)
+     ON CONFLICT (role, task_slug) DO UPDATE
+     SET scope = EXCLUDED.scope, acceptance_criteria = EXCLUDED.acceptance_criteria,
+         prompt_id = EXCLUDED.prompt_id, active = EXCLUDED.active, updated_at = NOW()
+     RETURNING *`,
+    { role: data.role, slug: data.task_slug, scope: data.scope || '',
+      ac: data.acceptance_criteria || [], pid: data.prompt_id,
+      active: data.active !== false }
+  );
+}
+
+// ── Role Checkpoints ────────────────────────────────────────────────
+
+export async function getRoleCheckpoints(): Promise<Record<string, { role: string; last_active: string }>> {
+  const rows = await qAll(
+    `SELECT role, MAX(as_of_dt) as last_active
+     FROM role_memory GROUP BY role ORDER BY role`
+  );
+  const result: Record<string, any> = {};
+  for (const r of rows) {
+    result[r.role] = { role: r.role, last_active: r.last_active };
+  }
+  return result;
+}
+
 export interface AgentSchedulerRow {
   id: number;
   role: string;
@@ -2474,10 +2642,29 @@ export async function getSchedulerEntry(id: number): Promise<AgentSchedulerRow |
   return qOne("SELECT * FROM agent_scheduler WHERE id = @id", { id });
 }
 
+// ── Scheduler coercion helpers ─────────────────────────────────────
+// agent_scheduler stores `enabled` and `schedule_value` as INTEGER
+// columns, but tackle-ui sends `enabled: true/false` (boolean) and
+// schedule values as strings. Coerce to the DB types here so live mode
+// matches mock mode instead of failing with integer-cast errors.
+function toEnabledInt(v: unknown, dflt: number): number {
+  if (v === undefined || v === null || v === "") return dflt;
+  if (v === true || v === 1 || v === "1" || v === "true") return 1;
+  if (v === false || v === 0 || v === "0" || v === "false") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : dflt;
+}
+
+function toInt(v: unknown, dflt: number): number {
+  if (v === undefined || v === null || v === "") return dflt;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : dflt;
+}
+
 export async function createSchedulerEntry(data: {
   role: string; model_id?: string; harness?: string;
-  agent_config?: string; schedule_type?: string; schedule_value?: number;
-  project_dir?: string; enabled?: number;
+  agent_config?: string; schedule_type?: string; schedule_value?: number | string;
+  project_dir?: string; enabled?: number | boolean | string;
 }): Promise<AgentSchedulerRow> {
   const now = new Date().toISOString();
   const row = await qOne(`
@@ -2490,9 +2677,9 @@ export async function createSchedulerEntry(data: {
     harness: data.harness ?? "opencode",
     agent_config: data.agent_config ?? "{}",
     schedule_type: data.schedule_type ?? "interval",
-    schedule_value: data.schedule_value ?? 3600,
+    schedule_value: toInt(data.schedule_value, 3600),
     project_dir: data.project_dir ?? "/home/codex/dev",
-    enabled: data.enabled ?? 1,
+    enabled: toEnabledInt(data.enabled, 1),
     now,
   });
   return row;
@@ -2500,8 +2687,8 @@ export async function createSchedulerEntry(data: {
 
 export async function updateSchedulerEntry(id: number, data: Partial<{
   role: string; model_id: string | null; harness: string;
-  agent_config: string; schedule_type: string; schedule_value: number;
-  project_dir: string; enabled: number; last_run_at: string;
+  agent_config: string; schedule_type: string; schedule_value: number | string;
+  project_dir: string; enabled: number | boolean | string; last_run_at: string;
   last_run_status: string; metadata: string;
 }>): Promise<AgentSchedulerRow | undefined> {
   const now = new Date().toISOString();
@@ -2512,7 +2699,11 @@ export async function updateSchedulerEntry(id: number, data: Partial<{
   for (const f of fields) {
     if ((data as any)[f] !== undefined) {
       sets.push(`${f} = @${f}`);
-      params[f] = (data as any)[f];
+      params[f] = f === "enabled"
+        ? toEnabledInt((data as any)[f], 1)
+        : f === "schedule_value"
+        ? toInt((data as any)[f], 3600)
+        : (data as any)[f];
     }
   }
   return qOne(
@@ -2982,4 +3173,81 @@ export async function seedDefaultAIConfig(force?: boolean): Promise<{
   };
 }
 
+// ── System Logs ──────────────────────────────────────────────────
 
+export interface SystemLogRow {
+  id: string;
+  timestamp: string;
+  level: string;
+  category: string;
+  message: string;
+  source?: string;
+  details?: any;
+}
+
+export async function insertLog(params: {
+  level: string;
+  category: string;
+  message: string;
+  source?: string;
+  details?: any;
+}): Promise<void> {
+  await qRun(
+    `INSERT INTO system_logs (level, category, message, source, details)
+     VALUES (@level, @category, @message, @source, @details)`,
+    params
+  );
+}
+
+export async function queryLogs(params: {
+  level?: string;
+  category?: string;
+  search?: string;
+  since?: string;
+  limit?: number;
+}): Promise<{ total: number; filtered_count: number; logs: SystemLogRow[] }> {
+  const conditions: string[] = [];
+  const vals: Record<string, any> = {};
+
+  if (params.level && params.level !== 'ALL') {
+    const levels = params.level.toUpperCase().split(',');
+    conditions.push(`level = ANY(ARRAY[${levels.map((_, i) => `@level${i}`).join(', ')}])`);
+    levels.forEach((l, i) => { vals[`level${i}`] = l; });
+  }
+  if (params.category && params.category !== 'ALL') {
+    const cats = params.category.toUpperCase().split(',');
+    conditions.push(`category = ANY(ARRAY[${cats.map((_, i) => `@cat${i}`).join(', ')}])`);
+    cats.forEach((c, i) => { vals[`cat${i}`] = c; });
+  }
+  if (params.search) {
+    vals.search = `%${params.search.toLowerCase()}%`;
+    conditions.push(`(LOWER(message) LIKE @search OR LOWER(category) LIKE @search OR LOWER(COALESCE(source,'')) LIKE @search)`);
+  }
+  if (params.since) {
+    vals.since = params.since;
+    conditions.push(`timestamp > @since`);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limitNum = Math.min(Math.max(1, params.limit || 100), 500);
+
+  const total = await qOne(`SELECT COUNT(*)::int AS count FROM system_logs`);
+  const filtered = await qOne(
+    `SELECT COUNT(*)::int AS count FROM system_logs ${where}`,
+    vals
+  );
+  const logs = await qAll(
+    `SELECT * FROM system_logs ${where} ORDER BY timestamp DESC LIMIT @limit`,
+    { ...vals, limit: limitNum }
+  );
+
+  return {
+    total: total?.count || 0,
+    filtered_count: filtered?.count || 0,
+    logs,
+  };
+}
+
+export async function clearLogs(): Promise<void> {
+  await qRun(`DELETE FROM system_logs`);
+}

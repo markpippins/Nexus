@@ -5,7 +5,7 @@ import {
   triggerRefresh,
   hasRoleMemoryChangedSince,
 } from "../memory";
-import { getDb } from "../db";
+import { getDb, getRoleCheckpoints } from "../db";
 
 export const memoryRouter = Router();
 
@@ -59,6 +59,15 @@ memoryRouter.post("/refresh", async (_req, res) => {
       roleIndices: result.result?.roleIndices ?? 0,
       timestamp: result.result?.timestamp ?? new Date().toISOString(),
     });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+memoryRouter.get("/role-updates", async (_req, res) => {
+  try {
+    const checkpoints = await getRoleCheckpoints();
+    res.json(checkpoints);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
