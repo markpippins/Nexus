@@ -1,0 +1,26 @@
+[Unit]
+Description=Sysadmin Agent — hourly infrastructure health governance cycle
+Documentation=https://github.com/codex/nexus/wiki/sysadmin-agent
+After=network.target terrain.service assembly-srv.service
+Wants=terrain.service assembly-srv.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/codex/dev/nexus/bin/sysadmin-harness.sh
+User=codex
+Group=codex
+TimeoutStartSec=23min
+TimeoutStopSec=30s
+
+# Environment
+Environment=OPENCODE_BIN=/home/codex/.opencode/bin/opencode
+Environment=OPENCODE_AGENT=sysadmin
+Environment=TIMEOUT_MINUTES=15
+Environment=SYSMODEL=opencode/big-pickle
+Environment=FALLBACK_MODEL=nvidia/z-ai/glm-5.2
+
+# Hardening (state files written to $XDG_RUNTIME_DIR, usually /run/user/1000/nexus-sysadmin)
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

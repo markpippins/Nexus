@@ -1,0 +1,13 @@
+[Unit]
+Description=Outage Detector timer — runs health checks every 5 minutes
+Documentation=https://github.com/codex/nexus/wiki/sysadmin-agent
+After=network.target
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+Persistent=true
+RandomizedDelaySec=30s
+
+[Install]
+WantedBy=timers.target
