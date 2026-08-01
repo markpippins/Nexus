@@ -2625,7 +2625,11 @@ export function createRoutes(pool: Pool): Router {
 
       const items = dataResult.rows.map(camelCaseRow);
       const total = parseInt(countResult.rows[0].total, 10);
-      res.json({ items, total, page, pageSize, sort });
+      // Dual-shape response: {items,total} is the canonical paginated shape;
+      // {harvests,count} is the legacy shape the nebula-ui DataService reads
+      // (listHarvests → fetchHarvests sets this.harvests.set(data.harvests || [])).
+      // Same backward-compat pattern as the harvest-candidates endpoints.
+      res.json({ items, harvests: items, total, count: total, page, pageSize, sort });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
