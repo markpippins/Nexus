@@ -26,7 +26,7 @@ DB_CONFIG = {
     "user": "pguser",
     "password": "pgpass",
     "database": "nexus",
-    "options": "-c search_path=nebula,public_old",
+    "options": "-c search_path=nebula",
 }
 
 AUDIT_ROOT = "/home/codex/dev/nexus/audit"
