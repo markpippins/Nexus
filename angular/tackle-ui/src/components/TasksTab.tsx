@@ -8,9 +8,7 @@ import {
   X,
   Filter,
   BookOpen,
-  Layers,
-  Maximize2,
-  Minimize2
+  Layers
 } from 'lucide-react';
 import { TaskDefinition, PromptTemplate, SystemRole } from '../types';
 
@@ -33,7 +31,6 @@ export const TasksTab: React.FC<TasksTabProps> = ({
 
   // Task Modal
   const [taskModalOpen, setTaskModalOpen] = useState(false);
-  const [taskModalMaximized, setTaskModalMaximized] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskDefinition | null>(null);
   const [tRole, setTRole] = useState('inspector');
   const [tSlug, setTSlug] = useState('');
@@ -54,7 +51,6 @@ export const TasksTab: React.FC<TasksTabProps> = ({
     setTCriteriaStr('');
     setTPromptId(prompts[0]?.id || '');
     setTActive(true);
-    setTaskModalMaximized(false);
     setTaskModalOpen(true);
   };
 
@@ -66,7 +62,6 @@ export const TasksTab: React.FC<TasksTabProps> = ({
     setTCriteriaStr((task.acceptance_criteria || []).join('\n'));
     setTPromptId(task.prompt_id);
     setTActive(task.active);
-    setTaskModalMaximized(false);
     setTaskModalOpen(true);
   };
 
@@ -257,33 +252,18 @@ export const TasksTab: React.FC<TasksTabProps> = ({
       {/* TASK MODAL */}
       {taskModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div
-            className={`bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl w-full p-6 space-y-4 shadow-2xl transition-all duration-200 ${
-              taskModalMaximized
-                ? 'max-w-5xl max-h-[90vh] overflow-y-auto'
-                : 'max-w-lg'
-            }`}
-          >
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl max-w-5xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <h3 className="text-sm font-bold text-[var(--text-primary)]">
                 {editingTask ? `Edit Task: ${editingTask.task_slug}` : 'Register New Task'}
               </h3>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setTaskModalMaximized(m => !m)}
-                  className="p-1.5 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition cursor-pointer"
-                  title={taskModalMaximized ? 'Restore size' : 'Maximize'}
-                >
-                  {taskModalMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                </button>
-                <button onClick={() => setTaskModalOpen(false)} className="text-[var(--text-muted)] cursor-pointer">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+              <button onClick={() => setTaskModalOpen(false)} className="text-[var(--text-muted)] cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
             <form onSubmit={handleSaveTaskSubmit} className="space-y-3 text-xs">
-              <div className={`grid gap-3 ${taskModalMaximized ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2'}`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Role *</label>
                   <select
@@ -309,17 +289,35 @@ export const TasksTab: React.FC<TasksTabProps> = ({
                     className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Scope Description</label>
-                <input
-                  type="text"
-                  value={tScope}
-                  onChange={e => setTScope(e.target.value)}
-                  placeholder="What the task is scoped to (plan ref, subsystem, path...)"
-                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-[var(--text-primary)]"
-                />
+                <div>
+                  <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Scope Description</label>
+                  <input
+                    type="text"
+                    value={tScope}
+                    onChange={e => setTScope(e.target.value)}
+                    placeholder="What the task is scoped to (plan ref, subsystem, path...)"
+                    className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-[var(--text-primary)]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Bound Prompt Template</label>
+                  <select
+                    value={tPromptId}
+                    onChange={e => setTPromptId(e.target.value)}
+                    className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
+                  >
+                    {(prompts.length ? prompts : []).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.title} ({p.role}/{p.slug} v{p.version})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                    This template's body is appended to the role's default persona when the task is attached to a scheduled job.
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -327,29 +325,11 @@ export const TasksTab: React.FC<TasksTabProps> = ({
                   Acceptance Criteria (1 per line)
                 </label>
                 <textarea
-                  rows={taskModalMaximized ? 10 : 3}
+                  rows={6}
                   value={tCriteriaStr}
                   onChange={e => setTCriteriaStr(e.target.value)}
                   className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-2.5 text-[var(--text-primary)]"
                 />
-              </div>
-
-              <div>
-                <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Bound Prompt Template</label>
-                <select
-                  value={tPromptId}
-                  onChange={e => setTPromptId(e.target.value)}
-                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
-                >
-                  {(prompts.length ? prompts : []).map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.title} ({p.role}/{p.slug} v{p.version})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-[var(--text-muted)] mt-1">
-                  This template's body is appended to the role's default persona when the task is attached to a scheduled job.
-                </p>
               </div>
 
               <label className="flex items-center gap-2 cursor-pointer">
