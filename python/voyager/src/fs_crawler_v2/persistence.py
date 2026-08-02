@@ -76,18 +76,22 @@ class PersistenceLayer:
     # SCAN EPOCH
     # ═══════════════════════════════════════════════════════════════════
 
-    async def create_epoch(self, epoch_id: str, root_path: str) -> None:
+    async def create_epoch(self, epoch_id: str, root_path: str,
+                           started_at=None) -> None:
+        """Insert a scan_epoch row. started_at defaults to now(); pass the
+        scanner's captured scan-start so a deferred (post-scan) insert keeps
+        the column truthful."""
         if not self.pool:
             return
         try:
             async with self.pool.acquire() as conn:
                 await conn.execute(
                     """INSERT INTO scan_epoch (epoch_id, root_path, started_at, status)
-                       VALUES ($1, $2, now(), 'running')
+                       VALUES ($1, $2, $3, 'running')
                        ON CONFLICT (epoch_id) DO UPDATE SET
-                         started_at = now(), status = 'running', files_scanned = 0,
+                         started_at = $3, status = 'running', files_scanned = 0,
                          new_files = 0, cached_files = 0, errors_count = 0""",
-                    epoch_id, root_path,
+                    epoch_id, root_path, started_at or datetime.now(timezone.utc),
                 )
         except Exception as e:
             logger.error("create_epoch(%s): %s", epoch_id, e)

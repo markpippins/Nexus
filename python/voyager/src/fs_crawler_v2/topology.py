@@ -43,15 +43,35 @@ class TopologyEngine:
         Stage 3 directory-level dedupe skips unchanged subtrees, which produce
         no observations. Absence here therefore means "unchanged", not
         "vanished" — re-staging last-known members prevents compute_signals()
-        from emitting false vanishing/removal signals for the whole tree on
-        every quiescent epoch. Genuine deletions are still reported by the
-        parent directory's evolution signal: a deletion changes the parent's
-        entry table, so the parent is re-visited and the removed member is
-        detected there.
+        from emitting false vanishing/removal signals for the whole tree.
+        (Stage 3.5: this now runs only on changed epochs; quiescent epochs
+        emit no topology signals at all.) Genuine deletions are still reported
+        by the parent directory's evolution signal: a deletion changes the
+        parent's entry table, so the parent is re-visited and the removed
+        member is detected there.
         """
         for dir_path, members in self.directory_history.items():
             if dir_path not in self.staged_members:
                 self.staged_members[dir_path] = members.copy()
+
+    def prune_history(self, existing_paths: set):
+        """Drop directory_history entries whose dir no longer exists.
+
+        Stage 3.5: directory_history otherwise grows without bound — every dir
+        ever seen stays forever, and restage_skipped_subtrees() re-stages all
+        of them every epoch, so compute_signals() keeps emitting containment
+        (+adjacency) signals for vanished dirs forever. Genuine deletions are
+        still reported by the parent directory's evolution signal (removed
+        members), so dropping a gone dir from history loses no signal. Call
+        this after the walk with the set of dirs that still exist.
+        """
+        if not existing_paths:
+            return
+        gone = [p for p in self.directory_history if p not in existing_paths]
+        for p in gone:
+            del self.directory_history[p]
+        if gone:
+            logging.info("prune_history: dropped %d stale dir(s) from directory_history", len(gone))
 
     def _stage(self, dir_path: str, name: str, obs_id: str):
         if dir_path not in self.staged_members:
