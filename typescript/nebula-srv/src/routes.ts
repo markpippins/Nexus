@@ -6983,15 +6983,29 @@ export function createRoutes(pool: Pool): Router {
   //  OPEN QUESTIONS
   // ════════════════════════════════════════════════════════════════
 
-  // GET /api/open-questions?requirementId=&candidateId=&status=
+  // GET /api/open-questions?requirementId=&candidateId=&status=&entityType=&entityId=
   router.get('/open-questions', async (req: Request, res: Response) => {
     try {
-      const { requirementId, candidateId, status } = req.query;
+      const { requirementId, candidateId, status, entityType, entityId } = req.query;
       const clauses: string[] = [];
       const vals: any[] = [];
       let i = 1;
       if (requirementId) { clauses.push(`requirement_id = $${i++}`); vals.push(requirementId); }
       if (candidateId) { clauses.push(`candidate_id = $${i++}`); vals.push(candidateId); }
+      // Entity-scoped filter (e.g. specification-detail / work-request-detail views)
+      // joins through nebula.open_question_entities, which holds current-valid
+      // (entity_type, entity_id) → open_question_id links. Both params must be
+      // present; otherwise the filter is ignored to match prior behavior.
+      if (entityType && entityId) {
+        clauses.push(`EXISTS (
+          SELECT 1 FROM nebula.open_question_entities oqe
+          WHERE oqe.open_question_id = oq.id
+            AND oqe.entity_type = $${i++}
+            AND oqe.entity_id = $${i++}
+            AND oqe.valid_until > now()
+        )`);
+        vals.push(entityType, entityId);
+      }
       if (status) { clauses.push(`status = $${i++}`); vals.push(status); }
       else { clauses.push(`status = 'OPEN'`); }
       const where = 'WHERE ' + clauses.join(' AND ');

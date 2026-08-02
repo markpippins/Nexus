@@ -10,12 +10,21 @@ const nebulaUrl = (process.env.NEBULA_SRV_URL || 'http://localhost:3101') + '/ap
 openQuestionsRouter.get('/', async (req, res, next) => {
   try {
     const { page = 1, pageSize = 100, entityType, entityId, requirementId, resolved } = req.query;
-    const data = await fetchNebula('/open-questions', { page, pageSize, entityType, entityId, requirementId, resolved });
+    // nebula-srv's GET /open-questions has no `resolved` param — it defaults to
+    // status=OPEN. Translate the resolutions view's `resolved=true` flag into an
+    // explicit status filter so resolved questions are actually returned.
+    const query = { page, pageSize, entityType, entityId, requirementId };
+    if (resolved === 'true') query.status = 'RESOLVED';
+    const data = await fetchNebula('/open-questions', query);
+    // nebula-srv returns { questions, count }; the Assembly UI expects the
+    // Paged<T> envelope { items, total, page, pageSize }. Normalize here so the
+    // list views render instead of silently mapping undefined to [].
+    const items = data.items || data.questions || [];
     res.json({
-      items: (data.items || []).map(snakeToCamel),
-      total: data.total || 0,
-      page: data.page || 1,
-      pageSize: data.pageSize || 100,
+      items: items.map(snakeToCamel),
+      total: data.total || data.count || items.length,
+      page: data.page || Number(page) || 1,
+      pageSize: data.pageSize || Number(pageSize) || 100,
     });
   } catch (err) {
     next(err);
