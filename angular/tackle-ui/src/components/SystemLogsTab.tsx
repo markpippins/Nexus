@@ -457,7 +457,7 @@ export const SystemLogsTab: React.FC = () => {
             <Terminal className="w-4 h-4 text-[var(--accent-color)]" />
             <span>STREAM LOGS ({filteredLogs.length} matching)</span>
           </div>
-          <span>Format: ISO-8601 | Server PID {process.env.PID || 3410}</span>
+          <span>Format: ISO-8601 | Server PID {3410}</span>
         </div>
 
         {isLoading ? (
