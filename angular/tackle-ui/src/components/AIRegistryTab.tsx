@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Package
 } from 'lucide-react';
-import { Provider, Harness, AIModel, SystemRole } from '../types';
+import { Provider, Harness, AIModel, SystemRole, ConfigBundle } from '../types';
+import { BundleModal } from './BundleModal';
 
 interface AIRegistryTabProps {
   providers: Provider[];
@@ -29,7 +30,7 @@ interface AIRegistryTabProps {
   onDeleteHarness: (id: string) => Promise<void>;
   onSaveModel: (mod: Partial<AIModel>) => Promise<void>;
   onDeleteModel: (id: string) => Promise<void>;
-  onCreateBundleForRole?: (role: string) => void;
+  onSaveBundle: (bundle: Partial<ConfigBundle>) => Promise<void>;
 }
 
 export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
@@ -43,13 +44,16 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
   onDeleteHarness,
   onSaveModel,
   onDeleteModel,
-  onCreateBundleForRole
+  onSaveBundle
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'providers' | 'harnesses' | 'models'>('models');
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
-  const [selectedRoleForBundle, setSelectedRoleForBundle] = useState<string>(
-    roles.find(r => r.name === 'engineer')?.name || roles[0]?.name || ''
-  );
+
+  // Shared config-bundle modal (same dialog as the Config Bundles view)
+  const [bundleModalOpen, setBundleModalOpen] = useState<boolean>(false);
+  const [bundlePrefill, setBundlePrefill] = useState<Partial<ConfigBundle> | null>(null);
+  // Bumped on every open so the modal remounts with fresh form state.
+  const [bundleModalKey, setBundleModalKey] = useState<number>(0);
 
   // Modals state
   const [provModalOpen, setProvModalOpen] = useState<boolean>(false);
@@ -204,6 +208,46 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
     }
   };
 
+  // Config bundle prefill handlers — open the shared BundleModal preconfigured
+  // with the card's model/provider/harness, without leaving this view. Bundles
+  // may be assigned to any role and the same config reused across roles.
+  const openBundleModal = (prefill: Partial<ConfigBundle>) => {
+    setBundlePrefill(prefill);
+    setBundleModalKey(k => k + 1);
+    setBundleModalOpen(true);
+  };
+
+  const openBundleModalForModel = (m: AIModel) => {
+    openBundleModal({
+      name: m.name,
+      model_id: m.id,
+      provider_id: m.provider_id,
+      harness_id: m.harness_id
+    });
+  };
+
+  const openBundleModalForProvider = (p: Provider) => {
+    const modelForProv = models.find(m => m.provider_id === p.id) || models[0];
+    openBundleModal({
+      name: p.name,
+      provider_id: p.id,
+      model_id: modelForProv?.id || '',
+      harness_id: modelForProv?.harness_id || ''
+    });
+  };
+
+  const openBundleModalForHarness = (h: Harness) => {
+    const modelForHarn = models.find(m => m.harness_id === h.id) || models[0];
+    openBundleModal({
+      name: h.name,
+      harness_id: h.id,
+      model_id: modelForHarn?.id || '',
+      provider_id: modelForHarn?.provider_id
+    });
+  };
+
+  const defaultBundleRole = roles.find(r => r.name === 'engineer')?.name || roles[0]?.name || '';
+
   return (
     <div className="space-y-6">
       {/* Sub-navigation */}
@@ -245,29 +289,6 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Quick-action: Add config bundle for a role */}
-          {onCreateBundleForRole && roles.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-lg px-2 py-1">
-              <select
-                value={selectedRoleForBundle}
-                onChange={e => setSelectedRoleForBundle(e.target.value)}
-                className="bg-transparent text-xs text-[var(--text-primary)] font-mono border-none outline-none cursor-pointer"
-              >
-                {roles.map(r => (
-                  <option key={r.id} value={r.name}>{r.name}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => onCreateBundleForRole(selectedRoleForBundle)}
-                className="px-2.5 py-1 rounded text-[10px] font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition flex items-center gap-1 cursor-pointer shadow-sm"
-                title={`Open 'Add Config Bundle for ${selectedRoleForBundle}' dialog in Config Bundles view`}
-              >
-                <Package className="w-3 h-3" />
-                <span>Add Config Bundle</span>
-              </button>
-            </div>
-          )}
-
           {activeSubTab === 'models' && (
             <button
               onClick={() => openModModal()}
@@ -370,6 +391,15 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                     </div>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => openBundleModalForModel(m)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer"
+                  title="Create a config bundle from this model and assign it to a role"
+                >
+                  <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+                  <span>Add to Role</span>
+                </button>
 
                 <div className="pt-2 border-t border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-muted)] flex justify-between">
                   <span>Registered</span>
@@ -474,6 +504,18 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                   </div>
                 </div>
 
+                <button
+                  onClick={() => openBundleModalForProvider(p)}
+                  disabled={models.length === 0}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={models.length === 0
+                    ? 'Register a model first — a config bundle requires a model'
+                    : 'Create a config bundle using this provider and assign it to a role'}
+                >
+                  <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+                  <span>Add to Role</span>
+                </button>
+
                 <div className="pt-2 border-t border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-muted)] flex justify-between">
                   <span>Provider ID: {p.id}</span>
                   <span>{new Date(p.created_at || '').toLocaleDateString()}</span>
@@ -570,6 +612,18 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                     </div>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => openBundleModalForHarness(h)}
+                  disabled={models.length === 0}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-color)] hover:text-[var(--accent-color)] transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={models.length === 0
+                    ? 'Register a model first — a config bundle requires a model'
+                    : 'Create a config bundle using this harness and assign it to a role'}
+                >
+                  <Package className="w-3.5 h-3.5 text-[var(--accent-color)]" />
+                  <span>Add to Role</span>
+                </button>
 
                 <div className="pt-2 border-t border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-muted)] flex justify-between">
                   <span>Tackle Invocation Harness</span>
@@ -900,6 +954,21 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Config Bundle Modal — shared with the Config Bundles view */}
+      {bundleModalOpen && (
+        <BundleModal
+          key={bundleModalKey}
+          initial={bundlePrefill}
+          defaultRole={defaultBundleRole}
+          onClose={() => setBundleModalOpen(false)}
+          models={models}
+          providers={providers}
+          harnesses={harnesses}
+          roles={roles}
+          onSaveBundle={onSaveBundle}
+        />
       )}
     </div>
   );

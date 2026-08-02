@@ -31,7 +31,6 @@ export default function App() {
   const [theme, setTheme] = useState<ThemeMode>('steel');
   const [currentTab, setCurrentTab] = useState<string>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [pendingBundleRole, setPendingBundleRole] = useState<string | null>(null);
 
   // Subsystem States
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -304,9 +303,15 @@ export default function App() {
     setFailureConfig(config);
   };
 
-  // Schedule CRUD
+  // Schedule CRUD — with an id this updates the existing entry (PATCH),
+  // otherwise it creates a new one (POST). The mock and real backends both
+  // treat PATCH /scheduler/:id as a partial update of the stored row.
   const handleSaveSchedule = async (sched: Partial<AgentScheduleEntry>) => {
-    await requestOrThrow('/scheduler', 'POST', sched);
+    if (sched.id) {
+      await requestOrThrow(`/scheduler/${sched.id}`, 'PATCH', sched);
+    } else {
+      await requestOrThrow('/scheduler', 'POST', sched);
+    }
     const updated = await fetch('/scheduler').then(r => r.json());
     setSchedules(unwrapList(updated, 'entries'));
   };
@@ -319,16 +324,6 @@ export default function App() {
   const handleDeleteSchedule = async (id: string) => {
     await requestOrThrow(`/scheduler/${id}`, 'DELETE');
     setSchedules(prev => prev.filter(s => s.id !== id));
-  };
-
-  // Cross-tab: navigate from AI Registry to Bundles with role prepopulated
-  const handleCreateBundleForRole = (role: string) => {
-    setPendingBundleRole(role);
-    setCurrentTab('bundles');
-  };
-
-  const handleConsumedPrepopulatedRole = () => {
-    setPendingBundleRole(null);
   };
 
   // Kill Session
@@ -378,7 +373,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-200 flex flex-col">
+    <div className="h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-200 flex flex-col">
       <Header
         theme={theme}
         setTheme={setTheme}
@@ -390,7 +385,7 @@ export default function App() {
         onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar
           currentTab={currentTab}
           setCurrentTab={setCurrentTab}
@@ -425,8 +420,6 @@ export default function App() {
                 onSaveBundle={handleSaveBundle}
                 onDeleteBundle={handleDeleteBundle}
                 onReorderPriority={handleReorderPriority}
-                prepopulatedRole={pendingBundleRole}
-                onConsumedPrepopulatedRole={handleConsumedPrepopulatedRole}
               />
             )}
 
@@ -442,7 +435,7 @@ export default function App() {
                 onDeleteHarness={handleDeleteHarness}
                 onSaveModel={handleSaveModel}
                 onDeleteModel={handleDeleteModel}
-                onCreateBundleForRole={handleCreateBundleForRole}
+                onSaveBundle={handleSaveBundle}
               />
             )}
 

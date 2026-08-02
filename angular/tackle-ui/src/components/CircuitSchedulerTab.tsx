@@ -4,6 +4,7 @@ import {
   Clock,
   RefreshCw,
   Plus,
+  Edit2,
   Trash2,
   CheckCircle2,
   XCircle,
@@ -47,6 +48,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
 
   // Scheduler modal state
   const [schedModalOpen, setSchedModalOpen] = useState<boolean>(false);
+  const [editingSched, setEditingSched] = useState<AgentScheduleEntry | null>(null);
   const [schedRole, setSchedRole] = useState<string>(roles[0]?.name || 'operator');
   const [schedModelId, setSchedModelId] = useState<string>(models[0]?.id || '');
   const [schedType, setSchedType] = useState<'cron' | 'interval' | 'manual'>('cron');
@@ -73,18 +75,44 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
     }
   };
 
+  const openCreateSched = () => {
+    setEditingSched(null);
+    setSchedRole(roles[0]?.name || 'operator');
+    setSchedModelId(models[0]?.id || '');
+    setSchedType('cron');
+    setSchedValue('0 */2 * * *');
+    setSchedProjectDir('/nexus/tackle');
+    setSchedModalOpen(true);
+  };
+
+  const openEditSched = (s: AgentScheduleEntry) => {
+    setEditingSched(s);
+    setSchedRole(s.role);
+    setSchedModelId(s.model_id || models[0]?.id || '');
+    setSchedType(s.schedule_type);
+    setSchedValue(String(s.schedule_value ?? ''));
+    setSchedProjectDir(s.project_dir || '/nexus/tackle');
+    setSchedModalOpen(true);
+  };
+
+  const closeSchedModal = () => {
+    setSchedModalOpen(false);
+    setEditingSched(null);
+  };
+
   const handleSaveSchedSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await onSaveSchedule({
+        id: editingSched?.id,
         role: schedRole,
         model_id: schedModelId,
         schedule_type: schedType,
         schedule_value: schedValue,
         project_dir: schedProjectDir,
-        enabled: true
+        enabled: editingSched ? editingSched.enabled : true
       });
-      setSchedModalOpen(false);
+      closeSchedModal();
     } catch (err) {
       alert(`Error saving schedule: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -252,7 +280,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
           </div>
 
           <button
-            onClick={() => setSchedModalOpen(true)}
+            onClick={openCreateSched}
             className="px-4 py-2 rounded-lg text-xs font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -309,6 +337,13 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
 
               <div className="flex items-center gap-2">
                 <button
+                  onClick={() => openEditSched(s)}
+                  className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded transition cursor-pointer"
+                  title="Edit Schedule"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
                   onClick={() => handleDeleteSched(s.id)}
                   className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 rounded cursor-pointer transition"
                   title="Delete Schedule"
@@ -326,8 +361,10 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">New Agent Schedule Entry</h3>
-              <button onClick={() => setSchedModalOpen(false)} className="text-[var(--text-muted)] cursor-pointer">
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                {editingSched ? 'Edit Agent Schedule' : 'New Agent Schedule Entry'}
+              </h3>
+              <button onClick={closeSchedModal} className="text-[var(--text-muted)] cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -343,6 +380,21 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                   {roles.map(r => (
                     <option key={r.id} value={r.name}>
                       {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Target Model</label>
+                <select
+                  value={schedModelId}
+                  onChange={e => setSchedModelId(e.target.value)}
+                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
+                >
+                  {models.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.model_identifier})
                     </option>
                   ))}
                 </select>
@@ -388,7 +440,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setSchedModalOpen(false)}
+                  onClick={closeSchedModal}
                   className="px-3 py-1.5 rounded-lg text-[var(--text-secondary)] cursor-pointer"
                 >
                   Cancel
@@ -397,7 +449,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                   type="submit"
                   className="px-4 py-1.5 rounded-lg font-bold bg-[var(--accent-color)] text-slate-950 cursor-pointer"
                 >
-                  Create Schedule
+                  {editingSched ? 'Update Schedule' : 'Create Schedule'}
                 </button>
               </div>
             </form>
