@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Terminal,
   RefreshCw,
@@ -18,6 +18,30 @@ interface MemoryContextTabProps {
   isRefreshingMemory: boolean;
 }
 
+// The live backend stores procedures as markdown bodies; numbered
+// `### N. Heading` lines map naturally to checklist steps.
+const parseSteps = (bodyMd: string | undefined): string[] => {
+  if (!bodyMd) return [];
+  const numbered = bodyMd
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => /^#{2,3}\s*\d+[.)]/.test(line));
+  if (numbered.length > 0) {
+    return numbered.map(line => line.replace(/^#{2,3}\s*\d+[.)]\s*/, ''));
+  }
+  return [];
+};
+
+// Live backend returns PG-style timestamps ("2026-06-25 01:27:55.694433+00"
+// with a space separator) which are not strict ISO — normalize before parsing.
+const parseDate = (ts: string | undefined | null): Date | null => {
+  if (!ts) return null;
+  const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T'));
+  return isNaN(d.getTime()) ? null : d;
+};
+const formatCardDate = (ts?: string): string => parseDate(ts)?.toLocaleDateString() ?? '—';
+const formatCheckTime = (ts?: string): string => parseDate(ts)?.toLocaleTimeString() ?? 'just now';
+
 export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
   roles,
   onRefreshMemory,
@@ -28,25 +52,66 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [activeCard, setActiveCard] = useState<ProcedureCard | null>(null);
   const [stalenessResult, setStalenessResult] = useState<any>(null);
+  // Guards against stale responses overwriting the grid when the user
+  // switches roles faster than the (parallelized) card fetches resolve.
+  const fetchIdRef = useRef(0);
 
   useEffect(() => {
     fetchProcedures(selectedRole);
   }, [selectedRole]);
 
   const fetchProcedures = async (roleName: string) => {
+    const fetchId = ++fetchIdRef.current;
     setLoading(true);
     try {
       const res = await fetch(`/memory/procedures/${roleName}`);
-      if (res.ok) {
-        const data = await res.json();
-        setProcedures(data.procedures || []);
-      } else {
-        setProcedures([]);
+      if (!res.ok) {
+        if (fetchId === fetchIdRef.current) setProcedures([]);
+        return;
       }
+      const data = await res.json();
+      const index: { slug: string; summary: string; tags?: string[] }[] = data.procedures || [];
+      // /memory/procedures/:role returns only the index (slug/summary/tags).
+      // Hydrate each entry with its full ProcedureCard so we never render
+      // index entries as full cards (which crashed on `card.steps.length`
+      // when `steps` was undefined).
+      const cards = await Promise.all(
+        index.map(async (entry) => {
+          const fallback = {
+            role: roleName,
+            slug: entry.slug,
+            title: entry.slug,
+            category: entry.tags?.[0] || 'procedure',
+            summary: entry.summary,
+            steps: [],
+            as_of_dt: '',
+            owner: 'infra'
+          };
+          try {
+            const cardRes = await fetch(`/memory/procedure/${encodeURIComponent(entry.slug)}`);
+            if (!cardRes.ok) throw new Error(`HTTP ${cardRes.status}`);
+            const card = await cardRes.json();
+            return {
+              ...fallback,
+              slug: card.slug || entry.slug,
+              title: card.title || entry.slug,
+              category: card.tags?.[0] || fallback.category,
+              summary: card.summary || fallback.summary,
+              steps: parseSteps(card.body_md),
+              as_of_dt: card.updated_at || '',
+              owner: card.roles?.[0] || fallback.owner
+            };
+          } catch {
+            // Fall back to index data so one missing card never blanks the tab
+            return fallback;
+          }
+        })
+      );
+      if (fetchId === fetchIdRef.current) setProcedures(cards);
     } catch (e) {
-      setProcedures([]);
+      if (fetchId === fetchIdRef.current) setProcedures([]);
     } finally {
-      setLoading(false);
+      if (fetchId === fetchIdRef.current) setLoading(false);
     }
   };
 
@@ -113,7 +178,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
             </span>
           </div>
           <span className="text-[11px] text-[var(--text-muted)]">
-            As of: {new Date(stalenessResult.latest_as_of || '').toLocaleTimeString()}
+            As of: {formatCheckTime(stalenessResult.latest_as_of)}
           </span>
         </div>
       )}
@@ -170,14 +235,18 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
                   <span>Procedure Steps ({card.steps.length})</span>
                 </span>
                 <div className="space-y-1 bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
-                  {card.steps.map((step, sIdx) => (
-                    <div key={sIdx} className="flex items-start gap-2">
-                      <span className="font-mono text-[10px] text-[var(--accent-color)] font-bold mt-0.5">
-                        {sIdx + 1}.
-                      </span>
-                      <span>{step}</span>
-                    </div>
-                  ))}
+                  {card.steps.length > 0 ? (
+                    card.steps.map((step, sIdx) => (
+                      <div key={sIdx} className="flex items-start gap-2">
+                        <span className="font-mono text-[10px] text-[var(--accent-color)] font-bold mt-0.5">
+                          {sIdx + 1}.
+                        </span>
+                        <span>{step}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p>{card.summary || 'No steps documented for this procedure.'}</p>
+                  )}
                 </div>
               </div>
 
@@ -194,7 +263,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
 
               <div className="pt-2 border-t border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-muted)] flex justify-between">
                 <span>Cached in mem:proc:{selectedRole}</span>
-                <span>{new Date(card.as_of_dt).toLocaleDateString()}</span>
+                <span>{formatCardDate(card.as_of_dt)}</span>
               </div>
             </div>
           ))}

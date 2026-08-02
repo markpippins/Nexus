@@ -124,6 +124,7 @@ export interface ProcedureCard {
   slug: string;
   title: string;
   category: string;
+  summary?: string;
   steps: string[];
   recovery_action?: string;
   as_of_dt: string;
