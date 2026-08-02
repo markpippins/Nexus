@@ -101,10 +101,20 @@ class Scanner:
             f"{self._epoch_error_count} errors)"
         )
 
-    async def scan_continuous(self, root_path: str, interval: int = 10):
-        """Continuously polls the filesystem for changes."""
+    async def scan_continuous(self, root_path: str, interval: int = 10,
+                              cooldown_threshold: int = 50,
+                              cooldown_factor: float = 2.0,
+                              cooldown_max: int = 600):
+        """Continuously polls the filesystem for changes.
+
+        Cooldown semantics: after an epoch that observed > cooldown_threshold
+        new files, back off proportionally before the next scan:
+            delay = min(max(interval, cooldown_factor * new_count), cooldown_max)
+        Idle epochs sleep exactly `interval` (see also systemd caps in
+        ~/.config/systemd/user/voyager.service).
+        """
         root_path = os.path.abspath(root_path)
-        logging.info(f"Starting continuous scan of {root_path} (interval: {interval}s)")
+        logging.info(f"Starting continuous scan of {root_path} (interval: {interval}s, cooldown: >{cooldown_threshold} new -> max({interval}, {cooldown_factor}x) capped {cooldown_max}s)")
         self.running = True
         while self.running:
             self.current_epoch = str(uuid.uuid4())
@@ -135,7 +145,14 @@ class Scanner:
                 f"{self._epoch_error_count} errors)"
             )
 
-            await asyncio.sleep(interval)
+            # Adaptive cooldown: busy epochs back off so a big change flood
+            # doesn't hammer the FS/Redis/PG repeatedly. Idle epochs stay lean.
+            if self._epoch_new_count > cooldown_threshold:
+                delay = int(min(max(interval, cooldown_factor * self._epoch_new_count), cooldown_max))
+                logging.info(f"Epoch busy ({self._epoch_new_count} new > {cooldown_threshold}) — cooldown {delay}s before next scan")
+            else:
+                delay = interval
+            await asyncio.sleep(delay)
 
     def _reset_epoch_counters(self):
         self._epoch_file_count = 0
