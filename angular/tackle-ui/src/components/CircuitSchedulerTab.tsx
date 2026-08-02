@@ -13,6 +13,9 @@ import {
   Settings,
   Folder,
   FileText,
+  ChevronDown,
+  ChevronUp,
+  ListChecks,
   X
 } from 'lucide-react';
 import { FailureRecoveryConfig, AgentScheduleEntry, SystemRole, AIModel, TaskDefinition, PromptTemplate } from '../types';
@@ -29,6 +32,11 @@ interface CircuitSchedulerTabProps {
   onToggleSchedule: (id: string, enabled: boolean) => Promise<void>;
   onDeleteSchedule: (id: string) => Promise<void>;
 }
+
+// Acceptance-checklist tracking is a page-session aid for operators (not
+// persisted server-side). Keep it in a module-level cache so it survives
+// tab switches within the session.
+const checkedCriteriaCache: Record<string, boolean> = {};
 
 export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
   failureConfig,
@@ -60,6 +68,20 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
   const [schedValue, setSchedValue] = useState<string>('0 */2 * * *');
   const [schedProjectDir, setSchedProjectDir] = useState<string>('/nexus/tackle');
   const [schedTaskSlug, setSchedTaskSlug] = useState<string>('');
+
+  // Task details panel (expandable per row) + per-row acceptance checklist
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [checkedCriteria, setCheckedCriteria] = useState<Record<string, boolean>>(checkedCriteriaCache);
+
+  const toggleRowExpanded = (id: string) =>
+    setExpandedRows(prev => ({ ...prev, [id]: !prev[id] }));
+
+  const toggleCriteria = (key: string) =>
+    setCheckedCriteria(prev => {
+      const next = !prev[key];
+      checkedCriteriaCache[key] = next; // session cache write-through (idempotent under StrictMode double-invoke)
+      return { ...prev, [key]: next };
+    });
 
   const handleCircuitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,17 +174,23 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
     .filter(p => p.role === schedRole && p.slug === 'opencode-persona')
     .sort((a, b) => b.version - a.version)[0];
   const selectedTask = tasks.find(t => t.task_slug === schedTaskSlug);
-  // Resolve the task's bound template the same way the server does — the
-  // LATEST version of its (role, slug) — so the preview matches the
-  // assembled payload on /scheduler/due.
-  const boundPrompt = selectedTask
-    ? prompts.find(p => p.id === selectedTask.prompt_id)
+  // Resolve a task's bound template the same way the server does — the
+  // LATEST version of its (role, slug) — so previews match the assembled
+  // payload on /scheduler/due.
+  const resolveLatestPrompt = (promptId: string): PromptTemplate | undefined => {
+    const bound = prompts.find(p => p.id === promptId);
+    if (!bound) return undefined;
+    return prompts
+      .filter(p => p.role === bound.role && p.slug === bound.slug)
+      .sort((a, b) => b.version - a.version)[0];
+  };
+  const selectedTaskPrompt = selectedTask
+    ? resolveLatestPrompt(selectedTask.prompt_id)
     : undefined;
-  const selectedTaskPrompt = boundPrompt
-    ? prompts
-        .filter(p => p.role === boundPrompt.role && p.slug === boundPrompt.slug)
-        .sort((a, b) => b.version - a.version)[0]
-    : undefined;
+
+  // Per-row task lookup — task slugs are unique per role, so match on both.
+  const resolveRowTask = (s: AgentScheduleEntry) =>
+    s.task_slug ? tasks.find(t => t.role === s.role && t.task_slug === s.task_slug) : undefined;
   const previewBase = defaultPersona?.body_md || null;
   const previewAppend = selectedTaskPrompt?.body_md || null;
 
@@ -322,78 +350,184 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
 
         {/* Schedules Table */}
         <div className="divide-y divide-[var(--border-subtle)] border border-[var(--border-subtle)] rounded-lg overflow-hidden">
-          {schedules.map(s => (
-            <div
-              key={s.id}
-              className={`p-4 transition flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-                s.enabled ? 'bg-[var(--bg-card)]' : 'bg-[var(--bg-secondary)] opacity-60'
-              }`}
-            >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-xs text-[var(--text-primary)]">
-                    Role: {s.role}
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--badge-bg)] text-[var(--accent-color)] font-bold uppercase">
-                    {s.schedule_type}: {s.schedule_value}
-                  </span>
-                  <button
-                    onClick={() => handleToggleSched(s)}
-                    className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold cursor-pointer transition ${
-                      s.enabled
-                        ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {s.enabled ? 'ENABLED' : 'DISABLED'}
-                  </button>
-                </div>
-
-                <div className="text-xs font-mono text-[var(--text-secondary)] flex items-center gap-3 flex-wrap">
-                  <span className="flex items-center gap-1">
-                    <Folder className="w-3 h-3 text-[var(--text-muted)]" />
-                    {s.project_dir || '/nexus/tackle'}
-                  </span>
-                  <span>•</span>
-                  <span>Model: {s.model_id || 'Default'}</span>
-                  <span>•</span>
-                  <span>ID: {s.id}</span>
-                  {s.task_slug && (
-                    <>
-                      <span>•</span>
-                      <span className="flex items-center gap-1 text-emerald-400">
-                        <FileText className="w-3 h-3" />
-                        Task: {s.task_slug}
+          {schedules.map(s => {
+            const rowTask = resolveRowTask(s);
+            const rowPrompt = rowTask ? resolveLatestPrompt(rowTask.prompt_id) : undefined;
+            const expanded = !!expandedRows[s.id];
+            const checkedCount = rowTask
+              ? rowTask.acceptance_criteria.filter((_, i) => !!checkedCriteria[`${s.id}:${i}`]).length
+              : 0;
+            return (
+              <div
+                key={s.id}
+                className={`p-4 transition ${
+                  s.enabled ? 'bg-[var(--bg-card)]' : 'bg-[var(--bg-secondary)] opacity-60'
+                }`}
+              >
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-xs text-[var(--text-primary)]">
+                        Role: {s.role}
                       </span>
-                    </>
-                  )}
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--badge-bg)] text-[var(--accent-color)] font-bold uppercase">
+                        {s.schedule_type}: {s.schedule_value}
+                      </span>
+                      <button
+                        onClick={() => handleToggleSched(s)}
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold cursor-pointer transition ${
+                          s.enabled
+                            ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}
+                      >
+                        {s.enabled ? 'ENABLED' : 'DISABLED'}
+                      </button>
+                    </div>
+
+                    <div className="text-xs font-mono text-[var(--text-secondary)] flex items-center gap-3 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Folder className="w-3 h-3 text-[var(--text-muted)]" />
+                        {s.project_dir || '/nexus/tackle'}
+                      </span>
+                      <span>•</span>
+                      <span>Model: {s.model_id || 'Default'}</span>
+                      <span>•</span>
+                      <span>ID: {s.id}</span>
+                      {s.task_slug && (
+                        <>
+                          <span>•</span>
+                          <span className="flex items-center gap-1 text-emerald-400">
+                            <FileText className="w-3 h-3" />
+                            Task: {s.task_slug}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    {s.last_run_at && (
+                      <div className="text-[10px] font-mono text-[var(--text-muted)]">
+                        Last run: {new Date(s.last_run_at).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {s.task_slug && (
+                      <button
+                        onClick={() => toggleRowExpanded(s.id)}
+                        className="flex items-center gap-1 px-2 py-1.5 rounded text-[10px] font-mono font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] border border-[var(--border-subtle)] transition cursor-pointer"
+                        title={expanded ? 'Hide task details' : 'Show task details & acceptance criteria'}
+                      >
+                        {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        <span>Details</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => openEditSched(s)}
+                      className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded transition cursor-pointer"
+                      title="Edit Schedule"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSched(s.id)}
+                      className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 rounded cursor-pointer transition"
+                      title="Delete Schedule"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
-                {s.last_run_at && (
-                  <div className="text-[10px] font-mono text-[var(--text-muted)]">
-                    Last run: {new Date(s.last_run_at).toLocaleString()}
+                {expanded && (
+                  <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] space-y-3">
+                    {rowTask ? (
+                      <>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <ListChecks className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span className="text-xs font-mono font-bold text-[var(--text-primary)]">
+                            Task: {rowTask.task_slug}
+                          </span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--badge-bg)] text-[var(--text-secondary)]">
+                            role: {rowTask.role}
+                          </span>
+                          {rowPrompt && (
+                            <span className="text-[10px] font-mono text-[var(--text-muted)]">
+                              Bound prompt: {rowPrompt.title} ({rowPrompt.role}/{rowPrompt.slug} v{rowPrompt.version})
+                            </span>
+                          )}
+                          <span
+                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                              rowTask.active
+                                ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-800/40'
+                                : 'bg-slate-800 text-slate-400'
+                            }`}
+                          >
+                            {rowTask.active ? 'ACTIVE' : 'INACTIVE'}
+                          </span>
+                        </div>
+
+                        {rowTask.scope && (
+                          <div className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg p-3">
+                            <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                              Scope — what this run will do
+                            </div>
+                            <p className="text-xs text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                              {rowTask.scope}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg p-3 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)]">
+                              Acceptance Criteria
+                            </div>
+                            <div className="text-[10px] font-mono font-bold text-[var(--accent-color)]">
+                              {checkedCount}/{rowTask.acceptance_criteria.length} verified
+                            </div>
+                          </div>
+                          {rowTask.acceptance_criteria.length === 0 ? (
+                            <p className="text-[10px] text-[var(--text-muted)] italic">
+                              No acceptance criteria defined for this task.
+                            </p>
+                          ) : (
+                            rowTask.acceptance_criteria.map((c, i) => {
+                              const key = `${s.id}:${i}`;
+                              const checked = !!checkedCriteria[key];
+                              return (
+                                <label key={key} className="flex items-start gap-2.5 cursor-pointer select-none group">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleCriteria(key)}
+                                    className="mt-0.5 h-4 w-4 rounded cursor-pointer accent-[var(--accent-color)]"
+                                  />
+                                  <span
+                                    className={`text-xs font-mono leading-relaxed transition ${
+                                      checked ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'
+                                    }`}
+                                  >
+                                    {c}
+                                  </span>
+                                </label>
+                              );
+                            })
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-amber-950/30 border border-amber-800/40 rounded-lg p-3 text-xs text-amber-300">
+                        Task “{s.task_slug}” is referenced but no longer exists in the registry (it may have been
+                        deleted). Runs for this schedule fall back to the role's default persona.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => openEditSched(s)}
-                  className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded transition cursor-pointer"
-                  title="Edit Schedule"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handleDeleteSched(s.id)}
-                  className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 rounded cursor-pointer transition"
-                  title="Delete Schedule"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
