@@ -28,6 +28,10 @@ Every table in the `nebula` schema now has temporal columns (`valid_from`, `vali
 | Endpoint | Old Response | New Response |
 |----------|-------------|-------------|
 | `DELETE /api/requirements/:id/dependencies/:depId` | `{ok: true}` | `{expired: true}` |
+| `DELETE /api/harvests/:id` | `{ok: true}` | `{expired: true}` |
+| `DELETE /api/agent-records/:id` | `{ok: true}` | `{expired: true}` |
+| `DELETE /api/projections/:id` | `{ok: true}` | `{expired: true}` |
+| `DELETE /api/cross-references/:id` | `{ok: true}` (204) | `{expired: true}` (200) |
 | `DELETE /api/artifact-provenance/:id` | `{ok: true}` | `{expired: true}` |
 
 **Fix:** Check for `response.expired` instead of `response.ok` in DELETE handlers. If your code does something like:
@@ -94,29 +98,38 @@ These operations work identically through the VIEWs with zero frontend changes:
 
 ## Known Issues
 
-### 🔴 Cross-References DELETE Not Converted (Line 5276)
+### ✅ VIEW-backed DELETEs now preserve history
 
-**Endpoint:** `DELETE /api/cross-references/:id`
+All identified hard deletes on VIEW-backed tables have been converted to soft-expiry operations:
 
-This endpoint still performs a hard `DELETE FROM nebula.cross_references` through the VIEW, which physically deletes from `cross_references_history`. It should be converted to `UPDATE valid_until = now()`.
+```sql
+UPDATE nebula.<view_name>
+SET valid_until = now()
+WHERE id = $1 AND valid_until > now()
+```
 
-**Current behavior:** The row is permanently deleted from the history table — violating the bitemporal contract.  
-**Expected fix:** Convert to soft-delete (`UPDATE valid_until = now()`), return `{expired: true}`.  
-**Risk:** Low — cross-references deleted through this endpoint lose their audit trail. The fix is straightforward.
+This updates the corresponding `_history` row through PostgreSQL's auto-updatable VIEW and removes it from the current projection without physically deleting its audit history.
 
-### 🟡 Pre-Existing Hard DELETEs on VIEW-Backed Tables
+Affected operations:
 
-The following endpoints still use hard `DELETE` on tables that have `_history`+VIEW. These pre-date the bitemporal refactor:
+| Endpoint / operation | Tables |
+|----------|-------|
+| `DELETE /api/cross-references/:id` | `cross_references` |
+| `DELETE /api/harvests/:id` | `harvest_candidates`, `harvests` |
+| `DELETE /api/agent-records/:id` | `agent_records` |
+| `DELETE /api/projections/:id` | `projections` |
+| Block segmentation delete | `segments` |
+| Block segmentation delete | `projection_overrides` |
 
-| Endpoint | Table | Line |
-|----------|-------|------|
-| `DELETE /api/harvests/:id` | `harvest_candidates`, `harvests` | routes.ts:2929-2930 |
-| `DELETE /api/agent-records/:id` | `agent_records` | routes.ts:5019 |
-| `DELETE /api/projections/:id` | `projections` | routes.ts:5170 |
-| Block segmentation delete | `segments` | block-segmentation.service.ts:425 |
-| Block segmentation delete | `projection_overrides` | block-segmentation.service.ts:482 |
+The three route handlers return `{expired: true}`. The block-segmentation service functions retain their existing typed `{ok: true}` contract. A repeated delete of an already-expired row returns the existing not-found error because of the `valid_until > now()` guard.
 
-**Impact:** These DELETEs physically remove rows from `_history` tables instead of soft-expiring them. This is pre-existing tech debt, not caused by the bitemporal refactor.
+No known hard DELETE remains for these six VIEW-backed tables in the reviewed `nebula-srv` code paths.
+
+### 🟡 Remaining DELETE work is outside this reviewed set
+
+Other legacy DELETE paths may still exist on tables outside the six operations listed above. They should be audited separately; the six VIEW-backed operations covered by this change are now history-preserving.
+
+
 
 ---
 

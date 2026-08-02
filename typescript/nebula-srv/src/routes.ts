@@ -2926,14 +2926,14 @@ export function createRoutes(pool: Pool): Router {
       const { id } = req.params;
       await client.query('BEGIN');
       // Manual cascade: harvest_candidates has no FK because harvests is a view
-      await client.query('DELETE FROM nebula.harvest_candidates WHERE harvest_id = $1', [id]);
-      const { rowCount } = await client.query('DELETE FROM nebula.harvests WHERE id = $1', [id]);
+      await client.query('UPDATE nebula.harvest_candidates SET valid_until = now() WHERE harvest_id = $1 AND valid_until > now()', [id]);
+      const { rowCount } = await client.query('UPDATE nebula.harvests SET valid_until = now() WHERE id = $1 AND valid_until > now()', [id]);
       if (rowCount === 0) {
         await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Harvest not found' });
       }
       await client.query('COMMIT');
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       await client.query('ROLLBACK');
       res.status(500).json({ error: err.message });
@@ -5016,9 +5016,9 @@ export function createRoutes(pool: Pool): Router {
   router.delete('/agent-records/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rowCount } = await pool.query('DELETE FROM nebula.agent_records WHERE id = $1', [id]);
+      const { rowCount } = await pool.query('UPDATE nebula.agent_records SET valid_until = now() WHERE id = $1 AND valid_until > now()', [id]);
       if (rowCount === 0) return res.status(404).json({ error: 'Agent record not found' });
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5167,9 +5167,9 @@ export function createRoutes(pool: Pool): Router {
   router.delete('/projections/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { rowCount } = await pool.query('DELETE FROM nebula.projections WHERE id = $1', [id]);
+      const { rowCount } = await pool.query('UPDATE nebula.projections SET valid_until = now() WHERE id = $1 AND valid_until > now()', [id]);
       if (rowCount === 0) return res.status(404).json({ error: 'Projection not found' });
-      res.json({ ok: true });
+      res.json({ expired: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
