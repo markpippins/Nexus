@@ -9,9 +9,11 @@
 # The harness:
 #   1. Acquires a pidfile lock (prevents concurrent runs)
 #   2. Sets up the environment (XDG_RUNTIME_DIR, etc.)
-#   3. Calls `opencode run --agent sysadmin` with the cycle message
-#   4. Logs timing, exit code, and any stderr to journald
-#   5. Updates the incident log with the run outcome
+#   3. Resolves the model chain from tackle-srv (config/ai/resolve/sysadmin)
+#   4. Calls `opencode run --agent sysadmin` with the cycle message,
+#      advancing through the fallback chain on failure
+#   5. Logs timing, exit code, and any stderr to journald AND nexus/logs/sysadmin-harness.log
+#   6. Updates the incident log with the run outcome
 #
 # Usage
 # -----
@@ -34,6 +36,10 @@ STATE_DIR="${XDG_RUNTIME_DIR:-/run/user/1000}/nexus-sysadmin"
 LOCK_FILE="$STATE_DIR/sysadmin-harness.lock"
 LOG_FILE="$STATE_DIR/sysadmin-harness.log"
 
+# Persistent audit log — nexus/logs (canonical, survives across sessions).
+LOG_DIR="$NEXUS_ROOT/logs"
+HARNESS_LOG="$LOG_DIR/sysadmin-harness.log"
+
 # ── Config ──────────────────────────────────────────────────────────────
 
 OPENCODE_BIN="${OPENCODE_BIN:-$(command -v opencode 2>/dev/null || echo "$HOME/.opencode/bin/opencode")}"
@@ -41,10 +47,15 @@ OPENCODE_PROJECT="${OPENCODE_PROJECT:-$NEXUS_ROOT}"
 OPENCODE_AGENT="${OPENCODE_AGENT:-sysadmin}"
 TIMEOUT_MINUTES="${TIMEOUT_MINUTES:-15}"  # max runtime per model attempt
 
-# Model selection — primary tries NVIDIA-hosted GLM 5.2, falls back to opencode/big-pickle
-# Override via SYSMODEL / FALLBACK_MODEL env vars.
-SYSMODEL="${SYSMODEL:-opencode/big-pickle}"
-FALLBACK_MODEL="${FALLBACK_MODEL:-nvidia/z-ai/glm-5.2}"
+# ── Model selection ────────────────────────────────────────────────────
+# Primary source of truth: the tackle AI config registry (tackle-srv,
+# port 3410) that tackle-ui writes to. The role's resolved model and its
+# fallback chain come from GET /config/ai/resolve/<role>.
+# SYSMODEL / FALLBACK_MODEL remain available as explicit overrides when a
+# caller sets them, but are no longer baked into the systemd unit.
+TACKLE_SRV_URL="${TACKLE_SRV_URL:-http://localhost:3410}"
+SYSMODEL="${SYSMODEL:-}"
+FALLBACK_MODEL="${FALLBACK_MODEL:-}"
 
 # ── Lock ────────────────────────────────────────────────────────────────
 
@@ -69,7 +80,10 @@ _release_lock() {
 _log() {
     local level="$1"
     shift
-    echo "[sysadmin-harness] $(date '+%Y-%m-%d %H:%M:%S') [$level] $*"
+    local line="[sysadmin-harness] $(date '+%Y-%m-%d %H:%M:%S') [$level] $*"
+    echo "$line"
+    mkdir -p "$LOG_DIR" 2>/dev/null || true
+    echo "$line" >> "$HARNESS_LOG" 2>/dev/null || true
 }
 
 # Check if opencode binary exists and is executable.
@@ -79,6 +93,78 @@ _check_opencode() {
         _log "ERROR" "Set OPENCODE_BIN or install opencode"
         exit 2
     fi
+}
+
+# opencode_model_for <tackle-model-identifier> → opencode --model value
+# OpenAI-compatible endpoints that namespace their wire model IDs (nvidia/...,
+# z-ai/..., deepseek-ai/...) require the opencode config model KEY to be the
+# full wire ID, so the opencode model ID is `<namespace>/<identifier>`.
+# Bare identifiers map to their opencode provider (opencode/, opencode-go/,
+# ollama/). Unknown identifiers pass through unchanged.
+opencode_model_for() {
+    local id="$1"
+    case "$id" in
+        opencode/*)            echo "$id" ;;
+        */*)                   echo "${id%%/*}/${id}" ;;
+        big-pickle)            echo "opencode/big-pickle" ;;
+        gemini-3.5-flash)      echo "opencode-go/gemini-3.5-flash" ;;
+        qwen2.5-coder)         echo "ollama/qwen2.5-coder" ;;
+        *)                     echo "$id" ;;
+    esac
+}
+
+# resolve_models <role> → newline-separated opencode model IDs, primary first.
+# Order: tackle model_identifier, tackle fallback_models (priority order),
+# $FALLBACK_MODEL override if set, opencode/big-pickle as last resort.
+resolve_models() {
+    local role="$1"
+    local list=""
+    local primary="" fb_raw=""
+    if [[ -n "$SYSMODEL" ]]; then
+        primary="$SYSMODEL"
+        _log "INFO" "SYSMODEL override in effect: $SYSMODEL"
+    else
+        local data
+        data=$(curl -s --max-time 10 "$TACKLE_SRV_URL/config/ai/resolve/$role" 2>/dev/null) || true
+        primary=$(printf '%s' "$data" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('model_identifier') or '')" 2>/dev/null || true)
+        fb_raw=$(printf '%s' "$data" | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+    for f in (d.get('fallback_models') or []):
+        mid = f.get('model_identifier')
+        if mid: print(mid)
+except Exception:
+    pass
+" 2>/dev/null || true)
+        _log "INFO" "tackle resolve role=$role primary=${primary:-<none>} fallbacks=[$(printf '%s' "$fb_raw" | tr '\n' ',')]"
+    fi
+
+    [[ -n "$primary" ]] && list="$primary"
+    local m
+    while IFS= read -r m; do
+        [[ -n "$m" ]] && list="${list:+$list
+}$m"
+    done <<< "$fb_raw"
+    [[ -n "$FALLBACK_MODEL" ]] && list="${list:+$list
+}$FALLBACK_MODEL"
+    if ! grep -qx 'opencode/big-pickle' <<< "$list"; then
+        list="${list:+$list
+}opencode/big-pickle"
+    fi
+
+    # Transform to opencode model IDs, de-duplicated, preserving order.
+    local out=""
+    while IFS= read -r m; do
+        [[ -n "$m" ]] || continue
+        local om
+        om=$(opencode_model_for "$m")
+        if ! grep -qx "$om" <<< "$out"; then
+            out="${out:+$out
+}$om"
+        fi
+    done <<< "$list"
+    printf '%s\n' "$out"
 }
 
 # ── Main ────────────────────────────────────────────────────────────────
@@ -126,27 +212,21 @@ main() {
     # Run the sysadmin agent
     # We run with --format json to get machine-readable output, redirecting
     # stdin from /dev/null so the agent doesn't hang waiting for input.
-    # Tries primary model first ($SYSMODEL), falls back to $FALLBACK_MODEL on failure.
-    local exit_code=0
-    local output
+    # The model chain comes from the tackle AI config registry (primary +
+    # fallback_models), transformed to opencode model IDs; each failure
+    # advances to the next candidate. Success/failure is per-candidate:
+    # a non-zero opencode exit advances the chain.
+    local model_list
+    model_list=$(resolve_models "$OPENCODE_AGENT")
+    _log "INFO" "Model chain: $(printf '%s' "$model_list" | tr '\n' ' > ')"
+
+    local exit_code=1
+    local output=""
     local attempt=1
-    local model="$SYSMODEL"
-
-    _log "INFO" "Attempt $attempt: running with model $model (timeout=${TIMEOUT_MINUTES}m)"
-    output=$(timeout "${TIMEOUT_MINUTES}m" "$OPENCODE_BIN" run \
-        --agent "$OPENCODE_AGENT" \
-        --model "$model" \
-        --dir "$OPENCODE_PROJECT" \
-        --format json \
-        --dangerously-skip-permissions \
-        "$cycle_msg" \
-        </dev/null 2>&1) || exit_code=$?
-
-    if [[ "$exit_code" -ne 0 && "$model" != "$FALLBACK_MODEL" ]]; then
-        _log "WARN" "Primary model $model failed (exit=$exit_code) — trying fallback $FALLBACK_MODEL"
-        attempt=2
-        model="$FALLBACK_MODEL"
-        exit_code=0
+    local model=""
+    local last_fail=0
+    while IFS= read -r model; do
+        [[ -n "$model" ]] || continue
         _log "INFO" "Attempt $attempt: running with model $model (timeout=${TIMEOUT_MINUTES}m)"
         output=$(timeout "${TIMEOUT_MINUTES}m" "$OPENCODE_BIN" run \
             --agent "$OPENCODE_AGENT" \
@@ -155,8 +235,16 @@ main() {
             --format json \
             --dangerously-skip-permissions \
             "$cycle_msg" \
-            </dev/null 2>&1) || exit_code=$?
-    fi
+            </dev/null 2>&1) || last_fail=$?
+        if [[ "$last_fail" -eq 0 ]]; then
+            exit_code=0
+            break
+        fi
+        _log "WARN" "Model $model failed (exit=$last_fail) — advancing to next candidate"
+        exit_code=$last_fail
+        attempt=$((attempt + 1))
+        last_fail=0
+    done <<< "$model_list"
 
     local end_ts
     end_ts=$(date +%s)
