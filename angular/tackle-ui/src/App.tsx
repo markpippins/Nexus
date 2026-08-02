@@ -10,6 +10,7 @@ import { CircuitSchedulerTab } from './components/CircuitSchedulerTab';
 import { SessionsPlaygroundTab } from './components/SessionsPlaygroundTab';
 import { SystemLogsTab } from './components/SystemLogsTab';
 import { SystemInsightsTab } from './components/SystemInsightsTab';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   ThemeMode,
   Provider,
@@ -395,6 +396,7 @@ export default function App() {
 
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
           <main className="flex-1 p-4 sm:p-6 lg:p-8">
+            <ErrorBoundary key={currentTab} label={`Tab '${currentTab}'`}>
             {currentTab === 'overview' && (
               <OverviewTab
                 roles={roles}
@@ -490,6 +492,7 @@ export default function App() {
             {currentTab === 'system-insights' && (
               <SystemInsightsTab initialHealthStatus={healthStatus} />
             )}
+            </ErrorBoundary>
           </main>
 
           <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-4 mt-auto">

@@ -18,24 +18,40 @@ interface MemoryContextTabProps {
   isRefreshingMemory: boolean;
 }
 
-// The live backend stores procedures as markdown bodies; numbered
-// `### N. Heading` lines map naturally to checklist steps.
-const parseSteps = (bodyMd: string | undefined): string[] => {
-  if (!bodyMd) return [];
-  const numbered = bodyMd
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => /^#{2,3}\s*\d+[.)]/.test(line));
-  if (numbered.length > 0) {
-    return numbered.map(line => line.replace(/^#{2,3}\s*\d+[.)]\s*/, ''));
+// The live backend stores procedures as markdown bodies in varying formats:
+// numbered headings (`### 1. Heading`), plain numbered list lines
+// (`1. **Step**`), or plain section headings (`### Section`). Parse in that
+// order of preference so the checklist shows real content for every card.
+const parseSteps = (bodyMd: unknown): string[] => {
+  if (typeof bodyMd !== 'string' || !bodyMd) return [];
+  const lines = bodyMd.split('\n').map(line => line.trim());
+  const clean = (s: string) => s.replace(/\*\*/g, '').trim();
+
+  const numberedHeadings = lines.filter(line => /^#{2,3}\s*\d+[.)]/.test(line));
+  if (numberedHeadings.length > 0) {
+    return numberedHeadings.map(line => clean(line.replace(/^#{2,3}\s*\d+[.)]\s*/, '')));
   }
+
+  const numberedLines = lines.filter(line => /^\d+[.)]\s+\S/.test(line));
+  if (numberedLines.length > 0) {
+    return numberedLines.map(line => clean(line.replace(/^\d+[.)]\s*/, '')));
+  }
+
+  // `###`-only: an H2 is usually the document title (e.g. `## Conduit-MCP
+  // Tool Reference`), which would render as a bogus first step. Numbered
+  // `## N.` headings are already handled by the first tier above.
+  const headings = lines.filter(line => /^###\s+/.test(line));
+  if (headings.length > 0) {
+    return headings.map(line => clean(line.replace(/^###\s*/, '')));
+  }
+
   return [];
 };
 
 // Live backend returns PG-style timestamps ("2026-06-25 01:27:55.694433+00"
 // with a space separator) which are not strict ISO — normalize before parsing.
-const parseDate = (ts: string | undefined | null): Date | null => {
-  if (!ts) return null;
+const parseDate = (ts: unknown): Date | null => {
+  if (typeof ts !== 'string' || !ts) return null;
   const d = new Date(ts.includes('T') ? ts : ts.replace(' ', 'T'));
   return isNaN(d.getTime()) ? null : d;
 };
