@@ -1,7 +1,7 @@
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 import asyncio
 from .models import FileObservation, MetadataSpanEmitted, MetadataSpan, DirectoryObservation, ObservationEdgeHint
@@ -59,6 +59,12 @@ class Scanner:
         self._epoch_error_count = 0
         self._epoch_skipped_count = 0
         self._epoch_dir_skip_count = 0
+        # Stage 3.5 activity tracking: a dir is "processed" when its subtree
+        # signature mismatched (i.e. it was re-visited). An epoch is IDLE when
+        # no dir was processed and no errors occurred — idle epochs cost zero
+        # PG writes and zero topology NATS publishes.
+        self._epoch_dir_processed = 0
+        self._epoch_dirs_seen: set = set()
 
         # Ignore lists — CLI > env var > defaults
         env_dirs = os.getenv("VOYAGER_IGNORE_DIRS")
@@ -70,33 +76,52 @@ class Scanner:
         logging.debug(f"Ignore extensions: {sorted(self.ignore_extensions)}")
 
     async def scan(self, root_path: str):
-        """Walks the filesystem once and processes entries."""
+        """Walks the filesystem once and processes entries.
+
+        Stage 3.5 idle gating: when the epoch observes no activity (no dirs
+        re-visited, no files processed, no errors), the scan_epoch row and
+        topology signal emission are skipped entirely — a quiescent tree
+        costs zero PG writes and zero NATS publishes. Changed epochs retain
+        full behavior. The epoch row is created after the scan so idle epochs
+        can skip it; observation inserts only reference epoch_id (no FK), so
+        the ordering is safe.
+        """
         root_path = os.path.abspath(root_path)
         self.current_epoch = str(uuid.uuid4())
         self.topology.set_epoch(self.current_epoch)
         self._reset_epoch_counters()
 
-        # Persist epoch start
-        if self.pg:
-            await self.pg.create_epoch(self.current_epoch, root_path)
-
         logging.info(f"Starting single scan of {root_path} (epoch: {self.current_epoch})")
+        # Capture real scan start so the deferred epoch row's started_at stays
+        # truthful (create_epoch runs post-scan, only on changed epochs).
+        scan_started_at = datetime.now(timezone.utc)
         await self._do_scan(root_path)
-        # Stage 3: unchanged subtrees were skipped (no observations) — carry
-        # their last-known members forward so topology doesn't flag them vanished.
-        self.topology.restage_skipped_subtrees()
-        self.topology.compute_signals()
-        await self.topology.emit_signals()
 
-        # Persist epoch completion
-        if self.pg:
-            await self.pg.complete_epoch(
-                self.current_epoch,
-                files_scanned=self._epoch_file_count,
-                new_files=self._epoch_new_count,
-                cached_files=self._epoch_cache_count,
-                errors_count=self._epoch_error_count,
-            )
+        changed = self._epoch_changed()
+        if changed:
+            # Stage 3: unchanged subtrees were skipped (no observations) — carry
+            # their last-known members forward so topology doesn't flag them vanished.
+            self.topology.restage_skipped_subtrees()
+            self.topology.compute_signals()
+            await self.topology.emit_signals()
+
+            # Persist epoch start + completion (deferred post-scan: idle
+            # epochs never touch PG, so this row exists only for activity).
+            if self.pg:
+                await self.pg.create_epoch(self.current_epoch, root_path,
+                                           started_at=scan_started_at)
+                await self.pg.complete_epoch(
+                    self.current_epoch,
+                    files_scanned=self._epoch_file_count,
+                    new_files=self._epoch_new_count,
+                    cached_files=self._epoch_cache_count,
+                    errors_count=self._epoch_error_count,
+                )
+
+        # Stage 3.5: keep directory_history bounded — drop entries for dirs
+        # that no longer exist. Must run AFTER compute_signals() so a just-
+        # reported deletion (parent evolution signal) isn't silently lost.
+        self.topology.prune_history(self._epoch_dirs_seen)
 
         logging.info(
             f"Epoch {self.current_epoch[:8]}: "
@@ -104,6 +129,7 @@ class Scanner:
             f"{self._epoch_cache_count} cached, {self._epoch_skipped_count} skipped, "
             f"{self._epoch_dir_skip_count} dirs skipped, "
             f"{self._epoch_error_count} errors)"
+            + ("" if changed else " — idle: PG + topology gated")
         )
 
     async def scan_continuous(self, root_path: str, interval: int = 10,
@@ -117,6 +143,11 @@ class Scanner:
             delay = min(max(interval, cooldown_factor * new_count), cooldown_max)
         Idle epochs sleep exactly `interval` (see also systemd caps in
         ~/.config/systemd/user/voyager.service).
+
+        Stage 3.5 idle gating: quiescent epochs (no dirs re-visited, no files
+        processed, no errors) skip the scan_epoch row AND topology signal
+        emission — zero PG writes, zero NATS publishes while the tree is
+        unchanged. Changed epochs keep full behavior.
         """
         root_path = os.path.abspath(root_path)
         logging.info(f"Starting continuous scan of {root_path} (interval: {interval}s, cooldown: >{cooldown_threshold} new -> max({interval}, {cooldown_factor}x) capped {cooldown_max}s)")
@@ -126,25 +157,39 @@ class Scanner:
             self.topology.set_epoch(self.current_epoch)
             self._reset_epoch_counters()
 
-            if self.pg:
-                await self.pg.create_epoch(self.current_epoch, root_path)
-
+            # Capture real scan start so the deferred epoch row's started_at
+            # stays truthful (create_epoch runs post-scan, only on changed
+            # epochs).
+            scan_started_at = datetime.now(timezone.utc)
             logging.debug(f"Scan cycle started (epoch: {self.current_epoch})")
             await self._do_scan(root_path)
-            # Stage 3: unchanged subtrees were skipped (no observations) — carry
-            # their last-known members forward so topology doesn't flag them vanished.
-            self.topology.restage_skipped_subtrees()
-            self.topology.compute_signals()
-            await self.topology.emit_signals()
 
-            if self.pg:
-                await self.pg.complete_epoch(
-                    self.current_epoch,
-                    files_scanned=self._epoch_file_count,
-                    new_files=self._epoch_new_count,
-                    cached_files=self._epoch_cache_count,
-                    errors_count=self._epoch_error_count,
-                )
+            changed = self._epoch_changed()
+            if changed:
+                # Stage 3: unchanged subtrees were skipped (no observations) —
+                # carry their last-known members forward so topology doesn't
+                # flag them vanished.
+                self.topology.restage_skipped_subtrees()
+                self.topology.compute_signals()
+                await self.topology.emit_signals()
+
+                # Persist epoch start + completion (deferred post-scan: idle
+                # epochs never touch PG, so this row exists only for activity).
+                if self.pg:
+                    await self.pg.create_epoch(self.current_epoch, root_path,
+                                               started_at=scan_started_at)
+                    await self.pg.complete_epoch(
+                        self.current_epoch,
+                        files_scanned=self._epoch_file_count,
+                        new_files=self._epoch_new_count,
+                        cached_files=self._epoch_cache_count,
+                        errors_count=self._epoch_error_count,
+                    )
+
+            # Stage 3.5: keep directory_history bounded — drop entries for
+            # dirs that no longer exist. Must run AFTER compute_signals() so
+            # a just-reported deletion isn't silently lost from history.
+            self.topology.prune_history(self._epoch_dirs_seen)
 
             logging.info(
                 f"Epoch {self.current_epoch[:8]}: "
@@ -152,6 +197,7 @@ class Scanner:
                 f"{self._epoch_cache_count} cached, {self._epoch_skipped_count} skipped, "
                 f"{self._epoch_dir_skip_count} dirs skipped, "
                 f"{self._epoch_error_count} errors)"
+                + ("" if changed else " — idle: PG + topology gated")
             )
 
             # Adaptive cooldown: busy epochs back off so a big change flood
@@ -170,6 +216,17 @@ class Scanner:
         self._epoch_error_count = 0
         self._epoch_skipped_count = 0
         self._epoch_dir_skip_count = 0
+        self._epoch_dir_processed = 0
+        self._epoch_dirs_seen = set()
+
+    def _epoch_changed(self) -> bool:
+        """True when this epoch observed any activity worth recording.
+
+        Any dir re-visited (subtree signature mismatch) or any processing
+        error makes the epoch "changed". New/cached file counts are subsumed:
+        files are only ever processed inside re-visited dirs.
+        """
+        return self._epoch_dir_processed > 0 or self._epoch_error_count > 0
 
     async def _do_scan(self, root_path: str):
         # ── Pass 1: walk once, collecting per-directory data ─────────────────
@@ -179,6 +236,7 @@ class Scanner:
         for root, dirs, files in os.walk(root_path):
             # Prune ignored directories in-place so os.walk never descends into them
             dirs[:] = [d for d in dirs if d not in self.ignore_dirs]
+            self._epoch_dirs_seen.add(root)
             dirs_info.append((root, os.path.dirname(root), self._dir_signature(root), files))
 
         # ── Post-order pass: fold subtree aggregates, decide skip/process ────
@@ -233,6 +291,7 @@ class Scanner:
                 self._epoch_dir_skip_count += 1
                 continue
 
+            self._epoch_dir_processed += 1
             # Process directory
             try:
                 await self.process_dir(root)
