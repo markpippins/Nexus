@@ -17,7 +17,7 @@ import express from "express";
 import { resolveContext, emitEvent, pool, redis } from "./db";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { writeFile, readFile, unlink, mkdir } from "fs/promises";
+import { writeFile, readFile, unlink, mkdir, appendFile } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 
@@ -28,6 +28,21 @@ app.use(express.json());
 const PORT = parseInt(process.env.HARNESS_PORT || "3420");
 const WORK_DIR = process.env.HARNESS_WORK_DIR || "/home/codex/dev";
 const PROMPT_DIR = join(WORK_DIR, ".harness", "prompts");
+
+// ── File logging (nexus/logs/harness-srv.log) ─────────────────────
+const LOG_DIR = process.env.NEXUS_LOG_DIR || "/home/codex/dev/nexus/logs";
+const LOG_FILE = join(LOG_DIR, "harness-srv.log");
+mkdir(LOG_DIR, { recursive: true }).catch(() => {});
+
+async function log(level: "info" | "warn" | "error", message: string): Promise<void> {
+  const line = `[harness-srv] ${new Date().toISOString()} [${level.toUpperCase()}] ${message}`;
+  console.log(line);
+  try {
+    await appendFile(LOG_FILE, line + "\n", "utf-8");
+  } catch {
+    // Log dir/file unavailable — journald/stdout still captured
+  }
+}
 
 // ── Process-level safety net ─────────────────────────────────────
 process.on('uncaughtException', (err: Error & { code?: string }) => {
@@ -83,6 +98,12 @@ app.post("/run", async (req, res) => {
     const effectiveHarnessId = harness_id || resolved.harness_id;
     const effectiveWorkDir = work_dir || WORK_DIR;
     const effectiveAgent = agent || resolved.role;
+    const effectiveModel = resolved.model?.opencode_model_id;
+
+    await log(
+      "info",
+      `run job=${jobId} role=${resolved.role} task=${resolved.task.task_slug} model=${effectiveModel ?? "(harness default)"} wind_task=${wind_task_id}`
+    );
 
     // 3. Emit harness.started event
     const startedEventId = await emitEvent({
@@ -129,6 +150,7 @@ app.post("/run", async (req, res) => {
           work_dir: effectiveWorkDir,
           agent: effectiveAgent,
           role: resolved.role,
+          model: effectiveModel,
           timeout_ms,
         });
         stdout = result.stdout;
@@ -163,6 +185,11 @@ app.post("/run", async (req, res) => {
       causation_id: startedEventId,
       caused_by_event_type: "harness.started",
     });
+
+    await log(
+      exitCode === 0 ? "info" : "warn",
+      `run job=${jobId} role=${resolved.role} exit=${exitCode} duration_ms=${Date.now() - startTime} model=${effectiveModel ?? "(harness default)"}`
+    );
 
     // 7. Parse outcome from agent output
     const parsedOutcome = parseOutcome(stdout, resolved.outcomes || []);
@@ -259,6 +286,7 @@ interface HarnessExecParams {
   work_dir: string;
   agent: string;
   role: string;
+  model?: string; // opencode --model value (from tackle config_bundle)
   timeout_ms: number;
 }
 
@@ -291,9 +319,11 @@ async function executeHarness(params: HarnessExecParams): Promise<HarnessExecRes
 
   const binary = config.binary;
 
-  // Route to the right executor
+  // Route to the right executor. The resolved model (from tackle
+  // config_bundle) is honored on both paths — opencode via --model, and
+  // ollama via the model_identifier passed to the generate API.
   if (binary === "ollama") {
-    return executeOllama(promptContent, role, timeout_ms);
+    return executeOllama(promptContent, role, params.model, timeout_ms);
   } else if (binary === "opencode") {
     return executeOpencode(params);
   } else {
@@ -308,10 +338,13 @@ async function executeHarness(params: HarnessExecParams): Promise<HarnessExecRes
 async function executeOllama(
   prompt: string,
   role: string,
+  model: string | undefined,
   timeout_ms: number
 ): Promise<HarnessExecResult> {
   const ollamaUrl = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
-  const model = process.env.OLLAMA_MODEL || "qwen2.5:0.5b";
+  const effectiveModel = model || process.env.OLLAMA_MODEL || "qwen2.5:0.5b";
+
+  await log("info", `ollama exec role=${role} model=${effectiveModel}`);
 
   try {
     const controller = new AbortController();
@@ -321,7 +354,7 @@ async function executeOllama(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model,
+        model: effectiveModel,
         prompt,
         stream: false,
         options: {
@@ -355,13 +388,17 @@ async function executeOllama(
 
 /**
  * Execute via opencode CLI (full tool access, requires GPU for reasonable speed).
+ * When a model was resolved from tackle config_bundle it is passed via --model,
+ * so external-provider changes made in tackle-ui take effect on harness runs.
  */
 async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecResult> {
-  const { prompt_file, work_dir, agent, role, timeout_ms } = params;
+  const { prompt_file, work_dir, agent, role, model, timeout_ms } = params;
+  const opencodeBin = process.env.OPENCODE_BIN || "opencode";
 
   const cmdArgs = [
     "run",
     "--agent", agent,
+    ...(model ? ["--model", model] : []),
     "--dir", work_dir,
     "--format", "json",
     "--file", prompt_file,
@@ -369,9 +406,11 @@ async function executeOpencode(params: HarnessExecParams): Promise<HarnessExecRe
     "",
   ];
 
+  await log("info", `opencode exec agent=${agent} model=${model ?? "(unset)"} file=${prompt_file} dir=${work_dir} bin=${opencodeBin}`);
+
   try {
     const { stdout, stderr } = await execFileAsync(
-      "opencode",
+      opencodeBin,
       cmdArgs,
       {
         cwd: work_dir,
@@ -470,6 +509,7 @@ const server = app.listen(PORT, () => {
   console.log(`[harness-srv] listening on port ${PORT}`);
   console.log(`[harness-srv] work dir: ${WORK_DIR}`);
   console.log(`[harness-srv] prompt dir: ${PROMPT_DIR}`);
+  log("info", `listening on port ${PORT} (work dir: ${WORK_DIR}, log: ${LOG_FILE})`);
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

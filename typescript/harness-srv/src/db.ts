@@ -71,6 +71,89 @@ export interface ResolvedContext {
   outcomes: TaskOutcome[];
   harness_id: string;
   harness_config: Record<string, any>;
+  model: ResolvedModelConfig | null; // tackle config_bundle resolution for the role
+}
+
+/**
+ * Active AI model config for a role, resolved from tackle.config_bundle
+ * (mirrors tackle-srv getResolvedRoleConfig).
+ */
+export interface ResolvedModelConfig {
+  model_identifier: string;
+  provider_id: string;
+  provider_name: string;
+  provider_type: string;
+  api_key: string | null;
+  endpoint_url: string | null;
+  harness_id: string;
+  harness_name: string;
+  invocation_semantics: Record<string, any>;
+  fallback_models: ResolvedFallbackModel[];
+  /** opencode --model value computed from model_identifier */
+  opencode_model_id: string;
+}
+
+export interface ResolvedFallbackModel {
+  priority: number;
+  model_identifier: string;
+  provider_type: string;
+  api_key: string | null;
+  endpoint_url: string | null;
+  harness_id: string;
+  harness_name: string;
+  invocation_semantics: Record<string, any>;
+  invocation_mode: string;
+}
+
+/**
+ * Map a tackle provider + model_identifier to the opencode --model value.
+ *
+ * opencode config keys its provider models by the wire model ID, and the
+ * wire `model` field is the map key verbatim — so the opencode model ID is
+ * `<opencode-provider>/<wire-id>`:
+ *   - Nvidia:    identifier already namespaced (nvidia/x, z-ai/x) → nvidia/nvidia/x
+ *   - DeepSeek:  identifier already namespaced (deepseek-ai/x)     → deepseek-ai/deepseek-ai/x
+ *   - OpenCode:  bare identifier (big-pickle)                      → opencode/big-pickle
+ *   - OpenCode Go: bare identifier (gemini-3.5-flash)              → opencode-go/gemini-3.5-flash
+ *   - Ollama:    bare identifier (qwen2.5-coder)                   → ollama/qwen2.5-coder
+ *   - OpenRouter: bare identifier (gpt-oss-120b)                   → openrouter/gpt-oss-120b
+ */
+const OPENCODE_PROVIDER_BY_TACKLE: Record<string, string> = {
+  "prov-1783906359513": "nvidia", // Nvidia
+  "prov-1782144397043": "openrouter", // OpenRouter
+  "prov-opencode-go": "opencode-go",
+  "prov-opencode": "opencode",
+  "prov-ollama": "ollama",
+  "prov-deepseek": "deepseek-ai",
+};
+
+/**
+ * Provider preference rank for fallback ordering — matches the operating
+ * ladder: Nvidia first, then free OpenRouter, then free OpenCode Go,
+ * then OpenCode (big-pickle), then Ollama (local, last resort), and the
+ * known-dead DeepSeek key dead last.
+ */
+const PROVIDER_RANK: Record<string, number> = {
+  "prov-1783906359513": 0, // Nvidia
+  "prov-1782144397043": 1, // OpenRouter
+  "prov-opencode-go": 2, // OpenCode Go
+  "prov-opencode": 3, // OpenCode (big-pickle)
+  "prov-ollama": 4, // Ollama
+  "prov-deepseek": 5, // DeepSeek (key currently invalid)
+};
+
+export function opencodeModelId(providerId: string, modelIdentifier: string): string {
+  const slash = modelIdentifier.indexOf("/");
+  if (slash > 0) {
+    // Already namespaced (nvidia/x, z-ai/x, deepseek-ai/x) — the opencode
+    // provider name is the first segment of the wire id, and the model key
+    // is the full wire id: nvidia/nvidia/x, z-ai/z-ai/x, deepseek-ai/deepseek-ai/x.
+    return modelIdentifier.slice(0, slash) + "/" + modelIdentifier;
+  }
+  // Bare identifier — map the tackle provider to its opencode provider.
+  const opencodeProvider = OPENCODE_PROVIDER_BY_TACKLE[providerId];
+  if (!opencodeProvider) return modelIdentifier; // unknown provider — pass through
+  return `${opencodeProvider}/${modelIdentifier}`;
 }
 
 // ── Resolution functions ────────────────────────────────────────────
@@ -135,8 +218,13 @@ export async function resolveContext(
     [row.wind_task_id]
   );
 
-  // 6. Determine harness
-  const harness = await getDefaultHarness();
+  // 6. Resolve the role's active AI model from tackle config_bundle
+  const modelConfig = await resolveRoleModel(row.role);
+
+  // 7. Determine harness — prefer the one the config bundle specifies
+  // (harn-opencode), falling back to the default when the bundle
+  // references an unknown harness id.
+  const harness = await getDefaultHarness(modelConfig?.harness_id || undefined);
 
   return {
     role: row.role,
@@ -154,6 +242,81 @@ export async function resolveContext(
     outcomes: outcomesResult.rows as TaskOutcome[],
     harness_id: harness.id,
     harness_config: harness.config,
+    model: modelConfig,
+  };
+}
+
+/**
+ * Resolve the active AI model config for a role from tackle.config_bundle.
+ *
+ * All active bundles for the role are loaded and sorted by provider
+ * preference rank (Nvidia > OpenRouter > OpenCode Go > OpenCode >
+ * Ollama > DeepSeek), then by bundle priority as a tiebreak. The first
+ * entry is the primary; the rest form the fallback chain. Returns null
+ * when the role has no active bundle (caller falls back to the harness
+ * default).
+ */
+export async function resolveRoleModel(role: string): Promise<ResolvedModelConfig | null> {
+  const result = await pool.query(
+    `SELECT m.model_identifier,
+            COALESCE(cb.provider_id, m.provider_id) AS provider_id,
+            p.name AS provider_name,
+            COALESCE(p.type, '') AS provider_type,
+            p.api_key,
+            COALESCE(cb.endpoint_url, p.endpoint_url) AS endpoint_url,
+            COALESCE(h.id, '') AS harness_id,
+            COALESCE(h.name, '') AS harness_name,
+            COALESCE(h.invocation_semantics, '{}') AS invocation_semantics,
+            COALESCE(cb.invocation_mode, '') AS invocation_mode,
+            cb.priority
+     FROM tackle.config_bundle cb
+     JOIN tackle.models m          ON cb.model_id = m.id
+     LEFT JOIN tackle.providers p  ON COALESCE(cb.provider_id, m.provider_id) = p.id
+     LEFT JOIN tackle.harnesses h  ON COALESCE(cb.harness_id, m.harness_id) = h.id
+     WHERE cb.role = $1 AND cb.is_active = 1
+     ORDER BY cb.priority ASC`,
+    [role]
+  );
+  if (result.rows.length === 0) return null;
+
+  const parseJson = (v: any): Record<string, any> =>
+    typeof v === "string" ? (JSON.parse(v) as Record<string, any>) : (v as Record<string, any>);
+
+  const rows = result.rows as any[];
+  // Config bundle priority wins (tackle-ui + admin demotions are encoded
+  // there); provider rank breaks ties between bundles at the same priority.
+  rows.sort(
+    (a, b) =>
+      (a.priority ?? 0) - (b.priority ?? 0) ||
+      (PROVIDER_RANK[a.provider_id] ?? 6) - (PROVIDER_RANK[b.provider_id] ?? 6)
+  );
+
+  const primary = rows[0];
+  const fallbacks: ResolvedFallbackModel[] = rows.slice(1).map((f: any) => ({
+    priority: f.priority,
+    model_identifier: f.model_identifier,
+    provider_id: f.provider_id ?? "",
+    provider_type: f.provider_type ?? "",
+    api_key: f.api_key ?? null,
+    endpoint_url: f.endpoint_url ?? null,
+    harness_id: f.harness_id ?? "",
+    harness_name: f.harness_name ?? "",
+    invocation_semantics: parseJson(f.invocation_semantics),
+    invocation_mode: f.invocation_mode ?? "",
+  }));
+
+  return {
+    model_identifier: primary.model_identifier,
+    provider_id: primary.provider_id ?? "",
+    provider_name: primary.provider_name ?? "",
+    provider_type: primary.provider_type ?? "",
+    api_key: primary.api_key ?? null,
+    endpoint_url: primary.endpoint_url ?? null,
+    harness_id: primary.harness_id ?? "",
+    harness_name: primary.harness_name ?? "",
+    invocation_semantics: parseJson(primary.invocation_semantics),
+    fallback_models: fallbacks,
+    opencode_model_id: opencodeModelId(primary.provider_id ?? "", primary.model_identifier),
   };
 }
 
@@ -195,39 +358,49 @@ function formatProcedureIndex(cards: ProcedureCard[]): string {
 }
 
 /**
- * Get the default harness (opencode CLI).
+ * Get a harness by id, or the default harness (opencode CLI, harn-opencode)
+ * when no preferred id is given or it does not exist.
+ *
+ * Note: this used to default to 'harn-ollama', which silently routed every
+ * harness-srv run through the local Ollama direct-http path (qwen2.5:0.5b)
+ * regardless of the role's tackle config_bundle. The default is now the
+ * opencode harness so external-model config from tackle-ui takes effect.
  */
-async function getDefaultHarness(): Promise<{
+async function getDefaultHarness(preferredId?: string): Promise<{
   id: string;
   config: Record<string, any>;
 }> {
-  const result = await pool.query(
-    `SELECT id, invocation_semantics FROM tackle.harnesses WHERE id = 'harn-ollama'`
-  );
-  if (result.rows.length === 0) {
-    // Fallback to any harness
-    const fallback = await pool.query(
-      `SELECT id, invocation_semantics FROM tackle.harnesses LIMIT 1`
+  const parseConfig = (row: any): Record<string, any> =>
+    typeof row.invocation_semantics === "string"
+      ? JSON.parse(row.invocation_semantics)
+      : row.invocation_semantics;
+
+  if (preferredId) {
+    const preferred = await pool.query(
+      `SELECT id, invocation_semantics FROM tackle.harnesses WHERE id = $1`,
+      [preferredId]
     );
-    if (fallback.rows.length === 0) {
-      throw new Error("No harnesses configured in tackle.harnesses");
+    if (preferred.rows.length > 0) {
+      return { id: preferred.rows[0].id, config: parseConfig(preferred.rows[0]) };
     }
-    return {
-      id: fallback.rows[0].id,
-      config:
-        typeof fallback.rows[0].invocation_semantics === "string"
-          ? JSON.parse(fallback.rows[0].invocation_semantics)
-          : fallback.rows[0].invocation_semantics,
-    };
   }
-  const row = result.rows[0];
-  return {
-    id: row.id,
-    config:
-      typeof row.invocation_semantics === "string"
-        ? JSON.parse(row.invocation_semantics)
-        : row.invocation_semantics,
-  };
+
+  // Default: opencode CLI harness
+  const result = await pool.query(
+    `SELECT id, invocation_semantics FROM tackle.harnesses WHERE id = 'harn-opencode'`
+  );
+  if (result.rows.length > 0) {
+    return { id: result.rows[0].id, config: parseConfig(result.rows[0]) };
+  }
+
+  // Fallback to any harness
+  const fallback = await pool.query(
+    `SELECT id, invocation_semantics FROM tackle.harnesses LIMIT 1`
+  );
+  if (fallback.rows.length === 0) {
+    throw new Error("No harnesses configured in tackle.harnesses");
+  }
+  return { id: fallback.rows[0].id, config: parseConfig(fallback.rows[0]) };
 }
 
 /**
