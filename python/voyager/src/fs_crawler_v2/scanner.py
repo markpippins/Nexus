@@ -58,6 +58,7 @@ class Scanner:
         self._epoch_cache_count = 0
         self._epoch_error_count = 0
         self._epoch_skipped_count = 0
+        self._epoch_dir_skip_count = 0
 
         # Ignore lists — CLI > env var > defaults
         env_dirs = os.getenv("VOYAGER_IGNORE_DIRS")
@@ -81,6 +82,9 @@ class Scanner:
 
         logging.info(f"Starting single scan of {root_path} (epoch: {self.current_epoch})")
         await self._do_scan(root_path)
+        # Stage 3: unchanged subtrees were skipped (no observations) — carry
+        # their last-known members forward so topology doesn't flag them vanished.
+        self.topology.restage_skipped_subtrees()
         self.topology.compute_signals()
         await self.topology.emit_signals()
 
@@ -98,6 +102,7 @@ class Scanner:
             f"Epoch {self.current_epoch[:8]}: "
             f"{self._epoch_file_count} files ({self._epoch_new_count} new, "
             f"{self._epoch_cache_count} cached, {self._epoch_skipped_count} skipped, "
+            f"{self._epoch_dir_skip_count} dirs skipped, "
             f"{self._epoch_error_count} errors)"
         )
 
@@ -126,6 +131,9 @@ class Scanner:
 
             logging.debug(f"Scan cycle started (epoch: {self.current_epoch})")
             await self._do_scan(root_path)
+            # Stage 3: unchanged subtrees were skipped (no observations) — carry
+            # their last-known members forward so topology doesn't flag them vanished.
+            self.topology.restage_skipped_subtrees()
             self.topology.compute_signals()
             await self.topology.emit_signals()
 
@@ -142,6 +150,7 @@ class Scanner:
                 f"Epoch {self.current_epoch[:8]}: "
                 f"{self._epoch_file_count} files ({self._epoch_new_count} new, "
                 f"{self._epoch_cache_count} cached, {self._epoch_skipped_count} skipped, "
+                f"{self._epoch_dir_skip_count} dirs skipped, "
                 f"{self._epoch_error_count} errors)"
             )
 
@@ -160,11 +169,69 @@ class Scanner:
         self._epoch_cache_count = 0
         self._epoch_error_count = 0
         self._epoch_skipped_count = 0
+        self._epoch_dir_skip_count = 0
 
     async def _do_scan(self, root_path: str):
+        # ── Pass 1: walk once, collecting per-directory data ─────────────────
+        # Pre-order walk (parents before children). No per-file work or Redis
+        # probes happen here — just the cheap local stat/scandir per dir.
+        dirs_info = []  # (root, parent, own_sig, files)
         for root, dirs, files in os.walk(root_path):
             # Prune ignored directories in-place so os.walk never descends into them
             dirs[:] = [d for d in dirs if d not in self.ignore_dirs]
+            dirs_info.append((root, os.path.dirname(root), self._dir_signature(root), files))
+
+        # ── Post-order pass: fold subtree aggregates, decide skip/process ────
+        # Reversed pre-order guarantees children precede their parent, so each
+        # dir's full signature incorporates its ENTIRE subtree. A change
+        # anywhere — add/edit/delete of a file at any depth — propagates up and
+        # mismatches every ancestor, so only changed paths are re-visited;
+        # unchanged branches still collapse to one dir probe each.
+        children: dict[str, list[str]] = {}
+        for root, parent, _sig, _files in dirs_info:
+            children.setdefault(parent, []).append(root)
+
+        computed: dict[str, dict] = {}
+        skipped: set[str] = set()
+        for root, _parent, own_sig, _files in reversed(dirs_info):
+            if own_sig is None:
+                continue  # stat failed — treat as changed; don't cache
+            full_sig = own_sig.copy()
+            subtree_files = own_sig["direct_file_count"]
+            subtree_mtime = own_sig["direct_mtime_sum"]
+            subtree_mtime_max = own_sig["direct_mtime_max"]
+            subtree_size = own_sig["direct_size_sum"]
+            subtree_size_max = own_sig["direct_size_max"]
+            for child in children.get(root, []):
+                child_sig = computed.get(child)
+                if child_sig is not None:
+                    subtree_files += child_sig["subtree_file_count"]
+                    subtree_mtime += child_sig["subtree_mtime_sum"]
+                    if child_sig["subtree_mtime_max"] > subtree_mtime_max:
+                        subtree_mtime_max = child_sig["subtree_mtime_max"]
+                    subtree_size += child_sig["subtree_size_sum"]
+                    if child_sig["subtree_size_max"] > subtree_size_max:
+                        subtree_size_max = child_sig["subtree_size_max"]
+            full_sig["subtree_file_count"] = subtree_files
+            full_sig["subtree_mtime_sum"] = subtree_mtime
+            full_sig["subtree_mtime_max"] = subtree_mtime_max
+            full_sig["subtree_size_sum"] = subtree_size
+            full_sig["subtree_size_max"] = subtree_size_max
+            computed[root] = full_sig
+
+            if full_sig == self.cache.get_dir(root):
+                skipped.add(root)
+            else:
+                # Record the signature from THIS walk. If processing below
+                # detects further changes, the recorded signature is already
+                # stale and the next epoch re-detects them (safe direction).
+                self.cache.set_dir(root, full_sig)
+
+        # ── Pass 2: process only dirs on changed paths ──────────────────────
+        for root, _parent, _sig, files in dirs_info:
+            if root in skipped:
+                self._epoch_dir_skip_count += 1
+                continue
 
             # Process directory
             try:
@@ -184,6 +251,76 @@ class Scanner:
                     await self.process_file(full_path)
                 except Exception as e:
                     logging.error(f"Error processing {full_path}: {e}")
+
+    def _dir_signature(self, path: str) -> dict | None:
+        """Cheap per-directory signature — own stat + DIRECT children only.
+
+        Combined post-order with children's subtree aggregates in _do_scan,
+        this becomes a full-subtree signature: any add/edit/delete at any depth
+        changes the folded file-count/mtime/size sums or the subtree max-file
+        mtime/size, which propagate up and mismatch every ancestor, so only
+        changed paths are re-visited. The max-file-mtime and max-file-size
+        components close the sum-collision class (e.g. two files' mtimes or
+        sizes changing while their sums stay constant). A quiescent tree
+        collapses to O(dirs) Redis probes (fs:dirc) per epoch instead of
+        O(files) (fs:cache) — while staying change-correct.
+        """
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        # Aggregate keys default to 0 so an OSError mid-scandir (e.g. an
+        # unreadable dir) still yields a complete, stable signature instead of
+        # a partial dict that would KeyError the post-order fold in _do_scan.
+        sig = {
+            "mtime_ns": st.st_mtime_ns,
+            "nlink": st.st_nlink,
+            "size": st.st_size,
+            "entry_count": 0,
+            "subdir_count": 0,
+            "direct_file_count": 0,
+            "direct_mtime_sum": 0,
+            "direct_mtime_max": 0,
+            "direct_size_sum": 0,
+            "direct_size_max": 0,
+        }
+        try:
+            entry_count = 0
+            subdir_count = 0
+            direct_file_count = 0
+            direct_mtime_sum = 0
+            direct_mtime_max = 0
+            direct_size_sum = 0
+            direct_size_max = 0
+            with os.scandir(path) as it:
+                for e in it:
+                    entry_count += 1
+                    try:
+                        if e.is_dir(follow_symlinks=False):
+                            subdir_count += 1
+                        elif e.is_file(follow_symlinks=False):
+                            direct_file_count += 1
+                            fst = e.stat()
+                            direct_mtime_sum += fst.st_mtime_ns
+                            if fst.st_mtime_ns > direct_mtime_max:
+                                direct_mtime_max = fst.st_mtime_ns
+                            direct_size_sum += fst.st_size
+                            if fst.st_size > direct_size_max:
+                                direct_size_max = fst.st_size
+                    except OSError:
+                        continue
+            sig.update(
+                entry_count=entry_count,
+                subdir_count=subdir_count,
+                direct_file_count=direct_file_count,
+                direct_mtime_sum=direct_mtime_sum,
+                direct_mtime_max=direct_mtime_max,
+                direct_size_sum=direct_size_sum,
+                direct_size_max=direct_size_max,
+            )
+        except OSError:
+            pass
+        return sig
 
     async def process_dir(self, path: str):
         """Processes a directory entry."""
