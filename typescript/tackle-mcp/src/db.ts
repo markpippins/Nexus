@@ -2264,6 +2264,7 @@ export interface AgentSchedulerRow {
   schedule_type: string;
   schedule_value: number;
   project_dir: string;
+  task_slug: string | null;
   enabled: number;
   last_run_at: string | null;
   last_run_status: string | null;
@@ -2283,12 +2284,12 @@ export async function getSchedulerEntry(id: number): Promise<AgentSchedulerRow |
 export async function createSchedulerEntry(data: {
   role: string; model_id?: string; harness?: string;
   agent_config?: string; schedule_type?: string; schedule_value?: number;
-  project_dir?: string; enabled?: number;
+  project_dir?: string; task_slug?: string | null; enabled?: number;
 }): Promise<AgentSchedulerRow> {
   const now = new Date().toISOString();
   const row = await qOne(`
-    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled, metadata, created_at, updated_at)
-    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @enabled, '{}', @now, @now)
+    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled, metadata, created_at, updated_at)
+    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @task_slug, @enabled, '{}', @now, @now)
     RETURNING *
   `, {
     role: data.role,
@@ -2298,6 +2299,7 @@ export async function createSchedulerEntry(data: {
     schedule_type: data.schedule_type ?? "interval",
     schedule_value: data.schedule_value ?? 3600,
     project_dir: data.project_dir ?? "/home/codex/dev",
+    task_slug: data.task_slug ?? null,
     enabled: data.enabled ?? 1,
     now,
   });
@@ -2307,14 +2309,14 @@ export async function createSchedulerEntry(data: {
 export async function updateSchedulerEntry(id: number, data: Partial<{
   role: string; model_id: string | null; harness: string;
   agent_config: string; schedule_type: string; schedule_value: number;
-  project_dir: string; enabled: number; last_run_at: string;
+  project_dir: string; task_slug: string | null; enabled: number; last_run_at: string;
   last_run_status: string; metadata: string;
 }>): Promise<AgentSchedulerRow | undefined> {
   const now = new Date().toISOString();
   const sets: string[] = ["updated_at = @now"];
   const params: Record<string, any> = { id, now };
   const fields = ["role", "model_id", "harness", "agent_config", "schedule_type",
-    "schedule_value", "project_dir", "enabled", "last_run_at", "last_run_status", "metadata"];
+    "schedule_value", "project_dir", "task_slug", "enabled", "last_run_at", "last_run_status", "metadata"];
   for (const f of fields) {
     if ((data as any)[f] !== undefined) {
       sets.push(`${f} = @${f}`);
@@ -2332,8 +2334,69 @@ export async function deleteSchedulerEntry(id: number): Promise<boolean> {
   return changes > 0;
 }
 
-export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
-  return qAll(`
+/**
+ * Due scheduler entry, enriched with the prompt payload an agent needs to
+ * start the run: the role's DEFAULT persona (latest `opencode-persona`)
+ * as base_prompt_body, the attached task's template body as
+ * task_prompt_body, and assembled_prompt = base + appended task prompt.
+ * When no task is attached, assembled_prompt === base_prompt_body.
+ */
+export interface DueSchedulerEntry extends AgentSchedulerRow {
+  base_prompt_body: string | null;
+  task_prompt_body: string | null;
+  assembled_prompt: string | null;
+}
+
+// Latest version of a (role, slug) prompt template body.
+async function resolvePromptBody(role: string, slug: string): Promise<string | null> {
+  const row = await qOne(
+    `SELECT DISTINCT ON (role, slug) body_md
+     FROM prompts
+     WHERE role = @role AND slug = @slug
+     ORDER BY role, slug, version DESC
+     LIMIT 1`,
+    { role, slug }
+  );
+  return row?.body_md ?? null;
+}
+
+async function resolveSchedulerPrompt(
+  entry: AgentSchedulerRow
+): Promise<Pick<DueSchedulerEntry, "base_prompt_body" | "task_prompt_body" | "assembled_prompt">> {
+  // Default system prompt for the role: latest `opencode-persona` template.
+  const base = await resolvePromptBody(entry.role, "opencode-persona");
+
+  // Attached task (if any): resolve its bound template and append its body.
+  let taskBody: string | null = null;
+  if (entry.task_slug) {
+    const task = await qOne(
+      `SELECT p.role AS prompt_role, p.slug AS prompt_slug
+       FROM tasks t
+       LEFT JOIN prompts p ON p.id = t.prompt_id
+       WHERE t.task_slug = @slug
+       ORDER BY t.active DESC, t.updated_at DESC
+       LIMIT 1`,
+      { slug: entry.task_slug }
+    );
+    if (task?.prompt_role && task?.prompt_slug) {
+      taskBody = await resolvePromptBody(task.prompt_role, task.prompt_slug);
+    }
+  }
+
+  let assembled: string | null = base;
+  if (taskBody) {
+    // Exact contract: base persona + separator + appended task prompt.
+    // No trim() — the seeded persona bodies carry meaningful leading
+    // whitespace/control chars that must survive verbatim.
+    assembled = base
+      ? `${base}\n\n---\n\n## Attached Task: ${entry.task_slug}\n\n${taskBody}`
+      : `## Attached Task: ${entry.task_slug}\n\n${taskBody}`;
+  }
+  return { base_prompt_body: base, task_prompt_body: taskBody, assembled_prompt: assembled };
+}
+
+export async function getDueSchedulerEntries(): Promise<DueSchedulerEntry[]> {
+  const rows = await qAll(`
     SELECT * FROM agent_scheduler
     WHERE enabled = 1
       AND (
@@ -2346,6 +2409,10 @@ export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
       )
     ORDER BY last_run_at ASC NULLS FIRST
   `);
+  const enriched = await Promise.all(
+    rows.map(async (row) => ({ ...row, ...(await resolveSchedulerPrompt(row)) }))
+  );
+  return enriched;
 }
 
 // ── Snapshot / Import / Export / Validate ─────────────────────────

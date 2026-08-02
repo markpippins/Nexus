@@ -149,6 +149,7 @@ export interface AgentScheduleEntry {
   schedule_type: 'cron' | 'interval' | 'manual';
   schedule_value: string; // e.g., '0 */2 * * *' or '15m'
   project_dir?: string;
+  task_slug?: string | null; // optional linked tackle.tasks task — its prompt is appended to the role persona at run time (null = explicitly none)
   enabled: boolean;
   last_run_at?: string;
   next_run_at?: string;

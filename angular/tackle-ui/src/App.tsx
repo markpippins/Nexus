@@ -7,6 +7,7 @@ import { AIRegistryTab } from './components/AIRegistryTab';
 import { RolesTasksTab } from './components/RolesTasksTab';
 import { MemoryContextTab } from './components/MemoryContextTab';
 import { CircuitSchedulerTab } from './components/CircuitSchedulerTab';
+import { TasksTab } from './components/TasksTab';
 import { SessionsPlaygroundTab } from './components/SessionsPlaygroundTab';
 import { SystemLogsTab } from './components/SystemLogsTab';
 import { SystemInsightsTab } from './components/SystemInsightsTab';
@@ -298,6 +299,18 @@ export default function App() {
     setInspectorDispatch(unwrapList(updatedDisp, 'tasks'));
   };
 
+  const handleDeleteTask = async (task: TaskDefinition) => {
+    await requestOrThrow(`/tasks/${encodeURIComponent(task.task_slug)}?role=${encodeURIComponent(task.role)}`, 'DELETE');
+    const [updatedTasks, updatedDisp, updatedSched] = await Promise.all([
+      fetch('/tasks').then(r => r.json()),
+      fetch('/tasks/inspector/dispatch').then(r => r.json()),
+      fetch('/scheduler').then(r => r.json())
+    ]);
+    setTasks(unwrapList(updatedTasks, 'tasks'));
+    setInspectorDispatch(unwrapList(updatedDisp, 'tasks'));
+    setSchedules(unwrapList(updatedSched, 'entries'));
+  };
+
   // Failure Recovery
   const handleSaveFailureConfig = async (config: FailureRecoveryConfig) => {
     await requestOrThrow('/config/failure-recovery', 'POST', config);
@@ -469,9 +482,21 @@ export default function App() {
                 schedules={schedules}
                 roles={roles}
                 models={models}
+                tasks={tasks}
+                prompts={prompts}
                 onSaveSchedule={handleSaveSchedule}
                 onToggleSchedule={handleToggleSchedule}
                 onDeleteSchedule={handleDeleteSchedule}
+              />
+            )}
+
+            {currentTab === 'tasks' && (
+              <TasksTab
+                tasks={tasks}
+                prompts={prompts}
+                roles={roles}
+                onSaveTask={handleSaveTask}
+                onDeleteTask={handleDeleteTask}
               />
             )}
 

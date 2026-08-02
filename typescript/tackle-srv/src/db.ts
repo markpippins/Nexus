@@ -653,6 +653,21 @@ const migrations: Migration[] = [
       console.log("[tackle-migrations] v11: Registered tackle.agent_timeclock table + indexes");
     },
   },
+  {
+    version: 12,
+    description: "Add optional task_slug link to tackle.agent_scheduler — scheduled jobs can attach a task (from tackle.tasks) whose prompt is appended to the role's default persona when the job runs. Loose reference (no FK) so tasks can be deleted; deleteTackleTask clears references.",
+    up: async (exec) => {
+      await exec(`
+        ALTER TABLE ${TACKLE_SCHEMA}.agent_scheduler
+          ADD COLUMN IF NOT EXISTS task_slug TEXT
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS idx_agent_scheduler_task_slug
+          ON ${TACKLE_SCHEMA}.agent_scheduler (task_slug)
+      `);
+      console.log("[tackle-migrations] v12: Added task_slug to tackle.agent_scheduler");
+    },
+  },
 ];
 
 /**
@@ -2642,6 +2657,37 @@ export async function upsertTackleTask(data: {
   );
 }
 
+/**
+ * Delete a task by (role, task_slug). The tasks table only guarantees
+ * task_slug uniqueness WITHIN a role (UNIQUE(role, task_slug)), so the
+ * delete is scoped by role to avoid collateral damage to a same-slug
+ * task belonging to another role. Because agent_scheduler references
+ * tasks by task_slug (loose link, no FK — migration v12), any scheduler
+ * entries pointing at the task have their task_slug cleared so scheduled
+ * jobs gracefully fall back to the role's default persona only.
+ */
+export async function deleteTackleTask(taskSlug: string, role?: string): Promise<boolean> {
+  if (role) {
+    await qRun(
+      "UPDATE agent_scheduler SET task_slug = NULL WHERE task_slug = @slug AND role = @role",
+      { slug: taskSlug, role }
+    );
+  } else {
+    await qRun(
+      "UPDATE agent_scheduler SET task_slug = NULL WHERE task_slug = @slug",
+      { slug: taskSlug }
+    );
+  }
+  const params: Record<string, any> = { slug: taskSlug };
+  let where = "task_slug = @slug";
+  if (role) {
+    params.role = role;
+    where += " AND role = @role";
+  }
+  const changes = await qRun(`DELETE FROM tasks WHERE ${where}`, params);
+  return changes > 0;
+}
+
 // ── Role Checkpoints ────────────────────────────────────────────────
 
 export async function getRoleCheckpoints(): Promise<Record<string, { role: string; last_active: string }>> {
@@ -2665,6 +2711,7 @@ export interface AgentSchedulerRow {
   schedule_type: string;
   schedule_value: number;
   project_dir: string;
+  task_slug: string | null;
   enabled: number;
   last_run_at: string | null;
   last_run_status: string | null;
@@ -2703,12 +2750,13 @@ function toInt(v: unknown, dflt: number): number {
 export async function createSchedulerEntry(data: {
   role: string; model_id?: string; harness?: string;
   agent_config?: string; schedule_type?: string; schedule_value?: number | string;
-  project_dir?: string; enabled?: number | boolean | string;
+  project_dir?: string; task_slug?: string | null;
+  enabled?: number | boolean | string;
 }): Promise<AgentSchedulerRow> {
   const now = new Date().toISOString();
   const row = await qOne(`
-    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, enabled, metadata, created_at, updated_at)
-    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @enabled, '{}', @now, @now)
+    INSERT INTO agent_scheduler (role, model_id, harness, agent_config, schedule_type, schedule_value, project_dir, task_slug, enabled, metadata, created_at, updated_at)
+    VALUES (@role, @model_id, @harness, @agent_config, @schedule_type, @schedule_value, @project_dir, @task_slug, @enabled, '{}', @now, @now)
     RETURNING *
   `, {
     role: data.role,
@@ -2718,6 +2766,7 @@ export async function createSchedulerEntry(data: {
     schedule_type: data.schedule_type ?? "interval",
     schedule_value: toInt(data.schedule_value, 3600),
     project_dir: data.project_dir ?? "/home/codex/dev",
+    task_slug: data.task_slug ?? null,
     enabled: toEnabledInt(data.enabled, 1),
     now,
   });
@@ -2734,7 +2783,7 @@ export async function updateSchedulerEntry(id: number, data: Partial<{
   const sets: string[] = ["updated_at = @now"];
   const params: Record<string, any> = { id, now };
   const fields = ["role", "model_id", "harness", "agent_config", "schedule_type",
-    "schedule_value", "project_dir", "enabled", "last_run_at", "last_run_status", "metadata"];
+    "schedule_value", "project_dir", "task_slug", "enabled", "last_run_at", "last_run_status", "metadata"];
   for (const f of fields) {
     if ((data as any)[f] !== undefined) {
       sets.push(`${f} = @${f}`);
@@ -2756,8 +2805,51 @@ export async function deleteSchedulerEntry(id: number): Promise<boolean> {
   return changes > 0;
 }
 
-export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
-  return qAll(`
+/**
+ * Due scheduler entry, enriched with the prompt payload an agent needs to
+ * start the run: the role's DEFAULT persona (latest `opencode-persona`)
+ * as base_prompt_body, the attached task's template body as
+ * task_prompt_body, and assembled_prompt = base + appended task prompt.
+ * When no task is attached, assembled_prompt === base_prompt_body.
+ */
+export interface DueSchedulerEntry extends AgentSchedulerRow {
+  base_prompt_body: string | null;
+  task_prompt_body: string | null;
+  assembled_prompt: string | null;
+}
+
+async function resolveSchedulerPrompt(
+  entry: AgentSchedulerRow
+): Promise<Pick<DueSchedulerEntry, "base_prompt_body" | "task_prompt_body" | "assembled_prompt">> {
+  // Default system prompt for the role: latest `opencode-persona` template.
+  const persona = await getPromptByRoleSlug(entry.role, "opencode-persona");
+  const base = persona?.body_md ?? null;
+
+  // Attached task (if any): resolve its bound template (latest version of
+  // that (role, slug)) and append its body to the base persona.
+  let taskBody: string | null = null;
+  if (entry.task_slug) {
+    const task = await getTackleTask(entry.task_slug);
+    if (task?.prompt_role && task?.prompt_slug) {
+      const p = await getPromptByRoleSlug(task.prompt_role, task.prompt_slug);
+      taskBody = p?.body_md ?? null;
+    }
+  }
+
+  let assembled: string | null = base;
+  if (taskBody) {
+    // Exact contract: base persona + separator + appended task prompt.
+    // No trim() — the seeded persona bodies carry meaningful leading
+    // whitespace/control chars that must survive verbatim.
+    assembled = base
+      ? `${base}\n\n---\n\n## Attached Task: ${entry.task_slug}\n\n${taskBody}`
+      : `## Attached Task: ${entry.task_slug}\n\n${taskBody}`;
+  }
+  return { base_prompt_body: base, task_prompt_body: taskBody, assembled_prompt: assembled };
+}
+
+export async function getDueSchedulerEntries(): Promise<DueSchedulerEntry[]> {
+  const rows = await qAll(`
     SELECT * FROM agent_scheduler
     WHERE enabled = 1
       AND (
@@ -2769,6 +2861,10 @@ export async function getDueSchedulerEntries(): Promise<AgentSchedulerRow[]> {
       )
     ORDER BY last_run_at ASC NULLS FIRST
   `);
+  const enriched = await Promise.all(
+    rows.map(async (row) => ({ ...row, ...(await resolveSchedulerPrompt(row)) }))
+  );
+  return enriched;
 }
 
 // ── Snapshot / Import / Export / Validate ─────────────────────────

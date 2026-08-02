@@ -11,6 +11,7 @@ import {
   getTackleTask,
   getInspectorDispatch,
   upsertTackleTask,
+  deleteTackleTask,
 } from "../db";
 
 export const tasksRouter = Router();
@@ -102,6 +103,20 @@ tasksRouter.post("/", async (req, res) => {
     }
     const task = await upsertTackleTask({ id, role, task_slug, scope, acceptance_criteria, prompt_id, active });
     res.json({ saved: true, task });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+tasksRouter.delete("/:task_slug", async (req, res) => {
+  try {
+    const role = typeof req.query.role === "string" ? req.query.role : undefined;
+    const deleted = await deleteTackleTask(req.params.task_slug, role);
+    if (!deleted) {
+      res.status(404).json({ error: "Task not found" });
+      return;
+    }
+    res.json({ deleted: true, task_slug: req.params.task_slug, role: role ?? null });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

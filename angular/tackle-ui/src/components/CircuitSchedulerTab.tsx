@@ -12,9 +12,10 @@ import {
   Calendar,
   Settings,
   Folder,
+  FileText,
   X
 } from 'lucide-react';
-import { FailureRecoveryConfig, AgentScheduleEntry, SystemRole, AIModel } from '../types';
+import { FailureRecoveryConfig, AgentScheduleEntry, SystemRole, AIModel, TaskDefinition, PromptTemplate } from '../types';
 
 interface CircuitSchedulerTabProps {
   failureConfig: FailureRecoveryConfig;
@@ -22,6 +23,8 @@ interface CircuitSchedulerTabProps {
   schedules: AgentScheduleEntry[];
   roles: SystemRole[];
   models: AIModel[];
+  tasks: TaskDefinition[];
+  prompts: PromptTemplate[];
   onSaveSchedule: (sched: Partial<AgentScheduleEntry>) => Promise<void>;
   onToggleSchedule: (id: string, enabled: boolean) => Promise<void>;
   onDeleteSchedule: (id: string) => Promise<void>;
@@ -33,6 +36,8 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
   schedules,
   roles,
   models,
+  tasks,
+  prompts,
   onSaveSchedule,
   onToggleSchedule,
   onDeleteSchedule
@@ -54,6 +59,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
   const [schedType, setSchedType] = useState<'cron' | 'interval' | 'manual'>('cron');
   const [schedValue, setSchedValue] = useState<string>('0 */2 * * *');
   const [schedProjectDir, setSchedProjectDir] = useState<string>('/nexus/tackle');
+  const [schedTaskSlug, setSchedTaskSlug] = useState<string>('');
 
   const handleCircuitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +88,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
     setSchedType('cron');
     setSchedValue('0 */2 * * *');
     setSchedProjectDir('/nexus/tackle');
+    setSchedTaskSlug('');
     setSchedModalOpen(true);
   };
 
@@ -92,6 +99,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
     setSchedType(s.schedule_type);
     setSchedValue(String(s.schedule_value ?? ''));
     setSchedProjectDir(s.project_dir || '/nexus/tackle');
+    setSchedTaskSlug(s.task_slug || '');
     setSchedModalOpen(true);
   };
 
@@ -110,6 +118,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
         schedule_type: schedType,
         schedule_value: schedValue,
         project_dir: schedProjectDir,
+        task_slug: schedTaskSlug || null,
         enabled: editingSched ? editingSched.enabled : true
       });
       closeSchedModal();
@@ -133,6 +142,29 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
       alert(`Error deleting schedule: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
+
+  // ── Task attachment helpers ────────────────────────────────────────
+  // The role's default system prompt is the latest `opencode-persona`
+  // template; a task attached to a scheduled job has its own bound
+  // template APPENDED to that base at run time.
+  const roleTasks = tasks.filter(t => t.role === schedRole && t.active);
+  const defaultPersona = prompts
+    .filter(p => p.role === schedRole && p.slug === 'opencode-persona')
+    .sort((a, b) => b.version - a.version)[0];
+  const selectedTask = tasks.find(t => t.task_slug === schedTaskSlug);
+  // Resolve the task's bound template the same way the server does — the
+  // LATEST version of its (role, slug) — so the preview matches the
+  // assembled payload on /scheduler/due.
+  const boundPrompt = selectedTask
+    ? prompts.find(p => p.id === selectedTask.prompt_id)
+    : undefined;
+  const selectedTaskPrompt = boundPrompt
+    ? prompts
+        .filter(p => p.role === boundPrompt.role && p.slug === boundPrompt.slug)
+        .sort((a, b) => b.version - a.version)[0]
+    : undefined;
+  const previewBase = defaultPersona?.body_md || null;
+  const previewAppend = selectedTaskPrompt?.body_md || null;
 
   return (
     <div className="space-y-8">
@@ -326,6 +358,15 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                   <span>Model: {s.model_id || 'Default'}</span>
                   <span>•</span>
                   <span>ID: {s.id}</span>
+                  {s.task_slug && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center gap-1 text-emerald-400">
+                        <FileText className="w-3 h-3" />
+                        Task: {s.task_slug}
+                      </span>
+                    </>
+                  )}
                 </div>
 
                 {s.last_run_at && (
@@ -436,6 +477,62 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                   className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
                 />
               </div>
+
+              <div>
+                <label className="block text-[var(--text-secondary)] mb-1 font-semibold">
+                  Attached Task (optional)
+                </label>
+                <select
+                  value={schedTaskSlug}
+                  onChange={e => setSchedTaskSlug(e.target.value)}
+                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
+                >
+                  <option value="">None — default {schedRole} persona</option>
+                  {roleTasks.map(t => (
+                    <option key={t.id} value={t.task_slug}>
+                      {t.task_slug}
+                    </option>
+                  ))}
+                  {!roleTasks.some(t => t.task_slug === schedTaskSlug) && schedTaskSlug && (
+                    <option value={schedTaskSlug}>{schedTaskSlug}</option>
+                  )}
+                </select>
+                <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                  When set, the task's bound prompt is appended to the role's default persona (`opencode-persona`)
+                  for this schedule's runs.
+                </p>
+              </div>
+
+              {/* Prompt Assembly Preview */}
+              {previewBase && (
+                <div className="space-y-2">
+                  <div className="text-[10px] font-mono uppercase text-[var(--text-muted)] flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    <span>Prompt Assembly Preview</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    <div className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg p-2.5">
+                      <div className="text-[10px] font-mono text-emerald-400 mb-1">
+                        1 · Default persona — {defaultPersona?.title} ({schedRole}/opencode-persona v{defaultPersona?.version})
+                      </div>
+                      <pre className="whitespace-pre-wrap font-mono text-[10px] text-[var(--text-primary)] leading-relaxed max-h-24 overflow-y-auto">
+                        {previewBase.slice(0, 500)}
+                        {previewBase.length > 500 ? '…' : ''}
+                      </pre>
+                    </div>
+                    <div className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg p-2.5">
+                      <div className="text-[10px] font-mono text-emerald-400 mb-1">
+                        2 · Appended task prompt — {selectedTaskPrompt ? selectedTaskPrompt.title : 'none'}
+                      </div>
+                      <pre className="whitespace-pre-wrap font-mono text-[10px] text-[var(--text-primary)] leading-relaxed max-h-24 overflow-y-auto">
+                        {previewAppend
+                          ? previewAppend.slice(0, 500) + (previewAppend.length > 500 ? '…' : '')
+                          : '(No task attached — runs use the default persona only.)'}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-2">
                 <button

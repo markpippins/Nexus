@@ -45,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'Runtime & Resilience',
       items: [
         { id: 'circuit-sched', label: 'Circuit & Scheduler', icon: ShieldAlert },
+        { id: 'tasks', label: 'Task Registry', icon: FileText },
         { id: 'sessions-playground', label: 'Sessions & Playground', icon: Play },
         { id: 'system-logs', label: 'System Logs', icon: FileText },
         { id: 'system-insights', label: 'System Insights (D3)', icon: Activity },
