@@ -242,7 +242,7 @@ async function createSchema(
                         CHECK(harness IN ('opencode', 'conduit')),
       agent_config     TEXT NOT NULL DEFAULT '{}',
       schedule_type    TEXT NOT NULL DEFAULT 'interval'
-                        CHECK(schedule_type IN ('interval', 'cron')),
+                        CHECK(schedule_type IN ('interval', 'cron', 'manual')),
       schedule_value   INTEGER NOT NULL DEFAULT 3600,
       project_dir      TEXT NOT NULL DEFAULT '/home/codex/dev',
       enabled          INTEGER NOT NULL DEFAULT 1,
@@ -666,6 +666,35 @@ const migrations: Migration[] = [
           ON ${TACKLE_SCHEMA}.agent_scheduler (task_slug)
       `);
       console.log("[tackle-migrations] v12: Added task_slug to tackle.agent_scheduler");
+    },
+  },
+  {
+    version: 13,
+    description: "Allow schedule_type 'manual' in tackle.agent_scheduler — the UI offers on-demand entries; the previous CHECK only allowed interval/cron so saving a manual row failed with a constraint violation.",
+    up: async (exec) => {
+      // Drop ANY existing CHECK on schedule_type regardless of its auto-generated
+      // name, then re-add with 'manual' allowed.
+      await exec(`
+        DO $$
+        DECLARE
+          c record;
+        BEGIN
+          FOR c IN
+            SELECT conname FROM pg_constraint
+            WHERE conrelid = '${TACKLE_SCHEMA}.agent_scheduler'::regclass
+              AND contype = 'c'
+              AND pg_get_constraintdef(oid) ILIKE '%schedule_type%'
+          LOOP
+            EXECUTE format('ALTER TABLE ${TACKLE_SCHEMA}.agent_scheduler DROP CONSTRAINT %I', c.conname);
+          END LOOP;
+        END $$;
+      `);
+      await exec(`
+        ALTER TABLE ${TACKLE_SCHEMA}.agent_scheduler
+          ADD CONSTRAINT agent_scheduler_schedule_type_check
+          CHECK (schedule_type IN ('interval', 'cron', 'manual'))
+      `);
+      console.log("[tackle-migrations] v13: Allowed schedule_type 'manual' in tackle.agent_scheduler");
     },
   },
 ];
@@ -2741,10 +2770,25 @@ function toEnabledInt(v: unknown, dflt: number): number {
   return Number.isFinite(n) ? n : dflt;
 }
 
-function toInt(v: unknown, dflt: number): number {
+// ── Schedule value coercion ────────────────────────────────────────
+// agent_scheduler.schedule_value is INTEGER seconds. The UI sends
+// durations like "15m", "1h", "90" or cron strings; cron strings cannot
+// be expressed as seconds so they fall back to the default (the runner
+// only re-fires interval entries anyway). Durations ARE parseable, so
+// "15m" stores 900 instead of silently collapsing to 3600.
+function toScheduleSeconds(v: unknown, dflt: number): number {
   if (v === undefined || v === null || v === "") return dflt;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : dflt;
+  if (typeof v === "number") return Number.isFinite(v) && v >= 1 ? v : dflt;
+  const s = String(v).trim();
+  const m = /^(\d+)(ms|s|m|h|d)?$/.exec(s);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    const mult: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, ms: 0.001 };
+    const secs = n * (mult[m[2] || "s"]);
+    if (secs >= 1 && Number.isFinite(secs)) return Math.round(secs);
+  }
+  const n2 = Number(v);
+  return Number.isFinite(n2) && n2 >= 1 ? n2 : dflt;
 }
 
 export async function createSchedulerEntry(data: {
@@ -2764,7 +2808,7 @@ export async function createSchedulerEntry(data: {
     harness: data.harness ?? "opencode",
     agent_config: data.agent_config ?? "{}",
     schedule_type: data.schedule_type ?? "interval",
-    schedule_value: toInt(data.schedule_value, 3600),
+    schedule_value: toScheduleSeconds(data.schedule_value, 3600),
     project_dir: data.project_dir ?? "/home/codex/dev",
     task_slug: data.task_slug ?? null,
     enabled: toEnabledInt(data.enabled, 1),
@@ -2790,7 +2834,7 @@ export async function updateSchedulerEntry(id: number, data: Partial<{
       params[f] = f === "enabled"
         ? toEnabledInt((data as any)[f], 1)
         : f === "schedule_value"
-        ? toInt((data as any)[f], 3600)
+        ? toScheduleSeconds((data as any)[f], 3600)
         : (data as any)[f];
     }
   }
@@ -2852,6 +2896,7 @@ export async function getDueSchedulerEntries(): Promise<DueSchedulerEntry[]> {
   const rows = await qAll(`
     SELECT * FROM agent_scheduler
     WHERE enabled = 1
+      AND schedule_type <> 'manual'
       AND (
         last_run_at IS NULL
         OR (

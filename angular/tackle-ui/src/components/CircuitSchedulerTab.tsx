@@ -16,9 +16,11 @@ import {
   ChevronDown,
   ChevronUp,
   ListChecks,
+  AlertCircle,
   X
 } from 'lucide-react';
 import { FailureRecoveryConfig, AgentScheduleEntry, SystemRole, AIModel, TaskDefinition, PromptTemplate } from '../types';
+import { validateScheduleExpression } from '../utils/scheduleValidation';
 
 interface CircuitSchedulerTabProps {
   failureConfig: FailureRecoveryConfig;
@@ -83,6 +85,9 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
       return { ...prev, [key]: next };
     });
 
+  // Live schedule-expression validation (cron / interval / manual)
+  const schedValidation = validateScheduleExpression(schedType, schedValue);
+
   const handleCircuitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingCircuit(true);
@@ -132,6 +137,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
 
   const handleSaveSchedSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!schedValidation.ok) return; // live validation blocks invalid expressions
     try {
       await onSaveSchedule({
         id: editingSched?.id,
@@ -591,16 +597,44 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
 
               <div>
                 <label className="block text-[var(--text-secondary)] mb-1 font-semibold">
-                  Schedule Expression *
+                  {schedType === 'cron'
+                    ? 'Cron Expression *'
+                    : schedType === 'interval'
+                      ? 'Interval (seconds or duration) *'
+                      : 'Expression (ignored for manual)'}
                 </label>
                 <input
+                  id="schedExpr"
                   type="text"
-                  required
+                  required={schedType !== 'manual'}
                   value={schedValue}
                   onChange={e => setSchedValue(e.target.value)}
-                  placeholder="0 */2 * * * or 15m"
-                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-3 py-2 font-mono text-[var(--text-primary)]"
+                  aria-invalid={!schedValidation.ok}
+                  aria-describedby="schedExprMsg"
+                  placeholder={schedType === 'cron' ? '0 */2 * * *  (minute hour dom month dow)' : schedType === 'interval' ? '15m, 1h, 90, 30s' : 'on demand — no expression needed'}
+                  className={`w-full bg-[var(--bg-tertiary)] border rounded-lg px-3 py-2 font-mono text-[var(--text-primary)] focus:outline-none ${
+                    schedValidation.ok
+                      ? 'border-[var(--border-color)] focus:border-emerald-500'
+                      : 'border-rose-500/70 focus:border-rose-500'
+                  }`}
                 />
+                <p
+                  id="schedExprMsg"
+                  className={`mt-1.5 flex items-start gap-1.5 text-[10px] font-mono leading-relaxed ${
+                    schedValidation.ok
+                      ? schedType === 'manual'
+                        ? 'text-[var(--text-muted)]'
+                        : 'text-emerald-400'
+                      : 'text-rose-400'
+                  }`}
+                >
+                  {schedValidation.ok ? (
+                    <CheckCircle2 className="w-3 h-3 shrink-0 mt-px" />
+                  ) : (
+                    <AlertCircle className="w-3 h-3 shrink-0 mt-px" />
+                  )}
+                  <span>{schedValidation.message}</span>
+                </p>
               </div>
 
               <div>
@@ -680,7 +714,12 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg font-bold bg-[var(--accent-color)] text-slate-950 cursor-pointer"
+                  disabled={!schedValidation.ok}
+                  className={`px-4 py-1.5 rounded-lg font-bold transition ${
+                    schedValidation.ok
+                      ? 'bg-[var(--accent-color)] text-slate-950 cursor-pointer hover:bg-[var(--accent-hover)]'
+                      : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                  }`}
                 >
                   {editingSched ? 'Update Schedule' : 'Create Schedule'}
                 </button>

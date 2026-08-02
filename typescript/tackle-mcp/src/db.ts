@@ -240,7 +240,7 @@ async function createSchema(
                         CHECK(harness IN ('opencode', 'conduit')),
       agent_config     TEXT NOT NULL DEFAULT '{}',
       schedule_type    TEXT NOT NULL DEFAULT 'interval'
-                        CHECK(schedule_type IN ('interval', 'cron')),
+                        CHECK(schedule_type IN ('interval', 'cron', 'manual')),
       schedule_value   INTEGER NOT NULL DEFAULT 3600,
       project_dir      TEXT NOT NULL DEFAULT '/home/codex/dev',
       enabled          INTEGER NOT NULL DEFAULT 1,
@@ -2281,9 +2281,28 @@ export async function getSchedulerEntry(id: number): Promise<AgentSchedulerRow |
   return qOne("SELECT * FROM agent_scheduler WHERE id = @id", { id });
 }
 
+// schedule_value is INTEGER seconds; the UI/agents may send durations like
+// "15m" or "1h" — parse them so they store the intended seconds instead of
+// silently falling back to the default (cron strings are unparseable as
+// seconds and keep the default; the runner only re-fires interval entries).
+function toScheduleSeconds(v: unknown, dflt: number): number {
+  if (v === undefined || v === null || v === "") return dflt;
+  if (typeof v === "number") return Number.isFinite(v) && v >= 1 ? v : dflt;
+  const s = String(v).trim();
+  const m = /^(\d+)(ms|s|m|h|d)?$/.exec(s);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    const mult: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, ms: 0.001 };
+    const secs = n * (mult[m[2] || "s"]);
+    if (secs >= 1 && Number.isFinite(secs)) return Math.round(secs);
+  }
+  const n2 = Number(v);
+  return Number.isFinite(n2) && n2 >= 1 ? n2 : dflt;
+}
+
 export async function createSchedulerEntry(data: {
   role: string; model_id?: string; harness?: string;
-  agent_config?: string; schedule_type?: string; schedule_value?: number;
+  agent_config?: string; schedule_type?: string; schedule_value?: number | string;
   project_dir?: string; task_slug?: string | null; enabled?: number;
 }): Promise<AgentSchedulerRow> {
   const now = new Date().toISOString();
@@ -2297,7 +2316,7 @@ export async function createSchedulerEntry(data: {
     harness: data.harness ?? "opencode",
     agent_config: data.agent_config ?? "{}",
     schedule_type: data.schedule_type ?? "interval",
-    schedule_value: data.schedule_value ?? 3600,
+    schedule_value: toScheduleSeconds(data.schedule_value, 3600),
     project_dir: data.project_dir ?? "/home/codex/dev",
     task_slug: data.task_slug ?? null,
     enabled: data.enabled ?? 1,
@@ -2308,7 +2327,7 @@ export async function createSchedulerEntry(data: {
 
 export async function updateSchedulerEntry(id: number, data: Partial<{
   role: string; model_id: string | null; harness: string;
-  agent_config: string; schedule_type: string; schedule_value: number;
+  agent_config: string; schedule_type: string; schedule_value: number | string;
   project_dir: string; task_slug: string | null; enabled: number; last_run_at: string;
   last_run_status: string; metadata: string;
 }>): Promise<AgentSchedulerRow | undefined> {
@@ -2320,7 +2339,9 @@ export async function updateSchedulerEntry(id: number, data: Partial<{
   for (const f of fields) {
     if ((data as any)[f] !== undefined) {
       sets.push(`${f} = @${f}`);
-      params[f] = (data as any)[f];
+      params[f] = f === "schedule_value"
+        ? toScheduleSeconds((data as any)[f], 3600)
+        : (data as any)[f];
     }
   }
   return qOne(
@@ -2399,9 +2420,9 @@ export async function getDueSchedulerEntries(): Promise<DueSchedulerEntry[]> {
   const rows = await qAll(`
     SELECT * FROM agent_scheduler
     WHERE enabled = 1
+      AND schedule_type <> 'manual'
       AND (
         last_run_at IS NULL
-        OR last_run_at = ''
         OR (
           schedule_type = 'interval'
           AND EXTRACT(EPOCH FROM NOW() - last_run_at::timestamp) >= schedule_value

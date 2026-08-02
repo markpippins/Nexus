@@ -57,6 +57,7 @@ class Runner:
                    last_run_at, metadata
             FROM tackle.agent_scheduler
             WHERE enabled = 1
+              AND schedule_type <> 'manual'
               AND (
                 last_run_at IS NULL
                 OR (
