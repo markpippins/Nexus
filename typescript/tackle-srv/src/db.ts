@@ -614,6 +614,45 @@ const migrations: Migration[] = [
       console.log("[tackle-migrations] v10: Created tackle.system_logs table with indexes");
     },
   },
+  {
+    version: 11,
+    description: "Register tackle.agent_timeclock — agent clock in/out table. Previously lived in the nebula schema (owned by the timeclock service via SQLAlchemy create_all); moved nebula -> tackle on 2026-08-02 via copy-repoint-drop. Idempotent: no-op where the table already exists (e.g. live DB), creates it on green-field installs. Mirrors the timeclock MCP model (python/timeclock/models.py) and the live table DDL (PK + clock_in/role/status indexes).",
+    up: async (exec) => {
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${TACKLE_SCHEMA}.agent_timeclock (
+          id             UUID        NOT NULL DEFAULT gen_random_uuid(),
+          role           TEXT        NOT NULL,
+          model          TEXT        NOT NULL,
+          session_id     TEXT,
+          clock_in       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          clock_out      TIMESTAMPTZ,
+          status         TEXT        NOT NULL DEFAULT 'active',
+          metadata       JSONB,
+          created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          recorded_on_dt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          valid_from     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          valid_until    TIMESTAMPTZ NOT NULL DEFAULT '9999-12-31 23:59:59+00'
+        )
+      `);
+      await exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS agent_timeclock_pkey
+          ON ${TACKLE_SCHEMA}.agent_timeclock (id)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS agent_timeclock_clock_in_idx
+          ON ${TACKLE_SCHEMA}.agent_timeclock (clock_in)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS agent_timeclock_role_idx
+          ON ${TACKLE_SCHEMA}.agent_timeclock (role)
+      `);
+      await exec(`
+        CREATE INDEX IF NOT EXISTS agent_timeclock_status_idx
+          ON ${TACKLE_SCHEMA}.agent_timeclock (status)
+      `);
+      console.log("[tackle-migrations] v11: Registered tackle.agent_timeclock table + indexes");
+    },
+  },
 ];
 
 /**
