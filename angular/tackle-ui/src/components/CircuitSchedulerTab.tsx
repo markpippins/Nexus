@@ -534,7 +534,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
       {/* SCHEDULER MODAL */}
       {schedModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl max-w-5xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
               <h3 className="text-sm font-bold text-[var(--text-primary)]">
                 {editingSched ? 'Edit Agent Schedule' : 'New Agent Schedule Entry'}
@@ -545,6 +545,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
             </div>
 
             <form onSubmit={handleSaveSchedSubmit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Target Agent Role *</label>
                 <select
@@ -636,6 +637,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                   for this schedule's runs.
                 </p>
               </div>
+              </div>
 
               {/* Prompt Assembly Preview */}
               {previewBase && (
@@ -644,12 +646,12 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                     <FileText className="w-3 h-3" />
                     <span>Prompt Assembly Preview</span>
                   </div>
-                  <div className="grid grid-cols-1 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg p-2.5">
                       <div className="text-[10px] font-mono text-emerald-400 mb-1">
                         1 · Default persona — {defaultPersona?.title} ({schedRole}/opencode-persona v{defaultPersona?.version})
                       </div>
-                      <pre className="whitespace-pre-wrap font-mono text-[10px] text-[var(--text-primary)] leading-relaxed max-h-24 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap font-mono text-[10px] text-[var(--text-primary)] leading-relaxed max-h-40 overflow-y-auto">
                         {previewBase.slice(0, 500)}
                         {previewBase.length > 500 ? '…' : ''}
                       </pre>
@@ -658,7 +660,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                       <div className="text-[10px] font-mono text-emerald-400 mb-1">
                         2 · Appended task prompt — {selectedTaskPrompt ? selectedTaskPrompt.title : 'none'}
                       </div>
-                      <pre className="whitespace-pre-wrap font-mono text-[10px] text-[var(--text-primary)] leading-relaxed max-h-24 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap font-mono text-[10px] text-[var(--text-primary)] leading-relaxed max-h-40 overflow-y-auto">
                         {previewAppend
                           ? previewAppend.slice(0, 500) + (previewAppend.length > 500 ? '…' : '')
                           : '(No task attached — runs use the default persona only.)'}
