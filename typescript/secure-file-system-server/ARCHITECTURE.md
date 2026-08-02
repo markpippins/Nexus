@@ -6,7 +6,7 @@ Inherits from: `../ARCHITECTURE.md` (platform) → `../../ARCHITECTURE.md` (root
 
 | Setting | Value |
 |---------|-------|
-| Name | file-system-server |
+| Name | secure-file-system-server |
 | Framework | Express |
 | Port | 4040 (explicit) |
 | Node | 20 (inherited from parent) |

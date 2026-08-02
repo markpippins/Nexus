@@ -94,7 +94,7 @@ different source domains and emit to different consumers.
 | **Projection type** | Scope — "this folder is magnetized and subject to search" |
 | **Consumer** | UI (Idea Stream), Search indexer |
 | **Passes through Canonicalizer?** | No |
-| **Code exists?** | ✅ Yes — `angular/nexus-console/src/services/remote-file-system.service.ts`, `file-system-server` |
+| **Code exists?** | ✅ Yes — `angular/nexus-console/src/services/remote-file-system.service.ts`, `secure-file-system-server` |
 
 Throttler projects filesystem scope by detecting the presence/absence of
 `.magnet` sentinel files. Its projection is binary: a folder is either

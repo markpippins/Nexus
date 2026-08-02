@@ -10,7 +10,7 @@ Group=codex
 WorkingDirectory=/home/codex/dev/nexus/typescript/secure-file-system-server
 
 # ── Environment ────────────────────────────────────────────────────────
-Environment=FS_SERVER_PORT=4041
+Environment=FS_SERVER_PORT=4040
 Environment=FS_ROOT_DIR=/home/codex/dev/nexus/typescript/secure-file-system-server/root
 Environment=NODE_ENV=production
 Environment=PATH=/home/codex/.nvm/versions/node/v24.15.0/bin:/usr/local/bin:/usr/bin:/bin

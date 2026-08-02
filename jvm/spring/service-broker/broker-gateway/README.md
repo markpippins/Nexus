@@ -44,8 +44,8 @@ java -jar target/broker-gateway-1.0.0-SNAPSHOT.jar --spring.profiles.active=dev
 
 ## Profiles
 
-- **selenium** (default): Runs on Selenium, connects to FS server on Beryllium (172.16.30.57:4040)
-- **beryllium**: Runs on Beryllium, connects to local FS server (localhost:4040)
+- **selenium** (default): Runs on Selenium, connects to secure FS server on Beryllium (172.16.30.57:4040)
+- **beryllium**: Runs on Beryllium, connects to local secure FS server (localhost:4040)
 - **dev**: Local development with debug logging
 
 See `docs/spring-profiles-guide.md` for detailed profile documentation.
@@ -95,7 +95,7 @@ Configuration files are in `src/main/resources/`:
 ## Dependencies
 
 - MongoDB (localhost:27017)
-- File System Server (port 4040)
+- Secure File System Server (port 4040)
 - User Service (embedded)
 - Login Service (embedded)
 
@@ -109,7 +109,7 @@ Check startup logs for: `The following 1 profile is active: "beryllium"`
 
 ### Connection Refused
 - Verify MongoDB is running: `mongosh`
-- Verify FS server is running: `curl http://localhost:4040/health`
+- Verify secure FS server is running: `curl http://localhost:4040/health`
 
 ## Documentation
 

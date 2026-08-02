@@ -47,8 +47,8 @@ export class AppComponent implements OnInit, OnDestroy {
   activeFilePath = signal<string | null>(null);
   contentChangeCounter = signal(0);
 
-  // API base URL — the file-system-server on port 4040
-  apiBaseUrl = signal('http://localhost:4040');
+  // API base URL — the file-system-server on port 4042 (edit-ui consumer)
+  apiBaseUrl = signal('http://localhost:4042');
 
   constructor() {
     // Apply theme to body

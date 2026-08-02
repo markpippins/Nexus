@@ -1,6 +1,6 @@
 # File System Server - Complete Test Suite
 
-This directory contains a comprehensive test suite for the file-system-server.
+This directory contains a comprehensive test suite for the secure-file-system-server.
 
 ## Files
 
@@ -28,7 +28,7 @@ All operations passing:
 ## Running Tests
 
 ```bash
-cd nexus/typescript/file-system-server
+cd nexus/typescript/secure-file-system-server
 bash run-tests.sh
 ```
 

@@ -8,7 +8,7 @@ Inherits from: `../ARCHITECTURE.md` (platform) → `../../ARCHITECTURE.md` (root
 |---------|-------|
 | Name | file-system-server |
 | Framework | Express |
-| Port | 4040 (explicit) |
+| Port | 4042 (explicit) |
 | Node | 20 (inherited from parent) |
 
 ## Dependencies

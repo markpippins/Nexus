@@ -265,17 +265,33 @@ CANDIDATES: tuple[Candidate, ...] = (
     ),
     Candidate(
         name="file-system-server",
+        port=4042,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:4042/health",
+        description=(
+            "Node.js file system proxy server for edit-ui. Provides CRUD "
+            "operations over a remote filesystem root directory (ls, cd, "
+            "mkdir, rmdir, newfile, deletefile, rename, copy, move). "
+            "Consumer: angular/edit-ui (port 4042)."
+        ),
+        startup="systemd: systemctl --user start file-system-server.service",
+        workspace_path="nexus/typescript/file-system-server",
+    ),
+    Candidate(
+        name="secure-file-system-server",
         port=4040,
         kind="runnable_service",
         service_type="Express",
         health_url="http://localhost:4040/health",
         description=(
-            "Node.js file system proxy server. Provides CRUD operations "
-            "over a remote filesystem root directory (ls, cd, mkdir, rmdir, "
-            "newfile, deletefile, rename, copy, move)."
+            "Secure Node.js file system proxy server for service-broker. "
+            "Provides CRUD operations over a remote filesystem root "
+            "directory. Consumer: jvm/spring/service-broker/file-service "
+            "via broker-gateway restfs.api.url (port 4040)."
         ),
-        startup="cd typescript/file-system-server && bash start.sh",
-        workspace_path="nexus/typescript/file-system-server",
+        startup="systemd: systemctl --user start secure-file-system-server.service",
+        workspace_path="nexus/typescript/secure-file-system-server",
     ),
     Candidate(
         name="terrain-mcp",

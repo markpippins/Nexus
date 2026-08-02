@@ -306,7 +306,8 @@ This will start all services with proper networking and dependencies.
 
 #### Node.js Services
 
-- **file-system-server**: `http://localhost:4040` - Proxy file system service
+- **secure-file-system-server**: `http://localhost:4040` - Secure proxy file system service (service-broker/file-service consumer)
+- **file-system-server**: `http://localhost:4042` - File system service for edit-ui (Angular)
 - **moleculer-search**: `http://localhost:4050` - Moleculer-based search service (Google, Gemini, Unsplash)
 
 #### Web Applications
@@ -366,7 +367,8 @@ cd spring/user-service && ./mvnw spring-boot:run -Dspring-boot.run.arguments="--
 cd quarkus/broker-gateway && ./mvnw compile quarkus:dev
 
 # Node.js services
-cd node/file-system-server && npm start
+cd typescript/file-system-server && npm start   # edit-ui consumer (port 4042)
+cd typescript/secure-file-system-server && npm start   # service-broker consumer (port 4040)
 
 # Web applications
 cd web/nextjs-api-tester && npm run dev
@@ -401,7 +403,8 @@ Web Apps (9002, 9012)
     ↓
 Broker Gateway (8080)
     ↓
-├── File System Server (4040)
+├── Secure File System Server (4040) → service-broker
+├── File System Server (4042) → edit-ui
 ├── User Access Service (8081) → MySQL
 ├── Login Service (8082) → User Access Service
 └── User Service (8083) → MongoDB

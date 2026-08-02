@@ -30,7 +30,7 @@ ALL_SERVICES=(
     "helidon-user-access-service.service"  # port 9093 — user access control (Helidon MP)
     "terrain.service"          # port 8084 — topology registry
     "file-system-server.service"        # port 4042 — file system operations (edit-ui)
-    "secure-file-system-server.service" # port 4041 — secure file system operations (service-broker)
+    "secure-file-system-server.service" # port 4040 — secure file system operations (service-broker)
     "ui-event-bus.service"     # port 3200 — cross-app UI event bus (SSE)
     "peb-kernel.service"       # port 8080 — engineering brain
     "kernel-srv.service"       # port 8100 — Semantic Kernel REST API (wraps sys_transition, sys_issue_receipt, v_* views; SSE over pg_notify)
@@ -110,7 +110,7 @@ SERVICE_PORTS=(
     ["helidon-user-access-service.service"]="9093"
     ["terrain.service"]="8084"
     ["file-system-server.service"]="4042"
-    ["secure-file-system-server.service"]="4041"
+    ["secure-file-system-server.service"]="4040"
     ["ui-event-bus.service"]="3200"
     ["peb-kernel.service"]="8080"
     ["kernel-srv.service"]="8100"

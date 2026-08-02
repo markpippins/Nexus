@@ -8,7 +8,7 @@
     { "key": "broker-gateway",    "name": "Broker Gateway",     "port": 8081, "healthPath": "/health", "category": "core" },
     { "key": "terrain",           "name": "Terrain Server",     "port": 8084, "healthPath": "/api/v1/platform/health", "category": "core" },
     { "key": "file-system-server","name": "File System Server", "port": 4042, "healthPath": "/health", "category": "core" },
-    { "key": "secure-file-system-server","name": "Secure File System Server", "port": 4041, "healthPath": "/health", "category": "core" },
+    { "key": "secure-file-system-server","name": "Secure File System Server", "port": 4040, "healthPath": "/health", "category": "core" },
     { "key": "peb-kernel",        "name": "PEB Kernel",         "port": 8080, "healthPath": "/health", "category": "core" },
     { "key": "nebula-srv",        "name": "Nebula API",         "port": 3101, "healthPath": "/health", "category": "core" },
     { "key": "role-memory-srv",   "name": "Role Memory Sync",   "port": 3500, "healthPath": "/health", "category": "core" },
