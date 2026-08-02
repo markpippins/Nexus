@@ -37,6 +37,22 @@ class TopologyEngine:
         dir_path = os.path.dirname(path)
         self._stage(dir_path, name, observation_id)
 
+    def restage_skipped_subtrees(self):
+        """Carry forward last-known members for dirs not observed this epoch.
+
+        Stage 3 directory-level dedupe skips unchanged subtrees, which produce
+        no observations. Absence here therefore means "unchanged", not
+        "vanished" — re-staging last-known members prevents compute_signals()
+        from emitting false vanishing/removal signals for the whole tree on
+        every quiescent epoch. Genuine deletions are still reported by the
+        parent directory's evolution signal: a deletion changes the parent's
+        entry table, so the parent is re-visited and the removed member is
+        detected there.
+        """
+        for dir_path, members in self.directory_history.items():
+            if dir_path not in self.staged_members:
+                self.staged_members[dir_path] = members.copy()
+
     def _stage(self, dir_path: str, name: str, obs_id: str):
         if dir_path not in self.staged_members:
             self.staged_members[dir_path] = {}
