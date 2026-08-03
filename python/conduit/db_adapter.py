@@ -698,7 +698,6 @@ class DBAdapter:
                 receipt_id, plan_id, receipt_type, agent_role, session_id,
                 ticket_id, summary, artifact_path, meta_json, tokens_used, now,
             ))
-            conn.execute("UPDATE plans SET updated_at = %s WHERE id = %s", (now, plan_id))
             conn.commit()
         _log.debug("insert_receipt: created %s", receipt_id)
 
@@ -811,7 +810,9 @@ class DBAdapter:
     def get_plan_by_id(self, plan_id: str) -> Optional[Dict[str, Any]]:
         _log.debug("get_plan_by_id: plan=%s", plan_id)
         with self._get_connection() as conn:
-            cursor = conn.execute("SELECT * FROM plans WHERE id = %s", (plan_id,))
+            # conduit.plans dropped 2026-08-02 — nebula.plans is the
+            # legacy-compat VIEW over nebula.implementation_plans (canonical).
+            cursor = conn.execute("SELECT * FROM nebula.plans WHERE id = %s", (plan_id,))
             plan = cursor.dict_fetchone()
             _log.debug("get_plan_by_id: plan=%s found=%s", plan_id, plan is not None)
             return plan
