@@ -11,6 +11,10 @@ export interface ScheduleValidation {
   message: string;
   /** Humanized description, e.g. "every 15 minutes" (valid expressions only). */
   humanized?: string;
+  /** Resolved next fire time (interval: from last_run_at; cron: next occurrence). */
+  nextRunAt?: Date | null;
+  /** Human-readable next-fire preview line, e.g. "Next fire: in 2h (Tue 12:00)". */
+  nextRunLabel?: string;
 }
 
 const CRON_MONTH_NAMES: Record<string, number> = {
@@ -122,7 +126,124 @@ export function describeCronExpression(expr: string): string {
   return parts.length ? parts.join(', ') : 'every minute';
 }
 
+// ── Next-fire time resolution ─────────────────────────────────────────
+// The runner (python/conduit/agent_scheduler_runner.py) marks an entry
+// due when: enabled AND type <> 'manual' AND (last_run_at IS NULL OR
+// (type = 'interval' AND now - last_run_at >= schedule_value)). Cron
+// strings are stored as-is but never re-parsed by the runner, so the
+// cron preview below is a format-level "next occurrence" calculation.
+
 const DURATION_UNITS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, ms: 0.001 };
+
+/** Expand a cron field into the set of allowed values (names resolved). */
+function expandCronField(
+  field: string,
+  min: number,
+  max: number,
+  names: Record<string, number>
+): Set<number> | null {
+  if (field === '*' || field === '?') return null; // unrestricted
+  const out = new Set<number>();
+  for (const part of field.split(',')) {
+    const [rangeExpr, stepStr] = part.split('/');
+    const step = stepStr ? parseInt(stepStr, 10) : 1;
+    let lo: number;
+    let hi: number;
+    if (rangeExpr === '*') {
+      lo = min;
+      hi = max;
+    } else {
+      const [a, b] = rangeExpr.split('-');
+      const av = parseCronToken(a, names);
+      const bv = b !== undefined ? parseCronToken(b, names) : av;
+      if (av === null || bv === null) return null;
+      lo = av;
+      hi = bv;
+    }
+    for (let v = lo; v <= hi; v += step) out.add(v);
+  }
+  return out;
+}
+
+/**
+ * Parse a validated cron expression into per-field value sets.
+ * minute/hour/month are concrete Sets; dom/dow are null when
+ * unrestricted (for standard dom/dow OR semantics when both set).
+ */
+function parseCronSets(
+  expr: string
+): {
+  minute: Set<number>;
+  hour: Set<number>;
+  month: Set<number>;
+  dom: Set<number> | null;
+  dow: Set<number> | null;
+} | null {
+  const trimmed = expr.trim();
+  if (validateCronExpression(trimmed) !== null) return null;
+  const [minF, hourF, domF, monF, dowF] = trimmed.split(/\s+/);
+  const all = (min: number, max: number) => {
+    const s = new Set<number>();
+    for (let v = min; v <= max; v++) s.add(v);
+    return s;
+  };
+  const minute = expandCronField(minF, 0, 59, {}) ?? all(0, 59);
+  const hour = expandCronField(hourF, 0, 23, {}) ?? all(0, 23);
+  const month = expandCronField(monF, 1, 12, CRON_MONTH_NAMES) ?? all(1, 12);
+  const dom = expandCronField(domF, 1, 31, {});
+  const dowRaw = expandCronField(dowF, 0, 7, CRON_DAY_NAMES);
+  // dow: 0 and 7 are both Sunday; normalize 7 -> 0
+  const dow = dowRaw ? new Set([...dowRaw].map(v => v % 7)) : null;
+  return { minute, hour, month, dom, dow };
+}
+
+function matchesDay(sets: ReturnType<typeof parseCronSets>, y: number, m: number, d: number): boolean {
+  if (!sets) return false;
+  if (!sets.month.has(m + 1)) return false;
+  const domMatch = sets.dom === null || sets.dom.has(d);
+  const dowMatch = sets.dow === null || sets.dow.has(new Date(y, m, d).getDay());
+  // Standard cron: when both dom and dow are restricted, fire on EITHER match.
+  if (sets.dom !== null && sets.dow !== null) return domMatch || dowMatch;
+  return domMatch && dowMatch;
+}
+
+/**
+ * Compute the next fire time for a cron expression, strictly after `from`.
+ * Returns null when the expression can never fire within the 3-year
+ * horizon (e.g. "0 0 31 2 *" — Feb 31st never exists).
+ */
+export function computeNextCronFire(expr: string, from: Date = new Date()): Date | null {
+  const sets = parseCronSets(expr);
+  if (!sets) return null;
+  const start = new Date(from);
+  start.setSeconds(0, 0);
+  start.setMinutes(start.getMinutes() + 1); // strictly after `from`
+  for (let i = 0; i < 1096; i++) { // ~3 years of days
+    const y = start.getFullYear();
+    const m = start.getMonth();
+    const d = start.getDate();
+    if (matchesDay(sets, y, m, d)) {
+      const hStart = i === 0 ? start.getHours() : 0;
+      for (let h = hStart; h < 24; h++) {
+        if (!sets.hour.has(h)) continue;
+        const mStart = i === 0 && h === hStart ? start.getMinutes() : 0;
+        for (let min = mStart; min < 60; min++) {
+          if (!sets.minute.has(min)) continue;
+          return new Date(y, m, d, h, min, 0, 0);
+        }
+      }
+    }
+    start.setDate(start.getDate() + 1);
+  }
+  return null;
+}
+
+/** Relative "in 2h / in 15m / in 4d" label for a future date. */
+export function relativeUntil(date: Date, now: Date = new Date()): string {
+  const secs = Math.max(0, Math.round((date.getTime() - now.getTime()) / 1000));
+  if (secs < 60) return 'in <1m';
+  return `in ${humanizeDuration(secs)}`;
+}
 
 /** Parse an interval duration ("15m", "1h", "90", "30s") into seconds, or null. */
 export function parseIntervalSeconds(value: string): number | null {
@@ -160,18 +281,60 @@ export function validateIntervalExpression(value: string): ScheduleValidation {
  */
 export function validateScheduleExpression(
   scheduleType: 'cron' | 'interval' | 'manual',
-  value: string
+  value: string,
+  opts?: { lastRunAt?: string | null }
 ): ScheduleValidation {
   if (scheduleType === 'manual') {
-    return { ok: true, message: 'manual — runs on demand only' };
+    return {
+      ok: true,
+      message: 'manual — runs on demand only',
+      nextRunLabel: 'Next fire: on demand — no automatic fire'
+    };
   }
   if (scheduleType === 'cron') {
     const err = validateCronExpression(value);
     if (err) return { ok: false, message: `invalid cron — ${err}` };
     // Format-level confirmation: the expression is a well-formed cron. The
     // runner currently re-fires interval schedules only, so don't over-claim
-    // that this schedule will be honored as-is.
-    return { ok: true, message: `valid cron format — ${describeCronExpression(value)}` };
+    // that this schedule will be honored as-is — the fire time below is the
+    // computed next occurrence of the expression, not a runner guarantee.
+    const next = computeNextCronFire(value);
+    if (!next) {
+      return {
+        ok: true,
+        message: `valid cron format — ${describeCronExpression(value)}`,
+        nextRunAt: null,
+        nextRunLabel: 'Next fire: never (expression cannot occur within 3 years)'
+      };
+    }
+    return {
+      ok: true,
+      message: `valid cron format — ${describeCronExpression(value)}`,
+      nextRunAt: next,
+      nextRunLabel: `Next fire (cron preview): ${next.toLocaleString()} (${relativeUntil(next)})`
+    };
   }
-  return validateIntervalExpression(value);
+  const res = validateIntervalExpression(value);
+  if (!res.ok) return res;
+  const secs = parseIntervalSeconds(value);
+  if (secs === null) return res;
+  const lastRunMs = opts?.lastRunAt ? Date.parse(opts.lastRunAt) : NaN;
+  const now = Date.now();
+  if (Number.isNaN(lastRunMs) || lastRunMs + secs * 1000 <= now) {
+    // Never run yet, or the interval has already elapsed since the last run.
+    const neverRun = Number.isNaN(lastRunMs);
+    return {
+      ...res,
+      nextRunAt: null,
+      nextRunLabel: neverRun
+        ? 'Next fire: on next runner poll (never run — due immediately)'
+        : 'Next fire: on next runner poll (interval elapsed since last run)'
+    };
+  }
+  const fire = new Date(lastRunMs + secs * 1000);
+  return {
+    ...res,
+    nextRunAt: fire,
+    nextRunLabel: `Next fire: ${fire.toLocaleString()} (${relativeUntil(fire, new Date(now))})`
+  };
 }
