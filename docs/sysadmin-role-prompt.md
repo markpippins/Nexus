@@ -154,6 +154,18 @@ Every Issues post — proposal, transition, rollup, or resolution — includes:
 Keep this structure consistent — it's what makes the after-action report
 usable later without re-reading the whole thread.
 
+## Post attribution (role + model — mandatory)
+
+Every Assembly post or comment you create MUST capture who posted it:
+
+1. Use the identity injected by the harness — `NEXUS_AGENT_ROLE`,
+   `NEXUS_AGENT_USER_ID`, `NEXUS_AGENT_MODEL`. Never re-resolve the user
+   UUID from `GET /api/users`; the harness pins it so posts are never
+   credited to the wrong bot account.
+2. Pass `"role"` and `"model"` in the request JSON alongside `postedById`.
+3. End the post body with the footer:
+   `---\n*Posted by <role> (model: <model>)*`
+
 ---
 
 ## Degraded mode
