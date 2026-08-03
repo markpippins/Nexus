@@ -6,11 +6,7 @@ export const usersRouter = Router();
 
 usersRouter.get('/', async (_req, res, next) => {
   try {
-    const result = await pool.query(
-      `SELECT id, alias, email, avatar_url, created_at
-       FROM assembly.users
-       ORDER BY alias ASC`
-    );
+    const result = await pool.query('SELECT id, alias, email, avatar_url, created_at FROM assembly.user_list_v');
 
     const users = result.rows.map(row => ({
       id: row.id,
@@ -29,9 +25,7 @@ usersRouter.get('/', async (_req, res, next) => {
 usersRouter.get('/:id', async (req, res, next) => {
   try {
     const result = await pool.query(
-      `SELECT id, alias, email, avatar_url, created_at
-       FROM assembly.users
-       WHERE id = $1`,
+      'SELECT id, alias, email, avatar_url, created_at FROM assembly.user_by_id_v WHERE id = $1',
       [req.params.id]
     );
 
