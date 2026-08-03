@@ -99,12 +99,16 @@ export async function createThreadById(
   body: string,
   postedById: string,
   sourceUrl?: string,
+  role?: string,
+  model?: string,
 ) {
   return post(`forums/by-id/${forumId}/threads`, {
     title,
     body,
     postedById,
     source_url: sourceUrl || null,
+    role: role || null,
+    model: model || null,
   });
 }
 
@@ -118,12 +122,16 @@ export async function createThread(
   body: string,
   postedById: string,
   sourceUrl?: string,
+  role?: string,
+  model?: string,
 ) {
   return post(`forums/${encodeURIComponent(forumSlug)}/threads`, {
     title,
     body,
     postedById,
     source_url: sourceUrl || null,
+    role: role || null,
+    model: model || null,
   });
 }
 
@@ -142,11 +150,15 @@ export async function createComment(
   text: string,
   postedById: string,
   parentId?: string,
+  role?: string,
+  model?: string,
 ) {
   return post(`forums/threads/${threadId}/comments`, {
     body: text,
     postedById,
     parentId: parentId || undefined,
+    role: role || null,
+    model: model || null,
   });
 }
 
