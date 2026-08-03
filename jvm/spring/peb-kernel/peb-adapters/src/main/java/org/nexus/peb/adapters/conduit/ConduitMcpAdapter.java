@@ -52,11 +52,6 @@ public class ConduitMcpAdapter implements ConduitMcpPort {
     }
 
     @Override
-    public JsonNode listWorkRequests() {
-        return get("/wr");
-    }
-
-    @Override
     public JsonNode transitionWorkRequest(String wrId, JsonNode transition) {
         return post("/wr/" + wrId + "/transition", transition);
     }
@@ -69,25 +64,6 @@ public class ConduitMcpAdapter implements ConduitMcpPort {
     @Override
     public JsonNode queryState() {
         return get("/state");
-    }
-
-    /**
-     * Invoke an MCP tool on conduit-mcp.
-     * 
-     * @param toolName the tool name (e.g., "create_plan", "issue_receipt")
-     * @param arguments the tool arguments
-     * @return the tool result
-     */
-    public JsonNode invokeTool(String toolName, JsonNode arguments) {
-        try {
-            var payload = objectMapper.createObjectNode();
-            payload.put("name", toolName);
-            payload.set("arguments", arguments);
-            return post("/tools/call", payload);
-        } catch (Exception e) {
-            log.error("Failed to invoke conduit tool {}: {}", toolName, e.getMessage());
-            throw e;
-        }
     }
 
     private JsonNode get(String path) {
