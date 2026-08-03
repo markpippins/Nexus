@@ -305,14 +305,20 @@ cmd_status_all() {
                 sub="tracking"  # Normal state for on-demand stdio MCP servers
                 health="OK (on-demand)"
             fi
-        # Docker services: verify container liveness
+        # Docker services: container liveness is the source of truth.
+        # NOTE: do NOT short-circuit on `[[ "$sub" == "running" ]]` — systemd's
+        # SubState lags actual container liveness during teardown, which caused
+        # a false "OK (docker)" report while the container was already gone.
+        # See audit record ef2ef768 (2026-08-03).
         elif _in_array "$svc" "${DOCKER_SERVICES[@]}"; then
             local container
             container=$(_docker_container_for "$svc")
-            if [[ "$sub" == "running" ]] || _docker_container_running "$container"; then
+            if _docker_container_running "$container"; then
                 health="OK (docker)"
             elif [[ "$active" == "active" ]]; then
-                health="⚠ systemd active, container?"
+                # systemd says active but the container is missing — surface
+                # the divergence instead of hiding it as "OK".
+                health="⚠ systemd active, container missing"
             else
                 health="DOWN"
             fi
