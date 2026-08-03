@@ -440,3 +440,73 @@ END;
 $$;
 
 COMMENT ON FUNCTION assembly.unlink_post_artifact IS 'Soft-expire a post-artifact link. Replaces bridges.js:78.';
+
+
+-- ── SEARCH HELPERS ────────────────────────────────────────────────────────
+
+-- Escape function for LIKE/ILIKE patterns (replaces JS escapeLike)
+CREATE OR REPLACE FUNCTION assembly.escape_like(p_input text)
+RETURNS text
+LANGUAGE sql IMMUTABLE
+AS $$
+  SELECT replace(replace(replace(p_input, '\', '\\'), '%', '\%'), '_', '\_');
+$$;
+
+COMMENT ON FUNCTION assembly.escape_like IS 'Escape special chars for LIKE/ILIKE patterns. Replaces JS escapeLike in search.js.';
+
+-- Search forums by name, description, or slug
+CREATE OR REPLACE FUNCTION assembly.search_forums(
+    q text,
+    lim integer DEFAULT 20
+)
+RETURNS TABLE(id uuid, name text, slug text, description text)
+LANGUAGE sql
+AS $$
+    SELECT f.id, f.name, f.slug, f.description
+    FROM assembly.forums f
+    WHERE (f.name ILIKE ('%' || assembly.escape_like(q) || '%') ESCAPE '\'
+        OR f.description ILIKE ('%' || assembly.escape_like(q) || '%') ESCAPE '\'
+        OR f.slug ILIKE ('%' || assembly.escape_like(q) || '%') ESCAPE '\')
+      AND (f.expiration_dt = 'infinity'::timestamptz OR f.expiration_dt > now())
+    LIMIT lim;
+$$;
+
+COMMENT ON FUNCTION assembly.search_forums IS 'Search forums by name/description/slug with ILIKE. Replaces search.js forum query.';
+
+-- Search posts/threads by title or body text
+CREATE OR REPLACE FUNCTION assembly.search_posts(
+    q text,
+    lim integer DEFAULT 20
+)
+RETURNS TABLE(id uuid, title text, body text, forum_slug text)
+LANGUAGE sql
+AS $$
+    SELECT p.id, p.title, p.text AS body, f.slug AS forum_slug
+    FROM assembly.posts p
+    JOIN assembly.forums f ON f.id = p.forum_uuid
+    WHERE (p.title ILIKE ('%' || assembly.escape_like(q) || '%') ESCAPE '\'
+        OR p.text ILIKE ('%' || assembly.escape_like(q) || '%') ESCAPE '\')
+      AND (p.expiration_dt = 'infinity'::timestamptz OR p.expiration_dt > now())
+    LIMIT lim;
+$$;
+
+COMMENT ON FUNCTION assembly.search_posts IS 'Search posts by title/body with ILIKE. Replaces search.js posts query.';
+
+-- Search comments by body text
+CREATE OR REPLACE FUNCTION assembly.search_comments(
+    q text,
+    lim integer DEFAULT 20
+)
+RETURNS TABLE(id uuid, body text, thread_id uuid, thread_title text, forum_slug text)
+LANGUAGE sql
+AS $$
+    SELECT c.id, c.text AS body, p.id AS thread_id, p.title AS thread_title, f.slug AS forum_slug
+    FROM assembly.comments c
+    JOIN assembly.posts p ON p.id = c.post_id AND (p.expiration_dt = 'infinity'::timestamptz OR p.expiration_dt > now())
+    JOIN assembly.forums f ON f.id = p.forum_uuid
+    WHERE c.text ILIKE ('%' || assembly.escape_like(q) || '%') ESCAPE '\'
+      AND (c.expiration_dt = 'infinity'::timestamptz OR c.expiration_dt > now())
+    LIMIT lim;
+$$;
+
+COMMENT ON FUNCTION assembly.search_comments IS 'Search comments by body text with ILIKE. Replaces search.js comments query.';

@@ -11,42 +11,16 @@ searchRouter.get('/', async (req, res, next) => {
       return res.json({ query: q, results: [] });
     }
 
-    const escapeLike = (value) => value.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
-    const pattern = `%${escapeLike(q)}%`;
     const limit = 20;
 
     // Delegate nebula-side search to nebula-srv
     const nebulaResponse = await fetchNebula('/search', { q });
 
-    // Assembly-local searches: forums, threads (posts), comments
+    // Assembly-local searches via stored procedures
     const [forumResult, threadResult, commentResult] = await Promise.all([
-      pool.query(
-        `SELECT id, name, slug, description
-         FROM assembly.forums
-         WHERE (name ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' OR slug ILIKE $1 ESCAPE '\\')
-           AND (expiration_dt = 'infinity'::timestamptz OR expiration_dt > now())
-         LIMIT $2`,
-        [pattern, limit]
-      ),
-       pool.query(
-        `SELECT p.id, p.title, p.text AS body, f.slug AS forum_slug
-         FROM assembly.posts p
-         JOIN assembly.forums f ON f.id = p.forum_uuid
-         WHERE (p.title ILIKE $1 ESCAPE '\\' OR p.text ILIKE $1 ESCAPE '\\')
-           AND (p.expiration_dt = 'infinity'::timestamptz OR p.expiration_dt > now())
-         LIMIT $2`,
-        [pattern, limit]
-      ),
-      pool.query(
-        `SELECT c.id, c.text AS body, p.id AS thread_id, p.title AS thread_title, f.slug AS forum_slug
-         FROM assembly.comments c
-         JOIN assembly.posts p ON p.id = c.post_id AND (p.expiration_dt = 'infinity'::timestamptz OR p.expiration_dt > now())
-         JOIN assembly.forums f ON f.id = p.forum_uuid
-         WHERE c.text ILIKE $1 ESCAPE '\\'
-           AND (c.expiration_dt = 'infinity'::timestamptz OR c.expiration_dt > now())
-         LIMIT $2`,
-        [pattern, limit]
-      ),
+      pool.query('SELECT * FROM assembly.search_forums($1, $2)', [q, limit]),
+      pool.query('SELECT * FROM assembly.search_posts($1, $2)', [q, limit]),
+      pool.query('SELECT * FROM assembly.search_comments($1, $2)', [q, limit]),
     ]);
 
     const assemblyResults = [
