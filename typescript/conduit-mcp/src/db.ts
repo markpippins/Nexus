@@ -3748,7 +3748,7 @@ export async function supersedeTicket(
 
     await tRun(
       client,
-      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'superseded', closed_at = @now,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'superseded', closed_at = @now::timestamptz,
         last_activity = @now, closure_reason = @reason
       WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
       { ticketId, now, reason }
@@ -3803,7 +3803,7 @@ export async function cancelTicket(ticketId: string, reason: string): Promise<nu
 
     const cancelled = await tRun(
       client,
-      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now::timestamptz,
         last_activity = @now, closure_reason = @reason
       WHERE id = @ticketId AND status IN ('open', 'claimed', 'stale')`,
       { ticketId, now, reason }
@@ -3912,7 +3912,7 @@ export async function cancelTicketsByPlan(planId: string, reason: string): Promi
 
     const count = await tRun(
       client,
-      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now,
+      `UPDATE ${VISION_SCHEMA}.tickets SET status = 'cancelled', closed_at = @now::timestamptz,
         last_activity = @now, closure_reason = @reason
       WHERE plan_id = @planId AND status IN ('open', 'claimed', 'stale', 'failed')`,
       { planId, now, reason }
