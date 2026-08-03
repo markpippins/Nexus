@@ -160,6 +160,8 @@ export const toolDefinitions: MCPToolDefinition[] = [
         user_id: { type: "string", description: "Author user UUID" },
         forum_id: { type: "string", description: "Forum UUID" },
         source_url: { type: "string", description: "Optional source URL" },
+        role: { type: "string", description: "Posting agent role (e.g. sysadmin, architect)" },
+        model: { type: "string", description: "Posting model ID (e.g. opencode/big-pickle)" },
       },
       required: ["title", "user_id", "forum_id", "body"],
     },
@@ -186,6 +188,8 @@ export const toolDefinitions: MCPToolDefinition[] = [
         user_id: { type: "string", description: "Author user UUID" },
         post_id: { type: "string", description: "Parent post (thread) UUID" },
         parent_id: { type: "string", description: "Parent comment UUID (for replies)" },
+        role: { type: "string", description: "Posting agent role (e.g. sysadmin, architect)" },
+        model: { type: "string", description: "Posting model ID (e.g. opencode/big-pickle)" },
       },
       required: ["text", "user_id", "post_id"],
     },
@@ -536,7 +540,7 @@ const handlers: Record<string, ToolHandler> = {
   },
 
   assembly_create_thread: async (args) => {
-    const { title, text, body, user_id, forum_id, source_url } = args;
+    const { title, text, body, user_id, forum_id, source_url, role, model } = args;
     const threadBody = body || text || "";
     if (!title || !user_id || !forum_id) {
       return createError("INVALID_ARGUMENTS", "title, user_id, and forum_id are required");
@@ -545,7 +549,7 @@ const handlers: Record<string, ToolHandler> = {
       return createError("INVALID_ARGUMENTS", "body (or text) is required");
     }
     try {
-      const post = await api.createThreadById(forum_id, title, threadBody, user_id, source_url);
+      const post = await api.createThreadById(forum_id, title, threadBody, user_id, source_url, role, model);
       return createSuccess(post);
     } catch (err: any) {
       if (err.message?.includes("404")) return createError("FORUM_NOT_FOUND", `Forum not found: ${forum_id}`);
@@ -567,12 +571,12 @@ const handlers: Record<string, ToolHandler> = {
 
   // ── Comments ────────────────────────────────────────────────────
   assembly_create_comment: async (args) => {
-    const { text, user_id, post_id, parent_id } = args;
+    const { text, user_id, post_id, parent_id, role, model } = args;
     if (!text || !user_id || !post_id) {
       return createError("INVALID_ARGUMENTS", "text, user_id, and post_id are required");
     }
     try {
-      const comment = await api.createComment(post_id, text, user_id, parent_id);
+      const comment = await api.createComment(post_id, text, user_id, parent_id, role, model);
       return createSuccess(comment);
     } catch (err: any) {
       if (err.message?.includes("404")) return createError("POST_NOT_FOUND", `Post not found: ${post_id}`);
