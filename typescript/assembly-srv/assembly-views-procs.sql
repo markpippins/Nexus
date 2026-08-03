@@ -159,7 +159,7 @@ BEGIN
     RETURN QUERY
     INSERT INTO assembly.forums (id, name, slug, description, sort_order)
     VALUES (gen_random_uuid(), p_name, p_slug, p_description, next_order)
-    RETURNING assembly.forums.id, assembly.forums.name, assembly.forums.slug, assembly.forums.description, assembly.forums.sort_order;
+    RETURNING assembly.forums.id, assembly.forums.name::text, assembly.forums.slug::text, assembly.forums.description, assembly.forums.sort_order;
 END;
 $$;
 
@@ -260,7 +260,7 @@ BEGIN
     RETURN QUERY
     INSERT INTO assembly.posts (id, forum_uuid, posted_by_id, title, text, source_url, role, model, created)
     VALUES (gen_random_uuid(), v_forum_id, p_user_id, p_title, p_body, p_source_url, p_role, p_model, now())
-    RETURNING assembly.posts.id, assembly.posts.title, assembly.posts.role, assembly.posts.model;
+    RETURNING assembly.posts.id, assembly.posts.title::text, assembly.posts.role, assembly.posts.model;
 END;
 $$;
 
@@ -334,9 +334,9 @@ DECLARE
     v_forum_exists boolean;
 BEGIN
     SELECT EXISTS(
-        SELECT 1 FROM assembly.forums
-        WHERE id = p_forum_id
-          AND (expiration_dt = 'infinity'::timestamptz OR expiration_dt > now())
+        SELECT 1 FROM assembly.forums f
+        WHERE f.id = p_forum_id
+          AND (f.expiration_dt = 'infinity'::timestamptz OR f.expiration_dt > now())
     ) INTO v_forum_exists;
 
     IF NOT v_forum_exists THEN
@@ -344,11 +344,11 @@ BEGIN
     END IF;
 
     RETURN QUERY
-    UPDATE assembly.posts
+    UPDATE assembly.posts p
     SET forum_uuid = p_forum_id, updated = now()
-    WHERE id = p_post_id
-      AND (expiration_dt = 'infinity'::timestamptz OR expiration_dt > now())
-    RETURNING assembly.posts.id, assembly.posts.title, assembly.posts.forum_uuid, assembly.posts.created, assembly.posts.updated, assembly.posts.text, assembly.posts.url, assembly.posts.rating, assembly.posts.posted_by_id, assembly.posts.source_url;
+    WHERE p.id = p_post_id
+      AND (p.expiration_dt = 'infinity'::timestamptz OR p.expiration_dt > now())
+    RETURNING p.id, p.title::text, p.forum_uuid, p.created, p.updated, p.text, p.url::text, p.rating, p.posted_by_id, p.source_url::text;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Post not found' USING ERRCODE = 'P0002';
