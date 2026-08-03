@@ -85,8 +85,19 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
       return { ...prev, [key]: next };
     });
 
-  // Live schedule-expression validation (cron / interval / manual)
-  const schedValidation = validateScheduleExpression(schedType, schedValue);
+  // Live schedule-expression validation (cron / interval / manual). Pass the
+  // editing schedule's last_run_at so interval previews resolve the actual
+  // next fire time (last_run_at + interval); new entries show the runner-poll
+  // behavior instead.
+  const schedValidation = validateScheduleExpression(schedType, schedValue, {
+    lastRunAt: editingSched?.last_run_at ?? null
+  });
+  // When editing a DISABLED schedule the runner will not fire it, so qualify
+  // the preview rather than implying a concrete fire time.
+  const schedNextRunLabel =
+    schedValidation.ok && editingSched && !editingSched.enabled
+      ? 'Next fire: disabled — no automatic fire while this schedule is off'
+      : schedValidation.nextRunLabel;
 
   const handleCircuitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -635,6 +646,19 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                   )}
                   <span>{schedValidation.message}</span>
                 </p>
+                {schedNextRunLabel && (
+                  <p
+                    className="mt-1 flex items-start gap-1.5 text-[10px] font-mono text-[var(--text-muted)]"
+                    title={
+                      schedValidation.ok && schedValidation.nextRunAt
+                        ? `resolved: ${schedValidation.nextRunAt.toISOString()}`
+                        : undefined
+                    }
+                  >
+                    <Calendar className="w-3 h-3 shrink-0 mt-px" />
+                    <span>{schedNextRunLabel}</span>
+                  </p>
+                )}
               </div>
 
               <div>
