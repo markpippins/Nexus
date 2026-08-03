@@ -39,7 +39,10 @@ const server = app.listen(PORT, () => {
   console.log(`shrapnel-srv listening on http://localhost:${PORT}  (dsn: ${dsnInfo})`);
 
   startHeartbeat({
-    serviceId: 117,
+    // registry.services row: id=54, name='shrapnel' (registered 2026-07-29).
+    // Previously hardcoded as 117, which did not match the registry row —
+    // heartbeats would upsert the wrong record. Aligned to the existing row.
+    serviceId: 54,
     serviceName: 'shrapnel',
     interval: 30,
     log: (...args) => console.log(new Date().toISOString(), '[heartbeat shrapnel]', ...args),
