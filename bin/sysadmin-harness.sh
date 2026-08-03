@@ -54,6 +54,7 @@ TIMEOUT_MINUTES="${TIMEOUT_MINUTES:-15}"  # max runtime per model attempt
 # SYSMODEL / FALLBACK_MODEL remain available as explicit overrides when a
 # caller sets them, but are no longer baked into the systemd unit.
 TACKLE_SRV_URL="${TACKLE_SRV_URL:-http://localhost:3410}"
+ASSEMBLY_URL="${ASSEMBLY_URL:-http://localhost:3107}"
 SYSMODEL="${SYSMODEL:-}"
 FALLBACK_MODEL="${FALLBACK_MODEL:-}"
 
@@ -81,7 +82,11 @@ _log() {
     local level="$1"
     shift
     local line="[sysadmin-harness] $(date '+%Y-%m-%d %H:%M:%S') [$level] $*"
-    echo "$line"
+    # NOTE: log to stderr (captured by systemd/journald) so that stdout
+    # stays clean — resolve_models() command-substitutes its output, and a
+    # stdout echo would leak log lines into the model chain (the cause of
+    # "Attempt 1" running with a garbage model ID and failing in ~35s).
+    echo "$line" >&2
     mkdir -p "$LOG_DIR" 2>/dev/null || true
     echo "$line" >> "$HARNESS_LOG" 2>/dev/null || true
 }
@@ -167,6 +172,27 @@ except Exception:
     printf '%s\n' "$out"
 }
 
+# resolve_agent_user_id <role> → Assembly user UUID whose alias matches the
+# role (e.g. "sysadmin"). The harness resolves identity deterministically so
+# the agent never has to guess from GET /api/users — that lookup is what
+# intermittently credited posts to the wrong user (e.g. Rover). Returns
+# empty string if unresolvable (agent falls back to GET /api/users).
+resolve_agent_user_id() {
+    local role="$1"
+    curl -s --max-time 10 "$ASSEMBLY_URL/api/users" 2>/dev/null \
+        | python3 -c "
+import sys, json
+try:
+    users = json.load(sys.stdin)
+    for u in users:
+        if (u.get('name') or '').lower() == sys.argv[1].lower():
+            print(u.get('id') or '')
+            break
+except Exception:
+    pass
+" "$role" 2>/dev/null || true
+}
+
 # ── Main ────────────────────────────────────────────────────────────────
 
 main() {
@@ -209,6 +235,23 @@ main() {
             ;;
     esac
 
+    # Deterministic identity for the agent. The harness resolves the Assembly
+    # user UUID here (never trust the agent to re-resolve — that produced the
+    # intermittent "Rover" miscredit). The per-attempt model is exported as
+    # NEXUS_AGENT_MODEL in the retry loop below.
+    export NEXUS_AGENT_ROLE="$OPENCODE_AGENT"
+    local agent_user_id
+    agent_user_id=$(resolve_agent_user_id "$OPENCODE_AGENT")
+    if [[ -n "$agent_user_id" ]]; then
+        export NEXUS_AGENT_USER_ID="$agent_user_id"
+    else
+        unset NEXUS_AGENT_USER_ID
+        _log "WARN" "Could not resolve Assembly user UUID for role $OPENCODE_AGENT — agent must fall back to GET /api/users"
+    fi
+    cycle_msg="${cycle_msg}
+
+Your identity (injected by the harness — do not re-resolve): role=$NEXUS_AGENT_ROLE, Assembly user UUID=${NEXUS_AGENT_USER_ID:-<unresolved — fall back to GET /api/users matching name \"$OPENCODE_AGENT\">}, model=\$NEXUS_AGENT_MODEL (env, set per attempt). Every Assembly post/comment you make MUST include role and model in the request JSON and a footer line '— role: <role>, model: <model>'."
+
     # Run the sysadmin agent
     # We run with --format json to get machine-readable output, redirecting
     # stdin from /dev/null so the agent doesn't hang waiting for input.
@@ -228,6 +271,7 @@ main() {
     while IFS= read -r model; do
         [[ -n "$model" ]] || continue
         _log "INFO" "Attempt $attempt: running with model $model (timeout=${TIMEOUT_MINUTES}m)"
+        export NEXUS_AGENT_MODEL="$model"
         output=$(timeout "${TIMEOUT_MINUTES}m" "$OPENCODE_BIN" run \
             --agent "$OPENCODE_AGENT" \
             --model "$model" \
