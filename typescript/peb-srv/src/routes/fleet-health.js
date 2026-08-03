@@ -82,13 +82,16 @@ fleetHealthRouter.get('/entropy', async (req, res, next) => {
       args
     );
     // Time-bucket rollup as well: counts per day per key, for trend chart.
+    // Bind $1 only when a window was supplied; otherwise fall back to the SQL
+    // default so we never reference an unbound parameter (previously 500).
     const trendArgs = since ? [since] : [];
+    const startExpr = since ? '$1::timestamptz' : "now() - interval '7 days'";
     const trend = await pool.query(
       `SELECT dates.day AS day,
               COALESCE(d.${groupBy}, '_no_data') AS key,
               count(*)::int AS total
          FROM generate_series(
-            COALESCE($1::timestamptz, now() - interval '7 days'),
+            ${startExpr},
             now(),
             interval '1 day'
          ) AS dates(day)
