@@ -34,6 +34,10 @@ log = logging.getLogger("analyst")
 
 _NEXUS_ROOT = Path("/home/codex/dev/nexus")
 _SEARCH_DIRS = ["python", "typescript", "angular", "sql", "schemas", "docs", "bin", "audit"]
+_KG_EVIDENCE_SECTIONS = [
+    "plans", "work_requests", "actors",
+    "architectural_observations", "decisions", "gaps_and_blockers",
+]
 
 # Stop words filtered from keyword extraction
 _STOP_WORDS: set[str] = {
@@ -284,6 +288,148 @@ def _query_cross_refs(conn, candidate_id: str) -> list[dict]:
         return []
 
 
+def _query_knowledge_graph(conn, keywords: list[str]) -> dict:
+    """Query knowledge.graph_entities for entities matching candidate keywords,
+    then follow graph_edges to find linked plans and work requests.
+
+    Returns dict with 'entities' (keyword-matched) and 'linked' (edge-reachable).
+    """
+    try:
+        cur = conn.cursor()
+        kw_list = keywords[:5]
+        if not kw_list:
+            cur.close()
+            return {"entities": [], "linked": []}
+
+        # ── Step 1: keyword-matched entities ──────────────────────────
+        like_clauses: list[str] = []
+        params: list[str] = []
+        for kw in kw_list:
+            like_clauses.append("(ge.name ILIKE %s OR ge.description ILIKE %s)")
+            params.extend([f"%{kw}%", f"%{kw}%"])
+
+        where_sql = " OR ".join(like_clauses)
+        query = f"""
+            WITH ranked AS (
+              SELECT ge.section, ge.entity_id, ge.name, ge.entity_type, ge.status,
+                     substring(ge.description, 1, 300) AS description_abbr,
+                     ROW_NUMBER() OVER (
+                       PARTITION BY ge.section
+                       ORDER BY ge.name
+                     ) AS rn
+              FROM knowledge.graph_entities ge
+              WHERE ({where_sql})
+                AND ge.section = ANY(%s)
+            )
+            SELECT section, entity_id, name, entity_type, status, description_abbr
+            FROM ranked
+            WHERE rn <= 5
+            ORDER BY
+              CASE section
+                WHEN 'plans' THEN 1
+                WHEN 'work_requests' THEN 2
+                WHEN 'actors' THEN 3
+                WHEN 'architectural_observations' THEN 4
+                WHEN 'decisions' THEN 5
+                WHEN 'gaps_and_blockers' THEN 6
+              END,
+              name
+            LIMIT 15
+        """
+        cur.execute(query, params + [_KG_EVIDENCE_SECTIONS])
+        cols = [d.name for d in cur.description]
+        entities = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+        # ── Step 2: follow edges to linked entities ───────────────────
+        linked: list[dict] = []
+        if entities:
+            try:
+                # Build VALUES clause for (section, entity_id) pairs
+                value_placeholders: list[str] = []
+                edge_params: list[str] = []
+                for ent in entities:
+                    value_placeholders.append("(%s, %s)")
+                    edge_params.extend([ent["section"], ent["entity_id"]])
+
+                values_sql = ", ".join(value_placeholders)
+                edge_query = f"""
+                    WITH matched(section, entity_id) AS (VALUES {values_sql})
+                    SELECT DISTINCT
+                      m.section AS matched_section,
+                      m.entity_id AS matched_id,
+                      e.relation_type,
+                      CASE WHEN e.source_section = m.section AND e.source_id = m.entity_id
+                           THEN e.target_section ELSE e.source_section
+                      END AS linked_section,
+                      CASE WHEN e.source_section = m.section AND e.source_id = m.entity_id
+                           THEN e.target_id ELSE e.source_id
+                      END AS linked_id
+                    FROM matched m
+                    JOIN knowledge.graph_edges e ON
+                      (e.source_section = m.section AND e.source_id = m.entity_id)
+                      OR (e.target_section = m.section AND e.target_id = m.entity_id)
+                    LIMIT 20
+                """
+                cur.execute(edge_query, edge_params)
+                edge_rows = cur.fetchall()
+
+                if edge_rows:
+                    edge_cols = [d.name for d in cur.description]
+                    edges = [dict(zip(edge_cols, r)) for r in edge_rows]
+
+                    # Resolve linked entity names
+                    linked_placeholders: list[str] = []
+                    linked_params: list[str] = []
+                    seen_linked: set[tuple[str, str]] = set()
+                    for e in edges:
+                        key = (e["linked_section"], e["linked_id"])
+                        if key not in seen_linked:
+                            seen_linked.add(key)
+                            linked_placeholders.append("(%s, %s)")
+                            linked_params.extend([e["linked_section"], e["linked_id"]])
+
+                    if linked_placeholders:
+                        resolve_sql = f"""
+                            WITH links(section, entity_id) AS (VALUES {', '.join(linked_placeholders)})
+                            SELECT l.section, l.entity_id, ge.name, ge.entity_type, ge.status
+                            FROM links l
+                            LEFT JOIN knowledge.graph_entities ge
+                              ON ge.section = l.section AND ge.entity_id = l.entity_id
+                        """
+                        cur.execute(resolve_sql, linked_params)
+                        resolve_cols = [d.name for d in cur.description]
+                        resolve_map: dict[tuple[str, str], dict] = {}
+                        for row in cur.fetchall():
+                            r = dict(zip(resolve_cols, row))
+                            resolve_map[(r["section"], r["entity_id"])] = r
+
+                        for e in edges:
+                            linked_key = (e["linked_section"], e["linked_id"])
+                            resolved = resolve_map.get(linked_key)
+                            linked_name = (resolved.get("name") or e["linked_id"]) if resolved else e["linked_id"]
+                            # Skip edges where the linked entity doesn't exist in graph_entities
+                            if resolved and not resolved.get("name"):
+                                continue
+                            linked.append({
+                                "matched_section": e["matched_section"],
+                                "matched_id": e["matched_id"],
+                                "relation_type": e["relation_type"],
+                                "linked_section": e["linked_section"],
+                                "linked_name": linked_name,
+                                "linked_type": resolved.get("entity_type", "") if resolved else "",
+                                "linked_status": resolved.get("status", "") if resolved else "",
+                            })
+            except Exception as e:
+                log.warning("KG edge traversal failed: %s", e)
+                # entities survive; linked stays empty
+
+        cur.close()
+        return {"entities": entities, "linked": linked[:10]}
+    except Exception as e:
+        log.warning("Knowledge graph query failed: %s", e)
+        return {"entities": [], "linked": []}
+
+
 def collect_filesystem_evidence(
     conn, candidate: dict | None, question: dict | None = None
 ) -> dict:
@@ -300,6 +446,7 @@ def collect_filesystem_evidence(
     empty = {
         "directories": [], "files": [], "code_refs": [],
         "audit_records": [], "cross_refs": [],
+        "kg_entities": [], "kg_linked": [],
         "summary": "No candidate linked",
     }
     if not candidate:
@@ -322,6 +469,9 @@ def collect_filesystem_evidence(
     code_refs = _grep_code_references(keywords)
     audit_records = _query_audit_records(conn, keywords, candidate["id"])
     cross_refs = _query_cross_refs(conn, candidate["id"])
+    kg_result = _query_knowledge_graph(conn, keywords)
+    kg_entities = kg_result.get("entities", [])
+    kg_linked = kg_result.get("linked", [])
 
     # Build human-readable summary
     summary_parts: list[str] = []
@@ -335,6 +485,10 @@ def collect_filesystem_evidence(
         summary_parts.append(f"{len(audit_records)} audit records")
     if cross_refs:
         summary_parts.append(f"{len(cross_refs)} cross-references")
+    if kg_entities:
+        summary_parts.append(f"{len(kg_entities)} KG entities")
+    if kg_linked:
+        summary_parts.append(f"{len(kg_linked)} KG links")
 
     summary = "; ".join(summary_parts) if summary_parts else "No filesystem or DB evidence found"
 
@@ -350,6 +504,20 @@ def collect_filesystem_evidence(
         "cross_refs": [
             {"rel_type": r.get("rel_type", ""), "linked_title": r.get("linked_title", "")}
             for r in cross_refs[:5]
+        ],
+        "kg_entities": [
+            {"section": r.get("section", ""), "name": r.get("name", ""),
+             "entity_type": r.get("entity_type", ""), "status": r.get("status", ""),
+             "description": r.get("description_abbr", "")}
+            for r in kg_entities[:5]
+        ],
+        "kg_linked": [
+            {"relation_type": r.get("relation_type", ""),
+             "linked_section": r.get("linked_section", ""),
+             "linked_name": r.get("linked_name", ""),
+             "linked_type": r.get("linked_type", ""),
+             "linked_status": r.get("linked_status", "")}
+            for r in kg_linked[:5]
         ],
         "summary": summary,
     }
@@ -530,6 +698,14 @@ class AnalystHarness(Harness):
                 if cross_refs:
                     xref_lines = [f"{r.get('rel_type','')} → {r.get('linked_title','')[:50]}" for r in cross_refs[:3]]
                     parts.append(f"- Cross-references: {', '.join(xref_lines)}")
+                kg = fs_evidence.get("kg_entities", [])
+                if kg:
+                    kg_lines = [f"{r.get('section','')}/{r.get('name','')} ({r.get('status','')})" for r in kg[:4]]
+                    parts.append(f"- Knowledge Graph entities ({len(kg)}): {', '.join(kg_lines)}")
+                kg_linked = fs_evidence.get("kg_linked", [])
+                if kg_linked:
+                    link_lines = [f"{r.get('relation_type','')}→{r.get('linked_section','')}/{r.get('linked_name','')}" for r in kg_linked[:4]]
+                    parts.append(f"- KG edge-linked entities ({len(kg_linked)}): {', '.join(link_lines)}")
                 parts.append("")
 
             if similar:
