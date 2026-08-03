@@ -23,7 +23,8 @@ searchRouter.get('/', async (req, res, next) => {
       pool.query(
         `SELECT id, name, slug, description
          FROM assembly.forums
-         WHERE name ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' OR slug ILIKE $1 ESCAPE '\\'
+         WHERE (name ILIKE $1 ESCAPE '\\' OR description ILIKE $1 ESCAPE '\\' OR slug ILIKE $1 ESCAPE '\\')
+           AND (expiration_dt = 'infinity'::timestamptz OR expiration_dt > now())
          LIMIT $2`,
         [pattern, limit]
       ),
@@ -31,16 +32,18 @@ searchRouter.get('/', async (req, res, next) => {
         `SELECT p.id, p.title, p.text AS body, f.slug AS forum_slug
          FROM assembly.posts p
          JOIN assembly.forums f ON f.id = p.forum_uuid
-         WHERE p.title ILIKE $1 ESCAPE '\\' OR p.text ILIKE $1 ESCAPE '\\'
+         WHERE (p.title ILIKE $1 ESCAPE '\\' OR p.text ILIKE $1 ESCAPE '\\')
+           AND (p.expiration_dt = 'infinity'::timestamptz OR p.expiration_dt > now())
          LIMIT $2`,
         [pattern, limit]
       ),
       pool.query(
         `SELECT c.id, c.text AS body, p.id AS thread_id, p.title AS thread_title, f.slug AS forum_slug
          FROM assembly.comments c
-         JOIN assembly.posts p ON p.id = c.post_id
+         JOIN assembly.posts p ON p.id = c.post_id AND (p.expiration_dt = 'infinity'::timestamptz OR p.expiration_dt > now())
          JOIN assembly.forums f ON f.id = p.forum_uuid
          WHERE c.text ILIKE $1 ESCAPE '\\'
+           AND (c.expiration_dt = 'infinity'::timestamptz OR c.expiration_dt > now())
          LIMIT $2`,
         [pattern, limit]
       ),
