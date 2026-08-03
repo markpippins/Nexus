@@ -57,13 +57,16 @@ const PIPELINE_VELOCITY_DATA = [
 ];
 
 export const MainDashboard: React.FC<MainDashboardProps> = ({
-  plans,
-  workRequests,
-  modelChains,
+  plans: rawPlans,
+  workRequests: rawWorkRequests,
+  modelChains: rawModelChains,
   status,
   onNavigateTab,
   onSelectPlan,
 }) => {
+  const plans = Array.isArray(rawPlans) ? rawPlans : [];
+  const workRequests = Array.isArray(rawWorkRequests) ? rawWorkRequests : [];
+  const modelChains = Array.isArray(rawModelChains) ? rawModelChains : [];
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
 

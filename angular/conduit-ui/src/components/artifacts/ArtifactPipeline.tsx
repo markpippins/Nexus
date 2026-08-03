@@ -37,11 +37,11 @@ interface ArtifactPipelineProps {
 }
 
 export const ArtifactPipeline: React.FC<ArtifactPipelineProps> = ({
-  harvests,
-  candidates,
-  intents,
-  requirements,
-  specs,
+  harvests: rawHarvests,
+  candidates: rawCandidates,
+  intents: rawIntents,
+  requirements: rawRequirements,
+  specs: rawSpecs,
   onAddHarvestClick,
   onExtractCandidates,
   onPromoteCandidate,
@@ -49,6 +49,11 @@ export const ArtifactPipeline: React.FC<ArtifactPipelineProps> = ({
   onCanonicalizeReq,
   onViewRawHarvest,
 }) => {
+  const harvests = Array.isArray(rawHarvests) ? rawHarvests : [];
+  const candidates = Array.isArray(rawCandidates) ? rawCandidates : [];
+  const intents = Array.isArray(rawIntents) ? rawIntents : [];
+  const requirements = Array.isArray(rawRequirements) ? rawRequirements : [];
+  const specs = Array.isArray(rawSpecs) ? rawSpecs : [];
   const [activeSubTab, setActiveSubTab] = useState<
     'harvests' | 'candidates' | 'intents' | 'requirements' | 'specs'
   >('harvests');

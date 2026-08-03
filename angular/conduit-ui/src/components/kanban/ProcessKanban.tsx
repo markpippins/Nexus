@@ -36,16 +36,22 @@ interface ProcessKanbanProps {
 }
 
 export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
-  plans,
-  harvests,
-  candidates,
-  intents,
-  requirements,
-  specs,
+  plans: rawPlans,
+  harvests: rawHarvests,
+  candidates: rawCandidates,
+  intents: rawIntents,
+  requirements: rawRequirements,
+  specs: rawSpecs,
   onSelectPlan,
   onAdvancePlanStatus,
   onProposeNewPlan,
 }) => {
+  const plans = Array.isArray(rawPlans) ? rawPlans : [];
+  const harvests = Array.isArray(rawHarvests) ? rawHarvests : [];
+  const candidates = Array.isArray(rawCandidates) ? rawCandidates : [];
+  const intents = Array.isArray(rawIntents) ? rawIntents : [];
+  const requirements = Array.isArray(rawRequirements) ? rawRequirements : [];
+  const specs = Array.isArray(rawSpecs) ? rawSpecs : [];
   const [boardType, setBoardType] = useState<'plans' | 'artifacts'>('plans');
 
   const planColumns: { status: PlanLifecycleStatus; label: string; color: string }[] = [

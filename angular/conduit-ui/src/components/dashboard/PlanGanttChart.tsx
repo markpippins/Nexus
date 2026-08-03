@@ -36,9 +36,10 @@ type SortKey = 'startDate' | 'tokens' | 'status' | 'cost';
 type FilterStatus = 'ALL' | 'ACTIVE' | 'COMPLETED' | 'BLOCKED' | 'PENDING';
 
 export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
-  plans,
+  plans: rawPlans,
   onSelectPlan,
 }) => {
+  const plans = Array.isArray(rawPlans) ? rawPlans : [];
   const [sortKey, setSortKey] = useState<SortKey>('startDate');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('ALL');
   const [activeTab, setActiveTab] = useState<'gantt' | 'token_density'>('gantt');

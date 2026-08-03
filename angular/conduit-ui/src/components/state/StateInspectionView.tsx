@@ -57,7 +57,7 @@ export const StateInspectionView: React.FC = () => {
   const loadLineage = async () => {
     try {
       const res = await apiService.getLineageEvents(undefined, 100);
-      setLineageEvents(res.events);
+      setLineageEvents(Array.isArray(res.events) ? res.events : []);
     } catch (err: any) {
       console.error(err);
     }
@@ -222,7 +222,7 @@ export const StateInspectionView: React.FC = () => {
               <div>
                 <div className="text-zinc-500 text-[10px] uppercase mb-1">Aliases</div>
                 <div className="flex gap-2">
-                  {identityResult.aliases.map((a) => (
+                  {(Array.isArray(identityResult.aliases) ? identityResult.aliases : []).map((a) => (
                     <span key={a} className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-xs">
                       {a}
                     </span>
@@ -280,7 +280,7 @@ export const StateInspectionView: React.FC = () => {
                 <div>
                   <div className="text-zinc-500 text-[10px] uppercase">Valid Next Transitions</div>
                   <div className="flex gap-1 mt-1">
-                    {planDetail.valid_transitions.map((t) => (
+                    {(Array.isArray(planDetail.valid_transitions) ? planDetail.valid_transitions : []).map((t) => (
                       <span key={t} className="bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded text-[10px]">
                         {t}
                       </span>
@@ -293,7 +293,7 @@ export const StateInspectionView: React.FC = () => {
               <div className="space-y-2">
                 <div className="text-xs font-mono font-bold text-zinc-400">CHRONOLOGICAL RECEIPT TIMELINE</div>
                 <div className="space-y-2">
-                  {planDetail.receipts.map((rc) => (
+                  {(Array.isArray(planDetail.receipts) ? planDetail.receipts : []).map((rc) => (
                     <div key={rc.id} className="p-3 bg-[#0c0c0e] border border-zinc-800 rounded font-mono text-xs space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-blue-400 font-bold">{rc.id}</span>
@@ -346,7 +346,7 @@ export const StateInspectionView: React.FC = () => {
                 </div>
                 <div className="text-right text-[10px] text-zinc-500 shrink-0">
                   <div>Delta: {ev.delta_id}</div>
-                  <div>Plans: {ev.affected_plans.join(', ')}</div>
+                  <div>Plans: {(Array.isArray(ev.affected_plans) ? ev.affected_plans : []).join(', ')}</div>
                 </div>
               </div>
             ))}
