@@ -48,9 +48,6 @@ feedRouter.delete('/:id', async (req, res, next) => {
     if (err.code === 'P0002') throw new NotFoundError('Post not found');
     next(err);
   }
-  } catch (err) {
-    next(err);
-  }
 });
 
 feedRouter.post('/', async (req, res, next) => {
