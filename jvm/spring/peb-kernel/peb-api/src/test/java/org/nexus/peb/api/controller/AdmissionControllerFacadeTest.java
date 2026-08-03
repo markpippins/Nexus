@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -32,7 +34,7 @@ class AdmissionControllerFacadeTest {
         RuntimeException nextException;
 
         StubGovernanceEngine() {
-            super(null, null, null);
+            super(null, null, null, null, null);
         }
 
         @Override
@@ -55,9 +57,24 @@ class AdmissionControllerFacadeTest {
         controller = new AdmissionControllerFacade(governanceEngine);
     }
 
+    /**
+     * Builds a structurally complete transaction — all four persistence-required
+     * fields present, exactly as peb-mcp sends them. Tests that target the
+     * boundary guard then drop individual fields to assert 400.
+     */
     private PebTransaction makeTransaction(String toolName) {
         PebTransaction tx = new PebTransaction();
+        ReflectionTestUtils.setField(tx, "idempotencyKey", "test-key");
+        ReflectionTestUtils.setField(tx, "entityId", "test-entity");
         ReflectionTestUtils.setField(tx, "toolName", toolName);
+        ReflectionTestUtils.setField(tx, "input", JsonNodeFactory.instance.objectNode());
+        return tx;
+    }
+
+    /** Complete transaction with one persistence-required field dropped (set to null). */
+    private PebTransaction makeTransactionMissing(String missingField) {
+        PebTransaction tx = makeTransaction("peb_validate_transition");
+        ReflectionTestUtils.setField(tx, missingField, null);
         return tx;
     }
 
@@ -138,11 +155,11 @@ class AdmissionControllerFacadeTest {
     // ── ORANGE PATH ─────────────────────────────────────────────
 
     @Nested
-    @DisplayName("OrangePath - UNKNOWN toolName (ROUTED, not rejected)")
+    @DisplayName("OrangePath - UNKNOWN toolName")
     class OrangePath {
 
         @Test
-        @DisplayName("unrecognized toolName -> still 200 OK if admitted")
+        @DisplayName("unrecognized (but present) toolName with complete fields -> engine decides")
         void unknown_tool_200_if_admitted() {
             stubAccepted("ROUTED: unknown tool");
             ResponseEntity<String> result = controller.submitTransaction(
@@ -151,23 +168,69 @@ class AdmissionControllerFacadeTest {
             assertEquals(HttpStatus.OK, result.getStatusCode());
             assertEquals("ROUTED: unknown tool", result.getBody());
         }
+    }
+
+    // ── MALFORMED PATH ──────────────────────────────────────────
+
+    @Nested
+    @DisplayName("MalformedPath - missing persistence-required fields -> 400 Bad Request")
+    class MalformedPath {
 
         @Test
-        @DisplayName("null toolName -> 200 OK (auditability)")
-        void null_toolName_200() {
-            stubAccepted("ROUTED: null tool");
-            ResponseEntity<String> result = controller.submitTransaction(makeTransaction(null));
+        @DisplayName("null body -> 400")
+        void null_body_400() {
+            ResponseEntity<String> result = controller.submitTransaction(null);
 
-            assertEquals(HttpStatus.OK, result.getStatusCode());
+            assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+            assertTrue(result.getBody().contains("transaction body"));
         }
 
         @Test
-        @DisplayName("empty toolName -> 200 OK")
-        void empty_toolName_200() {
-            stubAccepted("ROUTED: empty tool");
+        @DisplayName("null toolName -> 400 (was: stale 200 ROUTED intent)")
+        void null_toolName_400() {
+            ResponseEntity<String> result = controller.submitTransaction(makeTransaction(null));
+
+            assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+            assertTrue(result.getBody().contains("toolName"));
+        }
+
+        @Test
+        @DisplayName("empty toolName -> 400")
+        void empty_toolName_400() {
             ResponseEntity<String> result = controller.submitTransaction(makeTransaction(""));
 
-            assertEquals(HttpStatus.OK, result.getStatusCode());
+            assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+            assertTrue(result.getBody().contains("toolName"));
+        }
+
+        @Test
+        @DisplayName("missing idempotencyKey -> 400")
+        void missing_idempotencyKey_400() {
+            ResponseEntity<String> result = controller.submitTransaction(
+                    makeTransactionMissing("idempotencyKey"));
+
+            assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+            assertTrue(result.getBody().contains("idempotencyKey"));
+        }
+
+        @Test
+        @DisplayName("missing entityId -> 400")
+        void missing_entityId_400() {
+            ResponseEntity<String> result = controller.submitTransaction(
+                    makeTransactionMissing("entityId"));
+
+            assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+            assertTrue(result.getBody().contains("entityId"));
+        }
+
+        @Test
+        @DisplayName("missing input -> 400")
+        void missing_input_400() {
+            ResponseEntity<String> result = controller.submitTransaction(
+                    makeTransactionMissing("input"));
+
+            assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+            assertTrue(result.getBody().contains("input"));
         }
     }
 

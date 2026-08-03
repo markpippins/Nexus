@@ -74,6 +74,10 @@ public class PebTransaction {
         return id;
     }
 
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
     public String getEntityId() {
         return entityId;
     }
@@ -138,11 +142,22 @@ public class PebTransaction {
      * repository-level call sites that bypass
      * {@link org.nexus.peb.core.engine.PebGovernanceEngine}.
      *
-     * <p>Caller-supplied timestamps still win: this method only assigns
-     * when {@code createdAt} is currently null.
+     * <p>Also assigns {@link #id} when null. The identifier is declared with
+     * {@code @Id} but no {@code @GeneratedValue}: the kernel historically
+     * relied on a pre-assigned UUID that no dispatch path ever set, so every
+     * insert crashed with
+     * {@code IdentifierGenerationException: must be manually assigned before
+     * calling 'persist()'}. Defaulting here — exactly like {@code createdAt} —
+     * makes every insert path self-sufficient.
+     *
+     * <p>Caller-supplied values still win: this method only assigns
+     * when the field is currently null.
      */
     @PrePersist
     protected void onCreate() {
+        if (id == null) {
+            id = UUID.randomUUID();
+        }
         if (createdAt == null) {
             createdAt = Instant.now();
         }

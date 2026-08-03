@@ -47,6 +47,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   <li>Invariant-validator denial — engine returns
  *       {@link AdmissionResponse#denied(String)}, controller maps to 422.
  * </ol>
+ *
+ * <p>The boundary guard is also covered: requests missing any
+ * persistence-required field ({@code idempotencyKey}, {@code entityId},
+ * {@code toolName}, {@code input}) are rejected with 400 before reaching the
+ * engine — regression for the production 500 on {@code POST {} }.
  */
 @SpringBootTest(
     classes = PebApplication.class,
@@ -74,6 +79,15 @@ class AdmissionControllerFacadeTest {
     @MockitoBean
     private PebGovernanceEngine governanceEngine;
 
+    /** Structurally complete transaction, shaped exactly as peb-mcp sends it. */
+    private static final String COMPLETE_PAYLOAD =
+        "{\"idempotencyKey\":\"test-key\",\"entityId\":\"test-entity\","
+        + "\"toolName\":\"peb_validate_transition\",\"input\":{}}";
+
+    private static final String COMPLETE_VIOLATION_PAYLOAD =
+        "{\"idempotencyKey\":\"test-key\",\"entityId\":\"test-entity\","
+        + "\"toolName\":\"peb_report_violation\",\"input\":{\"violation_type\":\"policy\"}}";
+
     @Test
     void malformedViolation_returns422() throws Exception {
         when(governanceEngine.processForPath(any(), any()))
@@ -82,7 +96,7 @@ class AdmissionControllerFacadeTest {
 
         mockMvc.perform(post("/api/v1/peb/transaction")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
+                .content(COMPLETE_VIOLATION_PAYLOAD))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(content().string(
                 "Malformed admission request: "
@@ -96,7 +110,7 @@ class AdmissionControllerFacadeTest {
 
         mockMvc.perform(post("/api/v1/peb/transaction")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
+                .content(COMPLETE_PAYLOAD))
             .andExpect(status().isOk())
             .andExpect(content().string("Mutation processed"));
     }
@@ -108,8 +122,42 @@ class AdmissionControllerFacadeTest {
 
         mockMvc.perform(post("/api/v1/peb/transaction")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
+                .content(COMPLETE_PAYLOAD))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(content().string("Admission denied by invariant validator"));
+    }
+
+    // ── Boundary guard: malformed input -> 400 (regression for the 500) ──
+
+    @Test
+    void emptyObject_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/peb/transaction")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string(
+                "Malformed admission request: missing required field(s): "
+                + "idempotencyKey, entityId, toolName, input"));
+    }
+
+    @Test
+    void partialPayload_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/peb/transaction")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"toolName\":\"peb_validate_transition\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string(
+                "Malformed admission request: missing required field(s): "
+                + "idempotencyKey, entityId, input"));
+    }
+
+    @Test
+    void nullToolName_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/peb/transaction")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"idempotencyKey\":\"k\",\"entityId\":\"e\",\"input\":{}}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(content().string(
+                "Malformed admission request: missing required field(s): toolName"));
     }
 }
