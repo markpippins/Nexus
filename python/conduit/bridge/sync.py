@@ -311,8 +311,16 @@ class Syncer:
                     "Example: host=localhost port=5432 user=pguser "
                     "password=pgpass dbname=nexus"
                 )
+            # autocommit via attribute (a connect kwarg would be merged into
+            # the URI DSN and rejected by libpq). Reads (and the checkpoint
+            # writes) then commit immediately so the session never sits in
+            # "idle in transaction". PG's idle_in_transaction_session_timeout
+            # (30s) would otherwise kill the connection between poll cycles
+            # (poll interval is also 30s), and .closed can't detect the
+            # server-side kill.
             self._pg_conn = psycopg2.connect(dsn)
-            _log.debug("Syncer: connected to PG")
+            self._pg_conn.autocommit = True
+            _log.debug("Syncer: connected to PG (autocommit)")
         return self._pg_conn
 
     def close(self) -> None:

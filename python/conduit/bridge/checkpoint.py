@@ -72,11 +72,22 @@ class Checkpoint:
     # ── Connection ─────────────────────────────────────────────────────
 
     def _get_conn(self) -> psycopg2.extensions.connection:
-        """Lazy-init PG connection."""
+        """Lazy-init PG connection.
+
+        autocommit=True: every statement commits immediately, so the session
+        never sits in ``idle in transaction``. PG's
+        ``idle_in_transaction_session_timeout`` (30s on this server) would
+        otherwise terminate the connection between poll cycles, and the
+        ``.closed`` health check cannot detect a server-side kill — the next
+        cycle then fails with "server closed the connection unexpectedly".
+        """
         if self._conn is None or self._conn.closed:
             self._conn = psycopg2.connect(self._dsn)
+            # autocommit via attribute (not connect kwarg — that would be
+            # merged into the URI DSN and rejected by libpq)
+            self._conn.autocommit = True
             self._ensure_table()
-            _log.debug("Checkpoint: connected to PG")
+            _log.debug("Checkpoint: connected to PG (autocommit)")
         return self._conn
 
     def _ensure_table(self) -> None:
@@ -91,17 +102,22 @@ class Checkpoint:
                     id                  INTEGER PRIMARY KEY DEFAULT 1
                                         CHECK(id = 1),
                     last_id             TEXT NOT NULL DEFAULT '',
-                    last_recorded_on_dt TEXT NOT NULL DEFAULT '',
+                    -- TIMESTAMPTZ: conduit-mcp migration (db.ts:2228) converted this
+                    -- from TEXT; the '' default was dropped. Keep the bootstrap
+                    -- INSERT aligned (real timestamp, not '').
+                    last_recorded_on_dt TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     last_polled_at      TIMESTAMPTZ,
                     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
             """)
-            # Ensure the singleton row exists
+            # Ensure the singleton row exists (cursor semantics: last_id='' means
+            # "start from beginning" — sync.py only uses the cursor when both
+            # last_id and last_recorded_on_dt are truthy)
             cur.execute(f"""
                 INSERT INTO {self.TABLE}
                     (id, last_id, last_recorded_on_dt, last_polled_at, updated_at)
-                VALUES (1, '', '', NOW(), NOW())
+                VALUES (1, '', NOW(), NOW(), NOW())
                 ON CONFLICT (id) DO NOTHING
             """)
             self._conn.commit()
@@ -177,7 +193,7 @@ class Checkpoint:
                 f"""
                 UPDATE {self.TABLE}
                 SET last_id = '',
-                    last_recorded_on_dt = '',
+                    last_recorded_on_dt = NOW(),
                     last_polled_at = NOW(),
                     updated_at = NOW()
                 WHERE id = 1
