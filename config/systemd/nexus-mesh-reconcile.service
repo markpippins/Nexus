@@ -1,0 +1,18 @@
+[Unit]
+Description=Service Catalog Reconciliation (terrain vs registry vs sysadmin)
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus
+# --list: report-only unit — the journal is the deliverable; contradictions
+# show in the report itself, so the unit never flips to "failed".
+ExecStart=/usr/bin/python3 /home/codex/dev/nexus/bin/mesh-reconcile.py --quiet --list
+Environment=PGPASSWORD=pgpass
+Environment=PYTHONPATH=/home/codex/dev/nexus/python:/home/codex/dev/nexus/python/rover
+
+# Read-only reconciliation — no file writes needed
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only

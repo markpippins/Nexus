@@ -1,0 +1,13 @@
+[Unit]
+Description=Service Catalog Reconciliation (daily at 08:00)
+
+[Timer]
+# OnCalendar provides a robust steady-state schedule regardless of when the
+# timer is started — OnBootSec/OnUnitActiveSec alone leave a late-started
+# timer unarmed (NextElapse=infinity, Trigger: n/a).
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target
