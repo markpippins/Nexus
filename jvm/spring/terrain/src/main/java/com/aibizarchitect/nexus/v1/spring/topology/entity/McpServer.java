@@ -1,5 +1,7 @@
 package com.aibizarchitect.nexus.v1.spring.topology.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 
 @Entity
@@ -23,6 +25,7 @@ public class McpServer {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "service_type_id", insertable = false, updatable = false)
+    @JsonIgnore
     private ServiceType serviceType;
 
     @Column(name = "health_check_url")
