@@ -506,6 +506,21 @@ CANDIDATES: tuple[Candidate, ...] = (
         startup="systemd: systemctl --user start conduit-srv.service",
         workspace_path="nexus/typescript/conduit-srv",
     ),
+    Candidate(
+        name="apidocs-srv",
+        port=3180,
+        kind="runnable_service",
+        service_type="Python Service",
+        health_url="http://localhost:3180/health",
+        description=(
+            "API docs index — Swagger UI + ReDoc over all *-srv OpenAPI "
+            "specs. Plain HTTP on 127.0.0.1:3180 (localhost tooling); "
+            "HTTPS listener on 0.0.0.0:8443 (self-signed cert, "
+            "auto-generated) for LAN clients. Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start apidocs-srv.service",
+        workspace_path="nexus/tools/api-docs",
+    ),
 )
 
 
