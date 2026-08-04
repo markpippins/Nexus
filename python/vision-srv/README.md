@@ -659,3 +659,21 @@ All tables use **semi-bitemporal** tracking: `recorded_on_dt` (when the row beca
 | Database URL | (from losm-store config) | PostgreSQL connection |
 
 Service runs via systemd: `vision-srv-py.service` on port 8003.
+
+
+---
+
+## REST API & OpenAPI
+
+- Endpoint inventory: [`API.md`](./API.md) (generated from source route registrations)
+- OpenAPI spec: [`openapi.yaml`](./openapi.yaml) (FastAPI-native spec captured from the live service's `/openapi.json`)
+- The running service also serves its spec natively at `http://localhost:8003/openapi.json`
+  and its interactive docs at `http://localhost:8003/docs`
+
+Regenerate after route changes:
+
+```bash
+cd nexus
+python3 tools/api-docs/extract_routes.py --out /tmp/api_inventory.json
+python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json
+```

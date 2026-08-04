@@ -163,3 +163,19 @@ Stores the ISO 8601 timestamp of the most recent cache sync. Agents check this t
 - [`nexus/schemas/tackle/memory_procedure_registry.sql`](../../schemas/tackle/memory_procedure_registry.sql) — PostgreSQL DDL for the `tackle.memory` and `tackle.role_memory` tables
 - `nexus/typescript/tackle-mcp/` — MCP server that reads from the Redis cache (via HTTP to role-memory-srv or directly via tools-aggregator)
 - `nexus/typescript/tools-aggregator/` — Aggregates all MCP tools including procedure registry queries
+
+
+---
+
+## REST API & OpenAPI
+
+- Endpoint inventory: [`API.md`](./API.md) (generated from source route registrations)
+- OpenAPI 3.0 spec: [`openapi.yaml`](./openapi.yaml) (generated from source route registrations)
+
+Regenerate after route changes:
+
+```bash
+cd nexus
+python3 tools/api-docs/extract_routes.py --out /tmp/api_inventory.json
+python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json
+```

@@ -116,3 +116,19 @@ The pool pins `search_path=execution` as the default namespace. Cross-schema rea
 - [`025-execution-schema.sql`](../conduit-mcp/migrations/025-execution-schema.sql) — schema definition
 - [`vision-srv`](../vision-srv/) — sibling service (template) over the `vision` schema
 - [`REST API.md`](./REST%20API.md) — original spec, by-chat transcript action
+
+
+---
+
+## REST API & OpenAPI
+
+- Endpoint inventory: [`API.md`](./API.md) (generated from source route registrations)
+- OpenAPI 3.0 spec: [`openapi.yaml`](./openapi.yaml) (generated from source route registrations)
+
+Regenerate after route changes:
+
+```bash
+cd nexus
+python3 tools/api-docs/extract_routes.py --out /tmp/api_inventory.json
+python3 tools/api-docs/gen_openapi.py --inventory /tmp/api_inventory.json
+```
