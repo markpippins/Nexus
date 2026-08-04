@@ -94,7 +94,7 @@ server.listen(PORT, () => {
   console.log(`TypeSpec routes: /list, /cd, /mkdir, /rmdir, /touch, /rm, /rename, /rename-item, /copy, /move, /move-items, /has-file, /has-folder`);
 
   startHeartbeat({
-    serviceId: 116,
+    serviceId: 53, // registry.services id (was 116 = substance — wrong)
     serviceName: 'secure-file-system-server',
     interval: 30,
     log: (...args: any[]) => console.log(new Date().toISOString(), '[heartbeat secure-file-system-server]', ...args),
