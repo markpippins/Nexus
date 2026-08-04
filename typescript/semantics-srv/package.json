@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "openapi:gen": "tsx scripts/generate-openapi.ts"
   },
   "dependencies": {
     "heartbeat-client": "file:../heartbeat-client",

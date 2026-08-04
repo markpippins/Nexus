@@ -50,15 +50,23 @@ function buildUpdateCall(
     values.push(coerce(t, name, val));
     parts.push(`${name} => $${values.length}`);
   };
-  push("p_id", body.p_id);
+  const idParam = t.idParam ?? "p_id";
+  push(idParam, body[idParam] ?? body.p_id);
   if (t.table === "owning_subsystem") {
     if (body.p_new_id === undefined) {
       throw new Error("update owning_subsystem requires p_new_id (the new smallint key)");
     }
     push("p_new_id", body.p_new_id);
   }
+  if (t.table === "relationship_type") {
+    if (body.p_new_name === undefined) {
+      throw new Error("update relationship_type requires p_new_name (the new type name)");
+    }
+    push("p_new_name", body.p_new_name);
+  }
   for (const col of t.writable) {
     const key = `p_${col}`;
+    if (key === idParam) continue; // id already pushed above
     if (body[key] !== undefined) push(key, body[key]);
   }
   return { sql: `SELECT * FROM semantics.update_${t.table}(${parts.join(", ")})`, values };
@@ -119,11 +127,19 @@ for (const t of TABLES) {
     }
   });
 
-  // GET /api/<table>/:id — get by id (includes expired rows; row carries expired_at)
+  // GET /api/<table>/:id — get by id (includes expired rows; row carries expired_at).
+  // Tables with an idCol distinct from the uuid PK (relationship_type) match
+  // on either the uuid id or the natural key so both lookup styles work.
   semanticsRouter.get(`${base}/:id`, async (req, res) => {
     try {
+      const idCol = t.idCol ?? "id";
+      // idCol tables (relationship_type) match on either the uuid PK or the
+      // natural key; the uuid side is cast to text so the shared $1 placeholder
+      // resolves (avoiding 'operator does not exist: text = uuid' ambiguity).
+      const match =
+        idCol === "id" ? "id = $1" : "id::text = $1 OR " + idCol + " = $1";
       const { rows } = await getDb().query(
-        `SELECT * FROM semantics.${t.table} WHERE id = $1`,
+        `SELECT * FROM semantics.${t.table} WHERE ${match} LIMIT 1`,
         [req.params.id],
       );
       if (!rows.length) {
@@ -142,8 +158,11 @@ for (const t of TABLES) {
       const { rows } = await getDb().query(sql, values);
       res.status(201).json(rows[0]);
     } catch (err: any) {
-      const dup = err.message?.includes("23505") ? "duplicate_active_key" : "add_failed";
-      res.status(err.message?.includes("23503") ? 400 : 400).json({ error: dup, message: err.message });
+      // node-postgres exposes the SQLSTATE on err.code (e.g. '23505'), not in
+      // the message text — match on err.code so duplicate detection works.
+      const isDup = err?.code === "23505";
+      const dup = isDup ? "duplicate_active_key" : "add_failed";
+      res.status(400).json({ error: dup, message: err.message });
     }
   });
 
@@ -152,14 +171,15 @@ for (const t of TABLES) {
   // Response includes superseded_id = the id that was expired.
   semanticsRouter.patch(`${base}/:id`, async (req, res) => {
     try {
-      const body = { ...(req.body || {}), p_id: req.params.id };
+      const body = { ...(req.body || {}), [t.idParam ?? "p_id"]: req.params.id };
       const { sql, values } = buildUpdateCall(t, body);
       const { rows } = await getDb().query(sql, values);
       res.json({ ...rows[0], superseded_id: req.params.id });
     } catch (err: any) {
+      const isDup = err?.code === "23505";
       const code = err.message?.includes("no active row")
         ? "not_found"
-        : err.message?.includes("23505")
+        : isDup
           ? "duplicate_active_key"
           : "update_failed";
       const status = code === "not_found" ? 404 : 400;
@@ -171,7 +191,7 @@ for (const t of TABLES) {
   semanticsRouter.delete(`${base}/:id`, async (req, res) => {
     try {
       const { rows } = await getDb().query(
-        `SELECT semantics.soft_delete_${t.table}($1) AS deleted`,
+        `SELECT semantics.soft_delete_${t.table}(${t.idParam ?? "p_id"} => $1) AS deleted`,
         [req.params.id],
       );
       res.json({ table: t.table, id: req.params.id, deleted: rows[0].deleted });
