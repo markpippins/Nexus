@@ -85,7 +85,7 @@ Ports below are the authoritative `SERVICE_PORTS` map from that script.
 | `voyager-srv` | 3114 | Voyager REST — filesystem-acquisition queries |
 | `voyager` | — | Filesystem acquisition layer (NATS-backed) |
 | `mildred-dam-api` | 3140 | Mildred Digital Asset Management API |
-| `terrain` | 8084 | Topology registry (59 registered systems) |
+| `terrain` | 8084 | Topology registry (78 registered systems) |
 | `terrain-mcp` | stdio | Terrain topology MCP (on-demand) |
 | `vision-srv-py` | 8003 | Vision processing (Python) |
 | `losm-host` | 8006 | LOSM Host (FastAPI) |
@@ -102,6 +102,8 @@ Ports below are the authoritative `SERVICE_PORTS` map from that script.
 | `moleculer-search` | 4050 | Moleculer Search API (Google, registry) |
 | `ui-tools` | 3125 | UI Tools CRUD API (statusbar links) |
 | `ui-tools-mcp` | 3136 | UI Tools MCP (agent-facing link management) |
+| `semantics-srv` | 3160 | **Semantics REST** — CRUD over the `semantics.*` legend (11 tables, 34 stored procs) |
+| `semantics-mcp` | 3161 | **Semantics MCP** — agent-accessible CRUD over the legend (57 tools → semantics-srv) |
 
 ### 2.4 UI dev servers (Angular/Vite)
 
@@ -187,6 +189,10 @@ layer (the only thing that repeats).
 - **Seeded legend (V059):** 16 owning subsystems (the fleet), 11 concepts,
   12 legal pipeline edges, 6 identity strategies (incl. Asset as the
   `canonical_asset_id` root).
+- **Access layer (V1):** `semantics-srv` (REST :3160) + `semantics-mcp`
+  (:3161, 57 tools) expose CRUD over all 11 tables via the stored procs;
+  registered in terrain, service-registry (ids 60/61), systemd, and
+  `bin/start-nexus-services.sh`.
 - Full reference: `docs/semantics-schema.md`. Design: `semantics-db.md`.
 - **Status:** lookup layer seeded; representation layer (physical forms,
   consumers, identity mappings) is the next population step — the legend is

@@ -76,6 +76,8 @@ ALL_SERVICES=(
     "moleculer-search.service"  # port 4050 — Moleculer Search API (Google, registry)
     "ui-tools.service"          # port 3125 — UI Tools CRUD API (statusbar links)
     "ui-tools-mcp.service"       # port 3136 — UI Tools MCP (agent-facing link management)
+    "semantics-srv.service"      # port 3160 — semantics REST API (semantics.* schema — type-level legend)
+    "semantics-mcp.service"      # port 3161 — semantics MCP (→ semantics-srv)
 
     # API servers (non-UI services)
     "wind-srv.service"         # port 3300 — Wind IDE workflow API
@@ -151,6 +153,8 @@ SERVICE_PORTS=(
     ["moleculer-search.service"]="4050"
     ["ui-tools.service"]="3125"
     ["ui-tools-mcp.service"]="3136"
+    ["semantics-srv.service"]="3160"
+    ["semantics-mcp.service"]="3161"
     ["nebula-ui.service"]="4210"
     ["duality-ui.service"]="3002"
     ["view-architect.service"]="3003"

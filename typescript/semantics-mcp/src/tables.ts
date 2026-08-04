@@ -1,0 +1,172 @@
+/**
+ * tables.ts — registry of the 11 semantics.* tables (V057 design model).
+ * Kept in sync with semantics-srv/src/tables.ts (each package is self-contained).
+ *
+ * `writable` = column names accepted as p_* params by the add_/update_ procs,
+ * in proc parameter order.
+ */
+
+export interface TableMeta {
+  table: string;
+  label: string;
+  idType: "uuid" | "smallint";
+  idAuto: boolean;
+  smallintCols: string[];
+  jsonbCols: string[];
+  writable: string[];
+  required: string[];
+  note?: string;
+}
+
+export const TABLES: TableMeta[] = [
+  {
+    table: "owning_subsystem",
+    label: "owning subsystem (fleet)",
+    idType: "smallint",
+    idAuto: false,
+    smallintCols: ["id"],
+    jsonbCols: [],
+    writable: ["name", "description", "expired_at"],
+    required: ["id", "name"],
+    note: "Stable smallint lookup key — id is caller-supplied; update requires p_new_id.",
+  },
+  {
+    table: "concept",
+    label: "concept (class)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["name", "description", "expired_at"],
+    required: ["name"],
+  },
+  {
+    table: "representation",
+    label: "representation (physical form of a concept)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: ["owning_subsystem_id"],
+    jsonbCols: ["raw_metadata"],
+    writable: [
+      "concept_id",
+      "label",
+      "schema_name",
+      "table_name",
+      "owning_subsystem_id",
+      "owner",
+      "raw_metadata",
+      "expired_at",
+    ],
+    required: ["concept_id", "label", "owning_subsystem_id"],
+  },
+  {
+    table: "representation_relationship",
+    label: "representation relationship (fidelity/lineage between forms)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: [
+      "from_representation_id",
+      "to_representation_id",
+      "relationship_type",
+      "notes",
+      "expired_at",
+    ],
+    required: ["from_representation_id", "to_representation_id", "relationship_type"],
+  },
+  {
+    table: "consumer_operation",
+    label: "consumer operation (who touches a representation and how)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["representation_id", "consumer_name", "operation", "notes", "expired_at"],
+    required: ["representation_id", "consumer_name", "operation"],
+  },
+  {
+    table: "identity_strategy",
+    label: "identity strategy (what identity means for a concept)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["concept_id", "canonical_key_description", "notes", "expired_at"],
+    required: ["concept_id", "canonical_key_description"],
+  },
+  {
+    table: "representation_identity",
+    label: "representation identity (how a form expresses its concept's identity)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: [
+      "representation_id",
+      "identity_strategy_id",
+      "identity_expression",
+      "notes",
+      "expired_at",
+    ],
+    required: ["representation_id", "identity_strategy_id", "identity_expression"],
+  },
+  {
+    table: "snapshot",
+    label: "snapshot (per-baseline judgment record)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["label", "version", "parent_id", "status", "created_by", "notes", "expired_at"],
+    required: ["label", "version", "created_by"],
+  },
+  {
+    table: "snapshot_observation",
+    label: "snapshot observation (per-baseline judgment on a representation)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: [
+      "snapshot_id",
+      "representation_id",
+      "lifecycle_state",
+      "is_completed_fix",
+      "completed_fix_ref",
+      "audit_reason",
+      "safe_to_retire",
+      "expired_at",
+    ],
+    required: ["snapshot_id", "representation_id", "lifecycle_state"],
+  },
+  {
+    table: "drift_finding",
+    label: "drift finding (finding against a snapshot observation)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["observation_id", "description", "severity", "resolved_at", "expired_at"],
+    required: ["observation_id", "description", "severity"],
+    note: "Lifecycle: detected (resolved_at NULL) → resolved via semantics_resolve_drift_finding.",
+  },
+  {
+    table: "concept_relationship",
+    label: "concept relationship (legal pipeline shape between classes)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: [
+      "from_concept_id",
+      "to_concept_id",
+      "relationship_type",
+      "path",
+      "notes",
+      "expired_at",
+    ],
+    required: ["from_concept_id", "to_concept_id", "relationship_type"],
+    note: "path is 'green' | 'red' | null (branch tag).",
+  },
+];
