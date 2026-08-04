@@ -202,5 +202,17 @@
     "status": "ACTIVE",
     "version": "1.0.0",
     "dependencies": []
+  },
+  {
+    "name": "semantics-mcp",
+    "description": "MCP server (streamable HTTP) exposing the semantics.* schema tools, delegating to semantics-srv REST. Registered in service-registry (serviceId 61); sends 30s heartbeats via heartbeat-client.",
+    "framework": "Express",
+    "type": "MCP Server",
+    "defaultPort": 3161,
+    "apiBasePath": "/",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
   }
 ]
