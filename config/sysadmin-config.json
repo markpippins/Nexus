@@ -1,8 +1,8 @@
 {
   "$schema": "sysadmin-config-schema.json",
-  "version": 5,
+  "version": 6,
   "description": "Sysadmin ConfigBundle — declarative service registry for health monitoring",
-  "lastUpdated": "2026-07-30",
+  "lastUpdated": "2026-08-04",
 
   "global": {
     "stateDir": "${XDG_RUNTIME_DIR:-/run/user/1000}/nexus-sysadmin",
@@ -544,6 +544,46 @@
       "timeout": 5,
       "dependencies": [],
       "notes": "Angular/Vite dev server"
+    },
+    {
+      "id": "apidocs-srv",
+      "displayName": "API Docs SRV",
+      "category": "api",
+      "host": "localhost",
+      "port": 3180,
+      "checkMethod": "http",
+      "healthEndpoint": "/health",
+      "expectedStatus": 200,
+      "systemdUnit": "apidocs-srv.service",
+      "timeout": 5,
+      "dependencies": [],
+      "notes": "API docs index — Swagger UI + ReDoc over all *-srv OpenAPI specs (systemd-managed)"
+    },
+    {
+      "id": "semantics-srv",
+      "displayName": "Semantics SRV",
+      "category": "api",
+      "host": "localhost",
+      "port": 3160,
+      "checkMethod": "http",
+      "healthEndpoint": "/health",
+      "expectedStatus": 200,
+      "systemdUnit": "semantics-srv.service",
+      "timeout": 5,
+      "dependencies": ["postgresql"],
+      "notes": "Semantics REST API (semantics.* schema — type-level legend)"
+    },
+    {
+      "id": "semantics-mcp",
+      "displayName": "Semantics MCP",
+      "category": "mcp",
+      "host": "localhost",
+      "port": 3161,
+      "checkMethod": "port",
+      "systemdUnit": "semantics-mcp.service",
+      "timeout": 3,
+      "dependencies": ["semantics-srv"],
+      "notes": "Semantics MCP server (streamable HTTP on 3161 — port check, no health endpoint)"
     }
   ],
 
@@ -572,7 +612,8 @@
       {"from": "terrain-mcp", "to": "terrain"},
       {"from": "role-memory-srv", "to": "postgresql"},
       {"from": "role-memory-srv", "to": "redis"},
-      {"from": "address-tts-mcp", "to": "nats"}
+      {"from": "address-tts-mcp", "to": "nats"},
+      {"from": "semantics-mcp", "to": "semantics-srv"}
     ]
   },
 
