@@ -14,7 +14,9 @@ Environment=PYTHONUNBUFFERED=1
 Environment=PATH=/home/codex/opt/anaconda3/bin:/usr/local/bin:/usr/bin:/bin
 
 # ── Executable ─────────────────────────────────────────────────────────
-ExecStart=/home/codex/opt/anaconda3/bin/python3 /home/codex/dev/nexus/tools/api-docs/serve_docs.py --host 127.0.0.1 --port 3180
+# HTTPS on 0.0.0.0:8443 (self-signed cert auto-generated into tools/api-docs/certs/)
+# alongside plain HTTP on 127.0.0.1:3180 for localhost tooling/health checks.
+ExecStart=/home/codex/opt/anaconda3/bin/python3 /home/codex/dev/nexus/tools/api-docs/serve_docs.py --host 127.0.0.1 --port 3180 --tls-cert /home/codex/dev/nexus/tools/api-docs/certs/apidocs-selfsigned.crt --tls-key /home/codex/dev/nexus/tools/api-docs/certs/apidocs-selfsigned.key
 ExecReload=/bin/kill -HUP $MAINPID
 
 # ── Restart behavior ───────────────────────────────────────────────────

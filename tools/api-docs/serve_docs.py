@@ -17,6 +17,15 @@ Routes:
 
 Usage:
     python tools/api-docs/serve_docs.py [--port 3180] [--host 127.0.0.1]
+    python tools/api-docs/serve_docs.py --tls-cert CERT --tls-key KEY
+
+When --tls-cert/--tls-key are given, a second HTTPS listener is started on
+--tls-host:--tls-port (default 0.0.0.0:8443) in addition to the plain-HTTP
+listener, so LAN clients can reach the index over TLS while localhost
+tooling (health checks, drift CI) keeps using plain HTTP. If the cert/key
+files don't exist, a self-signed certificate is generated automatically
+with openssl (SANs: localhost, hostname, and the host's non-loopback IPv4
+addresses).
 
 Requires no third-party packages. Swagger UI and ReDoc are loaded from CDN
 (needs internet access in the browser). "Try it out" targets the servers
@@ -26,8 +35,12 @@ import argparse
 import http.server
 import json
 import os
+import socket
 import socketserver
+import ssl
+import subprocess
 import sys
+import threading
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -260,11 +273,101 @@ class ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     daemon_threads = True
 
 
+class TLSThreadingServer(ThreadingServer):
+    """HTTPServer variant that wraps every accepted socket in TLS."""
+
+    def __init__(self, addr, handler, context):
+        super().__init__(addr, handler)
+        self._tls_ctx = context
+
+    def get_request(self):
+        sock, addr = super().get_request()
+        return self._tls_ctx.wrap_socket(sock, server_side=True), addr
+
+
+CERT_DIR = os.path.join(HERE, "certs")
+CERT_FILE = os.path.join(CERT_DIR, "apidocs-selfsigned.crt")
+KEY_FILE = os.path.join(CERT_DIR, "apidocs-selfsigned.key")
+
+
+def _lan_ipv4s():
+    """Best-effort list of this host's non-loopback IPv4 addresses."""
+    ips = set()
+    try:
+        hostname = socket.gethostname()
+        for info in socket.getaddrinfo(hostname, None, socket.AF_INET):
+            ip = info[4][0]
+            if not ip.startswith("127."):
+                ips.add(ip)
+    except OSError:
+        pass
+    # Fallback: parse `hostname -I`
+    try:
+        out = subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=5)
+        for tok in out.stdout.split():
+            if "." in tok and not tok.startswith("127."):
+                ips.add(tok)
+    except Exception:
+        pass
+    return sorted(ips)
+
+
+def ensure_cert(cert_path=CERT_FILE, key_path=KEY_FILE):
+    """Generate a self-signed cert with openssl if the files are missing.
+
+    SANs cover localhost, the hostname, and the host's non-loopback IPv4
+    addresses so the cert is valid however clients reach it on the LAN.
+    The private key is chmod 0600.
+    """
+    if os.path.exists(cert_path) and os.path.exists(key_path):
+        return cert_path, key_path
+    os.makedirs(os.path.dirname(cert_path), exist_ok=True)
+    sans = ["DNS:localhost", "DNS:%s" % socket.gethostname()]
+    sans += ["IP:%s" % ip for ip in _lan_ipv4s()]
+    cmd = [
+        "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+        "-keyout", key_path, "-out", cert_path,
+        "-days", "3650", "-subj", "/CN=apidocs",
+        "-addext", "subjectAltName=" + ",".join(sans),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True)
+    try:
+        os.chmod(key_path, 0o600)
+    except OSError:
+        pass
+    print(f"generated self-signed cert: {cert_path} (SANs: {', '.join(sans)})")
+    return cert_path, key_path
+
+
+def run_tls_listener(host, port, cert_path, key_path):
+    """Run the HTTPS listener in its own thread; exits on main-thread stop."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert_path, key_path)
+    server = TLSThreadingServer((host, port), Handler, context)
+    print(f"apidocs index (TLS): https://{host}:{port}  ({len(find_specs())} specs)")
+    server.serve_forever()
+
+
 def main():
     ap = argparse.ArgumentParser(description="Single-port browsable index for all *-srv OpenAPI specs.")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=3180)
+    ap.add_argument("--tls-cert", default=None, help="path to TLS certificate; enables the HTTPS listener (self-signed generated if missing)")
+    ap.add_argument("--tls-key", default=None, help="path to TLS private key (defaults to sibling of --tls-cert: <cert>.key)")
+    ap.add_argument("--tls-host", default="0.0.0.0", help="bind address for the HTTPS listener")
+    ap.add_argument("--tls-port", type=int, default=8443, help="port for the HTTPS listener")
     args = ap.parse_args()
+
+    if args.tls_cert:
+        cert_path = args.tls_cert
+        key_path = args.tls_key or (os.path.splitext(cert_path)[0] + ".key")
+        cert_path, key_path = ensure_cert(cert_path, key_path)
+        threading.Thread(
+            target=run_tls_listener,
+            args=(args.tls_host, args.tls_port, cert_path, key_path),
+            daemon=True,
+        ).start()
+
     server = ThreadingServer((args.host, args.port), Handler)
     print(f"apidocs index: http://{args.host}:{args.port}  ({len(find_specs())} specs)")
     try:

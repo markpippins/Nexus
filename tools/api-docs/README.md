@@ -30,7 +30,7 @@ For each `*-srv` (in the service's own directory):
 | `extract_routes.py` | Parse route registrations from source → `/tmp/api_inventory.json`. |
 | `gen_openapi.py` | Emit `openapi.yaml` + `API.md` per service from the inventory (`--only <svc>` regenerates a subset). |
 | `check_drift.py` | **CI gate** — fail (exit 1) if any committed `openapi.yaml` no longer matches the source routes; `--update` regenerates only the drifted specs. |
-| `serve_docs.py` | Single-port browsable index (`http://localhost:3180`): Swagger UI + ReDoc over all specs. |
+| `serve_docs.py` | Single-port browsable index (`http://localhost:3180`): Swagger UI + ReDoc over all specs; optional HTTPS listener on `0.0.0.0:8443` via `--tls-cert`. |
 | `pre-push` hook | Range-aware git hook — see `.githooks/pre-push` below. |
 
 ## Usage
@@ -66,6 +66,28 @@ systemctl --user status apidocs-srv.service
 systemctl --user restart apidocs-srv.service
 journalctl --user -u apidocs-srv.service -f
 ```
+
+## HTTPS exposure (self-signed TLS on 8443)
+
+The unit starts a second listener that serves the same index over TLS on
+`0.0.0.0:8443` — reachable from any LAN client as `https://<titanium-ip>:8443`
+— while plain HTTP stays on `127.0.0.1:3180` for localhost tooling (drift CI,
+sysadmin health checks, local browsing).
+
+- **Cert:** `tools/api-docs/certs/apidocs-selfsigned.{crt,key}` — auto-generated
+  on startup by `serve_docs.py` (openssl, 10-year validity, SANs for
+  `localhost`, the hostname, and the host's non-loopback IPv4 addresses). The
+  directory is gitignored; delete the files and restart the unit to regenerate.
+- **Trust:** the cert is self-signed, so browsers show a warning until you add
+  it to the OS/browser trust store (`openssl x509 -in
+  tools/api-docs/certs/apidocs-selfsigned.crt -outform PEM` and import it, or
+  curl with `-k`).
+- **CLI:** `serve_docs.py --tls-cert <cert> --tls-key <key> [--tls-host 0.0.0.0]
+  [--tls-port 8443]`; TLS is opt-in (plain `--port 3180` runs stay HTTP-only).
+- **Security note:** the index exposes every service's OpenAPI spec. TLS
+  protects confidentiality in transit but adds no auth — anyone on the LAN can
+  read the specs. The service-broker auth/token tooling is the route to gating
+  it if specs must not be readable on the LAN.
 
 ## Git pre-push hook (`.githooks/pre-push`)
 
