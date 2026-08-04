@@ -1,5 +1,7 @@
 /**
- * tables.ts — registry of the 12 semantics.* tables (V057 design model + V060 relationship vocabulary).
+ * tables.ts — registry of the 17 semantics.* tables
+ *   (V057 design model + V060 relationship vocabulary + V065 T02 Phase 1
+ *    asset spine + V066 T02 Phase 2 relationship layer).
  *
  * The stored-procedure write surface is generated from this registry:
  *   add_<table>(p_id?, p_<writable>...)           INSERT ... RETURNING *
@@ -209,6 +211,116 @@ export const TABLES: TableMeta[] = [
     idCol: "name",
     idParam: "p_name",
     note: "Vocabulary table — FK-referenced by concept_relationship / representation_relationship (only defined types are legal edges). update takes p_new_name (names are never reused).",
+  },
+  // ── V065: T02 Phase 1 — canonical asset identity spine ──────────────
+  // canonical_asset / asset_revision / source_observation. Append-only /
+  // expire-not-delete, partial unique indexes on active rows. Phase 2
+  // (asset_identity_claim + asset_relation) lands in a later turn.
+  {
+    table: "canonical_asset",
+    label: "canonical asset (enduring identity record: asset:<platform>:<ns>:<key>)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: ["canonical_key"],
+    writable: [
+      "canonical_asset_id",
+      "asset_kind",
+      "canonical_key",
+      "source_hash",
+      "content_hash",
+      "validity_start",
+      "validity_end",
+      "expired_at",
+    ],
+    required: ["canonical_asset_id", "asset_kind"],
+    note: "T02 Phase 1. canonical_asset_id is the durable business key (compound asset:<platform>:<ns>:<key>); partial unique index on active rows. revisions/claims/relations hang off it.",
+  },
+  {
+    table: "asset_revision",
+    label: "asset revision (immutable append-only revision of a canonical asset)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: [
+      "revision_id",
+      "asset_id",
+      "content_hash",
+      "source_hash",
+      "parent_revision_id",
+      "recording_start",
+      "recording_end",
+      "created_by",
+      "expired_at",
+    ],
+    required: ["revision_id", "asset_id"],
+    note: "T02 Phase 1. Same content_hash → same revision (idempotent, invariant #2); different content_hash → NEW revision of the same asset, NOT a new asset.",
+  },
+  {
+    table: "source_observation",
+    label: "source observation (provenance: what was observed and from where)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: [
+      "revision_id",
+      "platform",
+      "platform_identifier",
+      "namespace",
+      "raw_location",
+      "observed_at",
+      "ingestion_run_id",
+      "raw_hash",
+      "expired_at",
+    ],
+    required: ["revision_id", "platform"],
+    note: "T02 Phase 1. No created_at — observations are provenance rows (matches snapshot_observation convention).",
+  },
+  // ── V066: T02 Phase 2 — asset relationship layer ────────────────────
+  // asset_identity_claim + asset_relation. The claim NEVER performs a
+  // merge — resolution requires an owning-role decision (Architect closes
+  // spec/plan, Planner closes candidate/question per contract Q4).
+  {
+    table: "asset_identity_claim",
+    label: "asset identity claim (proposed identity linkage with confidence)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: [
+      "asset_id",
+      "candidate_asset_id",
+      "claim_type",
+      "confidence",
+      "basis",
+      "status",
+      "decided_by",
+      "decided_at",
+      "expired_at",
+    ],
+    required: ["asset_id", "claim_type", "status"],
+    note: "T02 Phase 2. claim_type ∈ identity|supersession|derivation|consolidation|split; status lifecycle open→resolved/rejected; basis ∈ strong|medium|weak. INVARIANT: claim never performs the merge — only owning-role decision resolves it.",
+  },
+  {
+    table: "asset_relation",
+    label: "asset relation (directed edge: supersedes / derives_from / contradicts / consolidates_into / split_from)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: [
+      "from_asset_id",
+      "to_asset_id",
+      "relation_type",
+      "decided_by",
+      "decided_at",
+      "effective_at",
+      "expired_at",
+    ],
+    required: ["from_asset_id", "to_asset_id", "relation_type"],
+    note: "T02 Phase 2. Self-loops forbidden (from_asset_id <> to_asset_id). Append-only with expired_at soft-delete; active edge uniqueness on (from, to, type).",
   },
 ];
 
