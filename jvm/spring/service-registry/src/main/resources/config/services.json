@@ -190,5 +190,17 @@
     "status": "DEPRECATED",
     "version": "1.5.0",
     "dependencies": []
+  },
+  {
+    "name": "semantics-srv",
+    "description": "REST API over the semantics.* Postgres schema (type-level semantic topology legend). Registered via POST /api/v1/registry/register (serviceId 60); sends 30s heartbeats via heartbeat-client.",
+    "framework": "Express",
+    "type": "REST API",
+    "defaultPort": 3160,
+    "apiBasePath": "/api",
+    "repositoryUrl": "",
+    "status": "ACTIVE",
+    "version": "1.0.0",
+    "dependencies": []
   }
 ]

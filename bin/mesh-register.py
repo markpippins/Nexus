@@ -521,6 +521,33 @@ CANDIDATES: tuple[Candidate, ...] = (
         startup="systemd: systemctl --user start apidocs-srv.service",
         workspace_path="nexus/tools/api-docs",
     ),
+    Candidate(
+        name="semantics-srv",
+        port=3160,
+        kind="runnable_service",
+        service_type="Express",
+        health_url="http://localhost:3160/health",
+        description=(
+            "REST API over the semantics.* Postgres schema (type-level "
+            "semantic topology legend). Sends service-registry heartbeats "
+            "via heartbeat-client (id 60, 30s). Systemd-managed."
+        ),
+        startup="systemd: systemctl --user start semantics-srv.service",
+        workspace_path="nexus/typescript/semantics-srv",
+    ),
+    Candidate(
+        name="semantics-mcp",
+        port=3161,
+        kind="mcp_server",
+        transport_type="streamable-http",
+        health_url="http://localhost:3161/health",
+        description=(
+            "Semantics MCP server (streamable HTTP on 3161) — exposes the "
+            "semantics.* legend to MCP clients via semantics-srv."
+        ),
+        startup="systemd: systemctl --user start semantics-mcp.service",
+        workspace_path="nexus/typescript/semantics-mcp",
+    ),
 )
 
 
