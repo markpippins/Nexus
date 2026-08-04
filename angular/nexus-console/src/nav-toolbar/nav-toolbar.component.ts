@@ -71,6 +71,13 @@ export const NAV_ITEMS: NavItemOrSeparator[] = [
     iconPath: 'M9.75 17.25v-.75a2.25 2.25 0 012.25-2.25h.75a2.25 2.25 0 012.25 2.25v.75M12 12a3 3 0 100-6 3 3 0 000 6zM3 5.25a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 5.25v9a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 14.25v-9z',
   },
   {
+    type: 'item', key: 'semantics-ui',
+    label: 'Semantics UI',
+    title: 'Semantics Database Explorer',
+    // Heroicons v2 'book-open' icon — a stylised open book.
+    iconPath: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25',
+  },
+  {
     type: 'item', key: 'barbie',
     label: 'Barbie',
     title: 'Platform Operations Dashboard',
