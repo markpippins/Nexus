@@ -47,6 +47,26 @@ python3 tools/api-docs/check_drift.py [--update] [--quiet] [--json]
 python3 tools/api-docs/serve_docs.py --port 3180
 ```
 
+## Systemd service (`apidocs-srv.service`)
+
+The docs index runs as a persistent user-level systemd unit so it's always up
+(including across reboots).
+
+- **Tracked unit:** `tools/api-docs/apidocs-srv.service` (mirrors the sibling
+  `*-srv.service` convention: `WorkingDirectory` = `nexus/`, `ExecStart` =
+  `python3 tools/api-docs/serve_docs.py --port 3180`, `Restart=on-failure`).
+- **Installed copy:** `~/.config/systemd/user/apidocs-srv.service` (installed
+  with `cp` + `systemctl --user daemon-reload`).
+- **Registered in** `bin/start-nexus-services.sh` (`ALL_SERVICES` + port 3180
+  in `SERVICE_PORTS`), so `start|status|health|stop|restart` all cover it.
+
+```bash
+# manual management
+systemctl --user status apidocs-srv.service
+systemctl --user restart apidocs-srv.service
+journalctl --user -u apidocs-srv.service -f
+```
+
 ## Git pre-push hook (`.githooks/pre-push`)
 
 The repo's `pre-push` hook (tracked in `.githooks/`, active via

@@ -78,6 +78,7 @@ ALL_SERVICES=(
     "ui-tools-mcp.service"       # port 3136 — UI Tools MCP (agent-facing link management)
     "semantics-srv.service"      # port 3160 — semantics REST API (semantics.* schema — type-level legend)
     "semantics-mcp.service"      # port 3161 — semantics MCP (→ semantics-srv)
+    "apidocs-srv.service"        # port 3180 — API docs index (Swagger UI + ReDoc over all *-srv specs)
 
     # API servers (non-UI services)
     "wind-srv.service"         # port 3300 — Wind IDE workflow API
@@ -155,6 +156,7 @@ SERVICE_PORTS=(
     ["ui-tools-mcp.service"]="3136"
     ["semantics-srv.service"]="3160"
     ["semantics-mcp.service"]="3161"
+    ["apidocs-srv.service"]="3180"
     ["nebula-ui.service"]="4210"
     ["duality-ui.service"]="3002"
     ["view-architect.service"]="3003"
