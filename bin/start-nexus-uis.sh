@@ -41,6 +41,7 @@ UI_NAMES=(
     "monaco-judge"        # 4016
     "conduit-ui-legacy"  # 4015
     "data-explorer-ui"     # 4212
+    "semantics-ui"         # 4213 (live; mock was :3000)
 )
 
 UI_PORTS[nebula-ui]=4210
@@ -62,6 +63,7 @@ UI_PORTS[nebula-control-plane]=4014
 UI_PORTS[monaco-judge]=4016
 UI_PORTS[conduit-ui-legacy]=4015
 UI_PORTS[data-explorer-ui]=4212
+UI_PORTS[semantics-ui]=4213  # live mode (mock was :3000, intentionally unbound in live mode)
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
