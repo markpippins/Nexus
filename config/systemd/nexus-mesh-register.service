@@ -1,0 +1,16 @@
+[Unit]
+Description=Terrain Mesh Registration (sync live services to DB)
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/codex/dev/nexus
+ExecStart=/usr/bin/python3 /home/codex/dev/nexus/bin/mesh-register.py
+Environment=PGPASSWORD=pgpass
+Environment=PYTHONPATH=/home/codex/dev/nexus/python:/home/codex/dev/nexus/python/rover
+
+# Hardening — mesh-register only talks to Postgres over TCP; no file writes needed
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
