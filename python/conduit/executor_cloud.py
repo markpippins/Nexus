@@ -145,42 +145,26 @@ def _ensure_provider_prefix(model_id: str, role: str) -> str:
     """Return a provider-prefixed model ID suitable for opencode.
 
     opencode expects ``provider/model`` (e.g. ``ollama/qwen2.5-coder``).
-    When the identifier lacks a slash, look up the role's provider name in
-    tackle and prepend it as a lowercased-dashed slug (e.g. ``OpenCode Go``
-    becomes ``opencode-go``).
+    Identifiers that already carry a slash (fully-qualified IDs shipped
+    by the pipeline's ``_resolve_model_chain``) pass through unchanged.
+    For bare identifiers, resolve the role's provider slug via tackle and
+    prepend it (delegates to ``provider_prefix_slug`` so the priority
+    matches the pipeline: provider_name → provider_type → provider_id).
 
-    This is needed because the opencode binary registers each provider
-    instance under its own **ID** (e.g. ``opencode-go``), which differs
-    from both the database primary key (``prov-opencode-go``) and the
-    provider type (``opencode``).  Using the wrong prefix produces
-    ``ProviderModelNotFoundError``.
-
-    Prioritisation:
-    1. ``provider_name`` → lowercased, spaces → dashes (e.g. ``OpenCode Go`` → ``opencode-go``)
-    2. ``provider_id``   → strip ``prov-`` prefix for database convention compatibility
-    3. ``provider_type`` → as-is (original behaviour)
+    Using the wrong prefix produces ``ProviderModelNotFoundError``.
     """
     if not model_id or "/" in model_id:
         return model_id
     try:
         from tackle.db import get_role_config
+        from db_adapter import provider_prefix_slug, qualify_opencode_model_id
         cfg = get_role_config(role)
-        prefix = ""
-        if cfg:
-            # 1. provider_name → slug (lowercased, dashed)
-            name = cfg.get("provider_name", "")
-            if name:
-                prefix = name.lower().replace(" ", "-")
-            # 2. provider_id → strip prov- prefix
-            if not prefix:
-                pid = cfg.get("provider_id", "")
-                if pid and pid.startswith("prov-"):
-                    prefix = pid[5:]
-            # 3. Fall back to provider_type
-            if not prefix:
-                prefix = cfg.get("provider_type", "")
-        if prefix:
-            return f"{prefix}/{model_id}"
+        slug = provider_prefix_slug(
+            (cfg or {}).get("provider_name", ""),
+            (cfg or {}).get("provider_type", ""),
+            (cfg or {}).get("provider_id", ""),
+        )
+        return qualify_opencode_model_id(model_id, slug)
     except Exception as e:
         _log.debug("_ensure_provider_prefix: tackle lookup failed role=%s error=%s", role, e)
     return model_id
@@ -207,10 +191,14 @@ def _resolve_model_name(req: Dict[str, Any]) -> str:
             from tackle.db import get_role_config
             cfg = get_role_config(role)
             if cfg:
+                from db_adapter import provider_prefix_slug, qualify_opencode_model_id
                 model_id = cfg.get("model_identifier", "")
-                provider = cfg.get("provider_type", "")
-                if model_id and "/" not in model_id and provider:
-                    model_id = f"{provider}/{model_id}"
+                slug = provider_prefix_slug(
+                    cfg.get("provider_name", ""),
+                    cfg.get("provider_type", ""),
+                    cfg.get("provider_id", ""),
+                )
+                model_id = qualify_opencode_model_id(model_id, slug)
                 if model_id:
                     _log.debug("_resolve_model_name: tackle lookup role=%s model=%s", role, model_id)
                     return model_id

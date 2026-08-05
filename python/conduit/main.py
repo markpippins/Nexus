@@ -13,7 +13,7 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
-from db_adapter import DBAdapter
+from db_adapter import DBAdapter, provider_prefix_slug, qualify_opencode_model_id, fallback_provider_prefix_slug
 from env_config import load_env  # shared .env loader; load_env() fires at import time
 from executor_registry import ModelConfig, RegistryConfig, load_registry, resolve_executor
 from token_estimator import load_pricing, estimate_tokens, estimate_cost
@@ -250,8 +250,16 @@ def get_model(db: DBAdapter, registry: RegistryConfig, role: str = "builder") ->
     try:
         cfg = db.get_role_model_config(role)
         if cfg and cfg.get("harness") and cfg.get("model"):
-            log.debug("get_model: DB config role=%s harness=%s model=%s", role, cfg["harness"], cfg["model"])
-            return ModelConfig(harness=cfg["harness"], model=cfg["model"])
+            qualified = qualify_opencode_model_id(
+                cfg["model"],
+                provider_prefix_slug(
+                    cfg.get("provider_name", ""),
+                    cfg.get("provider_type", ""),
+                    cfg.get("provider_id", ""),
+                ),
+            )
+            log.debug("get_model: DB config role=%s harness=%s model=%s", role, cfg["harness"], qualified)
+            return ModelConfig(harness=cfg["harness"], model=qualified)
     except Exception:
         pass
 
@@ -408,10 +416,17 @@ def _resolve_model_chain(db: DBAdapter, role: str) -> list:
     """Build the primary + fallback model chain via tackle.
 
     Returns a list of dicts: primary first (from get_role_model_config),
-    then fallbacks (from get_fallback_models).  Entries whose harness
-    binary is empty are dropped with a warning log (Temporal-era
-    hardening — prevents silent infinite requeue on misconfigured
-    harnesses).
+    then fallbacks (from get_fallback_models).  Each entry's ``model`` is
+    the fully-qualified opencode ID for that model's OWN provider (e.g.
+    'opencode/big-pickle', 'nvidia/nvidia/nemotron-3-ultra-550b-a55b'),
+    so the executor never has to guess a provider prefix for fallback
+    models.  (v120 fix: every model used to be prefixed with the ROLE's
+    provider, producing 'nvidia/big-pickle' etc. →
+    ProviderModelNotFoundError.)
+
+    Entries whose harness binary is empty are dropped with a warning log
+    (Temporal-era hardening — prevents silent infinite requeue on
+    misconfigured harnesses).
     """
     log = _get_log()
     chain: list = []
@@ -420,8 +435,28 @@ def _resolve_model_chain(db: DBAdapter, role: str) -> list:
         primary = db.get_role_model_config(role)
     except Exception as exc:
         log.warning("_resolve_model_chain: primary lookup failed role=%s: %s", role, exc)
+
+    # provider_id → slug map for the primary provider.  Fallbacks that
+    # share it (duplicates of the primary model) reuse its name slug
+    # instead of their own numeric provider_id.
+    primary_slug = ""
+    provider_map: dict = {}
+    if primary:
+        primary_slug = provider_prefix_slug(
+            primary.get("provider_name", ""),
+            primary.get("provider_type", ""),
+            primary.get("provider_id", ""),
+        )
+        pid = primary.get("provider_id", "")
+        if pid and primary_slug:
+            provider_map[pid] = primary_slug
+
     if primary and primary.get("harness") and primary.get("model"):
-        chain.append({"harness": primary["harness"], "model": primary["model"], "priority": -1})
+        chain.append({
+            "harness": primary["harness"],
+            "model": qualify_opencode_model_id(primary["model"], primary_slug),
+            "priority": -1,
+        })
 
     try:
         fallbacks = db.get_fallback_models(role)
@@ -429,6 +464,7 @@ def _resolve_model_chain(db: DBAdapter, role: str) -> list:
         log.warning("_resolve_model_chain: fallback lookup failed role=%s: %s", role, exc)
         fallbacks = []
 
+    primary_model = (primary or {}).get("model", "")
     for fb in fallbacks:
         semantics = fb.get("invocation_semantics") or {}
         binary = semantics.get("binary", "")
@@ -439,9 +475,22 @@ def _resolve_model_chain(db: DBAdapter, role: str) -> list:
                 role, fb.get("model_identifier", "?"), fb.get("harness_name", "?"),
             )
             continue
+        model_id = fb.get("model_identifier", "")
+        # Skip fallbacks that merely duplicate the primary (same model).
+        if model_id and model_id == primary_model:
+            log.debug("_resolve_model_chain: skipping duplicate fallback role=%s model=%s", role, model_id)
+            continue
+        # Resolve this fallback's OWN provider slug: shared primary
+        # provider → type (opencode/ollama ARE the slug) → provider_name
+        # for generic APIs (OpenRouter) → provider_id → primary slug.
+        fbid = fb.get("provider_id", "")
+        slug = provider_map.get(fbid, "") or fallback_provider_prefix_slug(
+            fb.get("provider_name", ""), fb.get("provider_type", ""),
+            fbid, primary_slug,
+        )
         chain.append({
             "harness": binary,
-            "model": fb.get("model_identifier", ""),
+            "model": qualify_opencode_model_id(model_id, slug),
             "priority": fb.get("priority", 0),
         })
 
@@ -1033,7 +1082,7 @@ def clean_test_artifacts(db_path: str) -> None:
                 continue
             for plan_id in plan_ids:
                 conn.execute(
-                    "DELETE FROM receipts WHERE plan_id = %s AND session_id = %s AND type = 'BLOCK'",
+                    "DELETE FROM vision.receipts WHERE plan_id = %s AND session_id = %s AND type = 'BLOCK'",
                     (plan_id, session_id),
                 )
                 count += conn.total_changes

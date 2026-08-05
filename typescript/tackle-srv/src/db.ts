@@ -3139,6 +3139,7 @@ export interface ResolvedFallbackModel {
   priority: number;
   model_identifier: string;
   provider_type: string;
+  provider_name: string;
   provider_id: string;
   api_key: string | null;
   endpoint_url: string | null;
@@ -3192,6 +3193,7 @@ export async function getResolvedFallbackModels(role: string): Promise<ResolvedF
     `SELECT cb.priority,
             m.model_identifier,
             p.type          AS provider_type,
+            p.name          AS provider_name,
             p.api_key,
             cb.endpoint_url,  -- bundle-level override
             p.id            AS provider_id,
@@ -3214,6 +3216,7 @@ export async function getResolvedFallbackModels(role: string): Promise<ResolvedF
     priority: row.priority,
     model_identifier: row.model_identifier,
     provider_type: row.provider_type ?? "",
+    provider_name: row.provider_name ?? "",
     provider_id: row.provider_id ?? "",
     api_key: row.api_key ?? null,
     endpoint_url: row.endpoint_url ?? null,
