@@ -244,10 +244,16 @@ export function createRoutes(pool: Pool): Router {
             features: feats.map((f: any) => ({ ...camelCaseRow(f), subsystemId: f.subsystem_id })),
           });
         }
+        // External IDs (cross-schema junction)
+        const { rows: externalIds } = await pool.query(
+          'SELECT * FROM system_external_ids WHERE system_id = $1 ORDER BY source_schema, source_table',
+          [sys.id]
+        );
         result.push({
           ...camelCaseRow(sys),
           folders: folders.map((f: any) => ({ ...f, id: f.id, name: f.name, category: f.category, note: f.note })),
           subsystems,
+          externalIds: externalIds.map((eid: any) => camelCaseRow(eid)),
         });
       }
       res.json({
@@ -345,10 +351,16 @@ export function createRoutes(pool: Pool): Router {
           features: feats.map((f: any) => ({ ...toEpochMs(f, 'created_at'), subsystemId: f.subsystem_id })),
         });
       }
+      // External IDs (cross-schema junction)
+      const { rows: externalIds } = await pool.query(
+        'SELECT * FROM system_external_ids WHERE system_id = $1 ORDER BY source_schema, source_table',
+        [sys.id]
+      );
       res.json({
         ...toEpochMs(sys, 'created_at'),
         folders: folders.map((f: any) => ({ ...f, id: f.id, name: f.name, category: f.category, note: f.note })),
         subsystems,
+        externalIds: externalIds.map((eid: any) => camelCaseRow(eid)),
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -8306,6 +8318,143 @@ export function createRoutes(pool: Pool): Router {
         if (success) refreshed.push(name);
       }
       res.json({ ok: true, refreshed, skipped, errors });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  SYSTEM EXTERNAL IDS (cross-schema junction)
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/systems/:id/external-ids — list all external mappings for a system
+  router.get('/systems/:id/external-ids', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const page = Math.max(1, parseInt(String(req.query.page || '1'), 10));
+      const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize || '100'), 10)));
+      const offset = (page - 1) * pageSize;
+
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(
+          'SELECT * FROM system_external_ids WHERE system_id = $1 ORDER BY source_schema, source_table LIMIT $2 OFFSET $3',
+          [id, pageSize, offset]
+        ),
+        pool.query('SELECT COUNT(*)::int AS total FROM system_external_ids WHERE system_id = $1', [id]),
+      ]);
+
+      res.json({
+        items: dataResult.rows.map((r: any) => camelCaseRow(r)),
+        total: parseInt(countResult.rows[0].total, 10),
+        page,
+        pageSize,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/systems/:id/external-ids — create a new external ID mapping
+  router.post('/systems/:id/external-ids', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { sourceSchema, sourceTable, sourceId, matchConfidence = 1.0, matchMethod = 'manual', notes = null, roleInSystem = null } = req.body;
+      if (!sourceSchema || !sourceTable || !sourceId) {
+        return res.status(400).json({ error: 'sourceSchema, sourceTable, and sourceId are required' });
+      }
+      // Verify system exists
+      const { rows: [sys] } = await pool.query('SELECT id FROM systems WHERE id = $1', [id]);
+      if (!sys) return res.status(404).json({ error: 'System not found' });
+
+      const { rows: [eid] } = await pool.query(
+        `INSERT INTO system_external_ids_history (system_id, source_schema, source_table, source_id, match_confidence, match_method, role_in_system, notes, recorded_on_dt, recorded_until_dt)
+         SELECT $1, $2, $3, $4, $5, $6, $7, $8, NOW(), '9999-12-31 23:59:59+00'
+         WHERE NOT EXISTS (
+           SELECT 1 FROM system_external_ids_history
+           WHERE system_id = $1 AND source_schema = $2 AND source_table = $3
+             AND source_id = $4 AND role_in_system IS NOT DISTINCT FROM $7
+             AND recorded_until_dt = '9999-12-31 23:59:59+00'
+         )
+         RETURNING *`,
+        [id, sourceSchema, sourceTable, sourceId, matchConfidence, matchMethod, roleInSystem, notes]
+      );
+
+      if (!eid) {
+        return res.status(409).json({ error: `Mapping already exists for system ${id} → (${sourceSchema}, ${sourceTable}, ${sourceId}) with role ${roleInSystem || '(none)'}` });
+      }
+
+      res.status(201).json(camelCaseRow(eid));
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/systems/:id/external-ids/:eid — soft-expire a mapping
+  router.delete('/systems/:id/external-ids/:eid', async (req: Request, res: Response) => {
+    try {
+      const { id, eid } = req.params;
+      const { rowCount } = await pool.query(
+        `UPDATE system_external_ids_history
+         SET recorded_until_dt = NOW()
+         WHERE id = $1::uuid AND system_id = $2::uuid
+           AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+        [eid, id]
+      );
+      if (rowCount === 0) return res.status(404).json({ error: 'External ID mapping not found' });
+      res.json({ expired: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/external-ids — reverse lookup: find which nebula system owns a given external ID
+  router.get('/external-ids', async (req: Request, res: Response) => {
+    try {
+      const { sourceSchema, sourceTable, sourceId } = req.query;
+      if (!sourceSchema || !sourceTable || !sourceId) {
+        return res.status(400).json({ error: 'sourceSchema, sourceTable, and sourceId query params are required' });
+      }
+      const { rows } = await pool.query(
+        `SELECT eid.*, sys.name AS system_name, sys.description AS system_description
+         FROM system_external_ids eid
+         JOIN systems sys ON sys.id = eid.system_id
+         WHERE eid.source_schema = $1 AND eid.source_table = $2 AND eid.source_id = $3`,
+        [sourceSchema, sourceTable, sourceId]
+      );
+      if (rows.length === 0) {
+        return res.status(404).json({ error: `No system found for ${sourceSchema}.${sourceTable} id=${sourceId}` });
+      }
+      // Return all matches (multi-role is allowed now)
+      res.json({ items: rows.map((r: any) => camelCaseRow(r)), total: rows.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PATCH /api/external-ids/:id — update confidence, method, notes, or role_in_system
+  router.patch('/external-ids/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { matchConfidence, matchMethod, notes, roleInSystem, systemId } = req.body;
+      const sets: string[] = [];
+      const vals: any[] = [];
+      let i = 1;
+      if (matchConfidence !== undefined) { sets.push(`match_confidence = $${i++}`); vals.push(matchConfidence); }
+      if (matchMethod !== undefined) { sets.push(`match_method = $${i++}`); vals.push(matchMethod); }
+      if (notes !== undefined) { sets.push(`notes = $${i++}`); vals.push(notes); }
+      if (roleInSystem !== undefined) { sets.push(`role_in_system = $${i++}`); vals.push(roleInSystem); }
+      if (systemId !== undefined) { sets.push(`system_id = $${i++}`); vals.push(systemId); }
+      if (sets.length === 0) return res.json({ ok: true });
+      vals.push(id);
+      const { rows: [eid] } = await pool.query(
+        `UPDATE system_external_ids_history
+         SET ${sets.join(', ')}
+         WHERE id = $${i}::uuid AND recorded_until_dt = '9999-12-31 23:59:59+00'
+         RETURNING *`,
+        vals
+      );
+      if (!eid) return res.status(404).json({ error: 'External ID mapping not found' });
+      res.json(camelCaseRow(eid));
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
