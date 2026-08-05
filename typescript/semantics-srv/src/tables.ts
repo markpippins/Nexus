@@ -314,6 +314,42 @@ export const TABLES: TableMeta[] = [
     required: ["from_asset_id", "to_asset_id", "relation_type"],
     note: "T02 Phase 2. Self-loops forbidden (from_asset_id <> to_asset_id). Append-only with expired_at soft-delete; active edge uniqueness on (from, to, type).",
   },
+  // ── V072: Evidence spine ──────────────────────────────────────────
+  {
+    table: "evidence_type",
+    label: "evidence type (vocabulary of evidence kinds)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["name", "description", "origin_category", "notes", "expired_at"],
+    required: ["name", "description"],
+    idCol: "name",
+    idParam: "p_name",
+    note: "Vocabulary table — FK-referenced by evidence_item. update takes p_new_name.",
+  },
+  {
+    table: "evidence_item",
+    label: "evidence item (immutable, hash-deduplicated evidence record)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: ["metadata"],
+    writable: ["evidence_type_id", "uri", "excerpt", "note", "origin", "captured_at", "source_hash", "metadata", "valid_from", "valid_to", "expired_at"],
+    required: ["evidence_type_id"],
+    note: "Immutable after creation (no update_ proc). Soft-close via soft_delete_. Dedup on (evidence_type_id, source_hash).",
+  },
+  {
+    table: "statement_evidence",
+    label: "statement evidence (evidence linked to a relationship claim)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["evidence_item_id", "statement_type", "statement_id", "role", "strength", "comment", "expired_at"],
+    required: ["evidence_item_id", "statement_type", "statement_id", "role"],
+    note: "Polymorphic junction — statement_type ∈ {concept_relationship, representation_relationship}. Unique on (evidence_item_id, statement_type, statement_id, role).",
+  },
 ];
 
 export function getTable(name: string): TableMeta | undefined {

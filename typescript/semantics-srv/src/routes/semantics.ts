@@ -169,6 +169,8 @@ for (const t of TABLES) {
   // PATCH /api/<table>/:id — append-only replace via update_<table> proc.
   // NOTE: expires the old row and inserts a NEW version with a NEW id.
   // Response includes superseded_id = the id that was expired.
+  // evidence_item is immutable — no PATCH route.
+  if (t.table !== "evidence_item") {
   semanticsRouter.patch(`${base}/:id`, async (req, res) => {
     try {
       const body = { ...(req.body || {}), [t.idParam ?? "p_id"]: req.params.id };
@@ -186,6 +188,7 @@ for (const t of TABLES) {
       res.status(status).json({ error: code, message: err.message });
     }
   });
+  }
 
   // DELETE /api/<table>/:id — soft-delete (expire-not-delete, idempotent)
   semanticsRouter.delete(`${base}/:id`, async (req, res) => {
@@ -200,6 +203,106 @@ for (const t of TABLES) {
     }
   });
 }
+
+// ── Evidence join endpoints ──────────────────────────────────────────
+
+// GET /api/concept-relationship/:id/evidence — all evidence for a concept relationship
+semanticsRouter.get("/concept_relationship/:id/evidence", async (req, res) => {
+  try {
+    const db = getDb();
+    const { rows: [rel] } = await db.query(
+      "SELECT * FROM semantics.concept_relationship WHERE id = $1",
+      [req.params.id],
+    );
+    if (!rel) return res.status(404).json({ error: "Concept relationship not found" });
+
+    const { rows: evidence } = await db.query(
+      `SELECT se.id AS "statementEvidenceId", se.role, se.strength, se.comment,
+              ei.id, ei.uri, ei.excerpt, ei.origin, ei.captured_at AS "capturedAt",
+              ei.source_hash AS "sourceHash",
+              et.name AS "evidenceType"
+       FROM semantics.statement_evidence se
+       JOIN semantics.evidence_item ei ON ei.id = se.evidence_item_id
+          AND ei.recorded_until_dt = '9999-12-31 23:59:59+00'
+       JOIN semantics.evidence_type et ON et.id = ei.evidence_type_id
+       WHERE se.statement_type = 'concept_relationship'
+         AND se.statement_id = $1
+         AND se.expired_at IS NULL
+       ORDER BY se.effective_at DESC`,
+      [req.params.id],
+    );
+
+    res.json({
+      relationship: rel,
+      evidence: evidence.map((e: any) => ({
+        statementEvidenceId: e.statementEvidenceId,
+        role: e.role,
+        strength: e.strength,
+        comment: e.comment,
+        evidenceItem: {
+          id: e.id,
+          evidenceType: e.evidenceType,
+          uri: e.uri,
+          excerpt: e.excerpt,
+          origin: e.origin,
+          capturedAt: e.capturedAt ? new Date(e.capturedAt).getTime() : null,
+          sourceHash: e.sourceHash,
+        },
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "evidence_lookup_failed", message: err.message });
+  }
+});
+
+// GET /api/representation-relationship/:id/evidence
+semanticsRouter.get("/representation_relationship/:id/evidence", async (req, res) => {
+  try {
+    const db = getDb();
+    const { rows: [rel] } = await db.query(
+      "SELECT * FROM semantics.representation_relationship WHERE id = $1",
+      [req.params.id],
+    );
+    if (!rel) return res.status(404).json({ error: "Representation relationship not found" });
+
+    const { rows: evidence } = await db.query(
+      `SELECT se.id AS "statementEvidenceId", se.role, se.strength, se.comment,
+              ei.id, ei.uri, ei.excerpt, ei.origin, ei.captured_at AS "capturedAt",
+              ei.source_hash AS "sourceHash",
+              et.name AS "evidenceType"
+       FROM semantics.statement_evidence se
+       JOIN semantics.evidence_item ei ON ei.id = se.evidence_item_id
+          AND ei.recorded_until_dt = '9999-12-31 23:59:59+00'
+       JOIN semantics.evidence_type et ON et.id = ei.evidence_type_id
+       WHERE se.statement_type = 'representation_relationship'
+         AND se.statement_id = $1
+         AND se.expired_at IS NULL
+       ORDER BY se.effective_at DESC`,
+      [req.params.id],
+    );
+
+    res.json({
+      relationship: rel,
+      evidence: evidence.map((e: any) => ({
+        statementEvidenceId: e.statementEvidenceId,
+        role: e.role,
+        strength: e.strength,
+        comment: e.comment,
+        evidenceItem: {
+          id: e.id,
+          evidenceType: e.evidenceType,
+          uri: e.uri,
+          excerpt: e.excerpt,
+          origin: e.origin,
+          capturedAt: e.capturedAt ? new Date(e.capturedAt).getTime() : null,
+          sourceHash: e.sourceHash,
+        },
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "evidence_lookup_failed", message: err.message });
+  }
+});
 
 // ── Drift lifecycle ──────────────────────────────────────────────────
 
