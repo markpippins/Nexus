@@ -280,12 +280,33 @@ export class PipelineWatcher {
   // nebula.implementation_plans with status='pending' but no PLAN_CREATE
   // receipt or builder ticket. This method detects those and bootstraps
   // the execution pipeline (receipt + ticket) so they become visible.
-  private bootstrapInterval: ReturnType<typeof setInterval> | null = null;
+  private bootstrapTimer: ReturnType<typeof setTimeout> | null = null;
+  private bootstrapInFlight: Promise<{ bootstrapped: number; failed: number }> | null = null;
+  private bootstrapStarted = false;
+  private bootstrapFailureCount = 0;
   private readonly BOOTSTRAP_INTERVAL_MS = 30_000; // 30s, matches PlanWatcher refresh
+  private readonly BOOTSTRAP_MAX_BACKOFF_MS = 5 * 60_000;
 
-  async bootstrapUnclaimedPlans(): Promise<number> {
+  /**
+   * Run one bootstrap pass. Calls are single-flight so a manual invocation
+   * cannot overlap the scheduled pass and create duplicate work.
+   */
+  async bootstrapUnclaimedPlans(): Promise<{ bootstrapped: number; failed: number }> {
+    if (this.bootstrapInFlight) return this.bootstrapInFlight;
+
+    const run = this.runBootstrapPass();
+    this.bootstrapInFlight = run;
+    try {
+      return await run;
+    } finally {
+      if (this.bootstrapInFlight === run) this.bootstrapInFlight = null;
+    }
+  }
+
+  private async runBootstrapPass(): Promise<{ bootstrapped: number; failed: number }> {
     const db = getDb();
     let bootstrapped = 0;
+    let failed = 0;
 
     try {
       // Find plans in nebula.implementation_plans with status='pending'
@@ -357,35 +378,82 @@ export class PipelineWatcher {
         } catch (planErr: any) {
           // 23505 = unique_violation — another bootstrapper already handled this plan
           if (planErr?.code === "23505") continue;
+          failed++;
           console.warn(
             `Auto-bootstrap failed for plan ${plan.plan_number}:`,
             planErr?.message || planErr,
           );
         }
       }
+
+      if (failed > 0) {
+        console.warn(
+          `Auto-bootstrap pass completed with ${failed} failed plan(s); ` +
+          "they will be retried on the next pass",
+        );
+      }
     } catch (err: any) {
+      // Surface query/connection failures to the scheduler so it can apply
+      // backoff instead of silently treating an unavailable database as an
+      // empty backlog.
       console.warn("Auto-bootstrap query failed:", err?.message || err);
+      throw err;
     }
 
-    return bootstrapped;
+    return { bootstrapped, failed };
+  }
+
+  private scheduleAutoBootstrap(delayMs: number): void {
+    if (!this.bootstrapStarted) return;
+    if (this.bootstrapTimer) clearTimeout(this.bootstrapTimer);
+    this.bootstrapTimer = setTimeout(() => {
+      this.bootstrapTimer = null;
+      void this.runScheduledBootstrap();
+    }, delayMs);
+  }
+
+  private async runScheduledBootstrap(): Promise<void> {
+    if (!this.bootstrapStarted) return;
+
+    let nextDelay = this.BOOTSTRAP_INTERVAL_MS;
+    try {
+      const result = await this.bootstrapUnclaimedPlans();
+      if (result.failed > 0) {
+        throw new Error(`${result.failed} plan bootstrap(s) failed`);
+      }
+      this.bootstrapFailureCount = 0;
+      if (result.bootstrapped > 0) {
+        console.log(`Auto-bootstrap: bootstrapped ${result.bootstrapped} plan(s)`);
+      }
+    } catch (err: any) {
+      this.bootstrapFailureCount++;
+      const exponent = Math.min(this.bootstrapFailureCount - 1, 10);
+      nextDelay = Math.min(
+        this.BOOTSTRAP_INTERVAL_MS * 2 ** exponent,
+        this.BOOTSTRAP_MAX_BACKOFF_MS,
+      );
+      console.warn(
+        `Auto-bootstrap pass ${this.bootstrapFailureCount} failed; ` +
+        `retrying in ${nextDelay}ms: ${err?.message || err}`,
+      );
+    } finally {
+      this.scheduleAutoBootstrap(nextDelay);
+    }
   }
 
   startAutoBootstrap() {
-    // Run immediately on startup
-    this.bootstrapUnclaimedPlans().then((n) => {
-      if (n > 0) console.log(`Auto-bootstrap: bootstrapped ${n} plan(s) on startup`);
-    });
-    // Then check periodically
-    this.bootstrapInterval = setInterval(
-      () => this.bootstrapUnclaimedPlans(),
-      this.BOOTSTRAP_INTERVAL_MS,
-    );
+    // Idempotent: initialization/restart hooks must not create multiple loops.
+    if (this.bootstrapStarted) return;
+    this.bootstrapStarted = true;
+    this.bootstrapFailureCount = 0;
+    void this.runScheduledBootstrap();
   }
 
   stopAutoBootstrap() {
-    if (this.bootstrapInterval) {
-      clearInterval(this.bootstrapInterval);
-      this.bootstrapInterval = null;
+    this.bootstrapStarted = false;
+    if (this.bootstrapTimer) {
+      clearTimeout(this.bootstrapTimer);
+      this.bootstrapTimer = null;
     }
   }
 
