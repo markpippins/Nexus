@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: nebula-srv — Nebula Knowledge-Graph API
-  version: 1.0.7d4e4989
+  version: 1.0.6478f76c
   description: 'Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge
     graph, and cross-references.
 
@@ -26,6 +26,7 @@ tags:
 - name: docs
 - name: evidence-links
 - name: execution
+- name: external-ids
 - name: features
 - name: harvest-candidates
 - name: harvests
@@ -2180,6 +2181,74 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
       summary: GET /api/execution/state — summary of execution domain state
+  /api/external-ids:
+    get:
+      tags:
+      - external-ids
+      operationId: get_external_ids
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: 'GET /api/external-ids — reverse lookup: find which nebula system owns a given external ID'
+  /api/external-ids/{id}:
+    patch:
+      tags:
+      - external-ids
+      operationId: patch_external_ids_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: PATCH /api/external-ids/:id — update confidence, method, notes, or role_in_system
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
   /api/features:
     post:
       tags:
@@ -6663,6 +6732,122 @@ paths:
       summary: GET /api/systems/:id/docs — read docs from all workspaces for a system
       parameters:
       - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/systems/{id}/external-ids:
+    get:
+      tags:
+      - systems
+      operationId: get_systems_id_external_ids
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: SYSTEM EXTERNAL IDS (cross-schema junction) GET /api/systems/:id/external-ids — list all external mappings
+        for a system
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags:
+      - systems
+      operationId: post_systems_id_external_ids
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: POST /api/systems/:id/external-ids — create a new external ID mapping
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/systems/{id}/external-ids/{eid}:
+    delete:
+      tags:
+      - systems
+      operationId: delete_systems_id_external_ids_eid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: DELETE /api/systems/:id/external-ids/:eid — soft-expire a mapping
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: eid
         in: path
         required: true
         schema:

@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**209 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**214 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -72,6 +72,8 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | GET | `/api/execution/requests/:id` | GET /api/execution/requests/:id — get a single request |
 | PATCH | `/api/execution/requests/:id/transition` | PATCH /api/execution/requests/:id/transition — transition WorkRequest status |
 | GET | `/api/execution/state` | GET /api/execution/state — summary of execution domain state |
+| GET | `/api/external-ids` | GET /api/external-ids — reverse lookup: find which nebula system owns a given external ID |
+| PATCH | `/api/external-ids/:id` | PATCH /api/external-ids/:id — update confidence, method, notes, or role_in_system |
 | POST | `/api/features` | FEATURES POST /api/features |
 | DELETE | `/api/features/:id` | DELETE /api/features/:id — cascade deletes requirements with feature_id |
 | GET | `/api/features/:id` | GET /api/features/:id — single feature |
@@ -201,6 +203,9 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | PATCH | `/api/systems/:id` | PATCH /api/systems/:id — name, description, readme, architecture |
 | GET | `/api/systems/:id/agendas` | GET /api/systems/:id/agendas — list agendas scoped to a system, with nested items |
 | GET | `/api/systems/:id/docs` | GET /api/systems/:id/docs — read docs from all workspaces for a system |
+| GET | `/api/systems/:id/external-ids` | SYSTEM EXTERNAL IDS (cross-schema junction) GET /api/systems/:id/external-ids — list all external mappings for a system |
+| POST | `/api/systems/:id/external-ids` | POST /api/systems/:id/external-ids — create a new external ID mapping |
+| DELETE | `/api/systems/:id/external-ids/:eid` | DELETE /api/systems/:id/external-ids/:eid — soft-expire a mapping |
 | POST | `/api/systems/:id/folders` | POST /api/systems/:id/folders |
 | GET | `/api/systems/:id/harvest-candidates` | GET /api/systems/:id/harvest-candidates — list all harvest candidates linked to a specific system (direct filter by system_id). |
 | GET | `/api/systems/:id/implementation-plans` | GET /api/systems/:id/implementation-plans — plans linked to a system via cross-refs |
