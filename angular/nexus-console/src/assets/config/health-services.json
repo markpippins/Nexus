@@ -38,7 +38,7 @@
     { "key": "knowledge-srv",     "name": "Knowledge API",      "port": 3109, "healthPath": "/health", "category": "api" },
     { "key": "losm-host",         "name": "LOSM Host",          "port": 8006, "healthPath": "/health", "category": "api" },
     { "key": "peb-srv",           "name": "PEB Server",         "port": 3111, "healthPath": "/health", "category": "api" },
-    { "key": "angular-assembly",  "name": "Assembly UI",         "port": 4204, "healthPath": "/", "category": "ui" },
+    { "key": "angular-assembly",  "name": "Assembly UI",         "port": 4214, "healthPath": "/", "category": "ui" },
     { "key": "cascade-ui",        "name": "Cascade UI",          "port": 4203, "healthPath": "/", "category": "ui" },
     { "key": "conduit-ui",        "name": "Conduit UI",          "port": 4201, "healthPath": "/", "category": "ui" },
     { "key": "duality-ui",        "name": "Duality UI",          "port": 3002, "healthPath": "/", "category": "ui" },

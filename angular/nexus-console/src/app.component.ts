@@ -199,7 +199,7 @@ export class AppComponent implements OnInit, AfterViewInit, OnDestroy {
     'conduit-ui': 'http://localhost:4201',
     'duality': 'http://localhost:3002',
     'plurality': 'http://localhost:3004',
-    'assembly': 'http://localhost:4204',
+    'assembly': 'http://localhost:4214',
     'nebula-rms': 'http://localhost:4210',
     'peb-ui': 'http://localhost:4206',
     'kernel-ui': 'http://localhost:4207',
