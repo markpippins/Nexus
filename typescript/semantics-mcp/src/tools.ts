@@ -41,6 +41,9 @@ function buildWritableProps(t: TableMeta): Record<string, any> {
   if (t.table === "owning_subsystem") {
     props.p_new_id = { type: "number", description: "Required for update — the new smallint key" };
   }
+  if (t.table === "relationship_type") {
+    props.p_new_name = { type: "string", description: "Required for update — the new relationship type name" };
+  }
   return props;
 }
 
@@ -50,7 +53,7 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "semantics_meta",
     description:
-      "Schema overview of semantics.* — all 11 tables with active/total row counts, stored-proc count, and writable p_* params per table.",
+      "Schema overview of semantics.* — all 12 tables with active/total row counts, stored-proc count, and writable p_* params per table.",
     inputSchema: { type: "object", properties: {} },
   },
   ...TABLES.flatMap((t): MCPToolDefinition[] => [
@@ -120,8 +123,10 @@ export const toolDefinitions: MCPToolDefinition[] = [
 
 function bodyFromArgs(t: TableMeta, args: Record<string, any>): Record<string, any> {
   const body: Record<string, any> = {};
-  if (args.id !== undefined) body.p_id = args.id;
+  const idParam = t.idParam ?? "p_id";
+  if (args.id !== undefined) body[idParam] = args.id;
   if (t.table === "owning_subsystem" && args.p_new_id !== undefined) body.p_new_id = args.p_new_id;
+  if (t.table === "relationship_type" && args.p_new_name !== undefined) body.p_new_name = args.p_new_name;
   for (const col of t.writable) {
     const k = `p_${col}`;
     if (args[k] !== undefined) body[k] = args[k];

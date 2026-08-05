@@ -1,5 +1,5 @@
 /**
- * tables.ts — registry of the 11 semantics.* tables (V057 design model).
+ * tables.ts — registry of the 12 semantics.* tables (V057 design model + V060 relationship vocabulary).
  * Kept in sync with semantics-srv/src/tables.ts (each package is self-contained).
  *
  * `writable` = column names accepted as p_* params by the add_/update_ procs,
@@ -16,6 +16,10 @@ export interface TableMeta {
   writable: string[];
   required: string[];
   note?: string;
+  /** Column used for single-row lookups (default "id"); relationship_type uses "name". */
+  idCol?: string;
+  /** Proc param name for the id (default "p_id"); relationship_type uses "p_name". */
+  idParam?: string;
 }
 
 export const TABLES: TableMeta[] = [
@@ -26,7 +30,7 @@ export const TABLES: TableMeta[] = [
     idAuto: false,
     smallintCols: ["id"],
     jsonbCols: [],
-    writable: ["name", "description", "expired_at"],
+    writable: ["name", "description", "path", "expired_at"],
     required: ["id", "name"],
     note: "Stable smallint lookup key — id is caller-supplied; update requires p_new_id.",
   },
@@ -71,9 +75,14 @@ export const TABLES: TableMeta[] = [
       "to_representation_id",
       "relationship_type",
       "notes",
+      "evidence_source",
+      "evidence_type",
+      "confidence",
+      "evidence_notes",
       "expired_at",
     ],
     required: ["from_representation_id", "to_representation_id", "relationship_type"],
+    note: "evidence_source/type + confidence (0..1) + evidence_notes record the provenance backing each edge.",
   },
   {
     table: "consumer_operation",
@@ -164,9 +173,26 @@ export const TABLES: TableMeta[] = [
       "relationship_type",
       "path",
       "notes",
+      "evidence_source",
+      "evidence_type",
+      "confidence",
+      "evidence_notes",
       "expired_at",
     ],
     required: ["from_concept_id", "to_concept_id", "relationship_type"],
-    note: "path is 'green' | 'red' | null (branch tag).",
+    note: "path is 'green' | 'red' | null (branch tag); evidence_source/type + confidence (0..1) + evidence_notes record provenance.",
+  },
+  {
+    table: "relationship_type",
+    label: "relationship type (vocabulary of legal edge types)",
+    idType: "uuid",
+    idAuto: true,
+    smallintCols: [],
+    jsonbCols: [],
+    writable: ["name", "description", "scope", "notes", "expired_at"],
+    required: ["name", "description"],
+    idCol: "name",
+    idParam: "p_name",
+    note: "Vocabulary table — FK-referenced by concept_relationship / representation_relationship (only defined types are legal edges). update takes p_new_name (names are never reused).",
   },
 ];

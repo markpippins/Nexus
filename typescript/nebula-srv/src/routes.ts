@@ -264,11 +264,11 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/systems
   router.post('/systems', async (req: Request, res: Response) => {
     try {
-      const { name, description = '', readme = null, architecture = null } = req.body;
+      const { name, description = '', readme = null, architecture = null, path = null } = req.body;
       if (!name) return res.status(400).json({ error: 'name is required' });
       const { rows: [sys] } = await pool.query(
-        'INSERT INTO systems (name, description, readme, architecture) VALUES ($1, $2, $3, $4) RETURNING *',
-        [name, description, readme, architecture]
+        'INSERT INTO systems (name, description, readme, architecture, path) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [name, description, readme, architecture, path]
       );
       res.status(201).json({ ...toEpochMs(sys, 'created_at'), folders: [], subsystems: [] });
     } catch (err: any) {
@@ -280,7 +280,7 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/systems/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { name, description, readme, architecture } = req.body;
+      const { name, description, readme, architecture, path } = req.body;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -288,6 +288,7 @@ export function createRoutes(pool: Pool): Router {
       if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description); }
       if (readme !== undefined) { sets.push(`readme = $${i++}`); vals.push(readme); }
       if (architecture !== undefined) { sets.push(`architecture = $${i++}`); vals.push(architecture); }
+      if (path !== undefined) { sets.push(`path = $${i++}`); vals.push(path); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [sys] } = await pool.query(
@@ -295,7 +296,7 @@ export function createRoutes(pool: Pool): Router {
         vals
       );
       if (!sys) return res.status(404).json({ error: 'System not found' });
-      res.json({ ...toEpochMs(sys, 'created_at'), name: sys.name, description: sys.description, readme: sys.readme, architecture: sys.architecture });
+      res.json({ ...toEpochMs(sys, 'created_at'), name: sys.name, description: sys.description, readme: sys.readme, architecture: sys.architecture, path: sys.path });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -361,13 +362,13 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/subsystems
   router.post('/subsystems', async (req: Request, res: Response) => {
     try {
-      const { systemId, name, description = '', readme = null } = req.body;
+      const { systemId, name, description = '', readme = null, path = null } = req.body;
       if (!systemId || !name) return res.status(400).json({ error: 'systemId and name are required' });
       // Server-side color deduplication (Plan 0093)
       const color = await getUnusedColor(systemId, pool);
       const { rows: [sub] } = await pool.query(
-        'INSERT INTO subsystems (system_id, name, description, readme, color) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [systemId, name, description, readme, color]
+        'INSERT INTO subsystems (system_id, name, description, readme, color, path) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [systemId, name, description, readme, color, path]
       );
       res.status(201).json({
         ...toEpochMs(sub, 'created_at'),
@@ -383,7 +384,7 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/subsystems/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { name, description, readme, color } = req.body;
+      const { name, description, readme, color, path } = req.body;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
@@ -391,6 +392,7 @@ export function createRoutes(pool: Pool): Router {
       if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description); }
       if (readme !== undefined) { sets.push(`readme = $${i++}`); vals.push(readme); }
       if (color !== undefined) { sets.push(`color = $${i++}`); vals.push(color); }
+      if (path !== undefined) { sets.push(`path = $${i++}`); vals.push(path); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [sub] } = await pool.query(
@@ -398,7 +400,7 @@ export function createRoutes(pool: Pool): Router {
         vals
       );
       if (!sub) return res.status(404).json({ error: 'Subsystem not found' });
-      res.json({ ...toEpochMs(sub, 'created_at'), systemId: sub.system_id, name: sub.name, description: sub.description, readme: sub.readme, color: sub.color });
+      res.json({ ...toEpochMs(sub, 'created_at'), systemId: sub.system_id, name: sub.name, description: sub.description, readme: sub.readme, color: sub.color, path: sub.path });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -447,11 +449,11 @@ export function createRoutes(pool: Pool): Router {
   // POST /api/features
   router.post('/features', async (req: Request, res: Response) => {
     try {
-      const { subsystemId, name, description = '', readme = null } = req.body;
+      const { subsystemId, name, description = '', readme = null, path = null } = req.body;
       if (!subsystemId || !name) return res.status(400).json({ error: 'subsystemId and name are required' });
       const { rows: [feat] } = await pool.query(
-        'INSERT INTO features (subsystem_id, name, description, readme) VALUES ($1, $2, $3, $4) RETURNING *',
-        [subsystemId, name, description, readme]
+        'INSERT INTO features (subsystem_id, name, description, readme, path) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+        [subsystemId, name, description, readme, path]
       );
       res.status(201).json({ ...toEpochMs(feat, 'created_at'), subsystemId: feat.subsystem_id });
     } catch (err: any) {
@@ -463,13 +465,14 @@ export function createRoutes(pool: Pool): Router {
   router.patch('/features/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { name, description, readme } = req.body;
+      const { name, description, readme, path } = req.body;
       const sets: string[] = [];
       const vals: any[] = [];
       let i = 1;
       if (name !== undefined) { sets.push(`name = $${i++}`); vals.push(name); }
       if (description !== undefined) { sets.push(`description = $${i++}`); vals.push(description); }
       if (readme !== undefined) { sets.push(`readme = $${i++}`); vals.push(readme); }
+      if (path !== undefined) { sets.push(`path = $${i++}`); vals.push(path); }
       if (sets.length === 0) return res.json({ ok: true });
       vals.push(id);
       const { rows: [feat] } = await pool.query(
@@ -477,7 +480,7 @@ export function createRoutes(pool: Pool): Router {
         vals
       );
       if (!feat) return res.status(404).json({ error: 'Feature not found' });
-      res.json({ ...toEpochMs(feat, 'created_at'), subsystemId: feat.subsystem_id, name: feat.name, description: feat.description, readme: feat.readme });
+      res.json({ ...toEpochMs(feat, 'created_at'), subsystemId: feat.subsystem_id, name: feat.name, description: feat.description, readme: feat.readme, path: feat.path });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
@@ -5139,9 +5142,15 @@ export function createRoutes(pool: Pool): Router {
             const safeVal = val.replace(/\$/g, '$$$$');
             content = content.replace(new RegExp(`\\{\\{${escapedKey}\\}\\}`, 'g'), safeVal);
           }
-          const targetPath = proj.target_path
-            .replace(/\{\{id\}\}/g, row.id || '')
-            .replace(/\{\{name\}\}/g, row.name || row.title || 'unknown');
+          // Substitute every {{key}} in the target path (id, name, slug, …) —
+          // same escaping discipline as the content template.
+          let targetPath = proj.target_path;
+          for (const [key, value] of Object.entries(row)) {
+            const val = value === null ? '' : String(value);
+            const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const safeVal = val.replace(/\$/g, '$$$$');
+            targetPath = targetPath.replace(new RegExp(`\\{\\{${escapedKey}\\}\}`, 'g'), safeVal);
+          }
 
           const absPath = path.resolve(AUDIT_ROOT, targetPath);
           if (!absPath.startsWith(AUDIT_ROOT)) {

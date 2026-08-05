@@ -132,7 +132,7 @@ parity — schema/seed migrations are applied to both (see §7).
 | `nebula` | 47 | 51 | Knowledge graph & record store — **SCD4 bitemporal** (`_history` tables + live VIEWs, `valid_*` + `recorded_*`); agent records, harvests, candidates, intent records, requirements, plans, cross-references, projections |
 | `conduit` | 16 | 0 | WorkRequest pipeline — plans, tickets, receipts, execution state |
 | `cascade` | 5 | 0 | Instance-level operational lineage (`lineage_edges`, …) — the *map* |
-| `semantics` | 11 | 0 | **Type-level legend** — concepts, representations, relationships, identity, snapshots, drift (see `docs/semantics-schema.md`) |
+| `semantics` | 12 | 0 | **Type-level legend** — concepts, representations, relationship vocabulary, identity, snapshots, drift (see `docs/semantics-schema.md`) |
 | `assembly` | 16 | 7 | Forums, threads, comments, users |
 | `tackle` | 17 | 0 | Role memory & procedure cards (synced → Redis) |
 | `kernel` | 5 | 8 | Semantic Kernel state transitions & receipts |
@@ -183,9 +183,18 @@ legal relationships — independent of any one baseline. It is the legend;
 `cascade.lineage_edges` is the map; snapshots are the per-baseline judgment
 layer (the only thing that repeats).
 
-- 11 tables, 14 FKs, 34 stored procedures (`add_*` / `soft_delete_*` /
+- 12 tables, 16 FKs, 37 stored procedures (`add_*` / `soft_delete_*` /
   `update_*` / `resolve_drift_finding`), expire-not-delete via `expired_at`,
   active-only partial unique indexes.
+- **Relationship vocabulary (V060 + V061):** 29 legal edge types in
+  `semantics.relationship_type` (6 concept pipeline + 4 representation-fidelity
+  + 14 cross-domain: `defines`, `implements`, `projects`, `derives_from`,
+  `validates`, `constrains`, `governs`, `supersedes`, `observes`, `mediates`,
+  `interprets`, `depends_on_decision`, `evidences`, `questions` + 5 operational
+  between representations: `calls`, `consumes`, `writes`, `reads`, `uses`),
+  **FK-enforced** on `concept_relationship` and `representation_relationship` —
+  only defined types are capturable as edges, and operational facts can be
+  stated between any two representations.
 - **Seeded legend (V059):** 16 owning subsystems (the fleet), 11 concepts,
   12 legal pipeline edges, 6 identity strategies (incl. Asset as the
   `canonical_asset_id` root).
