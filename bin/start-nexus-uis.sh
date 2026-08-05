@@ -1,7 +1,7 @@
 #!/bin/bash
 # bin/start-nexus-uis.sh — manage ALL Nexus UI dev servers via systemd user units
 #
-# All 14 UIs run as systemd --user services, each in its own unit.
+# All 15 UIs run as systemd --user services, each in its own unit.
 # This script provides a unified interface to start/stop/status them.
 #
 # Usage:
@@ -42,6 +42,7 @@ UI_NAMES=(
     "conduit-ui-legacy"  # 4015
     "data-explorer-ui"     # 4212
     "semantics-ui"         # 4213 (live; mock was :3000)
+    "assembly-ui"          # 4214 (live; mock was :3000)
 )
 
 UI_PORTS[nebula-ui]=4210
@@ -64,6 +65,7 @@ UI_PORTS[monaco-judge]=4016
 UI_PORTS[conduit-ui-legacy]=4015
 UI_PORTS[data-explorer-ui]=4212
 UI_PORTS[semantics-ui]=4213  # live mode (mock was :3000, intentionally unbound in live mode)
+UI_PORTS[assembly-ui]=4214   # live mode (mock was :3000, intentionally unbound in live mode)
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
