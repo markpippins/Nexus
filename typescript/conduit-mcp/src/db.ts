@@ -378,9 +378,13 @@ async function withTransaction<T>(
   cb: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   const client = await pool.connect();
-  await client.query(`SET search_path TO ${PG_SCHEMA},${TACKLE_SCHEMA}`);
   try {
     await client.query("BEGIN");
+    // SET LOCAL (not plain SET): scoped to this transaction, so the session
+    // reverts to the pool default search_path (conduit,vision,peb,tackle) when
+    // the client is released. A plain SET here leaked a vision-less path into
+    // pooled connections, crashing the watcher's unqualified `FROM tickets`.
+    await client.query(`SET LOCAL search_path TO ${PG_SCHEMA},${TACKLE_SCHEMA}`);
     const result = await cb(client);
     await client.query("COMMIT");
     return result;

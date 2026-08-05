@@ -163,7 +163,7 @@ export class PipelineWatcher {
     const allPlanIds = [...placed];
     if (allPlanIds.length > 0) {
       const ticketRows = await qAll(
-        `SELECT plan_id, role, status, id, created_at, expires_at, objective FROM tickets
+        `SELECT plan_id, role, status, id, created_at, expires_at, objective FROM vision.tickets
          WHERE plan_id = ANY(@planIds)
          AND status IN ('open','claimed','completed','failed','expired','stale','cancelled','abandoned')
          ORDER BY plan_id, role`,
@@ -453,7 +453,7 @@ export class PipelineWatcher {
     const receiptStats = await getReceiptCount();
     const implCount = receiptStats.find((r) => r.type === "IMPLEMENTATION")?.count ?? 0;
     const killedRow = await qOne(
-      "SELECT COUNT(*) as count FROM tickets WHERE status IN ('failed', 'abandoned')",
+      "SELECT COUNT(*) as count FROM vision.tickets WHERE status IN ('failed', 'abandoned')",
     );
     const killedCount = killedRow?.count ?? 0;
     return this.analytics.compute(this.planWatcher.plans, {
