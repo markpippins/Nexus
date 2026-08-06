@@ -77,7 +77,7 @@ Ports below are the authoritative `SERVICE_PORTS` map from that script.
 
 | Service | Port | Role |
 |---------|------|------|
-| `assembly-srv` | 3107 | Assembly REST — forums (`issues-and-open-questions`, `todos`, `change-log`), threads, users |
+| `assembly-srv` | 3107 | Assembly REST — forums (`issues-and-open-questions`, `to-do`, `change-log`), threads, users |
 | `assembly-mcp` | 3113 | Assembly MCP |
 | `operator-svc` | 3018 | Operator host personality |
 | `substance` | 3115 | Segment Sets API (FastAPI) — the *SegmentSet* concept's owning subsystem |
@@ -218,7 +218,7 @@ durable state, per `AGENTS.md` (the governing doctrine):
 |-----------|-------|------------------|
 | Role governance | `nebula.agent_records` | Tag-routed inbox/outbox (`to:<role>`, `type:…`, `status:…`); every role owns binding outputs in its domain (I1–I4) |
 | Timeclock | :3600 | Session identity keyed on `(role, model, session_id)`; clock in/out at session boundaries (R13) |
-| Assembly forums | :3107 | `issues-and-open-questions`, `todos`, `change-log` — cross-role visibility, role+model attribution (R12/R14/R16) |
+| Assembly forums | :3107 | `issues-and-open-questions`, `to-do`, `change-log` — cross-role visibility, role+model attribution (R12/R14/R16) |
 | Procedure cards | tackle-mcp :3400 | Role-specific procedure indexes (`memory_get_procedures(<role>)`) |
 | Operational rules | `AGENTS.md` | R1–R17: record before/after work, engineer→architect updates, TTS completion, service verification at boot, end-of-turn inbox check, weekly review |
 | Inbox pointer | nebula REST :3101 | Per-role last-seen timestamp for new-message surfacing (R17) |
