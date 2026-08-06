@@ -106,6 +106,7 @@ work_request table, Planner cache; Wind/Orb/Drift consumers) and
 | `V060__semantics_relationship_vocabulary.sql` | `relationship_type` vocabulary (24 types) + proc trio + FK enforcement from both relationship tables | **current** |
 | `V061__semantics_operational_relationships.sql` | 5 operational representation-scope types (calls/consumes/writes/reads/uses); `produces` broadened to `both` — "we can say these are true between any two representations" | **current** |
 | `V062__semantics_owning_subsystem_path.sql` | `owning_subsystem.path` column + procs with `p_path`; PEB → "Persistent Engineering Brain"; path backfill (15/16) | **current** |
+| `V074__semantics_evidence_spine_hardening.sql` | T04 3B evidence-spine hardening: `verification_state` +`superseded`; dedup key → `(evidence_type_id, source_hash, digest(excerpt,'sha256'))` (partial active-row predicate preserved); `statement_type` CHECK widened to 7 values (5 new surfaces + 2 legacy relationship-layer); nullable FK `evidence_item.source_observation_id → source_observation(id)` | **current** |
 
 Commits: `52efd89` (V055) · `9ca6dae` (semantics.sql + V056 + V057) ·
 `00d74c3` (V058) · `6dab22b` (V059) · V060–V062 (this change set).
