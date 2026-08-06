@@ -34,6 +34,7 @@ export const routes: Routes = [
   { path: 'forums', component: ForumsViewComponent },
   { path: 'forums/:slug', component: ForumDetailViewComponent },
   { path: 'forums/:slug/:threadId', component: ThreadDetailViewComponent },
+  { path: 'todo', component: ForumDetailViewComponent, data: { slug: 'to-do' } },
   { path: 'work-requests', component: WorkRequestsViewComponent },
   { path: 'work-requests/:id', component: WorkRequestDetailViewComponent },
   { path: 'requirements', component: RequirementsViewComponent },

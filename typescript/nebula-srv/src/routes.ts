@@ -7881,7 +7881,7 @@ export function createRoutes(pool: Pool): Router {
         postsResult, requirementsResult, agendasResult, candidatesResult,
         harvestsResult, oqResult, intentsResult, assessmentsResult,
         observationsResult, agentRecordsResult, specificationsResult, plansResult,
-        usersResult,
+        usersResult, toDoThreadsResult,
       ] = await Promise.all([
         pool.query('SELECT COUNT(*)::int AS total FROM assembly.posts'),
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.requirements'),
@@ -7896,6 +7896,7 @@ export function createRoutes(pool: Pool): Router {
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.specifications'),
         pool.query('SELECT COUNT(*)::int AS total FROM nebula.plan_status WHERE id IS NOT NULL AND id != \'\''),
         pool.query('SELECT COUNT(*)::int AS total FROM assembly.users'),
+        pool.query("SELECT COUNT(*)::int AS total FROM assembly.thread_list_v WHERE forum_slug = 'to-do'"),
       ]);
 
       res.json({
@@ -7912,6 +7913,7 @@ export function createRoutes(pool: Pool): Router {
         specifications: specificationsResult.rows[0].total,
         plans: plansResult.rows[0].total,
         users: usersResult.rows[0].total,
+        toDoThreads: toDoThreadsResult.rows[0].total,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

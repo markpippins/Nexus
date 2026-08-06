@@ -29,6 +29,7 @@ export interface Counts {
   agentRecords: number;
   specifications: number;
   plans: number;
+  toDoThreads: number;
 }
 
 export interface Forum {

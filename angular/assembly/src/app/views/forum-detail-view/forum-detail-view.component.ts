@@ -38,7 +38,9 @@ export class ForumDetailViewComponent implements OnInit {
   private load() {
     this.loading.set(true);
     this.error.set(null);
-    const slug = this.route.snapshot.paramMap.get('slug') || '';
+    // slug comes from the route param, or from route data (e.g. the
+    // dedicated /todo route passes data: { slug: 'to-do' })
+    const slug = this.route.snapshot.paramMap.get('slug') || this.route.snapshot.data['slug'] || '';
     this.dataService.getForums().subscribe({
       next: forums => {
         this.forum.set(forums.find(f => f.slug === slug) || null);
@@ -76,7 +78,7 @@ export class ForumDetailViewComponent implements OnInit {
   }
 
   submitNewThread() {
-    const slug = this.route.snapshot.paramMap.get('slug') || '';
+    const slug = this.route.snapshot.paramMap.get('slug') || this.route.snapshot.data['slug'] || '';
     const title = this.newThreadTitle.trim();
     const body = this.newThreadBody.trim();
     if (!title || !body) return;

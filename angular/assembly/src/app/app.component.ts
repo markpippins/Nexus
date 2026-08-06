@@ -110,6 +110,7 @@ function labelForRoute(path: string): string {
   const labels: Record<string, string> = {
     feed: 'Feed',
     forums: 'Forums',
+    todo: 'To Do',
     'work-requests': 'Work Requests',
     requirements: 'Requirements',
     agendas: 'Agendas',

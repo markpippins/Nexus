@@ -19,6 +19,7 @@ export class SidebarComponent {
   topItems = [
     { route: '/feed', label: 'Feed', icon: 'rss', countKey: 'posts' as keyof Counts },
     { route: '/forums', label: 'Forums', icon: 'users', countKey: 'forums' as keyof Counts },
+    { route: '/todo', label: 'To Do', icon: 'check-square', countKey: 'toDoThreads' as keyof Counts },
   ];
 
   discoverItems = [
