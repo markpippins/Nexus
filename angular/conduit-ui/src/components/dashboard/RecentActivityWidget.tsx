@@ -172,20 +172,20 @@ export const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <Terminal className="w-4 h-4 text-blue-400" />
-            <h2 className="text-xs font-mono font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
+            <h2 className="text-sm font-mono font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
               Recent System Activity Log
               <span className="text-[10px] font-normal text-blue-400 bg-blue-950/50 border border-blue-800/40 px-2 py-0.5 rounded">
                 Last 10 System Events
               </span>
             </h2>
           </div>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-sm text-zinc-400 mt-0.5">
             Real-time audit trail of receipt issuances, plan state transitions, and DCO lease executions.
           </p>
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded p-0.5 text-xs font-mono shrink-0">
+        <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded p-0.5 text-sm font-mono shrink-0">
           <button
             onClick={() => setFilterCategory('ALL')}
             className={`px-2.5 py-1 rounded transition-colors ${
@@ -222,7 +222,7 @@ export const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
       {/* Events Stream List */}
       <div className="space-y-2">
         {filteredEvents.length === 0 ? (
-          <div className="p-6 text-center text-zinc-500 font-mono text-xs">
+          <div className="p-6 text-center text-zinc-500 font-mono text-sm">
             No recent system events logged.
           </div>
         ) : (
@@ -232,7 +232,7 @@ export const RecentActivityWidget: React.FC<RecentActivityWidgetProps> = ({
               return (
                 <div
                   key={evt.id}
-                  className="p-2.5 hover:bg-zinc-800/40 transition-colors text-xs font-mono group"
+                  className="p-2.5 hover:bg-zinc-800/40 transition-colors text-sm font-mono group"
                 >
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     {/* Left: Icon, Type Badge, Plan Link */}

@@ -40,12 +40,12 @@ export class ErrorBoundary extends (React.Component as any) {
           <div className="text-sm font-bold text-[var(--text-primary)]">
             {this.props.label || 'This view'} failed to render
           </div>
-          <p className="text-xs font-mono text-[var(--text-muted)] break-all max-w-2xl mx-auto">
+          <p className="text-sm font-mono text-[var(--text-muted)] break-all max-w-2xl mx-auto">
             {this.state.message}
           </p>
           <button
             onClick={() => this.setState({ hasError: false, message: '' })}
-            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition cursor-pointer"
+            className="px-4 py-1.5 rounded-lg text-sm font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition cursor-pointer"
           >
             Try Again
           </button>

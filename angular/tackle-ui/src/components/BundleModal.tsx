@@ -120,7 +120,7 @@ export const BundleModal: React.FC<BundleModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-4 text-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Bundle Name */}
             <div>
@@ -275,7 +275,7 @@ export const BundleModal: React.FC<BundleModalProps> = ({
               onChange={e => setFormIsActive(e.target.checked)}
               className="rounded border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--accent-color)] focus:ring-0"
             />
-            <label htmlFor="bundleActiveCheck" className="text-xs text-[var(--text-primary)] font-semibold cursor-pointer">
+            <label htmlFor="bundleActiveCheck" className="text-sm text-[var(--text-primary)] font-semibold cursor-pointer">
               Bundle Active in Resolver Queue
             </label>
           </div>
@@ -290,7 +290,7 @@ export const BundleModal: React.FC<BundleModalProps> = ({
               rows={3}
               value={formMetadataJson}
               onChange={e => setFormMetadataJson(e.target.value)}
-              className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-2.5 font-mono text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-color)]"
+              className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-2.5 font-mono text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-color)]"
             />
           </div>
 
@@ -299,14 +299,14 @@ export const BundleModal: React.FC<BundleModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-4 py-2 rounded-lg text-xs font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-sm font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition cursor-pointer disabled:opacity-50"
             >
               {isSaving ? 'Saving...' : isEdit ? 'Update Bundle' : 'Create Bundle'}
             </button>

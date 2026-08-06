@@ -74,13 +74,13 @@ export const StateInspectionView: React.FC = () => {
               2. State Inspection & Cross-Plan Graph (<code className="text-blue-400">/state</code>)
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Explore kernel state, cross-plan relationship graphs, plan receipt timelines, and lineage event logs.
           </p>
         </div>
 
         {/* Sub tab buttons */}
-        <div className="flex items-center bg-[#0c0c0e] border border-zinc-800 rounded p-1 text-xs font-mono">
+        <div className="flex items-center bg-[#0c0c0e] border border-zinc-800 rounded p-1 text-sm font-mono">
           <button
             onClick={() => setActiveSubTab('graph')}
             className={`px-3 py-1 rounded transition-colors ${
@@ -123,11 +123,11 @@ export const StateInspectionView: React.FC = () => {
       {activeSubTab === 'graph' && (
         <div className="bg-[#141416] border border-zinc-800 rounded-lg p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-            <h2 className="text-xs font-mono font-bold uppercase text-zinc-300 flex items-center gap-2">
+            <h2 className="text-sm font-mono font-bold uppercase text-zinc-300 flex items-center gap-2">
               <Network className="w-4 h-4 text-purple-400" />
               Cross-Plan Relationship Graph (`GET /state/graph`)
             </h2>
-            <span className="text-xs font-mono text-zinc-400">
+            <span className="text-sm font-mono text-zinc-400">
               Total Edges: <strong className="text-purple-400">{graphData?.total_edges ?? 0}</strong>
             </span>
           </div>
@@ -135,7 +135,7 @@ export const StateInspectionView: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Nodes list */}
             <div className="space-y-2">
-              <div className="text-xs font-mono font-bold text-zinc-400">GRAPH NODES</div>
+              <div className="text-sm font-mono font-bold text-zinc-400">GRAPH NODES</div>
               <div className="space-y-2">
                 {graphData?.nodes.map((node) => (
                   <div
@@ -148,8 +148,8 @@ export const StateInspectionView: React.FC = () => {
                     className="p-3 bg-[#0c0c0e] border border-zinc-800 hover:border-blue-600 rounded cursor-pointer transition-colors flex items-center justify-between"
                   >
                     <div>
-                      <div className="font-mono text-xs font-bold text-blue-400">{node.id}</div>
-                      <div className="text-xs text-zinc-300 font-semibold">{node.label}</div>
+                      <div className="font-mono text-sm font-bold text-blue-400">{node.id}</div>
+                      <div className="text-sm text-zinc-300 font-semibold">{node.label}</div>
                     </div>
                     <div className="flex gap-1 font-mono text-[10px]">
                       {node.aliases.map((a) => (
@@ -165,10 +165,10 @@ export const StateInspectionView: React.FC = () => {
 
             {/* Edges list */}
             <div className="space-y-2">
-              <div className="text-xs font-mono font-bold text-zinc-400">GRAPH EDGES</div>
+              <div className="text-sm font-mono font-bold text-zinc-400">GRAPH EDGES</div>
               <div className="space-y-2">
                 {graphData?.edges.map((edge, idx) => (
-                  <div key={idx} className="p-3 bg-[#0c0c0e] border border-zinc-800 rounded space-y-1 font-mono text-xs">
+                  <div key={idx} className="p-3 bg-[#0c0c0e] border border-zinc-800 rounded space-y-1 font-mono text-sm">
                     <div className="flex items-center gap-2 text-zinc-300">
                       <span className="text-blue-400 font-bold">{edge.source_label || edge.source}</span>
                       <ArrowRight className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
@@ -196,19 +196,19 @@ export const StateInspectionView: React.FC = () => {
                 value={searchIdentityId}
                 onChange={(e) => setSearchIdentityId(e.target.value)}
                 placeholder="Enter identity ID, alias, or plan number (e.g., iden::plan_0053, plan_0053, 0053)"
-                className="w-full bg-[#0c0c0e] border border-zinc-700 rounded pl-9 pr-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-blue-500"
+                className="w-full bg-[#0c0c0e] border border-zinc-700 rounded pl-9 pr-3 py-2 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
               />
             </div>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded transition-colors"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded transition-colors"
             >
               GET /state/identity/:id
             </button>
           </form>
 
           {errorMsg && (
-            <div className="p-3 bg-rose-950/60 border border-rose-800 rounded text-rose-300 text-xs">
+            <div className="p-3 bg-rose-950/60 border border-rose-800 rounded text-rose-300 text-sm">
               {errorMsg}
             </div>
           )}
@@ -217,13 +217,13 @@ export const StateInspectionView: React.FC = () => {
             <div className="p-4 bg-[#0c0c0e] border border-zinc-800 rounded space-y-3">
               <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
                 <span className="text-sm font-bold text-blue-400">{identityResult.id}</span>
-                <span className="text-xs text-zinc-300 font-sans font-semibold">{identityResult.label}</span>
+                <span className="text-sm text-zinc-300 font-sans font-semibold">{identityResult.label}</span>
               </div>
               <div>
                 <div className="text-zinc-500 text-[10px] uppercase mb-1">Aliases</div>
                 <div className="flex gap-2">
                   {(Array.isArray(identityResult.aliases) ? identityResult.aliases : []).map((a) => (
-                    <span key={a} className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-xs">
+                    <span key={a} className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded text-sm">
                       {a}
                     </span>
                   ))}
@@ -233,7 +233,7 @@ export const StateInspectionView: React.FC = () => {
               {identityResult.edges_outgoing && identityResult.edges_outgoing.length > 0 && (
                 <div>
                   <div className="text-zinc-500 text-[10px] uppercase mb-1">Outgoing Edges</div>
-                  <pre className="text-xs text-purple-300 bg-zinc-950 p-2 rounded border border-zinc-800">
+                  <pre className="text-sm text-purple-300 bg-zinc-950 p-2 rounded border border-zinc-800">
                     {JSON.stringify(identityResult.edges_outgoing, null, 2)}
                   </pre>
                 </div>
@@ -252,11 +252,11 @@ export const StateInspectionView: React.FC = () => {
               value={searchPlanNum}
               onChange={(e) => setSearchPlanNum(e.target.value)}
               placeholder="e.g. plan_0053 or 0053"
-              className="bg-[#0c0c0e] border border-zinc-700 rounded px-3 py-1.5 text-xs text-zinc-100 focus:outline-none focus:border-blue-500"
+              className="bg-[#0c0c0e] border border-zinc-700 rounded px-3 py-1.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
             />
             <button
               onClick={() => loadPlan(searchPlanNum)}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded transition-colors"
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded transition-colors"
             >
               GET /state/plan/:num
             </button>
@@ -264,7 +264,7 @@ export const StateInspectionView: React.FC = () => {
 
           {planDetail && (
             <div className="space-y-4">
-              <div className="p-4 bg-[#0c0c0e] border border-zinc-800 rounded flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
+              <div className="p-4 bg-[#0c0c0e] border border-zinc-800 rounded flex flex-wrap items-center justify-between gap-4 font-mono text-sm">
                 <div>
                   <div className="text-blue-400 font-bold text-sm">{planDetail.plan_num}</div>
                   <div className="text-zinc-400 font-sans">{planDetail.label}</div>
@@ -291,10 +291,10 @@ export const StateInspectionView: React.FC = () => {
 
               {/* Receipt timeline */}
               <div className="space-y-2">
-                <div className="text-xs font-mono font-bold text-zinc-400">CHRONOLOGICAL RECEIPT TIMELINE</div>
+                <div className="text-sm font-mono font-bold text-zinc-400">CHRONOLOGICAL RECEIPT TIMELINE</div>
                 <div className="space-y-2">
                   {(Array.isArray(planDetail.receipts) ? planDetail.receipts : []).map((rc) => (
-                    <div key={rc.id} className="p-3 bg-[#0c0c0e] border border-zinc-800 rounded font-mono text-xs space-y-1">
+                    <div key={rc.id} className="p-3 bg-[#0c0c0e] border border-zinc-800 rounded font-mono text-sm space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-blue-400 font-bold">{rc.id}</span>
                         <span className="text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60 text-[10px]">
@@ -319,19 +319,19 @@ export const StateInspectionView: React.FC = () => {
       {activeSubTab === 'lineage' && (
         <div className="bg-[#141416] border border-zinc-800 rounded-lg p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-            <h2 className="text-xs font-mono font-bold uppercase text-zinc-300 flex items-center gap-2">
+            <h2 className="text-sm font-mono font-bold uppercase text-zinc-300 flex items-center gap-2">
               <Clock className="w-4 h-4 text-amber-400" />
               Append-Only Kernel Lineage Log (`GET /state/lineage`)
             </h2>
             <button
               onClick={loadLineage}
-              className="text-xs font-mono text-blue-400 hover:underline"
+              className="text-sm font-mono text-blue-400 hover:underline"
             >
               Refresh Events
             </button>
           </div>
 
-          <div className="space-y-2 font-mono text-xs">
+          <div className="space-y-2 font-mono text-sm">
             {lineageEvents.map((ev) => (
               <div key={ev.id} className="p-3 bg-[#0c0c0e] border border-zinc-800 rounded flex items-center justify-between gap-4">
                 <div className="space-y-0.5">

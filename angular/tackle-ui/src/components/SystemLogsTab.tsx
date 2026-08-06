@@ -262,7 +262,7 @@ export const SystemLogsTab: React.FC = () => {
             <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
               Subsystem Event Stream & Diagnostic Logs
             </h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
               Real-time chronologic logs from <code className="font-mono text-blue-400">tackle-srv :3410</code>, Redis memory cache, Gemini API proxy, and failure circuit monitors.
             </p>
           </div>
@@ -272,7 +272,7 @@ export const SystemLogsTab: React.FC = () => {
             <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-1.5 px-3">
               <button
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded transition cursor-pointer ${
+                className={`flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded transition cursor-pointer ${
                   autoRefresh
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
@@ -286,7 +286,7 @@ export const SystemLogsTab: React.FC = () => {
                 <select
                   value={pollIntervalMs}
                   onChange={e => setPollIntervalMs(Number(e.target.value))}
-                  className="bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-secondary)] text-xs rounded px-2 py-1 outline-none font-mono"
+                  className="bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-secondary)] text-sm rounded px-2 py-1 outline-none font-mono"
                 >
                   <option value={1000}>1s interval</option>
                   <option value={3000}>3s interval</option>
@@ -300,7 +300,7 @@ export const SystemLogsTab: React.FC = () => {
             <button
               onClick={() => fetchLogs()}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] rounded-lg text-xs font-medium text-[var(--text-primary)] transition cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] rounded-lg text-sm font-medium text-[var(--text-primary)] transition cursor-pointer disabled:opacity-50"
               title="Refresh logs manually"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[var(--accent-color)] ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -310,7 +310,7 @@ export const SystemLogsTab: React.FC = () => {
             {/* Emit Test Event Button */}
             <button
               onClick={() => setShowEmitModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[var(--accent-color)] hover:bg-[var(--accent-hover)] text-white font-semibold rounded-lg text-xs transition cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-2 bg-[var(--accent-color)] hover:bg-[var(--accent-hover)] text-white font-semibold rounded-lg text-sm transition cursor-pointer shadow-xs"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Emit Test Event</span>
@@ -361,7 +361,7 @@ export const SystemLogsTab: React.FC = () => {
           <div className="col-span-2 sm:col-span-4 lg:col-span-1 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg p-2.5 px-3 flex items-center justify-between">
             <div>
               <span className="text-[10px] font-mono text-[var(--text-muted)] uppercase block">Last Polled</span>
-              <span className="text-xs font-mono text-[var(--text-secondary)]">
+              <span className="text-sm font-mono text-[var(--text-secondary)]">
                 {lastPolledAt ? new Date(lastPolledAt).toLocaleTimeString() : 'Never'}
               </span>
             </div>
@@ -381,12 +381,12 @@ export const SystemLogsTab: React.FC = () => {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search message, category, source, or payload details..."
-              className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-lg pl-9 pr-3 py-2 text-xs focus:ring-1 focus:ring-[var(--accent-color)] outline-none transition"
+              className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-1 focus:ring-[var(--accent-color)] outline-none transition"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-xs"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm"
               >
                 Clear
               </button>
@@ -395,7 +395,7 @@ export const SystemLogsTab: React.FC = () => {
 
           <div className="flex items-center gap-2 flex-wrap">
             {/* Level Filter Pills */}
-            <div className="flex items-center bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-1 text-xs">
+            <div className="flex items-center bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-1 text-sm">
               {['ALL', 'ERROR', 'WARN', 'INFO', 'DEBUG'].map(lvl => (
                 <button
                   key={lvl}
@@ -412,12 +412,12 @@ export const SystemLogsTab: React.FC = () => {
             </div>
 
             {/* Category Dropdown */}
-            <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2.5 py-1.5 text-xs">
+            <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg px-2.5 py-1.5 text-sm">
               <Filter className="w-3.5 h-3.5 text-[var(--text-muted)]" />
               <select
                 value={selectedCategory}
                 onChange={e => setSelectedCategory(e.target.value)}
-                className="bg-transparent text-[var(--text-primary)] font-mono text-xs outline-none cursor-pointer"
+                className="bg-transparent text-[var(--text-primary)] font-mono text-sm outline-none cursor-pointer"
               >
                 <option value="ALL">All Categories</option>
                 {categories.map(c => (
@@ -430,7 +430,7 @@ export const SystemLogsTab: React.FC = () => {
             <select
               value={timeWindow}
               onChange={e => setTimeWindow(e.target.value)}
-              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] font-mono text-xs rounded-lg px-2.5 py-2 outline-none cursor-pointer"
+              className="bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] font-mono text-sm rounded-lg px-2.5 py-2 outline-none cursor-pointer"
             >
               <option value="ALL">All Time</option>
               <option value="5M">Last 5 min</option>
@@ -441,7 +441,7 @@ export const SystemLogsTab: React.FC = () => {
             {/* Sort Toggle */}
             <button
               onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-              className="px-2.5 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg text-xs font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
+              className="px-2.5 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg text-sm font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition cursor-pointer"
               title="Toggle Sort Order"
             >
               {sortOrder === 'desc' ? '↓ Newest First' : '↑ Oldest First'}
@@ -452,7 +452,7 @@ export const SystemLogsTab: React.FC = () => {
 
       {/* Main Stream Log View Table */}
       <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-xs">
-        <div className="p-3 px-4 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)] flex items-center justify-between text-xs font-mono text-[var(--text-muted)]">
+        <div className="p-3 px-4 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)] flex items-center justify-between text-sm font-mono text-[var(--text-muted)]">
           <div className="flex items-center gap-2">
             <Terminal className="w-4 h-4 text-[var(--accent-color)]" />
             <span>STREAM LOGS ({filteredLogs.length} matching)</span>
@@ -461,12 +461,12 @@ export const SystemLogsTab: React.FC = () => {
         </div>
 
         {isLoading ? (
-          <div className="p-12 text-center text-xs text-[var(--text-muted)] font-mono flex flex-col items-center justify-center gap-2">
+          <div className="p-12 text-center text-sm text-[var(--text-muted)] font-mono flex flex-col items-center justify-center gap-2">
             <RefreshCw className="w-6 h-6 animate-spin text-[var(--accent-color)]" />
             <span>Loading system log stream...</span>
           </div>
         ) : filteredLogs.length === 0 ? (
-          <div className="p-12 text-center text-xs text-[var(--text-muted)] font-mono flex flex-col items-center justify-center gap-2">
+          <div className="p-12 text-center text-sm text-[var(--text-muted)] font-mono flex flex-col items-center justify-center gap-2">
             <Info className="w-6 h-6 text-[var(--text-muted)]" />
             <span>No log records match current search or level filters.</span>
             <button
@@ -482,7 +482,7 @@ export const SystemLogsTab: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-[var(--border-subtle)] font-mono text-xs">
+          <div className="divide-y divide-[var(--border-subtle)] font-mono text-sm">
             {filteredLogs.map(log => {
               const isExpanded = expandedLogIds.has(log.id);
               const hasDetails = log.details && (typeof log.details === 'object' ? Object.keys(log.details).length > 0 : String(log.details).trim().length > 0);
@@ -543,7 +543,7 @@ export const SystemLogsTab: React.FC = () => {
 
                   {/* Expanded Inspector Panel */}
                   {isExpanded && (
-                    <div className="p-4 bg-slate-950/80 border-t border-[var(--border-subtle)] text-xs font-mono space-y-3">
+                    <div className="p-4 bg-slate-950/80 border-t border-[var(--border-subtle)] text-sm font-mono space-y-3">
                       <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] border-b border-slate-800 pb-2">
                         <span>Log ID: {log.id}</span>
                         <span>Timestamp: {new Date(log.timestamp).toISOString()}</span>
@@ -585,7 +585,7 @@ export const SystemLogsTab: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleEmitEvent} className="space-y-4 text-xs font-sans">
+            <form onSubmit={handleEmitEvent} className="space-y-4 text-sm font-sans">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-[var(--text-secondary)] mb-1">Log Level</label>
@@ -649,7 +649,7 @@ export const SystemLogsTab: React.FC = () => {
                   rows={3}
                   value={emitDetails}
                   onChange={e => setEmitDetails(e.target.value)}
-                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-md p-3 outline-none font-mono text-xs"
+                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-md p-3 outline-none font-mono text-sm"
                 />
               </div>
 

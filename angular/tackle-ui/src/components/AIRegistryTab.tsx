@@ -255,7 +255,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
         <div className="flex space-x-2">
           <button
             onClick={() => setActiveSubTab('models')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'models'
                 ? 'bg-[var(--accent-color)] text-slate-950 shadow-sm'
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
@@ -266,7 +266,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
           </button>
           <button
             onClick={() => setActiveSubTab('providers')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'providers'
                 ? 'bg-[var(--accent-color)] text-slate-950 shadow-sm'
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
@@ -277,7 +277,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
           </button>
           <button
             onClick={() => setActiveSubTab('harnesses')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'harnesses'
                 ? 'bg-[var(--accent-color)] text-slate-950 shadow-sm'
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
@@ -292,7 +292,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
           {activeSubTab === 'models' && (
             <button
               onClick={() => openModModal()}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4 text-[var(--accent-color)]" />
               <span>Register Model</span>
@@ -301,7 +301,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
           {activeSubTab === 'providers' && (
             <button
               onClick={() => openProvModal()}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4 text-[var(--accent-color)]" />
               <span>Add Provider</span>
@@ -310,7 +310,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
           {activeSubTab === 'harnesses' && (
             <button
               onClick={() => openHarnModal()}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4 text-[var(--accent-color)]" />
               <span>Add Harness</span>
@@ -369,14 +369,14 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] font-mono text-xs space-y-1">
+                  <div className="p-2.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] font-mono text-sm space-y-1">
                     <div className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider">
                       Model Identifier String
                     </div>
                     <div className="font-bold text-[var(--accent-color)] break-all">{m.model_identifier}</div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                  <div className="grid grid-cols-2 gap-2 text-sm font-mono">
                     <div className="p-2 rounded bg-[var(--bg-card)] border border-[var(--border-subtle)]">
                       <div className="text-[10px] text-[var(--text-muted)]">Harness</div>
                       <div className="font-semibold text-[var(--text-primary)] truncate">
@@ -463,7 +463,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                   {/* Endpoint URL */}
                   <div className="space-y-1">
                     <div className="text-[10px] font-mono text-[var(--text-muted)] uppercase">Endpoint URL</div>
-                    <div className="p-2 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] font-mono text-xs text-[var(--text-primary)] flex items-center gap-2 truncate">
+                    <div className="p-2 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] font-mono text-sm text-[var(--text-primary)] flex items-center gap-2 truncate">
                       <Globe className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                       <span className="truncate">{p.endpoint_url || 'https://api.external.com'}</span>
                     </div>
@@ -483,7 +483,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                         <span>{isApiKeyShown ? 'Hide' : 'Show'}</span>
                       </button>
                     </div>
-                    <div className="p-2 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] font-mono text-xs text-[var(--text-secondary)]">
+                    <div className="p-2 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] font-mono text-sm text-[var(--text-secondary)]">
                       {p.api_key
                         ? isApiKeyShown
                           ? p.api_key
@@ -574,7 +574,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                   </div>
 
                   {/* Capabilities grid */}
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-3 gap-2 text-sm">
                     <div className="p-2 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-center space-y-1">
                       <div className="text-[10px] font-mono text-[var(--text-muted)]">Streaming</div>
                       {semantics.supports_streaming ? (
@@ -601,7 +601,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] space-y-1 text-xs font-mono">
+                  <div className="p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] space-y-1 text-sm font-mono">
                     <div className="flex justify-between text-[var(--text-secondary)]">
                       <span>Protocol:</span>
                       <span className="text-[var(--text-primary)] font-bold">{semantics.protocol || 'HTTP REST'}</span>
@@ -648,7 +648,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveProv} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveProv} className="space-y-3 text-sm">
               <div>
                 <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Provider ID *</label>
                 <input
@@ -716,7 +716,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
                   rows={3}
                   value={provConfigJson}
                   onChange={e => setProvConfigJson(e.target.value)}
-                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-2.5 font-mono text-xs text-[var(--text-primary)]"
+                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-2.5 font-mono text-sm text-[var(--text-primary)]"
                 />
               </div>
 
@@ -753,7 +753,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveHarn} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveHarn} className="space-y-3 text-sm">
               <div>
                 <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Harness ID *</label>
                 <input
@@ -865,7 +865,7 @@ export const AIRegistryTab: React.FC<AIRegistryTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveMod} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveMod} className="space-y-3 text-sm">
               <div>
                 <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Model ID *</label>
                 <input

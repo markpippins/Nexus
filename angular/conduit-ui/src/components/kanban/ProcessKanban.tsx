@@ -74,14 +74,14 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
               Process & Task Kanban Board
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Receipt-first plan lifecycle control plane: Propose → Promote → Plan → Build → Review → Complete.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           {/* Toggle between Plan Execution Kanban and Artifact Board */}
-          <div className="bg-zinc-950 p-1 rounded-md border border-zinc-800 flex items-center gap-1 font-mono text-xs">
+          <div className="bg-zinc-950 p-1 rounded-md border border-zinc-800 flex items-center gap-1 font-mono text-sm">
             <button
               onClick={() => setBoardType('plans')}
               className={`px-3 py-1 rounded transition-colors font-semibold ${
@@ -106,7 +106,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
 
           <button
             onClick={onProposeNewPlan}
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold rounded flex items-center gap-1.5 transition-all shadow-md"
+            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-sm font-bold rounded flex items-center gap-1.5 transition-all shadow-md"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Propose Plan</span>
@@ -126,7 +126,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
               >
                 {/* Column Header */}
                 <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2 mb-3">
-                  <span className="text-xs font-mono font-bold uppercase text-zinc-300 tracking-wider">
+                  <span className="text-sm font-mono font-bold uppercase text-zinc-300 tracking-wider">
                     {col.label}
                   </span>
                   <span className="text-[10px] font-mono font-bold bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full">
@@ -151,7 +151,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
                           </span>
                         </div>
 
-                        <h4 className="font-semibold text-xs text-zinc-100 group-hover:text-emerald-300 transition-colors line-clamp-2">
+                        <h4 className="font-semibold text-sm text-zinc-100 group-hover:text-emerald-300 transition-colors line-clamp-2">
                           {plan.title}
                         </h4>
 
@@ -201,7 +201,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 overflow-x-auto pb-4">
           {/* Col 1: Harvests */}
           <div className="border border-zinc-800 bg-zinc-950/40 rounded-lg p-3 min-w-[260px]">
-            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-xs font-bold uppercase text-indigo-400">
+            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-sm font-bold uppercase text-indigo-400">
               <span>1. Harvest Transcripts</span>
               <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full">
                 {harvests.length}
@@ -209,7 +209,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
             </div>
             <div className="space-y-2">
               {harvests.map((h) => (
-                <div key={h.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-xs">
+                <div key={h.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-sm">
                   <span className="font-mono text-[10px] text-indigo-400 block">{h.id}</span>
                   <span className="font-semibold text-zinc-200 line-clamp-2">{h.title}</span>
                 </div>
@@ -219,7 +219,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
 
           {/* Col 2: Candidates */}
           <div className="border border-zinc-800 bg-zinc-950/40 rounded-lg p-3 min-w-[260px]">
-            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-xs font-bold uppercase text-amber-400">
+            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-sm font-bold uppercase text-amber-400">
               <span>2. Candidates</span>
               <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full">
                 {candidates.length}
@@ -227,7 +227,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
             </div>
             <div className="space-y-2">
               {candidates.map((c) => (
-                <div key={c.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-xs">
+                <div key={c.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-sm">
                   <span className="font-mono text-[10px] text-amber-400 block">{c.id}</span>
                   <span className="font-semibold text-zinc-200 line-clamp-2">{c.title}</span>
                 </div>
@@ -237,7 +237,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
 
           {/* Col 3: Intents */}
           <div className="border border-zinc-800 bg-zinc-950/40 rounded-lg p-3 min-w-[260px]">
-            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-xs font-bold uppercase text-cyan-400">
+            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-sm font-bold uppercase text-cyan-400">
               <span>3. Intent Records</span>
               <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full">
                 {intents.length}
@@ -245,7 +245,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
             </div>
             <div className="space-y-2">
               {intents.map((i) => (
-                <div key={i.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-xs">
+                <div key={i.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-sm">
                   <span className="font-mono text-[10px] text-cyan-400 block">{i.id}</span>
                   <span className="font-semibold text-zinc-200 line-clamp-2">{i.summary}</span>
                 </div>
@@ -255,7 +255,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
 
           {/* Col 4: Requirements */}
           <div className="border border-zinc-800 bg-zinc-950/40 rounded-lg p-3 min-w-[260px]">
-            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-xs font-bold uppercase text-emerald-400">
+            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-sm font-bold uppercase text-emerald-400">
               <span>4. Requirements</span>
               <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full">
                 {requirements.length}
@@ -263,7 +263,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
             </div>
             <div className="space-y-2">
               {requirements.map((r) => (
-                <div key={r.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-xs">
+                <div key={r.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-sm">
                   <span className="font-mono text-[10px] text-emerald-400 block">{r.codeName}</span>
                   <span className="font-semibold text-zinc-200 line-clamp-2">{r.title}</span>
                 </div>
@@ -273,7 +273,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
 
           {/* Col 5: Canonical Specs */}
           <div className="border border-zinc-800 bg-zinc-950/40 rounded-lg p-3 min-w-[260px]">
-            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-xs font-bold uppercase text-purple-400">
+            <div className="border-b border-zinc-800 pb-2 mb-3 flex items-center justify-between font-mono text-sm font-bold uppercase text-purple-400">
               <span>5. Canonical Specs</span>
               <span className="bg-zinc-800 text-zinc-300 px-2 py-0.5 rounded-full">
                 {specs.length}
@@ -281,7 +281,7 @@ export const ProcessKanban: React.FC<ProcessKanbanProps> = ({
             </div>
             <div className="space-y-2">
               {specs.map((s) => (
-                <div key={s.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-xs">
+                <div key={s.id} className="bg-zinc-900 p-2.5 rounded border border-zinc-800 text-sm">
                   <span className="font-mono text-[10px] text-purple-400 block">{s.systemName}</span>
                   <span className="font-semibold text-zinc-200 line-clamp-2">{s.subsystemName}</span>
                 </div>

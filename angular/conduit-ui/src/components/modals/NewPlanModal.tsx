@@ -226,7 +226,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({ isOpen, onClose, onS
 
         {/* Feedback Alert Toast */}
         {feedbackMsg && (
-          <div className="bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-xs font-mono p-2.5 rounded flex items-center justify-between animate-fadeIn">
+          <div className="bg-emerald-950/80 border border-emerald-700/60 text-emerald-300 text-sm font-mono p-2.5 rounded flex items-center justify-between animate-fadeIn">
             <span className="flex items-center gap-1.5 font-semibold">
               <Check className="w-3.5 h-3.5 text-emerald-400" />
               {feedbackMsg}
@@ -239,7 +239,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({ isOpen, onClose, onS
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Bookmark className="w-4 h-4 text-cyan-400" />
-              <span className="font-mono text-xs font-bold text-zinc-200 uppercase tracking-wide">
+              <span className="font-mono text-sm font-bold text-zinc-200 uppercase tracking-wide">
                 Plan Templates Catalog
               </span>
               <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/60 border border-cyan-800/40 px-2 py-0.5 rounded">
@@ -271,7 +271,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({ isOpen, onClose, onS
           {/* Template Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
             {filteredTemplates.length === 0 ? (
-              <div className="col-span-2 text-center text-zinc-500 font-mono text-xs py-4">
+              <div className="col-span-2 text-center text-zinc-500 font-mono text-sm py-4">
                 No templates in selected category.
               </div>
             ) : (
@@ -290,7 +290,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({ isOpen, onClose, onS
                     <div className="flex items-center justify-between gap-1">
                       <div className="flex items-center gap-1.5 min-w-0">
                         {getCategoryIcon(tmpl.category)}
-                        <span className="font-mono text-xs font-bold text-zinc-200 truncate">
+                        <span className="font-mono text-sm font-bold text-zinc-200 truncate">
                           {tmpl.name}
                         </span>
                       </div>
@@ -326,7 +326,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({ isOpen, onClose, onS
         </div>
 
         {/* FORM INPUTS SECTION */}
-        <div className="space-y-3 font-mono text-xs">
+        <div className="space-y-3 font-mono text-sm">
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-zinc-400">Plan Title</label>
@@ -354,7 +354,7 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({ isOpen, onClose, onS
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe technical implementation scope and expected WorkRequest deliverables..."
-              className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-zinc-200 font-sans outline-none text-xs focus:border-blue-500 transition-all"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-zinc-200 font-sans outline-none text-sm focus:border-blue-500 transition-all"
             />
           </div>
 
@@ -365,14 +365,14 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({ isOpen, onClose, onS
                 <button
                   type="button"
                   onClick={() => setIsSavingCustom(true)}
-                  className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1.5 font-semibold"
+                  className="text-sm text-amber-400 hover:text-amber-300 flex items-center gap-1.5 font-semibold"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save current inputs as reusable Custom Template</span>
                 </button>
               ) : (
                 <div className="bg-zinc-900 border border-amber-800/50 p-3 rounded space-y-2">
-                  <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <div className="text-sm font-bold text-amber-300 flex items-center gap-1.5">
                     <Save className="w-3.5 h-3.5" />
                     Save Custom Template
                   </div>
@@ -382,20 +382,20 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({ isOpen, onClose, onS
                       value={customTemplateName}
                       onChange={(e) => setCustomTemplateName(e.target.value)}
                       placeholder="Template Name (e.g. Core Microservice Workflow)"
-                      className="flex-1 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-zinc-200 text-xs outline-none"
+                      className="flex-1 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-zinc-200 text-sm outline-none"
                     />
                     <button
                       type="button"
                       onClick={handleSaveCustomTemplate}
                       disabled={!customTemplateName.trim()}
-                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold rounded text-xs"
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold rounded text-sm"
                     >
                       Save
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsSavingCustom(false)}
-                      className="px-2 py-1.5 bg-zinc-800 text-zinc-400 hover:text-white rounded text-xs"
+                      className="px-2 py-1.5 bg-zinc-800 text-zinc-400 hover:text-white rounded text-sm"
                     >
                       Cancel
                     </button>
@@ -415,13 +415,13 @@ export const NewPlanModal: React.FC<NewPlanModalProps> = ({ isOpen, onClose, onS
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs rounded transition-colors"
+              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-sm rounded transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold rounded flex items-center gap-1.5 shadow-md transition-colors"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-sm font-bold rounded flex items-center gap-1.5 shadow-md transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Propose Implementation Plan</span>

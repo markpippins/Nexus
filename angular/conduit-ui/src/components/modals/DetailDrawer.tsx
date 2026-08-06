@@ -43,10 +43,10 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({ plan, harvest, onClo
         {plan && (
           <div className="space-y-6">
             <div className="space-y-2">
-              <div className="flex items-center justify-between font-mono text-xs">
+              <div className="flex items-center justify-between font-mono text-sm">
                 <span className="text-emerald-400 font-bold">{plan.ticketId}</span>
                 <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold border font-mono ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-sm font-bold border font-mono ${
                     plan.status === 'ACTIVE'
                       ? 'bg-blue-950/90 text-blue-300 border-blue-500/60 shadow-sm'
                       : plan.status === 'COMPLETED'
@@ -68,11 +68,11 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({ plan, harvest, onClo
                 </span>
               </div>
               <h2 className="text-base font-bold text-zinc-100">{plan.title}</h2>
-              <p className="text-xs text-zinc-300 font-sans">{plan.description}</p>
+              <p className="text-sm text-zinc-300 font-sans">{plan.description}</p>
             </div>
 
             {/* Role & Model Info */}
-            <div className="grid grid-cols-2 gap-3 font-mono text-xs bg-zinc-950 p-3 rounded border border-zinc-800">
+            <div className="grid grid-cols-2 gap-3 font-mono text-sm bg-zinc-950 p-3 rounded border border-zinc-800">
               <div>
                 <span className="text-zinc-500 block text-[10px]">CURRENT ROLE:</span>
                 <span className="text-zinc-200 font-bold capitalize">{plan.currentRole}</span>
@@ -98,11 +98,11 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({ plan, harvest, onClo
 
         {/* Harvest Transcript Mode */}
         {harvest && (
-          <div className="space-y-4 font-mono text-xs">
+          <div className="space-y-4 font-mono text-sm">
             <div>
               <span className="text-indigo-400 font-bold block mb-1">{harvest.id}</span>
               <h2 className="text-base font-bold font-sans text-zinc-100">{harvest.title}</h2>
-              <span className="text-zinc-400 text-xs font-sans">
+              <span className="text-zinc-400 text-sm font-sans">
                 Author: {harvest.author} | Ingested: {new Date(harvest.ingestedAt).toLocaleString()}
               </span>
             </div>
@@ -112,7 +112,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({ plan, harvest, onClo
                 Raw HTML Transcript View
               </span>
               <div
-                className="bg-zinc-950 p-4 rounded border border-zinc-800 text-zinc-300 font-sans text-xs prose prose-invert max-w-none max-h-96 overflow-y-auto"
+                className="bg-zinc-950 p-4 rounded border border-zinc-800 text-zinc-300 font-sans text-sm prose prose-invert max-w-none max-h-96 overflow-y-auto"
                 dangerouslySetInnerHTML={{ __html: harvest.rawHtmlContent }}
               />
             </div>

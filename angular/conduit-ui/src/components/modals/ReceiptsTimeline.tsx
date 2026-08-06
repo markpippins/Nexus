@@ -25,7 +25,7 @@ export const ReceiptsTimeline: React.FC<ReceiptsTimelineProps> = ({ receipts }) 
 
   if (!receipts || receipts.length === 0) {
     return (
-      <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-lg p-4 text-center font-mono text-xs text-zinc-500">
+      <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-lg p-4 text-center font-mono text-sm text-zinc-500">
         No receipt records found in audit chain.
       </div>
     );
@@ -117,7 +117,7 @@ export const ReceiptsTimeline: React.FC<ReceiptsTimelineProps> = ({ receipts }) 
   const allExpanded = receipts.every((r) => expandedIds[r.id]);
 
   return (
-    <div className="space-y-3 font-mono text-xs">
+    <div className="space-y-3 font-mono text-sm">
       {/* Header Bar */}
       <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
         <div className="flex items-center gap-2">

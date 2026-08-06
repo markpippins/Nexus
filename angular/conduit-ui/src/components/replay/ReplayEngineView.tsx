@@ -40,12 +40,12 @@ export const ReplayEngineView: React.FC = () => {
               3. KSRA Replay & State Audit Engine (<code className="text-cyan-400">/replay</code>)
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Reconstruct historical Kernel states using exact formula: <code className="text-blue-300">KernelState(N) = Snapshot(K) + Replay(deltas K+1 → N)</code>.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 font-mono text-xs">
+        <div className="flex items-center gap-3 font-mono text-sm">
           <label className="text-zinc-400">Target Version:</label>
           <input
             type="number"
@@ -69,7 +69,7 @@ export const ReplayEngineView: React.FC = () => {
 
       {/* Version Slider Control */}
       <div className="bg-[#141416] border border-zinc-800 rounded-lg p-5 space-y-3 font-mono">
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex items-center justify-between text-sm">
           <span className="text-zinc-400">STATE RECONSTRUCTION TIMELINE SLIDER</span>
           <span className="text-cyan-400 font-bold">Selected Version: v{targetVersion}</span>
         </div>
@@ -93,7 +93,7 @@ export const ReplayEngineView: React.FC = () => {
       </div>
 
       {/* Reconstructed State vs Compare Output */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 font-mono text-xs">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 font-mono text-sm">
         {/* Reconstructed State Box */}
         <div className="bg-[#141416] border border-zinc-800 rounded-lg p-5 space-y-4">
           <h2 className="font-bold text-zinc-300 uppercase flex items-center gap-2 border-b border-zinc-800 pb-2">
@@ -158,7 +158,7 @@ export const ReplayEngineView: React.FC = () => {
                       : 'HISTORICAL STATE DISCREPANCY DETECTED'}
                   </span>
                 </div>
-                <span className="text-xs">
+                <span className="text-sm">
                   Live: v{compareResult.live_version} vs Replay: v{compareResult.replay_version}
                 </span>
               </div>
@@ -169,17 +169,17 @@ export const ReplayEngineView: React.FC = () => {
                   <span className="text-zinc-300">Live Engine</span>
                   <span className="text-cyan-300">Replay Engine</span>
                 </div>
-                <div className="flex justify-between text-xs">
+                <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Plan Count</span>
                   <span className="text-zinc-200">{compareResult.live_plan_count}</span>
                   <span className="text-cyan-300">{compareResult.replay_plan_count}</span>
                 </div>
-                <div className="flex justify-between text-xs">
+                <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Receipt Count</span>
                   <span className="text-zinc-200">{compareResult.live_receipt_count}</span>
                   <span className="text-cyan-300">{compareResult.replay_receipt_count}</span>
                 </div>
-                <div className="flex justify-between text-xs">
+                <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Identity Count</span>
                   <span className="text-zinc-200">{compareResult.live_identity_count}</span>
                   <span className="text-cyan-300">{compareResult.replay_identity_count}</span>

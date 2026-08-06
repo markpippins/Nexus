@@ -53,7 +53,7 @@ export const NewHarvestModal: React.FC<NewHarvestModalProps> = ({ isOpen, onClos
           </button>
         </div>
 
-        <div className="space-y-3 font-mono text-xs">
+        <div className="space-y-3 font-mono text-sm">
           <div>
             <label className="block text-zinc-400 mb-1">Transcript Title</label>
             <input
@@ -103,13 +103,13 @@ export const NewHarvestModal: React.FC<NewHarvestModalProps> = ({ isOpen, onClos
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs rounded"
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-sm rounded"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold rounded flex items-center gap-1.5"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-sm font-bold rounded flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Ingest Transcript</span>

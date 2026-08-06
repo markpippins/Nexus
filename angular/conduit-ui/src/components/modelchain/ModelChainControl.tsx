@@ -61,7 +61,7 @@ export const ModelChainControl: React.FC<ModelChainControlProps> = ({
               Model Chain Resilience & Budget Control Plane
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Configure primary and fallback AI model chains per role, set USD budget ceilings, and simulate rate-limit recoveries.
           </p>
         </div>
@@ -69,7 +69,7 @@ export const ModelChainControl: React.FC<ModelChainControlProps> = ({
         <button
           onClick={handleSimulateFallback}
           disabled={isSimulating}
-          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-mono text-xs font-bold rounded flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(99,102,241,0.3)] self-start md:self-auto"
+          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-mono text-sm font-bold rounded flex items-center gap-1.5 transition-all shadow-[0_0_12px_rgba(99,102,241,0.3)] self-start md:self-auto"
         >
           <Play className="w-3.5 h-3.5" />
           <span>{isSimulating ? 'Simulating Fallback...' : 'Simulate Model Chain Fallback'}</span>
@@ -88,7 +88,7 @@ export const ModelChainControl: React.FC<ModelChainControlProps> = ({
                 : 'border-zinc-800 hover:border-zinc-700'
             }`}
           >
-            <div className="flex items-center justify-between font-mono text-xs">
+            <div className="flex items-center justify-between font-mono text-sm">
               <span className="text-emerald-400 font-bold uppercase">{config.role} Role</span>
               {config.circuitBreakerTripped ? (
                 <span className="bg-rose-950 text-rose-300 border border-rose-800 px-2 py-0.5 rounded text-[10px] font-bold">
@@ -101,7 +101,7 @@ export const ModelChainControl: React.FC<ModelChainControlProps> = ({
               )}
             </div>
 
-            <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80 font-mono text-xs space-y-1">
+            <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80 font-mono text-sm space-y-1">
               <div className="flex justify-between">
                 <span className="text-zinc-500">Primary:</span>
                 <span className="text-cyan-300 font-bold">{config.primaryModel}</span>
@@ -112,7 +112,7 @@ export const ModelChainControl: React.FC<ModelChainControlProps> = ({
               </div>
             </div>
 
-            <div className="space-y-1 font-mono text-xs">
+            <div className="space-y-1 font-mono text-sm">
               <div className="flex justify-between text-zinc-400">
                 <span>Budget Usage:</span>
                 <span className="text-white font-bold">
@@ -134,7 +134,7 @@ export const ModelChainControl: React.FC<ModelChainControlProps> = ({
 
       {/* Simulator Log Drawer */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-5 space-y-3">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-2 font-mono text-xs">
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-2 font-mono text-sm">
           <span className="text-zinc-200 font-bold uppercase flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-400" />
             Model Chain Resilience Test Harness Log
@@ -142,7 +142,7 @@ export const ModelChainControl: React.FC<ModelChainControlProps> = ({
           <span className="text-zinc-500">Target Role: {selectedRole}</span>
         </div>
 
-        <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-800 font-mono text-xs text-emerald-300 min-h-40 max-h-60 overflow-y-auto space-y-1.5 leading-relaxed">
+        <div className="bg-zinc-950 p-4 rounded-lg border border-zinc-800 font-mono text-sm text-emerald-300 min-h-40 max-h-60 overflow-y-auto space-y-1.5 leading-relaxed">
           {simulationLog.length > 0 ? (
             simulationLog.map((log, idx) => <div key={idx}>{log}</div>)
           ) : (

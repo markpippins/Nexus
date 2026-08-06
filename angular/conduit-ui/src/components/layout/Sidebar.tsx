@@ -92,10 +92,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Header */}
       <div className="p-3 border-b border-zinc-800 flex items-center justify-between bg-[#141416]">
         <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center font-bold text-xs text-white">
+          <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center font-bold text-sm text-white">
             W
           </div>
-          <span className="text-xs font-mono font-bold tracking-tight text-zinc-100 uppercase">
+          <span className="text-sm font-mono font-bold tracking-tight text-zinc-100 uppercase">
             WRP KERNEL RUNTIME
           </span>
         </div>
@@ -120,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     key={item.id}
                     onClick={() => onSelectTab(item.id)}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-medium transition-all ${
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-sm font-medium transition-all ${
                       isActive
                         ? 'bg-zinc-800 text-blue-400 font-semibold border border-zinc-700/60 shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent'

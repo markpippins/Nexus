@@ -223,20 +223,20 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                 Circuit Breaker & Failure Recovery Subsystem (`/config/failure-recovery`)
               </h2>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
               Configures threshold triggers for model failovers, retries, and pushback queue routing.
             </p>
           </div>
 
           {circuitSavedSuccess && (
-            <span className="text-xs font-mono font-bold text-emerald-400 flex items-center gap-1 bg-emerald-950/40 px-3 py-1 rounded border border-emerald-800/40">
+            <span className="text-sm font-mono font-bold text-emerald-400 flex items-center gap-1 bg-emerald-950/40 px-3 py-1 rounded border border-emerald-800/40">
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Saved Circuit Config</span>
             </span>
           )}
         </div>
 
-        <form onSubmit={handleCircuitSubmit} className="space-y-4 text-xs">
+        <form onSubmit={handleCircuitSubmit} className="space-y-4 text-sm">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Max Retries */}
             <div className="p-3 rounded-lg bg-[var(--bg-card)] border border-[var(--border-subtle)] space-y-1">
@@ -333,7 +333,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
             <button
               type="submit"
               disabled={isSavingCircuit}
-              className="px-5 py-2 rounded-lg font-bold text-xs bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition cursor-pointer"
+              className="px-5 py-2 rounded-lg font-bold text-sm bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition cursor-pointer"
             >
               {isSavingCircuit ? 'Updating...' : 'Save Failure Recovery Config'}
             </button>
@@ -351,14 +351,14 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                 Agent Scheduler Registry (`/scheduler`)
               </h2>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
               Automated cron / interval agent tasks for continuous inspection and orchestration.
             </p>
           </div>
 
           <button
             onClick={openCreateSched}
-            className="px-4 py-2 rounded-lg text-xs font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 rounded-lg text-sm font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Create Agent Schedule</span>
@@ -384,7 +384,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-xs text-[var(--text-primary)]">
+                      <span className="font-mono font-bold text-sm text-[var(--text-primary)]">
                         Role: {s.role}
                       </span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--badge-bg)] text-[var(--accent-color)] font-bold uppercase">
@@ -402,7 +402,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                       </button>
                     </div>
 
-                    <div className="text-xs font-mono text-[var(--text-secondary)] flex items-center gap-3 flex-wrap">
+                    <div className="text-sm font-mono text-[var(--text-secondary)] flex items-center gap-3 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Folder className="w-3 h-3 text-[var(--text-muted)]" />
                         {s.project_dir || '/nexus/tackle'}
@@ -463,7 +463,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                       <>
                         <div className="flex items-center gap-2 flex-wrap">
                           <ListChecks className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span className="text-xs font-mono font-bold text-[var(--text-primary)]">
+                          <span className="text-sm font-mono font-bold text-[var(--text-primary)]">
                             Task: {rowTask.task_slug}
                           </span>
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--badge-bg)] text-[var(--text-secondary)]">
@@ -490,7 +490,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                             <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] mb-1">
                               Scope — what this run will do
                             </div>
-                            <p className="text-xs text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                            <p className="text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
                               {rowTask.scope}
                             </p>
                           </div>
@@ -522,7 +522,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                                     className="mt-0.5 h-4 w-4 rounded cursor-pointer accent-[var(--accent-color)]"
                                   />
                                   <span
-                                    className={`text-xs font-mono leading-relaxed transition ${
+                                    className={`text-sm font-mono leading-relaxed transition ${
                                       checked ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'
                                     }`}
                                   >
@@ -535,7 +535,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
                         </div>
                       </>
                     ) : (
-                      <div className="bg-amber-950/30 border border-amber-800/40 rounded-lg p-3 text-xs text-amber-300">
+                      <div className="bg-amber-950/30 border border-amber-800/40 rounded-lg p-3 text-sm text-amber-300">
                         Task “{s.task_slug}” is referenced but no longer exists in the registry (it may have been
                         deleted). Runs for this schedule fall back to the role's default persona.
                       </div>
@@ -561,7 +561,7 @@ export const CircuitSchedulerTab: React.FC<CircuitSchedulerTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveSchedSubmit} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveSchedSubmit} className="space-y-3 text-sm">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Target Agent Role *</label>

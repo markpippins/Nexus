@@ -114,7 +114,7 @@ export const LeasesView: React.FC<LeasesViewProps> = ({
     <div className="p-4 space-y-4 font-sans text-slate-200 overflow-y-auto max-w-7xl mx-auto">
       {/* Top Banner: Stale Active Leases Alert */}
       {staleLeases.length > 0 && (
-        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center justify-between gap-3 text-amber-300 font-mono text-xs">
+        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center justify-between gap-3 text-amber-300 font-mono text-sm">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
             <span>
@@ -136,7 +136,7 @@ export const LeasesView: React.FC<LeasesViewProps> = ({
       )}
 
       {/* Filter & Search Bar */}
-      <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 font-mono text-xs shadow-md">
+      <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 font-mono text-sm shadow-md">
         <div className="flex items-center gap-2 flex-1">
           <div className="relative flex-1">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
@@ -190,7 +190,7 @@ export const LeasesView: React.FC<LeasesViewProps> = ({
       {/* Split Table & Inspector Layout */}
       <div className={`grid grid-cols-1 ${selectedLeaseId ? 'lg:grid-cols-12' : ''} gap-4`}>
         {/* Leases Data Table */}
-        <div className={`${selectedLeaseId ? 'lg:col-span-5' : 'w-full'} bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-md font-mono text-xs`}>
+        <div className={`${selectedLeaseId ? 'lg:col-span-5' : 'w-full'} bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-md font-mono text-sm`}>
           <div className="px-3 py-2 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
             <span className="font-bold text-slate-200 flex items-center gap-1.5">
               <Clock className="w-4 h-4 text-amber-400" />
@@ -271,7 +271,7 @@ export const LeasesView: React.FC<LeasesViewProps> = ({
 
               <button
                 onClick={onClearSelectedLease}
-                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs border border-slate-700"
+                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 text-sm border border-slate-700"
               >
                 Close Inspector
               </button>
@@ -280,15 +280,15 @@ export const LeasesView: React.FC<LeasesViewProps> = ({
             {isLoadingLifecycle ? (
               <div className="py-12 text-center text-slate-400 space-y-2">
                 <Clock className="w-6 h-6 animate-spin mx-auto text-amber-400" />
-                <p className="text-xs">Computing TTL & lifecycle state...</p>
+                <p className="text-sm">Computing TTL & lifecycle state...</p>
               </div>
             ) : lifecycle ? (
-              <div className="space-y-4 text-xs">
+              <div className="space-y-4 text-sm">
                 {/* 1. Lifecycle State Badge Box */}
                 <div className="p-3 bg-slate-950/80 border border-slate-800 rounded space-y-2">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
                     <span className="text-slate-400 font-bold">LIFECYCLE STATE</span>
-                    <span className={`px-2.5 py-1 rounded text-xs font-bold border uppercase ${getLifecyclePill(lifecycle.lifecycle_state)}`}>
+                    <span className={`px-2.5 py-1 rounded text-sm font-bold border uppercase ${getLifecyclePill(lifecycle.lifecycle_state)}`}>
                       {lifecycle.lifecycle_state}
                     </span>
                   </div>

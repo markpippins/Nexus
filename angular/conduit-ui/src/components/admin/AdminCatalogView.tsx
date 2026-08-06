@@ -59,14 +59,14 @@ export const AdminCatalogView: React.FC = () => {
               7. Admin Catalog & Consistency Inspector (`/admin`)
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Admin identity mapping catalog, alias management, and engine vs delta-store consistency validation.
           </p>
         </div>
 
         <button
           onClick={loadData}
-          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs rounded border border-zinc-700 flex items-center gap-1.5"
+          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-sm rounded border border-zinc-700 flex items-center gap-1.5"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Refresh Catalog</span>
@@ -76,7 +76,7 @@ export const AdminCatalogView: React.FC = () => {
       {/* Engine Consistency Banner */}
       {consistency && (
         <div
-          className={`p-4 border rounded-lg flex items-center justify-between font-mono text-xs ${
+          className={`p-4 border rounded-lg flex items-center justify-between font-mono text-sm ${
             consistency.aligned
               ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
               : 'bg-rose-950/60 border-rose-800 text-rose-300'
@@ -96,7 +96,7 @@ export const AdminCatalogView: React.FC = () => {
       )}
 
       {/* Identities Catalog Table */}
-      <div className="bg-[#141416] border border-zinc-800 rounded-lg overflow-hidden font-mono text-xs">
+      <div className="bg-[#141416] border border-zinc-800 rounded-lg overflow-hidden font-mono text-sm">
         <div className="p-3 bg-[#0c0c0e] border-b border-zinc-800 font-bold text-zinc-300">
           IDENTITY MAP CATALOG (`GET /admin/identities`)
         </div>
@@ -108,7 +108,7 @@ export const AdminCatalogView: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="text-blue-400 font-bold text-sm">{iden.id}</span>
-                    <span className="text-zinc-200 font-sans font-semibold text-xs">{iden.label}</span>
+                    <span className="text-zinc-200 font-sans font-semibold text-sm">{iden.label}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -151,7 +151,7 @@ export const AdminCatalogView: React.FC = () => {
                         type="text"
                         value={labelInput}
                         onChange={(e) => setLabelInput(e.target.value)}
-                        className="w-full bg-[#141416] border border-zinc-700 rounded px-2 py-1 text-zinc-200 text-xs"
+                        className="w-full bg-[#141416] border border-zinc-700 rounded px-2 py-1 text-zinc-200 text-sm"
                       />
                     </div>
                     <div>
@@ -160,7 +160,7 @@ export const AdminCatalogView: React.FC = () => {
                         type="text"
                         value={aliasesInput}
                         onChange={(e) => setAliasesInput(e.target.value)}
-                        className="w-full bg-[#141416] border border-zinc-700 rounded px-2 py-1 text-zinc-200 text-xs"
+                        className="w-full bg-[#141416] border border-zinc-700 rounded px-2 py-1 text-zinc-200 text-sm"
                       />
                     </div>
                   </div>

@@ -159,7 +159,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
               Role Memory Procedure Registry Reader
             </h2>
           </div>
-          <p className="text-xs text-[var(--text-secondary)] mt-1">
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
             Reads `mem:*` Redis namespace cached from canonical PostgreSQL database via `role-memory-srv` (:3500).
           </p>
         </div>
@@ -167,7 +167,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={checkStaleness}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
           >
             <Clock className="w-3.5 h-3.5 text-amber-400" />
             <span>Check Staleness (1h)</span>
@@ -176,7 +176,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
           <button
             onClick={onRefreshMemory}
             disabled={isRefreshingMemory}
-            className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-4 py-1.5 rounded-lg text-sm font-bold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingMemory ? 'animate-spin' : ''}`} />
             <span>Proxy POST /memory/refresh</span>
@@ -186,7 +186,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
 
       {/* Staleness Banner if clicked */}
       {stalenessResult && (
-        <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-xs flex items-center justify-between font-mono">
+        <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-sm flex items-center justify-between font-mono">
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4 text-cyan-400" />
             <span>
@@ -205,7 +205,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
           <button
             key={r.id}
             onClick={() => setSelectedRole(r.name)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-sm font-mono font-bold transition cursor-pointer ${
               selectedRole === r.name
                 ? 'bg-[var(--accent-color)] text-slate-950 shadow-sm'
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
@@ -218,7 +218,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
 
       {/* Procedure Cards Grid */}
       {loading ? (
-        <div className="py-12 text-center text-xs text-[var(--text-muted)] animate-pulse font-mono">
+        <div className="py-12 text-center text-sm text-[var(--text-muted)] animate-pulse font-mono">
           Fetching cached ProcedureCard entries from Redis memory layer...
         </div>
       ) : procedures.length > 0 ? (
@@ -250,7 +250,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
                   <List className="w-3 h-3 text-[var(--accent-color)]" />
                   <span>Procedure Steps ({card.steps.length})</span>
                 </span>
-                <div className="space-y-1 bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)]">
+                <div className="space-y-1 bg-[var(--bg-tertiary)] p-3 rounded-lg border border-[var(--border-subtle)] text-sm text-[var(--text-secondary)]">
                   {card.steps.length > 0 ? (
                     card.steps.map((step, sIdx) => (
                       <div key={sIdx} className="flex items-start gap-2">
@@ -268,7 +268,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
 
               {/* Recovery Action */}
               {card.recovery_action && (
-                <div className="p-2.5 rounded-lg bg-amber-950/20 border border-amber-800/40 text-amber-200 text-xs font-mono flex items-center gap-2">
+                <div className="p-2.5 rounded-lg bg-amber-950/20 border border-amber-800/40 text-amber-200 text-sm font-mono flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
                   <div>
                     <strong className="block text-[10px] text-amber-400">Recovery Trigger:</strong>
@@ -285,7 +285,7 @@ export const MemoryContextTab: React.FC<MemoryContextTabProps> = ({
           ))}
         </div>
       ) : (
-        <div className="p-10 text-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-muted)] space-y-2">
+        <div className="p-10 text-center bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-sm text-[var(--text-muted)] space-y-2">
           <div>No cached ProcedureCard entries found for role '{selectedRole}'.</div>
           <button
             onClick={onRefreshMemory}

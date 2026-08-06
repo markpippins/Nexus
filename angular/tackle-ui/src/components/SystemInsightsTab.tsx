@@ -558,7 +558,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
             <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
               Subsystem CPU & Memory Usage Trends
             </h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
               Real-time D3 time-series visualization powered by <code className="font-mono text-blue-400">GET /health</code> status API and runtime metrics telemetry.
             </p>
           </div>
@@ -568,7 +568,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
             <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-1.5 px-3">
               <button
                 onClick={() => setAutoRefresh(!autoRefresh)}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded transition cursor-pointer ${
+                className={`flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded transition cursor-pointer ${
                   autoRefresh
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
@@ -582,7 +582,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
                 <select
                   value={pollIntervalMs}
                   onChange={e => setPollIntervalMs(Number(e.target.value))}
-                  className="bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-secondary)] text-xs rounded px-2 py-1 outline-none font-mono cursor-pointer"
+                  className="bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-secondary)] text-sm rounded px-2 py-1 outline-none font-mono cursor-pointer"
                 >
                   <option value={1000}>1s interval</option>
                   <option value={3000}>3s interval</option>
@@ -596,7 +596,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
             <button
               onClick={() => fetchHealthData()}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] rounded-lg text-xs font-medium text-[var(--text-primary)] transition cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] rounded-lg text-sm font-medium text-[var(--text-primary)] transition cursor-pointer disabled:opacity-50"
               title="Sync metrics immediately"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[var(--accent-color)] ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -607,7 +607,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
             <button
               onClick={handleSimulateSpike}
               disabled={isSimulatingSpike}
-              className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-semibold rounded-lg text-xs transition cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 font-semibold rounded-lg text-sm transition cursor-pointer shadow-xs"
             >
               <Zap className="w-3.5 h-3.5 text-rose-400" />
               <span>{isSimulatingSpike ? 'Injecting Spike...' : 'Simulate Load Spike'}</span>
@@ -692,7 +692,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
               <span className="text-2xl font-bold text-[var(--text-primary)] font-mono">
                 {formatUptime(healthStatus?.uptime_seconds || 7200)}
               </span>
-              <span className="text-xs font-mono text-blue-400 font-semibold">
+              <span className="text-sm font-mono text-blue-400 font-semibold">
                 Port :{healthStatus?.port || 3410}
               </span>
             </div>
@@ -737,7 +737,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
             </h3>
 
             {/* Legend Badges */}
-            <div className="flex items-center gap-3 text-xs font-mono">
+            <div className="flex items-center gap-3 text-sm font-mono">
               <span className="inline-flex items-center gap-1.5">
                 <span className="w-3 h-1 rounded bg-cyan-400 block" />
                 <span className="text-[var(--text-secondary)]">CPU (%)</span>
@@ -759,7 +759,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
             {/* Threshold toggle */}
             <button
               onClick={() => setShowThresholdLine(!showThresholdLine)}
-              className={`px-2.5 py-1 rounded-lg border text-xs font-mono transition cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg border text-sm font-mono transition cursor-pointer ${
                 showThresholdLine
                   ? 'bg-rose-500/10 border-rose-500/30 text-rose-300 font-semibold'
                   : 'bg-[var(--bg-tertiary)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -772,7 +772,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
             <div className="flex items-center bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-0.5">
               <button
                 onClick={() => setViewMode('combined')}
-                className={`px-2.5 py-1 rounded text-xs font-mono font-medium transition cursor-pointer flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded text-sm font-mono font-medium transition cursor-pointer flex items-center gap-1 ${
                   viewMode === 'combined'
                     ? 'bg-[var(--accent-color)] text-white font-bold shadow-xs'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -783,7 +783,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
               </button>
               <button
                 onClick={() => setViewMode('split')}
-                className={`px-2.5 py-1 rounded text-xs font-mono font-medium transition cursor-pointer flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded text-sm font-mono font-medium transition cursor-pointer flex items-center gap-1 ${
                   viewMode === 'split'
                     ? 'bg-[var(--accent-color)] text-white font-bold shadow-xs'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -797,9 +797,9 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
         </div>
 
         {/* Hover Crosshair Tooltip Bar */}
-        <div className="min-h-[2.25rem] px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] flex items-center justify-between text-xs font-mono transition-all">
+        <div className="min-h-[2.25rem] px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] flex items-center justify-between text-sm font-mono transition-all">
           {hoveredPoint ? (
-            <div className="w-full flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="w-full flex flex-wrap items-center justify-between gap-3 text-sm">
               <div className="flex items-center gap-2">
                 <span className="px-1.5 py-0.5 rounded bg-[var(--accent-color)] text-white text-[10px] font-bold">
                   SAMPLE AT
@@ -834,7 +834,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
 
         {/* D3 Chart Canvas Area */}
         {isLoading ? (
-          <div className="h-80 flex flex-col items-center justify-center gap-3 bg-[var(--bg-tertiary)] rounded-lg text-xs font-mono text-[var(--text-muted)]">
+          <div className="h-80 flex flex-col items-center justify-center gap-3 bg-[var(--bg-tertiary)] rounded-lg text-sm font-mono text-[var(--text-muted)]">
             <RefreshCw className="w-6 h-6 animate-spin text-[var(--accent-color)]" />
             <span>Rendering D3 time-series visualization...</span>
           </div>
@@ -846,7 +846,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
         ) : (
           <div className="space-y-4">
             <div>
-              <div className="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider mb-1 px-1">
+              <div className="text-sm font-mono font-bold text-cyan-400 uppercase tracking-wider mb-1 px-1">
                 CPU Usage Trend (%) — Last 60 Minutes
               </div>
               <div
@@ -855,7 +855,7 @@ export const SystemInsightsTab: React.FC<SystemInsightsTabProps> = ({
               />
             </div>
             <div>
-              <div className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider mb-1 px-1">
+              <div className="text-sm font-mono font-bold text-emerald-400 uppercase tracking-wider mb-1 px-1">
                 Memory Usage Trend (%) — Last 60 Minutes
               </div>
               <div

@@ -206,14 +206,14 @@ export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-cyan-400" />
-            <h2 className="text-xs font-mono font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
+            <h2 className="text-sm font-mono font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
               Implementation Plans Gantt Timeline
               <span className="text-[10px] font-normal text-cyan-400 bg-cyan-950/50 border border-cyan-800/40 px-2 py-0.5 rounded">
                 Token & Receipt Overlay
               </span>
             </h2>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Execution span, receipt milestone checkpoints, and token usage intensity across active plans.
           </p>
         </div>
@@ -221,7 +221,7 @@ export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
         {/* View Switcher & Controls */}
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           {/* Tab Switcher */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 text-xs font-mono">
+          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 text-sm font-mono">
             <button
               onClick={() => setActiveTab('gantt')}
               className={`px-2.5 py-1 rounded transition-colors flex items-center gap-1 ${
@@ -247,7 +247,7 @@ export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
           </div>
 
           {/* Filter Dropdown */}
-          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs font-mono">
+          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-sm font-mono">
             <Filter className="w-3 h-3 text-zinc-500" />
             <select
               value={filterStatus}
@@ -263,7 +263,7 @@ export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
           </div>
 
           {/* Sort Dropdown */}
-          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs font-mono">
+          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-sm font-mono">
             <ArrowUpDown className="w-3 h-3 text-zinc-500" />
             <select
               value={sortKey}
@@ -280,7 +280,7 @@ export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
       </div>
 
       {/* Legend & Stats Summary Bar */}
-      <div className="flex items-center justify-between text-xs font-mono text-zinc-400 bg-zinc-900/60 p-2.5 rounded border border-zinc-800/80 flex-wrap gap-2">
+      <div className="flex items-center justify-between text-sm font-mono text-zinc-400 bg-zinc-900/60 p-2.5 rounded border border-zinc-800/80 flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <span className="text-zinc-500 uppercase text-[10px] font-bold">Status:</span>
           <span className="flex items-center gap-1">
@@ -345,7 +345,7 @@ export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
 
           {/* Plan Rows */}
           {sortedPlans.length === 0 ? (
-            <div className="p-8 text-center text-zinc-500 text-xs font-mono">
+            <div className="p-8 text-center text-zinc-500 text-sm font-mono">
               No implementation plans match current filter criteria.
             </div>
           ) : (
@@ -395,7 +395,7 @@ export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
                     {/* Left Column: Plan Metadata */}
                     <div className="col-span-4 lg:col-span-3 space-y-1">
                       <div className="flex items-center justify-between gap-1">
-                        <span className="font-mono text-xs font-bold text-blue-400 hover:underline truncate">
+                        <span className="font-mono text-sm font-bold text-blue-400 hover:underline truncate">
                           {plan.id}
                         </span>
                         <span
@@ -405,7 +405,7 @@ export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
                         </span>
                       </div>
 
-                      <div className="text-xs font-semibold text-zinc-200 truncate" title={plan.title}>
+                      <div className="text-sm font-semibold text-zinc-200 truncate" title={plan.title}>
                         {plan.title}
                       </div>
 
@@ -513,7 +513,7 @@ export const PlanGanttChart: React.FC<PlanGanttChartProps> = ({
         /* Token Density Recharts Section */
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-wide flex items-center gap-1.5">
+            <h3 className="text-sm font-mono font-bold text-zinc-300 uppercase tracking-wide flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-blue-400" />
               Token Usage & Cost Profile per Implementation Plan
             </h3>

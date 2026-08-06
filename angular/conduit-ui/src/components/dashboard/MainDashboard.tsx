@@ -142,7 +142,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
               Auto-Orchestrating
             </span>
           </div>
-          <p className="text-xs text-zinc-400 mt-1 font-sans leading-relaxed">
+          <p className="text-sm text-zinc-400 mt-1 font-sans leading-relaxed">
             PostgreSQL <code className="text-blue-300 font-mono bg-zinc-800/60 px-1 py-0.5 rounded">nexus</code> orchestrator driving hierarchical plan decomposition, model chain resilience, and deterministic WRP Kernel replay.
           </p>
         </div>
@@ -156,7 +156,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search title or status..."
-              className="bg-zinc-900 border border-zinc-700/80 rounded pl-8 pr-7 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 font-mono focus:outline-none focus:border-blue-500 w-52 sm:w-64 transition-all"
+              className="bg-zinc-900 border border-zinc-700/80 rounded pl-8 pr-7 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 font-mono focus:outline-none focus:border-blue-500 w-52 sm:w-64 transition-all"
             />
             {searchQuery && (
               <button
@@ -171,14 +171,14 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
           <button
             onClick={() => onNavigateTab('kanban_boards')}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs rounded transition-colors shadow-sm flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm rounded transition-colors shadow-sm flex items-center gap-1.5"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Process Kanban</span>
           </button>
           <button
             onClick={() => onNavigateTab('deliberation')}
-            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium text-xs rounded transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 font-medium text-sm rounded transition-colors flex items-center gap-1.5"
           >
             <FileCode className="w-3.5 h-3.5 text-blue-400" />
             <span>Deliberation Surface</span>
@@ -187,7 +187,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       </div>
 
       {/* Status Chips Filter Bar */}
-      <div className="flex items-center justify-between bg-[#141416] border border-zinc-800 rounded-lg p-2.5 px-4 font-mono text-xs flex-wrap gap-2 shadow-sm">
+      <div className="flex items-center justify-between bg-[#141416] border border-zinc-800 rounded-lg p-2.5 px-4 font-mono text-sm flex-wrap gap-2 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-zinc-500 uppercase text-[10px] font-bold tracking-wider mr-1">Status Filter:</span>
           {[
@@ -210,7 +210,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
               <button
                 key={chip.key}
                 onClick={() => setSelectedStatus(chip.key)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1 rounded-full text-sm font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
                   isSelected
                     ? activeStyle
                     : 'bg-zinc-900/90 text-zinc-400 border-zinc-800 hover:text-zinc-200 hover:border-zinc-700'
@@ -285,7 +285,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             <span className="text-2xl font-mono font-bold text-emerald-400">
               ${totalCostUsd.toFixed(2)}
             </span>
-            <span className="text-xs font-mono text-zinc-500">
+            <span className="text-sm font-mono text-zinc-500">
               / ${totalBudgetUsd.toFixed(0)}
             </span>
           </div>
@@ -325,10 +325,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         <div className="lg:col-span-2 bg-[#141416] border border-zinc-800 rounded-lg p-4 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-wide">
+              <h2 className="text-sm font-mono font-bold text-zinc-300 uppercase tracking-wide">
                 Pipeline Dispatch & Receipt Rate
               </h2>
-              <p className="text-xs text-zinc-500">
+              <p className="text-sm text-zinc-500">
                 WorkRequest dispatches vs deterministic execution receipts issued
               </p>
             </div>
@@ -390,14 +390,14 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         <div className="bg-[#141416] border border-zinc-800 rounded-lg p-4 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-wide">
+              <h2 className="text-sm font-mono font-bold text-zinc-300 uppercase tracking-wide">
                 Role Model Usage
               </h2>
-              <p className="text-xs text-zinc-500">Budget allocation per role</p>
+              <p className="text-sm text-zinc-500">Budget allocation per role</p>
             </div>
             <button
               onClick={() => onNavigateTab('model_chain')}
-              className="text-xs font-mono text-blue-400 hover:underline flex items-center gap-1"
+              className="text-sm font-mono text-blue-400 hover:underline flex items-center gap-1"
             >
               Config <ArrowUpRight className="w-3 h-3" />
             </button>
@@ -450,7 +450,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-[#0c0c0e]">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-blue-400" />
-            <h2 className="text-xs font-mono font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
+            <h2 className="text-sm font-mono font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
               <span>Active Implementation Plans & Receipt Chain State</span>
               {searchQuery && (
                 <span className="text-[10px] font-normal text-cyan-300 bg-cyan-950/60 border border-cyan-800/50 px-2 py-0.5 rounded font-mono">
@@ -461,7 +461,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
           <button
             onClick={() => onNavigateTab('kanban_boards')}
-            className="text-xs font-mono text-blue-400 hover:underline flex items-center gap-1"
+            className="text-sm font-mono text-blue-400 hover:underline flex items-center gap-1"
           >
             View All Plans <ArrowUpRight className="w-3 h-3" />
           </button>
@@ -470,7 +470,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse font-sans">
             <thead>
-              <tr className="bg-[#0c0c0e] text-zinc-400 text-xs font-mono uppercase tracking-wider border-b border-zinc-800">
+              <tr className="bg-[#0c0c0e] text-zinc-400 text-sm font-mono uppercase tracking-wider border-b border-zinc-800">
                 <th className="py-2.5 px-4 font-semibold">Plan ID / Ticket</th>
                 <th className="py-2.5 px-4 font-semibold">Title & Description</th>
                 <th className="py-2.5 px-4 font-semibold">Role</th>
@@ -481,10 +481,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 <th className="py-2.5 px-4 font-semibold text-right">Receipt Hash</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/80 text-xs">
+            <tbody className="divide-y divide-zinc-800/80 text-sm">
               {filteredPlans.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-zinc-500 font-mono text-xs">
+                  <td colSpan={8} className="py-8 text-center text-zinc-500 font-mono text-sm">
                     No implementation plans match your search query "{searchQuery}".
                     <button
                       onClick={() => setSearchQuery('')}

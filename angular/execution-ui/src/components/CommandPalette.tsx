@@ -57,7 +57,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-start justify-center pt-20 px-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-full max-w-xl overflow-hidden font-mono text-xs">
+      <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl w-full max-w-xl overflow-hidden font-mono text-sm">
         {/* Search Header */}
         <div className="flex items-center px-3 py-2.5 border-b border-slate-800 bg-slate-950/50">
           <Search className="w-4 h-4 text-slate-400 mr-2.5" />

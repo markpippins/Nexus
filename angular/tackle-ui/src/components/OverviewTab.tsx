@@ -82,7 +82,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                 AI Configuration Subsystem Overview
               </h2>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
               Live resolution of role config bundles, model bindings, providers & failure recovery parameters.
             </p>
           </div>
@@ -90,14 +90,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={onValidate}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5 text-[var(--accent-color)]" />
               <span>Validate Integrity</span>
             </button>
             <button
               onClick={onSeedDefaults}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
             >
               <span>Seed Defaults</span>
             </button>
@@ -107,7 +107,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
         {/* Validation Status Box */}
         {validationReport && (
           <div
-            className={`mt-4 p-3 rounded-lg border text-xs flex items-start gap-3 ${
+            className={`mt-4 p-3 rounded-lg border text-sm flex items-start gap-3 ${
               validationReport.valid
                 ? 'bg-emerald-950/20 border-emerald-800/40 text-emerald-200'
                 : 'bg-amber-950/20 border-amber-800/40 text-amber-200'
@@ -164,7 +164,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               <Shield className="w-4 h-4 text-[var(--accent-color)]" />
               <span>Select System Role</span>
             </h3>
-            <p className="text-xs text-[var(--text-secondary)] mb-4">
+            <p className="text-sm text-[var(--text-secondary)] mb-4">
               Select a role to inspect active priority bundle resolution (`/config/ai/resolve/:role`).
             </p>
 
@@ -183,7 +183,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     }`}
                   >
                     <div>
-                      <div className="font-mono font-bold text-xs flex items-center gap-2">
+                      <div className="font-mono font-bold text-sm flex items-center gap-2">
                         <span>{r.name}</span>
                         {isSelected && (
                           <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)] animate-ping" />
@@ -206,7 +206,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
 
           <button
             onClick={() => onNavigateToTab('bundles')}
-            className="mt-4 w-full py-2 px-3 rounded-lg text-xs font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center justify-center gap-1.5 cursor-pointer"
+            className="mt-4 w-full py-2 px-3 rounded-lg text-sm font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <span>Manage All Config Bundles</span>
             <ArrowRight className="w-3.5 h-3.5 text-[var(--accent-color)]" />
@@ -223,7 +223,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   Active Resolved Bundle for <span className="font-mono text-[var(--accent-color)]">{selectedRole}</span>
                 </h3>
               </div>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              <p className="text-sm text-[var(--text-secondary)] mt-0.5">
                 Evaluated based on priority ascending, is_active=true, and valid date bounds.
               </p>
             </div>
@@ -238,17 +238,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           </div>
 
           {loadingResolve ? (
-            <div className="py-12 text-center text-xs text-[var(--text-muted)] animate-pulse">
+            <div className="py-12 text-center text-sm text-[var(--text-muted)] animate-pulse">
               Resolving active bundle from tackle-srv...
             </div>
           ) : resolvedData ? (
             resolvedData.error ? (
               <div className="py-10 text-center space-y-2">
                 <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto" />
-                <div className="text-xs font-semibold text-[var(--text-primary)]">
+                <div className="text-sm font-semibold text-[var(--text-primary)]">
                   Resolution Error for '{selectedRole}'
                 </div>
-                <p className="text-xs text-[var(--text-secondary)] font-mono">
+                <p className="text-sm text-[var(--text-secondary)] font-mono">
                   {resolvedData.error}
                 </p>
               </div>
@@ -283,13 +283,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                         {bundleMode}
                       </span>
                     </div>
-                    <div className="text-xs text-[var(--text-secondary)] font-mono mt-1">
+                    <div className="text-sm text-[var(--text-secondary)] font-mono mt-1">
                       {bundleId ? `Bundle ID: ${bundleId}` : `Model: ${modelId}`}
                     </div>
                   </div>
                   <div className="text-right">
                     {bundleTimeout && (
-                      <span className="text-xs font-mono text-[var(--text-muted)] flex items-center gap-1 justify-end">
+                      <span className="text-sm font-mono text-[var(--text-muted)] flex items-center gap-1 justify-end">
                         <Clock className="w-3 h-3" />
                         {bundleTimeout}ms timeout
                       </span>
@@ -305,7 +305,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       <Cpu className="w-3 h-3 text-[var(--accent-color)]" />
                       <span>Model</span>
                     </div>
-                    <div className="font-bold text-xs text-[var(--text-primary)]">
+                    <div className="font-bold text-sm text-[var(--text-primary)]">
                       {modelName || 'Unknown Model'}
                     </div>
                     <div className="text-[10px] font-mono text-[var(--text-secondary)] truncate">
@@ -319,7 +319,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       <Server className="w-3 h-3 text-cyan-400" />
                       <span>Provider</span>
                     </div>
-                    <div className="font-bold text-xs text-[var(--text-primary)]">
+                    <div className="font-bold text-sm text-[var(--text-primary)]">
                       {providerName || 'Default Provider'}
                     </div>
                     <div className="text-[10px] font-mono text-[var(--text-secondary)] truncate flex items-center gap-1">
@@ -334,7 +334,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       <Layers className="w-3 h-3 text-indigo-400" />
                       <span>Harness</span>
                     </div>
-                    <div className="font-bold text-xs text-[var(--text-primary)]">
+                    <div className="font-bold text-sm text-[var(--text-primary)]">
                       {harnessName || 'Direct Harness'}
                     </div>
                     <div className="text-[10px] font-mono text-[var(--text-secondary)]">
@@ -347,14 +347,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               {/* Fallback Bundles Queue */}
               {fallbacks.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider font-mono">
+                  <div className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wider font-mono">
                     Standby Fallbacks ({fallbacks.length})
                   </div>
                   <div className="space-y-1.5">
                     {fallbacks.map((fb: any, idx: number) => (
                       <div
                         key={fb.model_identifier || fb.id || idx}
-                        className="p-2.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-subtle)] flex items-center justify-between text-xs"
+                        className="p-2.5 rounded-md bg-[var(--bg-card)] border border-[var(--border-subtle)] flex items-center justify-between text-sm"
                       >
                         <div className="flex items-center gap-2">
                           <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-muted)] font-bold">
@@ -377,7 +377,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
               {/* Quick Prompt Test */}
               <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1.5">
                     <Play className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Quick Test Invocation</span>
                   </span>
@@ -392,7 +392,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                     value={quickPrompt}
                     onChange={e => setQuickPrompt(e.target.value)}
                     placeholder="Enter test prompt..."
-                    className="flex-1 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-color)] font-mono"
+                    className="flex-1 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg px-3 py-1.5 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-color)] font-mono"
                   />
                   <button
                     onClick={async () => {
@@ -403,7 +403,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                       }
                       onNavigateToTab('sessions-playground');
                     }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition flex items-center gap-1 cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-[var(--accent-color)] text-slate-950 hover:bg-[var(--accent-hover)] transition flex items-center gap-1 cursor-pointer"
                   >
                     <span>Run in Sandbox</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -416,15 +416,15 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           ) : (
             <div className="py-10 text-center space-y-2">
               <AlertTriangle className="w-6 h-6 text-amber-400 mx-auto" />
-              <div className="text-xs font-semibold text-[var(--text-primary)]">
+              <div className="text-sm font-semibold text-[var(--text-primary)]">
                 No Active Bundle Resolved for '{selectedRole}'
               </div>
-              <p className="text-xs text-[var(--text-secondary)] max-w-sm mx-auto">
+              <p className="text-sm text-[var(--text-secondary)] max-w-sm mx-auto">
                 No bundle currently matches priority conditions or valid date window. Please assign or activate a bundle for this role.
               </p>
               <button
                 onClick={() => onNavigateToTab('bundles')}
-                className="mt-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-[var(--accent-color)] text-slate-950 font-bold"
+                className="mt-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--accent-color)] text-slate-950 font-bold"
               >
                 Create Bundle
               </button>
@@ -441,11 +441,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-color)] transition cursor-pointer space-y-2 group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono uppercase text-[var(--text-muted)]">01. Providers</span>
+            <span className="text-sm font-mono uppercase text-[var(--text-muted)]">01. Providers</span>
             <Server className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-2xl font-bold font-mono text-[var(--text-primary)]">{providers.length}</div>
-          <div className="text-xs text-[var(--text-secondary)]">Google Gemini, OpenAI, Anthropic, Ollama, vLLM</div>
+          <div className="text-sm text-[var(--text-secondary)]">Google Gemini, OpenAI, Anthropic, Ollama, vLLM</div>
         </div>
 
         {/* Card 2 */}
@@ -454,11 +454,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-color)] transition cursor-pointer space-y-2 group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono uppercase text-[var(--text-muted)]">02. Harnesses</span>
+            <span className="text-sm font-mono uppercase text-[var(--text-muted)]">02. Harnesses</span>
             <Layers className="w-4 h-4 text-indigo-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-2xl font-bold font-mono text-[var(--text-primary)]">{harnesses.length}</div>
-          <div className="text-xs text-[var(--text-secondary)]">Gemini SDK, OpenAI Direct, Anthropic Messages</div>
+          <div className="text-sm text-[var(--text-secondary)]">Gemini SDK, OpenAI Direct, Anthropic Messages</div>
         </div>
 
         {/* Card 3 */}
@@ -467,11 +467,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-color)] transition cursor-pointer space-y-2 group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono uppercase text-[var(--text-muted)]">03. Models</span>
+            <span className="text-sm font-mono uppercase text-[var(--text-muted)]">03. Models</span>
             <Cpu className="w-4 h-4 text-[var(--accent-color)] group-hover:scale-110 transition" />
           </div>
           <div className="text-2xl font-bold font-mono text-[var(--text-primary)]">{models.length}</div>
-          <div className="text-xs text-[var(--text-secondary)]">gemini-3.6-flash, gpt-4o, claude-3-7-sonnet</div>
+          <div className="text-sm text-[var(--text-secondary)]">gemini-3.6-flash, gpt-4o, claude-3-7-sonnet</div>
         </div>
 
         {/* Card 4 */}
@@ -480,11 +480,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
           className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-color)] transition cursor-pointer space-y-2 group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono uppercase text-[var(--text-muted)]">04. Bundles</span>
+            <span className="text-sm font-mono uppercase text-[var(--text-muted)]">04. Bundles</span>
             <Zap className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition" />
           </div>
           <div className="text-2xl font-bold font-mono text-[var(--text-primary)]">{bundles.length}</div>
-          <div className="text-xs text-[var(--text-secondary)]">Priority ordering, invocation modes & fallback rules</div>
+          <div className="text-sm text-[var(--text-secondary)]">Priority ordering, invocation modes & fallback rules</div>
         </div>
       </div>
     </div>

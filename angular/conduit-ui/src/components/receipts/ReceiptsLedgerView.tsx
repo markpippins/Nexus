@@ -84,7 +84,7 @@ export const ReceiptsLedgerView: React.FC = () => {
               4. Receipts Ledger & Audit Surface (<code className="text-emerald-400">/api/receipts</code>)
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Read, parse, insert, and delete cryptographic execution receipts per plan ID.
           </p>
         </div>
@@ -92,7 +92,7 @@ export const ReceiptsLedgerView: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold rounded flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-sm font-bold rounded flex items-center gap-1.5 transition-colors"
           >
             <Plus className="w-4 h-4" />
             <span>POST /api/receipts (Insert)</span>
@@ -101,7 +101,7 @@ export const ReceiptsLedgerView: React.FC = () => {
       </div>
 
       {/* Plan Filter & Bar Controls */}
-      <div className="bg-[#141416] border border-zinc-800 rounded-lg p-4 flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
+      <div className="bg-[#141416] border border-zinc-800 rounded-lg p-4 flex flex-wrap items-center justify-between gap-4 font-mono text-sm">
         <div className="flex items-center gap-3">
           <span className="text-zinc-400">Select Plan ID:</span>
           <select
@@ -144,7 +144,7 @@ export const ReceiptsLedgerView: React.FC = () => {
       </div>
 
       {/* Receipts Table */}
-      <div className="bg-[#141416] border border-zinc-800 rounded-lg overflow-hidden font-mono text-xs">
+      <div className="bg-[#141416] border border-zinc-800 rounded-lg overflow-hidden font-mono text-sm">
         <div className="p-3 bg-[#0c0c0e] border-b border-zinc-800 flex items-center justify-between">
           <span className="font-bold text-zinc-300">RECEIPTS FOR {selectedPlanId.toUpperCase()}</span>
           <div className="flex items-center gap-2">
@@ -184,7 +184,7 @@ export const ReceiptsLedgerView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="text-zinc-200 font-sans text-xs font-semibold">{rc.summary}</div>
+                <div className="text-zinc-200 font-sans text-sm font-semibold">{rc.summary}</div>
 
                 <div className="bg-[#0c0c0e] border border-zinc-800/80 rounded p-2.5 space-y-1">
                   <div className="text-[10px] text-zinc-500 uppercase flex items-center justify-between">
@@ -209,7 +209,7 @@ export const ReceiptsLedgerView: React.FC = () => {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-mono">
           <div className="bg-[#141416] border border-zinc-800 rounded-lg p-5 w-full max-w-md space-y-4">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <h2 className="text-xs font-bold text-white uppercase flex items-center gap-2">
+              <h2 className="text-sm font-bold text-white uppercase flex items-center gap-2">
                 <Plus className="w-4 h-4 text-emerald-400" />
                 POST /api/receipts (Insert Receipt)
               </h2>
@@ -218,7 +218,7 @@ export const ReceiptsLedgerView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleAddReceipt} className="space-y-3 text-xs">
+            <form onSubmit={handleAddReceipt} className="space-y-3 text-sm">
               <div>
                 <label className="block text-zinc-400 mb-1">Plan ID</label>
                 <input

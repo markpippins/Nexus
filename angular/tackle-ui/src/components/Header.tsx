@@ -63,23 +63,23 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Status Indicators & Actions */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             {/* System Health */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-mono bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
               {isOnline ? (
                 <>
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-semibold text-[11px] sm:text-xs">API ONLINE</span>
+                  <span className="text-emerald-400 font-semibold text-[11px] sm:text-sm">API ONLINE</span>
                   <span className="text-[var(--text-muted)] text-[11px] hidden md:inline ml-1">:3410</span>
                 </>
               ) : (
                 <>
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-amber-400 font-semibold text-[11px] sm:text-xs">OFFLINE</span>
+                  <span className="text-amber-400 font-semibold text-[11px] sm:text-sm">OFFLINE</span>
                 </>
               )}
             </div>
 
             {/* Active Sessions */}
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-mono bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
               <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
               <span>{activeSessionCount} Sessions</span>
             </div>
@@ -89,7 +89,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onRefreshMemory}
               disabled={isRefreshingMemory}
               title="Refresh Role Memory Redis Cache"
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm font-medium bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[var(--accent-color)] ${isRefreshingMemory ? 'animate-spin' : ''}`} />
               <span className="hidden md:inline">Sync Memory</span>
@@ -99,7 +99,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-0.5">
               <button
                 onClick={() => setTheme('steel')}
-                className={`px-2 py-0.5 rounded text-xs font-medium transition flex items-center gap-1 cursor-pointer ${
+                className={`px-2 py-0.5 rounded text-sm font-medium transition flex items-center gap-1 cursor-pointer ${
                   theme === 'steel'
                     ? 'bg-[var(--accent-color)] text-slate-950 font-semibold shadow-xs'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -111,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
               <button
                 onClick={() => setTheme('dark')}
-                className={`px-2 py-0.5 rounded text-xs font-medium transition flex items-center gap-1 cursor-pointer ${
+                className={`px-2 py-0.5 rounded text-sm font-medium transition flex items-center gap-1 cursor-pointer ${
                   theme === 'dark'
                     ? 'bg-[var(--accent-color)] text-white font-semibold shadow-xs'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -123,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
               <button
                 onClick={() => setTheme('light')}
-                className={`px-2 py-0.5 rounded text-xs font-medium transition flex items-center gap-1 cursor-pointer ${
+                className={`px-2 py-0.5 rounded text-sm font-medium transition flex items-center gap-1 cursor-pointer ${
                   theme === 'light'
                     ? 'bg-[var(--accent-color)] text-white font-semibold shadow-xs'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'

@@ -67,12 +67,12 @@ export const AgentSessionsView: React.FC = () => {
               5. Agent Sessions & Process PID Control (`/api/sessions`)
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Monitor running agent PIDs, send heartbeats, adjust cost tracking, and force-kill stuck processes.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 font-mono text-xs">
+        <div className="flex items-center gap-3 font-mono text-sm">
           <div className="flex items-center bg-[#0c0c0e] rounded p-1 border border-zinc-800">
             <button
               onClick={() => setFilterMode('all')}
@@ -110,7 +110,7 @@ export const AgentSessionsView: React.FC = () => {
       </div>
 
       {/* Sessions Table */}
-      <div className="bg-[#141416] border border-zinc-800 rounded-lg overflow-hidden font-mono text-xs">
+      <div className="bg-[#141416] border border-zinc-800 rounded-lg overflow-hidden font-mono text-sm">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-[#0c0c0e] text-zinc-400 uppercase border-b border-zinc-800 text-[11px]">

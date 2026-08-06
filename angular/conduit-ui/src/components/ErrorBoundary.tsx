@@ -45,14 +45,14 @@ export class ErrorBoundary extends Component<Props, State> {
                 <h1 className="text-base font-bold text-white uppercase tracking-wider">
                   Application Exception Intercepted
                 </h1>
-                <p className="text-xs text-zinc-400 font-sans">
+                <p className="text-sm text-zinc-400 font-sans">
                   The UI encountered an unexpected runtime error.
                 </p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs text-rose-300 font-semibold bg-rose-950/40 border border-rose-900/40 p-3 rounded">
+              <p className="text-sm text-rose-300 font-semibold bg-rose-950/40 border border-rose-900/40 p-3 rounded">
                 {this.state.error?.toString() || 'Unknown Error'}
               </p>
 
@@ -71,7 +71,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <button
                 type="button"
                 onClick={this.handleReset}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded flex items-center gap-2 transition-colors shadow-md"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm rounded flex items-center gap-2 transition-colors shadow-md"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Reload Application</span>

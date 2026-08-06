@@ -64,17 +64,17 @@ export const HierarchicalTree: React.FC<HierarchicalTreeProps> = ({ nodes }) => 
 
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-zinc-100">{node.name}</span>
+                <span className="font-mono text-sm font-bold text-zinc-100">{node.name}</span>
                 <span className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-1.5 py-0.2 rounded uppercase">
                   {node.type}
                 </span>
                 <span className="text-[10px] font-mono text-zinc-600">({node.id})</span>
               </div>
-              <p className="text-xs text-zinc-400 font-sans mt-0.5">{node.description}</p>
+              <p className="text-sm text-zinc-400 font-sans mt-0.5">{node.description}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 font-mono text-xs">
+          <div className="flex items-center gap-3 shrink-0 font-mono text-sm">
             <span className="text-purple-400 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800/40 text-[11px]">
               Specs: {node.linkedSpecsCount}
             </span>
@@ -103,7 +103,7 @@ export const HierarchicalTree: React.FC<HierarchicalTreeProps> = ({ nodes }) => 
             Hierarchical System & Subsystem Architecture
           </h1>
         </div>
-        <p className="text-xs text-zinc-400 mt-1">
+        <p className="text-sm text-zinc-400 mt-1">
           Canonical structural mapping from Organization level down to Subsystems, Modules, and Work Requests.
         </p>
       </div>

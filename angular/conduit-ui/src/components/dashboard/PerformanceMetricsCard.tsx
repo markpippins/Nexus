@@ -132,14 +132,14 @@ export const PerformanceMetricsCard: React.FC<PerformanceMetricsCardProps> = ({ 
         <div>
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
-            <h2 className="text-xs font-mono font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
+            <h2 className="text-sm font-mono font-bold text-zinc-200 uppercase tracking-wide flex items-center gap-2">
               Performance Metrics
               <span className="text-[10px] font-normal text-emerald-400 bg-emerald-950/50 border border-emerald-800/40 px-2 py-0.5 rounded">
                 Avg Cost & Duration
               </span>
             </h2>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Quantitative baseline analysis of execution duration (minutes) and model inference cost ($) across implementation plans.
           </p>
         </div>
@@ -147,7 +147,7 @@ export const PerformanceMetricsCard: React.FC<PerformanceMetricsCardProps> = ({ 
         {/* Controls */}
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           {/* Group By selector */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 text-xs font-mono">
+          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 text-sm font-mono">
             <button
               onClick={() => setGroupBy('status')}
               className={`px-2.5 py-1 rounded transition-colors ${
@@ -181,7 +181,7 @@ export const PerformanceMetricsCard: React.FC<PerformanceMetricsCardProps> = ({ 
           </div>
 
           {/* Metric Focus */}
-          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 text-xs font-mono">
+          <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 text-sm font-mono">
             <button
               onClick={() => setMetricFocus('both')}
               className={`px-2 py-1 rounded ${

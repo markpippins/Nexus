@@ -88,21 +88,21 @@ export const CircuitBreakerView: React.FC = () => {
               6. Circuit Breaker & Safety Controls (`/api/breaker`)
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Emergency orchestration safety controls: trip breaker, pause queues, reset faults, and configure model recovery limits.
           </p>
         </div>
 
         <button
           onClick={loadBreaker}
-          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs rounded border border-zinc-700"
+          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-sm rounded border border-zinc-700"
         >
           Refresh Safety Status
         </button>
       </div>
 
       {/* Main Status Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 font-mono text-xs">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 font-mono text-sm">
         {/* Breaker State Card */}
         <div className="bg-[#141416] border border-zinc-800 rounded-lg p-5 space-y-4">
           <h2 className="font-bold text-zinc-300 uppercase flex items-center justify-between border-b border-zinc-800 pb-2">

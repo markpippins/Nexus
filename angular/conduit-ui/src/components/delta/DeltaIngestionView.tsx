@@ -84,14 +84,14 @@ export const DeltaIngestionView: React.FC = () => {
               1. Delta Ingestion Pipeline (<code className="text-blue-400">POST /delta</code>)
             </h1>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Receives KernelDelta JSON payloads, validates receipt hashes, and reduces deltas into immutable state line.
           </p>
         </div>
 
         <button
           onClick={fetchDeltaState}
-          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-xs rounded border border-zinc-700 transition-colors self-start md:self-auto"
+          className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-mono text-sm rounded border border-zinc-700 transition-colors self-start md:self-auto"
         >
           Refresh Delta State
         </button>
@@ -129,12 +129,12 @@ export const DeltaIngestionView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Interactive Ingestion Form */}
         <div className="bg-[#141416] border border-zinc-800 rounded-lg p-5 space-y-4">
-          <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+          <h2 className="text-sm font-mono font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
             <Play className="w-4 h-4 text-emerald-400" />
             Ingest New KernelDelta Payload
           </h2>
 
-          <form onSubmit={handleIngestDelta} className="space-y-4 text-xs font-mono">
+          <form onSubmit={handleIngestDelta} className="space-y-4 text-sm font-mono">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-zinc-400 mb-1">delta_id</label>
@@ -224,20 +224,20 @@ export const DeltaIngestionView: React.FC = () => {
 
         {/* Right: Response Inspection Console */}
         <div className="bg-[#141416] border border-zinc-800 rounded-lg p-5 space-y-4 font-mono">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
             <Database className="w-4 h-4 text-blue-400" />
             Kernel Reduction Output Log
           </h2>
 
           {errorMessage && (
-            <div className="p-3 bg-rose-950/60 border border-rose-800 rounded text-rose-300 text-xs flex items-center gap-2">
+            <div className="p-3 bg-rose-950/60 border border-rose-800 rounded text-rose-300 text-sm flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
           {lastResponse ? (
-            <div className="p-3 bg-[#0c0c0e] border border-zinc-800 rounded text-xs space-y-2">
+            <div className="p-3 bg-[#0c0c0e] border border-zinc-800 rounded text-sm space-y-2">
               <div className="flex items-center justify-between text-emerald-400 font-bold border-b border-zinc-800 pb-2">
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -250,7 +250,7 @@ export const DeltaIngestionView: React.FC = () => {
               </pre>
             </div>
           ) : (
-            <div className="p-8 border border-dashed border-zinc-800 rounded text-center text-zinc-500 text-xs">
+            <div className="p-8 border border-dashed border-zinc-800 rounded text-center text-zinc-500 text-sm">
               Submit a KernelDelta payload using the form to execute reduction pipeline (persist → reduce → lineage → snapshot).
             </div>
           )}

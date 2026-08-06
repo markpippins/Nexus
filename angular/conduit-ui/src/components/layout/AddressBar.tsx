@@ -62,14 +62,14 @@ export const AddressBar: React.FC<AddressBarProps> = ({
         {/* Branding Box */}
         <div className="flex items-center gap-2.5 shrink-0">
           <div className="bg-[#141416] border border-zinc-800 rounded px-2.5 py-1 flex items-center gap-2">
-            <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center font-bold text-xs text-white">
+            <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center font-bold text-sm text-white">
               C
             </div>
-            <span className="font-mono text-xs font-bold tracking-tight text-white uppercase">
+            <span className="font-mono text-sm font-bold tracking-tight text-white uppercase">
               CONDUIT
             </span>
-            <span className="text-zinc-600 font-mono text-xs">/</span>
-            <span className="font-mono text-xs font-medium tracking-tight text-zinc-400">
+            <span className="text-zinc-600 font-mono text-sm">/</span>
+            <span className="font-mono text-sm font-medium tracking-tight text-zinc-400">
               NEXUS
             </span>
             <span className="bg-blue-900/30 text-blue-400 text-[10px] font-mono px-1.5 py-0.5 rounded border border-blue-800/50">
@@ -79,15 +79,15 @@ export const AddressBar: React.FC<AddressBarProps> = ({
         </div>
 
         {/* IDE Address Bar Input */}
-        <div className="flex-1 max-w-2xl flex items-center bg-black/40 border border-zinc-800 rounded px-3 py-1.5 text-xs font-mono focus-within:border-zinc-600 transition-all">
-          <span className="text-zinc-600 mr-2 shrink-0 font-mono text-xs">conduit://</span>
+        <div className="flex-1 max-w-2xl flex items-center bg-black/40 border border-zinc-800 rounded px-3 py-1.5 text-sm font-mono focus-within:border-zinc-600 transition-all">
+          <span className="text-zinc-600 mr-2 shrink-0 font-mono text-sm">conduit://</span>
           <input
             type="text"
             value={inputUrl.replace('conduit://', '')}
             onChange={(e) => setInputUrl(e.target.value.startsWith('conduit://') ? e.target.value : `conduit://${e.target.value}`)}
             onKeyDown={handleKeyDown}
             placeholder="nexus.local/dashboard"
-            className="w-full bg-transparent text-zinc-300 outline-none font-mono placeholder-zinc-600 text-xs"
+            className="w-full bg-transparent text-zinc-300 outline-none font-mono placeholder-zinc-600 text-sm"
           />
           <button
             onClick={onOpenSearch}

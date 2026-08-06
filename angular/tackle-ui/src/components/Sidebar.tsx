@@ -64,7 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="flex flex-col h-full bg-[var(--bg-tertiary)] border-r border-[var(--border-color)] p-4 select-none">
       {/* Mobile Header Close Button */}
       <div className="flex items-center justify-between lg:hidden mb-4 pb-2 border-b border-[var(--border-subtle)]">
-        <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Navigation</span>
+        <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)]">Navigation</span>
         <button
           onClick={onCloseMobile}
           className="p-1 rounded text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
@@ -87,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <li key={item.id}>
                     <button
                       onClick={() => handleSelect(item.id)}
-                      className={`w-full flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all duration-150 cursor-pointer ${
+                      className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-150 cursor-pointer ${
                         isActive
                           ? 'bg-[var(--badge-bg)] text-[var(--accent-color)] border border-[var(--accent-color)]/30 font-semibold shadow-xs'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'

@@ -100,20 +100,20 @@ export const ApiDocsView: React.FC<ApiDocsViewProps> = ({ onOpenReadme }) => {
           <Terminal className="w-6 h-6 text-emerald-400" />
           <div>
             <h1 className="text-base font-bold text-slate-100">execution-srv REST API Spec</h1>
-            <p className="text-xs text-slate-400">Strictly read-only observability endpoints over execution.* schema</p>
+            <p className="text-sm text-slate-400">Strictly read-only observability endpoints over execution.* schema</p>
           </div>
         </div>
 
         <button
           onClick={onOpenReadme}
-          className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 rounded text-xs font-bold transition-colors flex items-center gap-2"
+          className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 rounded text-sm font-bold transition-colors flex items-center gap-2"
         >
           <BookOpen className="w-4 h-4" />
           <span>Integration README</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 font-mono text-xs">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 font-mono text-sm">
         {/* Endpoint List */}
         <div className="lg:col-span-5 space-y-1.5">
           {endpoints.map((ep, idx) => {

@@ -147,7 +147,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
         <div className="flex space-x-2">
           <button
             onClick={() => setActiveSubTab('prompts')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'prompts'
                 ? 'bg-[var(--accent-color)] text-slate-950 shadow-sm'
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
@@ -158,7 +158,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
           </button>
           <button
             onClick={() => setActiveSubTab('tasks')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'tasks'
                 ? 'bg-[var(--accent-color)] text-slate-950 shadow-sm'
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
@@ -169,7 +169,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
           </button>
           <button
             onClick={() => setActiveSubTab('dispatch')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'dispatch'
                 ? 'bg-[var(--accent-color)] text-slate-950 shadow-sm'
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
@@ -180,7 +180,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
           </button>
           <button
             onClick={() => setActiveSubTab('roles')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 cursor-pointer ${
               activeSubTab === 'roles'
                 ? 'bg-[var(--accent-color)] text-slate-950 shadow-sm'
                 : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-subtle)]'
@@ -194,7 +194,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
         {activeSubTab === 'prompts' && (
           <button
             onClick={() => openPromptModal()}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-[var(--accent-color)]" />
             <span>New Prompt Template</span>
@@ -203,7 +203,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
         {activeSubTab === 'tasks' && (
           <button
             onClick={() => openTaskModal()}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-[var(--accent-color)]" />
             <span>Register Task</span>
@@ -216,7 +216,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
               setRoleDesc('');
               setRoleModalOpen(true);
             }}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg text-sm font-bold bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] text-[var(--text-primary)] transition flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-4 h-4 text-[var(--accent-color)]" />
             <span>Add Role</span>
@@ -241,7 +241,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                       v{prompt.version}
                     </span>
                   </div>
-                  <div className="text-xs font-mono text-[var(--text-secondary)] mt-1 flex items-center gap-3">
+                  <div className="text-sm font-mono text-[var(--text-secondary)] mt-1 flex items-center gap-3">
                     <span>Role: <strong className="text-[var(--text-primary)]">{prompt.role}</strong></span>
                     <span>•</span>
                     <span>Slug: <strong>{prompt.slug}</strong></span>
@@ -274,7 +274,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
 
               {/* Markdown Body Viewer */}
               <div className="bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg p-3 max-h-48 overflow-y-auto">
-                <pre className="whitespace-pre-wrap font-mono text-xs text-[var(--text-primary)] leading-relaxed">
+                <pre className="whitespace-pre-wrap font-mono text-sm text-[var(--text-primary)] leading-relaxed">
                   {prompt.body_md}
                 </pre>
               </div>
@@ -313,7 +313,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                     </span>
                   </div>
 
-                  <div className="text-xs text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-2.5 rounded-lg border border-[var(--border-subtle)]">
+                  <div className="text-sm text-[var(--text-secondary)] bg-[var(--bg-tertiary)] p-2.5 rounded-lg border border-[var(--border-subtle)]">
                     <strong className="text-[var(--text-primary)] block mb-1">Scope:</strong>
                     {task.scope}
                   </div>
@@ -322,7 +322,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                     <span className="text-[10px] font-mono uppercase text-[var(--text-muted)]">
                       Acceptance Criteria
                     </span>
-                    <ul className="space-y-1 text-xs">
+                    <ul className="space-y-1 text-sm">
                       {task.acceptance_criteria.map((crit, idx) => (
                         <li key={idx} className="flex items-start gap-1.5 text-[var(--text-secondary)]">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
@@ -352,7 +352,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                 Inspector Task Dispatch Wiring (`/tasks/inspector/dispatch`)
               </h3>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
               Bundles task definition + full persona prompt `body_md` in a single payload for zero-roundtrip agent dispatch.
             </p>
           </div>
@@ -370,17 +370,17 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                       ROLE: {item.role}
                     </span>
                   </div>
-                  <p className="text-xs text-[var(--text-secondary)] mt-1">{item.scope}</p>
+                  <p className="text-sm text-[var(--text-secondary)] mt-1">{item.scope}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1">
+                  <span className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Acceptance Checklist</span>
                   </span>
-                  <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-1 text-xs font-mono text-[var(--text-secondary)]">
+                  <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-1 text-sm font-mono text-[var(--text-secondary)]">
                     {item.acceptance_criteria.map((c, i) => (
                       <div key={i}>✓ {c}</div>
                     ))}
@@ -388,11 +388,11 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1">
+                  <span className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-1">
                     <BookOpen className="w-3.5 h-3.5 text-[var(--accent-color)]" />
                     <span>Bundled Persona Body ({item.prompt_title} v{item.prompt_version})</span>
                   </span>
-                  <pre className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] font-mono text-xs text-[var(--text-primary)] max-h-36 overflow-y-auto whitespace-pre-wrap">
+                  <pre className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] font-mono text-sm text-[var(--text-primary)] max-h-36 overflow-y-auto whitespace-pre-wrap">
                     {item.prompt_body_md}
                   </pre>
                 </div>
@@ -430,7 +430,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                   {r.description || 'System agent role'}
                 </p>
               </div>
@@ -455,7 +455,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveRole} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveRole} className="space-y-3 text-sm">
               <div>
                 <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Role Name *</label>
                 <input
@@ -512,7 +512,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSavePromptSubmit} className="space-y-3 text-xs">
+            <form onSubmit={handleSavePromptSubmit} className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Role *</label>
@@ -573,7 +573,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
                   required
                   value={pBodyMd}
                   onChange={e => setPBodyMd(e.target.value)}
-                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-3 font-mono text-xs text-[var(--text-primary)] leading-relaxed"
+                  className="w-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-lg p-3 font-mono text-sm text-[var(--text-primary)] leading-relaxed"
                 />
               </div>
 
@@ -619,7 +619,7 @@ export const RolesTasksTab: React.FC<RolesTasksTabProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveTaskSubmit} className="space-y-3 text-xs">
+            <form onSubmit={handleSaveTaskSubmit} className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[var(--text-secondary)] mb-1 font-semibold">Role *</label>
