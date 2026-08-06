@@ -5,7 +5,7 @@
 
 Canonical asset graph: systems, subsystems, features, documents, harvests, agent records, projections, knowledge graph, and cross-references.
 
-**214 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**215 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -213,6 +213,7 @@ Canonical asset graph: systems, subsystems, features, documents, harvests, agent
 | DELETE | `/api/systems/:id/info/:tabId` | DELETE /api/systems/:id/info/:tabId — delete an info tab When tabId='harvest_context', also unlinks all candidates from this system. |
 | PUT | `/api/systems/:id/info/:tabId` | PUT /api/systems/:id/info/:tabId — save an info tab |
 | GET | `/api/systems/:id/intent-records` | GET /api/systems/:id/intent-records — list intent records scoped to a system |
+| GET | `/api/systems/:id/inventory` | SYSTEM INVENTORY (unified cross-schema view) GET /api/systems/:id/inventory — unified inventory joining nebula.systems → system_external_ids → terrain / registry / semantics. Returns all external ID links for a system, each resolved with its source-layer details (terrain service, registry peer, sema |
 | GET | `/api/systems/:id/specifications` | GET /api/systems/:id/specifications — list specification revisions scoped to a system |
 | GET | `/api/systems/:id/work-requests` | GET /api/systems/:id/work-requests — list work requests scoped to a system |
 | DELETE | `/api/systems/:systemId/folders/:folderId` | DELETE /api/systems/:systemId/folders/:folderId |
