@@ -69,7 +69,7 @@ import { CreatePostComponent } from '../../components/create-post/create-post.co
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-sm font-semibold text-gray-900">{{ post.author.name }}</span>
-                        <app-time-ago [date]="post.createdAt" class="text-xs text-gray-400"></app-time-ago>
+                        <app-time-ago [date]="post.createdAt" class="text-sm text-gray-400"></app-time-ago>
                       </div>
                       <div class="mt-1 line-clamp-3">
                         <app-markdown-renderer [content]="post.content"></app-markdown-renderer>

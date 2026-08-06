@@ -102,9 +102,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 <td class="px-3 py-1 text-[13px]" [class.text-[rgb(var(--color-text-base))]]="service.status === 'ACTIVE'" [class.text-[rgb(var(--color-text-muted))]]="service.status !== 'ACTIVE'" [class.line-through]="service.status === 'DEPRECATED'">
                                                     @if (service.parentServiceId) {
                                                         <span class="inline-flex items-center gap-1">
-                                                            <span class="text-[rgb(var(--color-text-muted))] text-xs">└─</span>
+                                                            <span class="text-[rgb(var(--color-text-muted))] text-sm">└─</span>
                                                             {{ service.name }}
-                                                            <span class="px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">Sub-module</span>
+                                                            <span class="px-1.5 py-0.5 rounded text-sm bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">Sub-module</span>
                                                         </span>
                                                     } @else {
                                                         {{ service.name }}
@@ -113,7 +113,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ service.type?.name }}</td>
                                                 <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ service.framework?.name }}</td>
                                                 <td class="px-3 py-1 text-[13px]">
-                                                    <span [class]="'px-2 py-0.5 rounded-full text-xs font-medium ' + getServiceStatusClass(service.status)">
+                                                    <span [class]="'px-2 py-0.5 rounded-full text-sm font-medium ' + getServiceStatusClass(service.status)">
                                                         {{ service.status }}
                                                     </span>
                                                 </td>
@@ -132,15 +132,15 @@ import { LookupItem } from '../../services/platform-management.service.js';
                         <!-- Pagination -->
                         @if (totalPages() > 1 || totalItems() > 0) {
                             <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
-                                <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                <div class="text-sm text-[rgb(var(--color-text-muted))]">
                                     {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="flex items-center gap-1.5">
-                                        <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                        <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
                                         <select
                                             (change)="onPageSizeChange($event)"
-                                            class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                                         >
                                             @for (s of pageSizes; track s) {
                                                 <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
@@ -151,14 +151,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                         <button
                                             (click)="onPrevPage()"
                                             [disabled]="currentPage() === 0"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                             [class]="currentPage() === 0
                                                 ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                 : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
                                         >
                                             ← Previous
                                         </button>
-                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                        <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
                                             <span>Page</span>
                                             <input
                                                 type="number"
@@ -167,14 +167,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 [value]="currentPage() + 1"
                                                 (keydown.enter)="goToPage($event)"
                                                 (blur)="goToPage($event)"
-                                                class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                             >
                                             <span>of {{ totalPages() }}</span>
                                         </span>
                                         <button
                                             (click)="onNextPage()"
                                             [disabled]="currentPage() >= totalPages() - 1"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                             [class]="currentPage() >= totalPages() - 1
                                                 ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                 : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
@@ -260,15 +260,15 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
                                 <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
-                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                    <div class="text-sm text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
                                     <div class="flex items-center gap-3">
                                         <div class="flex items-center gap-1.5">
-                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
                                             <select
                                                 (change)="onPageSizeChange($event)"
-                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                                class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                                             >
                                                 @for (s of pageSizes; track s) {
                                                     <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
@@ -279,14 +279,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             <button
                                                 (click)="onPrevPage()"
                                                 [disabled]="currentPage() === 0"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() === 0
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                            <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
                                                 <span>Page</span>
                                                 <input
                                                     type="number"
@@ -295,14 +295,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     [value]="currentPage() + 1"
                                                     (keydown.enter)="goToPage($event)"
                                                     (blur)="goToPage($event)"
-                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                    class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                                 >
                                                 <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
                                                 [disabled]="currentPage() >= totalPages() - 1"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() >= totalPages() - 1
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
@@ -379,15 +379,15 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
                                 <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
-                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                    <div class="text-sm text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
                                     <div class="flex items-center gap-3">
                                         <div class="flex items-center gap-1.5">
-                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
                                             <select
                                                 (change)="onPageSizeChange($event)"
-                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                                class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                                             >
                                                 @for (s of pageSizes; track s) {
                                                     <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
@@ -398,14 +398,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             <button
                                                 (click)="onPrevPage()"
                                                 [disabled]="currentPage() === 0"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() === 0
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                            <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
                                                 <span>Page</span>
                                                 <input
                                                     type="number"
@@ -414,14 +414,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     [value]="currentPage() + 1"
                                                     (keydown.enter)="goToPage($event)"
                                                     (blur)="goToPage($event)"
-                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                    class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                                 >
                                                 <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
                                                 [disabled]="currentPage() >= totalPages() - 1"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() >= totalPages() - 1
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
@@ -489,9 +489,9 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))]">
                                                     @if (d.service?.parentServiceId) {
                                                         <span class="inline-flex items-center gap-1">
-                                                            <span class="text-[rgb(var(--color-text-muted))] text-xs">└─</span>
+                                                            <span class="text-[rgb(var(--color-text-muted))] text-sm">└─</span>
                                                             {{ d.service?.name }}
-                                                            <span class="px-1.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">Sub-module</span>
+                                                            <span class="px-1.5 py-0.5 rounded text-sm bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300">Sub-module</span>
                                                         </span>
                                                     } @else {
                                                         {{ d.service?.name }}
@@ -500,7 +500,7 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.environment }}</td>
                                                 <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ d.server?.hostname }}</td>
                                                 <td class="px-3 py-1 text-[13px]">
-                                                     <span [class]="'px-2 py-0.5 rounded-full text-xs font-medium ' + getStatusClass(d.status)">
+                                                     <span [class]="'px-2 py-0.5 rounded-full text-sm font-medium ' + getStatusClass(d.status)">
                                                         {{ d.status }}
                                                     </span>
                                                 </td>
@@ -521,15 +521,15 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
                                 <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
-                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                    <div class="text-sm text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
                                     <div class="flex items-center gap-3">
                                         <div class="flex items-center gap-1.5">
-                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
                                             <select
                                                 (change)="onPageSizeChange($event)"
-                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                                class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                                             >
                                                 @for (s of pageSizes; track s) {
                                                     <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
@@ -540,14 +540,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             <button
                                                 (click)="onPrevPage()"
                                                 [disabled]="currentPage() === 0"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() === 0
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                            <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
                                                 <span>Page</span>
                                                 <input
                                                     type="number"
@@ -556,14 +556,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     [value]="currentPage() + 1"
                                                     (keydown.enter)="goToPage($event)"
                                                     (blur)="goToPage($event)"
-                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                    class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                                 >
                                                 <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
                                                 [disabled]="currentPage() >= totalPages() - 1"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() >= totalPages() - 1
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
@@ -639,15 +639,15 @@ import { LookupItem } from '../../services/platform-management.service.js';
                         <!-- Pagination -->
                         @if (totalPages() > 1 || totalItems() > 0) {
                             <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
-                                <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                <div class="text-sm text-[rgb(var(--color-text-muted))]">
                                     {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <div class="flex items-center gap-1.5">
-                                        <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                        <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
                                         <select
                                             (change)="onPageSizeChange($event)"
-                                            class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                            class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                                         >
                                             @for (s of pageSizes; track s) {
                                                 <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
@@ -658,14 +658,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                         <button
                                             (click)="onPrevPage()"
                                             [disabled]="currentPage() === 0"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                             [class]="currentPage() === 0
                                                 ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                 : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
                                         >
                                             ← Previous
                                         </button>
-                                        <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                        <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
                                             <span>Page</span>
                                             <input
                                                 type="number"
@@ -674,14 +674,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                 [value]="currentPage() + 1"
                                                 (keydown.enter)="goToPage($event)"
                                                 (blur)="goToPage($event)"
-                                                class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                             >
                                             <span>of {{ totalPages() }}</span>
                                         </span>
                                         <button
                                             (click)="onNextPage()"
                                             [disabled]="currentPage() >= totalPages() - 1"
-                                            class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                            class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                             [class]="currentPage() >= totalPages() - 1
                                                 ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                 : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
@@ -788,15 +788,15 @@ import { LookupItem } from '../../services/platform-management.service.js';
                             <!-- Pagination -->
                             @if (totalPages() > 1 || totalItems() > 0) {
                                 <div class="flex items-center justify-between px-3 py-1.5 border-t border-[rgb(var(--color-border-base))] bg-[rgb(var(--color-surface-muted))] flex-shrink-0">
-                                    <div class="text-xs text-[rgb(var(--color-text-muted))]">
+                                    <div class="text-sm text-[rgb(var(--color-text-muted))]">
                                         {{ pageStartIndex() }}–{{ pageEndIndex() }} of {{ totalItems() }}
                                     </div>
                                     <div class="flex items-center gap-3">
                                         <div class="flex items-center gap-1.5">
-                                            <label class="text-xs text-[rgb(var(--color-text-muted))]">Rows:</label>
+                                            <label class="text-sm text-[rgb(var(--color-text-muted))]">Rows:</label>
                                             <select
                                                 (change)="onPageSizeChange($event)"
-                                                class="px-2 py-1 rounded text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
+                                                class="px-2 py-1 rounded text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] focus:outline-none focus:border-[rgb(var(--color-accent-ring))] cursor-pointer hover:bg-[rgb(var(--color-surface-hover))] transition-colors"
                                             >
                                                 @for (s of pageSizes; track s) {
                                                     <option [value]="s" [selected]="perPage() === s">{{ s }}</option>
@@ -807,14 +807,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                             <button
                                                 (click)="onPrevPage()"
                                                 [disabled]="currentPage() === 0"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() === 0
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
                                             >
                                                 ← Previous
                                             </button>
-                                            <span class="text-xs text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
+                                            <span class="text-sm text-[rgb(var(--color-text-muted))] font-medium flex items-center gap-1">
                                                 <span>Page</span>
                                                 <input
                                                     type="number"
@@ -823,14 +823,14 @@ import { LookupItem } from '../../services/platform-management.service.js';
                                                     [value]="currentPage() + 1"
                                                     (keydown.enter)="goToPage($event)"
                                                     (blur)="goToPage($event)"
-                                                    class="w-10 px-1 py-0.5 text-center text-xs bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
+                                                    class="w-10 px-1 py-0.5 text-center text-sm bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] border border-[rgb(var(--color-border-muted))] rounded focus:outline-none focus:border-[rgb(var(--color-accent-ring))]"
                                                 >
                                                 <span>of {{ totalPages() }}</span>
                                             </span>
                                             <button
                                                 (click)="onNextPage()"
                                                 [disabled]="currentPage() >= totalPages() - 1"
-                                                class="px-3 py-1.5 rounded text-xs font-medium transition-colors"
+                                                class="px-3 py-1.5 rounded text-sm font-medium transition-colors"
                                                 [class]="currentPage() >= totalPages() - 1
                                                     ? 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-muted))] opacity-50 cursor-not-allowed'
                                                     : 'bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"

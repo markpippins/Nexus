@@ -24,14 +24,14 @@ import { PlatformManagementService, SystemItem, SystemPayload, LookupItem } from
                 <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-3.5">
                     <!-- Name -->
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Name *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Name *</label>
                         <input type="text" formControlName="name" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="system-name">
-                        <span class="text-xs text-red-400" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">Name is required</span>
+                        <span class="text-sm text-red-400" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">Name is required</span>
                     </div>
 
                     <!-- Type -->
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Type</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Type</label>
                         <select formControlName="type" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Type</option>
                             @for (t of systemTypes(); track t.id) {
@@ -42,7 +42,7 @@ import { PlatformManagementService, SystemItem, SystemPayload, LookupItem } from
 
                     <!-- Description -->
                     <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
                         <textarea formControlName="description" rows="3" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="System description"></textarea>
                     </div>
                 </form>

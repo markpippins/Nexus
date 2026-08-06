@@ -11,11 +11,11 @@ import { ComponentConfig } from '../../models/component-config.js';
     <div class="flex flex-col h-full bg-[rgb(var(--color-surface-sidebar))] text-[rgb(var(--color-text-base))]">
       <!-- Header -->
       <div class="p-3 border-b border-[rgb(var(--color-border-base))]">
-        <h2 class="text-xs font-bold text-[rgb(var(--color-text-muted))] uppercase tracking-wider mb-2">Component Library</h2>
+        <h2 class="text-sm font-bold text-[rgb(var(--color-text-muted))] uppercase tracking-wider mb-2">Component Library</h2>
         <input 
           type="text" 
           placeholder="Filter components..." 
-          class="w-full bg-[rgb(var(--color-background))] border border-[rgb(var(--color-border-muted))] rounded px-2 py-1 text-xs focus:border-[rgb(var(--color-accent-ring))] focus:outline-none"
+          class="w-full bg-[rgb(var(--color-background))] border border-[rgb(var(--color-border-muted))] rounded px-2 py-1 text-sm focus:border-[rgb(var(--color-accent-ring))] focus:outline-none"
         >
       </div>
       
@@ -46,7 +46,7 @@ import { ComponentConfig } from '../../models/component-config.js';
           </button>
         }
         @if (state.customComponents().length === 0) {
-          <div class="text-xs text-[rgb(var(--color-text-subtle))] px-3 py-2 italic">No custom components yet.</div>
+          <div class="text-sm text-[rgb(var(--color-text-subtle))] px-3 py-2 italic">No custom components yet.</div>
         }
       </div>
 
@@ -54,7 +54,7 @@ import { ComponentConfig } from '../../models/component-config.js';
       <div class="p-3 border-t border-[rgb(var(--color-border-base))]">
         <button 
           (click)="state.startNew()" 
-          class="w-full bg-[rgb(var(--color-accent-solid-bg))] hover:bg-[rgb(var(--color-accent-solid-bg-hover))] text-white py-2 rounded text-xs font-bold transition-colors"
+          class="w-full bg-[rgb(var(--color-accent-solid-bg))] hover:bg-[rgb(var(--color-accent-solid-bg-hover))] text-white py-2 rounded text-sm font-bold transition-colors"
         >
           + Create New Component
         </button>

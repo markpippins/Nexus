@@ -11,7 +11,7 @@ import { DEFAULT_USER_ID } from '../../config/user.config';
   template: `
     <div class="app-panel p-3 mb-4">
       <div class="flex gap-3">
-        <div class="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+        <div class="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-semibold flex-shrink-0">
           {{ currentUserInitial }}
         </div>
         <div class="flex-1 min-w-0">

@@ -25,21 +25,21 @@ import { Framework } from '../../../models/service-mesh.model.js';
              <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-3.5">
                  <!-- Name -->
                  <div class="flex flex-col gap-1.5">
-                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Name *</label>
+                    <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Name *</label>
                     <input type="text" formControlName="name" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="Framework Name">
-                    <span class="text-xs text-red-400" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">Name is required</span>
+                    <span class="text-sm text-red-400" *ngIf="form.get('name')?.invalid && form.get('name')?.touched">Name is required</span>
                  </div>
 
                  <!-- Description -->
                  <div class="flex flex-col gap-1.5">
-                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
+                    <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
                     <textarea formControlName="description" rows="3" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="Framework description"></textarea>
                  </div>
 
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Category -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Category *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Category *</label>
                         <select formControlName="categoryId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Category</option>
                             <option *ngFor="let c of categories()" [value]="c.id">{{ c.name }}</option>
@@ -48,7 +48,7 @@ import { Framework } from '../../../models/service-mesh.model.js';
 
                      <!-- Language -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Language *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Language *</label>
                          <select formControlName="languageId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Language</option>
                             <option *ngFor="let l of languages()" [value]="l.id">{{ l.name }}</option>
@@ -59,20 +59,20 @@ import { Framework } from '../../../models/service-mesh.model.js';
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Current Version -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Current Version</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Current Version</label>
                         <input type="text" formControlName="currentVersion" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="v1.0.0">
                      </div>
 
                      <!-- LTS Version -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">LTS Version</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">LTS Version</label>
                         <input type="text" formControlName="ltsVersion" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="v1.0.0">
                      </div>
                  </div>
 
                  <!-- URL -->
                  <div class="flex flex-col gap-1.5">
-                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">URL</label>
+                    <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">URL</label>
                     <input type="text" formControlName="url" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="https://framework.com">
                  </div>
              </form>

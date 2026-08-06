@@ -145,13 +145,13 @@ export const EntityModal: React.FC<EntityModalProps> = ({
         </div>
 
         {error && (
-          <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 p-3 text-xs text-rose-400 font-mono">
+          <div className="rounded-lg bg-rose-500/10 border border-rose-500/30 p-3 text-sm text-rose-400 font-mono">
             {error}
           </div>
         )}
 
         {/* Dynamic Form */}
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="space-y-4 text-sm">
           
           {/* SERVICE / REGISTER SERVICE FORM */}
           {(modalType === 'service' || modalType === 'register-service') && (

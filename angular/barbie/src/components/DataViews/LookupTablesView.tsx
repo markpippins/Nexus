@@ -108,7 +108,7 @@ export const LookupTablesView: React.FC<LookupTablesViewProps> = ({ refreshTrigg
             <button
               key={item.type}
               onClick={() => { setActiveType(item.type); setPage(1); setIsCreating(false); }}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${
                 activeType === item.type
                   ? 'bg-sky-500 text-white shadow ring-1 ring-sky-400'
                   : 'border border-[var(--border-color)] bg-[var(--bg-main)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -122,13 +122,13 @@ export const LookupTablesView: React.FC<LookupTablesViewProps> = ({ refreshTrigg
 
       {/* Header & New Button */}
       <div className="flex items-center justify-between">
-        <h3 className="font-mono text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">
+        <h3 className="font-mono text-sm font-bold text-[var(--text-primary)] uppercase tracking-wider">
           Registry Lookup Endpoint: <span className="text-sky-400">/api/v1/registry/{activeType}</span>
         </h3>
 
         <button
           onClick={() => setIsCreating(!isCreating)}
-          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-500 shadow"
+          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-sky-500 shadow"
         >
           <Plus className="h-3.5 w-3.5" />
           <span>Add Lookup Entry</span>
@@ -138,11 +138,11 @@ export const LookupTablesView: React.FC<LookupTablesViewProps> = ({ refreshTrigg
       {/* Inline Create Form */}
       {isCreating && (
         <form onSubmit={handleCreateEntry} className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-4 space-y-3">
-          <h4 className="text-xs font-bold text-sky-400 uppercase tracking-wider">
+          <h4 className="text-sm font-bold text-sky-400 uppercase tracking-wider">
             Create Entry for {LOOKUP_TYPES.find(t => t.type === activeType)?.label}
           </h4>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-xs">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
             <input
               type="text"
               value={keyInput}
@@ -162,7 +162,7 @@ export const LookupTablesView: React.FC<LookupTablesViewProps> = ({ refreshTrigg
             />
           </div>
 
-          <div className="flex justify-end gap-2 text-xs">
+          <div className="flex justify-end gap-2 text-sm">
             <button
               type="button"
               onClick={() => setIsCreating(false)}
@@ -183,7 +183,7 @@ export const LookupTablesView: React.FC<LookupTablesViewProps> = ({ refreshTrigg
 
       {/* Data Table */}
       <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-        <table className="w-full text-left text-xs text-[var(--text-primary)]">
+        <table className="w-full text-left text-sm text-[var(--text-primary)]">
           <thead className="border-b border-[var(--border-color)] bg-[var(--bg-main)]/60 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
             <tr>
               <th className="p-3">Entry ID</th>
@@ -229,7 +229,7 @@ export const LookupTablesView: React.FC<LookupTablesViewProps> = ({ refreshTrigg
       </div>
 
       {/* Pagination */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--text-secondary)] px-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--text-secondary)] px-1">
         <div>Total Entries: {totalItems}</div>
         <div className="flex items-center gap-1">
           <button

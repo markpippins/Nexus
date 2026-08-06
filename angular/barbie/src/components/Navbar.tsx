@@ -98,13 +98,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search services, servers, endpoints, systems, or tags..."
-              className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] py-2 pl-9 pr-8 text-xs text-[var(--text-primary)] placeholder-[var(--text-secondary)] transition-all focus:border-[var(--accent-blue)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-blue)]"
+              className="w-full rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] py-2 pl-9 pr-8 text-sm text-[var(--text-primary)] placeholder-[var(--text-secondary)] transition-all focus:border-[var(--accent-blue)] focus:outline-none focus:ring-1 focus:ring-[var(--accent-blue)]"
               aria-label="Filter systems and entities"
             />
             {searchQuery && (
               <button
                 onClick={() => onSearchChange('')}
-                className="absolute right-2.5 top-2.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                className="absolute right-2.5 top-2.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               >
                 Clear
               </button>
@@ -155,7 +155,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
               {apiMode === 'live' ? 'Live Backend' : 'Mock Client'}
             </span>
-            <span className={`text-xs font-bold flex items-center gap-1.5 ${
+            <span className={`text-sm font-bold flex items-center gap-1.5 ${
               apiMode === 'live' ? 'text-emerald-400' : 'text-amber-400'
             }`}>
               <span className={`w-2 h-2 rounded-full ${
@@ -170,7 +170,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onManualRefresh}
               disabled={isRefreshing}
-              className={`flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] ${
+              className={`flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] ${
                 isRefreshing ? 'opacity-50' : ''
               }`}
               title="Refresh platform telemetry"
@@ -182,7 +182,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <select
               value={autoRefreshInterval}
               onChange={(e) => onAutoRefreshChange(Number(e.target.value))}
-              className="h-8 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-highlight)] focus:outline-none"
+              className="h-8 rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2 text-sm font-medium text-[var(--text-secondary)] hover:border-[var(--border-highlight)] focus:outline-none"
               title="Set Live Telemetry Interval"
             >
               <option value={3000}>3s Live</option>
@@ -196,7 +196,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Service Register Button */}
           <button
             onClick={onOpenRegisterModal}
-            className="flex h-8 items-center gap-1.5 rounded-lg bg-sky-600 px-3 text-xs font-semibold text-white shadow-sm hover:bg-sky-500 active:scale-95 transition-all"
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-sky-600 px-3 text-sm font-semibold text-white shadow-sm hover:bg-sky-500 active:scale-95 transition-all"
           >
             <PlusCircle className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Register Service</span>
@@ -206,7 +206,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] p-0.5">
             <button
               onClick={() => setTheme('dark')}
-              className={`flex h-7 w-7 items-center justify-center rounded-md text-xs transition-all ${
+              className={`flex h-7 w-7 items-center justify-center rounded-md text-sm transition-all ${
                 theme === 'dark'
                   ? 'bg-sky-500/20 text-sky-400 font-bold ring-1 ring-sky-500/40'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -219,7 +219,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => setTheme('steel')}
-              className={`flex h-7 w-7 items-center justify-center rounded-md text-xs transition-all ${
+              className={`flex h-7 w-7 items-center justify-center rounded-md text-sm transition-all ${
                 theme === 'steel'
                   ? 'bg-cyan-500/20 text-cyan-400 font-bold ring-1 ring-cyan-500/40'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -232,7 +232,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             <button
               onClick={() => setTheme('light')}
-              className={`flex h-7 w-7 items-center justify-center rounded-md text-xs transition-all ${
+              className={`flex h-7 w-7 items-center justify-center rounded-md text-sm transition-all ${
                 theme === 'light'
                   ? 'bg-amber-500/20 text-amber-600 font-bold ring-1 ring-amber-500/40'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -248,7 +248,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* System Filter Pills Sub-Bar */}
       <div className="border-t border-[var(--border-color)] bg-[var(--bg-main)]/60 px-4 py-2">
-        <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto text-xs no-scrollbar">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 overflow-x-auto text-sm no-scrollbar">
           <span className="text-[11px] font-semibold text-[var(--text-secondary)] whitespace-nowrap uppercase tracking-wider">
             Filter System:
           </span>

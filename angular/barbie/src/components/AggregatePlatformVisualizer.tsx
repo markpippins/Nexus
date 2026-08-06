@@ -158,7 +158,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-xl font-black text-[var(--text-primary)]">
               {aggregateState.avgLatencyMs}
-              <span className="text-xs font-normal text-[var(--text-secondary)]">ms</span>
+              <span className="text-sm font-normal text-[var(--text-secondary)]">ms</span>
             </span>
             <span className="text-[10px] font-medium text-emerald-400">p95 38ms</span>
           </div>
@@ -221,7 +221,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
               <Network className="h-5 w-5 text-sky-400" />
               <span>Platform State Topology & Aggregate Health</span>
             </h2>
-            <p className="text-xs text-[var(--text-secondary)]">
+            <p className="text-sm text-[var(--text-secondary)]">
               Click any service, node or system block to populate real-time logs and metrics in the right panel.
             </p>
           </div>
@@ -229,7 +229,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
           <div className="flex items-center gap-1 self-start sm:self-auto rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)] p-1">
             <button
               onClick={() => setViewMode('topology')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${
                 viewMode === 'topology'
                   ? 'bg-sky-500 text-white shadow-sm ring-1 ring-sky-400'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -241,7 +241,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
 
             <button
               onClick={() => setViewMode('heatmap')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${
                 viewMode === 'heatmap'
                   ? 'bg-sky-500 text-white shadow-sm ring-1 ring-sky-400'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -253,7 +253,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
 
             <button
               onClick={() => setViewMode('incidents')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-all ${
                 viewMode === 'incidents'
                   ? 'bg-sky-500 text-white shadow-sm ring-1 ring-sky-400'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -291,7 +291,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
                         {getStatusBadge(system.status)}
                       </div>
 
-                      <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
+                      <div className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
                         <span className="rounded bg-slate-800/60 px-2 py-0.5 text-[11px] font-mono text-slate-300">
                           {system.tier}
                         </span>
@@ -317,7 +317,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div>
-                                <h3 className="font-mono text-xs font-bold text-[var(--text-primary)] group-hover:text-sky-400 transition-colors">
+                                <h3 className="font-mono text-sm font-bold text-[var(--text-primary)] group-hover:text-sky-400 transition-colors">
                                   {svc.name}
                                 </h3>
                                 <p className="text-[11px] text-[var(--text-secondary)]">{svc.type}</p>
@@ -347,7 +347,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
                                   <ServerIcon className="h-3 w-3 text-purple-400" />
                                   <span className="font-mono">{relatedServer.name}</span>
                                 </span>
-                                <span className="font-mono text-xs text-[var(--text-primary)]">
+                                <span className="font-mono text-sm text-[var(--text-primary)]">
                                   CPU {relatedServer.cpuUsage}%
                                 </span>
                               </div>
@@ -366,7 +366,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
         {/* VIEW MODE 2: CLUSTER HEATMAP & SERVERS GRID */}
         {viewMode === 'heatmap' && (
           <div className="p-5">
-            <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">
               Infrastructure Server Clusters & Regional Nodes
             </h3>
 
@@ -388,7 +388,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
                       <div>
                         <div className="flex items-center gap-1.5">
                           <ServerIcon className="h-4 w-4 text-purple-400" />
-                          <span className="font-mono text-xs font-bold text-[var(--text-primary)]">
+                          <span className="font-mono text-sm font-bold text-[var(--text-primary)]">
                             {srv.name}
                           </span>
                         </div>
@@ -446,7 +446,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
         {/* VIEW MODE 3: ACTIVE HEALTH INCIDENTS */}
         {viewMode === 'incidents' && (
           <div className="p-5">
-            <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+            <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">
               Operational Incidents & Degraded System Alerts
             </h3>
 
@@ -454,7 +454,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
               <div className="flex h-40 flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-main)]/30 text-center">
                 <CheckCircle2 className="h-8 w-8 text-emerald-400 mb-2" />
                 <p className="text-sm font-semibold text-[var(--text-primary)]">All Platform Systems Operational</p>
-                <p className="text-xs text-[var(--text-secondary)]">No critical or degraded alerts in queue.</p>
+                <p className="text-sm text-[var(--text-secondary)]">No critical or degraded alerts in queue.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -471,7 +471,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
                           <AlertTriangle className="h-5 w-5 text-rose-400" />
                           <div>
                             <h4 className="font-mono text-sm font-bold text-rose-200">{s.name}</h4>
-                            <p className="text-xs text-rose-300/80">
+                            <p className="text-sm text-rose-300/80">
                               System: {s.systemName} • Latency: {s.latencyMs}ms • Error Rate: {s.errorRate}%
                             </p>
                           </div>
@@ -494,7 +494,7 @@ export const AggregatePlatformVisualizer: React.FC<VisualizerProps> = ({
                           <Cpu className="h-5 w-5 text-amber-400" />
                           <div>
                             <h4 className="font-mono text-sm font-bold text-amber-200">{srv.name}</h4>
-                            <p className="text-xs text-amber-300/80">
+                            <p className="text-sm text-amber-300/80">
                               CPU Pressure: {srv.cpuUsage}% • Memory: {srv.memoryUsage}% • Region: {srv.datacenterRegion}
                             </p>
                           </div>

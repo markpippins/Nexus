@@ -207,7 +207,7 @@ export const DetailContextPanel: React.FC<DetailContextPanelProps> = ({
                 {data.status || 'ACTIVE'}
               </span>
             </div>
-            <p className="text-xs text-[var(--text-secondary)] capitalize">
+            <p className="text-sm text-[var(--text-secondary)] capitalize">
               {selection.type} Entity Context
             </p>
           </div>
@@ -223,7 +223,7 @@ export const DetailContextPanel: React.FC<DetailContextPanelProps> = ({
       </div>
 
       {/* Quick Actions Bar */}
-      <div className="flex items-center justify-between border-b border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2 text-xs">
+      <div className="flex items-center justify-between border-b border-[var(--border-color)] bg-[var(--bg-card)] px-4 py-2 text-sm">
         <div className="flex items-center gap-2">
           {selection.type === 'service' && (
             <>
@@ -264,7 +264,7 @@ export const DetailContextPanel: React.FC<DetailContextPanelProps> = ({
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-[var(--border-color)] bg-[var(--bg-main)]/50 text-xs font-semibold">
+      <div className="flex border-b border-[var(--border-color)] bg-[var(--bg-main)]/50 text-sm font-semibold">
         <button
           onClick={() => setActiveTab('logs')}
           className={`flex flex-1 items-center justify-center gap-2 border-b-2 py-3 transition-colors ${
@@ -304,7 +304,7 @@ export const DetailContextPanel: React.FC<DetailContextPanelProps> = ({
 
       {/* TAB 1: LIVE LOGS STREAM */}
       {activeTab === 'logs' && (
-        <div className="flex flex-1 flex-col overflow-hidden bg-slate-950 p-3 font-mono text-xs">
+        <div className="flex flex-1 flex-col overflow-hidden bg-slate-950 p-3 font-mono text-sm">
           
           {/* Search & Level Filter Controls */}
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
@@ -315,7 +315,7 @@ export const DetailContextPanel: React.FC<DetailContextPanelProps> = ({
                 value={logFilter}
                 onChange={(e) => setLogFilter(e.target.value)}
                 placeholder="Filter log stream..."
-                className="w-full rounded border border-slate-800 bg-slate-900 py-1 pl-8 pr-2 text-xs text-slate-200 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
+                className="w-full rounded border border-slate-800 bg-slate-900 py-1 pl-8 pr-2 text-sm text-slate-200 placeholder-slate-500 focus:border-sky-500 focus:outline-none"
               />
             </div>
 
@@ -411,7 +411,7 @@ export const DetailContextPanel: React.FC<DetailContextPanelProps> = ({
           
           {/* Chart 1: CPU & Memory Usage % */}
           <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-3">
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5">
+            <h4 className="mb-2 text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5">
               <Cpu className="h-3.5 w-3.5 text-sky-400" />
               <span>CPU & Memory Pressure (%)</span>
             </h4>
@@ -441,7 +441,7 @@ export const DetailContextPanel: React.FC<DetailContextPanelProps> = ({
 
           {/* Chart 2: Request Latency & RPS */}
           <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-3">
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5">
+            <h4 className="mb-2 text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5">
               <Activity className="h-3.5 w-3.5 text-amber-400" />
               <span>Latency (ms) & Throughput (RPS)</span>
             </h4>
@@ -463,7 +463,7 @@ export const DetailContextPanel: React.FC<DetailContextPanelProps> = ({
 
       {/* TAB 3: SPECS & SPECS */}
       {activeTab === 'specs' && (
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
           <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-main)] p-4 space-y-3">
             <h4 className="font-bold text-[var(--text-primary)] border-b border-[var(--border-color)] pb-2 uppercase tracking-wider text-[11px] text-[var(--text-secondary)]">
               Entity Configuration

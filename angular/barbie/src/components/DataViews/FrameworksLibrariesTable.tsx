@@ -121,7 +121,7 @@ export const FrameworksLibrariesTable: React.FC<FrameworksLibrariesTableProps> =
         <div className="flex items-center gap-2">
           <button
             onClick={() => { setActiveTab('frameworks'); setIsCreating(false); }}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${
               activeTab === 'frameworks'
                 ? 'bg-sky-500 text-white shadow'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -133,7 +133,7 @@ export const FrameworksLibrariesTable: React.FC<FrameworksLibrariesTableProps> =
 
           <button
             onClick={() => { setActiveTab('libraries'); setIsCreating(false); }}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${
               activeTab === 'libraries'
                 ? 'bg-sky-500 text-white shadow'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -146,7 +146,7 @@ export const FrameworksLibrariesTable: React.FC<FrameworksLibrariesTableProps> =
 
         <button
           onClick={() => setIsCreating(!isCreating)}
-          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-sky-500"
+          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-sky-500"
         >
           <Plus className="h-3.5 w-3.5" />
           <span>Add {activeTab === 'frameworks' ? 'Framework' : 'Library'}</span>
@@ -156,11 +156,11 @@ export const FrameworksLibrariesTable: React.FC<FrameworksLibrariesTableProps> =
       {/* Inline Create Form */}
       {isCreating && (
         <form onSubmit={handleCreateEntry} className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-4 space-y-3">
-          <h4 className="text-xs font-bold text-sky-400 uppercase tracking-wider">
+          <h4 className="text-sm font-bold text-sky-400 uppercase tracking-wider">
             Register New {activeTab === 'frameworks' ? 'Framework' : 'Library'}
           </h4>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 text-xs">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-4 text-sm">
             <input
               type="text"
               value={nameInput}
@@ -192,7 +192,7 @@ export const FrameworksLibrariesTable: React.FC<FrameworksLibrariesTableProps> =
             />
           </div>
 
-          <div className="flex justify-end gap-2 text-xs">
+          <div className="flex justify-end gap-2 text-sm">
             <button
               type="button"
               onClick={() => setIsCreating(false)}
@@ -212,7 +212,7 @@ export const FrameworksLibrariesTable: React.FC<FrameworksLibrariesTableProps> =
 
       {/* Data Table */}
       <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-        <table className="w-full text-left text-xs text-[var(--text-primary)]">
+        <table className="w-full text-left text-sm text-[var(--text-primary)]">
           <thead className="border-b border-[var(--border-color)] bg-[var(--bg-main)]/60 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
             <tr>
               <th className="p-3">Name</th>

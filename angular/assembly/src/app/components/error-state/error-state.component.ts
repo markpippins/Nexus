@@ -15,7 +15,7 @@ import { CommonModule } from '@angular/common';
         </svg>
       </div>
       <h3 class="text-sm sm:text-base font-semibold text-steel-900 dark:text-steel-100">{{ title() }}</h3>
-      <p class="text-xs sm:text-sm text-steel-500 dark:text-steel-400 mt-1 max-w-xs">{{ description() }}</p>
+      <p class="text-sm sm:text-sm text-steel-500 dark:text-steel-400 mt-1 max-w-xs">{{ description() }}</p>
       <button *ngIf="showRetry()" (click)="retry.emit()" class="app-btn-primary mt-4">Retry</button>
     </div>
   `,

@@ -26,17 +26,17 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Service -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Service *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Service *</label>
                         <select formControlName="serviceId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Service</option>
                             <option *ngFor="let s of standaloneServices()" [value]="s.id">{{ s.name }}</option>
                         </select>
-                        <span class="text-xs text-[rgb(var(--color-text-muted))]">Sub-modules are automatically deployed with their parent service</span>
+                        <span class="text-sm text-[rgb(var(--color-text-muted))]">Sub-modules are automatically deployed with their parent service</span>
                      </div>
 
                      <!-- Server -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Server *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Server *</label>
                         <select formControlName="serverId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Server</option>
                             <option *ngFor="let s of servers()" [value]="s.id">{{ s.hostname }}</option>
@@ -47,7 +47,7 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Environment -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Environment *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Environment *</label>
                         <select formControlName="environmentId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Environment</option>
                             <option *ngFor="let e of environments()" [value]="e.id">{{ e.name }}</option>
@@ -56,7 +56,7 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
 
                       <!-- Status -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Status</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Status</label>
                         <select formControlName="status" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option value="STOPPED">STOPPED</option>
                             <option value="RUNNING">RUNNING</option>
@@ -70,26 +70,26 @@ import { Deployment, ServiceInstance } from '../../../models/service-mesh.model.
                  <div class="grid grid-cols-2 gap-4">
                      <!-- Version -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Version</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Version</label>
                         <input type="text" formControlName="version" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="v1.0.0">
                      </div>
 
                      <!-- Port -->
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Port</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Port</label>
                         <input type="number" formControlName="port" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="8081">
                      </div>
                  </div>
 
                  <!-- Context API Path -->
                  <div class="flex flex-col gap-1.5">
-                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Context Path</label>
+                    <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Context Path</label>
                     <input type="text" formControlName="contextPath" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="/api/v1">
                  </div>
 
                  <!-- Health Check URL -->
                  <div class="flex flex-col gap-1.5">
-                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Health Check URL</label>
+                    <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Health Check URL</label>
                     <input type="text" formControlName="healthCheckUrl" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="http://host:port/health">
                  </div>
              </form>

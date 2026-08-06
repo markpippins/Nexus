@@ -40,7 +40,7 @@ interface TopologyServiceItem {
             <h2 class="text-xl font-semibold text-[rgb(var(--color-text-base))]">Topology</h2>
           </div>
           @if (summary()?.loadedAt) {
-            <span class="text-xs text-[rgb(var(--color-text-muted))]">
+            <span class="text-sm text-[rgb(var(--color-text-muted))]">
               Last updated: {{ summary()!.loadedAt | date:'mediumTime' }}
             </span>
           }
@@ -66,10 +66,10 @@ interface TopologyServiceItem {
                 <h3 class="text-lg font-semibold text-red-500">Terrain Server is Down</h3>
               </div>
               <p class="text-[rgb(var(--color-text-muted))] text-sm">
-                Unable to reach the terrain server at <code class="px-1.5 py-0.5 bg-[rgb(var(--color-surface-muted))] rounded text-xs">{{ baseUrl() }}</code>.
+                Unable to reach the terrain server at <code class="px-1.5 py-0.5 bg-[rgb(var(--color-surface-muted))] rounded text-sm">{{ baseUrl() }}</code>.
               </p>
               @if (summary()?.terrainError) {
-                <p class="mt-2 text-xs text-red-400">{{ summary()?.terrainError }}</p>
+                <p class="mt-2 text-sm text-red-400">{{ summary()?.terrainError }}</p>
               }
               <button
                 (click)="refresh()"
@@ -99,7 +99,7 @@ interface TopologyServiceItem {
                 <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Third-Party Dependencies</span>
                 <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ thirdPartyItems().length }}</span>
               </div>
-              <div class="flex gap-2 text-xs">
+              <div class="flex gap-2 text-sm">
                 <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countEffective(thirdPartyItems(), 'ON') }} Online</span>
                 <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countEffective(thirdPartyItems(), 'OFFLINE') }} Offline</span>
                 @if (countEffective(thirdPartyItems(), 'DEGRADED') > 0) {
@@ -114,7 +114,7 @@ interface TopologyServiceItem {
                 <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Internal Services</span>
                 <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ internalItems().length }}</span>
               </div>
-              <div class="flex gap-2 text-xs">
+              <div class="flex gap-2 text-sm">
                 <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countEffective(internalItems(), 'ON') }} Online</span>
                 <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countEffective(internalItems(), 'OFFLINE') }} Offline</span>
                 @if (countEffective(internalItems(), 'DEGRADED') > 0) {
@@ -129,7 +129,7 @@ interface TopologyServiceItem {
                 <span class="text-sm font-medium text-[rgb(var(--color-text-muted))]">Host Servers</span>
                 <span class="text-2xl font-bold text-[rgb(var(--color-text-base))]">{{ s.servers.length }}</span>
               </div>
-              <div class="flex gap-2 text-xs">
+              <div class="flex gap-2 text-sm">
                 <span class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600">{{ countServerByStatus(s.servers, 'ONLINE') }} Online</span>
                 <span class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">{{ countServerByStatus(s.servers, 'OFFLINE') }} Offline</span>
               </div>
@@ -161,7 +161,7 @@ interface TopologyServiceItem {
               <span class="text-sm font-medium text-[rgb(var(--color-text-base))]">
                 @if (hasIssues()) {
                   Terrain Server: <span class="text-yellow-500">Degraded</span>
-                  <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">
+                  <span class="ml-2 text-sm text-[rgb(var(--color-text-muted))]">
                     {{ countOffline() }} service(s) offline, {{ countDegraded() }} degraded
                   </span>
                 } @else if (s.terrainUp) {
@@ -170,7 +170,7 @@ interface TopologyServiceItem {
                   Terrain Server: <span class="text-red-500">Offline</span>
                 }
               </span>
-              <span class="text-xs text-[rgb(var(--color-text-muted))] ml-auto">{{ baseUrl() }}</span>
+              <span class="text-sm text-[rgb(var(--color-text-muted))] ml-auto">{{ baseUrl() }}</span>
             </div>
           </div>
 
@@ -199,21 +199,21 @@ interface TopologyServiceItem {
                         <td class="px-3 py-1 text-[13px]">
                           <span class="font-medium text-[rgb(var(--color-text-base))]">{{ item.name }}</span>
                           @if (item.version) {
-                            <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ item.version }}</span>
+                            <span class="ml-2 text-sm text-[rgb(var(--color-text-muted))]">v{{ item.version }}</span>
                           }
                         </td>
                         <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ item.port || '—' }}</td>
                         <td class="px-3 py-1 text-[13px]">
-                          <span class="px-1.5 py-0.5 rounded text-xs font-medium"
+                          <span class="px-1.5 py-0.5 rounded text-sm font-medium"
                             [class.bg-blue-500/10]="item.entityType === 'MCP Server'"
                             [class.text-blue-600]="item.entityType === 'MCP Server'"
                             [class.bg-purple-500/10]="item.entityType === 'Service'"
                             [class.text-purple-600]="item.entityType === 'Service'"
                           >{{ item.entityType }}</span>
                         </td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ item.detail || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-sm">{{ item.detail || '—' }}</td>
                         <td class="px-3 py-1">
-                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-sm font-medium"
                             [class.bg-green-500/10]="eff === 'ON'"
                             [class.text-green-600]="eff === 'ON'"
                             [class.bg-red-500/10]="eff === 'OFFLINE'"
@@ -236,7 +236,7 @@ interface TopologyServiceItem {
                             <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ item.status }}</span>
                           }
                         </td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ item.healthCheckUrl || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-sm">{{ item.healthCheckUrl || '—' }}</td>
                       </tr>
                     }
                   </tbody>
@@ -274,21 +274,21 @@ interface TopologyServiceItem {
                         <td class="px-3 py-1 text-[13px]">
                           <span class="font-medium text-[rgb(var(--color-text-base))]">{{ item.name }}</span>
                           @if (item.version) {
-                            <span class="ml-2 text-xs text-[rgb(var(--color-text-muted))]">v{{ item.version }}</span>
+                            <span class="ml-2 text-sm text-[rgb(var(--color-text-muted))]">v{{ item.version }}</span>
                           }
                         </td>
                         <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ item.port || '—' }}</td>
                         <td class="px-3 py-1 text-[13px]">
-                          <span class="px-1.5 py-0.5 rounded text-xs font-medium"
+                          <span class="px-1.5 py-0.5 rounded text-sm font-medium"
                             [class.bg-blue-500/10]="item.entityType === 'MCP Server'"
                             [class.text-blue-600]="item.entityType === 'MCP Server'"
                             [class.bg-purple-500/10]="item.entityType === 'Service'"
                             [class.text-purple-600]="item.entityType === 'Service'"
                           >{{ item.entityType }}</span>
                         </td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ item.detail || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-sm">{{ item.detail || '—' }}</td>
                         <td class="px-3 py-1">
-                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-sm font-medium"
                             [class.bg-green-500/10]="eff === 'ON'"
                             [class.text-green-600]="eff === 'ON'"
                             [class.bg-red-500/10]="eff === 'OFFLINE'"
@@ -311,7 +311,7 @@ interface TopologyServiceItem {
                             <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] line-through">{{ item.status }}</span>
                           }
                         </td>
-                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-xs">{{ item.healthCheckUrl || '—' }}</td>
+                        <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono text-sm">{{ item.healthCheckUrl || '—' }}</td>
                       </tr>
                     }
                   </tbody>
@@ -346,7 +346,7 @@ interface TopologyServiceItem {
                         <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))] font-mono">{{ server.ipAddress || '—' }}</td>
                         <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-muted))]">{{ server.os || '—' }}</td>
                         <td class="px-3 py-1">
-                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-sm font-medium"
                             [class.bg-green-500/10]="server.status === 'ONLINE'"
                             [class.text-green-600]="server.status === 'ONLINE'"
                             [class.bg-red-500/10]="server.status === 'OFFLINE'"
@@ -428,7 +428,7 @@ interface TopologyServiceItem {
           </div>
           <button
             (click)="refresh()"
-            class="inline-flex items-center gap-2 px-3 py-1.5 text-xs text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] rounded-md transition-colors"
+            class="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-[rgb(var(--color-text-muted))] hover:text-[rgb(var(--color-text-base))] hover:bg-[rgb(var(--color-surface-hover))] rounded-md transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm10.899 12.101A7.002 7.002 0 012.399 8.567a1 1 0 011.885-.666A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101z" clip-rule="evenodd" />

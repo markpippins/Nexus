@@ -121,7 +121,7 @@ export const ServersTable: React.FC<ServersTableProps> = ({
       
       {/* Filter bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="flex items-center gap-1 font-semibold text-[var(--text-secondary)]">
             <Filter className="h-3.5 w-3.5 text-sky-400" />
             <span>Filters:</span>
@@ -130,7 +130,7 @@ export const ServersTable: React.FC<ServersTableProps> = ({
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 py-1 text-xs text-[var(--text-primary)] focus:outline-none"
+            className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 py-1 text-sm text-[var(--text-primary)] focus:outline-none"
           >
             <option value="all">All Statuses</option>
             <option value="healthy">Healthy</option>
@@ -142,7 +142,7 @@ export const ServersTable: React.FC<ServersTableProps> = ({
           <select
             value={envFilter}
             onChange={(e) => { setEnvFilter(e.target.value); setPage(1); }}
-            className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 py-1 text-xs text-[var(--text-primary)] focus:outline-none"
+            className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-main)] px-2.5 py-1 text-sm text-[var(--text-primary)] focus:outline-none"
           >
             <option value="all">All Environments</option>
             <option value="production">Production</option>
@@ -153,7 +153,7 @@ export const ServersTable: React.FC<ServersTableProps> = ({
 
         <button
           onClick={onOpenCreateModal}
-          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-sky-500"
+          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-sky-500"
         >
           <Plus className="h-3.5 w-3.5" />
           <span>New Server</span>
@@ -162,7 +162,7 @@ export const ServersTable: React.FC<ServersTableProps> = ({
 
       {/* Main Table */}
       <div className="overflow-x-auto rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm">
-        <table className="w-full text-left text-xs text-[var(--text-primary)]">
+        <table className="w-full text-left text-sm text-[var(--text-primary)]">
           <thead className="border-b border-[var(--border-color)] bg-[var(--bg-main)]/60 text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
             <tr>
               <th className="p-3">Server Name & IP</th>
@@ -270,7 +270,7 @@ export const ServersTable: React.FC<ServersTableProps> = ({
       </div>
 
       {/* Pagination */}
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--text-secondary)] px-1">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--text-secondary)] px-1">
         <div>Total Servers: {totalItems}</div>
         <div className="flex items-center gap-1">
           <button

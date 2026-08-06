@@ -136,7 +136,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
         {/* Collapse Toggle (Desktop Only) */}
         <div className="hidden lg:flex items-center justify-between pb-2 border-b border-[var(--border-color)]">
           {!isCollapsed && (
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+            <div className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">
               <ShieldCheck className="h-4 w-4 text-sky-400" />
               <span>Registry Navigation</span>
             </div>
@@ -156,7 +156,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
             onOpenRegisterModal();
             onCloseMobile();
           }}
-          className={`w-full flex items-center justify-center gap-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-bold py-2.5 px-3 text-xs shadow-md shadow-sky-500/20 transition-all active:scale-[0.98] ${
+          className={`w-full flex items-center justify-center gap-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-bold py-2.5 px-3 text-sm shadow-md shadow-sky-500/20 transition-all active:scale-[0.98] ${
             isCollapsed ? 'px-0' : ''
           }`}
           title="Register New Microservice"
@@ -175,7 +175,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
             <select
               value={selectedSystemFilter}
               onChange={(e) => onSystemFilterChange(e.target.value)}
-              className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-xs text-[var(--text-primary)] focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
+              className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-primary)] focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
             >
               <option value="all">All Systems ({systemsList.length})</option>
               {systemsList.map((sys) => (
@@ -204,7 +204,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                     <button
                       key={item.id}
                       onClick={() => handleSelectTab(item.id)}
-                      className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold transition-all ${
+                      className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-sm font-semibold transition-all ${
                         isActive
                           ? 'bg-sky-500 text-white font-bold shadow-sm shadow-sky-500/30 ring-1 ring-sky-400'
                           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
@@ -278,7 +278,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           <aside className="fixed inset-y-0 left-0 z-50 w-72 bg-[var(--bg-sidebar)] border-r border-[var(--border-color)] shadow-2xl flex flex-col">
             <div className="flex items-center justify-between border-b border-[var(--border-color)] px-4 py-3">
               <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500 text-white font-extrabold text-xs">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500 text-white font-extrabold text-sm">
                   PC
                 </div>
                 <span className="font-extrabold text-sm text-[var(--text-primary)]">Platform Core</span>

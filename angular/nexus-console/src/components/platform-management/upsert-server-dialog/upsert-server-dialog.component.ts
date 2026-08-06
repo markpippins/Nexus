@@ -25,11 +25,11 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
                  <!-- Hostname & IP -->
                  <div class="grid grid-cols-2 gap-4">
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Hostname *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Hostname *</label>
                         <input type="text" formControlName="hostname" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="server-01">
                      </div>
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">IP Address *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">IP Address *</label>
                          <input type="text" formControlName="ipAddress" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="192.168.1.10">
                      </div>
                  </div>
@@ -37,7 +37,7 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
                  <!-- Server Type & Env -->
                  <div class="grid grid-cols-2 gap-4">
                      <div class="flex flex-col gap-1.5">
-                         <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Server Type *</label>
+                         <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Server Type *</label>
                         <select formControlName="serverTypeId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                              <option [value]="null">Select Type</option>
                             @for (t of serverTypes(); track t.id) {
@@ -46,7 +46,7 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
                         </select>
                      </div>
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Environment *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Environment *</label>
                         <select formControlName="environmentTypeId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select Env</option>
                             @for (e of environmentTypes(); track e.id) {
@@ -59,7 +59,7 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
                  <!-- OS & Status -->
                  <div class="grid grid-cols-2 gap-4">
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Operating System *</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Operating System *</label>
                         <select formControlName="operatingSystemId" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option [value]="null">Select OS</option>
                             @for (os of operatingSystems(); track os.id) {
@@ -68,7 +68,7 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
                         </select>
                      </div>
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Status</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Status</label>
                          <select formControlName="status" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors">
                             <option value="ACTIVE">ACTIVE</option>
                             <option value="INACTIVE">INACTIVE</option>
@@ -81,15 +81,15 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
                  <!-- Specs -->
                  <div class="grid grid-cols-3 gap-4">
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">CPU Cores</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">CPU Cores</label>
                         <input type="number" formControlName="cpuCores" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="4">
                      </div>
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Memory</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Memory</label>
                         <input type="text" formControlName="memory" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="16GB">
                      </div>
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Disk</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Disk</label>
                         <input type="text" formControlName="disk" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="500GB">
                      </div>
                  </div>
@@ -97,18 +97,18 @@ import { PlatformManagementService, LookupItem, Server, LOOKUP_SERVER_TYPES, LOO
                  <!-- Cloud -->
                  <div class="grid grid-cols-2 gap-4">
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Cloud Provider</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Cloud Provider</label>
                         <input type="text" formControlName="cloudProvider" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="AWS">
                      </div>
                      <div class="flex flex-col gap-1.5">
-                        <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Region</label>
+                        <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Region</label>
                         <input type="text" formControlName="region" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="us-east-1">
                      </div>
                  </div>
 
                  <!-- Description -->
                  <div class="flex flex-col gap-1.5">
-                    <label class="text-xs font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
+                    <label class="text-sm font-medium text-[rgb(var(--color-text-muted))] uppercase tracking-wide">Description</label>
                      <textarea formControlName="description" rows="2" class="w-full px-3 py-2 text-sm rounded-md border border-[rgb(var(--color-border-muted))] bg-[rgb(var(--color-surface-input))] text-[rgb(var(--color-text-base))] placeholder:text-[rgb(var(--color-text-muted))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--color-accent-ring))]/30 focus:border-[rgb(var(--color-accent-ring))] transition-colors" placeholder="Server description"></textarea>
                  </div>
              </form>

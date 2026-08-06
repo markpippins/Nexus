@@ -15,7 +15,7 @@ import { LookupItem, TYPE_LABELS, FILTER_TYPES, getCategoryEndpointType } from '
                 @for (t of filterTypes; track t) {
                     <button
                         (click)="selectedType.set(t)"
-                        class="px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-150"
+                        class="px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-150"
                         [class]="selectedType() === t
                             ? 'bg-[rgb(var(--color-accent-ring))] text-white shadow-sm'
                             : 'bg-[rgb(var(--color-surface-muted))] text-[rgb(var(--color-text-muted))] hover:bg-[rgb(var(--color-surface-hover))] border border-[rgb(var(--color-border-muted))]'"
@@ -71,7 +71,7 @@ import { LookupItem, TYPE_LABELS, FILTER_TYPES, getCategoryEndpointType } from '
                         >
                             <td class="px-3 py-1 text-[13px] text-[rgb(var(--color-text-base))] font-medium">{{ item.name }}</td>
                             <td class="px-3 py-1 text-[13px]">
-                                <span class="px-2 py-0.5 rounded text-xs font-medium"
+                                <span class="px-2 py-0.5 rounded text-sm font-medium"
                                     [class]="getTypeBadgeClass(item.type || '')"
                                 >{{ typeLabels[item.type || ''] || item.type }}</span>
                             </td>

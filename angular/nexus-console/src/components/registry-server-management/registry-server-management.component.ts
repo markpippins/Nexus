@@ -27,7 +27,7 @@ import { RegistryServerProfile } from '../../models/registry-server-profile.mode
                       <h3 class="font-bold text-[rgb(var(--color-text-prominent))] group-hover:text-[rgb(var(--color-accent-solid-bg))] transition-colors">
                         {{ profile.name }}
                       </h3>
-                      <p class="text-xs text-[rgb(var(--color-text-muted))] truncate max-w-[200px]" [title]="profile.registryServerUrl">
+                      <p class="text-sm text-[rgb(var(--color-text-muted))] truncate max-w-[200px]" [title]="profile.registryServerUrl">
                         {{ profile.registryServerUrl || 'No Server URL' }}
                       </p>
                     </div>
@@ -57,13 +57,13 @@ import { RegistryServerProfile } from '../../models/registry-server-profile.mode
                 <div class="grid grid-cols-2 gap-4 mt-4">
                   <div class="flex flex-col">
                     <span class="text-[10px] uppercase tracking-wider text-[rgb(var(--color-text-subtle))]">Environment</span>
-                    <span class="text-xs font-medium text-[rgb(var(--color-text-base))]">
+                    <span class="text-sm font-medium text-[rgb(var(--color-text-base))]">
                       {{ profile.environment || 'DEV' }}
                     </span>
                   </div>
                    <div class="flex flex-col">
                     <span class="text-[10px] uppercase tracking-wider text-[rgb(var(--color-text-subtle))]">Status</span>
-                    <span class="text-xs font-medium" [class.text-[rgb(var(--color-success-text))]]="profile.status === 'ACTIVE'" [class.text-[rgb(var(--color-danger-text))]]="profile.status === 'INACTIVE'">
+                    <span class="text-sm font-medium" [class.text-[rgb(var(--color-success-text))]]="profile.status === 'ACTIVE'" [class.text-[rgb(var(--color-danger-text))]]="profile.status === 'INACTIVE'">
                       {{ profile.status || 'ACTIVE' }}
                     </span>
                   </div>
@@ -72,7 +72,7 @@ import { RegistryServerProfile } from '../../models/registry-server-profile.mode
               <div class="px-5 py-3 bg-[rgb(var(--color-surface-hover-subtle))] border-t border-[rgb(var(--color-border-muted))] rounded-b-xl flex justify-end">
                 <button
                   (click)="editServiceRegistry.emit(profile.name)"
-                  class="text-xs font-bold text-[rgb(var(--color-accent-solid-bg))] hover:underline uppercase tracking-wide"
+                  class="text-sm font-bold text-[rgb(var(--color-accent-solid-bg))] hover:underline uppercase tracking-wide"
                 >
                   Edit Profile
                 </button>

@@ -54,7 +54,7 @@ type CategoryFilter = 'all' | 'infrastructure' | 'core' | 'api' | 'tts' | 'mcp';
             }
           </div>
         </div>
-        <div class="flex items-center gap-2 text-xs">
+        <div class="flex items-center gap-2 text-sm">
           @if (allHealthy()) {
             <span class="text-green-500 font-medium">All healthy</span>
           } @else {
@@ -74,7 +74,7 @@ type CategoryFilter = 'all' | 'infrastructure' | 'core' | 'api' | 'tts' | 'mcp';
 
       <div class="overflow-x-auto rounded-lg border border-[rgb(var(--color-border-muted))]">
         <table class="w-full text-left border-collapse">
-          <thead class="bg-[rgb(var(--color-surface-muted))] text-xs text-[rgb(var(--color-text-muted))] uppercase">
+          <thead class="bg-[rgb(var(--color-surface-muted))] text-sm text-[rgb(var(--color-text-muted))] uppercase">
             <tr>
               <th class="p-3 font-semibold">Service</th>
               <th class="p-3 font-semibold">Category</th>
@@ -93,14 +93,14 @@ type CategoryFilter = 'all' | 'infrastructure' | 'core' | 'api' | 'tts' | 'mcp';
                     <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))] italic">({{ svc.note }})</span>
                   }
                 </td>
-                <td class="p-3 text-xs text-[rgb(var(--color-text-muted))]">
+                <td class="p-3 text-sm text-[rgb(var(--color-text-muted))]">
                   <span class="px-1.5 py-0.5 rounded-full bg-[rgb(var(--color-surface-hover))]">{{ svc.category }}</span>
                 </td>
-                <td class="p-3 text-sm font-mono text-xs text-[rgb(var(--color-text-muted))]">
+                <td class="p-3 text-sm font-mono text-sm text-[rgb(var(--color-text-muted))]">
                   {{ getEndpoint(svc) }}
                 </td>
                 <td class="p-3">
-                  <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
+                  <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-sm font-medium"
                     [class.bg-green-500/10]="health?.status === 'healthy'"
                     [class.text-green-600]="health?.status === 'healthy'"
                     [class.bg-red-500/10]="health?.status === 'down'"
@@ -123,7 +123,7 @@ type CategoryFilter = 'all' | 'infrastructure' | 'core' | 'api' | 'tts' | 'mcp';
                     <span class="ml-1.5 text-[10px] text-[rgb(var(--color-text-muted))]">{{ health?.detail }}</span>
                   }
                 </td>
-                <td class="p-3 text-xs text-[rgb(var(--color-text-muted))]">
+                <td class="p-3 text-sm text-[rgb(var(--color-text-muted))]">
                   @if (health?.lastChecked) {
                     {{ health.lastChecked | date:'HH:mm:ss' }}
                   } @else {
@@ -136,7 +136,7 @@ type CategoryFilter = 'all' | 'infrastructure' | 'core' | 'api' | 'tts' | 'mcp';
         </table>
         @if (!configLoaded()) {
           <div class="p-6 text-center text-sm text-red-500">
-            Failed to load health service configuration. Check that <code class="px-1 py-0.5 bg-[rgb(var(--color-surface-muted))] rounded text-xs">assets/config/health-services.json</code> exists and is valid.
+            Failed to load health service configuration. Check that <code class="px-1 py-0.5 bg-[rgb(var(--color-surface-muted))] rounded text-sm">assets/config/health-services.json</code> exists and is valid.
           </div>
         } @else if (filteredServices().length === 0) {
           <div class="p-6 text-center text-sm text-[rgb(var(--color-text-muted))]">

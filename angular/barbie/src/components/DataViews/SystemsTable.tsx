@@ -71,12 +71,12 @@ export const SystemsTable: React.FC<SystemsTableProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] p-3">
         <div>
           <h3 className="text-sm font-bold text-[var(--text-primary)]">System Architectures & Platform Domains</h3>
-          <p className="text-xs text-[var(--text-secondary)]">Manage system platform boundaries and link registered services.</p>
+          <p className="text-sm text-[var(--text-secondary)]">Manage system platform boundaries and link registered services.</p>
         </div>
 
         <button
           onClick={onOpenCreateModal}
-          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-sky-500"
+          className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-semibold text-white shadow hover:bg-sky-500"
         >
           <Plus className="h-3.5 w-3.5" />
           <span>New System Domain</span>
@@ -109,7 +109,7 @@ export const SystemsTable: React.FC<SystemsTableProps> = ({
               </span>
             </div>
 
-            <p className="mt-3 text-xs text-[var(--text-secondary)] line-clamp-2">
+            <p className="mt-3 text-sm text-[var(--text-secondary)] line-clamp-2">
               {system.description}
             </p>
 
@@ -146,7 +146,7 @@ export const SystemsTable: React.FC<SystemsTableProps> = ({
             </div>
 
             {/* Card Action footer */}
-            <div className="mt-4 flex items-center justify-between border-t border-[var(--border-color)]/60 pt-2 text-xs">
+            <div className="mt-4 flex items-center justify-between border-t border-[var(--border-color)]/60 pt-2 text-sm">
               <span className="text-[10px] text-[var(--text-secondary)]">Environment: {system.environment}</span>
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 <button

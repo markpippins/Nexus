@@ -11,14 +11,14 @@ import { ComponentCreatorStateService } from '../../services/component-creator-s
     <div class="flex flex-col h-full bg-[rgb(var(--color-surface))] text-[rgb(var(--color-text-base))]">
       <!-- Header -->
       <div class="p-2 border-b border-[rgb(var(--color-border-base))] text-center bg-[rgb(var(--color-surface-muted))]">
-        <span class="text-xs font-bold text-[rgb(var(--color-text-muted))] uppercase">Live Preview</span>
+        <span class="text-sm font-bold text-[rgb(var(--color-text-muted))] uppercase">Live Preview</span>
       </div>
 
       <!-- 3D Preview Container -->
       <div class="flex-1 min-h-[200px]" #previewContainer></div>
 
       <!-- Component Info -->
-      <div class="p-4 border-t border-[rgb(var(--color-border-base))] text-xs text-[rgb(var(--color-text-muted))] space-y-2">
+      <div class="p-4 border-t border-[rgb(var(--color-border-base))] text-sm text-[rgb(var(--color-text-muted))] space-y-2">
         @if (state.activeConfig(); as form) {
           <p><strong class="text-[rgb(var(--color-text-subtle))]">ID:</strong> {{ form.id }}</p>
           <p><strong class="text-[rgb(var(--color-text-subtle))]">Type:</strong> {{ form.type }}</p>
