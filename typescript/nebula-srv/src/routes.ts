@@ -8324,6 +8324,158 @@ export function createRoutes(pool: Pool): Router {
   });
 
   // ════════════════════════════════════════════════════════════════
+  //  SYSTEM INVENTORY (unified cross-schema view)
+  // ════════════════════════════════════════════════════════════════
+
+  // GET /api/systems/:id/inventory — unified inventory joining
+  // nebula.systems → system_external_ids → terrain / registry / semantics.
+  // Returns all external ID links for a system, each resolved with its
+  // source-layer details (terrain service, registry peer, semantics asset).
+  router.get('/systems/:id/inventory', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params as { id: string };
+
+      // Validate UUID format before hitting the DB
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRe.test(id)) {
+        return res.status(400).json({ error: 'invalid_id', message: `'${id}' is not a valid UUID` });
+      }
+
+      // 1. Fetch the system
+      const { rows: [sys] } = await pool.query(
+        'SELECT id, name, description, path FROM systems WHERE id = $1',
+        [id],
+      );
+      if (!sys) return res.status(404).json({ error: 'System not found' });
+
+      // 2. Fetch all external IDs with resolved source-layer data.
+      //    LEFT JOIN terrain + registry (via service_identity_map) and
+      //    semantics in a single query so each row carries its relevant
+      //    resolved details. Rows where the source_schema doesn't match
+      //    get NULLs for that layer's columns.
+      const { rows } = await pool.query(
+        `SELECT
+           sei.id,
+           sei.source_schema AS "sourceSchema",
+           sei.source_table AS "sourceTable",
+           sei.source_id AS "sourceId",
+           sei.match_confidence AS "matchConfidence",
+           sei.match_method AS "matchMethod",
+           sei.role_in_system AS "roleInSystem",
+           sei.notes,
+           -- terrain layer
+           trs.id AS "terrainId",
+           trs.name AS "terrainName",
+           trs.port AS "terrainPort",
+           trs.status AS "terrainStatus",
+           trs.health_check_url AS "terrainHealthCheckUrl",
+           trs.workspace_path AS "terrainWorkspacePath",
+           trs.is_internal AS "terrainIsInternal",
+           -- registry layer (via service_identity_map from terrain)
+           rs.id AS "registryId",
+           rs.name AS "registryName",
+           rs.default_port AS "registryPort",
+           rs.status AS "registryStatus",
+           rs.description AS "registryDescription",
+           rs.version AS "registryVersion",
+           rs.repository_url AS "registryRepositoryUrl",
+           -- semantics layer
+           ca.id AS "assetId",
+           ca.canonical_asset_id AS "canonicalAssetId",
+           ca.asset_kind AS "assetKind",
+           ca.validity_start AS "assetValidityStart",
+           ca.validity_end AS "assetValidityEnd"
+         FROM nebula.system_external_ids sei
+         LEFT JOIN terrain.runnable_services trs
+           ON sei.source_schema = 'terrain'
+          AND sei.source_table = 'runnable_services'
+          AND trs.id::text = sei.source_id
+         LEFT JOIN registry.service_identity_map sim
+           ON sim.terrain_service_id = trs.id
+          AND sim.valid_until = '9999-12-31 00:00:00+00'
+         LEFT JOIN registry.services rs
+           ON rs.id = sim.registry_service_id
+         LEFT JOIN semantics.canonical_asset ca
+           ON sei.source_schema = 'semantics'
+          AND sei.source_table = 'canonical_asset'
+          AND ca.id::text = sei.source_id
+          AND ca.expired_at IS NULL
+         WHERE sei.system_id = $1
+           AND sei.recorded_until_dt = '9999-12-31 23:59:59+00'
+         ORDER BY sei.source_schema, sei.source_table, trs.name NULLS LAST`,
+        [id],
+      );
+
+      // 3. Assemble: each row gets its resolved source-layer object
+      const externalIds = rows.map((r: any) => {
+        const entry: any = {
+          id: r.id,
+          sourceSchema: r.sourceSchema,
+          sourceTable: r.sourceTable,
+          sourceId: r.sourceId,
+          matchConfidence: r.matchConfidence,
+          matchMethod: r.matchMethod,
+          roleInSystem: r.roleInSystem,
+          notes: r.notes,
+        };
+
+        if (r.terrainId !== null) {
+          entry.terrain = {
+            id: r.terrainId,
+            name: r.terrainName,
+            port: r.terrainPort,
+            status: r.terrainStatus,
+            healthCheckUrl: r.terrainHealthCheckUrl,
+            workspacePath: r.terrainWorkspacePath,
+            isInternal: r.terrainIsInternal,
+          };
+        }
+
+        if (r.registryId !== null) {
+          entry.registry = {
+            id: r.registryId,
+            name: r.registryName,
+            port: r.registryPort,
+            status: r.registryStatus,
+            description: r.registryDescription,
+            version: r.registryVersion,
+            repositoryUrl: r.registryRepositoryUrl,
+          };
+        }
+
+        if (r.assetId !== null) {
+          entry.semantics = {
+            id: r.assetId,
+            canonicalAssetId: r.canonicalAssetId,
+            assetKind: r.assetKind,
+            validityStart: r.assetValidityStart,
+            validityEnd: r.assetValidityEnd,
+          };
+        }
+
+        return entry;
+      });
+
+      // 4. Aggregate counts
+      const counts = {
+        totalExternalIds: externalIds.length,
+        terrainServices: externalIds.filter((e: any) => e.terrain).length,
+        registryServices: externalIds.filter((e: any) => e.registry).length,
+        semanticsAssets: externalIds.filter((e: any) => e.semantics).length,
+        roles: [...new Set(externalIds.map((e: any) => e.roleInSystem).filter(Boolean))] as string[],
+      };
+
+      res.json({
+        system: { id: sys.id, name: sys.name, description: sys.description, path: sys.path },
+        externalIds,
+        counts,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: 'inventory_failed', message: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
   //  SYSTEM EXTERNAL IDS (cross-schema junction)
   // ════════════════════════════════════════════════════════════════
 
