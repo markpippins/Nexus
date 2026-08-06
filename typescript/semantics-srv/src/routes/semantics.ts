@@ -104,6 +104,221 @@ semanticsRouter.get("/meta", async (_req, res) => {
   }
 });
 
+// ── T02: Asset identity spine — envelope routes ─────────────────────
+// Registered BEFORE the for-loop so they override the auto-gen flat
+// GET /canonical_asset/:id and GET /asset_revision/:id.
+// POST/PATCH/DELETE auto-gen routes on the same paths still work
+// because they use different HTTP methods.
+
+// GET /api/canonical_asset/:id — expanded envelope with revisions,
+// identity claims, relations, and cross-schema external IDs.
+semanticsRouter.get("/canonical_asset/:id", async (req, res) => {
+  try {
+    const db = getDb();
+    const assetId = req.params.id;
+
+    // 1. Fetch the asset (match on uuid or canonical_asset_id)
+    const { rows: [asset] } = await db.query(
+      `SELECT * FROM semantics.canonical_asset
+       WHERE (id::text = $1 OR canonical_asset_id = $1)
+         AND expired_at IS NULL
+       LIMIT 1`,
+      [assetId],
+    );
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${assetId} not found` });
+    }
+
+    // 2–4: run parallel queries (no cross-schema — those can fail independently)
+    const [revResult, claimResult, relResult] = await Promise.all([
+      // 2. Revisions with source_observations
+      db.query(
+        `SELECT ar.*,
+                COALESCE(json_agg(
+                  json_build_object(
+                    'id', so.id, 'platform', so.platform,
+                    'platformIdentifier', so.platform_identifier,
+                    'namespace', so.namespace, 'rawLocation', so.raw_location,
+                    'observedAt', so.observed_at, 'ingestionRunId', so.ingestion_run_id,
+                    'rawHash', so.raw_hash
+                  ) ORDER BY so.observed_at DESC
+                ) FILTER (WHERE so.id IS NOT NULL), '[]'::json) AS "sourceObservations",
+                parent.revision_id AS "parentRevisionId"
+         FROM semantics.asset_revision ar
+         LEFT JOIN semantics.source_observation so ON so.revision_id = ar.id AND so.expired_at IS NULL
+         LEFT JOIN semantics.asset_revision parent ON parent.id = ar.parent_revision_id
+         WHERE ar.asset_id = $1 AND ar.expired_at IS NULL
+         GROUP BY ar.id, parent.revision_id
+         ORDER BY ar.recording_start DESC NULLS LAST, ar.created_at DESC`,
+        [asset.id],
+      ),
+      // 3. Identity claims with candidate asset
+      db.query(
+        `SELECT aic.*,
+                json_build_object(
+                  'id', ca.id, 'canonicalAssetId', ca.canonical_asset_id,
+                  'assetKind', ca.asset_kind, 'canonicalKey', ca.canonical_key
+                ) AS "candidateAsset"
+         FROM semantics.asset_identity_claim aic
+         LEFT JOIN semantics.canonical_asset ca ON ca.id = aic.candidate_asset_id AND ca.expired_at IS NULL
+         WHERE aic.asset_id = $1 AND aic.expired_at IS NULL
+         ORDER BY aic.created_at DESC`,
+        [asset.id],
+      ),
+      // 4. Relations with related asset (resolve both directions).
+      // NOTE: CASE in JOIN ON clause trades index usage for a single
+      // query instead of a UNION — fine for small relation tables.
+      db.query(
+        `SELECT ar.*,
+                json_build_object(
+                  'id', ca.id, 'canonicalAssetId', ca.canonical_asset_id,
+                  'assetKind', ca.asset_kind, 'canonicalKey', ca.canonical_key
+                ) AS "relatedAsset",
+                CASE WHEN ar.from_asset_id = $1 THEN 'outbound' ELSE 'inbound' END AS direction
+         FROM semantics.asset_relation ar
+         JOIN semantics.canonical_asset ca ON ca.id =
+           CASE WHEN ar.from_asset_id = $1 THEN ar.to_asset_id ELSE ar.from_asset_id END
+           AND ca.expired_at IS NULL
+         WHERE (ar.from_asset_id = $1 OR ar.to_asset_id = $1)
+           AND ar.expired_at IS NULL
+         ORDER BY ar.effective_at DESC`,
+        [asset.id],
+      ),
+    ]);
+
+    // 5. Cross-schema external IDs — run separately so a nebula schema
+    //    outage doesn't 500 the entire envelope. Graceful degrade to [].
+    let extRows: any[] = [];
+    try {
+      const { rows } = await db.query(
+        `SELECT sei.id, sei.source_schema AS "sourceSchema",
+                sei.source_table AS "sourceTable", sei.source_id AS "sourceId",
+                sei.match_confidence AS "matchConfidence",
+                sei.match_method AS "matchMethod",
+                sei.role_in_system AS "roleInSystem", sei.notes,
+                json_build_object(
+                  'id', ns.id, 'name', ns.name,
+                  'description', ns.description
+                ) AS "nebulaSystem"
+         FROM nebula.system_external_ids sei
+         JOIN nebula.systems ns ON ns.id = sei.system_id
+         WHERE sei.source_schema = 'semantics'
+           AND sei.source_table = 'canonical_asset'
+           AND sei.source_id = $1
+           AND sei.recorded_until_dt = '9999-12-31 23:59:59+00'
+         ORDER BY sei.match_confidence DESC`,
+        [asset.id],
+      );
+      extRows = rows;
+    } catch {
+      // nebula schema may not be accessible in all environments
+    }
+
+    // Assemble the envelope
+    const revisions = (revResult.rows || []).map((r: any) => ({
+      id: r.id,
+      revisionId: r.revision_id,
+      contentHash: r.content_hash,
+      sourceHash: r.source_hash,
+      recordingStart: r.recording_start,
+      recordingEnd: r.recording_end,
+      createdBy: r.created_by,
+      createdAt: r.created_at,
+      parentRevisionId: r.parentRevisionId || null,
+      sourceObservations: r.sourceObservations || [],
+    }));
+
+    const identityClaims = (claimResult.rows || []).map((c: any) => ({
+      id: c.id,
+      claimType: c.claim_type,
+      confidence: c.confidence,
+      basis: c.basis,
+      status: c.status,
+      decidedBy: c.decided_by,
+      decidedAt: c.decided_at,
+      candidateAsset: c.candidateAsset || null,
+    }));
+
+    const relations = (relResult.rows || []).map((r: any) => ({
+      id: r.id,
+      relationType: r.relation_type,
+      direction: r.direction,
+      effectiveAt: r.effective_at,
+      decidedBy: r.decided_by,
+      decidedAt: r.decided_at,
+      relatedAsset: r.relatedAsset,
+    }));
+
+    const externalIds = extRows;
+
+    res.json({
+      id: asset.id,
+      canonicalAssetId: asset.canonical_asset_id,
+      assetKind: asset.asset_kind,
+      canonicalKey: asset.canonical_key,
+      sourceHash: asset.source_hash,
+      contentHash: asset.content_hash,
+      validityStart: asset.validity_start,
+      validityEnd: asset.validity_end,
+      createdAt: asset.created_at,
+      expiredAt: asset.expired_at,
+      revisions,
+      identityClaims,
+      relations,
+      externalIds,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "envelope_failed", message: err.message });
+  }
+});
+
+// GET /api/asset_revision/:id — expanded envelope with asset,
+// source observations, parent revision, and child revisions.
+semanticsRouter.get("/asset_revision/:id", async (req, res) => {
+  try {
+    const db = getDb();
+
+    // Fetch the revision
+    const { rows: [rev] } = await db.query(
+      `SELECT * FROM semantics.asset_revision
+       WHERE (id::text = $1 OR revision_id = $1)
+         AND expired_at IS NULL
+       LIMIT 1`,
+      [req.params.id],
+    );
+    if (!rev) {
+      return res.status(404).json({ error: "not_found", message: `asset_revision ${req.params.id} not found` });
+    }
+
+    // Parallel: asset, source observations, parent, children
+    const [assetResult, soResult, parentResult, childResult] = await Promise.all([
+      db.query("SELECT * FROM semantics.canonical_asset WHERE id = $1 AND expired_at IS NULL", [rev.asset_id]),
+      db.query("SELECT * FROM semantics.source_observation WHERE revision_id = $1 AND expired_at IS NULL ORDER BY observed_at DESC", [rev.id]),
+      rev.parent_revision_id
+        ? db.query("SELECT id, revision_id, content_hash, created_at FROM semantics.asset_revision WHERE id = $1", [rev.parent_revision_id])
+        : Promise.resolve({ rows: [] }),
+      db.query("SELECT id, revision_id, content_hash, created_at FROM semantics.asset_revision WHERE parent_revision_id = $1 AND expired_at IS NULL ORDER BY created_at DESC", [rev.id]),
+    ]);
+
+    res.json({
+      id: rev.id,
+      revisionId: rev.revision_id,
+      contentHash: rev.content_hash,
+      sourceHash: rev.source_hash,
+      recordingStart: rev.recording_start,
+      recordingEnd: rev.recording_end,
+      createdBy: rev.created_by,
+      createdAt: rev.created_at,
+      asset: assetResult.rows[0] || null,
+      sourceObservations: soResult.rows,
+      parentRevision: parentResult.rows[0] || null,
+      childRevisions: childResult.rows,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "envelope_failed", message: err.message });
+  }
+});
+
 // ── Generated per-table CRUD ─────────────────────────────────────────
 
 for (const t of TABLES) {
@@ -301,6 +516,215 @@ semanticsRouter.get("/representation_relationship/:id/evidence", async (req, res
     });
   } catch (err: any) {
     res.status(500).json({ error: "evidence_lookup_failed", message: err.message });
+  }
+});
+
+// ── T02: Asset sub-resource routes ───────────────────────────────────
+
+// GET /api/canonical_asset/:id/revisions — paginated revisions
+semanticsRouter.get("/canonical_asset/:id/revisions", async (req, res) => {
+  try {
+    const db = getDb();
+    const limit = Math.min(parseInt(String(req.query.limit || "50"), 10) || 50, 200);
+    const offset = Math.max(parseInt(String(req.query.offset || "0"), 10) || 0, 0);
+
+    // Resolve asset first (match on uuid or canonical_asset_id)
+    const { rows: [asset] } = await db.query(
+      "SELECT id, canonical_asset_id, asset_kind FROM semantics.canonical_asset WHERE (id::text = $1 OR canonical_asset_id = $1) AND expired_at IS NULL LIMIT 1",
+      [req.params.id],
+    );
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${req.params.id} not found` });
+    }
+
+    const { rows: revisions } = await db.query(
+      `SELECT ar.*,
+              COALESCE(json_agg(
+                json_build_object(
+                  'id', so.id, 'platform', so.platform,
+                  'platformIdentifier', so.platform_identifier,
+                  'namespace', so.namespace, 'rawLocation', so.raw_location,
+                  'observedAt', so.observed_at, 'ingestionRunId', so.ingestion_run_id,
+                  'rawHash', so.raw_hash
+                ) ORDER BY so.observed_at DESC
+              ) FILTER (WHERE so.id IS NOT NULL), '[]'::json) AS "sourceObservations",
+              parent.revision_id AS "parentRevisionId"
+       FROM semantics.asset_revision ar
+       LEFT JOIN semantics.source_observation so ON so.revision_id = ar.id AND so.expired_at IS NULL
+       LEFT JOIN semantics.asset_revision parent ON parent.id = ar.parent_revision_id
+       WHERE ar.asset_id = $1 AND ar.expired_at IS NULL
+       GROUP BY ar.id, parent.revision_id
+       ORDER BY ar.recording_start DESC NULLS LAST, ar.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [asset.id, limit, offset],
+    );
+
+    const { rows: [{ count }] } = await db.query(
+      "SELECT count(*)::int FROM semantics.asset_revision WHERE asset_id = $1 AND expired_at IS NULL",
+      [asset.id],
+    );
+
+    res.json({
+      asset: { id: asset.id, canonicalAssetId: asset.canonical_asset_id, assetKind: asset.asset_kind },
+      revisions: (revisions || []).map((r: any) => ({
+        id: r.id,
+        revisionId: r.revision_id,
+        contentHash: r.content_hash,
+        sourceHash: r.source_hash,
+        recordingStart: r.recording_start,
+        recordingEnd: r.recording_end,
+        createdBy: r.created_by,
+        createdAt: r.created_at,
+        parentRevisionId: r.parentRevisionId || null,
+        sourceObservations: r.sourceObservations || [],
+      })),
+      count,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "revisions_failed", message: err.message });
+  }
+});
+
+// GET /api/canonical_asset/:id/identity-claims
+semanticsRouter.get("/canonical_asset/:id/identity-claims", async (req, res) => {
+  try {
+    const db = getDb();
+
+    const { rows: [asset] } = await db.query(
+      "SELECT id, canonical_asset_id, asset_kind FROM semantics.canonical_asset WHERE (id::text = $1 OR canonical_asset_id = $1) AND expired_at IS NULL LIMIT 1",
+      [req.params.id],
+    );
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${req.params.id} not found` });
+    }
+
+    const { rows: claims } = await db.query(
+      `SELECT aic.*,
+              json_build_object(
+                'id', ca.id, 'canonicalAssetId', ca.canonical_asset_id,
+                'assetKind', ca.asset_kind, 'canonicalKey', ca.canonical_key
+              ) AS "candidateAsset"
+       FROM semantics.asset_identity_claim aic
+       LEFT JOIN semantics.canonical_asset ca ON ca.id = aic.candidate_asset_id AND ca.expired_at IS NULL
+       WHERE aic.asset_id = $1 AND aic.expired_at IS NULL
+       ORDER BY aic.created_at DESC`,
+      [asset.id],
+    );
+
+    res.json({
+      asset: { id: asset.id, canonicalAssetId: asset.canonical_asset_id, assetKind: asset.asset_kind },
+      claims: (claims || []).map((c: any) => ({
+        id: c.id,
+        claimType: c.claim_type,
+        confidence: c.confidence,
+        basis: c.basis,
+        status: c.status,
+        decidedBy: c.decided_by,
+        decidedAt: c.decided_at,
+        createdAt: c.created_at,
+        candidateAsset: c.candidateAsset || null,
+      })),
+      count: claims.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "claims_failed", message: err.message });
+  }
+});
+
+// GET /api/canonical_asset/:id/relations
+semanticsRouter.get("/canonical_asset/:id/relations", async (req, res) => {
+  try {
+    const db = getDb();
+
+    const { rows: [asset] } = await db.query(
+      "SELECT id, canonical_asset_id, asset_kind FROM semantics.canonical_asset WHERE (id::text = $1 OR canonical_asset_id = $1) AND expired_at IS NULL LIMIT 1",
+      [req.params.id],
+    );
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${req.params.id} not found` });
+    }
+
+    const { rows: relations } = await db.query(
+      `SELECT ar.*,
+              json_build_object(
+                'id', ca.id, 'canonicalAssetId', ca.canonical_asset_id,
+                'assetKind', ca.asset_kind, 'canonicalKey', ca.canonical_key
+              ) AS "relatedAsset",
+              CASE WHEN ar.from_asset_id = $1 THEN 'outbound' ELSE 'inbound' END AS direction
+       FROM semantics.asset_relation ar
+       JOIN semantics.canonical_asset ca ON ca.id =
+         CASE WHEN ar.from_asset_id = $1 THEN ar.to_asset_id ELSE ar.from_asset_id END
+         AND ca.expired_at IS NULL
+       WHERE (ar.from_asset_id = $1 OR ar.to_asset_id = $1)
+         AND ar.expired_at IS NULL
+       ORDER BY ar.effective_at DESC`,
+      [asset.id],
+    );
+
+    res.json({
+      asset: { id: asset.id, canonicalAssetId: asset.canonical_asset_id, assetKind: asset.asset_kind },
+      relations: (relations || []).map((r: any) => ({
+        id: r.id,
+        relationType: r.relation_type,
+        direction: r.direction,
+        effectiveAt: r.effective_at,
+        decidedBy: r.decided_by,
+        decidedAt: r.decided_at,
+        relatedAsset: r.relatedAsset,
+      })),
+      count: relations.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "relations_failed", message: err.message });
+  }
+});
+
+// GET /api/canonical_asset/:id/external-ids — cross-schema bridge
+semanticsRouter.get("/canonical_asset/:id/external-ids", async (req, res) => {
+  try {
+    const db = getDb();
+
+    const { rows: [asset] } = await db.query(
+      "SELECT id, canonical_asset_id, asset_kind FROM semantics.canonical_asset WHERE (id::text = $1 OR canonical_asset_id = $1) AND expired_at IS NULL LIMIT 1",
+      [req.params.id],
+    );
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${req.params.id} not found` });
+    }
+
+    let externalIds: any[] = [];
+    try {
+      const { rows } = await db.query(
+        `SELECT sei.id, sei.source_schema AS "sourceSchema",
+                sei.source_table AS "sourceTable", sei.source_id AS "sourceId",
+                sei.match_confidence AS "matchConfidence",
+                sei.match_method AS "matchMethod",
+                sei.role_in_system AS "roleInSystem", sei.notes,
+                json_build_object(
+                  'id', ns.id, 'name', ns.name,
+                  'description', ns.description
+                ) AS "nebulaSystem"
+         FROM nebula.system_external_ids sei
+         JOIN nebula.systems ns ON ns.id = sei.system_id
+         WHERE sei.source_schema = 'semantics'
+           AND sei.source_table = 'canonical_asset'
+           AND sei.source_id = $1
+           AND sei.recorded_until_dt = '9999-12-31 23:59:59+00'
+         ORDER BY sei.match_confidence DESC`,
+        [asset.id],
+      );
+      externalIds = rows;
+    } catch {
+      // nebula schema may not be accessible in all environments — graceful degrade
+    }
+
+    res.json({
+      asset: { id: asset.id, canonicalAssetId: asset.canonical_asset_id, assetKind: asset.asset_kind },
+      externalIds,
+      count: externalIds.length,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "external_ids_failed", message: err.message });
   }
 });
 
