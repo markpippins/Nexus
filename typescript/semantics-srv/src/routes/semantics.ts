@@ -728,6 +728,326 @@ semanticsRouter.get("/canonical_asset/:id/external-ids", async (req, res) => {
   }
 });
 
+// ── T02: Mutation routes for sub-resources ───────────────────────────
+
+// Helper: resolve a canonical_asset by uuid or canonical_asset_id.
+// Returns the asset row or null.
+async function resolveAsset(db: any, id: string): Promise<any> {
+  const { rows: [asset] } = await db.query(
+    "SELECT * FROM semantics.canonical_asset WHERE (id::text = $1 OR canonical_asset_id = $1) AND expired_at IS NULL LIMIT 1",
+    [id],
+  );
+  return asset || null;
+}
+
+// POST /api/canonical_asset/:id/revisions — create a revision scoped to an asset
+semanticsRouter.post("/canonical_asset/:id/revisions", async (req, res) => {
+  try {
+    const db = getDb();
+    const asset = await resolveAsset(db, req.params.id);
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${req.params.id} not found` });
+    }
+
+    const body = req.body || {};
+    const params: string[] = [];
+    const values: any[] = [];
+    const push = (name: string, val: any) => { values.push(val); params.push(`${name} => $${values.length}`); };
+
+    push("p_asset_id", asset.id);
+    if (body.revisionId !== undefined) push("p_revision_id", body.revisionId);
+    if (body.contentHash !== undefined) push("p_content_hash", body.contentHash);
+    if (body.sourceHash !== undefined) push("p_source_hash", body.sourceHash);
+    if (body.parentRevisionId !== undefined) push("p_parent_revision_id", body.parentRevisionId);
+    if (body.recordingStart !== undefined) push("p_recording_start", body.recordingStart);
+    if (body.recordingEnd !== undefined) push("p_recording_end", body.recordingEnd);
+    if (body.createdBy !== undefined) push("p_created_by", body.createdBy);
+
+    const { rows: [revision] } = await db.query(
+      `SELECT * FROM semantics.add_asset_revision(${params.join(", ")})`,
+      values,
+    );
+    res.status(201).json(revision);
+  } catch (err: any) {
+    const isDup = err?.code === "23505";
+    res.status(isDup ? 400 : 500).json({
+      error: isDup ? "duplicate_active_key" : "add_revision_failed",
+      message: err.message,
+    });
+  }
+});
+
+// POST /api/canonical_asset/:id/identity-claims — create a claim scoped to an asset
+semanticsRouter.post("/canonical_asset/:id/identity-claims", async (req, res) => {
+  try {
+    const db = getDb();
+    const asset = await resolveAsset(db, req.params.id);
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${req.params.id} not found` });
+    }
+
+    const body = req.body || {};
+    const params: string[] = [];
+    const values: any[] = [];
+    const push = (name: string, val: any) => { values.push(val); params.push(`${name} => $${values.length}`); };
+
+    push("p_asset_id", asset.id);
+    if (body.candidateAssetId !== undefined) push("p_candidate_asset_id", body.candidateAssetId);
+    if (body.claimType !== undefined) push("p_claim_type", body.claimType);
+    if (body.confidence !== undefined) push("p_confidence", body.confidence);
+    if (body.basis !== undefined) push("p_basis", body.basis);
+    if (body.status !== undefined) push("p_status", body.status);
+    if (body.decidedBy !== undefined) push("p_decided_by", body.decidedBy);
+
+    const { rows: [claim] } = await db.query(
+      `SELECT * FROM semantics.add_asset_identity_claim(${params.join(", ")})`,
+      values,
+    );
+    res.status(201).json(claim);
+  } catch (err: any) {
+    const isDup = err?.code === "23505";
+    res.status(isDup ? 400 : 500).json({
+      error: isDup ? "duplicate_active_key" : "add_claim_failed",
+      message: err.message,
+    });
+  }
+});
+
+// POST /api/canonical_asset/:id/relations — create a relation with automatic
+// direction resolution. The asset in :id becomes `from_asset_id`; the body's
+// `relatedAssetId` becomes `to_asset_id`. The relation is directional —
+// use relation_type values like supersedes, derives_from, contradicts, etc.
+semanticsRouter.post("/canonical_asset/:id/relations", async (req, res) => {
+  try {
+    const db = getDb();
+    const asset = await resolveAsset(db, req.params.id);
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${req.params.id} not found` });
+    }
+
+    const body = req.body || {};
+    if (!body.relatedAssetId) {
+      return res.status(400).json({ error: "missing_field", message: "relatedAssetId is required" });
+    }
+    if (!body.relationType) {
+      return res.status(400).json({ error: "missing_field", message: "relationType is required" });
+    }
+
+    // Resolve the related asset
+    const related = await resolveAsset(db, body.relatedAssetId);
+    if (!related) {
+      return res.status(404).json({ error: "not_found", message: `related asset ${body.relatedAssetId} not found` });
+    }
+
+    if (asset.id === related.id) {
+      return res.status(400).json({ error: "self_relation", message: "Cannot relate an asset to itself" });
+    }
+
+    const params: string[] = [];
+    const values: any[] = [];
+    const push = (name: string, val: any) => { values.push(val); params.push(`${name} => $${values.length}`); };
+
+    push("p_from_asset_id", asset.id);
+    push("p_to_asset_id", related.id);
+    push("p_relation_type", body.relationType);
+    if (body.decidedBy !== undefined) push("p_decided_by", body.decidedBy);
+    if (body.effectiveAt !== undefined) push("p_effective_at", body.effectiveAt);
+
+    const { rows: [relation] } = await db.query(
+      `SELECT * FROM semantics.add_asset_relation(${params.join(", ")})`,
+      values,
+    );
+
+    res.status(201).json({
+      ...relation,
+      fromAsset: { id: asset.id, canonicalAssetId: asset.canonical_asset_id, assetKind: asset.asset_kind },
+      toAsset: { id: related.id, canonicalAssetId: related.canonical_asset_id, assetKind: related.asset_kind },
+    });
+  } catch (err: any) {
+    const isDup = err?.code === "23505";
+    res.status(isDup ? 400 : 500).json({
+      error: isDup ? "duplicate_active_key" : "add_relation_failed",
+      message: err.message,
+    });
+  }
+});
+
+// POST /api/asset_identity_claim/:id/resolve — lifecycle transition
+// (open → resolved | rejected). Sets decided_by and decided_at.
+semanticsRouter.post("/asset_identity_claim/:id/resolve", async (req, res) => {
+  try {
+    const db = getDb();
+    const body = req.body || {};
+    const status = body.status;
+
+    if (!status || !["resolved", "rejected"].includes(status)) {
+      return res.status(400).json({
+        error: "invalid_status",
+        message: "status must be 'resolved' or 'rejected'",
+      });
+    }
+
+    // Fetch current state
+    const { rows: [claim] } = await db.query(
+      "SELECT * FROM semantics.asset_identity_claim WHERE id = $1 AND expired_at IS NULL",
+      [req.params.id],
+    );
+    if (!claim) {
+      return res.status(404).json({ error: "not_found", message: `claim ${req.params.id} not found` });
+    }
+    if (claim.status !== "open") {
+      return res.status(400).json({
+        error: "invalid_transition",
+        message: `Claim is already ${claim.status} — only 'open' claims can be resolved`,
+      });
+    }
+
+    // Update via the append-only update_ proc — must pass all NOT NULL
+    // fields from the original claim (asset_id, claim_type, status) so
+    // the new row passes constraints.
+    const { rows: [updated] } = await db.query(
+      `SELECT * FROM semantics.update_asset_identity_claim(
+         p_id => $1, p_asset_id => $2, p_candidate_asset_id => $3,
+         p_claim_type => $4, p_confidence => $5, p_basis => $6,
+         p_status => $7, p_decided_by => $8, p_decided_at => $9
+       )`,
+      [
+        req.params.id,
+        claim.asset_id,
+        claim.candidate_asset_id,
+        claim.claim_type,
+        claim.confidence,
+        claim.basis,
+        status,
+        body.decidedBy || claim.decided_by || null,
+        new Date().toISOString(),
+      ],
+    );
+
+    res.json({
+      ...updated,
+      supersededId: req.params.id,
+      previousStatus: "open",
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "resolve_failed", message: err.message });
+  }
+});
+
+// POST /api/canonical_asset/:id/external-ids — create a cross-schema link
+// in nebula.system_external_ids_history pointing to this canonical_asset.
+semanticsRouter.post("/canonical_asset/:id/external-ids", async (req, res) => {
+  try {
+    const db = getDb();
+    const asset = await resolveAsset(db, req.params.id);
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${req.params.id} not found` });
+    }
+
+    const body = req.body || {};
+    if (!body.nebulaSystemId) {
+      return res.status(400).json({ error: "missing_field", message: "nebulaSystemId is required" });
+    }
+
+    // Verify the nebula system exists
+    const { rows: [sys] } = await db.query(
+      "SELECT id, name, description FROM nebula.systems WHERE id = $1",
+      [body.nebulaSystemId],
+    );
+    if (!sys) {
+      return res.status(404).json({ error: "not_found", message: `nebula system ${body.nebulaSystemId} not found` });
+    }
+
+    // Auto-populate source fields from the canonical_asset context
+    const sourceSchema = body.sourceSchema || "semantics";
+    const sourceTable = body.sourceTable || "canonical_asset";
+    const sourceId = body.sourceId || asset.id;
+
+    // WHERE NOT EXISTS guard — duplicate detection
+    const { rows: [existing] } = await db.query(
+      `SELECT id FROM nebula.system_external_ids_history
+       WHERE system_id = $1 AND source_schema = $2 AND source_table = $3
+         AND source_id = $4 AND role_in_system IS NOT DISTINCT FROM $5
+         AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
+      [sys.id, sourceSchema, sourceTable, sourceId, body.roleInSystem || null],
+    );
+    if (existing) {
+      return res.status(409).json({
+        error: "duplicate_active_key",
+        message: "An active external ID link already exists for this (system, schema, table, source, role)",
+        existingId: existing.id,
+      });
+    }
+
+    const { rows: [link] } = await db.query(
+      `INSERT INTO nebula.system_external_ids_history
+         (system_id, source_schema, source_table, source_id,
+          match_confidence, match_method, role_in_system, notes,
+          recorded_on_dt, recorded_until_dt)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), '9999-12-31 23:59:59+00')
+       RETURNING *`,
+      [
+        sys.id,
+        sourceSchema,
+        sourceTable,
+        sourceId,
+        body.matchConfidence ?? null,
+        body.matchMethod || "manual",
+        body.roleInSystem || null,
+        body.notes || null,
+      ],
+    );
+
+    res.status(201).json({
+      ...link,
+      nebulaSystem: { id: sys.id, name: sys.name, description: sys.description },
+      canonicalAsset: { id: asset.id, canonicalAssetId: asset.canonical_asset_id, assetKind: asset.asset_kind },
+    });
+  } catch (err: any) {
+    const isDup = err?.code === "23505";
+    res.status(isDup ? 409 : 500).json({
+      error: isDup ? "duplicate_active_key" : "link_failed",
+      message: err.message,
+    });
+  }
+});
+
+// DELETE /api/canonical_asset/:id/external-ids/:eid — soft-expire a cross-schema link
+semanticsRouter.delete("/canonical_asset/:id/external-ids/:eid", async (req, res) => {
+  try {
+    const db = getDb();
+
+    // Verify the asset exists
+    const asset = await resolveAsset(db, req.params.id);
+    if (!asset) {
+      return res.status(404).json({ error: "not_found", message: `canonical_asset ${req.params.id} not found` });
+    }
+
+    const { rows: [result] } = await db.query(
+      `UPDATE nebula.system_external_ids_history
+       SET recorded_until_dt = now()
+       WHERE id = $1
+         AND source_schema = 'semantics'
+         AND source_table = 'canonical_asset'
+         AND source_id = $2
+         AND recorded_until_dt = '9999-12-31 23:59:59+00'
+       RETURNING id`,
+      [req.params.eid, asset.id],
+    );
+
+    if (!result) {
+      return res.status(404).json({
+        error: "not_found",
+        message: `External ID link ${req.params.eid} not found or already expired for this asset`,
+      });
+    }
+
+    res.json({ id: req.params.eid, deleted: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "unlink_failed", message: err.message });
+  }
+});
+
 // ── Drift lifecycle ──────────────────────────────────────────────────
 
 // POST /api/drift_finding/:id/resolve — detected → resolved
