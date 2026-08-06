@@ -590,14 +590,15 @@ export const toolDefinitions: MCPToolDefinition[] = [
   {
     name: "runtime_transition",
     description: "Apply a transition event to a WorkRequest. Validates against the state machine. " +
-      "Allowed types: WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED.",
+      "Allowed types: WR_VALIDATED, WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED " +
+      "(WR_VALIDATED: VALIDATED→QUEUED — used by the ADR-006 cascade admission subscriber).",
     inputSchema: {
       type: "object",
       properties: {
         wrId: { type: "string", description: "WorkRequest ID" },
         type: {
           type: "string",
-          description: "Event type (WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED)",
+          description: "Event type (WR_VALIDATED, WR_CLAIMED, WR_ACKED, WR_SETTLED, WR_REJECTED, WR_FAILED, WR_NOOP, WR_DEFERRED)",
         },
         payload: {
           type: "object",
