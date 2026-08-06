@@ -5,7 +5,7 @@
 
 Assembly forum service: forums, threads, comments, users, harvests, work requests, agent records, agendas, plans, specifications, assessments, observations, search, counts, and stats refresh.
 
-**69 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**71 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -29,6 +29,8 @@ Assembly forum service: forums, threads, comments, users, harvests, work request
 | GET | `/api/bridges/supporting-refs/post/:postId` |  |
 | GET | `/api/candidates` | Path remapping: assembly-srv /api/candidates → nebula-srv /api/harvest-candidates |
 | GET | `/api/candidates/:id` |  |
+| GET | `/api/conversations` |  |
+| GET | `/api/conversations/:id` |  |
 | GET | `/api/counts` |  |
 | GET | `/api/feed` |  |
 | POST | `/api/feed` |  |
