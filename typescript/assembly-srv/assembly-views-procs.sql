@@ -297,7 +297,7 @@ BEGIN
     -- If parentId provided, validate it belongs to this thread
     IF p_parent_id IS NOT NULL THEN
         WITH RECURSIVE chain AS (
-            SELECT id, parent_id, post_id FROM assembly.comments WHERE id = p_parent_id
+            SELECT c.id, c.parent_id, c.post_id FROM assembly.comments c WHERE c.id = p_parent_id
             UNION ALL
             SELECT c.id, c.parent_id, c.post_id
             FROM assembly.comments c

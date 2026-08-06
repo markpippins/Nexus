@@ -8,6 +8,7 @@ import { requirementsRouter } from './requirements.js';
 import { agendasRouter } from './agendas.js';
 import { candidatesRouter } from './candidates.js';
 import { harvestsRouter } from './harvests.js';
+import { conversationsRouter } from './conversations.js';
 
 import { openQuestionsRouter } from './open-questions.js';
 import { intentsRouter } from './intents.js';
@@ -35,6 +36,7 @@ routes.use('/requirements', requirementsRouter);
 routes.use('/agendas', agendasRouter);
 routes.use('/candidates', candidatesRouter);
 routes.use('/harvests', harvestsRouter);
+routes.use('/conversations', conversationsRouter);
 
 routes.use('/open-questions', openQuestionsRouter);
 routes.use('/intents', intentsRouter);
