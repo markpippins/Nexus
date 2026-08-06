@@ -40,6 +40,7 @@ ALL_SERVICES=(
     "wrp-bridge-daemon.service" # conduit→kernel sync
     "cascade-kernel-subscriber.service" # pg_notify → NATS (kernel transitions)
     "cascade-obs-subscriber.service"   # pg_notify → NATS (PEB governance + Vision lifecycle)
+    "cascade-admission-subscriber.service" # NATS → WR_VALIDATED + execution.requests mirror (ADR-006)
 
     # API servers
     "vision-srv-py.service"    # port 8003 — Vision Python
@@ -123,6 +124,7 @@ SERVICE_PORTS=(
     ["cascade-srv.service"]="3106"
     ["role-memory-srv.service"]="3500"
     # wrp-bridge-daemon — no HTTP health endpoint
+    # cascade-admission-subscriber — no HTTP health endpoint
     ["vision-srv-py.service"]="8003"
     ["losm-host.service"]="8006"
     # image-server — no HTTP health endpoint
