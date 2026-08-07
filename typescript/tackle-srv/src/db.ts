@@ -1713,18 +1713,32 @@ BEGIN
     VALUES (
         'planner-create-plan',
         'Planner: Create & Manage Plans',
-        'How to create, propose, update, and promote implementation plans via conduit-mcp.',
+        'How to create, update, and promote implementation plans (via nebula_create_plan), and route DB-change plans to the Engineer before a Builder starts.',
         E'## Creating & Managing Plans\\n\\n'
-        '### Proposed Plan (new idea)\\n'
-        'Use \`conduit-mcp_create_proposed_plan\` with title, project, and goal. '
-        'Issues a PROPOSED receipt; file goes to proposed/.\\n\\n'
-        '### Full Plan (ready for implementation)\\n'
-        'Use \`conduit-mcp_create_plan\` with title, project, goal, filesAffected, '
-        'acceptanceCriteria, and dependencies. Issues a PLAN_CREATE receipt; '
-        'file goes to pending/.\\n\\n'
-        '### Promote Proposed to Planning\\n'
-        'Use \`conduit-mcp_promote_plan\` with the plan number. '
-        'Saves any edits and issues a PLANNING receipt.\\n\\n'
+        '### Create a Plan (ready for implementation)\\n'
+        'Use \`nebula_create_plan\` (nebula-mcp) with title, project, goal, filesAffected, '
+        'acceptanceCriteria, and dependencies. conduit-mcp create_plan / create_proposed_plan '
+        'are REMOVED stubs (TOOL_NOT_FOUND) — do not call them. The plan lands in '
+        'nebula.implementation_plans (status pending) and conduit-mcp auto-bootstraps a '
+        'PLAN_CREATE receipt + builder ticket within ~30s.\\n\\n'
+        '### Proposed / Planning states\\n'
+        'There is no create_proposed_plan tool. Start ideas as a full plan via nebula_create_plan; '
+        'use \`conduit-mcp_revise_plan\` to create a revision copy for planning discussion. '
+        'Use \`conduit-mcp_update_plan\` / \`conduit-mcp_report_plan_metadata\` '
+        'to set filesAffected, acceptanceCriteria, dependencies.\\n\\n'
+        '### ⚠ DB-Change Routing (mandatory rule)\\n'
+        '**Plans that require database changes go to the Engineer for the DB work BEFORE a '
+        'Builder starts implementation.** When creating or updating a plan whose goal, '
+        'filesAffected, or acceptance criteria involve schema changes, migrations, DDL, '
+        'seed/data backfills, or index changes:\\n'
+        '1. Write a nebula agent record tagged \`["to:engineer", "type:db-change", "planRef:<N>", "status:open"]\` '
+        'describing exactly which database changes are required (tables, columns, '
+        'migrations, data). Use recordType report.\\n'
+        '2. Put the DB change as the FIRST acceptance criterion of the plan so the builder '
+        'knows the schema must exist before implementation.\\n'
+        '3. The Builder must not start implementation until the Engineer completes the '
+        'DB change and the plan is still pending/ready. If a builder ticket is already '
+        'open for a DB-change plan, escalate via \`type:escalation\` to keep sequencing.\\n\\n'
         '### Update Metadata\\n'
         'Use \`conduit-mcp_update_plan\` or \`conduit-mcp_report_plan_metadata\` '
         'to set filesAffected, acceptanceCriteria, dependencies.\\n\\n'
@@ -1732,16 +1746,16 @@ BEGIN
         'Use \`conduit-mcp_revise_plan\` to create a revision copy (issues PLANNING on the new copy).\\n\\n'
         '### Issue Receipts (state transitions)\\n'
         'Use \`conduit-mcp_issue_receipt\` with plan_id, type (PLAN_CREATE|IMPLEMENTATION|'
-        'REVIEW_PASS|REVIEW_REJECT|BLOCK|CANCELLED), and agent_role.\\n\\n'
+        'REVIEW_PASS|REVIEW_REJECT|BLOCK|PLANNING|HOLD|CANCELLED), and agent_role.\\n\\n'
         '### Delete a Plan\\n'
         'Use \`conduit-mcp_delete_plan\` for soft-delete (preserves audit trail). '
         'Use \`conduit-mcp_hard_delete_plan\` (with title confirmation) for permanent removal.',
-        ARRAY['planner', 'plans', 'create', 'manage', 'workflow'],
-        ARRAY['create plan', 'new plan', 'propose plan', 'promote plan', 'delete plan'],
-        ARRAY['conduit-mcp_create_proposed_plan', 'conduit-mcp_create_plan',
-              'conduit-mcp_promote_plan', 'conduit-mcp_update_plan',
-              'conduit-mcp_issue_receipt', 'conduit-mcp_delete_plan',
-              'conduit-mcp_revise_plan']
+        ARRAY['planner', 'plans', 'create', 'manage', 'workflow', 'db-change'],
+        ARRAY['create plan', 'new plan', 'propose plan', 'promote plan', 'delete plan',
+              'database change', 'schema change', 'migration'],
+        ARRAY['nebula_create_plan', 'conduit-mcp_update_plan',
+              'conduit-mcp_revise_plan', 'conduit-mcp_issue_receipt',
+              'conduit-mcp_delete_plan', 'conduit-mcp_hard_delete_plan']
     )
     ON CONFLICT (slug) DO NOTHING
     RETURNING id INTO v_memory_id;
