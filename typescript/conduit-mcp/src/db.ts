@@ -409,25 +409,9 @@ async function createSchema(
   await exec(`CREATE SCHEMA IF NOT EXISTS ${TACKLE_SCHEMA}`);
 
   await exec(`
-    CREATE TABLE IF NOT EXISTS plans (
-      id            TEXT PRIMARY KEY,
-      file_name     TEXT NOT NULL,
-      title         TEXT NOT NULL DEFAULT '',
-      project       TEXT NOT NULL DEFAULT '',
-      goal          TEXT NOT NULL DEFAULT '',
-      content       TEXT NOT NULL DEFAULT '',
-      files_affected    TEXT NOT NULL DEFAULT '[]',
-      acceptance_criteria TEXT NOT NULL DEFAULT '[]',
-      dependencies  TEXT NOT NULL DEFAULT '[]',
-      prompt_ref    TEXT NOT NULL DEFAULT '',
-      notes         TEXT NOT NULL DEFAULT '',
-      priority      INTEGER NOT NULL DEFAULT 0,
-      deleted       INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    CREATE INDEX IF NOT EXISTS idx_plans_status ON plans(updated_at);
-
+    -- conduit.plans removed 2026-08-07: empty legacy table, no dependents
+    -- (runtime reads nebula.plans, the legacy-compat view over
+    -- nebula.implementation_plans_history). Dropped from DDL so it stays gone.
     -- Schema version tracking for formal migrations
     CREATE TABLE IF NOT EXISTS schema_version (
       version     INTEGER PRIMARY KEY,
@@ -780,14 +764,40 @@ const migrations: Migration[] = [
     version: 3,
     description: "Add notes TEXT column to plans for free-form annotation",
     up: async (exec) => {
-      await exec(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT ''`);
+      // Guard: conduit.plans no longer exists on fresh schemas (removed
+      // 2026-08-07). Only legacy DBs that still carry the table get the column.
+      await exec(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = current_schema()
+            AND table_name = 'plans'
+          ) THEN
+            ALTER TABLE plans ADD COLUMN IF NOT EXISTS notes TEXT NOT NULL DEFAULT '';
+          END IF;
+        END $$;
+      `);
     },
   },
   {
     version: 4,
     description: "Add priority INTEGER column to plans for ordering importance",
     up: async (exec) => {
-      await exec(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0`);
+      // Guard: conduit.plans no longer exists on fresh schemas (removed
+      // 2026-08-07). Only legacy DBs that still carry the table get the column.
+      await exec(`
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = current_schema()
+            AND table_name = 'plans'
+          ) THEN
+            ALTER TABLE plans ADD COLUMN IF NOT EXISTS priority INTEGER NOT NULL DEFAULT 0;
+          END IF;
+        END $$;
+      `);
     },
   },
   {
@@ -943,9 +953,24 @@ const migrations: Migration[] = [
       // The existing vision.work_requests was created as a VIEW during the
       // manual schema split (pointing at the old conduit.work_requests which
       // was later dropped). Replace it with a proper BASE TABLE.
-      await exec(`DROP VIEW IF EXISTS ${VISION_SCHEMA}.work_requests CASCADE`);
+      // NOTE: on fresh DBs createSchema already creates this as a BASE TABLE,
+      // so the DROP is relkind-guarded (only a leftover VIEW is dropped) and
+      // the CREATE is IF NOT EXISTS. The INDEX still must be created here —
+      // createSchema deliberately defers it to v12/v13 (see comment above).
       await exec(`
-        CREATE TABLE ${VISION_SCHEMA}.work_requests (
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = '${VISION_SCHEMA}' AND c.relname = 'work_requests'
+            AND c.relkind = 'v'
+          ) THEN
+            EXECUTE 'DROP VIEW ${VISION_SCHEMA}.work_requests CASCADE';
+          END IF;
+        END $$;
+      `);
+      await exec(`
+        CREATE TABLE IF NOT EXISTS ${VISION_SCHEMA}.work_requests (
           id              BIGSERIAL PRIMARY KEY,
           wr_id           TEXT UNIQUE,
           dco_json        TEXT NOT NULL DEFAULT '{}',
@@ -2549,7 +2574,7 @@ const migrations: Migration[] = [
             p.id AS source_plan_id,
             MIN(r.created_at) AS created_at,
             MAX(r.created_at) AS updated_at
-        FROM conduit.plans p
+        FROM nebula.plans p
         JOIN vision.receipts r ON r.plan_id = p.id
         WHERE NOT EXISTS (
             SELECT 1 FROM execution.requests er
