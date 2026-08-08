@@ -186,27 +186,23 @@ semanticsRouter.get("/canonical_asset/:id", async (req, res) => {
       ),
     ]);
 
-    // 5. Cross-schema external IDs — run separately so a nebula schema
-    //    outage doesn't 500 the entire envelope. Graceful degrade to [].
+    // 5. Cross-schema external IDs — V076 migration: replaced
+    //    system_external_ids junction with asset_relation.
+    //    Returns nebula systems that own this asset.
     let extRows: any[] = [];
     try {
       const { rows } = await db.query(
-        `SELECT sei.id, sei.source_schema AS "sourceSchema",
-                sei.source_table AS "sourceTable", sei.source_id AS "sourceId",
-                sei.match_confidence AS "matchConfidence",
-                sei.match_method AS "matchMethod",
-                sei.role_in_system AS "roleInSystem", sei.notes,
+        `SELECT ar.id, ar.relation_type AS "relationType",
+                ar.effective_at AS "effectiveAt",
                 json_build_object(
                   'id', ns.id, 'name', ns.name,
                   'description', ns.description
                 ) AS "nebulaSystem"
-         FROM nebula.system_external_ids sei
-         JOIN nebula.systems ns ON ns.id = sei.system_id
-         WHERE sei.source_schema = 'semantics'
-           AND sei.source_table = 'canonical_asset'
-           AND sei.source_id = $1
-           AND sei.recorded_until_dt = '9999-12-31 23:59:59+00'
-         ORDER BY sei.match_confidence DESC`,
+         FROM semantics.asset_relation ar
+         JOIN nebula.systems ns ON ns.asset_id = ar.from_asset_id
+         WHERE ar.to_asset_id = $1
+           AND ar.expired_at IS NULL
+         ORDER BY ar.effective_at DESC`,
         [asset.id],
       );
       extRows = rows;
@@ -680,6 +676,8 @@ semanticsRouter.get("/canonical_asset/:id/relations", async (req, res) => {
 });
 
 // GET /api/canonical_asset/:id/external-ids — cross-schema bridge
+// V076 migration: queries asset_relation instead of the deprecated
+// system_external_ids junction.
 semanticsRouter.get("/canonical_asset/:id/external-ids", async (req, res) => {
   try {
     const db = getDb();
@@ -695,22 +693,17 @@ semanticsRouter.get("/canonical_asset/:id/external-ids", async (req, res) => {
     let externalIds: any[] = [];
     try {
       const { rows } = await db.query(
-        `SELECT sei.id, sei.source_schema AS "sourceSchema",
-                sei.source_table AS "sourceTable", sei.source_id AS "sourceId",
-                sei.match_confidence AS "matchConfidence",
-                sei.match_method AS "matchMethod",
-                sei.role_in_system AS "roleInSystem", sei.notes,
+        `SELECT ar.id, ar.relation_type AS "relationType",
+                ar.effective_at AS "effectiveAt",
                 json_build_object(
                   'id', ns.id, 'name', ns.name,
                   'description', ns.description
                 ) AS "nebulaSystem"
-         FROM nebula.system_external_ids sei
-         JOIN nebula.systems ns ON ns.id = sei.system_id
-         WHERE sei.source_schema = 'semantics'
-           AND sei.source_table = 'canonical_asset'
-           AND sei.source_id = $1
-           AND sei.recorded_until_dt = '9999-12-31 23:59:59+00'
-         ORDER BY sei.match_confidence DESC`,
+         FROM semantics.asset_relation ar
+         JOIN nebula.systems ns ON ns.asset_id = ar.from_asset_id
+         WHERE ar.to_asset_id = $1
+           AND ar.expired_at IS NULL
+         ORDER BY ar.effective_at DESC`,
         [asset.id],
       );
       externalIds = rows;
@@ -935,7 +928,7 @@ semanticsRouter.post("/asset_identity_claim/:id/resolve", async (req, res) => {
 });
 
 // POST /api/canonical_asset/:id/external-ids — create a cross-schema link
-// in nebula.system_external_ids_history pointing to this canonical_asset.
+// V076 migration: writes to asset_relation instead of system_external_ids.
 semanticsRouter.post("/canonical_asset/:id/external-ids", async (req, res) => {
   try {
     const db = getDb();
@@ -949,57 +942,43 @@ semanticsRouter.post("/canonical_asset/:id/external-ids", async (req, res) => {
       return res.status(400).json({ error: "missing_field", message: "nebulaSystemId is required" });
     }
 
-    // Verify the nebula system exists
+    // Verify the nebula system exists and has an asset_id
     const { rows: [sys] } = await db.query(
-      "SELECT id, name, description FROM nebula.systems WHERE id = $1",
+      "SELECT id, name, description, asset_id FROM nebula.systems WHERE id = $1",
       [body.nebulaSystemId],
     );
     if (!sys) {
       return res.status(404).json({ error: "not_found", message: `nebula system ${body.nebulaSystemId} not found` });
     }
+    if (!sys.asset_id) {
+      return res.status(400).json({ error: "no_asset", message: `nebula system ${body.nebulaSystemId} has no asset_id — run V075 first` });
+    }
 
-    // Auto-populate source fields from the canonical_asset context
-    const sourceSchema = body.sourceSchema || "semantics";
-    const sourceTable = body.sourceTable || "canonical_asset";
-    const sourceId = body.sourceId || asset.id;
-
-    // WHERE NOT EXISTS guard — duplicate detection
+    // Check for existing relation (idempotent guard)
     const { rows: [existing] } = await db.query(
-      `SELECT id FROM nebula.system_external_ids_history
-       WHERE system_id = $1 AND source_schema = $2 AND source_table = $3
-         AND source_id = $4 AND role_in_system IS NOT DISTINCT FROM $5
-         AND recorded_until_dt = '9999-12-31 23:59:59+00'`,
-      [sys.id, sourceSchema, sourceTable, sourceId, body.roleInSystem || null],
+      `SELECT id FROM semantics.asset_relation
+       WHERE from_asset_id = $1 AND to_asset_id = $2
+         AND relation_type = $3 AND expired_at IS NULL`,
+      [sys.asset_id, asset.id, body.relationType || "owns"],
     );
     if (existing) {
       return res.status(409).json({
         error: "duplicate_active_key",
-        message: "An active external ID link already exists for this (system, schema, table, source, role)",
+        message: "An active relation already exists between these assets",
         existingId: existing.id,
       });
     }
 
-    const { rows: [link] } = await db.query(
-      `INSERT INTO nebula.system_external_ids_history
-         (system_id, source_schema, source_table, source_id,
-          match_confidence, match_method, role_in_system, notes,
-          recorded_on_dt, recorded_until_dt)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now(), '9999-12-31 23:59:59+00')
-       RETURNING *`,
-      [
-        sys.id,
-        sourceSchema,
-        sourceTable,
-        sourceId,
-        body.matchConfidence ?? null,
-        body.matchMethod || "manual",
-        body.roleInSystem || null,
-        body.notes || null,
-      ],
+    const { rows: [relation] } = await db.query(
+      `SELECT * FROM semantics.add_asset_relation(
+         p_from_asset_id => $1, p_to_asset_id => $2,
+         p_relation_type => $3, p_decided_by => $4
+       )`,
+      [sys.asset_id, asset.id, body.relationType || "owns", body.decidedBy || null],
     );
 
     res.status(201).json({
-      ...link,
+      ...relation,
       nebulaSystem: { id: sys.id, name: sys.name, description: sys.description },
       canonicalAsset: { id: asset.id, canonicalAssetId: asset.canonical_asset_id, assetKind: asset.asset_kind },
     });
@@ -1024,13 +1003,11 @@ semanticsRouter.delete("/canonical_asset/:id/external-ids/:eid", async (req, res
     }
 
     const { rows: [result] } = await db.query(
-      `UPDATE nebula.system_external_ids_history
-       SET recorded_until_dt = now()
+      `UPDATE semantics.asset_relation
+       SET expired_at = now()
        WHERE id = $1
-         AND source_schema = 'semantics'
-         AND source_table = 'canonical_asset'
-         AND source_id = $2
-         AND recorded_until_dt = '9999-12-31 23:59:59+00'
+         AND to_asset_id = $2
+         AND expired_at IS NULL
        RETURNING id`,
       [req.params.eid, asset.id],
     );
@@ -1038,7 +1015,7 @@ semanticsRouter.delete("/canonical_asset/:id/external-ids/:eid", async (req, res
     if (!result) {
       return res.status(404).json({
         error: "not_found",
-        message: `External ID link ${req.params.eid} not found or already expired for this asset`,
+        message: `Relation ${req.params.eid} not found or already expired for this asset`,
       });
     }
 
