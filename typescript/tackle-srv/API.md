@@ -5,7 +5,7 @@
 
 Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access, failure recovery, tasks, and logs.
 
-**66 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
+**73 endpoints** — inventory generated from source route registrations (`nexus/tools/api-docs/`).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -54,6 +54,13 @@ Tackle role memory and orchestration: AI config, sessions, roles, scheduler, mem
 | GET | `/memory/procedures/:role` |  |
 | POST | `/memory/refresh` |  |
 | GET | `/memory/role-updates` |  |
+| GET | `/projections` | Routes GET /projections — list all projection configs |
+| POST | `/projections` | POST /projections — create new projection config |
+| GET | `/projections/:id` | GET /projections/:id — get single projection config |
+| PUT | `/projections/:id` | PUT /projections/:id — update projection config |
+| POST | `/projections/:id/render` | POST /projections/:id/render — render a single projection |
+| GET | `/projections/drift` | GET /projections/drift — compare on-disk sha vs last_sha256 for all enabled projections |
+| POST | `/projections/render-all` | POST /projections/render-all — render all enabled projections |
 | GET | `/prompts` |  |
 | POST | `/prompts` |  |
 | GET | `/prompts/:role` | GET /prompts/:role — list prompts for a role (wind-ui compat) |

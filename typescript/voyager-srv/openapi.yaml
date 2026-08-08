@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: voyager-srv — Filesystem / Entity Voyager API
-  version: 1.0.c0f9b354
+  version: 1.0.508b8b20
   description: 'Voyager over filesystems and entities: scan epochs, file/directory observations, topology signals and edge
     hints, identity candidates, entities, spans, requirements, and stats.
 
@@ -13,9 +13,7 @@ servers:
 tags:
 - name: entities
 - name: health
-- name: identity
 - name: observations
-- name: requirements
 - name: scan-epochs
 - name: spans
 - name: stats
@@ -51,7 +49,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-      summary: ENTITIES GET /api/entities — list entities
+      summary: agent lives above Voyager in the semantics layer. See legacy/identity.py and legacy/losm.py for aspirational
+        code. ENTITIES GET /api/entitie
   /api/entities/{id}:
     get:
       tags:
@@ -157,37 +156,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/identity/candidates:
-    get:
-      tags:
-      - identity
-      operationId: get_identity_candidates
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      summary: IDENTITY CANDIDATES GET /api/identity/candidates — list identity candidates
   /api/observations/directories:
     get:
       tags:
@@ -325,37 +293,6 @@ paths:
         required: true
         schema:
           type: string
-  /api/requirements:
-    get:
-      tags:
-      - requirements
-      operationId: get_requirements
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JsonBody'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '404':
-          description: Not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          description: Server error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-      summary: REQUIREMENT CANDIDATES GET /api/requirements — list requirement candidates (LOSM output)
   /api/scan-epochs:
     get:
       tags:

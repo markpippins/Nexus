@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: tackle-srv — Tackle Role Memory + Agent Orchestration
-  version: 1.0.7a195426
+  version: 1.0.9905f9bc
   description: 'Tackle role memory and orchestration: AI config, sessions, roles, scheduler, memory, prompts, tool access,
     failure recovery, tasks, and logs.
 
@@ -15,6 +15,7 @@ tags:
 - name: health
 - name: logs
 - name: memory
+- name: projections
 - name: prompts
 - name: roles
 - name: scheduler
@@ -1471,6 +1472,239 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /projections:
+    get:
+      tags:
+      - projections
+      operationId: get_projections
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: Routes GET /projections — list all projection configs
+    post:
+      tags:
+      - projections
+      operationId: post_projections
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: POST /projections — create new projection config
+  /projections/{id}:
+    get:
+      tags:
+      - projections
+      operationId: get_projections_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /projections/:id — get single projection config
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags:
+      - projections
+      operationId: put_projections_id
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: PUT /projections/:id — update projection config
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /projections/{id}/render:
+    post:
+      tags:
+      - projections
+      operationId: post_projections_id_render
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: POST /projections/:id/render — render a single projection
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /projections/drift:
+    get:
+      tags:
+      - projections
+      operationId: get_projections_drift
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: GET /projections/drift — compare on-disk sha vs last_sha256 for all enabled projections
+  /projections/render-all:
+    post:
+      tags:
+      - projections
+      operationId: post_projections_render_all
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JsonBody'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      summary: POST /projections/render-all — render all enabled projections
   /prompts:
     get:
       tags:
