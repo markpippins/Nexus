@@ -23,7 +23,7 @@
 | `npx tsx --watch src/index.ts` | Start with live reload |
 | `curl http://localhost:3100/health` | Health check + orphan scan |
 | `curl http://localhost:3100/state` | Pipeline state JSON |
-| `curl -X POST -d '{"name":"create_proposed_plan","arguments":{"title":"Test"}}' http://localhost:3100/tools/call` | Create a proposed plan |
+| `POST /` JSON-RPC tools/call` — create_plan/create_proposed_plan REMOVED (TOOL_NOT_FOUND); use nebula-mcp `nebula_create_plan` | Plan creation |
 
 ## Troubleshooting
 

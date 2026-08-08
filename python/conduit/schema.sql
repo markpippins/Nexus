@@ -187,28 +187,8 @@ CREATE TABLE IF NOT EXISTS models (
     updated_at       TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS role_config (
-    id            TEXT PRIMARY KEY,
-    role          TEXT NOT NULL UNIQUE CHECK(role IN (
-                     'planner','builder','reviewer','critic'
-                   )),
-    provider_id   TEXT NOT NULL REFERENCES providers(id),
-    harness_id    TEXT NOT NULL REFERENCES harnesses(id),
-    model_id      TEXT NOT NULL REFERENCES models(id),
-    extra_params  TEXT NOT NULL DEFAULT '{}',
-    created_at    TEXT NOT NULL,
-    updated_at    TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS role_models (
-    id          TEXT PRIMARY KEY,
-    role        TEXT NOT NULL REFERENCES role_config(role) ON DELETE CASCADE,
-    model_id    TEXT NOT NULL REFERENCES models(id),
-    priority    INTEGER NOT NULL DEFAULT 0,
-    provider_id TEXT REFERENCES providers(id),
-    harness_id  TEXT REFERENCES harnesses(id),
-    UNIQUE(role, model_id)
-);
+-- NOTE: role_config / role_models were removed (2026-08-07) — replaced by
+-- config_bundle (see conduit-mcp src/db.ts v7/v8 no-op migrations).
 
 SET search_path TO conduit;
 
