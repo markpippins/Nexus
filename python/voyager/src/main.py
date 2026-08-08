@@ -4,13 +4,13 @@ import os
 import argparse
 import sys
 
-# Add the current directory to sys.path so we can import fs_crawler_v2
+# Ensure the current directory is on sys.path so local modules are importable
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from fs_crawler_v2.cache import DedupeCache
-from fs_crawler_v2.publisher import Publisher
-from fs_crawler_v2.persistence import PersistenceLayer
-from fs_crawler_v2.scanner import Scanner
+from cache import DedupeCache
+from publisher import Publisher
+from persistence import PersistenceLayer
+from scanner import Scanner
 
 
 def _env_int(name: str, default: int) -> int:
